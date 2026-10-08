@@ -80,6 +80,7 @@ export class EpdfForm extends pluginService({
     'delete',
     'removeWidget',
     'deleteWidget',
+    'reorderCalculations',
     'repair',
     'canRead',
     'canFill',

@@ -753,6 +753,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'forms.widgetDeleted':
       case 'forms.widgetRestored':
       case 'forms.widgetsReordered':
+      case 'forms.calculationsReordered':
       case 'forms.effectsApplied':
         // Form writes move the form's pins: the affected pages are the
         // ones whose widgets changed.

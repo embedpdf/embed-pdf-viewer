@@ -21,9 +21,10 @@ import type {
   FormWidgetDeleteResult,
   FormWidgetLinkResult,
   FormWidgetsReorderResult,
+  FormCalculationsReorderResult,
   FormWidgetUpdateResult,
 } from '../mutation/FormMutationResults';
-import type { AnnotationPosition } from '../mutation/ListPosition';
+import type { AnnotationPosition, FieldPosition } from '../mutation/ListPosition';
 import type {
   FormFieldCreateOptions,
   FormWidgetAddOptions,
@@ -259,6 +260,21 @@ export interface DocumentFormsService {
     position: AnnotationPosition,
     options?: WriteOptions,
   ): AbortablePromise<FormWidgetsReorderResult>;
+
+  /**
+   * Change the form's calculation order (`/AcroForm /CO`), the order the
+   * fields' calculate scripts run in: the fields go together, in the order
+   * given, to `position`, next to a neighbour or at `'start'` / `'end'`.
+   * Every field named must be in the order already: a `calculate` script
+   * puts a field in it (`create`, `update`). `doc.forms.list()` reads the
+   * order as `calculationOrder`. Gated by `doc.forms.modify`. Emits
+   * `forms.calculationsReordered`.
+   */
+  reorderCalculations(
+    fields: FormFieldRef[],
+    position: FieldPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<FormCalculationsReorderResult>;
 
   /**
    * Make the engine's read-time reconciliation durable in the document

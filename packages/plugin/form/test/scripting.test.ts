@@ -52,6 +52,12 @@ const text = (
   noExport: false,
   alternateName: null,
   mappingName: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'scalar', value },
   defaultValueEntry: { kind: 'scalar', value: '' },
   value,
@@ -74,6 +80,12 @@ const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
   noExport: false,
   alternateName: null,
   mappingName: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
@@ -194,6 +206,27 @@ describe('form scripting transaction', () => {
         { kind: 'setAppearanceText', ref: ref(3), text: '$6' },
       ],
     ]);
+  });
+
+  it('runs a calculate script added through update from the next fill on', async () => {
+    const snapshot: FormSnapshot = {
+      formKind: 'acroform',
+      needsAppearances: false,
+      widgets: [],
+      fields: [text(2, 'amount', '1'), text(3, 'total', '')],
+      calculationOrder: [],
+    };
+    const fx = harness(snapshot);
+    await fx.controller.commit(ref(2), { value: '3' });
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '3' } }]);
+
+    // What the update's event brings the form's mirror: the script, and the order it joined.
+    snapshot.fields[1] = text(3, 'total', '', {
+      calculate: action(`event.value = Number(getField('amount').value) * 2;`),
+    });
+    snapshot.calculationOrder = [ref(3)];
+    await fx.controller.commit(ref(2), { value: '4' });
+    expect(fx.batches[1]).toContainEqual({ kind: 'setValue', ref: ref(3), value: { value: '8' } });
   });
 
   it('surfaces validation rejection without sending the proposed value', async () => {

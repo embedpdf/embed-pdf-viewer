@@ -41,8 +41,19 @@ export type {
   ActionReadBudget,
   SubmitFormFlags,
   SubmitFormPayload,
+  PdfActionWrite,
+  FieldScriptWrite,
+  FieldScriptEvent,
+  FieldActionsPatch,
 } from './dto/PdfAction';
-export { decodeSubmitFormFlags } from './dto/PdfAction';
+export {
+  actionWriteOf,
+  decodeSubmitFormFlags,
+  fieldScriptOf,
+  isFieldScript,
+  needsScriptRight,
+  writesScripts,
+} from './dto/PdfAction';
 
 // Canonical PDF-document geometry vocabulary (y-up, edges, browser-free).
 export type {
@@ -663,6 +674,7 @@ export type {
   FormWidgetRestoreResult,
   FormWidgetRows,
   FormWidgetsReorderResult,
+  FormCalculationsReorderResult,
   FormWidgetUpdateResult,
 } from './mutation/FormMutationResults';
 // Search: contract types + the pure match/anchor stages. The matcher and
@@ -711,7 +723,12 @@ export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 export type { PageReorderInput } from './mutation/PageReorderInput';
 export type { PageReorderResult } from './mutation/PageReorderResult';
 export { anchorOf, positionIndex, reorderPart, reorderedList } from './mutation/ListPosition';
-export type { AnnotationPosition, ListPosition, PagePosition } from './mutation/ListPosition';
+export type {
+  AnnotationPosition,
+  FieldPosition,
+  ListPosition,
+  PagePosition,
+} from './mutation/ListPosition';
 export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
 export type { PageNameResult } from './mutation/PageNameResult';
 export type {

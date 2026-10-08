@@ -30,6 +30,8 @@ import {
   type FormWidgetDeleteResult,
   type FormWidgetUpdateResult,
   type FormWidgetsReorderResult,
+  type FormCalculationsReorderResult,
+  type FieldPosition,
   type WidgetPatch,
   encodeAnnotKey,
   type AnnotationPosition,
@@ -56,6 +58,7 @@ import {
   FormWidgetDeleteResultSchema,
   FormWidgetUpdateResultSchema,
   FormWidgetsReorderResultSchema,
+  FormCalculationsReorderResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -485,6 +488,30 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
+  reorderCalculations(
+    fields: FormFieldRef[],
+    position: FieldPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<FormCalculationsReorderResult> {
+    const rejected = this.rejectIfClosed<FormCalculationsReorderResult>();
+    if (rejected) return rejected;
+    return AbortablePromise.run<FormCalculationsReorderResult>(async (signal) => {
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerFormCalculationsReorder(this.docId, this.layerName),
+            { fields, position },
+            (raw) => FormCalculationsReorderResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.calculationsReordered');
+      });
+    });
+  }
+
   reorderWidgets(
     widgets: AnnotationRef[],
     position: AnnotationPosition,
@@ -565,7 +592,8 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       | 'forms.widgetRemoved'
       | 'forms.widgetUpdated'
       | 'forms.widgetDeleted'
-      | 'forms.widgetsReordered',
+      | 'forms.widgetsReordered'
+      | 'forms.calculationsReordered',
   ): T {
     this.manifest.apply(result.meta, ['forms']);
     this.publisher.publishWrite(opId, { type, ...result } as unknown as DocumentEventInit);

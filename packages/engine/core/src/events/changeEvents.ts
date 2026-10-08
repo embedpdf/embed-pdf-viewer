@@ -85,6 +85,10 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
       const { type: _type, ...result } = item;
       return [{ type: 'forms.widgetsReordered', ...result }];
     }
+    case 'forms.reorderCalculations': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'forms.calculationsReordered', ...result }];
+    }
     case 'forms.updateWidget': {
       const { type: _type, skipped: _skipped, ...result } = item;
       return [{ type: 'forms.widgetUpdated', ...result }];

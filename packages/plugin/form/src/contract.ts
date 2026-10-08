@@ -16,6 +16,7 @@ import type {
 import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@embedpdf/core-acrojs';
 import type {
   AnnotationRef,
+  FieldPosition,
   FormDataExport,
   FormDataFormat,
   FormEffectsResult,
@@ -366,6 +367,18 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     widget: AnnotationRef,
     options?: OperationOptions,
   ): Promise<{ readonly field: FormFieldDTO | null }>;
+  /**
+   * Change the order the fields' calculate scripts run in: the fields go
+   * together, in the order given, to `position`, next to a neighbour or at
+   * `'start'` / `'end'`. A field is in the order while it has a calculate
+   * script. Resolves the whole new order. Rejects `permission-denied`
+   * without `doc.forms.modify`, `not-found` for a field not in the order.
+   */
+  reorderCalculations(
+    fields: FormFieldRef[],
+    position: FieldPosition,
+    options?: OperationOptions,
+  ): Promise<{ readonly calculationOrder: readonly FormFieldRef[] }>;
   /**
    * Fix a form other PDF apps read differently, such as fields missing from
    * the form's list, and resolve what was fixed. Fires `onResynced`. Rejects

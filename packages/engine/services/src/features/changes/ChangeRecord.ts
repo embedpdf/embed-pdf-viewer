@@ -37,6 +37,7 @@ export type ReverseStep =
   | FieldRestoreStep
   | WidgetRestoreStep
   | WidgetDeleteStep
+  | CalculationOrderStep
   | MetadataRevertStep;
 
 /**
@@ -138,6 +139,20 @@ export interface AnnotationReorderStep {
   readonly before: readonly AnnotationRef[];
   /** The family's order it left. */
   readonly after: readonly AnnotationRef[];
+}
+
+/**
+ * Takes back what a change did to the form's calculation order, by field
+ * object number, where nobody changed it since (see `orderBack`): a field it
+ * added leaves, one it took out comes back, one it moved goes back beside
+ * its old neighbour.
+ */
+export interface CalculationOrderStep {
+  readonly kind: 'calculations.restore';
+  /** The order before the change. */
+  readonly before: readonly number[];
+  /** The order the change left. */
+  readonly after: readonly number[];
 }
 
 /**

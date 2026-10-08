@@ -155,18 +155,27 @@ export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
 export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldIndex | MirrorReload {
   switch (event.type) {
     case 'forms.valueSet':
-    case 'forms.updated':
     case 'forms.widgetAdded':
     case 'forms.widgetRemoved':
     case 'forms.restored':
       return upsertWidgets(upsertFields(index, [event.field]), event.widgets);
+    case 'forms.updated':
+      return withCalculationOrder(
+        upsertWidgets(upsertFields(index, [event.field]), event.widgets),
+        event.calculationOrder,
+      );
     case 'forms.created': {
       // The first field of a document without a form creates its /AcroForm.
       const created = upsertWidgets(upsertFields(index, [event.field]), event.widgets);
-      return created.snapshot?.formKind === 'none'
-        ? indexFields({ ...created.snapshot, formKind: 'acroform' })
-        : created;
+      return withCalculationOrder(
+        created.snapshot?.formKind === 'none'
+          ? indexFields({ ...created.snapshot, formKind: 'acroform' })
+          : created,
+        event.calculationOrder,
+      );
     }
+    case 'forms.calculationsReordered':
+      return withCalculationOrder(index, event.calculationOrder);
     case 'forms.widgetDeleted': {
       const gone = removeWidgets(index, event.meta.changedWidgets);
       return event.field ? upsertFields(gone, [event.field]) : gone;
@@ -182,7 +191,10 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
       return reorderWidgetRows(index, event.page, event.order);
     case 'forms.deleted':
       return event.deleted
-        ? removeWidgets(removeField(index, event.deleted), event.meta.changedWidgets)
+        ? withCalculationOrder(
+            removeWidgets(removeField(index, event.deleted), event.meta.changedWidgets),
+            event.calculationOrder,
+          )
         : reload();
     case 'forms.effectsApplied':
       return upsertWidgets(
@@ -206,6 +218,12 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
     default:
       return index;
   }
+}
+
+/** The index with the calculation order a write answered, when the write changed it. */
+function withCalculationOrder(index: FieldIndex, order: FormFieldRef[] | undefined): FieldIndex {
+  if (!order || !index.snapshot) return index;
+  return indexFields({ ...index.snapshot, calculationOrder: order });
 }
 
 export const fieldByKey = (index: FieldIndex, key: FieldKey): FormFieldDTO | null => {

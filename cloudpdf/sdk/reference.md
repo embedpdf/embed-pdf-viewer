@@ -2349,6 +2349,63 @@ await client.doc.forms.list({
 </dl>
 </details>
 
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderCalculations</a>({ ...params }) -> CloudPDF.DocFormsReorderCalculations200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.forms.reorderCalculations({
+    docId: "docId",
+    layerName: "layerName",
+    fields: [{
+            kind: "objectNumber",
+            objectNumber: 1
+        }],
+    position: "start"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocFormsReorderCalculationsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FormsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">exportData</a>({ ...params }) -> core.BinaryResponse</code></summary>
 <dl>
 <dd>

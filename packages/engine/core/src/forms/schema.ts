@@ -14,7 +14,7 @@ import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormDataFormat, FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
-import { PdfFieldActionsSchema } from '../dto/PdfAction.schema';
+import { FieldActionsPatchSchema, PdfFieldActionsSchema } from '../dto/PdfAction.schema';
 
 export { FormFieldRefSchema };
 
@@ -182,6 +182,7 @@ const FormFieldDraftBaseShape = {
   noExport: z.boolean().optional(),
   alternateName: z.string().optional(),
   mappingName: z.string().optional(),
+  actions: FieldActionsPatchSchema.optional(),
   widgets: z.array(WidgetPlacementSchema).optional(),
 };
 
@@ -235,6 +236,7 @@ const FormFieldPatchBaseShape = {
   noExport: z.boolean().optional(),
   alternateName: z.string().nullable().optional(),
   mappingName: z.string().nullable().optional(),
+  actions: FieldActionsPatchSchema.optional(),
 };
 
 /**

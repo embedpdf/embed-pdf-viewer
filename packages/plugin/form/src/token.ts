@@ -22,6 +22,7 @@ export const FormToken = createCapabilityToken<FormCapability>('form', {
     delete: true,
     removeWidget: true,
     deleteWidget: true,
+    reorderCalculations: true,
     repair: true,
   },
 });

@@ -283,7 +283,8 @@ doesn't recalculate a total, format a date or an amount, or run a validation scr
 those scripts while a user types.
 
 A field's scripts are in `field.actions` (`keystroke`, `format`, `validate` and `calculate`), and
-the list's `calculationOrder` holds the fields whose totals are calculated, in order.
+the list's `calculationOrder` holds the fields whose totals are calculated, in order. To write them,
+see [Scripts and calculations](/docs/engine/forms/authoring#scripts-and-calculations).
 
 The viewer's form plugin runs these scripts and writes their results in one call,
 `doc.forms.applyEffects(effects)`: an ordered list of changes, each a `setValue`, a `reset`, a

@@ -6,7 +6,11 @@ import {
   formResetFacts,
   opIdOf,
   wirePack,
+  writesScripts,
   type AnnotationActor,
+  type FieldActionsPatch,
+  type FieldPosition,
+  type FormCalculationsReorderResult,
   type DocumentFormsService,
   type FormDataExport,
   type FormDataFormat,
@@ -224,7 +228,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     draft: FormFieldDraft,
     options: FormFieldCreateOptions = {},
   ): AbortablePromise<FormFieldCreateResult> {
-    const write = this.beginWrite('doc.forms.modify', options);
+    const write = this.beginDesign(options, draft.actions);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -276,7 +280,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     patch: FormFieldPatch,
     options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult> {
-    const write = this.beginWrite('doc.forms.modify', options);
+    const write = this.beginDesign(options, patch.actions);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -444,6 +448,35 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
+  reorderCalculations(
+    fields: FormFieldRef[],
+    position: FieldPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<FormCalculationsReorderResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'forms.reorderCalculations',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          fields,
+          position,
+        }),
+    });
+    return this.await(submission, 'forms.reorderCalculations', (payload) => {
+      this.publisher.publishWrite(write.opId, {
+        type: 'forms.calculationsReordered',
+        ...payload.result,
+      });
+      return payload.result;
+    });
+  }
+
   repair(options?: FormRepairOptions): AbortablePromise<FormRepairResult> {
     const write = this.beginWrite('doc.forms.modify', options);
     if (write.rejected) return write.rejected;
@@ -469,6 +502,17 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     return actor ? { actor } : {};
   }
 
+  /** A design write: `doc.forms.modify`, and `doc.forms.script` too when it writes scripts. */
+  private beginDesign(
+    options: WriteOptions | undefined,
+    actions: FieldActionsPatch | undefined,
+  ): ReturnType<LocalDocumentFormsService['beginWrite']> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected || !writesScripts(actions)) return write;
+    const rejected = this.gate('doc.forms.script');
+    return rejected ? { rejected } : write;
+  }
+
   private beginWrite(
     cap: 'doc.forms.fill' | 'doc.forms.modify',
     options: WriteOptions | undefined,
@@ -483,7 +527,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
   }
 
   private gate(
-    cap: 'doc.forms.read' | 'doc.forms.fill' | 'doc.forms.modify',
+    cap: 'doc.forms.read' | 'doc.forms.fill' | 'doc.forms.modify' | 'doc.forms.script',
   ): AbortablePromise<never> | null {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(

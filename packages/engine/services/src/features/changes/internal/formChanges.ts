@@ -4,7 +4,11 @@ import {
   deserializeError,
   EngineError,
   EngineErrorCode,
+  fieldScriptOf,
+  writesScripts,
   type ChangeItem,
+  type FieldActionsPatch,
+  type FieldScriptEvent,
   type ChangeItemType,
   type ChangeOp,
   type FormEffect,
@@ -43,12 +47,20 @@ import { applyReorder, planReorder, readPageStack } from '../../annotations/inte
 import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
 import { FormMutator } from '../../forms/FormMutator';
 import { FormsEffectsApplier } from '../../forms/FormsEffectsApplier';
+import {
+  orderBack,
+  readCalculationOrder,
+  sameOrder,
+  writeCalculationOrder,
+  type OrderChange,
+} from '../../forms/internal/calculationOrder';
 import { acquireFormModel } from '../../forms/internal/formModelCache';
 import { formMutationMeta } from '../../forms/internal/formMutationMeta';
 import { readFieldAt } from '../../forms/internal/readFormSnapshot';
 import { resolveFieldRef } from '../../forms/internal/resolveFieldRef';
 import { withWidgetRows } from '../../forms/internal/widgetRows';
 import type {
+  CalculationOrderStep,
   CapturedObject,
   FieldRemoveStep,
   FieldRestoreStep,
@@ -149,7 +161,8 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
 /** `forms.create`; its reverse deletes the field, when nobody changed it since. */
 export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
-  const { field } = new FormMutator(ctx.runtime, ctx.session).createField(
+  if (writesScripts(op.draft.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
+  const { field, calculationOrder } = new FormMutator(ctx.runtime, ctx.session).createField(
     op.draft,
     ctx.signal,
     ctx.authority.identity,
@@ -158,8 +171,9 @@ export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
       ...(op.widgetObjectNumbers ? { widgetObjectNumbers: op.widgetObjectNumbers } : {}),
     },
   );
+  // Its undo deletes the field, which takes it out of the calculation order too.
   return {
-    item: { type: 'forms.create', ...fieldResult(ctx, field) },
+    item: { type: 'forms.create', ...fieldResult(ctx, field), ...orderResult(calculationOrder) },
     reverse: [{ kind: 'field.remove', objectNumber: numberOf(field.ref), left: field }],
   };
 }
@@ -171,6 +185,7 @@ export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
  */
 export function updateField(ctx: ChangeContext, op: Op<'forms.update'>, opIndex: number): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
+  if (writesScripts(op.patch.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const before = readField(ctx, op.field);
   assertExpected(opIndex, propertiesOf(before.field), op.expect);
   return writeUpdate(ctx, before, op.patch);
@@ -358,6 +373,57 @@ export function updateWidget(
  * also their tab order where the page's `/Tabs` follows it. Its reverse puts
  * them back beside their old neighbours.
  */
+/** `forms.reorderCalculations`; its reverse puts each field back beside its old neighbours. */
+export function reorderCalculations(ctx: ChangeContext, op: Op<'forms.reorderCalculations'>): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const { before, after, moved } = new FormMutator(ctx.runtime, ctx.session).reorderCalculations(
+    op.fields,
+    op.position,
+    ctx.signal,
+  );
+  return {
+    item: calculationsItem(ctx, after, moved),
+    reverse: [orderStep({ before, after })],
+  };
+}
+
+/**
+ * Takes back what a change did to the calculation order (see `orderBack`).
+ * Left alone when nothing of it is still as the change left it.
+ */
+export function restoreCalculationOrder(ctx: ChangeContext, step: CalculationOrderStep): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const now = readCalculationOrder(ctx.runtime, acquireFormModel(ctx.runtime, ctx.session));
+  const order = orderBack(
+    now,
+    step,
+    (objectNumber) => tryReadFieldByNumber(ctx, objectNumber) !== null,
+  );
+  if (sameOrder(now, order)) return leftAlone(ctx, 'forms.reorderCalculations');
+  writeCalculationOrder(ctx.runtime, ctx.session.requireDocPtr(), order);
+  ctx.session.invalidateDerived();
+  const moved = [...new Set([...now, ...order])].filter(
+    (objectNumber) => now.indexOf(objectNumber) !== order.indexOf(objectNumber),
+  );
+  return {
+    item: calculationsItem(ctx, order, moved),
+    reverse: [orderStep({ before: now, after: order })],
+  };
+}
+
+/** A calculation-order change's item: the whole new order, and the fields that moved. */
+function calculationsItem(
+  ctx: ChangeContext,
+  order: readonly number[],
+  moved: readonly number[],
+): ChangeItem<PdfCoordinates> {
+  return {
+    type: 'forms.reorderCalculations',
+    calculationOrder: order.map(fieldRefOf),
+    meta: formMutationMeta(ctx.session.writeStamp(), moved.map(fieldRefOf), []),
+  };
+}
+
 export function reorderWidgets(ctx: ChangeContext, op: Op<'forms.reorderWidgets'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   const stack = readPageStack(ctx.runtime, ctx.session, op.page);
@@ -624,11 +690,20 @@ function writeEffect(
  */
 function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatch): Done {
   const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: before.objectNumber };
-  return recordRevert(
+  let order = null as OrderChange | null;
+  const done = recordRevert(
     ctx,
     before,
     'forms.update',
-    () => new FormMutator(ctx.runtime, ctx.session).updateField(ref, patch, ctx.signal),
+    () => {
+      const updated = new FormMutator(ctx.runtime, ctx.session).updateField(
+        ref,
+        patch,
+        ctx.signal,
+      );
+      order = updated.calculationOrder;
+      return updated;
+    },
     (after) => {
       const was = propertiesOf(before.field) as Record<string, unknown>;
       const is = propertiesOf(after) as Record<string, unknown>;
@@ -643,6 +718,33 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
       };
     },
   );
+  return withOrderChange(ctx, done, order);
+}
+
+/**
+ * `done` with what its write did to the calculation order, when it changed
+ * it: the new order on its item, and the step that takes the change back
+ * after the others.
+ */
+function withOrderChange(ctx: ChangeContext, done: Done, order: OrderChange | null): Done {
+  if (!order || isSkippedItem(done.item)) return done;
+  return {
+    item: { ...done.item, ...orderResult(order) } as ChangeItem<PdfCoordinates>,
+    reverse: [...done.reverse, orderStep(order)],
+  };
+}
+
+/** The new calculation order a write's result carries, when the write changed it. */
+function orderResult(order: OrderChange | null): { calculationOrder?: FormFieldRef[] } {
+  return order ? { calculationOrder: order.after.map(fieldRefOf) } : {};
+}
+
+function orderStep({ before, after }: OrderChange): CalculationOrderStep {
+  return { kind: 'calculations.restore', before, after };
+}
+
+function fieldRefOf(objectNumber: number): FormFieldRef {
+  return { kind: 'objectNumber', objectNumber };
 }
 
 /**
@@ -671,25 +773,30 @@ function recordRevert(
 function writeDelete(ctx: ChangeContext, before: ReadField): Done {
   const capture = exportField(ctx.runtime, ctx.session.requireDocPtr(), before.objectNumber);
   const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: before.objectNumber };
-  const { deleted, removedWidgets } = new FormMutator(ctx.runtime, ctx.session).deleteField(
-    ref,
-    ctx.signal,
-  );
-  return {
-    item: {
-      type: 'forms.delete',
-      meta: formMutationMeta(ctx.session.writeStamp(), [deleted], removedWidgets),
-    },
-    reverse: [
-      {
-        kind: 'field.restore',
-        objectNumber: before.objectNumber,
-        name: before.field.name,
-        pages: before.field.widgets.flatMap((widget) => (widget.page ? [widget.page] : [])),
-        capture,
+  const { deleted, removedWidgets, calculationOrder } = new FormMutator(
+    ctx.runtime,
+    ctx.session,
+  ).deleteField(ref, ctx.signal);
+  // Its undo brings the field back first, then into the calculation order.
+  return withOrderChange(
+    ctx,
+    {
+      item: {
+        type: 'forms.delete',
+        meta: formMutationMeta(ctx.session.writeStamp(), [deleted], removedWidgets),
       },
-    ],
-  };
+      reverse: [
+        {
+          kind: 'field.restore',
+          objectNumber: before.objectNumber,
+          name: before.field.name,
+          pages: before.field.widgets.flatMap((widget) => (widget.page ? [widget.page] : [])),
+          capture,
+        },
+      ],
+    },
+    calculationOrder,
+  );
 }
 
 function revertStep(
@@ -818,6 +925,7 @@ function propertiesOf(field: FormFieldDTO<PdfCoordinates>): FormFieldPatch {
     noExport: field.noExport,
     alternateName: field.alternateName,
     mappingName: field.mappingName,
+    actions: scriptsOf(field),
   };
   const hasDefault = field.defaultValueEntry.kind !== 'none';
   const options = (list: readonly { label: string; value: string }[]) =>
@@ -855,6 +963,25 @@ function propertiesOf(field: FormFieldDTO<PdfCoordinates>): FormFieldPatch {
     default:
       return base;
   }
+}
+
+/**
+ * A field's scripts as a patch writes them: `null` for an event without
+ * one. An event whose actions a write can't make (not JavaScript all
+ * through) is left out, so putting the patch back never removes it.
+ */
+function scriptsOf(field: FormFieldDTO<PdfCoordinates>): FieldActionsPatch {
+  const scripts: FieldActionsPatch = {};
+  for (const event of ['keystroke', 'format', 'validate', 'calculate'] as FieldScriptEvent[]) {
+    const tree = field.actions?.[event];
+    if (!tree) {
+      scripts[event] = null;
+      continue;
+    }
+    const script = fieldScriptOf(tree);
+    if (script) scripts[event] = script;
+  }
+  return scripts;
 }
 
 function pick(values: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {

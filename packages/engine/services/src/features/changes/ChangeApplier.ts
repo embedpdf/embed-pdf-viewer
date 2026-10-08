@@ -31,6 +31,8 @@ import {
   reset,
   restoreField,
   restoreWidget,
+  reorderCalculations,
+  restoreCalculationOrder,
   revertForm,
   setAppearanceText,
   setDisplay,
@@ -160,6 +162,8 @@ function runOp(
       return updateWidget(ctx, op, at);
     case 'forms.reorderWidgets':
       return reorderWidgets(ctx, op);
+    case 'forms.reorderCalculations':
+      return reorderCalculations(ctx, op);
     case 'forms.setSignatureAppearance':
       return setSignatureAppearance(ctx, op);
     case 'metadata.update':
@@ -189,6 +193,8 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return restoreWidget(ctx, step);
     case 'widget.delete':
       return deleteRestoredWidget(ctx, step);
+    case 'calculations.restore':
+      return restoreCalculationOrder(ctx, step);
     case 'metadata.revert':
       return revertMetadata(ctx, step);
   }

@@ -63,6 +63,8 @@ const FILE_WIDGET = at(9);
 const NAME: FormFieldRef = { kind: 'fqn', name: 'name' };
 
 const BLUE = '#0000ff';
+/** A calculate script: a field with one is in the form's calculation order. */
+const CALCULATE = { type: 'javascript', script: 'event.value = 1;' } as const;
 const box = (x: number, y = 120): PageBox => ({ x, y, width: 40, height: 30 });
 
 export interface ChangeConformanceOptions {
@@ -140,13 +142,25 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
         draft: {
           family: 'text',
           name: 'email',
+          // A calculate script also puts it in the calculation order.
+          actions: { calculate: CALCULATE },
           widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 20, width: 140, height: 24 } }],
         },
       },
     ],
   },
   'forms.update': {
-    ops: () => [{ type: 'forms.update', field: NAME, patch: { required: true, name: 'fullName' } }],
+    ops: () => [
+      {
+        type: 'forms.update',
+        field: NAME,
+        patch: {
+          required: true,
+          name: 'fullName',
+          actions: { format: { type: 'javascript', script: 'event.value = "x";' } },
+        },
+      },
+    ],
   },
   'forms.delete': {
     ops: () => [{ type: 'forms.delete', field: NAME }],
@@ -192,6 +206,24 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       },
     ],
     ops: ([, , right]) => [{ type: 'forms.deleteWidget', widget: at(right!) }],
+  },
+  'forms.reorderCalculations': {
+    // Two calculated fields: the file's goes after the new one.
+    setup: ([field]) => [
+      { type: 'forms.update', field: NAME, patch: { actions: { calculate: CALCULATE } } },
+      {
+        type: 'forms.create',
+        draft: { family: 'text', name: 'total', actions: { calculate: CALCULATE } },
+        objectNumber: field,
+      },
+    ],
+    ops: ([field]) => [
+      {
+        type: 'forms.reorderCalculations',
+        fields: [NAME],
+        position: { after: { kind: 'objectNumber', objectNumber: field! } },
+      },
+    ],
   },
   'forms.reorderWidgets': {
     // The file's widget goes on top of two new ones.
@@ -316,6 +348,7 @@ export function runChangeConformance(
         annotations: [onPage.annotations, onEmptyPage.annotations],
         fields: form.fields,
         widgets: form.widgets,
+        calculationOrder: form.calculationOrder,
         metadata: { title: metadata.title, subject: metadata.subject },
         custom,
       };

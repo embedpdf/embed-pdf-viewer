@@ -127,6 +127,10 @@ export {
   type PermissionToken,
 } from './conformance/runPermissionConformance';
 export {
+  runFormScriptConformance,
+  type FormScriptConformanceOptions,
+} from './conformance/runFormScriptConformance';
+export {
   runFormAttributionConformance,
   type FormAttributionConformanceOptions,
 } from './conformance/runFormAttributionConformance';

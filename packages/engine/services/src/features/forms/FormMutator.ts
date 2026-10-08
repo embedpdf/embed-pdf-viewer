@@ -1,4 +1,7 @@
 import type {
+  FieldPosition,
+  FieldScriptWrite,
+  ListPosition,
   FormDataFormat,
   FormFieldDraft,
   FormFieldDTO,
@@ -16,7 +19,12 @@ import type {
   PdfCoordinates,
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, formWidget } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  formWidget,
+  reorderedList,
+} from '@embedpdf/engine-core/runtime';
 import type { AnnotationActor, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -38,7 +46,14 @@ import {
   readSignaturesFromModel,
   withSignatureModel,
 } from '../signature/internal/readSignatureModel';
+import {
+  readCalculationOrder,
+  sameOrder,
+  writeCalculationOrder,
+  type OrderChange,
+} from './internal/calculationOrder';
 import { clearFieldFill, stampFieldCreation, stampFieldFill } from './internal/fieldAttribution';
+import { writeFieldScripts } from './internal/fieldScripts';
 import {
   applyNativeWrite,
   isAtDefault,
@@ -313,7 +328,7 @@ export class FormMutator {
       /** Its widgets', in `draft.widgets` order; the next free ones when absent. */
       readonly widgetObjectNumbers?: readonly number[];
     } = {},
-  ): { field: FormFieldDTO<PdfCoordinates> } {
+  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -365,8 +380,12 @@ export class FormMutator {
         throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
       }
     });
+    const calculationOrder = this.followCalculateScript(
+      fieldObjectNumber,
+      draft.actions?.calculate,
+    );
     this.session.invalidateDerived();
-    return { field: this.readBackField(fieldObjectNumber) };
+    return { field: this.readBackField(fieldObjectNumber), calculationOrder };
   }
 
   /** EPDFForm_DeleteField: unlink the field and detach its kid widgets. */
@@ -466,6 +485,9 @@ export class FormMutator {
         'mapping name rejected',
       );
     }
+    if (draft.actions) {
+      writeFieldScripts(this.runtime, docPtr, fieldObjectNumber, undefined, draft.actions);
+    }
   }
 
   /**
@@ -522,7 +544,7 @@ export class FormMutator {
     ref: FormFieldRef,
     patch: FormFieldPatch,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates> } {
+  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -603,9 +625,73 @@ export class FormMutator {
     if ('options' in patch && patch.options) {
       this.applyOptions(fieldObjectNumber, patch.options);
     }
+    if (patch.actions) {
+      writeFieldScripts(this.runtime, docPtr, fieldObjectNumber, before.actions, patch.actions);
+    }
+    const calculationOrder = this.followCalculateScript(
+      fieldObjectNumber,
+      patch.actions?.calculate,
+    );
 
     this.session.invalidateDerived();
-    return { field: this.readBackField(fieldObjectNumber) };
+    return { field: this.readBackField(fieldObjectNumber), calculationOrder };
+  }
+
+  /**
+   * Move fields in the calculation order: they go together, in the order
+   * given, to `position`. Every field named must be in the order.
+   */
+  reorderCalculations(
+    fields: readonly FormFieldRef[],
+    position: FieldPosition,
+    signal: AbortSignal,
+  ): OrderChange & { moved: number[] } {
+    throwIfAborted(signal);
+    const model = acquireFormModel(this.runtime, this.session);
+    const numberOf = (ref: FormFieldRef) =>
+      resolveFieldRef(this.runtime, model, ref).fieldObjectNumber;
+    const before = readCalculationOrder(this.runtime, model);
+    const moved = fields.map(numberOf);
+    const at: ListPosition<number> =
+      position === 'start' || position === 'end'
+        ? position
+        : 'before' in position
+          ? { before: numberOf(position.before) }
+          : { after: numberOf(position.after) };
+    const after = reorderedList(before, moved, at, String);
+    throwIfAborted(signal);
+    if (!sameOrder(before, after)) {
+      writeCalculationOrder(this.runtime, this.session.requireDocPtr(), after);
+      this.session.invalidateDerived();
+    }
+    return { before, after, moved };
+  }
+
+  /**
+   * Keep the calculation order in step with a field's calculate script, as
+   * a write left it: a script puts the field at the end when it isn't in the
+   * order, removing the script takes the field out. Returns the order before
+   * and after, when it changed.
+   */
+  private followCalculateScript(
+    fieldObjectNumber: number,
+    calculate: FieldScriptWrite | null | undefined,
+  ): OrderChange | null {
+    if (calculate === undefined) return null;
+    const before = readCalculationOrder(
+      this.runtime,
+      acquireFormModel(this.runtime, this.session),
+    );
+    const listed = before.includes(fieldObjectNumber);
+    const after =
+      calculate === null
+        ? before.filter((objectNumber) => objectNumber !== fieldObjectNumber)
+        : listed
+          ? before
+          : [...before, fieldObjectNumber];
+    if (sameOrder(before, after)) return null;
+    writeCalculationOrder(this.runtime, this.session.requireDocPtr(), after);
+    return { before, after };
   }
 
   /**
@@ -619,7 +705,11 @@ export class FormMutator {
   deleteField(
     ref: FormFieldRef,
     signal: AbortSignal,
-  ): { deleted: FormFieldRef; removedWidgets: FormWidget[] } {
+  ): {
+    deleted: FormFieldRef;
+    removedWidgets: FormWidget[];
+    calculationOrder: OrderChange | null;
+  } {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
@@ -636,6 +726,9 @@ export class FormMutator {
     // refusal leaves the document untouched; nothing after it may throw for
     // caller input or cancellation.
     throwIfAborted(signal);
+    // A deleted field's calculate script runs no more: it leaves the order
+    // first, while the order can still name it.
+    const calculationOrder = this.followCalculateScript(resolved.fieldObjectNumber, null);
     if (!this.nativeDeleteField(resolved.fieldObjectNumber)) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'field cannot be deleted');
     }
@@ -650,7 +743,7 @@ export class FormMutator {
     // The cascade edited /Annots after the bump above; bump again so the
     // form model rebuilds.
     this.session.invalidateDerived();
-    return { deleted: before.ref, removedWidgets };
+    return { deleted: before.ref, removedWidgets, calculationOrder };
   }
 
   /**
@@ -906,6 +999,7 @@ const PATCH_BASE_MEMBERS = [
   'noExport',
   'alternateName',
   'mappingName',
+  'actions',
 ];
 
 /** The members each family's patch adds; a family not listed takes the base only. */

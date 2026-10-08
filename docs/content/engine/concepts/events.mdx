@@ -66,6 +66,7 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 | `forms.created`, `.updated`, `.deleted`, `.widgetAdded`, `.widgetRemoved` | A field's structure changed.                                                              |
 | `forms.widgetUpdated`, `forms.widgetsReordered`                           | A widget was moved or restyled, or a page's widgets were restacked.                       |
 | `forms.widgetDeleted`, `forms.widgetRestored`                             | A widget was deleted, or an undo brought it back.                                         |
+| `forms.calculationsReordered`                                             | The order calculate scripts run in changed.                                               |
 | `forms.restored`                                                          | An undo brought back a deleted field.                                                     |
 | `forms.imported`, `forms.repaired`, `forms.effectsApplied`                | Many values or fields changed at once.                                                    |
 | `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |

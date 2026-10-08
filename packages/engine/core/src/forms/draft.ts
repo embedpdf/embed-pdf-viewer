@@ -1,4 +1,5 @@
 import type { WidgetStyleDraftFields } from '../annotation/kinds/widget.shared';
+import type { FieldActionsPatch } from '../dto/PdfAction';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
@@ -41,6 +42,12 @@ interface FormFieldDraftBase {
   alternateName?: string;
   /** /TM — the export mapping name. */
   mappingName?: string;
+  /**
+   * The field's scripts, by event (JavaScript only). A `calculate` script
+   * puts the field at the end of the form's calculation order. Writing a
+   * script takes `doc.forms.script` too.
+   */
+  actions?: FieldActionsPatch;
 }
 
 export interface TextFieldDraft<

@@ -7,6 +7,7 @@ import type {
 } from './AnnotationMutationResults';
 import type { CustomMetadataUpdateResult } from './CustomMetadataUpdateResult';
 import type {
+  FormCalculationsReorderResult,
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
@@ -19,7 +20,7 @@ import type {
   FormWidgetsReorderResult,
   FormWidgetUpdateResult,
 } from './FormMutationResults';
-import type { AnnotationPosition } from './ListPosition';
+import type { AnnotationPosition, FieldPosition } from './ListPosition';
 import type { MetadataUpdateResult } from './MetadataUpdateResult';
 import type { MutationMeta } from './MutationMeta';
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
@@ -162,6 +163,12 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly expect?: WidgetPatch<C>;
     }
   | {
+      /** The calculation order: the fields go together to `position` in it. */
+      readonly type: 'forms.reorderCalculations';
+      readonly fields: readonly FormFieldRef[];
+      readonly position: FieldPosition;
+    }
+  | {
       /** Stacking order: the widgets go together to `position` among the page's widgets. */
       readonly type: 'forms.reorderWidgets';
       readonly page: PageRef;
@@ -259,6 +266,7 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
   | ({ type: 'forms.deleteWidget' } & FormWidgetDeleteResult<C>)
   | ({ type: 'forms.restoreWidget' } & FormWidgetRestoreResult<C>)
   | ({ type: 'forms.reorderWidgets' } & FormWidgetsReorderResult)
+  | ({ type: 'forms.reorderCalculations' } & FormCalculationsReorderResult)
   | ({
       type: 'forms.updateWidget';
       /** The fields an undo left alone: they no longer showed what the change had set. */

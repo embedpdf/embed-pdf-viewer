@@ -10,6 +10,8 @@ import {
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
   EngineErrorPayloadSchema,
+  FieldPositionSchema,
+  FormCalculationsReorderResultSchema,
   FormFieldCreateResultSchema,
   FormFieldDeleteResultSchema,
   FormFieldUpdateResultSchema,
@@ -144,6 +146,11 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     expect: WidgetPatchSchema.optional(),
   }),
   z.object({
+    type: z.literal('forms.reorderCalculations'),
+    fields: z.array(FormFieldRefSchema).min(1),
+    position: FieldPositionSchema,
+  }),
+  z.object({
     type: z.literal('forms.reorderWidgets'),
     page: PageRefSchema,
     widgets: z.array(AnnotationRefSchema).min(1),
@@ -263,6 +270,7 @@ export const ChangeItemSchema = z.union([
   itemOf('forms.deleteWidget', FormWidgetDeleteResultSchema),
   itemOf('forms.restoreWidget', FormWidgetRestoreResultSchema),
   itemOf('forms.reorderWidgets', FormWidgetsReorderResultSchema),
+  itemOf('forms.reorderCalculations', FormCalculationsReorderResultSchema),
   itemOf('forms.updateWidget', FormWidgetUpdateResultSchema, { skipped: SkippedFieldsSchema }),
   itemOf('metadata.update', MetadataUpdateResultSchema, { skipped: SkippedFieldsSchema }),
   itemOf('metadata.updateCustom', CustomMetadataUpdateResultSchema, {

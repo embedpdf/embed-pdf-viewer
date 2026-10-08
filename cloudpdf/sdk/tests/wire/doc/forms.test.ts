@@ -128,6 +128,141 @@ describe("FormsClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
+    test("reorderCalculations (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { fields: [{ kind: "objectNumber", objectNumber: 1 }], position: "start" };
+        const rawResponseBody = {
+            calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.reorderCalculations({
+            docId: "docId",
+            layerName: "layerName",
+            fields: [
+                {
+                    kind: "objectNumber",
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reorderCalculations (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            fields: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reorderCalculations({
+                docId: "docId",
+                layerName: "layerName",
+                fields: [
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reorderCalculations (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            fields: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reorderCalculations({
+                docId: "docId",
+                layerName: "layerName",
+                fields: [
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
     test("importData (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });

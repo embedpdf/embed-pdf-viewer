@@ -94,6 +94,9 @@ export {
   FormWidgetUpdateResultSchema,
   FormWidgetsReorderBodySchema,
   FormWidgetsReorderResultSchema,
+  FormCalculationsReorderBodySchema,
+  FormCalculationsReorderResultSchema,
+  FieldPositionSchema,
   PageListSnapshotSchema,
   PageLayoutSchema,
   PageBoxesSchema,
@@ -142,6 +145,8 @@ export {
   PdfPageActionsSchema,
   PdfAnnotationActionsSchema,
   DocumentActionsSnapshotSchema,
+  FieldScriptWriteSchema,
+  FieldActionsPatchSchema,
   PdfActionWireComponents,
 } from './dto/PdfAction.schema';
 export type {

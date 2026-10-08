@@ -28,6 +28,7 @@ import {
   type FormWidgetDeleteResult,
   type FormWidgetUpdateResult,
   type FormWidgetsReorderResult,
+  type FormCalculationsReorderResult,
   type MetadataUpdateResult,
   type CustomMetadataUpdateResult,
   type PageDeleteResult,
@@ -277,6 +278,12 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         type: 'forms.widgetsReordered',
         origin,
         ...(row.payload as FormWidgetsReorderResult),
+      };
+    case 'form.reorderCalculations':
+      return {
+        type: 'forms.calculationsReordered',
+        origin,
+        ...(row.payload as FormCalculationsReorderResult),
       };
     case 'form.applyEffects':
       return { type: 'forms.effectsApplied', origin, ...(row.payload as FormEffectsResult) };

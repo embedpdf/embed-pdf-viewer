@@ -41,6 +41,12 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   noExport: false,
   alternateName: null,
   mappingName: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'scalar', value: over.value ?? 'abc' },
   defaultValueEntry: { kind: 'scalar', value: '' },
   widgets: [formWidget(4, toPageRef(3))],
@@ -165,6 +171,36 @@ describe('field index', () => {
     expect(fieldForWidget(index, 8)).toBeNull();
   });
 
+  test('takes the calculation order from a write that changed it, and from a reorder', () => {
+    const total = { kind: 'objectNumber', objectNumber: 4 } as const;
+    const other = { kind: 'objectNumber', objectNumber: 7 } as const;
+    let index: FieldIndex = indexFields(snapshot([text()]));
+    // A write that left the order alone carries none, and keeps the mirror's.
+    index = foldFormEvent(index, event({ type: 'forms.updated', field: text() })) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([]);
+
+    index = foldFormEvent(
+      index,
+      event({ type: 'forms.updated', field: text(), calculationOrder: [total] }),
+    ) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([total]);
+    index = foldFormEvent(
+      index,
+      event({ type: 'forms.calculationsReordered', calculationOrder: [other, total], meta: {} }),
+    ) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([other, total]);
+    index = foldFormEvent(
+      index,
+      event({
+        type: 'forms.deleted',
+        deleted: other,
+        calculationOrder: [total],
+        meta: { changedFields: [other], changedWidgets: [] },
+      }),
+    ) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([total]);
+  });
+
   test('the first field of a document without a form creates an AcroForm', () => {
     const empty = indexFields({ ...snapshot([]), formKind: 'none' });
     const index = foldFormEvent(
@@ -231,6 +267,12 @@ const signature = (
   noExport: false,
   alternateName: 'Sign here',
   mappingName: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(9, toPageRef(3))],

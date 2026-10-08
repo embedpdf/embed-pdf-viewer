@@ -109,6 +109,8 @@ export interface FormFieldCreateResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
+  /** The form's calculation order, when the write changed it (a `calculate` script). */
+  calculationOrder?: FormFieldRef[];
   meta: FormMutationMeta;
 }
 
@@ -117,6 +119,8 @@ export interface FormFieldUpdateResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
+  /** The form's calculation order, when the write changed it (a `calculate` script). */
+  calculationOrder?: FormFieldRef[];
   meta: FormMutationMeta;
 }
 
@@ -148,6 +152,18 @@ export interface FormWidgetsReorderResult {
  * the field and lists them, so caches can invalidate.
  */
 export interface FormFieldDeleteResult {
+  /** The form's calculation order, when the field was in it. */
+  calculationOrder?: FormFieldRef[];
+  meta: FormMutationMeta;
+}
+
+/**
+ * Result of `reorderCalculations`: the form's calculation order, whole: the
+ * fields whose calculate scripts run, in the order they run.
+ */
+export interface FormCalculationsReorderResult {
+  calculationOrder: FormFieldRef[];
+  /** `meta.changedFields` names the fields that moved, in the order given. */
   meta: FormMutationMeta;
 }
 

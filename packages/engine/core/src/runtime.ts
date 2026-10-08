@@ -197,6 +197,7 @@ export type {
   FormsDetachWidgetWorkerRequest,
   FormsDeleteWidgetWorkerRequest,
   FormsReorderWidgetsWorkerRequest,
+  FormsReorderCalculationsWorkerRequest,
   FormsUpdateWidgetWorkerRequest,
   FontsRegisterWorkerRequest,
   FontsAddFallbackWorkerRequest,

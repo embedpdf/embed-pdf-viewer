@@ -92,6 +92,7 @@ import type {
 import type { AttachmentList } from '../dto/Attachment';
 import type {
   FormFieldCreateResult,
+  FormCalculationsReorderResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
   FormImportResult,
@@ -994,6 +995,9 @@ export const PagePositionSchema = listPositionSchema(PageRefSchema);
 /** Where annotations go among their page's annotations, or widgets among its widgets. */
 export const AnnotationPositionSchema = listPositionSchema(AnnotationRefSchema);
 
+/** Where fields go in the form's calculation order. */
+export const FieldPositionSchema = listPositionSchema(FormFieldRefSchema);
+
 /**
  * Stable public component names for the models every part of the document
  * wire shares (page refs, a write's meta, the metadata), like
@@ -1113,6 +1117,7 @@ export const FormWireComponents = {
   FormWidget: FormWidgetSchema,
   FormFieldDraft: FormFieldDraftSchema,
   FormFieldPatch: FormFieldPatchSchema,
+  FieldPosition: FieldPositionSchema,
   WidgetPlacement: WidgetPlacementSchema,
   WidgetAnnotation: WidgetDTOSchema,
   WidgetPatch: WidgetPatchSchema,
@@ -1174,12 +1179,14 @@ export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
 export const FormFieldCreateResultSchema: z.ZodType<FormFieldCreateResult> = z.object({
   field: FormFieldDTOSchema,
   widgets: z.array(WidgetDTOSchema),
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
   meta: FormMutationMetaSchema,
 }) as unknown as z.ZodType<FormFieldCreateResult>;
 
 export const FormFieldUpdateResultSchema: z.ZodType<FormFieldUpdateResult> = z.object({
   field: FormFieldDTOSchema,
   widgets: z.array(WidgetDTOSchema),
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
   meta: FormMutationMetaSchema,
 }) as unknown as z.ZodType<FormFieldUpdateResult>;
 
@@ -1202,8 +1209,21 @@ export const FormWidgetsReorderResultSchema: z.ZodType<FormWidgetsReorderResult>
 });
 
 export const FormFieldDeleteResultSchema: z.ZodType<FormFieldDeleteResult> = z.object({
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
   meta: FormMutationMetaSchema,
 });
+
+/** What `forms.reorderCalculations` takes on the wire: the fields and where they go. */
+export const FormCalculationsReorderBodySchema = z
+  .object({ fields: z.array(FormFieldRefSchema).min(1), position: FieldPositionSchema })
+  .strict();
+
+/** A calculation-order change: the form's whole new order. */
+export const FormCalculationsReorderResultSchema: z.ZodType<FormCalculationsReorderResult> =
+  z.object({
+    calculationOrder: z.array(FormFieldRefSchema),
+    meta: FormMutationMetaSchema,
+  });
 
 export const FormWidgetLinkResultSchema: z.ZodType<FormWidgetLinkResult> = z.object({
   field: FormFieldDTOSchema,

@@ -6,6 +6,8 @@ import {
   decodeFieldRefKey,
   toPageRef,
   wirePack,
+  writesScripts,
+  type FieldPosition,
   type FormDataFormat,
   type FormEffect,
   type FormFieldDraft,
@@ -30,6 +32,7 @@ import {
   SignatureAppearanceBodySchema,
   FormWidgetUpdateBodySchema,
   FormWidgetsReorderBodySchema,
+  FormCalculationsReorderBodySchema,
   WidgetPlacementSchema,
   decodeFormToken,
   decodeWidgetAppearancesRenderToken,
@@ -240,6 +243,39 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     },
   );
 
+  // The form's calculation order: a form write (`doc.forms.reorderCalculations`).
+  app.post('/v1/docs/:docId/layers/:layerName/form/calculations/reorder', async (req, reply) => {
+    const { docId, layerName } = layerParams(req);
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.modify',
+      pdfBits,
+      protection,
+    );
+    const { fields, position } = parseOrInvalidArg<{
+      fields: FormFieldRef[];
+      position: FieldPosition;
+    }>(
+      FormCalculationsReorderBodySchema as unknown as SchemaLike<{
+        fields: FormFieldRef[];
+        position: FieldPosition;
+      }>,
+      req.body ?? {},
+      'body',
+    );
+    setNoStore(reply);
+    return layerService.reorderFormCalculations(
+      ctx,
+      { docId, layerName, fields, position },
+      abortSignalOf(reply),
+    );
+  });
+
   // The widgets' stacking order on a page: a form write (`doc.forms.reorderWidgets`).
   app.post(
     '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',
@@ -430,6 +466,10 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       req.body,
       'request body',
     );
+    // Writing a script takes doc.forms.script too.
+    if (writesScripts(draft.actions)) {
+      requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+    }
     const objectNumber = objectNumberQuery(req.query, 'objectNumber');
     const widgetObjectNumbers = objectNumbersQuery(req.query, 'widgetObjectNumbers');
     setNoStore(reply);
@@ -465,6 +505,10 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       req.body,
       'request body',
     );
+    // Writing a script takes doc.forms.script too; removing one doesn't.
+    if (writesScripts(patch.actions)) {
+      requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+    }
     setNoStore(reply);
     return layerService.updateFormField(
       ctx,

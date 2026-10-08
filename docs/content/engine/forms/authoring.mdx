@@ -156,6 +156,51 @@ Also:
 - `options` replaces the whole list of a dropdown or list.
 - `maxLength` fails with `InvalidArg` when the current text is longer.
 
+## Scripts and calculations
+
+A field can run scripts: while the user types (`keystroke`), to show the value (`format`), to
+check it (`validate`) and to work it out from other fields (`calculate`). `create()` and `update()`
+take them in `actions`:
+
+```ts
+const { field: total } = await doc.forms.create({
+  family: 'text',
+  name: 'total',
+  readOnly: true,
+  actions: {
+    calculate: {
+      type: 'javascript',
+      script: 'event.value = this.getField("subtotal").value * 1.21;',
+    },
+    format: { type: 'javascript', script: 'AFNumber_Format(2, 0, 0, 0, "€ ", true);' },
+  },
+});
+
+await doc.forms.update(total.ref, { actions: { format: null } }); // remove one script
+```
+
+A script sets that event's, `null` removes it, and an event you leave out keeps its script. A
+field's events take JavaScript only: any other action fails with `InvalidArg`. A script can name
+more scripts to run after it, in `next`.
+
+The engine stores the scripts; it doesn't run them. The viewer's form plugin runs them while the
+user fills the form in (see
+[Calculations, formatting and validation](/docs/engine/forms#calculations-formatting-and-validation)).
+
+### The calculation order
+
+Calculate scripts run in the form's calculation order, which `doc.forms.list()` returns as
+`calculationOrder`. A field joins it at the end when it gets a calculate script, and leaves it when
+the script is removed or the field is deleted. `reorderCalculations()` moves fields in it, the way
+`reorderWidgets()` restacks widgets:
+
+```ts
+const { calculationOrder } = await doc.forms.reorderCalculations([tax.ref], { before: total.ref });
+```
+
+A field must be in the order to move it (`NotFound` otherwise). A result of `create()`, `update()`
+or `delete()` that changed the order carries the new one as `calculationOrder`.
+
 ## Delete a field
 
 `delete()` removes the field and all of its widgets from their pages:
@@ -276,6 +321,7 @@ repair can't be undone, and it ends undo for every change made before it; see
 | `forms.widgetDeleted`                      | `deleteWidget()`                           |
 | `forms.widgetUpdated`                      | `updateWidget()`                           |
 | `forms.widgetsReordered`                   | `reorderWidgets()`                         |
+| `forms.calculationsReordered`              | `reorderCalculations()`                    |
 | `forms.repaired`                           | `repair()`                                 |
 
 Each event carries what the call returned, with the rows of the widgets it changed (`widgets`). See
@@ -285,8 +331,9 @@ Each event carries what the call returned, with the rows of the widgets it chang
 
 Creating, changing and deleting fields, adding, moving, restacking and removing widgets and
 repairing the form need `doc.forms.modify`, which includes `doc.forms.fill` and `doc.forms.read`.
-See
-[Permissions](/docs/engine/concepts/permissions).
+Writing a script also needs `doc.forms.script`: a script runs for everyone who fills the form in
+(see [Scripts in forms](/docs/engine/concepts/permissions#scripts-in-forms)). Removing one doesn't.
+See [Permissions](/docs/engine/concepts/permissions).
 
 A certified document doesn't allow changes to its fields: these calls fail with
 `ProtectedDocument`. See

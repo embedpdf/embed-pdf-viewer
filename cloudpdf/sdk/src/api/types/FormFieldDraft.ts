@@ -19,6 +19,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         defaultValue?: string | undefined;
         maxLength?: number | undefined;
@@ -35,6 +36,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
 
@@ -46,6 +48,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         radiosInUnison?: boolean | undefined;
         noToggleToOff?: boolean | undefined;
@@ -59,6 +62,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         edit?: boolean | undefined;
         options?: FormFieldDraftCombobox.Options.Item[] | undefined;
@@ -84,6 +88,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         multiSelect?: boolean | undefined;
         options?: FormFieldDraftListbox.Options.Item[] | undefined;
@@ -109,6 +114,7 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
 }

@@ -30,6 +30,7 @@ import {
   type FormsDeleteWidgetWorkerRequest,
   type FormsDetachWidgetWorkerRequest,
   type FormsReorderWidgetsWorkerRequest,
+  type FormsReorderCalculationsWorkerRequest,
   type FormsUpdateWidgetWorkerRequest,
   type FormsExportWorkerRequest,
   type FormsImportWorkerRequest,
@@ -624,6 +625,9 @@ export class WorkerHost {
           break;
         case 'forms.reorderWidgets':
           resultPack = this.handleFormsReorderWidgets(msg, ctrl.signal);
+          break;
+        case 'forms.reorderCalculations':
+          resultPack = this.handleFormsReorderCalculations(msg, ctrl.signal);
           break;
         case 'pages.list':
           resultPack = this.handlePagesList(msg, ctrl.signal);
@@ -2576,6 +2580,25 @@ export class WorkerHost {
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.deleteWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsReorderCalculations(
+    req: FormsReorderCalculationsWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.reorderCalculations', fields: req.fields, position: req.position },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(
+      session,
+      { tag: 'forms.reorderCalculations', result },
+      req.artifactPath,
+    );
   }
 
   private handleFormsReorderWidgets(

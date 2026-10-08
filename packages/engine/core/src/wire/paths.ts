@@ -539,6 +539,10 @@ export const wirePaths = {
    * the widget's annotation key. Not under `form/pages/`, which the CDN
    * signs for reads.
    */
+  /** POST: the form's calculation order (`doc.forms.reorderCalculations`). */
+  layerFormCalculationsReorder: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/calculations/reorder`,
+
   /** POST: the stacking order of a page's widgets (`doc.forms.reorderWidgets`). */
   layerFormWidgetsReorder: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/widgets/${encodeURIComponent(encodePageKey(page))}/reorder`,
@@ -737,6 +741,7 @@ export const wireTemplates = {
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
   layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
   layerFormWidgetsReorder: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',
+  layerFormCalculationsReorder: '/v1/docs/:docId/layers/:layerName/form/calculations/reorder',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
   layerFormReset: '/v1/docs/:docId/layers/:layerName/form/reset',
   layerFormFieldSignatureAppearance:

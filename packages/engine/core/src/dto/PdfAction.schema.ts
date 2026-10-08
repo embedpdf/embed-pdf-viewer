@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import type {
   DocumentActionsSnapshot,
+  FieldActionsPatch,
+  FieldScriptWrite,
   PdfActionNode,
   PdfActionTargetRef,
   PdfActionTree,
@@ -164,6 +166,26 @@ export const PdfAnnotationActionsSchema = PAGE_SPACE.annotationActions;
 export const FileAnnotationActionsSchema = PDF_SPACE.annotationActions;
 
 /**
+ * A field event's script: JavaScript all through. Any other action type is
+ * refused here, at the boundary.
+ */
+export const FieldScriptWriteSchema: z.ZodType<FieldScriptWrite> = z.lazy(() =>
+  z.object({
+    type: z.literal('javascript'),
+    script: z.string(),
+    next: z.array(FieldScriptWriteSchema).optional(),
+  }),
+);
+
+/** A field's scripts to write, by event: a script sets one, `null` removes it. */
+export const FieldActionsPatchSchema: z.ZodType<FieldActionsPatch> = z.object({
+  keystroke: FieldScriptWriteSchema.nullable().optional(),
+  format: FieldScriptWriteSchema.nullable().optional(),
+  validate: FieldScriptWriteSchema.nullable().optional(),
+  calculate: FieldScriptWriteSchema.nullable().optional(),
+});
+
+/**
  * Stable public component names for generators that project the action wire
  * model into OpenAPI or another schema format. Keep reusable boundaries here;
  * individual action arms remain owned by `PdfActionNodeSchema`.
@@ -177,4 +199,6 @@ export const PdfActionWireComponents = {
   PdfPageActions: PdfPageActionsSchema,
   PdfAnnotationActions: PdfAnnotationActionsSchema,
   DocumentActionsSnapshot: DocumentActionsSnapshotSchema,
+  FieldScriptWrite: FieldScriptWriteSchema,
+  FieldActionsPatch: FieldActionsPatchSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;

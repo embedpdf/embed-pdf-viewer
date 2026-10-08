@@ -58,6 +58,7 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
   FormWidgetsReorderResult,
+  FormCalculationsReorderResult,
   FormWidgetUpdateResult,
   FormWidgetDeleteResult,
 } from '../mutation/FormMutationResults';
@@ -65,7 +66,7 @@ import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { AnnotationPosition, PagePosition } from '../mutation/ListPosition';
+import type { AnnotationPosition, FieldPosition, PagePosition } from '../mutation/ListPosition';
 import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
@@ -846,6 +847,18 @@ export interface FormsDeleteWidgetWorkerRequest extends WriteJobFields {
   artifactPath?: string;
 }
 
+/** The form's calculation order: `fields` go together to `position`. */
+export interface FormsReorderCalculationsWorkerRequest extends WriteJobFields {
+  kind: 'forms.reorderCalculations';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  fields: FormFieldRef[];
+  position: FieldPosition;
+  artifactPath?: string;
+}
+
 /** A page's widgets' stacking order: `widgets` go together to `position`. */
 export interface FormsReorderWidgetsWorkerRequest extends WriteJobFields {
   kind: 'forms.reorderWidgets';
@@ -1550,6 +1563,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsDetachWidgetWorkerRequest
   | FormsDeleteWidgetWorkerRequest
   | FormsReorderWidgetsWorkerRequest
+  | FormsReorderCalculationsWorkerRequest
   | FormsUpdateWidgetWorkerRequest<C>
   | PagesListWorkerRequest
   | PagesReorderWorkerRequest
@@ -1832,6 +1846,12 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'forms.reorderWidgets';
       result: FormWidgetsReorderResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.reorderCalculations';
+      result: FormCalculationsReorderResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

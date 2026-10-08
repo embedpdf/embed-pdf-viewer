@@ -17,6 +17,7 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.FormsAddWidget
     | CloudPDF.ChangeOp.FormsRemoveWidget
     | CloudPDF.ChangeOp.FormsDeleteWidget
+    | CloudPDF.ChangeOp.FormsReorderCalculations
     | CloudPDF.ChangeOp.FormsReorderWidgets
     | CloudPDF.ChangeOp.FormsUpdateWidget
     | CloudPDF.ChangeOp.FormsSetSignatureAppearance
@@ -147,6 +148,12 @@ export namespace ChangeOp {
         type: "forms.deleteWidget";
         widget: CloudPDF.AnnotationRef;
         expect?: CloudPDF.WidgetPatch | undefined;
+    }
+
+    export interface FormsReorderCalculations {
+        type: "forms.reorderCalculations";
+        fields: CloudPDF.FormFieldRef[];
+        position: CloudPDF.FieldPosition;
     }
 
     export interface FormsReorderWidgets {

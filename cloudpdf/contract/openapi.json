@@ -1416,6 +1416,115 @@
         }
       }
     },
+    "/v1/docs/{docId}/layers/{layerName}/form/calculations/reorder": {
+      "post": {
+        "operationId": "doc.forms.reorderCalculations",
+        "x-fern-sdk-group-name": ["doc", "forms"],
+        "x-fern-sdk-method-name": "reorderCalculations",
+        "x-docs-title": "Reorder form calculations",
+        "summary": "Change the form's calculation order, the order its fields' calculate scripts run in: the fields go together, in the order given, next to a neighbour field or to the start (`'start'`) or end (`'end'`). Every field named must have a calculate script, which puts it in the order. Returns the whole new order.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.forms.modify"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocFormsReorderCalculationsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsReorderCalculations200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsReorderCalculations400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsReorderCalculations404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/layers/{layerName}/form/data": {
       "get": {
         "operationId": "doc.forms.exportData",
@@ -8156,6 +8265,62 @@
           }
         },
         "required": ["nameTreeScripts", "openAction"],
+        "additionalProperties": false
+      },
+      "FieldScriptWrite": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["javascript"]
+          },
+          "script": {
+            "type": "string"
+          },
+          "next": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": ["type", "script"],
+        "additionalProperties": false
+      },
+      "FieldActionsPatch": {
+        "type": "object",
+        "properties": {
+          "keystroke": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "validate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "calculate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          }
+        },
         "additionalProperties": false
       },
       "Annotation": {
@@ -19426,6 +19591,9 @@
               "mappingName": {
                 "type": "string"
               },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "type": "array",
                 "items": {
@@ -19478,6 +19646,9 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
@@ -19509,6 +19680,9 @@
               },
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
               },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
@@ -19547,6 +19721,9 @@
               },
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
               },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
@@ -19602,6 +19779,9 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
@@ -19649,6 +19829,9 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
@@ -19685,6 +19868,9 @@
           "mappingName": {
             "type": "string",
             "nullable": true
+          },
+          "actions": {
+            "$ref": "#/components/schemas/FieldActionsPatch"
           },
           "family": {
             "type": "string",
@@ -19749,6 +19935,26 @@
           }
         },
         "additionalProperties": false
+      },
+      "FieldPosition": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": ["start", "end"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#/components/schemas/FormFieldRef"
+              },
+              "after": {
+                "$ref": "#/components/schemas/FormFieldRef"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
       },
       "WidgetPlacement": {
         "type": "object",
@@ -20681,6 +20887,27 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": ["forms.reorderCalculations"]
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                },
+                "minItems": 1
+              },
+              "position": {
+                "$ref": "#/components/schemas/FieldPosition"
+              }
+            },
+            "required": ["type", "fields", "position"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "enum": ["forms.reorderWidgets"]
               },
               "page": {
@@ -20808,6 +21035,7 @@
                   "forms.addWidget",
                   "forms.removeWidget",
                   "forms.deleteWidget",
+                  "forms.reorderCalculations",
                   "forms.reorderWidgets",
                   "forms.updateWidget",
                   "forms.setSignatureAppearance",
@@ -20986,6 +21214,12 @@
                   "$ref": "#/components/schemas/WidgetAnnotation"
                 }
               },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
@@ -21005,6 +21239,9 @@
               },
               "widgets": {
                 "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+              },
+              "calculationOrder": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -21058,6 +21295,12 @@
                   "$ref": "#/components/schemas/WidgetAnnotation"
                 }
               },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
@@ -21081,6 +21324,9 @@
               "widgets": {
                 "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
               },
+              "calculationOrder": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
@@ -21094,6 +21340,12 @@
               "type": {
                 "type": "string",
                 "enum": ["forms.delete"]
+              },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -21137,6 +21389,9 @@
               },
               "widgets": {
                 "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+              },
+              "calculationOrder": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -21265,6 +21520,26 @@
               }
             },
             "required": ["type", "page", "order", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.reorderCalculations"]
+              },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/FormMutationMeta"
+              }
+            },
+            "required": ["type", "calculationOrder", "meta"],
             "additionalProperties": false
           },
           {
@@ -25575,6 +25850,45 @@
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocFormsReorderWidgets404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsReorderCalculationsRequest": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormFieldRef"
+            },
+            "minItems": 1
+          },
+          "position": {
+            "$ref": "#/components/schemas/FieldPosition"
+          }
+        },
+        "required": ["fields", "position"],
+        "additionalProperties": false
+      },
+      "DocFormsReorderCalculations200Response": {
+        "type": "object",
+        "properties": {
+          "calculationOrder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormFieldRef"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/FormMutationMeta"
+          }
+        },
+        "required": ["calculationOrder", "meta"],
+        "additionalProperties": false
+      },
+      "DocFormsReorderCalculations400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsReorderCalculations404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocFormsResetRequest": {

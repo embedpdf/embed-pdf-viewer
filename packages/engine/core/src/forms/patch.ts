@@ -1,4 +1,5 @@
 import type { FormFieldOptionInput } from './draft';
+import type { FieldActionsPatch } from '../dto/PdfAction';
 
 /**
  * Patch-field semantics follow the annotation patches: `undefined` leaves
@@ -18,6 +19,14 @@ interface FormFieldPatchBase {
   noExport?: boolean;
   alternateName?: string | null;
   mappingName?: string | null;
+  /**
+   * The field's scripts, by event (JavaScript only): a script sets one,
+   * `null` removes it, an event left out keeps what it has. Adding a
+   * `calculate` script puts the field at the end of the calculation order;
+   * removing it takes the field out. Writing a script takes
+   * `doc.forms.script` too; removing one doesn't.
+   */
+  actions?: FieldActionsPatch;
 }
 
 export interface TextFieldPatch extends FormFieldPatchBase {

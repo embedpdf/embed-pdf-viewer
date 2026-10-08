@@ -35,6 +35,8 @@ export type AuditMutationKind =
   | 'form.updateWidget'
   /** A page's widgets restacked (`doc.forms.reorderWidgets`). */
   | 'form.reorderWidgets'
+  /** The form's calculation order changed (`doc.forms.reorderCalculations`). */
+  | 'form.reorderCalculations'
   /** A widget deleted from its page and its field (`doc.forms.deleteWidget`). */
   | 'form.deleteWidget'
   | 'form.applyEffects'

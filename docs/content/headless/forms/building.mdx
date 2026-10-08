@@ -106,6 +106,27 @@ family's settings are on [Creating form fields](/docs/engine/forms/authoring).
 
 <Example name="form/create" />
 
+## Scripts and calculations
+
+A field's scripts go in `actions` when you create or change it: a calculated total, a formatted
+amount, a check on what the user typed. The viewer runs them while the user fills the form in.
+
+```ts
+await form.update(total.ref, {
+  actions: {
+    calculate: {
+      type: 'javascript',
+      script: 'event.value = this.getField("subtotal").value * 1.21;',
+    },
+  },
+});
+await form.reorderCalculations([tax.ref], { before: total.ref });
+```
+
+A calculate script puts the field at the end of the order calculations run in;
+`reorderCalculations()` moves it. Writing a script needs `canWriteScripts()`. See
+[Scripts and calculations](/docs/engine/forms/authoring#scripts-and-calculations).
+
 ## Remove a field
 
 ```ts
@@ -121,17 +142,18 @@ as it is now.
 What `useForm()` gives you for building forms. Reading, filling and the form's state are on
 [Filling forms](../forms#methods).
 
-| Method                      | What it does                                                                                                                                                                                          |
-| :-------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create(draft)`             | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)                                                                                 |
-| `update(ref, patch)`        | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings)                                                                      |
-| `delete(ref)`               | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
-| `deleteWidget(widget)`      | Removes one box from its page, and from its field when it has one. Resolves `{ field }`, or `{ field: null }` for a box in no field. [Remove a field](#remove-a-field)                                |
-| `removeWidget(ref, widget)` | Takes one box out of its field; it stays on the page, in no field, until `deleteWidget()` removes it                                                                                                  |
-| `repair(options?)`          | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
-| `canDesign()`               | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
-| `canRestoreAttribution()`   | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
-| `canWriteScripts()`         | Whether scripts, submit buttons and links may be written into fields. [Permissions](#permissions)                                                                                                     |
+| Method                                  | What it does                                                                                                                                                                                          |
+| :-------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create(draft)`                         | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)                                                                                 |
+| `update(ref, patch)`                    | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings)                                                                      |
+| `delete(ref)`                           | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
+| `deleteWidget(widget)`                  | Removes one box from its page, and from its field when it has one. Resolves `{ field }`, or `{ field: null }` for a box in no field. [Remove a field](#remove-a-field)                                |
+| `removeWidget(ref, widget)`             | Takes one box out of its field; it stays on the page, in no field, until `deleteWidget()` removes it                                                                                                  |
+| `reorderCalculations(fields, position)` | Moves fields in the order calculate scripts run in. Resolves `{ calculationOrder }`. [Scripts and calculations](#scripts-and-calculations)                                                            |
+| `repair(options?)`                      | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
+| `canDesign()`                           | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
+| `canRestoreAttribution()`               | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
+| `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields. [Permissions](#permissions)                                                                                                     |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 

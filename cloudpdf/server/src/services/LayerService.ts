@@ -63,6 +63,8 @@ import {
   type FormWidgetDeleteResult,
   type FormWidgetUpdateResult,
   type FormWidgetsReorderResult,
+  type FormCalculationsReorderResult,
+  type FieldPosition,
   type WidgetPatch,
   type FormWidget,
   type Identity,
@@ -1643,6 +1645,22 @@ export class LayerService {
       },
       checkedAuthority(),
       'form.reorderWidgets',
+      signal,
+    );
+  }
+
+  /** The form's calculation order: `fields` go together to `position`. */
+  async reorderFormCalculations(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; fields: FormFieldRef[]; position: FieldPosition },
+    signal?: AbortSignal,
+  ): Promise<FormCalculationsReorderResult> {
+    return this.applySingleOp<FormCalculationsReorderResult>(
+      ctx,
+      input,
+      { type: 'forms.reorderCalculations', fields: input.fields, position: input.position },
+      checkedAuthority(),
+      'form.reorderCalculations',
       signal,
     );
   }

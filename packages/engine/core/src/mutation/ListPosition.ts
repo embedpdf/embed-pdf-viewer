@@ -1,6 +1,7 @@
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { PageRef } from '../identity/PageRef';
 
 /**
@@ -25,6 +26,9 @@ export type PagePosition = ListPosition<PageRef>;
 
 /** Where annotations go among their page's annotations, or widgets among its widgets. */
 export type AnnotationPosition = ListPosition<AnnotationRef>;
+
+/** Where fields go in the form's calculation order. */
+export type FieldPosition = ListPosition<FormFieldRef>;
 
 /** The neighbour a position names, or `null` for `'start'` and `'end'`. */
 export function anchorOf<Ref>(position: ListPosition<Ref>): Ref | null {

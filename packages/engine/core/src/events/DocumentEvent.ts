@@ -25,6 +25,7 @@ import type {
   FormWidgetLinkResult,
   FormWidgetRestoreResult,
   FormWidgetsReorderResult,
+  FormCalculationsReorderResult,
   FormWidgetUpdateResult,
 } from '../mutation/FormMutationResults';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
@@ -224,6 +225,11 @@ export type DocumentEvent =
       type: 'forms.widgetsReordered';
       origin: EventOrigin;
     } & FormWidgetsReorderResult)
+  | ({
+      /** A calculation-order change: the form's whole new order. */
+      type: 'forms.calculationsReordered';
+      origin: EventOrigin;
+    } & FormCalculationsReorderResult)
   | ({ type: 'forms.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
   | ({
       type: 'pages.flattened';

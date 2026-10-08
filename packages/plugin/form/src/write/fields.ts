@@ -5,11 +5,13 @@
  * widget changes from the same events.
  */
 import type { OperationOptions } from '@embedpdf/core';
+import { writesScripts, type FieldActionsPatch } from '@embedpdf/engine-core/runtime';
 
 import type { FormCapability, FormFieldResult } from '../contract';
 import type { FormContext, FormServices } from '../services';
 
 const MODIFY = 'doc.forms.modify';
+const SCRIPT = 'doc.forms.script';
 
 export function createFieldWrites(
   ctx: FormContext,
@@ -23,8 +25,11 @@ export function createFieldWrites(
     operation: string,
     run: () => Promise<T>,
     options?: OperationOptions,
+    actions?: FieldActionsPatch,
   ): Promise<T> => {
     ctx.assertAllowed(MODIFY, operation);
+    // Writing a script takes doc.forms.script too; removing one doesn't.
+    if (writesScripts(actions)) ctx.assertAllowed(SCRIPT, operation);
     return enqueue(() => ctx.cancellable(options?.signal, run()), options);
   };
 
@@ -39,6 +44,7 @@ export function createFieldWrites(
         return { field };
       },
       options,
+      draft.actions,
     );
 
   return {
@@ -48,6 +54,16 @@ export function createFieldWrites(
         design(
           'form.update',
           async () => ({ field: (await ctx.doc.forms.update(ref, patch)).field }),
+          options,
+          patch.actions,
+        ),
+      reorderCalculations: (fields, position, options) =>
+        design(
+          'form.reorderCalculations',
+          async () => ({
+            calculationOrder: (await ctx.doc.forms.reorderCalculations(fields, position))
+              .calculationOrder,
+          }),
           options,
         ),
       delete: (ref, options) =>
