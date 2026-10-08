@@ -27,6 +27,8 @@ const KNOWN_CAPABILITIES: ReadonlySet<DocCapability> = new Set([
   'doc.forms.read',
   'doc.forms.fill',
   'doc.forms.modify',
+  'doc.forms.import',
+  'doc.forms.script',
   'doc.forms.submit',
   'doc.annotate.read',
   'doc.annotate.modify',

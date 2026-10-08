@@ -63,15 +63,20 @@ describe('deriveProtection: enforced vs judged', () => {
     // A declaration refuses everything outside what it permits: structure too.
     expect(protectedCapabilities(p3).has('doc.pages.assemble')).toBe(true);
     expect(protectedCapabilities(p3).has('doc.forms.modify')).toBe(true);
+    // Writing scripts into the form is designing it.
+    expect(protectedCapabilities(p3).has('doc.forms.script')).toBe(true);
     const p2 = deriveProtection([sig({ catalogCertification: true, docMdp: 2 })]);
     expect(p2).toMatchObject({ enforced: 'fill', judged: 'fill' });
     expect(protectedCapabilities(p2).has('doc.annotate.modify')).toBe(true);
     // Restoring someone else's annotations is still writing annotations.
     expect(protectedCapabilities(p2).has('doc.annotate.import')).toBe(true);
     expect(protectedCapabilities(p2).has('doc.forms.fill')).toBe(false);
+    expect(protectedCapabilities(p2).has('doc.forms.import')).toBe(false);
     const p1 = deriveProtection([sig({ catalogCertification: true, docMdp: 1 })]);
     expect(p1).toMatchObject({ enforced: 'lta', judged: 'lta' });
     expect(protectedCapabilities(p1).has('doc.forms.fill')).toBe(true);
+    // Restoring who filled the fields in is still filling them.
+    expect(protectedCapabilities(p1).has('doc.forms.import')).toBe(true);
   });
 
   test('a signed field lock with /P tightens; a later approval never loosens a certification', () => {

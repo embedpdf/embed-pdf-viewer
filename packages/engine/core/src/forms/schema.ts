@@ -13,6 +13,7 @@ import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget 
 import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormDataFormat, FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
+import { IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
 import { PdfFieldActionsSchema } from '../dto/PdfAction.schema';
 
 export { FormFieldRefSchema };
@@ -61,6 +62,12 @@ const FormFieldBaseShape = {
   valueEntry: FormValueEntrySchema,
   defaultValueEntry: FormValueEntrySchema,
   actions: PdfFieldActionsSchema.optional(),
+  createdBy: z.string().nullable(),
+  createdAt: IsoDateTimeSchema.nullable(),
+  filledBy: z.string().nullable(),
+  filledByName: z.string().nullable(),
+  filledAt: IsoDateTimeSchema.nullable(),
+  importedBy: z.string().nullable(),
   widgets: z.array(FormFieldWidgetSchema),
 };
 

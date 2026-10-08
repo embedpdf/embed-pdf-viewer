@@ -72,6 +72,8 @@ To list what the user was given (for a "you can…" panel), read `doc.security.s
 | `doc.forms.read`         | See form fields and their values.                                                                          |
 | `doc.forms.fill`         | Fill in form fields.                                                                                       |
 | `doc.forms.modify`       | Create, change and delete form fields.                                                                     |
+| `doc.forms.import`       | Import form fields and values with who created and filled them in, and when.                               |
+| `doc.forms.script`       | Write scripts, submit buttons and links into form fields.                                                  |
 | `doc.sign`               | Sign the document.                                                                                         |
 | `doc.sign.certify`       | Sign as the certifying signature.                                                                          |
 | `doc.metadata.modify`    | Change the title, author and other metadata.                                                               |
@@ -84,6 +86,11 @@ Some permissions include others: `doc.annotate.modify` includes `doc.annotate.re
 `doc.forms.fill` includes `doc.forms.read`, and `doc.forms.modify` includes `doc.forms.fill` and
 `doc.forms.read`. Each page of these docs says which permission its calls
 need.
+
+`doc.annotate.import`, `doc.forms.import` and `doc.forms.script` come only from a scope that names
+them (or `*`): no other permission, and not `pdf.permissions`, includes them. `doc.forms.script`
+is about writing code into the form, never running it. Scripts run in each viewer, for everyone
+who fills the form in, so putting one in is a separate decision from designing fields.
 
 ## Annotations
 
@@ -223,3 +230,19 @@ annotations.
 with the authors, dates and owners they had in the source document. Only give it to trusted jobs,
 such as syncing from your own database: it lets the caller create annotations in someone else's
 name.
+
+`doc.forms.import` does the same for form fields: an import keeps who created each field and who
+filled it in, instead of naming the importing user. On a signed form, who filled a field in is
+evidence, so give it as carefully.
+
+### Scripts in forms
+
+`doc.forms.script` decides who may put code into a form: scripts that check or calculate a field,
+and buttons that submit the form or open a link. A script runs for everyone who fills the form in
+afterwards. In your viewer it can change what they type or hide fields; opened in another PDF app,
+a script or a submit button can send their answers anywhere. So a user who may design fields
+(`doc.forms.modify`) doesn't get it with that. Buttons that only go to a page, reset the form, or
+show and hide fields need `doc.forms.modify` alone.
+
+It doesn't make a script's result trustworthy: a client can skip scripts and send any value. A
+server that must trust a calculated value calculates it itself.

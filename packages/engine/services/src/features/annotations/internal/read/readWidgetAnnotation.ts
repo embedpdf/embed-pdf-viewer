@@ -45,6 +45,14 @@ export function readWidget(
   const da = readDefaultAppearance(fn, mem, annotPtr);
   return {
     ...base,
+    // Who made and filled a widget is its field's to say: a field merged
+    // with its widget shares one /EMBD_Metadata, and a key never means two
+    // things. The row reports no attribution of its own.
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    modifiedBy: null,
+    importedBy: null,
     subtype: 'widget',
     color: readMKColor(fn, mem, annotPtr, MK_BORDER_COLOR),
     interiorColor: readMKColor(fn, mem, annotPtr, MK_BACKGROUND_COLOR),

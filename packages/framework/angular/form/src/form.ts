@@ -84,6 +84,8 @@ export class EpdfForm extends pluginService({
     'canRead',
     'canFill',
     'canDesign',
+    'canRestoreAttribution',
+    'canWriteScripts',
   ],
   events: [
     'onValueChanged',

@@ -130,6 +130,8 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `removeWidget(ref, widget)` | Takes one box out of its field; it stays on the page, in no field, until `deleteWidget()` removes it                                                                                                  |
 | `repair(options?)`          | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
 | `canDesign()`               | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
+| `canRestoreAttribution()`   | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
+| `canWriteScripts()`         | Whether scripts, submit buttons and links may be written into fields. [Permissions](#permissions)                                                                                                     |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -145,11 +147,14 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 ## Permissions
 
-| Permission         | What it allows                                  | Check              |
-| :----------------- | :---------------------------------------------- | :----------------- |
-| `doc.forms.modify` | Adding, changing, removing and repairing fields | `form.canDesign()` |
+| Permission         | What it allows                                                  | Check                          |
+| :----------------- | :-------------------------------------------------------------- | :----------------------------- |
+| `doc.forms.modify` | Adding, changing, removing and repairing fields                 | `form.canDesign()`             |
+| `doc.forms.import` | Importing fields and values with who created and filled them in | `form.canRestoreAttribution()` |
+| `doc.forms.script` | Writing scripts, submit buttons and links into fields           | `form.canWriteScripts()`       |
 
-Hide the field tools when `canDesign()` is false.
+Hide the field tools when `canDesign()` is false, and the script and submit options of a field's
+actions when `canWriteScripts()` is false. Scripts already in the form run either way.
 
 ## Good to know
 

@@ -1,4 +1,5 @@
 import type {
+  AnnotationActor,
   FormEffect,
   FormEffectResult,
   FormEffectsResult,
@@ -20,6 +21,7 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { throwIfAborted } from '../../shared/abort';
+import { clearFieldFill, stampFieldFill } from './internal/fieldAttribution';
 import { acquireFormModel } from './internal/formModelCache';
 import {
   assertFieldNotLocked,
@@ -63,11 +65,15 @@ export interface AppliedFormEffects {
   wrote: boolean;
 }
 
-/** Ordered, non-rollback-atomic sink for one committed client script run. */
+/**
+ * Ordered, non-rollback-atomic sink for one committed client script run,
+ * whose values count as filled in by `actor`: the user whose fill ran it.
+ */
 export class FormsEffectsApplier {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
+    private readonly actor: AnnotationActor,
   ) {}
 
   apply(effects: FormEffect[], signal: AbortSignal): AppliedFormEffects {
@@ -147,6 +153,7 @@ export class FormsEffectsApplier {
         }
 
         mustFinalize = true;
+        this.stampFills(item.effect, item.fieldObjectNumbers, before);
         this.session.invalidateDerived();
         const fields = this.readFieldsBestEffort(item.fieldObjectNumbers, resultActionBudget);
         const changedWidgets = widgetRefs(native.changedWidgetObjectNumbers, before, fields);
@@ -176,6 +183,31 @@ export class FormsEffectsApplier {
       result: withWidgetRows(this.runtime, this.session, { results, meta }),
       wrote: mustFinalize,
     };
+  }
+
+  /**
+   * Name who filled in each field whose value an applied effect changed: a
+   * script's value is filled in by the user whose fill ran it, and a reset
+   * field by nobody.
+   */
+  private stampFills(
+    effect: FormEffect,
+    fieldObjectNumbers: number[],
+    before: FormFieldDTO<PdfCoordinates>[],
+  ): void {
+    const docPtr = this.session.requireDocPtr();
+    if (effect.kind === 'setValue') {
+      if (!isNoOp(effect, before)) {
+        stampFieldFill(this.runtime, docPtr, fieldObjectNumbers[0]!, this.actor);
+      }
+    } else if (effect.kind === 'reset') {
+      fieldObjectNumbers.forEach((objectNumber, at) => {
+        const field = before[at]!;
+        if (!valueEntriesEqual(field.valueEntry, field.defaultValueEntry)) {
+          clearFieldFill(this.runtime, docPtr, objectNumber);
+        }
+      });
+    }
   }
 
   private preflight(

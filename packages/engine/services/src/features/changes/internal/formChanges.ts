@@ -149,10 +149,15 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
 /** `forms.create`; its reverse deletes the field, when nobody changed it since. */
 export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
-  const { field } = new FormMutator(ctx.runtime, ctx.session).createField(op.draft, ctx.signal, {
-    ...(op.objectNumber !== undefined ? { objectNumber: op.objectNumber } : {}),
-    ...(op.widgetObjectNumbers ? { widgetObjectNumbers: op.widgetObjectNumbers } : {}),
-  });
+  const { field } = new FormMutator(ctx.runtime, ctx.session).createField(
+    op.draft,
+    ctx.signal,
+    ctx.authority.identity,
+    {
+      ...(op.objectNumber !== undefined ? { objectNumber: op.objectNumber } : {}),
+      ...(op.widgetObjectNumbers ? { widgetObjectNumbers: op.widgetObjectNumbers } : {}),
+    },
+  );
   return {
     item: { type: 'forms.create', ...fieldResult(ctx, field) },
     reverse: [{ kind: 'field.remove', objectNumber: numberOf(field.ref), left: field }],
@@ -560,7 +565,12 @@ function writeWidgetDelete(ctx: ChangeContext, widget: WidgetAnnotation<PdfCoord
 function writeValue(ctx: ChangeContext, before: ReadField, value: FormFieldValue): Done {
   const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: before.objectNumber };
   const pending = captureBefore(ctx.runtime, ctx.session, objectsOf(before));
-  const result = new FormMutator(ctx.runtime, ctx.session).setValue(ref, value, ctx.signal);
+  const result = new FormMutator(ctx.runtime, ctx.session).setValue(
+    ref,
+    value,
+    ctx.signal,
+    ctx.authority.identity,
+  );
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
   return {
     item: { type: 'forms.setValue', ...rows(ctx, result) },
@@ -591,7 +601,11 @@ function writeEffect(
 ): Done {
   const before = readField(ctx, ref);
   return recordRevert(ctx, before, type, () => {
-    const { result } = new FormsEffectsApplier(ctx.runtime, ctx.session).apply(
+    const { result } = new FormsEffectsApplier(
+      ctx.runtime,
+      ctx.session,
+      ctx.authority.identity,
+    ).apply(
       [effect],
       ctx.signal,
     );

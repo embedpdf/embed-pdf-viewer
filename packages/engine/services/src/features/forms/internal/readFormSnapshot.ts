@@ -18,6 +18,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
+import { readFieldAttribution } from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 export const FAMILY_BY_CODE: Record<number, FormFieldFamily> = {
@@ -167,6 +168,7 @@ export function readFieldAt(
     valueEntry,
     defaultValueEntry,
     ...(actions ? { actions } : {}),
+    ...readFieldAttribution(runtime, model, fieldIndex),
     widgets: [],
   };
   const scalarValue = entryScalar(valueEntry);

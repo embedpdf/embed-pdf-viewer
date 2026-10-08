@@ -133,9 +133,11 @@ export const PROTECTABLE_CAPABILITIES = [
   'doc.redact',
   'doc.attachments.modify',
   'doc.forms.modify',
+  'doc.forms.script',
   'doc.annotate.modify',
   'doc.annotate.import',
   'doc.forms.fill',
+  'doc.forms.import',
 ] as const satisfies readonly DocCapability[];
 
 export type ProtectableCapability = (typeof PROTECTABLE_CAPABILITIES)[number];
@@ -173,11 +175,15 @@ export function protectedCapabilities(protection: DocumentProtection | null): Se
   out.add('doc.redact');
   out.add('doc.attachments.modify');
   out.add('doc.forms.modify');
+  out.add('doc.forms.script');
   if (!levelAllows(protection.enforced, 'annotate')) {
     out.add('doc.annotate.modify');
     out.add('doc.annotate.import');
   }
-  if (!levelAllows(protection.enforced, 'fill')) out.add('doc.forms.fill');
+  if (!levelAllows(protection.enforced, 'fill')) {
+    out.add('doc.forms.fill');
+    out.add('doc.forms.import');
+  }
   return out;
 }
 

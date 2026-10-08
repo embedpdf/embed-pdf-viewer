@@ -6,6 +6,7 @@ import {
   formResetFacts,
   opIdOf,
   wirePack,
+  type AnnotationActor,
   type DocumentFormsService,
   type FormDataExport,
   type FormDataFormat,
@@ -106,7 +107,16 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.setValue', effect: 'write', jobId, opId: write.opId, docId, ref, value }),
+        wirePack({
+          kind: 'forms.setValue',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          ref,
+          value,
+          ...this.actor(),
+        }),
     });
     return this.await(submission, 'forms.setValue', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.valueSet', ...payload.result });
@@ -145,7 +155,15 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.applyEffects', effect: 'write', jobId, opId: write.opId, docId, effects }),
+        wirePack({
+          kind: 'forms.applyEffects',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          effects,
+          ...this.actor(),
+        }),
     });
     return this.await(submission, 'forms.applyEffects', (payload) => {
       if (payload.wrote) {
@@ -222,6 +240,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           ...(options.widgetObjectNumbers
             ? { widgetObjectNumbers: [...options.widgetObjectNumbers] }
             : {}),
+          ...this.actor(),
         }),
     });
     return this.await(submission, 'forms.createField', (payload) => {
@@ -444,6 +463,12 @@ export class LocalDocumentFormsService implements DocumentFormsService {
    * The checks before a write: the document is open, the caller may, and the
    * caller's `opId` is valid. Returns the write's `opId`, or the refusal.
    */
+  /** Who the handle's writes act for: stamped as a field's creator or filler. */
+  private actor(): { actor?: AnnotationActor } {
+    const actor = this.guard.actorForCreate();
+    return actor ? { actor } : {};
+  }
+
   private beginWrite(
     cap: 'doc.forms.fill' | 'doc.forms.modify',
     options: WriteOptions | undefined,

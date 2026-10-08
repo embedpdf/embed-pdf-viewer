@@ -26,6 +26,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldTextValueEntry;
         defaultValueEntry: CloudPDF.FormFieldTextDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: CloudPDF.FormWidget[];
         value: string;
         defaultValue: string;
@@ -56,6 +62,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldCheckboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldCheckboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: FormFieldCheckbox.Widgets.Item[];
         checked: boolean;
         exportValue: string;
@@ -94,6 +106,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldRadioValueEntry;
         defaultValueEntry: CloudPDF.FormFieldRadioDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: FormFieldRadio.Widgets.Item[];
         value: string;
         radiosInUnison: boolean;
@@ -133,6 +151,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldComboboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldComboboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: CloudPDF.FormWidget[];
         value: string;
         defaultValue: string;
@@ -170,6 +194,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldListboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldListboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: CloudPDF.FormWidget[];
         selectedValues: string[];
         defaultValue: string[];
@@ -207,6 +237,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldPushbuttonValueEntry;
         defaultValueEntry: CloudPDF.FormFieldPushbuttonDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: CloudPDF.FormWidget[];
     }
 
@@ -231,6 +267,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldSignatureValueEntry;
         defaultValueEntry: CloudPDF.FormFieldSignatureDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: CloudPDF.FormWidget[];
     }
 
@@ -255,6 +297,12 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldUnknownValueEntry;
         defaultValueEntry: CloudPDF.FormFieldUnknownDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        createdBy: string | null;
+        createdAt: string | null;
+        filledBy: string | null;
+        filledByName: string | null;
+        filledAt: string | null;
+        importedBy: string | null;
         widgets: CloudPDF.FormWidget[];
         rawValue: string;
     }

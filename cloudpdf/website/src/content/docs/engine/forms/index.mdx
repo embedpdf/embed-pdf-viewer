@@ -74,6 +74,28 @@ if (field.family === 'listbox') console.log(field.selectedValues); // string[]
 Each option of a dropdown (`combobox`) or list is `{ label, value, selected }`. `label` is what the
 user sees; `value` is what the form stores, and what you pass when you fill the field in.
 
+### Who created and filled it in
+
+A field records who created it and who last filled it in, from the identity the document was opened
+with:
+
+```ts
+field.createdBy; // 'user-17': who created the field, or null
+field.filledBy; // 'user-42': whose fill last changed the value
+field.filledByName; // 'Ann de Vries'
+field.filledAt; // '2026-10-08T10:42:00Z'
+```
+
+| Field                                  | What it is                                                                                                                                                                            |
+| :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `createdBy`, `createdAt`               | Who created the field, and when. `null` for a field another app made.                                                                                                                 |
+| `filledBy`, `filledByName`, `filledAt` | The user whose fill last changed the value, their name, and when. A calculated value counts as filled in by whoever's fill calculated it. `null` after a reset, or an anonymous fill. |
+| `importedBy`                           | Who imported the field with its attribution kept.                                                                                                                                     |
+
+The engine stamps these; a write can't set them. A fill that leaves the value as it was changes
+none of them, and undoing a fill puts the previous ones back. A widget has no attribution of its own:
+its field's is the one.
+
 ### Widgets
 
 A field shows on a page through a **widget**: the box you see and click. Most fields have one. A

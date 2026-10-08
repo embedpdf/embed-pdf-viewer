@@ -17,7 +17,7 @@ import type {
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, formWidget } from '@embedpdf/engine-core/runtime';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationActor, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -38,9 +38,11 @@ import {
   readSignaturesFromModel,
   withSignatureModel,
 } from '../signature/internal/readSignatureModel';
+import { clearFieldFill, stampFieldCreation, stampFieldFill } from './internal/fieldAttribution';
 import {
   applyNativeWrite,
   isAtDefault,
+  isNoOpWrite,
   nativeWriteOf,
   valueEntriesEqual,
   type NativeFieldWrite,
@@ -100,23 +102,28 @@ export class FormMutator {
     private readonly session: DocumentSession,
   ) {}
 
+  /**
+   * Set a field's value, as `actor` filled it in. A write that changes the
+   * value names who filled the field in; one that leaves it as it was only
+   * repaints.
+   */
   setValue(
     ref: FormFieldRef,
     value: FormFieldValue,
     signal: AbortSignal,
+    actor: AnnotationActor,
   ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
 
-    const before = readFieldAt(
-      this.runtime,
-      model,
-      resolved.fieldIndex,
-      this.session.requireDocPtr(),
-    );
-    const changed = this.applyWrite(resolved.fieldObjectNumber, nativeWriteOf(before, value));
+    const docPtr = this.session.requireDocPtr();
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    const write = nativeWriteOf(before, value);
+    const fills = !isNoOpWrite(before, write);
+    const changed = this.applyWrite(resolved.fieldObjectNumber, write);
+    if (fills) stampFieldFill(this.runtime, docPtr, resolved.fieldObjectNumber, actor);
     return this.readBack(resolved.fieldObjectNumber, changed);
   }
 
@@ -157,6 +164,8 @@ export class FormMutator {
         if (changed === null) {
           throw new EngineError(EngineErrorCode.Unknown, `'${before.name}' could not be reset`);
         }
+        // Back at its default, the value was filled in by nobody.
+        clearFieldFill(this.runtime, docPtr, fieldObjectNumberOf(before));
         return { before, changed };
       });
     if (written.length > 0) this.session.invalidateDerived();
@@ -289,13 +298,15 @@ export class FormMutator {
   /**
    * Create a field and (optionally) its widgets as one change: native
    * field creation, widget birth through the annotation plane, adoption,
-   * then field-plane setters. Everything a caller can get wrong is checked
-   * before the first write; any failure after it aborts the job's layer
-   * transaction, so a rejected draft creates nothing.
+   * then field-plane setters, stamped as `actor` created it. Everything a
+   * caller can get wrong is checked before the first write; any failure
+   * after it aborts the job's layer transaction, so a rejected draft creates
+   * nothing.
    */
   createField(
     draft: FormFieldDraft<PdfCoordinates>,
     signal: AbortSignal,
+    actor: AnnotationActor,
     numbers: {
       /** The field's object number; the next free one when absent. */
       readonly objectNumber?: number;
@@ -338,6 +349,7 @@ export class FormMutator {
     // back the field, its widgets and any parent's /Kids together.
     const fieldObjectNumber = this.createFieldNode(draft, objectNumber);
     this.configureNewField(draft, fieldObjectNumber);
+    stampFieldCreation(this.runtime, docPtr, fieldObjectNumber, actor);
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
         this.runtime,

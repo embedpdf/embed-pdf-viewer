@@ -40,6 +40,8 @@ export const caps = {
       read: () => 'doc.forms.read' as const,
       fill: () => 'doc.forms.fill' as const,
       modify: () => 'doc.forms.modify' as const,
+      import: () => 'doc.forms.import' as const,
+      script: () => 'doc.forms.script' as const,
       submit: () => 'doc.forms.submit' as const,
     },
     annotate: {

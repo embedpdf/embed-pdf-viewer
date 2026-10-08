@@ -127,6 +127,10 @@ export {
   type PermissionToken,
 } from './conformance/runPermissionConformance';
 export {
+  runFormAttributionConformance,
+  type FormAttributionConformanceOptions,
+} from './conformance/runFormAttributionConformance';
+export {
   WIDGET_FINDING_CASES,
   runWidgetFindingConformance,
   type WidgetFindingCase,

@@ -14,6 +14,12 @@ const BASE = {
   noExport: false,
   alternateName: null,
   mappingName: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
 } as const;
 
 const RADIO: FormFieldDTO = {

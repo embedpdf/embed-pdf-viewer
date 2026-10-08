@@ -2355,7 +2355,7 @@ export class WorkerHost {
       session,
       req.opId,
       { type: 'forms.setValue', field: req.ref, value: req.value },
-      checkedAuthority(),
+      checkedAuthority(req.actor),
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.setValue', result }, req.artifactPath);
@@ -2385,7 +2385,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const { result, wrote } = new FormsEffectsApplier(this.runtime, session).apply(
+    const { result, wrote } = new FormsEffectsApplier(this.runtime, session, req.actor ?? {}).apply(
       req.effects,
       signal,
     );
@@ -2443,7 +2443,7 @@ export class WorkerHost {
         ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
         ...(req.widgetObjectNumbers ? { widgetObjectNumbers: req.widgetObjectNumbers } : {}),
       },
-      checkedAuthority(),
+      checkedAuthority(req.actor),
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.createField', result }, req.artifactPath);

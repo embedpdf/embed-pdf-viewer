@@ -380,6 +380,16 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   canFill(): boolean;
   /** Whether adding, changing and removing fields is allowed: `doc.forms.modify`. */
   canDesign(): boolean;
+  /**
+   * Whether an import may restore who created and filled in the fields it
+   * brings, instead of naming the importing user: `doc.forms.import`.
+   */
+  canRestoreAttribution(): boolean;
+  /**
+   * Whether scripts, submit buttons and links may be written into fields:
+   * `doc.forms.script`. Running a form's scripts never needs it.
+   */
+  canWriteScripts(): boolean;
 
   // ── events ──
   /** A field's value changed, whoever changed it. */

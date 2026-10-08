@@ -1,4 +1,5 @@
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { IsoDateTime } from '../dto/IsoDateTime';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { FormValueEntry } from './value-entry';
@@ -102,6 +103,27 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   defaultValueEntry: FormValueEntry;
   /** Effective inherited field `/AA` actions. */
   actions?: PdfFieldActions<C['destination']>;
+  /**
+   * The user who created the field, as the creating session's identity
+   * named them; `null` for a field another tool made, or an anonymous
+   * session.
+   */
+  createdBy: string | null;
+  /** When the field was created; `null` when nobody recorded it. */
+  createdAt: IsoDateTime | null;
+  /**
+   * The user whose write last changed the value: a fill, or the script that
+   * fill ran (a calculated total counts as filled by whoever's fill
+   * calculated it). `null` after a reset, or when an anonymous session
+   * filled it last.
+   */
+  filledBy: string | null;
+  /** That user's display name, as their session gave it. */
+  filledByName: string | null;
+  /** When the value last changed by a fill; `null` with `filledBy`. */
+  filledAt: IsoDateTime | null;
+  /** The session that restored this field's attribution in an import. */
+  importedBy: string | null;
   /** The field's widget annotations, in control order. May be empty ("unplaced"). */
   widgets: FormFieldWidget[];
 }

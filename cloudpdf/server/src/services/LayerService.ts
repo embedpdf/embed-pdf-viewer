@@ -1309,7 +1309,7 @@ export class LayerService {
       ctx,
       input,
       { type: 'forms.setValue', field: input.ref, value: input.value },
-      checkedAuthority(),
+      checkedAuthority(actorFromContext(ctx)),
       'form.setValue',
       signal,
     );
@@ -1337,6 +1337,8 @@ export class LayerService {
     signal?: AbortSignal,
   ): Promise<FormEffectsResult> {
     const opId = writeOpIdOf(ctx);
+    // The scripts' values count as filled in by the user whose fill ran them.
+    const actor = actorFromContext(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       const { layer } = materialized;
@@ -1353,6 +1355,7 @@ export class LayerService {
               layerName: input.layerName,
               effects: input.effects,
               artifactPath,
+              ...(actor ? { actor } : {}),
             }),
           signal,
         );
@@ -1477,7 +1480,7 @@ export class LayerService {
         ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
         ...(input.widgetObjectNumbers ? { widgetObjectNumbers: input.widgetObjectNumbers } : {}),
       },
-      checkedAuthority(),
+      checkedAuthority(actorFromContext(ctx)),
       'form.createField',
       signal,
     );

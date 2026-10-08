@@ -167,6 +167,16 @@ describe('pdf.permissions expansion — bit-derived', () => {
     expect(checkCapability('doc.annotate.import', ['*'], NO_BITS)).toBe(true);
   });
 
+  it.each(['doc.forms.import', 'doc.forms.script'] as const)(
+    'never grants %s: only a minted grant carries it',
+    (capability) => {
+      expect(checkCapability(capability, ['pdf.permissions'], ALL_BITS)).toBe(false);
+      expect(checkCapability(capability, ['doc.forms.modify'], ALL_BITS)).toBe(false);
+      expect(checkCapability(capability, [capability], NO_BITS)).toBe(true);
+      expect(checkCapability(capability, ['*'], NO_BITS)).toBe(true);
+    },
+  );
+
   it('pdf.permissions never consults bits when not in scope', () => {
     // Token has explicit doc.download but no pdf.permissions; bits are
     // all set but text.copy is not granted because pdf.permissions wasn't

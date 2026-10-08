@@ -121,21 +121,21 @@ On CloudPDF, the user's token carries both, so your server decides and the viewe
 
 Each plugin's page has a Permissions section with the permission behind each check.
 
-| Plugin                                           | Checks                                                                                                    |
-| :----------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
-| [Documents](../documents/saving#permissions)     | `canDownload()` `canPrint()`                                                                              |
-| [Rendering](../viewing/render#permissions)       | `canRender()`                                                                                             |
-| [Page editing](../documents/pages#permissions)   | `canEdit()`, one answer for every page change; `canExtract()` for copying pages out                       |
-| [Metadata](../documents/metadata#permissions)    | `canUpdate()`                                                                                             |
-| [Selection](../text/selection#permissions)       | `canSelect()` `canCopy()`                                                                                 |
-| [Search](../text/search#permissions)             | `canSearch()`, and `canSearch({ snippets: true })` for the words around each match                         |
-| [Annotations](../annotations/with-code#permissions) | `canRead()` `canCreate()` `canUpdate(ref)` `canDelete(ref)`; `selection.canGroup()` `selection.canUngroup()` |
-| [Comments](../annotations/comments#permissions)  | `canReply(ref)` `canSetText(ref)` `canSetStatus(ref)` `canSetMarked(ref)` `canDelete(ref)` `canDeleteThread(ref)` |
-| [Stamps](../annotations/stamps#permissions)      | `canPlace()` `canCreateFromAnnotations()`                                                                 |
-| [Measurements](../annotations/measurements#permissions) | `canMeasure(page)` `canCalibrate()`                                                                |
-| [Redaction](../annotations/redaction#permissions) | `canMark()` `canUnmark(ref)` `canUpdateLabel(ref)` `canApply()`                                          |
-| [Forms](../forms#permissions)                    | `canRead()` `canFill()`; [building forms](../forms/building#permissions): `canDesign()`                  |
-| [Signatures](../forms/signatures#permissions)    | `canSign()` `canCertify()` `canFill()` `canReadRevision()`                                               |
+| Plugin                                                  | Checks                                                                                                                                |
+| :------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------ |
+| [Documents](../documents/saving#permissions)            | `canDownload()` `canPrint()`                                                                                                          |
+| [Rendering](../viewing/render#permissions)              | `canRender()`                                                                                                                         |
+| [Page editing](../documents/pages#permissions)          | `canEdit()`, one answer for every page change; `canExtract()` for copying pages out                                                   |
+| [Metadata](../documents/metadata#permissions)           | `canUpdate()`                                                                                                                         |
+| [Selection](../text/selection#permissions)              | `canSelect()` `canCopy()`                                                                                                             |
+| [Search](../text/search#permissions)                    | `canSearch()`, and `canSearch({ snippets: true })` for the words around each match                                                    |
+| [Annotations](../annotations/with-code#permissions)     | `canRead()` `canCreate()` `canUpdate(ref)` `canDelete(ref)`; `selection.canGroup()` `selection.canUngroup()`                          |
+| [Comments](../annotations/comments#permissions)         | `canReply(ref)` `canSetText(ref)` `canSetStatus(ref)` `canSetMarked(ref)` `canDelete(ref)` `canDeleteThread(ref)`                     |
+| [Stamps](../annotations/stamps#permissions)             | `canPlace()` `canCreateFromAnnotations()`                                                                                             |
+| [Measurements](../annotations/measurements#permissions) | `canMeasure(page)` `canCalibrate()`                                                                                                   |
+| [Redaction](../annotations/redaction#permissions)       | `canMark()` `canUnmark(ref)` `canUpdateLabel(ref)` `canApply()`                                                                       |
+| [Forms](../forms#permissions)                           | `canRead()` `canFill()`; [building forms](../forms/building#permissions): `canDesign()` `canRestoreAttribution()` `canWriteScripts()` |
+| [Signatures](../forms/signatures#permissions)           | `canSign()` `canCertify()` `canFill()` `canReadRevision()`                                                                            |
 
 A [command](../ui/commands)'s `enabled` is where these checks go, so every toolbar button and
 shortcut follows them.

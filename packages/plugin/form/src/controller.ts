@@ -50,6 +50,8 @@ export function createFormController(ctx: FormContext) {
       canRead: () => ctx.allows('doc.forms.read'),
       canFill: () => ctx.allows('doc.forms.fill'),
       canDesign: () => ctx.allows('doc.forms.modify'),
+      canRestoreAttribution: () => ctx.allows('doc.forms.import'),
+      canWriteScripts: () => ctx.allows('doc.forms.script'),
       onValueChanged: events.valueChanged.on,
       onFieldCreated: events.fieldCreated.on,
       onFieldUpdated: events.fieldUpdated.on,

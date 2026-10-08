@@ -697,6 +697,8 @@ export interface FormsSetValueWorkerRequest extends WriteJobFields {
   ref: FormFieldRef;
   value: FormFieldValue;
   artifactPath?: string;
+  /** Who fills the field in, stamped as its filler when the value changes; absent when anonymous. */
+  actor?: AnnotationActor;
 }
 
 export interface FormsResetWorkerRequest extends WriteJobFields {
@@ -718,6 +720,8 @@ export interface FormsApplyEffectsWorkerRequest extends WriteJobFields {
   layerName?: string;
   effects: FormEffect[];
   artifactPath?: string;
+  /** The user whose fill ran the scripts, stamped as the filler of each value they change. */
+  actor?: AnnotationActor;
 }
 
 export interface FormsExportWorkerRequest {
@@ -766,6 +770,8 @@ export interface FormsCreateFieldWorkerRequest<
   /** Its widgets' object numbers, in `draft.widgets` order; the next free ones when absent. */
   widgetObjectNumbers?: number[];
   artifactPath?: string;
+  /** Who creates the field, stamped as its creator; absent when anonymous. */
+  actor?: AnnotationActor;
 }
 
 export interface FormsUpdateFieldWorkerRequest extends WriteJobFields {

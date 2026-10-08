@@ -18557,6 +18557,35 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "filledBy": {
+                "type": "string",
+                "nullable": true
+              },
+              "filledByName": {
+                "type": "string",
+                "nullable": true
+              },
+              "filledAt": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+                  }
+                ],
+                "nullable": true
+              },
+              "importedBy": {
+                "type": "string",
+                "nullable": true
+              },
               "widgets": {
                 "type": "array",
                 "items": {
@@ -18600,6 +18629,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family",
               "value",
@@ -18646,6 +18681,24 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "createdBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
+              },
+              "createdAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+              },
+              "filledBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledBy"
+              },
+              "filledByName": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledByName"
+              },
+              "filledAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledAt"
+              },
+              "importedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/importedBy"
               },
               "widgets": {
                 "type": "array",
@@ -18708,6 +18761,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family",
               "checked",
@@ -18751,6 +18810,24 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "createdBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
+              },
+              "createdAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+              },
+              "filledBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledBy"
+              },
+              "filledByName": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledByName"
+              },
+              "filledAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledAt"
+              },
+              "importedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/importedBy"
+              },
               "widgets": {
                 "type": "array",
                 "items": {
@@ -18782,6 +18859,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family",
               "value",
@@ -18825,6 +18908,24 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "createdBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
+              },
+              "createdAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+              },
+              "filledBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledBy"
+              },
+              "filledByName": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledByName"
+              },
+              "filledAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledAt"
+              },
+              "importedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/importedBy"
               },
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
@@ -18873,6 +18974,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family",
               "value",
@@ -18918,6 +19025,24 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "createdBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
+              },
+              "createdAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+              },
+              "filledBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledBy"
+              },
+              "filledByName": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledByName"
+              },
+              "filledAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledAt"
+              },
+              "importedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/importedBy"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
               },
@@ -18958,6 +19083,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family",
               "selectedValues",
@@ -19003,6 +19134,24 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "createdBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
+              },
+              "createdAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+              },
+              "filledBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledBy"
+              },
+              "filledByName": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledByName"
+              },
+              "filledAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledAt"
+              },
+              "importedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/importedBy"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
               },
@@ -19022,6 +19171,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family"
             ],
@@ -19062,6 +19217,24 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "createdBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
+              },
+              "createdAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+              },
+              "filledBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledBy"
+              },
+              "filledByName": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledByName"
+              },
+              "filledAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledAt"
+              },
+              "importedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/importedBy"
               },
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
@@ -19082,6 +19255,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family"
             ],
@@ -19122,6 +19301,24 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "createdBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
+              },
+              "createdAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdAt"
+              },
+              "filledBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledBy"
+              },
+              "filledByName": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledByName"
+              },
+              "filledAt": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/filledAt"
+              },
+              "importedBy": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/importedBy"
               },
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
@@ -19145,6 +19342,12 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "createdBy",
+              "createdAt",
+              "filledBy",
+              "filledByName",
+              "filledAt",
+              "importedBy",
               "widgets",
               "family",
               "rawValue"
