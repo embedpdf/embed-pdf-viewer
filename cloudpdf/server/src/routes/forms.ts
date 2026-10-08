@@ -5,6 +5,7 @@ import {
   decodeAnnotKey,
   decodeFieldRefKey,
   toPageRef,
+  draftWritesScripts,
   wirePack,
   writesScripts,
   type FieldPosition,
@@ -234,6 +235,10 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         req.body ?? {},
         'body',
       );
+      // An action that runs a script, submits or links takes doc.forms.script too.
+      if (writesScripts(patch.actions)) {
+        requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+      }
       setNoStore(reply);
       return layerService.updateFormWidget(
         ctx,
@@ -466,8 +471,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       req.body,
       'request body',
     );
-    // Writing a script takes doc.forms.script too.
-    if (writesScripts(draft.actions)) {
+    // Writing a script, the field's or a widget's, takes doc.forms.script too.
+    if (draftWritesScripts(draft)) {
       requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
     }
     const objectNumber = objectNumberQuery(req.query, 'objectNumber');
@@ -678,6 +683,10 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         req.body,
         'body',
       );
+      // An action that runs a script, submits or links takes doc.forms.script too.
+      if (writesScripts(placement.actions)) {
+        requireLayerCapability(req, docId, layerName, 'doc.forms.script', pdfBits, protection);
+      }
       const objectNumber = objectNumberQuery(req.query, 'objectNumber');
       const splitObjectNumber = objectNumberQuery(req.query, 'splitObjectNumber');
       setNoStore(reply);

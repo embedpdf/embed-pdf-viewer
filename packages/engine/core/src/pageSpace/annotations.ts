@@ -1,6 +1,6 @@
 import {
-  mapAnnotationActions,
   mapLinkTarget,
+  mapTriggerActions,
   pageDestinationOf,
   pdfDestinationOf,
   type VisibleBoxOf,
@@ -15,7 +15,6 @@ import {
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationSubtype } from '../annotation/subtype';
 import type { PdfMeasurement } from '../dto/Measure';
-import type { PdfAnnotationActions } from '../dto/PdfAction';
 import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { PdfLinkTarget } from '../dto/PdfLinkTarget';
 import {
@@ -64,8 +63,10 @@ const TO_PAGE: Record<MeasuredFieldSpace, Converter> = {
   measure: (measure: PdfMeasurement, { visible }) => pageMeasureOf(measure, visible),
   linkTarget: (target: PdfLinkTarget<PdfDestination>, { boxOf }) =>
     mapLinkTarget(target, (destination) => pageDestinationOf(destination, boxOf)),
-  actions: (actions: PdfAnnotationActions<PdfDestination>, { boxOf }) =>
-    mapAnnotationActions(actions, (destination) => pageDestinationOf(destination, boxOf)),
+  actions: (actions: object, { boxOf }) =>
+    mapTriggerActions(actions, (destination: PdfDestination) =>
+      pageDestinationOf(destination, boxOf),
+    ),
 };
 
 const TO_PDF: Record<MeasuredFieldSpace, Converter> = {
@@ -85,8 +86,10 @@ const TO_PDF: Record<MeasuredFieldSpace, Converter> = {
   measure: (measure: PdfMeasurement, { visible }) => pdfMeasureOf(measure, visible),
   linkTarget: (target: PdfLinkTarget<PageDestination>, { boxOf }) =>
     mapLinkTarget(target, (destination) => pdfDestinationOf(destination, boxOf)),
-  actions: (actions: PdfAnnotationActions<PageDestination>, { boxOf }) =>
-    mapAnnotationActions(actions, (destination) => pdfDestinationOf(destination, boxOf)),
+  actions: (actions: object, { boxOf }) =>
+    mapTriggerActions(actions, (destination: PageDestination) =>
+      pdfDestinationOf(destination, boxOf),
+    ),
 };
 
 /**

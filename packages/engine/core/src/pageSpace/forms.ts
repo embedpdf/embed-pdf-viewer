@@ -1,6 +1,12 @@
 import { pageAnnotationOf } from './annotations';
 import type { PageCoordinates, PdfCoordinates } from './coordinates';
-import { mapFieldActions, pageDestinationOf, type VisibleBoxOf } from './destinations';
+import {
+  mapFieldActions,
+  mapTriggerActions,
+  pageDestinationOf,
+  pdfDestinationOf,
+  type VisibleBoxOf,
+} from './destinations';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
@@ -14,7 +20,18 @@ export function pdfWidgetPlacementOf(
   placement: WidgetPlacement<PageCoordinates>,
   boxOf: VisibleBoxOf,
 ): WidgetPlacement<PdfCoordinates> {
-  return { ...placement, rect: pdfRectOf(placement.rect, boxOf(placement.page)) };
+  const { actions, ...rest } = placement;
+  return {
+    ...rest,
+    rect: pdfRectOf(placement.rect, boxOf(placement.page)),
+    ...(actions
+      ? {
+          actions: mapTriggerActions(actions, (destination: PageDestination) =>
+            pdfDestinationOf(destination, boxOf),
+          ),
+        }
+      : {}),
+  } as WidgetPlacement<PdfCoordinates>;
 }
 
 /** A field draft in the file's coordinates: each widget measured on its own page. */

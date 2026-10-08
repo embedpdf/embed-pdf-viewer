@@ -4,10 +4,12 @@ import type {
   WidgetStyleDraftFields,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
-import { rgbOf } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, rgbOf } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions';
 import { borderStyleToCode } from '../shapeBorderStyle';
+import type { AnnotationWriteContext } from './annotationWriteContext';
 import { standardFontToCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import { setAnnotRect } from './annotationWritePrimitives';
@@ -81,14 +83,16 @@ export function applyWidgetDraft(
   annotPtr: Ptr,
   draft: WidgetDraft<PdfCoordinates>,
 ): void {
-  applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
+  // The base writer never writes actions; a widget's are its own (below).
+  const { actions: _actions, ...base } = draft;
+  applyAnnotationBaseDraft(fn, mem, annotPtr, base);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyWidgetStyle(fn, mem, annotPtr, draft);
 }
 
 /**
- * Move/restyle a widget. When the widget is attached to a field the
- * family-correct appearance is re-baked afterwards; on inert widgets the
+ * Move, restyle or retarget a widget. When the widget is attached to a field
+ * the family-correct appearance is re-baked afterwards; on inert widgets the
  * regenerator is a no-op (no /FT context) and that is fine.
  */
 export function applyWidgetPatch(
@@ -96,11 +100,23 @@ export function applyWidgetPatch(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   patch: WidgetPatch<PdfCoordinates>,
+  ctx?: AnnotationWriteContext,
 ): void {
-  applyAnnotationBasePatch(fn, mem, annotPtr, patch);
+  const { actions: _actions, ...base } = patch;
+  applyAnnotationBasePatch(fn, mem, annotPtr, base);
   if (patch.rect) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }
   applyWidgetStyle(fn, mem, annotPtr, patch);
+  if (patch.actions !== undefined) {
+    if (!ctx?.runtime || !ctx.docPtr) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        "writing a widget's actions requires the runtime and the document on the write context",
+      );
+    }
+    // A read's actions sent back unchanged never get here (`checkAnnotationPatch`).
+    writeWidgetActions(ctx.runtime, ctx.docPtr, annotPtr, patch.actions as never);
+  }
   fn.EPDFAnnot_GenerateFormFieldAP(annotPtr);
 }

@@ -45,6 +45,8 @@ export type {
   FieldScriptWrite,
   FieldScriptEvent,
   FieldActionsPatch,
+  WidgetActionEvent,
+  WidgetActionsPatch,
 } from './dto/PdfAction';
 export {
   actionWriteOf,
@@ -52,7 +54,9 @@ export {
   fieldScriptOf,
   isFieldScript,
   needsScriptRight,
+  widgetActionsOf,
   writesScripts,
+  WIDGET_ACTION_EVENTS,
 } from './dto/PdfAction';
 
 // Canonical PDF-document geometry vocabulary (y-up, edges, browser-free).
@@ -555,6 +559,7 @@ export type {
   ListBoxFieldDraft,
   FormFieldDraft,
 } from './forms/draft';
+export { draftWritesScripts } from './forms/draft';
 export type {
   TextFieldPatch,
   CheckboxFieldPatch,

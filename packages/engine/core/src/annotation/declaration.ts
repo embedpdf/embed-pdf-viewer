@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 import { PdfLinkTargetSchema, PdfLinkTargetWritableSchema } from './kinds/link/values';
 import type { AnnotationResourceRole } from './resources';
-import type { PdfAnnotationActions } from '../dto/PdfAction';
-import { PdfAnnotationActionsSchema } from '../dto/PdfAction.schema';
+import type { PdfAnnotationActions, WidgetActionsPatch } from '../dto/PdfAction';
+import { PdfAnnotationActionsSchema, WidgetActionsPatchSchema } from '../dto/PdfAction.schema';
 import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { PageBox, PagePoint, PageQuad } from '../geometry/pageSpace';
 import type { PdfPoint, PdfQuad } from '../geometry/primitives';
@@ -243,7 +243,11 @@ export type PageValue<Space, Value> = Value extends null | undefined
         ? Omit<Value, 'destination'> & { destination: PageDestination }
         : Value
       : Space extends 'actions'
-        ? PdfAnnotationActions<PageDestination>
+        ? Value extends PdfAnnotationActions<PdfDestination>
+          ? PdfAnnotationActions<PageDestination>
+          : Value extends WidgetActionsPatch<PdfDestination>
+            ? WidgetActionsPatch<PageDestination>
+            : Value
         : Space extends 'none' | 'length'
           ? Value
           : PagePointsIn<Value>;
@@ -415,7 +419,8 @@ const PAGE_SPACE_SCHEMAS: Partial<
 > = {
   box: { read: PageBoxSchema, write: PageBoxSchema },
   linkTarget: { read: PdfLinkTargetSchema, write: PdfLinkTargetWritableSchema },
-  actions: { read: PdfAnnotationActionsSchema, write: PdfAnnotationActionsSchema },
+  // Only a widget writes its actions; every other kind's are kept as read.
+  actions: { read: PdfAnnotationActionsSchema, write: WidgetActionsPatchSchema },
 };
 
 interface ZodShapes {

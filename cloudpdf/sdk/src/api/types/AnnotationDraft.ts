@@ -1883,7 +1883,7 @@ export namespace AnnotationDraft {
         createdBy?: unknown | undefined;
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
-        actions?: unknown | undefined;
+        actions?: (CloudPDF.WidgetActionsPatch | null) | undefined;
         color?: (string | null) | undefined;
         interiorColor?: (string | null) | undefined;
         strokeWidth?: number | undefined;

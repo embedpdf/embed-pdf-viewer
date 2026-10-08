@@ -147,6 +147,9 @@ export {
   DocumentActionsSnapshotSchema,
   FieldScriptWriteSchema,
   FieldActionsPatchSchema,
+  PdfActionWriteSchema,
+  WidgetActionsPatchSchema,
+  FileWidgetActionsPatchSchema,
   PdfActionWireComponents,
 } from './dto/PdfAction.schema';
 export type {

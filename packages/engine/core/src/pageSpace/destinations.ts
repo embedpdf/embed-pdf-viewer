@@ -3,6 +3,7 @@ import type {
   NamedJavaScriptAction,
   PdfActionNode,
   PdfActionTree,
+  PdfActionWrite,
   PdfAnnotationActions,
   PdfFieldActions,
   PdfPageActions,
@@ -159,6 +160,38 @@ export function mapActionTree<From, To>(
   convert: Convert<From, To>,
 ): PdfActionTree<To> {
   return { ...tree, root: tree.root ? mapActionNode(tree.root, convert) : null };
+}
+
+/** An action to write, its destinations converted. */
+export function mapActionWrite<From, To>(
+  action: PdfActionWrite<From>,
+  convert: Convert<From, To>,
+): PdfActionWrite<To> {
+  const next = action.next?.map((child) => mapActionWrite(child, convert));
+  const converted =
+    action.type === 'goto' ? { ...action, destination: convert(action.destination) } : action;
+  return (next ? { ...converted, next } : converted) as PdfActionWrite<To>;
+}
+
+/**
+ * A record of triggers as a read has them (trees) or a write takes them
+ * (actions to write, `null` to remove one), its destinations converted.
+ */
+export function mapTriggerActions<From, To>(
+  triggers: object,
+  convert: Convert<From, To>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(triggers as Record<string, unknown>).map(([trigger, value]) => {
+      if (value == null) return [trigger, value];
+      return [
+        trigger,
+        'root' in (value as object)
+          ? mapActionTree(value as PdfActionTree<From>, convert)
+          : mapActionWrite(value as PdfActionWrite<From>, convert),
+      ];
+    }),
+  );
 }
 
 /** Every action tree in a record of triggers (an annotation's, a page's or a field's). */

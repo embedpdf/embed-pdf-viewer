@@ -134,7 +134,8 @@ widgets: [
 ```
 
 To change the look later, update the widget with the same fields (see
-[Move and style widgets](#move-and-style-widgets)).
+[Move and style widgets](#move-and-style-widgets)). An entry also takes what the widget does when
+it's clicked, in `actions` (see [Widget actions](#widget-actions)).
 
 ## Change a field
 
@@ -283,6 +284,38 @@ order of its widgets, this changes the tab order too. An annotation is never a n
 `reorderWidgets()` refuses one with `InvalidArg`; restack annotations with
 [`page.annotations.reorder()`](/docs/engine/annotations#delete-and-reorder).
 
+## Widget actions
+
+A widget can do something when the user clicks it (`activate`), and on its other events: the
+pointer entering or leaving it (`cursorEnter`, `cursorExit`), the mouse button going down and up
+(`mouseDown`, `mouseUp`), getting and losing focus (`focus`, `blur`), and its page opening,
+closing, coming into view or leaving it (`pageOpen`, `pageClose`, `pageVisible`,
+`pageInvisible`). `updateWidget()` takes them in `actions`, and so does each entry of `widgets` in
+`create()` and `addWidget()`:
+
+```ts
+await doc.forms.updateWidget(widget.ref, {
+  actions: {
+    activate: { type: 'reset-form', fields: null, exclude: false },
+    focus: { type: 'javascript', script: 'app.alert("Your name as on your passport");' },
+  },
+});
+
+await doc.forms.updateWidget(widget.ref, { actions: { focus: null } }); // remove one
+```
+
+An action sets that event's, `null` removes it, and an event you leave out keeps its action;
+`actions: null` removes them all. An action runs a script (`javascript`), goes to a page (`goto`,
+with a destination as for [links](/docs/engine/annotations/links#link-to-a-page)), opens a web
+address (`uri`), runs a viewer command (`named`), shows or hides fields (`hide`), or resets or
+submits the form (`reset-form`, `submit-form`). More actions to run after it go in `next`.
+
+The widget's row in `doc.forms.list()` reads them back in `actions`, by event, each as the full
+action. A row's `actions` passed back unchanged keeps them; to change one, pass it as above.
+
+On a field stored in one object with its widget (see [Good to know](#good-to-know)), the widget's
+actions and the field's scripts stay apart: writing one leaves the other as it is.
+
 ## Repair a broken form
 
 Some PDFs ship a form that other PDF apps read differently: fields that show on a page but are
@@ -333,9 +366,11 @@ Each event carries what the call returned, with the rows of the widgets it chang
 
 Creating, changing and deleting fields, adding, moving, restacking and removing widgets and
 repairing the form need `doc.forms.modify`, which includes `doc.forms.fill` and `doc.forms.read`.
-Writing a script also needs `doc.forms.script`: a script runs for everyone who fills the form in
-(see [Scripts in forms](/docs/engine/concepts/permissions#scripts-in-forms)). Removing one doesn't.
-See [Permissions](/docs/engine/concepts/permissions).
+Writing a script, or a widget action that submits the form or opens a web address, also needs
+`doc.forms.script`: it runs for everyone who fills the form in (see
+[Scripts in forms](/docs/engine/concepts/permissions#scripts-in-forms)). Removing one doesn't, and
+widget actions that go to a page, reset the form or show and hide fields need `doc.forms.modify`
+alone. See [Permissions](/docs/engine/concepts/permissions).
 
 A certified document doesn't allow changes to its fields: these calls fail with
 `ProtectedDocument`. See

@@ -14,7 +14,11 @@ import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormDataFormat, FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
-import { FieldActionsPatchSchema, PdfFieldActionsSchema } from '../dto/PdfAction.schema';
+import {
+  FieldActionsPatchSchema,
+  PdfFieldActionsSchema,
+  WidgetActionsPatchSchema,
+} from '../dto/PdfAction.schema';
 
 export { FormFieldRefSchema };
 
@@ -166,6 +170,7 @@ export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z
     page: PageRefSchema,
     rect: PageBoxSchema,
     exportValue: z.string().min(1).optional(),
+    actions: WidgetActionsPatchSchema.optional(),
     ...WIDGET_STYLE_SHAPE,
   })
   .strict() as unknown as z.ZodType<WidgetPlacement>;

@@ -334,8 +334,9 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   /**
    * Add a field with a widget for each place it shows, with every setting the
    * engine takes. Fires `onFieldCreated`. Rejects `permission-denied` without
-   * `doc.forms.modify`, `invalid-input` (a name that's taken, a radio button
-   * without its export value).
+   * `doc.forms.modify`, or without `doc.forms.script` when the field or a
+   * widget gets a script, a submit or a link; `invalid-input` (a name that's
+   * taken, a radio button without its export value).
    */
   create(draft: FormFieldDraft, options?: OperationOptions): Promise<FormFieldResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */
@@ -399,8 +400,8 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    */
   canRestoreAttribution(): boolean;
   /**
-   * Whether scripts, submit buttons and links may be written into fields:
-   * `doc.forms.script`. Running a form's scripts never needs it.
+   * Whether scripts, submit buttons and links may be written into fields and
+   * their widgets: `doc.forms.script`. Running a form's scripts never needs it.
    */
   canWriteScripts(): boolean;
 

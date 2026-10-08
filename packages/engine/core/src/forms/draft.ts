@@ -1,5 +1,9 @@
 import type { WidgetStyleDraftFields } from '../annotation/kinds/widget.shared';
-import type { FieldActionsPatch } from '../dto/PdfAction';
+import {
+  writesScripts,
+  type FieldActionsPatch,
+  type WidgetActionsPatch,
+} from '../dto/PdfAction';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
@@ -19,6 +23,26 @@ export interface WidgetPlacement<
    * `'Yes'` for a checkbox when left out. Other families take none.
    */
   exportValue?: string;
+  /**
+   * What the widget does when clicked (`activate`), entered, focused and so
+   * on. A JavaScript, submit-form or URI action takes `doc.forms.script` too.
+   */
+  actions?: WidgetActionsPatch<C['destination']>;
+}
+
+/**
+ * Whether creating a field from `draft` takes `doc.forms.script`: a script
+ * among its actions, or a widget action that holds JavaScript, a submit or a
+ * link.
+ */
+export function draftWritesScripts(draft: {
+  readonly actions?: FieldActionsPatch;
+  readonly widgets?: readonly { readonly actions?: WidgetActionsPatch<unknown> }[];
+}): boolean {
+  return (
+    writesScripts(draft.actions) ||
+    (draft.widgets ?? []).some((placement) => writesScripts(placement.actions))
+  );
 }
 
 /** An option of a choice field at authoring time. */

@@ -101,8 +101,8 @@ radio group is one field with a widget per button, and a field repeated on every
 reference number in the header, say) has a widget per page, all showing the same value.
 
 Each widget in `field.widgets` has its `page` and its `ref`. The form also lists every widget in
-`widgets`: where it is (`rect`, in points from the page's top-left), how it looks, its state, and
-the ref of the field it belongs to (`field`). So one read is enough to draw your own form layer
+`widgets`: where it is (`rect`, in points from the page's top-left), how it looks, its state,
+what it does when clicked (`actions`), and the ref of the field it belongs to (`field`). So one read is enough to draw your own form layer
 over a page:
 
 ```ts

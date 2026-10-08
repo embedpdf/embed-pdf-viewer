@@ -4,6 +4,7 @@ import {
   deserializeError,
   EngineError,
   EngineErrorCode,
+  draftWritesScripts,
   fieldScriptOf,
   writesScripts,
   type ChangeItem,
@@ -161,7 +162,7 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
 /** `forms.create`; its reverse deletes the field, when nobody changed it since. */
 export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
-  if (writesScripts(op.draft.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
+  if (draftWritesScripts(op.draft)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const { field, calculationOrder } = new FormMutator(ctx.runtime, ctx.session).createField(
     op.draft,
     ctx.signal,
@@ -206,6 +207,7 @@ export function deleteField(ctx: ChangeContext, op: Op<'forms.delete'>, opIndex:
  */
 export function addWidget(ctx: ChangeContext, op: Op<'forms.addWidget'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
+  if (writesScripts(op.placement.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const before = readField(ctx, op.field);
   const pages = new Set([op.placement.page.objectNumber]);
   for (const widget of before.field.widgets) {
@@ -351,6 +353,7 @@ export function updateWidget(
   opIndex: number,
 ): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
+  if (writesScripts(op.patch.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const current = readAnnotation(ctx, op.widget);
   if (current.subtype !== 'widget') {
     throw new EngineError(

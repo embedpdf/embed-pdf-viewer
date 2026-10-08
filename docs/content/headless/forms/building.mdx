@@ -127,6 +127,10 @@ A calculate script puts the field at the end of the order calculations run in;
 `reorderCalculations()` moves it. Writing a script needs `canWriteScripts()`. See
 [Scripts and calculations](/docs/engine/forms/authoring#scripts-and-calculations).
 
+A box can do something when it's clicked, too, such as reset the form: give its entry of
+`widgets` in `create()` its `actions`. A script, a submit or a web link there needs
+`canWriteScripts()` as well. See [Widget actions](/docs/engine/forms/authoring#widget-actions).
+
 ## Remove a field
 
 ```ts
@@ -153,7 +157,7 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `repair(options?)`                      | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
 | `canDesign()`                           | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
 | `canRestoreAttribution()`               | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
-| `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields. [Permissions](#permissions)                                                                                                     |
+| `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields and their boxes. [Permissions](#permissions)                                                                                     |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -173,10 +177,10 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | :----------------- | :-------------------------------------------------------------- | :----------------------------- |
 | `doc.forms.modify` | Adding, changing, removing and repairing fields                 | `form.canDesign()`             |
 | `doc.forms.import` | Importing fields and values with who created and filled them in | `form.canRestoreAttribution()` |
-| `doc.forms.script` | Writing scripts, submit buttons and links into fields           | `form.canWriteScripts()`       |
+| `doc.forms.script` | Writing scripts, submit buttons and links into fields and boxes | `form.canWriteScripts()`       |
 
-Hide the field tools when `canDesign()` is false, and the script and submit options of a field's
-actions when `canWriteScripts()` is false. Scripts already in the form run either way.
+Hide the field tools when `canDesign()` is false, and the script, submit and link options of a
+field's or a box's actions when `canWriteScripts()` is false. Scripts already in the form run either way.
 
 ## Good to know
 

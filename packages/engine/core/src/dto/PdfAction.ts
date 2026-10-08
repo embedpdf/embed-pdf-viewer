@@ -289,6 +289,19 @@ export interface FieldScriptWrite {
 /** The events a field's scripts run on. */
 export type FieldScriptEvent = keyof PdfFieldActions;
 
+/** The events a widget's actions run on: `activate` (`/A`, a click) and its `/AA` events. */
+export type WidgetActionEvent = keyof PdfAnnotationActions;
+
+/**
+ * A widget's actions to write, by event: an action sets the event's, `null`
+ * removes it, and an event left out keeps what it has. Any type a write
+ * makes; a JavaScript, submit-form or URI action anywhere in a tree takes
+ * `doc.forms.script` too.
+ */
+export type WidgetActionsPatch<Destination = PageDestination> = {
+  [Event in WidgetActionEvent]?: PdfActionWrite<Destination> | null;
+};
+
 /**
  * A field's scripts to write, by event: a script sets the event's, `null`
  * removes it, and an event left out keeps what it has. A `calculate` script
@@ -312,11 +325,23 @@ export function needsScriptRight(action: PdfActionWrite<unknown>): boolean {
 }
 
 /**
- * Whether writing a field's scripts takes `doc.forms.script`: it sets a
- * script on any event. Removing scripts (`null`) doesn't.
+ * Whether writing actions, a field's or a widget's, takes `doc.forms.script`:
+ * an event gets a tree holding a JavaScript, submit-form or URI action.
+ * Removing actions (`null`) never does, and neither does a widget's read sent
+ * back: its trees are kept unchanged or refused, never written.
  */
-export function writesScripts(actions: FieldActionsPatch | undefined): boolean {
-  return Object.values(actions ?? {}).some((script) => script != null && needsScriptRight(script));
+export function writesScripts(
+  actions:
+    | FieldActionsPatch
+    | WidgetActionsPatch<unknown>
+    | PdfAnnotationActions<unknown>
+    | null
+    | undefined,
+): boolean {
+  return Object.values(actions ?? {}).some(
+    (action: PdfActionWrite<unknown> | PdfActionTree<unknown> | null | undefined) =>
+      action != null && !('root' in action) && needsScriptRight(action),
+  );
 }
 
 /**
@@ -330,6 +355,42 @@ export function actionWriteOf<Destination>(
   if (tree.incomplete || !tree.root) return null;
   return nodeWriteOf(tree.root);
 }
+
+/**
+ * A widget's read actions as a patch writes them: `null` for an event
+ * without one. An event whose actions a write can't make is left out, so
+ * writing the patch back never removes it.
+ */
+export function widgetActionsOf<Destination>(
+  actions: PdfAnnotationActions<Destination> | null,
+): WidgetActionsPatch<Destination> {
+  const patch: WidgetActionsPatch<Destination> = {};
+  for (const event of WIDGET_ACTION_EVENTS) {
+    const tree = actions?.[event];
+    if (!tree) {
+      patch[event] = null;
+      continue;
+    }
+    const write = actionWriteOf(tree);
+    if (write) patch[event] = write;
+  }
+  return patch;
+}
+
+/** Every event a widget's actions run on, in `EPDF_ANNOT_ACTION_*` order. */
+export const WIDGET_ACTION_EVENTS = [
+  'activate',
+  'cursorEnter',
+  'cursorExit',
+  'mouseDown',
+  'mouseUp',
+  'focus',
+  'blur',
+  'pageOpen',
+  'pageClose',
+  'pageVisible',
+  'pageInvisible',
+] as const satisfies readonly WidgetActionEvent[];
 
 /** The field script of a read tree: `null` unless it is JavaScript all through. */
 export function fieldScriptOf(tree: PdfActionTree<unknown>): FieldScriptWrite | null {

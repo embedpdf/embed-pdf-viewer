@@ -6,9 +6,9 @@ import {
   formResetFacts,
   opIdOf,
   wirePack,
+  draftWritesScripts,
   writesScripts,
   type AnnotationActor,
-  type FieldActionsPatch,
   type FieldPosition,
   type FormCalculationsReorderResult,
   type DocumentFormsService,
@@ -228,7 +228,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     draft: FormFieldDraft,
     options: FormFieldCreateOptions = {},
   ): AbortablePromise<FormFieldCreateResult> {
-    const write = this.beginDesign(options, draft.actions);
+    const write = this.beginDesign(options, draftWritesScripts(draft));
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -280,7 +280,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     patch: FormFieldPatch,
     options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult> {
-    const write = this.beginDesign(options, patch.actions);
+    const write = this.beginDesign(options, writesScripts(patch.actions));
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -316,7 +316,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     placement: WidgetPlacement,
     options: FormWidgetAddOptions = {},
   ): AbortablePromise<FormWidgetLinkResult> {
-    const write = this.beginWrite('doc.forms.modify', options);
+    const write = this.beginDesign(options, writesScripts(placement.actions));
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -388,7 +388,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     patch: WidgetPatch,
     options?: WriteOptions,
   ): AbortablePromise<FormWidgetUpdateResult> {
-    const write = this.beginWrite('doc.forms.modify', options);
+    const write = this.beginDesign(options, writesScripts(patch.actions));
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -502,13 +502,16 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     return actor ? { actor } : {};
   }
 
-  /** A design write: `doc.forms.modify`, and `doc.forms.script` too when it writes scripts. */
+  /**
+   * A design write: `doc.forms.modify`, and `doc.forms.script` too when it
+   * writes scripts, submits or links (`scripts`).
+   */
   private beginDesign(
     options: WriteOptions | undefined,
-    actions: FieldActionsPatch | undefined,
+    scripts: boolean,
   ): ReturnType<LocalDocumentFormsService['beginWrite']> {
     const write = this.beginWrite('doc.forms.modify', options);
-    if (write.rejected || !writesScripts(actions)) return write;
+    if (write.rejected || !scripts) return write;
     const rejected = this.gate('doc.forms.script');
     return rejected ? { rejected } : write;
   }

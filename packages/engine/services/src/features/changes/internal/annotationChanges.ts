@@ -23,6 +23,9 @@ import {
   type PageObjectNumber,
   type PageRef,
   type PdfCoordinates,
+  type PdfAnnotationActions,
+  type PdfDestination,
+  widgetActionsOf,
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 
@@ -63,7 +66,13 @@ type Op<T extends ChangeOp['type']> = Extract<
 /** The ops that update an annotation's dictionary in place: a widget's is a form op. */
 export type UpdateReport = 'annotations.update' | 'forms.updateWidget';
 
-/** What an update may write in an annotation's appearance and attached file. */
+/**
+ * What an update may write in an annotation's appearance and attached file.
+ * A widget's actions need no deep capture: each write makes new action
+ * objects, and the runtime copies a shared `/AA` into the widget before it
+ * changes, so the widget's own dictionary holds the change. Following `/A`
+ * would also reach the fields a reset or submit names.
+ */
 const APPEARANCE_KEYS = ['AP', 'FS'];
 
 // ---------------------------------------------------------------------------
@@ -218,7 +227,12 @@ export function revertAnnotation(
   const keys = Object.keys(left);
   const kept = keys.filter((key) => valuesEqual(now[key], left[key]));
   if (kept.length === 0) return leftAlone(ctx, reports);
-  const patch = Object.fromEntries(kept.map((key) => [key, restore[key]]));
+  // A widget's actions are kept as read (trees) and written as a patch.
+  const writable = (key: string, value: unknown) =>
+    key === 'actions' && current.subtype === 'widget'
+      ? widgetActionsOf(value as PdfAnnotationActions<PdfDestination> | null)
+      : value;
+  const patch = Object.fromEntries(kept.map((key) => [key, writable(key, restore[key])]));
   const done = writeUpdate(ctx, ref, patch as AnnotationPatch<PdfCoordinates>, reports);
   const skipped = keys.filter((key) => !kept.includes(key));
   const item = done.item;

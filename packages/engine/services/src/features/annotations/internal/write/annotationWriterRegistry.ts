@@ -259,7 +259,7 @@ export function applyPatch(
     return;
   }
   if (isWidgetSubtype(subtype)) {
-    applyWidgetPatch(fn, mem, annotPtr, patch as WidgetPatch<PdfCoordinates>);
+    applyWidgetPatch(fn, mem, annotPtr, patch as WidgetPatch<PdfCoordinates>, ctx);
     return;
   }
   if (isPopupSubtype(subtype)) {

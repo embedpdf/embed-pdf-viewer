@@ -1,5 +1,5 @@
 import type { FontIdentityInfo, WireAnnotationResources } from '@embedpdf/engine-core/runtime';
-import type { Ptr } from '@embedpdf/engine-runtime';
+import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
 
@@ -27,6 +27,8 @@ export interface AnnotationWriteContext {
    * family; this is how a key is told apart.
    */
   describeRegisteredFont?: (fontKey: string) => FontIdentityInfo | undefined;
+  /** The runtime, for writers that marshal tables of pointers (a widget's actions). */
+  runtime?: PdfRuntimeModule;
   /** Document pointer — required by writers that create page objects. */
   docPtr?: Ptr;
   /** Page pointer of the annotation being written. */

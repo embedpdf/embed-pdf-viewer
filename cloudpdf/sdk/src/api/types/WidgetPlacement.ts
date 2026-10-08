@@ -6,6 +6,7 @@ export interface WidgetPlacement {
     page: CloudPDF.PageRef;
     rect: WidgetPlacement.Rect;
     exportValue?: string | undefined;
+    actions?: CloudPDF.WidgetActionsPatch | undefined;
     color?: (string | null) | undefined;
     interiorColor?: (string | null) | undefined;
     strokeWidth?: number | undefined;

@@ -1,22 +1,27 @@
 import { CHANGE_FIXTURE_PDF } from './runChangeConformance';
 import type { ConformanceTestRunner } from './runMetadataConformance';
-import type { FieldScriptWrite } from '../dto/PdfAction';
+import type { FieldScriptWrite, PdfActionWrite } from '../dto/PdfAction';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { FormFieldDTO } from '../forms/field';
+import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import { toPageRef } from '../identity/PageRef';
 
 /**
  * A field's scripts, written through `create` and `update`, and the form's
  * calculation order, which follows the calculate scripts and moves by
- * neighbour. Undo puts both back. A field event takes JavaScript only, and
- * writing a script takes `doc.forms.script`.
+ * neighbour; a widget's actions, written through its placement and
+ * `updateWidget`. Undo puts them back. A field event takes JavaScript only;
+ * writing a script, a submit or a link takes `doc.forms.script`, while the
+ * actions that only change the view (go to, reset, show and hide) need
+ * `doc.forms.modify` alone.
  *
  * It runs on {@link CHANGE_FIXTURE_PDF}: the text field `name`, merged with
- * its widget, and no calculation order.
+ * its widget (9) on the first page, and no calculation order.
  */
 
 export interface FormScriptConformanceOptions {
@@ -30,6 +35,9 @@ const EVERYTHING = ['*'] as const;
 const DESIGN_ONLY = ['doc.open', 'doc.render', 'doc.forms.modify'] as const;
 
 const NAME: FormFieldRef = { kind: 'fqn', name: 'name' };
+const PAGE = toPageRef(3);
+const WIDGET: AnnotationRef = { kind: 'objectNumber', page: PAGE, objectNumber: 9 };
+const RESET: PdfActionWrite = { type: 'reset-form', fields: null, exclude: false };
 const script = (source: string): FieldScriptWrite => ({ type: 'javascript', script: source });
 const CALCULATE = script('event.value = 1;');
 
@@ -211,6 +219,150 @@ export function runFormScriptConformance(
         );
         expect(scriptOf(await fieldOf(doc, 'name'), 'format')).toBe(null);
       });
+    });
+
+    /** The widget row of `ref`, as the form reads it. */
+    const rowOf = async (doc: DocumentHandle, ref: AnnotationRef) => {
+      const row = (await doc.forms.list()).widgets.find(
+        (w) => JSON.stringify(w.ref) === JSON.stringify(ref),
+      );
+      if (!row) throw new Error('no widget row');
+      return row;
+    };
+    const actionType = (row: { actions: unknown }, event: string) =>
+      ((row.actions as Record<string, { root?: { type?: string } }> | null)?.[event]?.root?.type ??
+        null) as string | null;
+
+    test("a widget's actions are written with its placement and read back from its row", async () => {
+      await withDoc(async (doc) => {
+        const { field } = await doc.forms.create({
+          family: 'text',
+          name: 'clearing',
+          widgets: [
+            {
+              page: PAGE,
+              rect: { x: 20, y: 200, width: 120, height: 24 },
+              actions: { activate: RESET, focus: script('focused();') },
+            },
+          ],
+        });
+        const [first] = field.widgets;
+        const row = await rowOf(doc, first!.ref!);
+        expect(actionType(row, 'activate')).toBe('reset-form');
+        expect(actionType(row, 'focus')).toBe('javascript');
+
+        const added = await doc.forms.addWidget(field.ref, {
+          page: PAGE,
+          rect: { x: 20, y: 240, width: 120, height: 24 },
+          actions: { blur: script('blurred();') },
+        });
+        const second = added.field.widgets.find((w) => w.objectNumber !== first!.objectNumber)!;
+        expect(actionType(await rowOf(doc, second.ref!), 'blur')).toBe('javascript');
+      });
+    });
+
+    test('updateWidget sets, replaces and removes actions; a read sent back keeps them', async () => {
+      await withDoc(async (doc) => {
+        await doc.forms.update(NAME, { actions: { calculate: CALCULATE } });
+        await doc.forms.updateWidget(WIDGET, {
+          actions: {
+            activate: {
+              type: 'goto',
+              destination: { kind: 'xyz', page: PAGE, x: 10, y: 20, zoom: null },
+            },
+            mouseUp: script('up();'),
+          },
+        });
+        let row = await rowOf(doc, WIDGET);
+        expect(actionType(row, 'activate')).toBe('goto');
+        const goto = row.actions?.activate?.root;
+        expect(goto?.type === 'goto' && goto.destination.kind === 'xyz' && goto.destination.x).toBe(
+          10,
+        );
+        // The field's own script, on the same merged dictionary, is untouched.
+        expect(scriptOf(await fieldOf(doc, 'name'), 'calculate')).toBe('event.value = 1;');
+
+        // A read's actions sent back unchanged are kept.
+        await doc.forms.updateWidget(WIDGET, { actions: row.actions, interiorColor: '#eeeeee' });
+        row = await rowOf(doc, WIDGET);
+        expect(actionType(row, 'mouseUp')).toBe('javascript');
+
+        await doc.forms.updateWidget(WIDGET, { actions: { activate: RESET, mouseUp: null } });
+        row = await rowOf(doc, WIDGET);
+        expect([actionType(row, 'activate'), actionType(row, 'mouseUp')]).toEqual([
+          'reset-form',
+          null,
+        ]);
+      });
+    });
+
+    test("undo puts a widget's actions back", async () => {
+      await withDoc(async (doc) => {
+        await doc.forms.updateWidget(WIDGET, { actions: { activate: RESET } });
+        const changed = await doc.forms.updateWidget(WIDGET, {
+          actions: { activate: script('a();'), focus: script('f();') },
+        });
+        await doc.apply({ undoOf: changed.meta.opId });
+        const row = await rowOf(doc, WIDGET);
+        expect([actionType(row, 'activate'), actionType(row, 'focus')]).toEqual([
+          'reset-form',
+          null,
+        ]);
+      });
+    });
+
+    test('a widget action that only changes the view needs doc.forms.modify alone', async () => {
+      await withDoc(async (doc) => {
+        await doc.forms.updateWidget(WIDGET, { actions: { activate: RESET } });
+        const scripted = [
+          script('x();'),
+          { type: 'uri', uri: 'https://example.com' } as PdfActionWrite,
+          { type: 'submit-form', url: 'https://example.com/in', fields: null } as PdfActionWrite,
+          { ...RESET, next: [script('then();')] } as PdfActionWrite,
+        ];
+        for (const action of scripted) {
+          expect(
+            await outcome(doc.forms.updateWidget(WIDGET, { actions: { activate: action } })),
+          ).toBe(EngineErrorCode.Forbidden);
+        }
+        expect(
+          await outcome(
+            doc.forms.create({
+              family: 'text',
+              name: 'y',
+              widgets: [
+                {
+                  page: PAGE,
+                  rect: { x: 20, y: 300, width: 80, height: 20 },
+                  actions: { activate: script('y();') },
+                },
+              ],
+            }),
+          ),
+        ).toBe(EngineErrorCode.Forbidden);
+        expect(
+          await outcome(
+            doc.forms.addWidget(NAME, {
+              page: PAGE,
+              rect: { x: 20, y: 340, width: 80, height: 20 },
+              actions: { blur: script('b();') },
+            }),
+          ),
+        ).toBe(EngineErrorCode.Forbidden);
+        expect(
+          await outcome(
+            doc.apply({
+              ops: [
+                {
+                  type: 'forms.updateWidget',
+                  widget: WIDGET,
+                  patch: { actions: { focus: script('f();') } },
+                },
+              ],
+            }),
+          ),
+        ).toBe(EngineErrorCode.Forbidden);
+      }, DESIGN_ONLY);
     });
 
     test('writing a script takes doc.forms.script; removing one does not', async () => {

@@ -105,6 +105,7 @@ export class AnnotationMutator {
             describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
           }
         : {}),
+      runtime: this.runtime,
       docPtr: this.session.requireDocPtr(),
       drawings: this.session.drawingIndex(),
       pdfPageCount: (bytes) => pdfPageCountOf(this.runtime.fn, this.runtime.mem, bytes),

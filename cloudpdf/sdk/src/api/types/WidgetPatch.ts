@@ -33,7 +33,7 @@ export interface WidgetPatch {
     createdBy?: unknown | undefined;
     modifiedBy?: unknown | undefined;
     importedBy?: unknown | undefined;
-    actions?: unknown | undefined;
+    actions?: WidgetPatch.Actions | undefined;
     color?: (string | null) | undefined;
     interiorColor?: (string | null) | undefined;
     strokeWidth?: number | undefined;
@@ -92,6 +92,7 @@ export namespace WidgetPatch {
         export type Type = (typeof Type)[keyof typeof Type];
     }
 
+    export type Actions = CloudPDF.WidgetActionsPatch | null | CloudPDF.PdfAnnotationActions | null;
     export const BorderStyle = {
         Solid: "solid",
         Dashed: "dashed",
