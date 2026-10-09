@@ -8,6 +8,12 @@
  * session's own mutation before the mutation's promise resolves, so a verb
  * that awaits its engine call already sees its own write in the mirror.
  *
+ * What the user sees is `view()`: the mirror's value with this session's
+ * pending changes (changes.ts) replayed on top, op by op, through the spec's
+ * `predict`. An answered change leaves the view once the mirror holds the
+ * answer: at once when its events folded, or, when a fold asked to read
+ * again, once that read (or a later full load) lands.
+ *
  * The load protocol:
  *   1. The mirror subscribes to the event stream when it is created.
  *   2. The first load starts once the plugin is connected.
@@ -26,6 +32,7 @@
  *      closes, so it is reactive and a closed instance cannot write it.
  */
 import type { DocumentEvent, DocumentHandle, PageRef } from '@embedpdf/engine-core/runtime';
+import type { ChangeViews, PredictedOp, QueuedChange } from './changes';
 import { isPluginError } from './errors';
 import type { SliceLease } from './store';
 import type { ResourceStatus } from './types';
@@ -76,6 +83,13 @@ export interface MirrorSpec<V> {
    */
   fold(value: V, event: DocumentEvent): V | MirrorReload;
   /**
+   * Apply one op of a change this session staged and the engine hasn't
+   * answered, as the engine will: the same rules, and absolute, so an op the
+   * value already holds changes nothing. Pure. Return `value` itself for an op
+   * it doesn't concern. Without it, `view()` is `get()`.
+   */
+  predict?(value: V, op: PredictedOp): V;
+  /**
    * Read some pages and return how to merge them into the value. Required
    * when `fold` asks for a page-scoped reload; without it such a request
    * reloads everything.
@@ -94,7 +108,10 @@ export interface MirrorSpec<V> {
 }
 
 export interface Mirror<V> {
+  /** What the engine confirmed. */
   get(): V;
+  /** What the user sees: `get()` with this session's pending changes on top (`predict`). */
+  view(): V;
   /** `idle` until the first load starts; stays `ready` while a reload runs. */
   getStatus(): ResourceStatus;
   /** Reload everything. Joins a running load; rejects when the load fails. */
@@ -114,6 +131,10 @@ export interface MirrorEnvironment {
   cell<T>(name: string, initial: T): SliceLease<T>;
   /** Subscribe to the document's confirmed events for the instance's lifetime. */
   onDocumentEvent(listener: (event: DocumentEvent) => void): void;
+  /** The document's pending changes, which `view()` shows. */
+  readonly changes: ChangeViews;
+  /** Wake the store's readers: what `view()` shows changed outside a store write. */
+  notify(): void;
   report(error: unknown): void;
 }
 
@@ -128,6 +149,42 @@ export const isResync = (event: DocumentEvent): boolean =>
 
 export const statusOfFailure = (error: unknown): ResourceStatus =>
   isPluginError(error, 'permission-denied') ? 'forbidden' : 'error';
+
+/** The `opId` of the change an event belongs to, or null for an event of none. */
+export const changeIdOf = (event: DocumentEvent): string | null =>
+  'origin' in event ? (event.origin.tx?.id ?? null) : null;
+
+/** The changes a view shows: the queue's, and the answered ones a mirror keeps, each once. */
+export function showingWith(
+  changes: ChangeViews,
+  kept: Iterable<{ readonly change: QueuedChange }>,
+): QueuedChange[] {
+  const shown = new Map(changes.shown().map((change) => [change.opId, change]));
+  for (const { change } of kept) shown.set(change.opId, change);
+  return [...shown.values()];
+}
+
+/**
+ * Replay changes over a value, in staging order: the shown ones and the
+ * answered ones a mirror still shows. A `predict` that throws is reported,
+ * and the value shows the truth.
+ */
+export function replay<V>(
+  value: V,
+  changes: readonly QueuedChange[],
+  predict: (value: V, op: PredictedOp) => V,
+  report: (error: unknown) => void,
+): V {
+  const ordered = [...changes].sort((left, right) => left.seq - right.seq);
+  let next = value;
+  try {
+    for (const change of ordered) for (const op of change.shows) next = predict(next, op);
+  } catch (error) {
+    report(error);
+    return value;
+  }
+  return next;
+}
 
 /** A mirror plus the kernel-side `start`, called once the plugin is connected. */
 export interface MirrorController<V> {
@@ -146,6 +203,55 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
   let loadAgain = false;
   /** Non-null while a full load runs: the events to replay after it lands. */
   let queued: DocumentEvent[] | null = null;
+  /** How many full loads have started: a load clears what was kept before it started. */
+  let fullLoads = 0;
+
+  /**
+   * Changes this mirror still shows though the engine may have answered them: a
+   * fold asked to read again, and the read hasn't landed. `after`: the full
+   * loads started before; a later full load that lands holds the change too.
+   */
+  const kept = new Map<string, { change: QueuedChange; after: number }>();
+  let keptVersion = 0;
+
+  /** Keep the change an event belongs to until a read lands, when it's one of ours. */
+  const keepUntilRead = (event: DocumentEvent, after: number): string | null => {
+    const opId = changeIdOf(event);
+    const change = opId !== null && spec.predict ? env.changes.find(opId) : undefined;
+    if (!change) return null;
+    kept.set(change.opId, { change, after });
+    keptVersion += 1;
+    return change.opId;
+  };
+
+  const release = (opIds: readonly string[]): void => {
+    let any = false;
+    for (const opId of opIds) any = kept.delete(opId) || any;
+    if (!any) return;
+    keptVersion += 1;
+    env.notify();
+  };
+
+  const releaseLoadedBy = (load: number): void =>
+    release([...kept].filter(([, entry]) => entry.after < load).map(([opId]) => opId));
+
+  let viewMemo: { value: V; version: number; kept: number; view: V } | null = null;
+  const view = (): V => {
+    const value = cell.read().value;
+    if (!spec.predict) return value;
+    const version = env.changes.version();
+    if (
+      viewMemo &&
+      viewMemo.value === value &&
+      viewMemo.version === version &&
+      viewMemo.kept === keptVersion
+    ) {
+      return viewMemo.view;
+    }
+    const next = replay(value, showingWith(env.changes, kept.values()), spec.predict, env.report);
+    viewMemo = { value, version, kept: keptVersion, view: next };
+    return next;
+  };
 
   const announce = (change: MirrorChange<V>): void => {
     try {
@@ -168,7 +274,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
     });
   };
 
-  const reloadPages = async (pages: readonly PageRef[]): Promise<void> => {
+  const reloadPages = async (pages: readonly PageRef[], keptFor: string | null): Promise<void> => {
     try {
       const merge = await spec.loadPages!(env.doc, pages, env.lifetime);
       if (!cell.live) return;
@@ -176,6 +282,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       const next = merge(previous);
       cell.write({ ...cell.read(), value: next });
       announce({ cause: 'load', event: null, pages, previous, next });
+      if (keptFor !== null) release([keptFor]);
     } catch (error) {
       if (isPluginError(error, 'instance-closed') || !cell.live) return;
       // The value is stale for these pages: say so until a full load succeeds.
@@ -195,10 +302,11 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
     }
     if (isReload(result)) {
       const pages = result[RELOAD];
+      const keptFor = keepUntilRead(event, fullLoads);
       if (pages === 'all' || !spec.loadPages) {
         reloadInBackground();
       } else {
-        const reloading = reloadPages(pages).finally(() => pageReloads.delete(reloading));
+        const reloading = reloadPages(pages, keptFor).finally(() => pageReloads.delete(reloading));
         pageReloads.add(reloading);
       }
       return;
@@ -212,8 +320,13 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       if (started) reloadInBackground();
       return;
     }
-    if (queued) queued.push(event);
-    else applyEvent(event);
+    if (queued) {
+      // Folded once the running load lands: shown until then.
+      queued.push(event);
+      keepUntilRead(event, fullLoads - 1);
+    } else {
+      applyEvent(event);
+    }
   });
 
   const loadOnce = async (): Promise<void> => {
@@ -222,6 +335,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       return;
     }
     if (cell.read().status !== 'ready') cell.write({ ...cell.read(), status: 'loading' });
+    const load = ++fullLoads;
     queued = [];
     let loaded: { value: V; cursor?: number | null };
     try {
@@ -246,6 +360,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       if (cursor !== null && serverId !== null && serverId <= cursor) continue;
       applyEvent(event);
     }
+    releaseLoadedBy(load);
   };
 
   function refresh(): Promise<void> {
@@ -275,6 +390,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
   return {
     mirror: {
       get: () => cell.read().value,
+      view,
       getStatus: () => cell.read().status,
       refresh,
       async settled() {

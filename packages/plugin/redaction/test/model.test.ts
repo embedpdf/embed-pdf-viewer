@@ -7,7 +7,7 @@ const result: RedactionApplyResult = {
   scope: { pages: [] },
   results: [],
   removedAnnotationCount: 0,
-  meta: { affectedPages: [], cacheDelta: null },
+  meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: false },
 };
 
 describe('redaction transitions', () => {

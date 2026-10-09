@@ -3,8 +3,8 @@
  * mounted, which part of its page it paints, and the render layer reads which
  * parts are painted, to leave them out of the page's picture.
  */
-import { useInsertionEffect, useSyncExternalStore } from 'react';
 import { pageLayersOf, type PagePart, type PaintedParts } from '@embedpdf/web';
+import { useInsertionEffect, useSyncExternalStore } from 'react';
 
 /**
  * Say, while mounted, that this layer paints `part` of its page (`pageRef`,

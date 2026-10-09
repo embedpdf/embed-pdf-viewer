@@ -1,3 +1,5 @@
+import { createBurstGate } from './bursts';
+import { createDocumentChanges } from './changes';
 import { timerClock, type HostClock } from './clock';
 import { createStore } from './store';
 import {
@@ -270,7 +272,7 @@ interface DocumentSession extends SessionRef {
   /** `connect` halves of `create()`, run once every instance of the document is built. */
   connectors: Map<AnyPlugin, () => void>;
   /** How many changes the document has had since it opened: a download that read them all clears `hasUnsavedChanges`. */
-  changes: number;
+  changeCount: number;
   close(): Promise<void>;
 }
 
@@ -445,9 +447,17 @@ export function createKernel(config: {
       leases: new Map(),
       settleFlushes: new Set(),
       downloadWraps: [],
-      changes: 0,
+      changes: createDocumentChanges({
+        handle: () => session.handle,
+        notify: () => store.notify(),
+        report,
+      }),
+      changeCount: 0,
       close: () => closeSession(session),
     };
+    // A download waits for every change: open holds are sent, and the answers awaited.
+    session.settleFlushes.add(() => session.changes.settle());
+    session.scope.defer(() => session.changes.close());
     return session;
   }
 
@@ -660,11 +670,11 @@ export function createKernel(config: {
       if (!handle) throw new PluginError('not-ready', 'documents', `no open document to ${verb}`);
       let readAt = -1;
       const readFile = () => {
-        readAt = session.changes;
+        readAt = session.changeCount;
         return cancellable('documents', signal, read(handle));
       };
       const bytes = await readWrapped(session.downloadWraps, readFile);
-      if (readAt === session.changes) setUnsavedChanges(session, false);
+      if (readAt === session.changeCount) setUnsavedChanges(session, false);
       return bytes;
     } catch (error) {
       throw toPluginError('documents', error);
@@ -851,9 +861,13 @@ export function createKernel(config: {
     // pages.list(), so this is a direct swap, no merge. Own mutations and
     // remote (collaborator) mutations arrive identically; the handler is
     // origin-agnostic, as the event model intends.
+    // The kernel listens first and last, so a change's events land as one store update.
+    const bursts = createBurstGate(store);
+    session.scope.defer(bursts.close);
     const unsubscribeEvents = session.handle!.events.subscribe((event) => {
+      bursts.first(event);
       if (tracksChanges && changesDocument(event)) {
-        session.changes += 1;
+        session.changeCount += 1;
         setUnsavedChanges(session, true);
       }
       const layout = layoutFromEvent(event);
@@ -895,6 +909,7 @@ export function createKernel(config: {
       buildDocumentCapability(plugin, session);
       session.connectors.get(plugin)?.();
     }
+    session.scope.defer(session.handle!.events.subscribe((event) => bursts.last(event)));
     checkpoint(session);
   }
 

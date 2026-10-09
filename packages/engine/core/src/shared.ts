@@ -799,6 +799,7 @@ export {
   isUndoChange,
   itemWrote,
   objectNumbersNamedBy,
+  objectNumbersReferencedBy,
   resolveChangeResources,
 } from './mutation/Change';
 export { changeFingerprint, isKeptRefusal } from './mutation/changeOutcome';

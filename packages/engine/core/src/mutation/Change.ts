@@ -436,6 +436,33 @@ export function objectNumbersNamedBy<C extends Coordinates, R>(
 }
 
 /**
+ * The object numbers a change's ops refer to: every `{ kind: 'objectNumber' }`
+ * ref anywhere in them, the annotation or field an op writes and the parent
+ * a reply names among them. A change that refers to a number only a refused
+ * change creates can't apply. An undo refers to none: it names its change.
+ */
+export function objectNumbersReferencedBy<C extends Coordinates, R>(
+  change: RecordedChange<C, R>,
+): number[] {
+  if (isUndoChange(change)) return [];
+  const referenced = new Set<number>();
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value === null || typeof value !== 'object' || ArrayBuffer.isView(value)) return;
+    const record = value as Record<string, unknown>;
+    if (record.kind === 'objectNumber' && typeof record.objectNumber === 'number') {
+      referenced.add(record.objectNumber);
+    }
+    for (const field of Object.values(record)) visit(field);
+  };
+  change.ops.forEach(visit);
+  return [...referenced];
+}
+
+/**
  * A change with bytes it owns, ready to send: each op's resources copied
  * (`resolveAnnotationResources`), a file attachment's `file` completed from
  * its `File` (`withFileFromResource`), a signature appearance copied.

@@ -15,8 +15,8 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { annotationKey } from '@embedpdf/core';
 import { CapabilityBinding, injectKernelHost, injectPage } from '@embedpdf/angular/runtime';
+import { annotationKey } from '@embedpdf/core';
 import { FormToken as FormHostToken, type ShownWidget } from '@embedpdf/plugin-form/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {

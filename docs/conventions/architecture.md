@@ -61,26 +61,28 @@ in reverse order, and then fires `documents.onClosed`.
 
 ## Four kinds of state
 
-| Kind     | What it is                                                                                  | Where it lives                                                              | How it changes                                                                             | Examples                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Mirror   | A local copy of data the engine owns                                                        | `ctx.mirror(spec)` or `ctx.pageMirror(spec)`: a store cell of its own       | Only by folding confirmed engine events (every origin) and by loads. Verbs never write it. | form fields, annotation records, metadata, signatures, links per page, text geometry per page |
-| Overlay  | A local change the engine has not confirmed yet                                             | Session state, keyed by the record it changes                               | Added by a verb or gesture; dropped when the writes carrying it settle, success or failure | an annotation the user moved, shown at its new place until its engine write settles           |
-| Session  | State the client owns that is not in the PDF                                                | `ctx.state`                                                                 | Only through named pure transitions in `model.ts`                                          | camera, open surfaces, active tool, selection, search session, in-flight flags                |
-| Resource | Anything that is not plain data: handles, rasters, workers, registries of functions, caches | Closures in the controller, released through `ctx.cleanup` or `ctx.acquire` | However the owner likes; readers are woken with `ctx.notify()`                             | raster store, tile manager, command and tool registries, script sandboxes                     |
+| Kind           | What it is                                                                                  | Where it lives                                                                                  | How it changes                                                                                                                   | Examples                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Mirror         | A local copy of data the engine owns                                                        | `ctx.mirror(spec)` or `ctx.pageMirror(spec)`: a store cell of its own                           | Only by folding confirmed engine events (every origin) and by loads. Verbs never write it.                                       | form fields, annotation records, metadata, signatures, links per page, text geometry per page |
+| Pending change | A change this session staged that the engine hasn't answered                                | The document's change queue (`ctx.changes`), shared by its plugins; mirrors show it in `view()` | Staged by a verb or gesture; leaves the views once the engine answered and each mirror holds the answer, or at once when refused | three annotations the user moved, shown at their new places until the engine answers          |
+| Session        | State the client owns that is not in the PDF                                                | `ctx.state`                                                                                     | Only through named pure transitions in `model.ts`                                                                                | camera, open surfaces, active tool, selection, search session, in-flight flags                |
+| Resource       | Anything that is not plain data: handles, rasters, workers, registries of functions, caches | Closures in the controller, released through `ctx.cleanup` or `ctx.acquire`                     | However the owner likes; readers are woken with `ctx.notify()`                                                                   | raster store, tile manager, command and tool registries, script sandboxes                     |
 
-What the UI sees is mirror, overlay and session combined by pure, memoized
-reads.
+What the UI sees is each mirror's `view()` (the confirmed value with the
+pending changes replayed on top) and session state, combined by pure,
+memoized reads.
 
 Rules:
 
 - A mirror always holds what the engine confirmed. Nothing optimistic enters
   it.
-- An overlay entry is dropped when the writes carrying it settle, whether
-  they succeeded (the mirror already holds the confirmed result) or failed
-  (the change is wrong). Rollback is deletion: the reads show the mirror
-  again, never a copy taken before the write.
-- A new record has no key until the engine answers, so its entry carries one
-  its confirmation will carry too (an annotation's `/NM`).
+- A pending change leaves the views when the engine answered: an applied one
+  once each mirror holds the answer, a refused one at once. Rollback is
+  leaving: the views show the mirror again, never a copy taken before the
+  change.
+- A new object is named at birth: its create takes a reserved object number
+  (`ctx.changes.takeObjectNumber()`), so everything that holds it before the
+  engine answers holds its final ref.
 - State is plain data: no functions, class instances, handles, `Map`s or
   `Set`s in `ctx.state` or a mirror. Anything else is a resource.
 - No state exists only to wake the UI. A counter bumped so that selectors
@@ -94,10 +96,10 @@ Rules:
  user gesture or API call
           │
           ▼
-   capability verb ──(optional)──► overlay entry (session state)
+   capability verb ──► ctx.changes.stage(change) ──► every mirror's view() shows it
           │
           ▼
-   await ctx.doc.<service>.<mutation>(...)
+   doc.apply(change), after everything staged before it
           │                                   another session's mutation
           ▼                                              │
    engine confirms ─► document event (origin: local) ◄───┘ (origin: remote)
@@ -106,7 +108,7 @@ Rules:
    mirror fold(value, event)  ── the same code for every origin
           │
           ├─► new mirror value (its store cell)
-          ├─► overlay entries matching the confirmation are dropped
+          ├─► the answered change leaves the view
           └─► the plugin's fact events fire (origin = event.origin)
           │
           ▼

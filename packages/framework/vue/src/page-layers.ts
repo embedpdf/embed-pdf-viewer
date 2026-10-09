@@ -3,9 +3,9 @@
  * it lives, which part of its page it paints, and the render layer reads which
  * parts are painted, to leave them out of the page's picture.
  */
+import { pageLayersOf, type PagePart, type PaintedParts } from '@embedpdf/web';
 import { onMounted, shallowRef, watch } from 'vue';
 import type { Ref, ShallowRef } from 'vue';
-import { pageLayersOf, type PagePart, type PaintedParts } from '@embedpdf/web';
 
 /**
  * Say, for as long as this component lives, that it paints `part` of its page

@@ -6,12 +6,12 @@ kinds of state are introduced in [`architecture.md`](./architecture.md); every
 API below is a member of the `PluginContext` a plugin's `create(ctx)` receives
 (`packages/core/main/src/types.ts`).
 
-| Kind     | API                                                                      |
-| -------- | ------------------------------------------------------------------------ |
-| Session  | `ctx.state` (`get`, `update`, `onChange`)                                |
-| Mirror   | `ctx.mirror(spec)`, `ctx.pageMirror(spec)`                               |
-| Overlay  | session state, matched to confirmations in a mirror's `changed` callback |
-| Resource | closures, `ctx.notify()`, `ctx.cleanup`, `ctx.acquire`                   |
+| Kind            | API                                                                         |
+| --------------- | --------------------------------------------------------------------------- |
+| Session         | `ctx.state` (`get`, `update`, `onChange`)                                   |
+| Mirror          | `ctx.mirror(spec)`, `ctx.pageMirror(spec)`                                  |
+| Pending changes | `ctx.changes` (`stage`, `hold`, `group`), a mirror's `predict` and `view()` |
+| Resource        | closures, `ctx.notify()`, `ctx.cleanup`, `ctx.acquire`                      |
 
 ## Session state: `ctx.state`
 
@@ -107,15 +107,16 @@ two ways only: a load (the whole value, or some pages of it) and a fold (one
 confirmed event applied by a pure function). Mirrors exist in
 document-scoped plugins only.
 
-| Spec member                      | Meaning                                                                                                                                                                           |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                           | Unique within the plugin; names the store cell and appears in errors.                                                                                                             |
-| `initial()`                      | The value before the first load lands.                                                                                                                                            |
-| `readable?()`                    | Asked before every load. `false`: status `forbidden`, no engine read.                                                                                                             |
-| `load(doc, signal)`              | Read the whole value: `{ value, cursor? }`. `cursor` is the newest server event the snapshot already contains (cloud engines); omit it otherwise.                                 |
-| `fold(value, event)`             | Apply one confirmed event. Pure, the same for every origin. Returns `value` itself when the event does not apply, or `reload(...)` when the event does not carry enough to apply. |
-| `loadPages?(doc, pages, signal)` | Read some pages and return `(value) => value` merging them in. Needed when `fold` returns `reload({ pages })`.                                                                    |
-| `changed?(change)`               | Runs after every load (even one that changed nothing) and after every event that changed the value. The one place the plugin emits the events this data drives.                   |
+| Spec member                      | Meaning                                                                                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                           | Unique within the plugin; names the store cell and appears in errors.                                                                                                                 |
+| `initial()`                      | The value before the first load lands.                                                                                                                                                |
+| `readable?()`                    | Asked before every load. `false`: status `forbidden`, no engine read.                                                                                                                 |
+| `load(doc, signal)`              | Read the whole value: `{ value, cursor? }`. `cursor` is the newest server event the snapshot already contains (cloud engines); omit it otherwise.                                     |
+| `fold(value, event)`             | Apply one confirmed event. Pure, the same for every origin. Returns `value` itself when the event does not apply, or `reload(...)` when the event does not carry enough to apply.     |
+| `predict?(value, op)`            | Apply one op of this session's pending changes, as the engine will. Pure and absolute (see [Pending changes](#pending-changes)). Returns `value` itself for an op it doesn't concern. |
+| `loadPages?(doc, pages, signal)` | Read some pages and return `(value) => value` merging them in. Needed when `fold` returns `reload({ pages })`.                                                                        |
+| `changed?(change)`               | Runs after every load (even one that changed nothing) and after every event that changed the value. The one place the plugin emits the events this data drives.                       |
 
 The metadata plugin is a complete mirror plugin in one file
 (`packages/plugin/metadata/src/controller.ts`):
@@ -233,7 +234,8 @@ interface MirrorChange<V> {
 
 | Member        | Behavior                                                                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `get()`       | The current value.                                                                                                                                                       |
+| `get()`       | The value the engine confirmed.                                                                                                                                          |
+| `view()`      | What the user sees: `get()` with this session's pending changes replayed on top through `predict`. `get()` when the spec has no `predict`.                               |
 | `getStatus()` | `idle` until the first load starts, `loading` while it runs, then `ready`. Stays `ready` while a reload runs. `forbidden` or `error` after a failed load or page reload. |
 | `refresh()`   | Reload everything. Joins a running load; rejects when the load fails.                                                                                                    |
 | `settled()`   | Resolves once no load or page reload runs, including reloads started while it waits. Never rejects.                                                                      |
@@ -253,11 +255,13 @@ current.
 | `load(doc, page, signal)`   | Read one page's value.                                                                                                                                                       |
 | `affected(event)`           | Which pages an event makes stale: a list, `'all'` (every loaded page), or `null`. Only loaded pages are touched.                                                             |
 | `fold?(value, event, page)` | Apply an event to an affected page instead of re-reading it; return `'reload'` to re-read. Without `fold`, affected pages are re-read.                                       |
+| `predict?(value, op, page)` | Apply one op of this session's pending changes to a loaded page's value, as a mirror's `predict` does.                                                                       |
 | `changed?(change)`          | Runs after every load of a page (even one that changed nothing) and every applied change. `change` is `{ page, cause: 'load' \| 'event' \| 'drop', event, previous, next }`. |
 
 | Member               | Behavior                                            |
 | -------------------- | --------------------------------------------------- |
 | `get(page)`          | The page's value, or `undefined` before it loaded.  |
+| `view(page)`         | `get(page)` with the pending changes on top.        |
 | `getStatus(page)`    | `idle`, `loading`, `ready`, `forbidden` or `error`. |
 | `ensureLoaded(page)` | Load the page unless it is loaded or loading.       |
 | `refresh(page?)`     | Re-read one page, or every loaded page.             |
@@ -295,48 +299,107 @@ const pages = ctx.pageMirror<readonly Link[]>({
 });
 ```
 
-## Overlays
+## Pending changes
 
-An overlay entry is a local change the engine has not confirmed yet. It lives
-in session state, next to (never inside) the mirror, and reads combine the
-two. The rules:
+A user action is one change: a list of the engine's ops (`ChangeOp`),
+applied all or nothing by `doc.apply`, sent as one request, undone as one
+step. A plugin describes its writes as ops and stages them on the document's
+change queue, `ctx.changes`, which every plugin of the document shares:
 
-- **One entry per write, holding what that write carries.** A record's new
-  flags, its new geometry, its typed text: each is its own entry, so settling
-  one write never touches other outstanding work on the same record.
-- **Keyed by the record, following it.** When a record gets another key (a new
-  record confirmed under the engine's key), its entries move with it. A new record has no key until the engine answers,
-  so its create carries one the confirmation carries too, chosen before the
-  engine call; a write to a record that does not exist in the engine yet waits
-  for its create.
-- **Refused: dropped at once.** The change is wrong; the reads show the
-  mirror, including anything another session changed meanwhile. Rollback is
-  deletion; nothing is restored from a copy.
-- **Accepted: dropped once the mirror holds it**, and only after every older
-  entry of the same record settled, so the view never falls back to an older
-  version of what the user did. The engine publishes before it resolves, so an
-  exactly folded event is in the mirror already; an event that asked for a
-  page read is in once that read succeeded. While the mirror is stale (a read
-  failed), accepted entries stay: the engine accepted them.
+```ts
+// Moving three selected annotations.
+ctx.changes.stage({
+  label: { key: 'annotation.move', count: 3 },
+  ops: moved.map(({ ref, rect }) => ({
+    type: 'annotations.update',
+    ref,
+    patch: { rect },
+  })),
+  undo: before.map(({ ref, rect }) => ({
+    type: 'annotations.update',
+    ref,
+    patch: { rect },
+  })),
+});
+```
 
-The annotation plugin is the reference
-(`packages/plugin/annotation/README.md`): `services/intents.ts` stages a
-message's changes and settles them, `model.ts` holds the transitions
-(`stage`, `writeSettled`, `followRecord`), and `services/record-identity.ts`
-is the one place a record changes its key: it matches new records to their
-confirmation by `/NM` and moves everything keyed by the record, including
-what other areas keep per record.
+- **Shown at once.** Before `stage` returns, every mirror's `view()` shows the
+  change: the mirror replays the pending changes over its value, op by op,
+  through its spec's `predict`.
+- **Sent in order.** The queue sends a change after everything staged before
+  it; the engine keeps that order. `stage` returns the `PendingChange`: its
+  `opId` (what its events carry as `origin.tx.id`) and `result`, the engine's
+  answer.
+- **`label`** names it in history and refusals: an i18n key and its values.
+  **`undo`** says what undoing it looks like, so a history can draw it; it is
+  never sent. `history: false` keeps a change out of the history.
 
-A write that shows no value before it is confirmed needs no overlay. An in-flight flag in
-session state is enough: the form plugin marks a field in `writing` for the
-duration of its write (`beginWrite` / `endWrite` in
-`packages/plugin/form/src/model.ts`), and a reload never touches that flag.
+### Predict
+
+`predict` is the engine's own rule for an op, from the engine-core functions
+the engine follows, in the plugin's `model.ts` next to `fold`.
+
+- **Pure and absolute.** Ops say what to set, never by how much, so replaying
+  an op over a value that already holds its answer changes nothing. Both
+  engines publish a change's events before they answer, so for a moment the
+  mirror holds the answer and the change is still pending; with absolute ops
+  that moment looks exactly like the answer.
+- **Keep what an op doesn't touch.** Return the same object for every record
+  an op leaves alone, so readers of the other records don't run again.
+  `view()` is memoized on the value and the pending list.
+- **Reads show the view.** What a plugin's reads hand out (`list`, `get`, its
+  render items) comes from `view()`. `get()` stays the confirmed truth, for
+  code that must not see a prediction.
+
+### When a change leaves the view
+
+| The engine…         | The change leaves…                                                                                                                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| applied it          | each mirror's view once that mirror holds the answer: at once when its events folded; after the read a `fold` asked for, when it asked; and a mirror that couldn't read keeps it until a load lands |
+| refused it          | every view, at once, together with its dependents                                                                                                                                                   |
+| the document closed | nothing is shown any more; its `result` rejects `instance-closed`                                                                                                                                   |
+
+**Dependents.** A create can name its object (`objectNumber`, from
+`ctx.changes.takeObjectNumber()`), so later changes can refer to it before the
+engine answers. When that create is refused, the changes that refer to what
+only it would have created can't apply: the queue refuses them too (`conflict`,
+`details.reason: 'dependency-refused'`) and aborts their engine calls.
+`onSettled` reports every answer, refusals with their label.
+
+### Holds and groups
+
+- **A hold** is a change that can still be amended before it is sent: typing,
+  or a form commit waiting for its scripts. `ctx.changes.hold(label)` returns it;
+  `set(ops, undo?)` replaces its ops, and the views show the latest. Any later
+  `stage` sends the open holds first, and `send()` sends the holds staged
+  before it too, so send order is always staging order. `cancel()` drops it.
+  The plugin decides when it's done (a pause in typing, `ctx.clock.after`); the
+  kernel sends every open hold before a download.
+- **A group** makes everything staged while its `run` runs, by any plugin, one
+  change: `ctx.changes.group(label, () => { … })`. Only what is staged before
+  `run` returns joins; a verb that awaits first stages its own change. Nested
+  groups join the outer one, a hold inside a group is refused, and when `run`
+  throws nothing of it is sent.
+
+### One change, one store update
+
+Both engines publish a change's events in one burst that shares `origin.tx`.
+The kernel holds the store's notifications while a burst arrives, so readers
+see a change land in one update, whoever made it.
+
+The kernel tests each rule in `packages/core/main/test/changes.test.ts`.
+
+The annotation plugin still keeps an overlay of its own in session state
+(`services/intents.ts`, `model.ts`'s `stage`, `writeSettled` and
+`followRecord`), from before the change queue; it moves onto the queue.
 
 ## Held-back writes
 
 Some writes wait on purpose: the annotation plugin writes typed text once
 typing pauses, the ink tool waits for the next stroke of a drawing, a form
-field is written on blur. A write queue holds writes that are on their way.
+field is written on blur. A hold (see [Pending changes](#pending-changes)) is
+how a change waits, and the kernel sends every open hold before a download
+itself. A write queue holds writes that are on their way.
 Before anything reads the whole file (`documents.download()`, `downloadLayer()`), the
 kernel settles the document (`packages/core/main/src/settle.ts`): it runs every
 flush plugins registered with `ctx.onSettle(flush)` and waits for them, so the
@@ -401,8 +464,8 @@ the actions plugin clears its per-page trigger cache.
 3. `fold` applies the data the event carries. It asks for a reload only when
    the event does not carry enough (`forms.repaired`, or `redaction.applied`
    for annotations).
-4. Verbs call the engine and return. They do not refetch, do not wait for
-   revisions, and do not emit fact events.
+4. Verbs stage a change (or call the engine) and return. They do not
+   refetch, do not wait for revisions, and do not emit fact events.
 5. A verb's `await` sees its own write. Both engines publish the event for a
    session's own mutation before the mutation's promise settles, so the fold
    and the fact events have run by the time the verb resumes.
@@ -411,3 +474,5 @@ the actions plugin clears its per-page trigger cache.
 7. Reactions subscribe with `ctx.listen` in `connect`.
 8. `refresh()` exists for recovery and for callers that want a fresh read. No
    write path calls it.
+9. What the user sees is `view()`: the truth with this session's pending
+   changes on top. Nothing else keeps a copy of a pending change.

@@ -3,8 +3,8 @@
  * part of its page it paints, and the render layer reads which parts are painted, to leave them
  * out of the page's picture.
  */
-import { untrack } from 'svelte';
 import { pageLayersOf, type PagePart, type PaintedParts } from '@embedpdf/web';
+import { untrack } from 'svelte';
 
 /**
  * Say, for as long as this component lives, that it paints `part` of its page (`pageRef()`, the

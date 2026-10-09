@@ -14,6 +14,15 @@ export { reload } from './mirror';
 export type { Mirror, MirrorChange, MirrorReload, MirrorSpec } from './mirror';
 export type { PageMirror, PageMirrorChange, PageMirrorSpec } from './page-mirror';
 export type {
+  ChangeLabel,
+  ChangeQueue,
+  HeldChange,
+  PendingChange,
+  PredictedOp,
+  SettledChange,
+  StagedChange,
+} from './changes';
+export type {
   DeepPartial,
   NoSettings,
   Settings,

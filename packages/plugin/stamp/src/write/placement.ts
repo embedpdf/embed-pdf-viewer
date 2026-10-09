@@ -173,16 +173,8 @@ export function createPlacement(
       }
 
       const page = selectedPage.ref;
-      const flattened = await doc.pages.flatten([page], { usage: 'display' });
-      const failed = flattened.results.find(
-        ({ status }) => status === 'failed' || status === 'skipped',
-      );
-      if (failed) {
-        throw stampError(
-          'operation-failed',
-          `dynamic stamp flatten failed for page ${failed.page.objectNumber}`,
-        );
-      }
+      // All or nothing: a page that fails to flatten throws.
+      await doc.pages.flatten([page], { usage: 'display' });
 
       const bytes = await doc.pages.extract([page]);
       const image = await doc.page(page).render.image({

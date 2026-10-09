@@ -38,6 +38,8 @@ import { pageRefsEqual, subscribeToType } from '@embedpdf/engine-core/runtime';
  *  `isLocalEngine` and `isLocalDocument` accept it. */
 export { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
 
+import { createBurstGate } from './bursts';
+import { createDocumentChanges } from './changes';
 import { instanceClock, timerClock, type Cancel, type HostClock } from './clock';
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
@@ -239,9 +241,16 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     if (!doc) throw new PluginError('not-ready', id, 'the test context has no document');
     return doc;
   };
+  // The document's change queue, as the kernel keeps one: `doc.apply` sends its changes.
+  const changes = createDocumentChanges({ handle: () => doc, notify: store.notify, report });
+  settleFlushes.add(() => changes.settle());
+  cleanups.push(() => changes.close());
+  const bursts = createBurstGate(store);
   const mirrors: MirrorController<unknown>[] = [];
   const mirrorEnvironment = (): MirrorEnvironment => ({
     doc: requireDoc(),
+    changes,
+    notify: store.notify,
     lifetime: lifetime.signal,
     cell(name, initial) {
       const cell = store.lease(`${id}/${name}`, initial, instanceId);
@@ -327,6 +336,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       return controller.mirror;
     },
     pageMirror: (spec) => createPageMirror(spec, mirrorEnvironment()),
+    changes: changes.forPlugin(id),
     document: () => meta,
     get: require,
     tryGet: resolve,
@@ -425,7 +435,11 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       for (const mirror of mirrors.splice(0)) mirror.start();
       return instance.api;
     },
-    emitDocumentEvent: (event) => documentEvents.emit(event),
+    emitDocumentEvent: (event) => {
+      bursts.first(event);
+      documentEvents.emit(event);
+      bursts.last(event);
+    },
     settle: (signal) => settle(settleFlushes, [signal, lifetime.signal], report),
     download: (read) => readWrapped(downloadWraps, read),
     dispose: async () => {

@@ -8,6 +8,11 @@
  * that started before a newer one can never overwrite it. Loads for the same
  * page are shared while in flight. Deleted pages are dropped, and
  * `stream.desynced` / `document.versioned` re-read every loaded page.
+ *
+ * `view(page)` is the page's value with this session's pending changes on
+ * top (`predict`), as for whole-document mirrors (mirror.ts): an answered
+ * change that made a page read again stays in that page's view until the
+ * read lands.
  */
 import {
   encodePageKey,
@@ -15,8 +20,16 @@ import {
   type DocumentHandle,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
+import type { PredictedOp, QueuedChange } from './changes';
 import { isPluginError } from './errors';
-import { isResync, statusOfFailure, type MirrorEnvironment } from './mirror';
+import {
+  changeIdOf,
+  isResync,
+  replay,
+  showingWith,
+  statusOfFailure,
+  type MirrorEnvironment,
+} from './mirror';
 import type { OperationOptions, ResourceStatus } from './types';
 
 /** One applied change of one page, handed to the spec's `changed` callback. */
@@ -44,6 +57,13 @@ export interface PageMirrorSpec<V> {
    * Return `'reload'` to re-read. Without `fold`, affected pages are re-read.
    */
   fold?(value: V, event: DocumentEvent, page: PageRef): V | 'reload';
+  /**
+   * Apply one op of a pending change of this session to a loaded page's
+   * value, as the engine will. Pure and absolute, like a mirror's `predict`;
+   * return `value` itself for an op that doesn't concern the page. Without
+   * it, `view(page)` is `get(page)`.
+   */
+  predict?(value: V, op: PredictedOp, page: PageRef): V;
   /** Runs after every load of a page (even one that changed nothing) and every applied change. */
   readonly changed?: (change: PageMirrorChange<V>) => void;
 }
@@ -51,6 +71,8 @@ export interface PageMirrorSpec<V> {
 export interface PageMirror<V> {
   /** The page's value, or undefined when it has not loaded. */
   get(page: PageRef): V | undefined;
+  /** What the user sees on the page: `get(page)` with this session's pending changes on top. */
+  view(page: PageRef): V | undefined;
   getStatus(page: PageRef): ResourceStatus;
   /** Load the page unless it is loaded or loading. */
   ensureLoaded(page: PageRef, options?: OperationOptions): Promise<void>;
@@ -75,6 +97,56 @@ export function createPageMirror<V>(
   const cell = env.cell<PageCells<V>>(`page-mirror/${spec.name}`, {});
   const epochs = new Map<string, number>();
   const inFlight = new Map<string, Promise<void>>();
+
+  /**
+   * Per page: answered changes the page still shows, because an event of
+   * theirs made it read again. `epoch`: the page's epoch then; a later read
+   * that lands clears them.
+   */
+  const kept = new Map<string, Map<string, { change: QueuedChange; epoch: number }>>();
+  let keptVersion = 0;
+
+  const keepUntilRead = (key: string, event: DocumentEvent): void => {
+    const opId = changeIdOf(event);
+    const change = opId !== null && spec.predict ? env.changes.find(opId) : undefined;
+    if (!change) return;
+    let page = kept.get(key);
+    if (!page) kept.set(key, (page = new Map()));
+    page.set(change.opId, { change, epoch: epochs.get(key) ?? 0 });
+    keptVersion += 1;
+  };
+
+  const releasePage = (key: string, epoch: number): void => {
+    const page = kept.get(key);
+    if (!page) return;
+    const before = page.size;
+    for (const [opId, entry] of page) if (entry.epoch < epoch) page.delete(opId);
+    if (page.size === 0) kept.delete(key);
+    if (page.size === before) return;
+    keptVersion += 1;
+    env.notify();
+  };
+
+  const views = new Map<string, { value: V; version: number; kept: number; view: V }>();
+  const view = (page: PageRef): V | undefined => {
+    const key = encodePageKey(page);
+    const value = entryOf(key)?.value;
+    if (value === undefined || !spec.predict) return value;
+    const version = env.changes.version();
+    const memo = views.get(key);
+    if (memo && memo.value === value && memo.version === version && memo.kept === keptVersion) {
+      return memo.view;
+    }
+    const predict = spec.predict;
+    const next = replay(
+      value,
+      showingWith(env.changes, kept.get(key)?.values() ?? []),
+      (current: V, op: PredictedOp) => predict(current, op, page),
+      env.report,
+    );
+    views.set(key, { value, version, kept: keptVersion, view: next });
+    return next;
+  };
 
   const entryOf = (key: string): PageEntry<V> | undefined => cell.read()[key];
 
@@ -108,6 +180,7 @@ export function createPageMirror<V>(
           const previous = entryOf(key)?.value;
           setEntry(key, { page, status: 'ready', value });
           announce({ page, cause: 'load', event: null, previous, next: value });
+          if (kept.has(key)) releasePage(key, epoch);
         },
         (error: unknown) => {
           if (!isCurrent() || isPluginError(error, 'instance-closed')) return;
@@ -145,6 +218,8 @@ export function createPageMirror<V>(
         const before = entryOf(key);
         if (!before) continue;
         epochs.set(key, (epochs.get(key) ?? 0) + 1);
+        kept.delete(key);
+        views.delete(key);
         setEntry(key, null);
         announce({ page, cause: 'drop', event, previous: before.value, next: undefined });
       }
@@ -158,6 +233,7 @@ export function createPageMirror<V>(
       const entry = entryOf(key);
       if (!entry || entry.status === IDLE) continue;
       if (!spec.fold || entry.status !== 'ready') {
+        keepUntilRead(key, event);
         reloadInBackground(page);
         continue;
       }
@@ -169,6 +245,7 @@ export function createPageMirror<V>(
         next = 'reload';
       }
       if (next === 'reload') {
+        keepUntilRead(key, event);
         reloadInBackground(page);
         continue;
       }
@@ -181,6 +258,7 @@ export function createPageMirror<V>(
 
   return {
     get: (page) => entryOf(encodePageKey(page))?.value,
+    view,
     getStatus: (page) => entryOf(encodePageKey(page))?.status ?? IDLE,
     ensureLoaded(page) {
       const key = encodePageKey(page);
