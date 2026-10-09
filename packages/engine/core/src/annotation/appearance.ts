@@ -146,6 +146,7 @@ const TURNING_KINDS: ReadonlySet<string> = new Set([
   'free-text',
   'stamp',
   'caret',
+  'widget',
   'line',
   'polyline',
   'polygon',
@@ -177,7 +178,7 @@ const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
   stamp: ['box'],
   'file-attachment': ['rect'],
   link: ['rect'],
-  widget: ['rect'],
+  widget: ['box'],
 };
 
 const numEq = (a: number, b: number): boolean => Math.abs(a - b) <= EPSILON;

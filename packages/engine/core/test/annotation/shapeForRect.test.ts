@@ -9,8 +9,7 @@ import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 import { resolveRectCommand, shapeForRect } from '../../src/pageSpace/helpers';
 
 /** An annotation as a read returns it, with the fields the mapping looks at. */
-const read = (fields: Record<string, unknown>) =>
-  fields as unknown as Annotation<PdfCoordinates>;
+const read = (fields: Record<string, unknown>) => fields as unknown as Annotation<PdfCoordinates>;
 
 /** Acrobat's `[x1, y1, x2, y2]`. */
 const rect = ([left, bottom, right, top]: number[]): PdfRect => ({ left, bottom, right, top });
@@ -170,6 +169,28 @@ describe('pdfShapeForRect', () => {
     expect(() => pdfShapeForRect(square, rect([50, 50, 200, 150]))).toThrow(
       expect.objectContaining({ code: EngineErrorCode.InvalidArg, details: { field: 'rect' } }),
     );
+  });
+
+  test('a box at a quarter turn also resizes, along its own sides; a widget is one', () => {
+    // 160 × 40, turned 90: it stands 40 × 160 on the page.
+    const square = read({
+      subtype: 'square',
+      rect: rect([160, 40, 200, 200]),
+      box: rect([100, 100, 260, 140]),
+      rotation: 90,
+    });
+    expect(pdfShapeForRect(square, rect([120, 40, 180, 240]))).toEqual({
+      box: rect([50, 110, 250, 170]),
+    });
+    const widget = read({
+      subtype: 'widget',
+      rect: rect([20, 20, 44, 180]),
+      box: rect([-48, 88, 112, 112]),
+      rotation: 270,
+    });
+    expect(pdfShapeForRect(widget, rect([20, 20, 60, 220]))).toEqual({
+      box: rect([-60, 100, 140, 140]),
+    });
   });
 
   test("a rect can't squash a drawing flat, or stretch one that is", () => {

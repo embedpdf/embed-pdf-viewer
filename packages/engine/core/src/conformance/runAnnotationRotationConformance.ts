@@ -7,6 +7,7 @@ import type { PageHandle } from '../engine/PageHandle';
 import type { PageLayout } from '../dto/PageLayout';
 import { pdfRectTurnedBounds } from '../geometry/convert';
 import { pageBoxOf, type PageBox } from '../geometry/pageSpace';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { annotationKey } from '../identity/annotationKey';
 
 export type AnnotationRotationFixture =
@@ -198,6 +199,78 @@ export function runAnnotationRotationConformance(
           0.01,
         );
         expect((annotation as { rotation: number | null }).rotation).toBe(30);
+      });
+    });
+
+    test('a create gives a quarter turn by where it stands: its rect, the box worked out', async () => {
+      await onPage('authoring', async (page) => {
+        const rect = { x: 100, y: 100, width: 40, height: 160 };
+        const { annotation: square } = await page.annotations.create({
+          subtype: 'square',
+          rect,
+          rotation: 90,
+        });
+        expectRect(square.rect, rect, 0.01);
+        expect((square as { rotation: number | null }).rotation).toBe(90);
+        // The box is the rect with its sides swapped, about the same middle.
+        expectRect(
+          (square as { box: PageBox }).box,
+          { x: 40, y: 160, width: 160, height: 40 },
+          0.01,
+        );
+
+        const { annotation: text } = await page.annotations.create({
+          subtype: 'free-text',
+          rect: { x: 300, y: 100, width: 30, height: 200 },
+          rotation: 270,
+          contents: 'Up the page',
+        });
+        expectRect(text.rect, { x: 300, y: 100, width: 30, height: 200 }, 0.01);
+        expectRect((text as FreeText).box, { x: 215, y: 185, width: 200, height: 30 }, 0.01);
+      });
+    });
+
+    test('a rect places a box at a quarter turn only, and a create gives one or the other', async () => {
+      await onPage('authoring', async (page) => {
+        const refusal = (draft: Record<string, unknown>) =>
+          page.annotations.create({ subtype: 'square', ...draft } as never).then(
+            () => null,
+            (error: unknown) => error as { code?: string; details?: Record<string, unknown> },
+          );
+        const tilted = await refusal({
+          rect: { x: 10, y: 10, width: 40, height: 40 },
+          rotation: 20,
+        });
+        expect(tilted).toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'rect' },
+        });
+        const neither = await refusal({ rotation: 90 });
+        expect(neither).toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'box' },
+        });
+        const { annotations } = await page.annotations.list();
+        expect(annotations).toHaveLength(0);
+      });
+    });
+
+    test('a rect resizes a box at a quarter turn along its own sides', async () => {
+      await onPage('authoring', async (page) => {
+        const { annotation } = await page.annotations.create({
+          subtype: 'square',
+          box: { x: 100, y: 100, width: 160, height: 40 },
+          rotation: 90,
+        });
+        const rect = { x: 120, y: 40, width: 60, height: 200 };
+        const { annotation: resized } = await page.annotations.update(annotation.ref, { rect });
+        expectRect(resized.rect, rect, 0.01);
+        expect((resized as { rotation: number | null }).rotation).toBe(90);
+        expectRect(
+          (resized as { box: PageBox }).box,
+          { x: 50, y: 110, width: 200, height: 60 },
+          0.01,
+        );
       });
     });
 

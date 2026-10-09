@@ -12,10 +12,11 @@ import {
 } from '../../../dto/PdfAction.schema';
 import { FormFieldRefSchema } from '../../../identity/FormFieldRef.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields } from '../shared-fields';
+import { annotationBaseFields, widgetBoxFields } from '../shared-fields';
 
 export const WidgetDeclaration = defineKind('widget', {
   ...annotationBaseFields,
+  ...widgetBoxFields,
   color: field.data(ColorSchema).nullable().optional(),
   interiorColor: field.data(ColorSchema).nullable().optional(),
   strokeWidth: field.data(z.number().nonnegative()).optional(),

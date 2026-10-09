@@ -31,7 +31,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftHighlight.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftHighlight.BlendMode | undefined;
@@ -62,6 +62,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftHighlight {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -136,7 +143,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftUnderline.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftUnderline.BlendMode | undefined;
@@ -167,6 +174,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftUnderline {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -241,7 +255,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftSquiggly.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftSquiggly.BlendMode | undefined;
@@ -272,6 +286,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftSquiggly {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -346,7 +367,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftStrikeout.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftStrikeout.BlendMode | undefined;
@@ -378,6 +399,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftStrikeout {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -457,7 +485,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftCircle.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftCircle.BlendMode | undefined;
@@ -488,12 +516,19 @@ export namespace AnnotationDraft {
         borderStyle?: AnnotationDraftCircle.BorderStyle | undefined;
         dashArray?: (number[] | null) | undefined;
         interiorColor?: (string | null) | undefined;
-        box: AnnotationDraftCircle.Box;
+        box?: AnnotationDraftCircle.Box | undefined;
         rotation?: (number | null) | undefined;
         cloudyIntensity?: (number | null) | undefined;
     }
 
     export namespace AnnotationDraftCircle {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -548,7 +583,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftSquare.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftSquare.BlendMode | undefined;
@@ -579,12 +614,19 @@ export namespace AnnotationDraft {
         borderStyle?: AnnotationDraftSquare.BorderStyle | undefined;
         dashArray?: (number[] | null) | undefined;
         interiorColor?: (string | null) | undefined;
-        box: AnnotationDraftSquare.Box;
+        box?: AnnotationDraftSquare.Box | undefined;
         rotation?: (number | null) | undefined;
         cloudyIntensity?: (number | null) | undefined;
     }
 
     export namespace AnnotationDraftSquare {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -639,7 +681,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftPolygon.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftPolygon.BlendMode | undefined;
@@ -680,6 +722,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftPolygon {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -746,7 +795,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftPolyline.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftPolyline.BlendMode | undefined;
@@ -787,6 +836,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftPolyline {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -886,7 +942,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftLine.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftLine.BlendMode | undefined;
@@ -929,6 +985,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftLine {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -1126,7 +1189,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftInk.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftInk.BlendMode | undefined;
@@ -1162,6 +1225,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftInk {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -1222,7 +1292,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftFreeText.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftFreeText.BlendMode | undefined;
@@ -1247,7 +1317,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        box: AnnotationDraftFreeText.Box;
+        box?: AnnotationDraftFreeText.Box | undefined;
         rotation?: (number | null) | undefined;
         intent?: AnnotationDraftFreeText.Intent | undefined;
         fontFamily?: string | undefined;
@@ -1268,6 +1338,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftFreeText {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -1498,7 +1575,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftCaret.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftCaret.BlendMode | undefined;
@@ -1525,12 +1602,19 @@ export namespace AnnotationDraft {
         actions?: unknown | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
-        box: AnnotationDraftCaret.Box;
+        box?: AnnotationDraftCaret.Box | undefined;
         rotation?: (number | null) | undefined;
         intent?: (AnnotationDraftCaret.Intent | null) | undefined;
     }
 
     export namespace AnnotationDraftCaret {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -1677,7 +1761,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect?: unknown | undefined;
+        rect?: AnnotationDraftStamp.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftStamp.BlendMode | undefined;
@@ -1702,7 +1786,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        box: AnnotationDraftStamp.Box;
+        box?: AnnotationDraftStamp.Box | undefined;
         rotation?: (number | null) | undefined;
         name?: (string | null) | undefined;
         fit?: (AnnotationDraftStamp.Fit | null) | undefined;
@@ -1710,6 +1794,13 @@ export namespace AnnotationDraft {
     }
 
     export namespace AnnotationDraftStamp {
+        export interface Rect {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }
+
         export const BlendMode = {
             Normal: "normal",
             Multiply: "multiply",
@@ -1859,7 +1950,7 @@ export namespace AnnotationDraft {
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
-        rect: AnnotationDraftWidget.Rect;
+        rect?: AnnotationDraftWidget.Rect | undefined;
         contents?: (string | null) | undefined;
         subject?: (string | null) | undefined;
         blendMode?: AnnotationDraftWidget.BlendMode | undefined;
@@ -1884,6 +1975,8 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: (CloudPDF.WidgetActionsPatch | null) | undefined;
+        box?: AnnotationDraftWidget.Box | undefined;
+        rotation?: (number | null) | undefined;
         color?: (string | null) | undefined;
         interiorColor?: (string | null) | undefined;
         strokeWidth?: number | undefined;
@@ -1936,6 +2029,13 @@ export namespace AnnotationDraft {
                 Group: "group",
             } as const;
             export type Type = (typeof Type)[keyof typeof Type];
+        }
+
+        export interface Box {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
         }
 
         export const BorderStyle = {

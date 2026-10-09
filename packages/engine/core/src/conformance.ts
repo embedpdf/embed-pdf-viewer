@@ -140,6 +140,11 @@ export {
   type FormTransferConformanceOptions,
 } from './conformance/runFormTransferConformance';
 export {
+  runWidgetRotationConformance,
+  TURNED_FIELDS_PDF,
+  type WidgetRotationConformanceOptions,
+} from './conformance/runWidgetRotationConformance';
+export {
   WIDGET_FINDING_CASES,
   runWidgetFindingConformance,
   type WidgetFindingCase,

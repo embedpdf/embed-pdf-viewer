@@ -7,20 +7,24 @@ import {
   setAnnotRect,
   writeAnnotString,
 } from '../../annotations/internal/write/annotationWritePrimitives';
-import { applyWidgetStyle } from '../../annotations/internal/write/writeWidgetAnnotation';
+import {
+  applyWidgetStyle,
+  setWidgetTurn,
+} from '../../annotations/internal/write/writeWidgetAnnotation';
 import { writeWidgetActions } from '../../actions/internal/writeWidgetActions';
 
 const WIDGET_SUBTYPE_CODE = 20; // FPDF_ANNOT_WIDGET
 
 /**
  * Birth a widget through the annotation plane (EPDFPage_CreateAnnotRaw -
- * indirect, durable object number, no page load), place it, and style it
- * with the placement's style fields through the widget-plane writer
- * (`applyWidgetStyle` - the same code the widget annotation kind uses for
- * create/patch), and give it the placement's actions. Like every annotation the engine makes, it gets a fresh
- * UUIDv7 `/NM`. Returns the widget's object number (`objectNumber`, which
- * the session checked, or the next free one), ready for
- * EPDFForm_AttachWidget adoption.
+ * indirect, durable object number, no page load), place it and turn it
+ * (`/MK /R`), style it with the placement's style fields through the
+ * widget-plane writer (`applyWidgetStyle` - the same code the widget
+ * annotation kind uses for create/patch), and give it the placement's
+ * actions. Like every annotation the engine makes, it gets a fresh UUIDv7
+ * `/NM`. Returns the widget's object number (`objectNumber`, which the
+ * session checked, or the next free one), ready for EPDFForm_AttachWidget
+ * adoption, which draws its appearance turned.
  */
 export function createUnattachedWidget(
   runtime: PdfRuntimeModule,
@@ -44,8 +48,9 @@ export function createUnattachedWidget(
   }
   try {
     writeAnnotString(fn, mem, annotPtr, 'NM', generateUuidV7());
-    const { page: _page, rect, exportValue: _exportValue, actions, ...style } = placement;
+    const { page: _page, rect, rotation, exportValue: _exportValue, actions, ...style } = placement;
     setAnnotRect(fn, mem, annotPtr, rect);
+    if (rotation) setWidgetTurn(fn, annotPtr, rotation);
     if (Object.keys(style).length > 0) applyWidgetStyle(fn, mem, annotPtr, style);
     if (actions) writeWidgetActions(runtime, docPtr, annotPtr, actions);
     const widgetObjectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);

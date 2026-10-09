@@ -27,7 +27,8 @@ import type { Coordinates, PageCoordinates, PdfCoordinates } from '../pageSpace/
  *   engine field marked `readBack()` is worked out from other fields: an
  *   update takes the value a read returned. The one such field, a drawn
  *   kind's `rect`, also takes another rect, which puts the shape there
- *   (`shapeForRect`).
+ *   (`shapeForRect`), and a box kind's create takes it with a quarter turn
+ *   in place of its `box`.
  */
 
 /**
@@ -451,7 +452,7 @@ function shapesOf(
       if (readBack) readBackWrites[name] = write;
     } else {
       // Accepted so a read DTO can be sent back; the engine decides what happens to it.
-      create[name] = z.unknown().optional();
+      create[name] = readBack ? read[name]!.optional() : z.unknown().optional();
       update[name] = readBack ? read[name]!.optional() : z.unknown().optional();
       if (readBack) readBackWrites[name] = null;
     }

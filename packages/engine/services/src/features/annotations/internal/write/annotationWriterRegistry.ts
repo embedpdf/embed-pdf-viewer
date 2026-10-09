@@ -3,6 +3,7 @@ import {
   EngineErrorCode,
   type AnnotationDraft,
   type AnnotationPatch,
+  type PlacedDraft,
 } from '@embedpdf/engine-core/runtime';
 import type {
   CaretDraft,
@@ -122,7 +123,8 @@ export function preflightPatch(
  *
  * The mutator calls `applyDraft` or `applyPatch` once per mutation; the
  * actual `EPDFPage_CreateAnnot` / identity resolution happens around
- * these calls in `AnnotationMutator`.
+ * these calls in `AnnotationMutator`. A draft here is resolved
+ * (`pdfResolveAnnotationDraft`), so a box kind's states its box.
  */
 export function applyDraft(
   fn: PdfFunctions,
@@ -136,7 +138,7 @@ export function applyDraft(
     return;
   }
   if (isShapeSubtype(draft.subtype)) {
-    applyShapeDraft(fn, mem, annotPtr, draft as ShapeDraft);
+    applyShapeDraft(fn, mem, annotPtr, draft as PlacedDraft<ShapeDraft>);
     return;
   }
   if (isVertexSubtype(draft.subtype)) {
@@ -160,11 +162,11 @@ export function applyDraft(
     return;
   }
   if (isFreeTextSubtype(draft.subtype)) {
-    applyFreeTextDraft(fn, mem, annotPtr, draft as FreeTextDraft<PdfCoordinates>, ctx);
+    applyFreeTextDraft(fn, mem, annotPtr, draft as PlacedDraft<FreeTextDraft<PdfCoordinates>>, ctx);
     return;
   }
   if (isCaretSubtype(draft.subtype)) {
-    applyCaretDraft(fn, mem, annotPtr, draft as CaretDraft<PdfCoordinates>);
+    applyCaretDraft(fn, mem, annotPtr, draft as PlacedDraft<CaretDraft<PdfCoordinates>>);
     return;
   }
   if (isTextSubtype(draft.subtype)) {
@@ -172,7 +174,7 @@ export function applyDraft(
     return;
   }
   if (isStampSubtype(draft.subtype)) {
-    applyStampDraft(fn, mem, annotPtr, draft as StampDraft<PdfCoordinates>, ctx);
+    applyStampDraft(fn, mem, annotPtr, draft as PlacedDraft<StampDraft<PdfCoordinates>>, ctx);
     return;
   }
   if (isFileAttachmentSubtype(draft.subtype)) {
@@ -180,7 +182,7 @@ export function applyDraft(
     return;
   }
   if (isWidgetSubtype(draft.subtype)) {
-    applyWidgetDraft(fn, mem, annotPtr, draft as WidgetDraft<PdfCoordinates>);
+    applyWidgetDraft(fn, mem, annotPtr, draft as PlacedDraft<WidgetDraft<PdfCoordinates>>);
     return;
   }
   if (isPopupSubtype(draft.subtype)) {

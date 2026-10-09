@@ -435,6 +435,7 @@ function placementOf(
   return {
     page: mapPage(row.page),
     rect: row.rect,
+    ...(row.rotation ? { rotation: row.rotation } : {}),
     strokeWidth: row.strokeWidth,
     borderStyle: row.borderStyle,
     textAlign: row.textAlign,

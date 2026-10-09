@@ -34,6 +34,8 @@ export interface WidgetAnnotation {
     modifiedBy: string | null;
     importedBy: string | null;
     actions: CloudPDF.PdfAnnotationActions | null;
+    box: WidgetAnnotation.Box;
+    rotation: number | null;
     color: string | null;
     interiorColor: string | null;
     strokeWidth: number;
@@ -91,6 +93,13 @@ export namespace WidgetAnnotation {
             Group: "group",
         } as const;
         export type Type = (typeof Type)[keyof typeof Type];
+    }
+
+    export interface Box {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
     }
 
     export const BorderStyle = {

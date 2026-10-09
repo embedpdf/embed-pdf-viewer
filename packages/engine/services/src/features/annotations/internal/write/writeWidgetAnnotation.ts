@@ -3,8 +3,19 @@ import type {
   WidgetPatch,
   WidgetStyleDraftFields,
   PdfCoordinates,
+  PdfRect,
+  PdfRotation,
+  PlacedDraft,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, rgbOf } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  normalizePdfRect,
+  pdfQuarterTurnBox,
+  pdfRectTurnedBounds,
+  rgbOf,
+  semanticEqual,
+} from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
   type PdfFunctions,
@@ -13,6 +24,8 @@ import {
 } from '@embedpdf/engine-runtime';
 
 import { withUtf16String } from '../../../../runtime/memory/strings';
+import { readAnnotRect } from '../read/annotationReadPrimitives';
+import { readWidgetTurn } from '../read/readWidgetAnnotation';
 import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions';
 import { borderStyleToCode } from '../shapeBorderStyle';
 import type { AnnotationWriteContext } from './annotationWriteContext';
@@ -92,18 +105,78 @@ export function applyWidgetStyle(
   }
 }
 
+/**
+ * Write a widget's turn, `/MK /R`, counterclockwise as the file keeps it: a
+ * clockwise quarter turn, `null` upright (which removes `/R`). The
+ * appearance is drawn again by the caller.
+ */
+export function setWidgetTurn(fn: PdfFunctions, annotPtr: Ptr, rotation: PdfRotation | null): void {
+  if (!fn.EPDFAnnot_SetMKRotation(annotPtr, (360 - (rotation ?? 0)) % 360)) {
+    throw new EngineError(
+      EngineErrorCode.Unknown,
+      "the widget's turn (/MK /R) could not be written",
+    );
+  }
+}
+
+/**
+ * A widget's box and turn: `/Rect` is where it stands, the box turned, and
+ * `/MK /R` the turn. Each is written only when it changes.
+ */
+function writeWidgetBox(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  geometry: { box: PdfRect; rotation: PdfRotation | null },
+  current: { rect: PdfRect; rotation: PdfRotation | null } | null,
+): void {
+  const box = normalizePdfRect(geometry.box);
+  const rect = geometry.rotation ? pdfRectTurnedBounds(box, geometry.rotation) : box;
+  if (!current || geometry.rotation !== current.rotation) {
+    setWidgetTurn(fn, annotPtr, geometry.rotation);
+  }
+  if (!current || !semanticEqual(rect, current.rect)) setAnnotRect(fn, mem, annotPtr, rect);
+}
+
 /** Create an inert widget: the fields every kind has, placement and style. Adoption is a forms concern. */
 export function applyWidgetDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: WidgetDraft<PdfCoordinates>,
+  draft: PlacedDraft<WidgetDraft<PdfCoordinates>>,
 ): void {
   // The base writer never writes actions; a widget's are its own (below).
   const { actions: _actions, ...base } = draft;
   applyAnnotationBaseDraft(fn, mem, annotPtr, base);
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
+  writeWidgetBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null }, null);
   applyWidgetStyle(fn, mem, annotPtr, draft);
+}
+
+/**
+ * An update's `box` and `rotation`, each kept when left out (`rotation:
+ * null` or `0` turns the widget upright about its middle). A `rect` never
+ * gets here: the update resolved it into the box it places
+ * (`checkAnnotationPatch`).
+ */
+function applyWidgetBoxPatch(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  patch: { box?: PdfRect; rotation?: PdfRotation | null },
+): void {
+  if (patch.box === undefined && patch.rotation === undefined) return;
+  const rect = normalizePdfRect(readAnnotRect(fn, mem, annotPtr));
+  const turn = readWidgetTurn(fn, annotPtr);
+  writeWidgetBox(
+    fn,
+    mem,
+    annotPtr,
+    {
+      box: patch.box ?? pdfQuarterTurnBox(rect, turn ?? 0),
+      rotation: patch.rotation === undefined ? turn : patch.rotation || null,
+    },
+    { rect, rotation: turn },
+  );
 }
 
 /**
@@ -119,9 +192,7 @@ export function applyWidgetPatch(
 ): void {
   const { actions: _actions, ...base } = patch;
   applyAnnotationBasePatch(fn, mem, annotPtr, base);
-  if (patch.rect) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
+  applyWidgetBoxPatch(fn, mem, annotPtr, patch);
   applyWidgetStyle(fn, mem, annotPtr, patch);
   if (patch.actions !== undefined) {
     if (!ctx?.runtime || !ctx.docPtr) {

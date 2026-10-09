@@ -5,6 +5,7 @@ import type * as CloudPDF from "../index.js";
 export interface WidgetPlacement {
     page: CloudPDF.PageRef;
     rect: WidgetPlacement.Rect;
+    rotation?: number | undefined;
     exportValue?: string | undefined;
     actions?: CloudPDF.WidgetActionsPatch | undefined;
     color?: (string | null) | undefined;

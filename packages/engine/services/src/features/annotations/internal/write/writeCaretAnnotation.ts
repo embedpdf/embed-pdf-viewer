@@ -3,6 +3,7 @@ import {
   type CaretDraft,
   type CaretPatch,
   type PdfCoordinates,
+  type PlacedDraft,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -30,7 +31,7 @@ export function applyCaretDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: CaretDraft<PdfCoordinates>,
+  draft: PlacedDraft<CaretDraft<PdfCoordinates>>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   writeAnnotationBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null });

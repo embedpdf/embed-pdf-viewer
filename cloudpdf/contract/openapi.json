@@ -12931,7 +12931,27 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "width": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "height": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": ["x", "y", "width", "height"],
+                "additionalProperties": false
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13081,7 +13101,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13176,7 +13198,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13271,7 +13295,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13371,7 +13397,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13469,25 +13497,7 @@
                 "nullable": true
               },
               "box": {
-                "type": "object",
-                "properties": {
-                  "x": {
-                    "type": "number"
-                  },
-                  "y": {
-                    "type": "number"
-                  },
-                  "width": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "height": {
-                    "type": "number",
-                    "minimum": 0
-                  }
-                },
-                "required": ["x", "y", "width", "height"],
-                "additionalProperties": false
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -13500,7 +13510,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -13518,7 +13528,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13614,7 +13626,7 @@
                 "nullable": true
               },
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -13629,7 +13641,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -13647,7 +13659,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13930,7 +13944,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14105,7 +14121,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14292,7 +14310,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -14387,7 +14405,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14515,7 +14535,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14583,7 +14605,7 @@
               "importedBy": {},
               "actions": {},
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -14858,7 +14880,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -14876,7 +14898,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14950,7 +14974,7 @@
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
               },
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -14962,7 +14986,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -14981,7 +15005,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -15091,7 +15115,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -15159,7 +15185,7 @@
               "importedBy": {},
               "actions": {},
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -15180,7 +15206,7 @@
                 "maximum": 1
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -15199,7 +15225,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -15317,7 +15343,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -15392,6 +15418,30 @@
                 ],
                 "nullable": true
               },
+              "box": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
+              "rotation": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "enum": [0]
+                  },
+                  {
+                    "type": "number",
+                    "enum": [90]
+                  },
+                  {
+                    "type": "number",
+                    "enum": [180]
+                  },
+                  {
+                    "type": "number",
+                    "enum": [270]
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -15460,7 +15510,7 @@
               "field": {},
               "fieldFamily": {}
             },
-            "required": ["subtype", "rect"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -15479,7 +15529,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -15607,7 +15657,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -20078,6 +20128,26 @@
             "required": ["x", "y", "width", "height"],
             "additionalProperties": false
           },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [0]
+              },
+              {
+                "type": "number",
+                "enum": [90]
+              },
+              {
+                "type": "number",
+                "enum": [180]
+              },
+              {
+                "type": "number",
+                "enum": [270]
+              }
+            ]
+          },
           "exportValue": {
             "type": "string",
             "minLength": 1
@@ -20324,6 +20394,30 @@
             ],
             "nullable": true
           },
+          "box": {
+            "$ref": "#/components/schemas/WidgetAnnotation/properties/rect"
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [0]
+              },
+              {
+                "type": "number",
+                "enum": [90]
+              },
+              {
+                "type": "number",
+                "enum": [180]
+              },
+              {
+                "type": "number",
+                "enum": [270]
+              }
+            ],
+            "nullable": true
+          },
           "color": {
             "type": "string",
             "pattern": "^#[0-9a-fA-F]{6}$",
@@ -20440,6 +20534,8 @@
           "modifiedBy",
           "importedBy",
           "actions",
+          "box",
+          "rotation",
           "color",
           "interiorColor",
           "strokeWidth",
@@ -20596,6 +20692,30 @@
                 "nullable": true
               }
             ]
+          },
+          "box": {
+            "$ref": "#/components/schemas/WidgetPatch/properties/rect"
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [0]
+              },
+              {
+                "type": "number",
+                "enum": [90]
+              },
+              {
+                "type": "number",
+                "enum": [180]
+              },
+              {
+                "type": "number",
+                "enum": [270]
+              }
+            ],
+            "nullable": true
           },
           "color": {
             "type": "string",

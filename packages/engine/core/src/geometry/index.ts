@@ -28,6 +28,8 @@ export {
   pdfQuadBounds,
   normalizePdfQuad,
   pdfRectTurnedBounds,
+  pdfQuarterTurnBox,
+  quarterTurnOf,
   pdfRectIntersection,
   isSamePdfRect,
 } from './convert';

@@ -363,6 +363,14 @@ export class FormMutator {
         details: { field: 'rect' },
       });
     }
+    const { rotation } = placement;
+    if (rotation !== undefined && ![0, 90, 180, 270].includes(rotation)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `a widget turns by a quarter turn (0, 90, 180 or 270), not ${rotation}`,
+        { details: { field: 'rotation' } },
+      );
+    }
     return record.pageIndex;
   }
 

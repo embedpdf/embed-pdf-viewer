@@ -85,6 +85,8 @@ export {
   pdfQuadBounds,
   normalizePdfQuad,
   pdfRectTurnedBounds,
+  pdfQuarterTurnBox,
+  quarterTurnOf,
   pdfRectIntersection,
   isSamePdfRect,
   pdfPointsBounds,
@@ -531,6 +533,7 @@ export {
   resolveMeasurementDraft,
   touchesCaption,
   type DraftResolveOptions,
+  type PlacedDraft,
   type ResolveOptions,
 } from './annotation/resolve';
 export {

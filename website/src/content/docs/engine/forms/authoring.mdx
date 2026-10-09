@@ -163,7 +163,8 @@ widgets: [
 
 To change the look later, update the widget with the same fields (see
 [Move and style widgets](#move-and-style-widgets)). An entry also takes what the widget does when
-it's clicked, in `actions` (see [Widget actions](#widget-actions)).
+it's clicked, in `actions` (see [Widget actions](#widget-actions)), and a quarter turn of its
+contents, in `rotation` (see [Turned widgets](#turned-widgets)).
 
 ## Change a field
 
@@ -296,6 +297,34 @@ as `hidden` and `print`, work as for other annotations; see
 field's `readOnly`: PDF apps ignore a widget annotation's own `readOnly`.
 
 A widget is the form's, so `page.annotations.update()` refuses one with `InvalidArg`.
+
+### Turned widgets
+
+A widget's contents can turn a quarter, so that a field on a turned page reads upright, or a label
+runs up the page. A widget then reads like every shape that turns: its `box` is the frame its
+contents are laid out in, its `rotation` the turn (0, 90, 180 or 270, clockwise; `null` upright),
+and its `rect` where it stands on the page, the box turned. A placement takes the `rect` and the
+turn:
+
+```ts
+await doc.forms.create({
+  family: 'text',
+  name: 'side',
+  // 24 wide and 160 tall: the text runs up the page
+  widgets: [{ page: page.ref, rect: { x: 20, y: 120, width: 24, height: 160 }, rotation: 270 }],
+});
+```
+
+An update turns a widget as it turns any shape:
+
+- `{ rotation }` turns the whole widget about its middle, so it stands the other way;
+- `{ rotation, box }` turns its contents and keeps it where it is, as Acrobat's Orientation does.
+  The new `box` is the `rect` with its sides swapped;
+- `{ rect }` moves and resizes it, and keeps its turn.
+
+Another angle fails with `InvalidArg`. The turn is the widget's `/MK /R`, which every PDF app
+reads. The file holds it counterclockwise, so Acrobat's Orientation of 90° reads as
+`rotation: 270`.
 
 ### Stacking order
 

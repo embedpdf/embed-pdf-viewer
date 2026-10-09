@@ -7,6 +7,7 @@ import {
   type RichTextDocumentInput,
   type PdfCoordinates,
   type VerticalAlignment,
+  type PlacedDraft,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -87,7 +88,7 @@ export function applyFreeTextDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: FreeTextDraft<PdfCoordinates>,
+  draft: PlacedDraft<FreeTextDraft<PdfCoordinates>>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);

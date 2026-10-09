@@ -194,17 +194,18 @@ const noOtherPage: VisibleBoxOf = () => {
  * copy there).
  *
  * - A kind whose shape is its rect (note, file attachment, link, popup,
- *   widget, redaction) takes `rect` as it is.
+ *   redaction) takes `rect` as it is.
  * - A drawn kind has every place it holds mapped from its current `rect` onto
  *   `rect`, each axis on its own, as Acrobat does when a script sets
  *   `annot.rect`: a rect of the same size moves the shape, a bigger one
  *   stretches it. The engine then works out the rect from the shape, so it
- *   can differ a little from `rect` (a stroke keeps its width).
+ *   can differ a little from `rect` (a stroke keeps its width). A box at a
+ *   quarter turn stretches along its own sides, as it stands on the page.
  *
- * A drawn kind refuses a rect that would squash it to no width or height, and
- * a rect of another size when it's turned (it can only move) or when its own
- * rect has no width or height to stretch. Each refusal is `InvalidArg` on
- * `rect`.
+ * A drawn kind refuses a rect that would squash it to no width or height, a
+ * rect of another size when it's turned (it can only move) unless it is a
+ * box at a quarter turn, and one when its own rect has no width or height to
+ * stretch. Each refusal is `InvalidArg` on `rect`.
  */
 export function shapeForRect<A extends Annotation>(annotation: A, rect: PageBox): Partial<A> {
   if (!DRAWN_RECT_KINDS.has(annotation.subtype)) return { rect } as Partial<A>;

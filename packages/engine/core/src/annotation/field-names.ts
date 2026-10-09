@@ -670,6 +670,8 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
     'modifiedBy',
     'importedBy',
     'actions',
+    'box',
+    'rotation',
     'color',
     'interiorColor',
     'strokeWidth',

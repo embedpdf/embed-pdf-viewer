@@ -3,8 +3,9 @@ import type {
   Color,
   WidgetAnnotation,
   PdfCoordinates,
+  PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import { colorOf } from '@embedpdf/engine-core/runtime';
+import { colorOf, pdfQuarterTurnBox, quarterTurnOf } from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
@@ -33,9 +34,19 @@ function readMKColor(
 }
 
 /**
- * Widget-plane read: /MK colours, /BS border, /DA text defaults, /Q, and
- * the field join. Field-plane data (value, options, flags) lives on
- * `doc.forms` — join via `field`, the field's ref.
+ * A widget's turn: `/MK /R`, which the file holds counterclockwise, as the
+ * clockwise quarter turn the API reads; `null` upright. A value that isn't
+ * a quarter turn reads upright, as the appearance generator draws it.
+ */
+export function readWidgetTurn(fn: PdfFunctions, annotPtr: Ptr): PdfRotation | null {
+  return quarterTurnOf(-fn.EPDFAnnot_GetMKRotation(annotPtr)) || null;
+}
+
+/**
+ * Widget-plane read: /MK colours, /BS border, /DA text defaults, /Q, the
+ * turn (/MK /R) with the box it turns, and the field join. Field-plane
+ * data (value, options, flags) lives on `doc.forms` — join via `field`,
+ * the field's ref.
  */
 export function readWidget(
   fn: PdfFunctions,
@@ -45,8 +56,12 @@ export function readWidget(
 ): WidgetAnnotation<PdfCoordinates> {
   const border = readBorderFields(fn, mem, annotPtr);
   const da = readDefaultAppearance(fn, mem, annotPtr);
+  const rotation = readWidgetTurn(fn, annotPtr);
   return {
     ...base,
+    // `/Rect` is where the widget stands: its box, turned.
+    box: pdfQuarterTurnBox(base.rect, rotation ?? 0),
+    rotation,
     // Who made and filled a widget is its field's to say: a field merged
     // with its widget shares one /EMBD_Metadata, and a key never means two
     // things. The row reports no attribution of its own.

@@ -33,7 +33,7 @@ export const ANNOTATION_FIELD_SPACES: Readonly<
   text: base,
   stamp: { ...base, box: 'box' },
   'file-attachment': base,
-  widget: base,
+  widget: { ...base, box: 'box' },
   redact: { ...base, quadPoints: 'quads' },
   popup: base,
   unsupported: base,

@@ -1,22 +1,26 @@
 import type { WidgetStyleDraftFields } from '../annotation/kinds/widget.shared';
-import {
-  writesScripts,
-  type FieldActionsPatch,
-  type WidgetActionsPatch,
-} from '../dto/PdfAction';
+import { writesScripts, type FieldActionsPatch, type WidgetActionsPatch } from '../dto/PdfAction';
+import type { PdfRotation } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
- * Where a widget goes and how it looks: its page, its box, and the same
- * style fields a widget annotation's update takes. `create()` places a
- * field's widgets with these, and `addWidget()` adds one.
+ * Where a widget goes and how it looks: its page, where it stands on it,
+ * its turn, and the same style fields a widget annotation's update takes.
+ * `create()` places a field's widgets with these, and `addWidget()` adds one.
  */
 export interface WidgetPlacement<
   C extends Coordinates = PageCoordinates,
 > extends WidgetStyleDraftFields {
   page: PageRef;
+  /** Where the widget stands on the page; with a turn, its contents run along the turned box. */
   rect: C['box'];
+  /**
+   * How its contents turn inside `rect`, degrees clockwise: a quarter turn
+   * (`/MK /R`). With 90 or 270 the text runs along the rect's height, as
+   * Acrobat's Orientation turns it. Upright when left out.
+   */
+  rotation?: PdfRotation;
   /**
    * A checkbox or radio widget's export value: what the form data holds
    * while it's checked. Required for a radio button (and never `'Off'`);
