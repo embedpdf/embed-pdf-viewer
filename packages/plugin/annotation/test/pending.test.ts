@@ -572,6 +572,56 @@ describe('a new record before the engine answered its create', () => {
   });
 });
 
+describe('the selection follows undo and redo', () => {
+  it('an undo selects what was selected before the change, a redo what was after it', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20), square(21)]);
+    harness.capability.selection.set([ref(20)]);
+
+    await harness.capability.selection.delete();
+    expect(harness.model().selected).toEqual([]);
+    const deleted = harness.applied.at(-1)!;
+    const undo = harness.ctx.changes.stage({
+      label: { key: 'history.undo' },
+      undoOf: deleted.opId,
+      shows: [{ type: 'annotations.restore', annotation: harness.read(square(20)), index: 0 }],
+    });
+    // The square is back in the view, selected as it was before the delete.
+    expect(harness.model().order).toEqual(['obj:20', 'obj:21']);
+    expect(harness.model().selected).toEqual(['obj:20']);
+
+    harness.ctx.changes.stage({
+      label: { key: 'history.redo' },
+      undoOf: undo.opId,
+      shows: [{ type: 'annotations.delete', ref: ref(20) }],
+    });
+    expect(harness.model().order).toEqual(['obj:21']);
+    expect(harness.model().selected).toEqual([]);
+  });
+
+  it('a record that no longer shows is left out; nothing left clears the selection', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.create.mockReturnValue(new Promise(() => {}));
+    void drawSquare(harness);
+    const [, id] = harness.model().order;
+    harness.capability.selection.set([ref(20)]);
+    const remove = harness.capability.delete(ref(20));
+    void remove.catch(() => {});
+    const deleted = harness.pending().at(-1)!;
+    // Undoing the create (staged before the delete) takes the new square away; what was
+    // selected before the create was nothing.
+    harness.ctx.changes.stage({
+      label: { key: 'history.undo' },
+      undoOf: harness.pending()[0]!.opId,
+      shows: harness.pending()[0]!.undo,
+    });
+    expect(harness.model().byId[id!]).toBeUndefined();
+    expect(harness.model().selected).toEqual([]);
+    expect(deleted.undoOf).toBeNull();
+  });
+});
+
 describe('a full load while changes are on their way', () => {
   it('a create the engine answers while a full load runs stays on screen and selected', async () => {
     const harness = annotationHarness();

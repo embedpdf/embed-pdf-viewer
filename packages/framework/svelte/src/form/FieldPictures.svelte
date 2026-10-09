@@ -12,6 +12,7 @@
   } from '@embedpdf/plugin-form/contract/host';
   import { RenderToken } from '@embedpdf/plugin-render/contract/host';
   import {
+    createShownUrls,
     loadFieldPictureUrls,
     rectInPixels,
     shownFieldPicture,
@@ -48,6 +49,9 @@
   );
 
   let urls = $state.raw<Record<string, AppearanceUrl>>({});
+  // The pictures shown stay valid until the next ones are shown.
+  const shown = createShownUrls();
+  $effect(() => () => shown.release());
   $effect(() => {
     const renderer = render.current;
     const ref = page.ref;
@@ -56,6 +60,7 @@
     if (!renderer || !at) return;
     return untrack(() =>
       loadFieldPictureUrls(
+        shown,
         (signal) => renderer.renderFieldAppearances(ref, { scale: at, signal }),
         annotationKey,
         (loaded) => (urls = loaded),

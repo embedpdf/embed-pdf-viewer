@@ -40,6 +40,7 @@
       "@embedpdf/plugin-annotation",
       "@embedpdf/plugin-commands",
       "@embedpdf/plugin-form",
+      "@embedpdf/plugin-history",
       "@embedpdf/plugin-i18n",
       "@embedpdf/plugin-interaction",
       "@embedpdf/plugin-link",

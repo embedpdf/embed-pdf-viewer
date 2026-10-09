@@ -61,6 +61,7 @@ import {
   annotationDrawingOf,
   bakedAppearanceOf,
   chromeInPixels,
+  createShownUrls,
   createTextBoxEditorFollower,
   editingTextKeyOf,
   enrichCommentThreads,
@@ -807,6 +808,9 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
     shallowArray,
   );
   const [urls, setUrls] = useState<Record<string, AppearanceUrl>>({});
+  // The pictures shown stay valid until the next ones are shown.
+  const [shown] = useState(createShownUrls);
+  useEffect(() => () => shown.release(), [shown]);
   useRendererBehaviors(anno, () => (interaction?.getActiveToolId() as string) ?? '', renderers);
   usePaintsPagePart(page.ref, 'annotations');
   // Entry identity keys the behavior registration, so an inline `renderers`
@@ -844,11 +848,12 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
   useEffect(
     () =>
       loadAppearanceUrls(
+        shown,
         (signal) => anno.renderAppearances(page.ref, bakeScale, signal),
         annotationKey,
         setUrls,
       ),
-    [anno, page.ref, bakeScale, bakedKey],
+    [shown, anno, page.ref, bakeScale, bakedKey],
   );
 
   /** The text box being typed in, by key. */

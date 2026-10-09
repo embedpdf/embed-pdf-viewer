@@ -21,6 +21,7 @@
   import {
     annotationDrawingOf,
     bakedAppearanceOf,
+    createShownUrls,
     editingTextKeyOf,
     layerTextBoxesOf,
     loadAppearanceUrls,
@@ -122,6 +123,9 @@
   // ── baked appearances ──────────────────────────────────────────────────────
 
   let urls = $state.raw<Record<string, AppearanceUrl>>({});
+  // The pictures shown stay valid until the next ones are shown.
+  const shown = createShownUrls();
+  $effect(() => () => shown.release());
   // Baked annotations draw from engine rasters: load them again when the page's baked set or an
   // appearance version changes (a stamp just placed, a resize whose new appearance arrived), and
   // when the bake scale does. A move or a turn leaves the epoch as it is (the same pixels, placed
@@ -146,6 +150,7 @@
     if (!host || !scale) return;
     return untrack(() =>
       loadAppearanceUrls(
+        shown,
         (signal) => host.renderAppearances(ref, scale, signal),
         annotationKey,
         (loaded) => (urls = loaded),

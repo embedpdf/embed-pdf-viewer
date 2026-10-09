@@ -94,6 +94,17 @@ describe('foldRecords', () => {
     ).toEqual(reload({ pages: [toPageRef(11)] }));
   });
 
+  it('re-reads the page an undo brought annotations back to: the event says what, not where', () => {
+    const restored = event({
+      type: 'annotations.restored',
+      page: toPageRef(11),
+      annotations: [recordOn(11, 7)],
+    });
+    expect(foldRecords(recordsOf(recordOn(11, 1)), restored)).toEqual(
+      reload({ pages: [toPageRef(11)] }),
+    );
+  });
+
   it('re-reads the pages a flatten applied to', () => {
     const results = [
       { status: 'applied', page: toPageRef(11) },

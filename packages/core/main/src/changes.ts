@@ -77,6 +77,13 @@ export interface PendingChange {
   /** Its name: what the engine's events carry as `origin.tx.id`, and what `undoOf` names. */
   readonly opId: string;
   readonly label: ChangeLabel;
+  /** For an undo: the `opId` of the change it undoes. `null` for a change of ops. */
+  readonly undoOf: string | null;
+  /**
+   * A held change's `merge` key: consecutive changes with the same key are one step of the
+   * history (the pauses of one typing session). `null` for every other change.
+   */
+  readonly merge: string | null;
   /** What the views show until the engine answers: its ops, or an undo's prediction. */
   readonly shows: readonly PredictedOp[];
   /** What undoing it looks like (drawing only); empty when the stager gave none. */
@@ -93,6 +100,12 @@ export interface PendingChange {
 export type SettledChange =
   | { readonly change: PendingChange; readonly status: 'applied'; readonly result: ChangeResult }
   | { readonly change: PendingChange; readonly status: 'refused'; readonly error: PluginError };
+
+/** How a held change is put in the history. */
+export interface HoldOptions {
+  /** Consecutive changes with the same key are one step of the history: typing into one text box. */
+  readonly merge?: string;
+}
 
 /** A change that can still be amended until it is sent. */
 export interface HeldChange {
@@ -126,7 +139,9 @@ export interface ChangeQueue {
    * A change that can still be amended until it is sent: typing, or a form commit waiting for
    * its scripts. It keeps its place in the order from its first `set`. Refused inside a group.
    */
-  hold(label: ChangeLabel): HeldChange;
+  hold(label: ChangeLabel, options?: HoldOptions): HeldChange;
+  /** Send every open hold now, in staging order: what an undo does first, as a download does. */
+  sendHolds(): void;
   /**
    * Everything staged while `run` runs, by any plugin, becomes one change: one request, one
    * undo step. Only what is staged before `run` returns joins; nested groups join the outer
@@ -180,6 +195,7 @@ interface Entry {
   /** The engine's ops; `null` for an undo. */
   ops: readonly ChangeOp[] | null;
   readonly undoOf: string | null;
+  readonly merge: string | null;
   shows: readonly PredictedOp[];
   undo: readonly PredictedOp[];
   history: boolean;
@@ -237,6 +253,7 @@ export function createDocumentChanges(options: {
     label: ChangeLabel;
     ops: readonly ChangeOp[] | null;
     undoOf: string | null;
+    merge?: string | null;
     shows: readonly PredictedOp[];
     undo: readonly PredictedOp[];
     history: boolean;
@@ -253,6 +270,7 @@ export function createDocumentChanges(options: {
     result.catch(() => {});
     return {
       ...init,
+      merge: init.merge ?? null,
       seq: nextSeq++,
       opId: generateUuidV7(),
       result,
@@ -415,7 +433,7 @@ export function createDocumentChanges(options: {
       return entry;
     },
 
-    hold(label) {
+    hold(label, options = {}) {
       assertOpen(capability);
       if (grouping) throw invalid(capability, 'a change can not be held inside a group');
       let entry: Entry | null = null;
@@ -436,6 +454,7 @@ export function createDocumentChanges(options: {
               label,
               ops,
               undoOf: null,
+              merge: options.merge ?? null,
               shows: ops,
               undo,
               history: true,
@@ -483,6 +502,7 @@ export function createDocumentChanges(options: {
       return value;
     },
 
+    sendHolds: () => sendHolds(),
     takeObjectNumber: () => handleFor(capability).objectNumbers.take(),
     async reserveObjectNumbers(count) {
       try {

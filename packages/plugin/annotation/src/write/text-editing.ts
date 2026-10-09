@@ -53,7 +53,8 @@ export function createTextEditing(
     if (typing && (typing.id !== id || !typing.hold.open)) void sendTyping();
     typing ??= {
       id,
-      hold: store.hold({ key: 'annotation.text' }),
+      // Every pause of typing into one text box is one step of the history.
+      hold: store.hold({ key: 'annotation.text' }, { merge: `annotation.text:${id}` }),
       written: null,
       cancelPause: () => {},
     };

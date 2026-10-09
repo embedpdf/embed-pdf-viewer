@@ -12,7 +12,7 @@
   The `#handle` and `#rotation-handle` slots draw the handles your way.
 -->
 <script setup lang="ts">
-import { computed, h, markRaw, shallowRef, toRaw, watch } from 'vue';
+import { computed, h, markRaw, onUnmounted, shallowRef, toRaw, watch } from 'vue';
 import type { Component } from 'vue';
 import { annotationKey, shallowEqual } from '@embedpdf/core';
 import type { RenderItem } from '@embedpdf/core-annotation';
@@ -24,6 +24,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import {
   annotationDrawingOf,
   bakedAppearanceOf,
+  createShownUrls,
   editingTextKeyOf,
   layerTextBoxesOf,
   loadAppearanceUrls,
@@ -134,6 +135,9 @@ watch(
 // ── baked appearances ────────────────────────────────────────────────────────
 
 const urls = shallowRef<Record<string, AppearanceUrl>>({});
+// The pictures shown stay valid until the next ones are shown.
+const shown = createShownUrls();
+onUnmounted(() => shown.release());
 // Baked annotations draw from engine rasters: load them again when the page's
 // baked set or an appearance version changes (a stamp just placed, a resize
 // whose new appearance arrived), and when the bake scale does. A move or a
@@ -157,6 +161,7 @@ watch(
     if (!host || !scale) return;
     onCleanup(
       loadAppearanceUrls(
+        shown,
         (signal) => host.renderAppearances(pageRef, scale, signal),
         annotationKey,
         (loaded) => (urls.value = loaded),

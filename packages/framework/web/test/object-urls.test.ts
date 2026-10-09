@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   bakedAppearanceOf,
+  createShownUrls,
   loadAppearanceUrls,
   loadFieldPictureUrls,
   loadObjectUrl,
@@ -66,27 +67,63 @@ describe('loadAppearanceUrls', () => {
     };
   };
 
-  it('hands over every URL by key, and revokes them all on cancel', async () => {
-    const pictures = [picture('a'), picture('b')];
+  it('hands over every URL by key, and keeps them until the next set is shown', async () => {
+    const shown = createShownUrls();
+    const first = [picture('a'), picture('b')];
     const onLoaded = vi.fn();
     const cancel = loadAppearanceUrls(
-      async () => pictures,
+      shown,
+      async () => first,
       (ref) => `key:${ref}`,
       onLoaded,
     );
     await flush();
     expect(onLoaded).toHaveBeenCalledWith({
-      'key:a': { url: 'url:a', box: pictures[0]!.rect },
-      'key:b': { url: 'url:b', box: pictures[1]!.rect },
+      'key:a': { url: 'url:a', box: first[0]!.rect },
+      'key:b': { url: 'url:b', box: first[1]!.rect },
     });
+    // The page changed: the next load starts, and what shows stays valid meanwhile.
     cancel();
-    expect(pictures.every((each) => each.revoke.mock.calls.length === 1)).toBe(true);
+    expect(first.some((each) => each.revoke.mock.calls.length > 0)).toBe(false);
+    const next = [picture('a')];
+    loadAppearanceUrls(shown, async () => next, String, onLoaded);
+    await flush();
+    expect(first.every((each) => each.revoke.mock.calls.length === 1)).toBe(true);
+    expect(next[0]!.revoke).not.toHaveBeenCalled();
+    shown.release();
+    expect(next[0]!.revoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('a load cancelled before it is shown revokes what it made, and leaves the shown set', async () => {
+    const shown = createShownUrls();
+    const showing = [picture('a')];
+    loadAppearanceUrls(
+      shown,
+      async () => showing,
+      String,
+      () => {},
+    );
+    await flush();
+    let arrive!: () => void;
+    const late = picture('b');
+    const cancel = loadAppearanceUrls(
+      shown,
+      () => new Promise<typeof showing>((done) => (arrive = () => done([late]))),
+      String,
+      () => {},
+    );
+    cancel();
+    arrive();
+    await flush();
+    expect(late.revoke).toHaveBeenCalledTimes(1);
+    expect(showing[0]!.revoke).not.toHaveBeenCalled();
   });
 
   it('aborts the load and hands over nothing when cancelled first', async () => {
     let signal: AbortSignal | null = null;
     const onLoaded = vi.fn();
     const cancel = loadAppearanceUrls(
+      createShownUrls(),
       async (given) => {
         signal = given;
         return [picture('a')];
@@ -125,6 +162,7 @@ describe('field pictures', () => {
   it('loads every state, and a widget shows the one it is in', async () => {
     const onLoaded = vi.fn();
     loadFieldPictureUrls(
+      createShownUrls(),
       async () => [picture('check', 'Yes'), picture('check', 'Off'), picture('name', null)],
       (ref) => `obj:${ref}`,
       onLoaded,

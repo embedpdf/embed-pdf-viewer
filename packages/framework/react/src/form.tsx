@@ -49,6 +49,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  createShownUrls,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
   formColorsOf,
@@ -509,15 +510,19 @@ function FieldPictures({ page }: { page: PageContextValue }) {
     0,
   );
   const [urls, setUrls] = useState<Record<string, AppearanceUrl>>({});
+  // The pictures shown stay valid until the next ones are shown.
+  const [shown] = useState(createShownUrls);
+  useEffect(() => () => shown.release(), [shown]);
 
   useEffect(() => {
     if (!render || !scale) return;
     return loadFieldPictureUrls(
+      shown,
       (signal) => render.renderFieldAppearances(page.ref, { scale, signal }),
       annotationKey,
       setUrls,
     );
-  }, [render, page.ref, scale, epoch]);
+  }, [shown, render, page.ref, scale, epoch]);
 
   return (
     <>

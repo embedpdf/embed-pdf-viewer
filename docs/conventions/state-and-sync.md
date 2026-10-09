@@ -397,6 +397,28 @@ The annotation plugin is the reference: one change per message
 records are named by the object numbers they take, and typing is a hold
 (`write/text-editing.ts`).
 
+### Undo and redo
+
+The history (`@embedpdf/plugin-history`) is built on the queue and keeps no
+copy of the document. Every change staged on the queue is a step, recorded
+when it is staged (`onStaged`), so an undo right after an action undoes it
+while it is still on its way. An undo is a change too:
+`stage({ label, undoOf: opId, shows })`. The views show `shows` (the change's
+`undo`) at once, and the engine applies the reverse it recorded. A redo is the
+undo of that undo.
+
+- **What a plugin gives the history:** `undo` on every change it stages, so an
+  undo is drawn before the engine answers, and `history: false` on a change
+  that isn't the user's action. Holds that make up one step pass the same
+  `merge` key: `hold(label, { merge: 'annotation.text:<id>' })`.
+- **What a plugin may do around it:** listen to `onStaged` for changes whose
+  `undoOf` is set, as the annotation plugin does to put the selection back
+  (`services/selection-history.ts`). It never stages undos itself.
+- **What the engine decides:** a part someone changed since is left alone
+  (`skipped`), a final change (redaction, flattening, signing, form repair)
+  or a new version ends undo before it (`conflict` with the engine's
+  `UndoUnavailable`), and an undo of a refused change applies nothing.
+
 ## Held-back writes
 
 Some writes wait on purpose: the annotation plugin sends typed text once

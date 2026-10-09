@@ -62,6 +62,15 @@ describe('matchShortcut', () => {
     ).toBe(false);
   });
 
+  it('tells a letter with Shift from the letter without it', () => {
+    const undo = parseShortcut('Mod+z');
+    const redo = parseShortcut('Shift+Mod+z');
+    const shifted = stroke({ key: 'Z', metaKey: true, shiftKey: true });
+    expect(matchShortcut(undo, shifted, { isMac: true })).toBe(false);
+    expect(matchShortcut(redo, shifted, { isMac: true })).toBe(true);
+    expect(matchShortcut(undo, stroke({ key: 'z', metaKey: true }), { isMac: true })).toBe(true);
+  });
+
   it('matches long key names against event.code for numpad keys', () => {
     const parsed = parseShortcut('Ctrl+NumpadAdd');
     expect(

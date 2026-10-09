@@ -152,6 +152,10 @@ export function foldRecords(
     }
     case 'annotations.deleted':
       return drop(records, event.deleted.map(annotationKey));
+    // An undo brought deleted annotations back, each in the place it had:
+    // the event doesn't say where, so the page is read again.
+    case 'annotations.restored':
+      return reload({ pages: [event.page] });
     case 'pages.deleted':
       return drop(records, keysOnPages(records, event.pages));
     case 'pages.inserted':

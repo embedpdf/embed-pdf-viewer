@@ -17,6 +17,7 @@ export type {
   ChangeLabel,
   ChangeQueue,
   HeldChange,
+  HoldOptions,
   PendingChange,
   PredictedOp,
   SettledChange,

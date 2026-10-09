@@ -20,6 +20,7 @@
     "./link": "./src/link.tsx",
     "./measurement": "./src/measurement.tsx",
     "./metadata": "./src/metadata.ts",
+    "./history": "./src/history.ts",
     "./page-edit": "./src/page-edit.ts",
     "./page-view": "./src/page-view.tsx",
     "./redaction": "./src/redaction.tsx",
@@ -83,6 +84,10 @@
       "./metadata": {
         "import": "./dist/metadata.js",
         "require": "./dist/metadata.cjs"
+      },
+      "./history": {
+        "import": "./dist/history.js",
+        "require": "./dist/history.cjs"
       },
       "./page-edit": {
         "import": "./dist/page-edit.js",
@@ -159,6 +164,7 @@
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",

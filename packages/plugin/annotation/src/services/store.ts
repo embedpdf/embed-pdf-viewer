@@ -25,6 +25,7 @@ import {
   toPluginErrorInfo,
   type ChangeLabel,
   type HeldChange,
+  type HoldOptions,
   type Mirror,
   type PendingChange,
 } from '@embedpdf/core';
@@ -54,6 +55,7 @@ import {
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
 import { createObjectNumbers } from './object-numbers';
+import { createSelectionHistory } from './selection-history';
 import {
   checkedOpOf,
   idsOf,
@@ -186,8 +188,11 @@ export interface AnnotationStore {
   apply(changes: readonly StoreChange[], options?: ApplyOptions): Applied;
   /** `apply`, once the object numbers its creates take are there: at once, in this call, when they are. */
   applyWhenNumbered(changes: readonly StoreChange[], options?: ApplyOptions): Promise<Applied>;
-  /** A change that later commits go into (`commit(…, { into })`); its label names it in history. */
-  hold(label: ChangeLabel): StoreHold;
+  /**
+   * A change that later commits go into (`commit(…, { into })`); its label names it in history,
+   * and consecutive holds with the same `merge` key are one step of it.
+   */
+  hold(label: ChangeLabel, options?: HoldOptions): StoreHold;
   /** Claim the ops of one kind of effect (one builder per kind; last wins). */
   onEffect<K extends Effect['type']>(kind: K, build: OpBuilder<K>): void;
   /** Claim what follows an update (one; last wins). */
@@ -262,6 +267,7 @@ export function createStore(
   };
 
   const numbers = createObjectNumbers(ctx);
+  const selections = createSelectionHistory(ctx, { model, commit: (message) => commit(message) });
 
   /* ── the doors ───────────────────────────────────────────────────────── */
 
@@ -271,8 +277,8 @@ export function createStore(
     base: AnnotationRecords | null;
   }
 
-  const hold = (label: ChangeLabel): StoreHold => {
-    const held = ctx.changes.hold(label);
+  const hold = (label: ChangeLabel, options?: HoldOptions): StoreHold => {
+    const held = ctx.changes.hold(label, options);
     const entry: Hold = {
       held,
       base: null,
@@ -324,10 +330,13 @@ export function createStore(
         const change = into.held.change;
         if (change) {
           mine.add(change.opId);
+          selections.remember(change.opId, before.selected, result.session.selected);
           written = writtenOf(change, idsOf(ops));
         }
       } else {
-        written = writtenOf(stage(ops, shown), idsOf(ops));
+        const change = stage(ops, shown);
+        selections.remember(change.opId, before.selected, result.session.selected);
+        written = writtenOf(change, idsOf(ops));
       }
     }
     // The records this message drew live render live from now on.
@@ -403,7 +412,9 @@ export function createStore(
         session: { ...state.session, objectNumbers: following.held },
       }));
     }
+    const selected = model().selected;
     const change = stage(withoutCoveredDeletes(shown, [...ops, ...following.ops]), shown);
+    selections.remember(change.opId, selected, options.select ? ids : selected);
     if (vector.length) ctx.state.update(withSession, ctx.state.get().session, vector);
     if (options.select) commit({ type: 'select', ids });
     const written = writtenOf(change, idsOf(ops)).then(

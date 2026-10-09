@@ -1,0 +1,9 @@
+# @embedpdf/plugin-history — ./contract
+
+HISTORY_DEFAULTS [VariableDeclaration]: HISTORY_DEFAULTS: HistorySettings ={ limit: 100}
+HistoryCapability [InterfaceDeclaration]: export interface HistoryCapability extends SettingsApi<HistorySettings>{ undo(): void; redo(): void; canUndo(): boolean; canRedo(): boolean; getUndoLabel(): ChangeLabel | null; getRedoLabel(): ChangeLabel | null; clear(): void; readonly onUndone: EventHook<HistoryUndoneEvent>; readonly onUndoFailed: EventHook<HistoryUndoFailedEvent>; }
+HistoryConfig [TypeAliasDeclaration]: export type HistoryConfig = DeepPartial<HistorySettings>;
+HistorySettings [InterfaceDeclaration]: export interface HistorySettings{ readonly limit: number; }
+HistoryToken [VariableDeclaration] (from packages/plugin/history/src/token.ts): HistoryToken = createCapabilityToken<HistoryCapability>('history', { hint: "add historyPlugin() from '@embedpdf/plugin-history' to your plugins list", } )
+HistoryUndoFailedEvent [InterfaceDeclaration]: export interface HistoryUndoFailedEvent{ readonly label: ChangeLabel; readonly redo: boolean; readonly reason: 'unavailable' | 'refused'; readonly error: PluginError; }
+HistoryUndoneEvent [InterfaceDeclaration]: export interface HistoryUndoneEvent{ readonly label: ChangeLabel; readonly redo: boolean; readonly skipped: number; }

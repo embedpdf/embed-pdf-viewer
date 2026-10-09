@@ -9,6 +9,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   PLATFORM_ID,
@@ -20,6 +21,7 @@ import { annotationKey } from '@embedpdf/core';
 import { FormToken as FormHostToken, type ShownWidget } from '@embedpdf/plugin-form/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
+  createShownUrls,
   loadFieldPictureUrls,
   rectInPixels,
   shownFieldPicture,
@@ -72,6 +74,8 @@ export class EpdfFieldPictures {
     0,
   );
   private readonly urls = signal<Record<string, AppearanceUrl>>({});
+  /** The pictures shown stay valid until the next ones are shown. */
+  private readonly shown = createShownUrls();
 
   protected readonly pictures = computed(() => {
     const urls = this.urls();
@@ -87,6 +91,7 @@ export class EpdfFieldPictures {
 
   constructor() {
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
+    inject(DestroyRef).onDestroy(() => this.shown.release());
     effect((onCleanup) => {
       const render = this.render.capability();
       const scale = this.scale();
@@ -96,6 +101,7 @@ export class EpdfFieldPictures {
       onCleanup(
         untracked(() =>
           loadFieldPictureUrls(
+            this.shown,
             (signal) => render.renderFieldAppearances(ref, { scale, signal }),
             annotationKey,
             (urls) => this.urls.set(urls),

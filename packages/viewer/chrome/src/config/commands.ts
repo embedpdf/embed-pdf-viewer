@@ -12,9 +12,10 @@
  *   form tools                             → real form plugin palette (draw-to-place)
  *   insert tools                           → real stamp and signature panels +
  *                                            image/attachment click-then-pick
- *   history undo/redo                      → disabled (there is no history plugin)
+ *   history undo/redo                      → real History
  */
 import type { CommandDef, IconAccent } from '@embedpdf/react/commands';
+import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
 import { StageToken, ZoomMode } from '@embedpdf/react/stage';
 import type { SpreadMode } from '@embedpdf/react/stage';
@@ -818,22 +819,25 @@ export const defaultCommands: CommandDef[] = [
     visible: (commandContext) => selectionLink(commandContext) != null,
   },
 
-  // ── history (no plugin yet → disabled, shows the disabled styling) ──────
+  // ── history ──────────────────────────────────────────────────────────────
+  // Focus in a text field keeps its own undo: shortcuts skip text fields.
   {
     id: 'history:undo',
     labelKey: 'commands.undo',
     icon: 'arrowBackUp',
+    shortcut: 'Mod+z',
     categories: ['history'],
-    run: () => {},
-    enabled: () => false,
+    run: (commandContext) => commandContext.tryGet(HistoryToken)?.undo(),
+    enabled: (commandContext) => commandContext.tryGet(HistoryToken)?.canUndo() ?? false,
   },
   {
     id: 'history:redo',
     labelKey: 'commands.redo',
     icon: 'arrowForwardUp',
+    shortcut: ['Shift+Mod+z', 'Mod+y'],
     categories: ['history'],
-    run: () => {},
-    enabled: () => false,
+    run: (commandContext) => commandContext.tryGet(HistoryToken)?.redo(),
+    enabled: (commandContext) => commandContext.tryGet(HistoryToken)?.canRedo() ?? false,
   },
 ];
 

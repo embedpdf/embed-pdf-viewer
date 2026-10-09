@@ -209,6 +209,7 @@ export type {
 } from './annotation-renderers';
 export {
   bakedAppearanceOf,
+  createShownUrls,
   loadAppearanceUrls,
   loadFieldPictureUrls,
   loadObjectUrl,
@@ -221,6 +222,7 @@ export type {
   FieldPicture,
   ObjectUrl,
   PictureBytes,
+  ShownUrls,
 } from './object-urls';
 export { enrichCommentThreads } from './comment-threads';
 export type { CommentPageLayout, CommentThreadPage } from './comment-threads';

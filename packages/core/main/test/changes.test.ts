@@ -223,6 +223,26 @@ describe('a staged change', () => {
     expect(notes.view()).toBe(notes.get());
   });
 
+  it('an undo names the change it undoes, and shows its prediction until answered', async () => {
+    const { ctx, notes, calls, answer } = await loaded();
+    const forward = ctx.changes.stage({
+      label: { key: 'note.edit' },
+      ops: [write(1, 'uno')],
+      undo: [write(1, 'one')],
+    });
+    answer(0, (opId) => [updated(1, 'uno', own(opId))]);
+    await tick();
+    const undo = ctx.changes.stage({
+      label: { key: 'history.undo' },
+      undoOf: forward.opId,
+      shows: [write(1, 'one')],
+    });
+    expect(forward.undoOf).toBeNull();
+    expect(undo.undoOf).toBe(forward.opId);
+    expect(calls[1]!.change).toEqual({ undoOf: forward.opId });
+    expect(notes.view()).toEqual({ 1: 'one', 2: 'two' });
+  });
+
   it('keeps every other record as it was', async () => {
     const { ctx, notes } = await loaded();
     const before = notes.view();
@@ -398,6 +418,18 @@ describe('a held change', () => {
     expect(calls).toHaveLength(1);
     answer(0);
     await settling;
+  });
+
+  it('carries its merge key, and is sent on request, as an undo sends it first', async () => {
+    const { ctx, calls } = await loaded();
+    const typing = ctx.changes.hold({ key: 'note.type' }, { merge: 'note:1' });
+    typing.set([write(1, 'uno')]);
+    expect(ctx.changes.pending().map((change) => change.merge)).toEqual(['note:1']);
+    ctx.changes.sendHolds();
+    expect(calls.map((call) => call.change)).toEqual([{ ops: [write(1, 'uno')] }]);
+    expect(typing.open).toBe(false);
+    const other = ctx.changes.stage({ label: { key: 'note.edit' }, ops: [write(2, 'dos')] });
+    expect(other.merge).toBeNull();
   });
 });
 

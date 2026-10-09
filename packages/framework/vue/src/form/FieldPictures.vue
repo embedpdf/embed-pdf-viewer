@@ -4,12 +4,13 @@
   its new state as soon as its value changes; hidden widgets aren't drawn.
 -->
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue';
+import { computed, onUnmounted, shallowRef, watch } from 'vue';
 import { annotationKey, shallowEqual } from '@embedpdf/core';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import type { ShownWidget } from '@embedpdf/plugin-form/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
+  createShownUrls,
   loadFieldPictureUrls,
   rectInPixels,
   shownFieldPicture,
@@ -42,12 +43,16 @@ const scale = useOptionalSelector(
 );
 
 const urls = shallowRef<Record<string, AppearanceUrl>>({});
+// The pictures shown stay valid until the next ones are shown.
+const shown = createShownUrls();
+onUnmounted(() => shown.release());
 watch(
   [render, () => page.value.ref, scale, epoch],
   ([lens, pageRef, at], _previous, onCleanup) => {
     if (!lens || !at) return;
     onCleanup(
       loadFieldPictureUrls(
+        shown,
         (signal) => lens.renderFieldAppearances(pageRef, { scale: at, signal }),
         annotationKey,
         (loaded) => (urls.value = loaded),

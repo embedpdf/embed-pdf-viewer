@@ -27,6 +27,7 @@ import {
   computed,
   contentChild,
   contentChildren,
+  DestroyRef,
   effect,
   inject,
   Injector,
@@ -49,6 +50,7 @@ import {
   annotationChromePaint,
   annotationDrawingOf,
   bakedAppearanceOf,
+  createShownUrls,
   editingTextKeyOf,
   frameInPixels,
   ghostOpacity,
@@ -286,6 +288,8 @@ export class EpdfAnnotationLayer {
 
   /** The baked pictures' URLs, by annotation key, for the page's appearance epoch and bake scale. */
   private readonly urls = signal<Readonly<Record<string, AppearanceUrl>>>(NO_URLS);
+  /** The pictures shown stay valid until the next ones are shown. */
+  private readonly shown = createShownUrls();
   // A move or a turn leaves the epoch as it is (the same pixels, placed elsewhere), and live
   // gestures don't touch it: nothing loads mid-drag.
   private readonly appearanceEpoch = this.annotation.select(
@@ -422,6 +426,7 @@ export class EpdfAnnotationLayer {
     paintsPagePart(() => this.page.ref, 'annotations');
     this.registerBehaviors();
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
+    inject(DestroyRef).onDestroy(() => this.shown.release());
     this.loadAppearances();
     this.loadGhost();
   }
@@ -463,7 +468,7 @@ export class EpdfAnnotationLayer {
 
   /**
    * The baked pictures, loaded again when the page's appearance epoch or the bake scale changes;
-   * each load revokes the URLs of the one before.
+   * the ones shown stay valid until the next are shown.
    */
   private loadAppearances(): void {
     effect((onCleanup) => {
@@ -475,6 +480,7 @@ export class EpdfAnnotationLayer {
       onCleanup(
         untracked(() =>
           loadAppearanceUrls(
+            this.shown,
             (abort) => annotation.renderAppearances(page, scale, abort),
             annotationKey,
             (urls) => this.urls.set(urls),

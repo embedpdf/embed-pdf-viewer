@@ -11,6 +11,7 @@ import {
   type ViewEnv,
 } from '@embedpdf/core-annotation';
 import {
+  annotationKey,
   imageSourceOfBytes,
   shownAppearances,
   type DocumentHandle,
@@ -25,12 +26,18 @@ import { buildTextItems } from '../text-item';
 import type { Ghost } from '../tools/ghost';
 import type { Stamps } from '../write/stamps';
 
+/** How many of the engine's pictures are kept for annotations an undo brings back. */
+const KEPT = 200;
+/** How many of each page's latest sets of engine pictures are kept: an undo goes back to one. */
+const DRAWN_PER_PAGE = 4;
+
 /**
  * What a page paints: the vector items (drafts, previews and the tool's
  * ghost ride the same pipeline), the editable text items, the navigable link
  * areas, and the baked-appearance seam (epoch, bake scale, rasters). A stamp
  * this session placed shows the preview it was placed with until the
- * engine's picture of it exists.
+ * engine's picture of it exists, and an annotation an undo brings back the
+ * picture it had.
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc'>,
@@ -174,16 +181,23 @@ export function createRenderReads(
       const doc = ctx.doc;
       if (!doc) return Promise.resolve([]);
       const { engine } = epochOf(page);
-      const kept = drawn.get(page.objectNumber);
-      const engines =
-        kept && kept.scale === scale && kept.engine === engine
-          ? Promise.resolve(kept.pictures)
-          : enginePictures(doc, page, scale, signal).then((pictures) => {
-              if (!pictures) return [];
-              drawn.set(page.objectNumber, { scale, engine, pictures });
-              return pictures;
-            });
-      return Promise.all([engines, placedPictures(page, scale)]).then(([theirs, placed]) => [
+      const sets = drawn.get(page.objectNumber) ?? [];
+      const known = sets.find((set) => set.scale === scale && set.engine === engine);
+      const engines = known
+        ? Promise.resolve(known.pictures)
+        : enginePictures(doc, page, scale, signal).then((pictures) => {
+            if (!pictures) return [];
+            const others = (drawn.get(page.objectNumber) ?? []).filter(
+              (set) => set.scale !== scale || set.engine !== engine,
+            );
+            drawn.set(
+              page.objectNumber,
+              [...others, { scale, engine, pictures }].slice(-DRAWN_PER_PAGE),
+            );
+            keep(pictures);
+            return pictures;
+          });
+      return Promise.all([engines, ownPictures(page, scale)]).then(([theirs, placed]) => [
         ...theirs,
         ...placed,
       ]);
@@ -217,6 +231,7 @@ export function createRenderReads(
       if (isSubstrateOnly(record)) continue;
       if (record.unconfirmed) {
         if (stamps.lookOf(record)) placed.push(`${id}@placed`);
+        else if (kept.has(id)) placed.push(`${id}@kept`);
         continue;
       }
       engine.push(`${id}@${record.apVersion ?? 0}:${record.annotation.appearanceState ?? ''}`);
@@ -225,12 +240,14 @@ export function createRenderReads(
   };
 
   /**
-   * The engine's pictures of each page, kept with the epoch and scale they
-   * were drawn at: a placed stamp coming or going asks the engine for nothing.
+   * The engine's latest pictures of each page, each set kept with the epoch
+   * and scale it was drawn at: a placed stamp coming or going asks the engine
+   * for nothing, and neither does an undo that brings a page back to how it
+   * was a moment ago (a delete undone before its answer).
    */
   const drawn = new Map<
     number,
-    { scale: number; engine: string; pictures: AnnotationAppearancePicture[] }
+    { scale: number; engine: string; pictures: AnnotationAppearancePicture[] }[]
   >();
 
   /** The engine's pictures of `page` at rest, in the state each shows; `null` when the render failed. */
@@ -261,21 +278,37 @@ export function createRenderReads(
   };
 
   /**
-   * The pictures of the stamps this session placed on `page` that the engine
-   * hasn't written yet: each one's preview, at the size the page shows it,
-   * in its box (before its turn, which the layer puts back, as for the
-   * engine's).
+   * The engine's last picture of each annotation, kept a while after it left
+   * the page (the newest `KEPT`): an undo that brings it back shows it at once.
    */
-  const placedPictures = async (
+  const kept = new Map<string, AnnotationAppearancePicture>();
+  const keep = (pictures: readonly AnnotationAppearancePicture[]): void => {
+    for (const picture of pictures) {
+      const key = annotationKey(picture.ref);
+      kept.delete(key);
+      kept.set(key, picture);
+    }
+    while (kept.size > KEPT) kept.delete(kept.keys().next().value!);
+  };
+
+  /**
+   * The pictures of what shows on `page` that the engine hasn't written yet:
+   * a stamp this session placed shows its preview, at the size the page shows
+   * it, in its box (before its turn, which the layer puts back, as for the
+   * engine's); an annotation an undo brings back shows the picture it had.
+   */
+  const ownPictures = async (
     page: PageRef,
     scale: number,
   ): Promise<AnnotationAppearancePicture[]> => {
     const model = pageModel(page.objectNumber);
     const pictures = model.order.map(async (id) => {
       const record = model.byId[id]!;
-      const look = record.unconfirmed ? stamps.lookOf(record) : null;
+      if (!record.unconfirmed) return null;
+      const look = stamps.lookOf(record);
+      if (!look) return kept.get(id) ?? null;
       const rect = record.apBox;
-      if (!look || !rect) return null;
+      if (!rect) return null;
       const preview = await look(rect.width * scale);
       if (!preview) return null;
       return {
