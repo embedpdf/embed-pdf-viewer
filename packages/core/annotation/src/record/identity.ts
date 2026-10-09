@@ -28,11 +28,11 @@ export function kindOf(annotation: Annotation): AnnotationKind {
 }
 
 /**
- * A record's engine ref: `null` while a record this session created waits for
- * the engine, and for a record the view doesn't hold.
+ * A record's engine ref, a new one's included (it names the object number
+ * its create takes); `null` for a record the view doesn't hold.
  */
 export const refOf = (record: ModelAnnotation | undefined): AnnotationRef | null =>
-  record && !record.unconfirmed ? record.annotation.ref : null;
+  record?.annotation.ref ?? null;
 
 /**
  * The key of the annotation an annotation answers (`/IRT`): a comment reply's

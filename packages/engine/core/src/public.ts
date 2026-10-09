@@ -159,6 +159,7 @@ export type {
   PageRenderOptions,
   PageImageOptions,
   PageImageHandle,
+  ImageSource,
   PageRaster,
   PageRenderImage,
   PageRenderRaster,

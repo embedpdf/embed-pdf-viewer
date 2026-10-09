@@ -96,6 +96,13 @@ export type SettledChange =
 
 /** A change that can still be amended until it is sent. */
 export interface HeldChange {
+  /**
+   * Whether it can still be amended: false once it was sent (by `send`, by a later stage, or
+   * before a download) or cancelled. What comes after goes into a new change.
+   */
+  readonly open: boolean;
+  /** The change it is, once it has ops (its `opId`, its answer); `null` before. */
+  readonly change: PendingChange | null;
   /** Its ops from now on, and what undoing them looks like. The views show the latest. */
   set(ops: readonly ChangeOp[], undo?: readonly PredictedOp[]): void;
   /**
@@ -412,9 +419,18 @@ export function createDocumentChanges(options: {
       assertOpen(capability);
       if (grouping) throw invalid(capability, 'a change can not be held inside a group');
       let entry: Entry | null = null;
+      let cancelled = false;
+      const open = (): boolean =>
+        !closed && !cancelled && (entry === null || (entry.held && !entry.answered));
       return {
+        get open() {
+          return open();
+        },
+        get change() {
+          return entry;
+        },
         set(ops, undo = []) {
-          if (closed || (entry && !entry.held)) return;
+          if (!open()) return;
           if (!entry) {
             entry = createEntry({
               label,
@@ -439,6 +455,7 @@ export function createDocumentChanges(options: {
           return entry;
         },
         cancel() {
+          cancelled = true;
           if (entry?.held) cancel(entry, capability);
         },
       };

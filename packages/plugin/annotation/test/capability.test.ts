@@ -220,7 +220,7 @@ describe('the drawing order', () => {
     release();
     await done;
     expect(keys(harness.capability.list())).toEqual(keys([square(22), square(20), square(21)]));
-    expect(harness.state().reorders).toEqual([]);
+    expect(harness.capability.isPending(ref(22))).toBe(false);
     expect(reordered).toEqual([[ref(22), ref(20), ref(21)]]);
   });
 
@@ -250,16 +250,17 @@ describe('the drawing order', () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     // A new square on the second page, shown before the engine confirms it.
-    harness.apply([
+    const { ids } = harness.apply([
       {
         type: 'create',
         page: toPageRef(2),
-        draft: { subtype: 'square', box: { x: 1, y: 1, width: 5, height: 5 }, nm: 'x' },
+        draft: { subtype: 'square', box: { x: 1, y: 1, width: 5, height: 5 } },
       },
     ]);
-    await expect(
-      harness.capability.reorder([ref(20), { kind: 'nm', page: toPageRef(2), nm: 'x' }], 'start'),
-    ).rejects.toMatchObject({ code: 'invalid-input' });
+    const created = harness.model().byId[ids[0]!]!.annotation.ref;
+    await expect(harness.capability.reorder([ref(20), created], 'start')).rejects.toMatchObject({
+      code: 'invalid-input',
+    });
     expect(harness.reorder).not.toHaveBeenCalled();
   });
 });

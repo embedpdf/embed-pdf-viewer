@@ -1,19 +1,19 @@
 /**
- * Randomized interleavings of changes to one record: restyles and flag
- * toggles whose engine writes settle in any order, some refused, with other
- * sessions' updates arriving meanwhile. A restyle to the colour the record
- * already shows changes nothing and writes nothing. The fake engine applies a write when
- * it answers it and publishes the result before the promise settles, as the
- * real engines do.
+ * Randomized interleavings of changes to one record, on the change queue:
+ * restyles and flag toggles, each one change, answered in the order they were
+ * staged (as both engines answer), some refused, with other sessions' updates
+ * arriving meanwhile. A restyle to the colour the record already shows
+ * changes nothing and sends nothing. The fake engine applies a change when it
+ * answers it and publishes its events before the answer, as the real engines
+ * do.
  *
- * After every step, each field shows the newest change the engine has not
- * settled for that field (a change stays until every older change of the
- * record settled), or else the engine's value. The record renders the way it
- * did when the user made the newest unsettled change (a restyle renders live,
- * whatever another session does meanwhile), or else by its render preference:
+ * After every step, each field shows the newest change the engine hasn't
+ * answered for that field, or else the engine's value. The record draws live
+ * when what it shows differs visibly from the engine's record (a colour the
+ * engine's raster doesn't have), and otherwise by its render preference:
  * live once this session restyled it, the engine's raster again after
- * another session's update. Once everything settled, the view is the engine's
- * record and nothing is pending.
+ * another session's update. Once everything is answered, the view is the
+ * engine's record and nothing is pending.
  */
 import type { DocumentEvent } from '@embedpdf/core';
 import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
@@ -88,7 +88,7 @@ function random(seed: number) {
   return { next, pick: <T>(items: readonly T[]) => items[Math.floor(next() * items.length)]! };
 }
 
-/** One write the fake engine holds until the test answers it. */
+/** The change the fake engine is applying, held until the test answers it. */
 interface HeldWrite {
   patch: { color?: string; print?: boolean };
   resolve(result: unknown): void;
@@ -97,13 +97,10 @@ interface HeldWrite {
 
 type Source = 'vector' | 'baked';
 
-/** One change the user made, as the test expects the view to treat it. */
+/** One change the user made and the engine hasn't answered yet. */
 interface UserChange {
   field: 'color' | 'print';
   value: string | boolean;
-  state: 'pending' | 'accepted' | 'refused';
-  /** How the record rendered once the user made the change. */
-  source: Source;
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -115,41 +112,49 @@ async function play(seed: number, steps: number) {
   await harness.load([squareOf(engine)]);
   harness.capability.selection.set([REF]);
 
+  // The engine works on one change at a time: the oldest unanswered one.
   const held: HeldWrite[] = [];
-  const changes: UserChange[] = [];
   harness.update.mockImplementation(
     (_ref: AnnotationRef, patch: HeldWrite['patch']) =>
       new Promise((resolve, reject) => held.push({ patch, resolve, reject })),
   );
 
-  // Writes are held in the order they were made, one per change.
-  const inFlight: UserChange[] = [];
-  /** Whether the record renders live once nothing is pending. */
+  /** The user's changes the engine hasn't answered, oldest first. */
+  const unanswered: UserChange[] = [];
+  /** Whether the record draws live when it shows what the engine has. */
   let preferVector = false;
 
-  /** The changes still showing: not refused, and unsettled or behind an unsettled older one. */
-  const outstanding = () =>
-    changes.filter(
-      (change, index) =>
-        change.state !== 'refused' &&
-        (change.state === 'pending' ||
-          changes.slice(0, index).some((older) => older.state === 'pending')),
-    );
   const expected = (field: UserChange['field']) => {
-    const newest = outstanding()
-      .filter((change) => change.field === field)
-      .at(-1);
+    const newest = unanswered.filter((change) => change.field === field).at(-1);
     if (newest) return newest.value;
     return field === 'color' ? engine.color : engine.print;
   };
+  // A colour the engine's raster doesn't show draws live; a flag never matters.
   const expectedSource = (): Source =>
-    outstanding().at(-1)?.source ?? (preferVector ? 'vector' : 'baked');
+    expected('color') !== engine.color || preferVector ? 'vector' : 'baked';
   const check = (label: string) => {
     const annotation = harness.capability.get(REF)!;
     expect(dataOf(annotation).color, `${label}: color`).toBe(expected('color'));
     expect(annotation.print, `${label}: print`).toBe(expected('print'));
     const item = harness.capability.listPageItems(PAGE).find(({ id }) => id === 'obj:20')!;
     expect(item.source, `${label}: source`).toBe(expectedSource());
+    expect(harness.pending(), `${label}: pending`).toHaveLength(unanswered.length);
+  };
+
+  /** The engine answers the oldest change: applies it, or refuses it. */
+  const answerOldest = async (accept: boolean) => {
+    const change = unanswered.shift()!;
+    const write = held.shift()!;
+    expect(write.patch).toMatchObject({ [change.field]: change.value });
+    if (accept) {
+      if (write.patch.color) engine.color = write.patch.color;
+      if (write.patch.print !== undefined) engine.print = write.patch.print;
+      write.resolve({ annotation: squareOf(engine) });
+    } else {
+      write.reject(new Error('refused'));
+    }
+    // The answer lands, and the engine starts on the next change.
+    await flush();
   };
 
   for (let step = 0; step < steps; step++) {
@@ -158,44 +163,20 @@ async function play(seed: number, steps: number) {
     if (roll < 0.3) {
       const color = rng.pick(COLORS);
       void harness.capability.selection.update({ color });
-      // The colour it already shows: no change, and no write.
-      if (color === expected('color')) {
-        check(label);
-        continue;
+      // The colour it already shows: no change, and nothing sent.
+      if (color !== expected('color')) {
+        // A restyle draws live: this session owns the appearance now.
+        preferVector = true;
+        unanswered.push({ field: 'color', value: color });
       }
-      // A restyle renders live: this session owns the appearance now.
-      const change: UserChange = {
-        field: 'color',
-        value: color,
-        state: 'pending',
-        source: 'vector',
-      };
-      preferVector = true;
-      changes.push(change);
-      inFlight.push(change);
     } else if (roll < 0.5) {
       const print = !harness.capability.get(REF)!.print;
-      // Flags leave the appearance alone: the record renders as it did.
-      const source = expectedSource();
+      // Flags leave the appearance alone: the record draws as it did, and keeps drawing so.
+      if (expectedSource() === 'vector') preferVector = true;
       void harness.capability.selection.update({ print });
-      const change: UserChange = { field: 'print', value: print, state: 'pending', source };
-      if (source === 'vector') preferVector = true;
-      changes.push(change);
-      inFlight.push(change);
-    } else if (roll < 0.85 && held.length) {
-      const index = Math.floor(rng.next() * held.length);
-      const change = inFlight.splice(index, 1)[0]!;
-      const [write] = held.splice(index, 1);
-      if (rng.next() < 0.75) {
-        if (write!.patch.color) engine.color = write!.patch.color;
-        if (write!.patch.print !== undefined) engine.print = write!.patch.print;
-        change.state = 'accepted';
-        write!.resolve({ annotation: squareOf(engine) });
-      } else {
-        change.state = 'refused';
-        write!.reject(new Error('refused'));
-      }
-      await flush();
+      unanswered.push({ field: 'print', value: print });
+    } else if (roll < 0.85 && unanswered.length) {
+      await answerOldest(rng.next() < 0.75);
     } else {
       // Another session changes the record: its raster is the truth again.
       if (rng.next() < 0.5) engine.color = rng.pick(COLORS);
@@ -207,31 +188,18 @@ async function play(seed: number, steps: number) {
         origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: step + 100 },
         annotation: squareOf(engine),
         appearance: { changed: false },
-        meta: {
-          affectedPages: [],
-          cacheDelta: null,
-          changed: [],
-          weakRefsInvalidated: false,
-          shouldRefetch: null,
-        },
+        meta: { affectedPages: [], cacheDelta: null, changed: [] },
       } as unknown as DocumentEvent);
     }
     check(label);
   }
 
-  // Answer everything still in flight, in a random order.
-  while (held.length) {
-    const index = Math.floor(rng.next() * held.length);
-    const change = inFlight.splice(index, 1)[0]!;
-    const [write] = held.splice(index, 1);
-    if (write!.patch.color) engine.color = write!.patch.color;
-    if (write!.patch.print !== undefined) engine.print = write!.patch.print;
-    change.state = 'accepted';
-    write!.resolve({ annotation: squareOf(engine) });
-    await flush();
+  // Answer everything still on its way, in order.
+  while (unanswered.length) {
+    await answerOldest(true);
     check(`seed ${seed} drain`);
   }
-  expect(harness.state().pending).toEqual([]);
+  expect(harness.pending()).toEqual([]);
   expect(dataOf(harness.capability.get(REF)).color).toBe(engine.color);
   expect(harness.capability.get(REF)!.print).toBe(engine.print);
 }

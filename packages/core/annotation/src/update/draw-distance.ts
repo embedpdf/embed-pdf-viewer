@@ -8,7 +8,7 @@ import {
 } from '../measurement';
 import { styleOf } from '../record';
 import type { Shape, Effect, Model, PointerInput } from '../types';
-import { draftOf, newRecord } from './changes';
+import { draftOf, newRecord, numbersLeft } from './changes';
 import { measurementSelectionQuad } from '../measurement-shape';
 import { MIN_DRAG } from '../placement';
 import { fractionOnPage } from './page-bound';
@@ -127,7 +127,7 @@ export function distancePointer(
   return [
     {
       ...model,
-      seq: model.seq + 1,
+      objectNumbers: numbersLeft(model, 1),
       byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],

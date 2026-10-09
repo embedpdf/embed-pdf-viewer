@@ -48,22 +48,26 @@ export const geomEqual = (left: Shape, right: Shape): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
 /**
- * The ref the `offset`-th record a message creates is written under: its name
- * `<namePrefix><n>` on `page`, counted from the session's `seq`.
+ * The ref of the `offset`-th record a message creates: the object number the
+ * session holds in that place (`Session.objectNumbers`), on `page`. Throws
+ * when the session holds too few: the plugin hands it what a message needs
+ * before it runs (`newRecordsAtMost`).
  */
-export const newRecordRef = (
+const newRecordRef = (
   model: Model,
   page: PageRef,
-  offset = 1,
-): Extract<AnnotationRef, { kind: 'nm' }> => ({
-  kind: 'nm',
-  page,
-  nm: `${model.namePrefix}${model.seq + offset}`,
-});
+  offset: number,
+): Extract<AnnotationRef, { kind: 'objectNumber' }> => {
+  const objectNumber = model.objectNumbers[offset - 1];
+  if (objectNumber === undefined) {
+    throw new Error('annotation-core: the session holds no object number for a new record');
+  }
+  return { kind: 'objectNumber', page, objectNumber };
+};
 
-/** The key of the `offset`-th record a message creates on `page`: its `nm` ref's. */
-export const newRecordId = (model: Model, page: PageRef, offset = 1): Id =>
-  annotationKey(newRecordRef(model, page, offset));
+/** The session's object numbers once a message created `count` records. */
+export const numbersLeft = (model: Model, count: number): readonly number[] =>
+  model.objectNumbers.slice(count);
 
 /**
  * The draft a drawing creates, complete before its record is made: the
@@ -95,18 +99,18 @@ export function draftOf(
   } as unknown as AnnotationDraft;
 }
 
-/** A record a message creates, and the draft it is written from, named as the record is keyed. */
+/** A record a message creates, and the draft it is written from. */
 export interface NewRecord {
   readonly record: ModelAnnotation;
   readonly draft: AnnotationDraft;
 }
 
 /**
- * The `offset`-th record a message creates, from its `draft`: named by the
- * `nm` it will be written under (its key), holding the annotation the engine
- * will read back (`annotationOfNew`), appended after the page's other
- * records, and drawn as a new record is (`sourceOfNew`). `reply` ties it to
- * the annotation it belongs to; the write states it once that one has a ref.
+ * The `offset`-th record a message creates, from its `draft`: keyed by the
+ * object number it takes (`newRecordRef`), holding the annotation the engine
+ * will read back (`annotationOfNew`), and drawn as a new record is
+ * (`sourceOfNew`). `reply` ties it to
+ * the annotation it belongs to, which can be one the same message creates.
  */
 export function newRecord(
   model: Model,
@@ -116,11 +120,9 @@ export function newRecord(
 ): NewRecord {
   const offset = options.offset ?? 1;
   const ref = newRecordRef(model, page, offset);
-  const named = { ...draft, nm: ref.nm } as AnnotationDraft;
-  const onPage = model.order.filter(
-    (id) => model.byId[id]?.annotation.page.objectNumber === page.objectNumber,
-  ).length;
-  const read = annotationOfNew(named, { ref, index: onPage + offset - 1 });
+  // The annotation it answers is the engine's to look up as it writes: read
+  // without it, then stated.
+  const read = annotationOfNew(draft, { ref });
   const annotation: Annotation = options.reply ? { ...read, reply: options.reply } : read;
   return {
     record: {
@@ -129,7 +131,7 @@ export function newRecord(
       source: sourceOfNew(annotation),
       annotation,
     },
-    draft: named,
+    draft: options.reply ? ({ ...draft, reply: options.reply } as AnnotationDraft) : draft,
   };
 }
 

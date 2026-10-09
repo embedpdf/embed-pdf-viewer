@@ -1,12 +1,12 @@
 /**
- * Free-text editing. Every keystroke is an ordinary commit: the core's
- * `setText` / `setRichText` puts the edited record in the change set, the
- * view shows it at once, and its `text` effect waits for the next engine
- * write of that record. The write runs after a pause in typing (or at once
- * when editing ends) and sends the latest text, so it carries every keystroke
- * that waited for it: they settle together, accepted or refused.
+ * Free-text editing. Every keystroke is an ordinary commit of the core's
+ * `setText` / `setRichText`, into one change that is still being made (a
+ * hold): the view shows the text at once, and the change keeps its place in
+ * line holding the latest text. It is sent after a pause in typing, when
+ * editing ends, when anything else is staged, and before a download; what is
+ * typed after that goes into a new one.
  */
-import { type Id, type Point, richDocOf } from '@embedpdf/core-annotation';
+import { refOf, type Id, type Message, type Point, richDocOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -18,85 +18,63 @@ import { setTextSelection } from '../model';
 import type { ChromeReads } from '../read/chrome';
 import { cssFontFamilyForFace, textCommitPatch, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import type { Commit, StoreHold, Written } from '../services/store';
 
 const TEXT_WRITE_DELAY_MS = 250;
 
-interface Waiter {
-  resolve(): void;
-  reject(error: unknown): void;
-}
-
 export function createTextEditing(
-  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'clock' | 'cancellable'>,
-  { store, identity, fonts }: Pick<AnnotationServices, 'store' | 'identity' | 'fonts'>,
+  ctx: Pick<AnnotationContext, 'state' | 'clock' | 'cancellable'>,
+  { store, fonts }: Pick<AnnotationServices, 'store' | 'fonts'>,
   chrome: Pick<ChromeReads, 'textBoxAt'>,
 ) {
-  /** Cancels the pause wait of each record being typed in (the clock drops them at close). */
-  const pauses = new Map<Id, () => void>();
-  /** The keystrokes of each record waiting for its next write, oldest first. */
-  const waiting = new Map<Id, Waiter[]>();
+  /** What is being typed: the record, the change it goes into, how it settles, and the pause before it is sent. */
+  let typing: {
+    readonly id: Id;
+    readonly hold: StoreHold;
+    written: Promise<Written> | null;
+    cancelPause: () => void;
+  } | null = null;
 
-  /** Write the record's text once typing pauses. */
-  const writeAfterPause = (id: Id): void => {
-    pauses.get(id)?.();
-    pauses.set(
-      id,
-      ctx.clock.after(TEXT_WRITE_DELAY_MS, () => flushText(id)),
-    );
+  /** Send what was typed now. Resolves once the engine answered it; never rejects. */
+  const sendTyping = async (): Promise<void> => {
+    const sent = typing;
+    if (!sent) return;
+    typing = null;
+    sent.cancelPause();
+    sent.hold.send();
+    await sent.written;
   };
 
   /**
-   * Write the record's current text now, and settle every keystroke that
-   * waited for it: they are all in this one write. A record the engine has
-   * not confirmed yet is written once its create is, under its real key.
-   * Resolves when the write settled; never rejects (each keystroke's own
-   * write reports a refusal).
+   * One edit of the record's text (a keystroke, or a format on the words
+   * selected while typing) into its typing, sent once typing pauses.
    */
-  const flushText = (id: Id): Promise<void> => {
-    pauses.get(id)?.();
-    pauses.delete(id);
-    const waiters = waiting.get(id) ?? [];
-    waiting.delete(id);
-    return identity
-      .withRef(id, async (ref) => {
-        const record = store.model().byId[annotationKey(ref)];
-        if (!record) return;
-        const patch = textCommitPatch(
-          record,
-          richDocOf(record.annotation, fonts).paragraphs,
-          fonts,
-        );
-        await ctx.doc.page(ref.page).annotations.update(ref, { subtype: 'free-text', ...patch });
-      })
-      .then(
-        () => waiters.forEach((waiter) => waiter.resolve()),
-        (error: unknown) => waiters.forEach((waiter) => waiter.reject(error)),
-      );
+  const type = (id: Id, message: Message): Commit => {
+    if (typing && (typing.id !== id || !typing.hold.open)) void sendTyping();
+    typing ??= {
+      id,
+      hold: store.hold({ key: 'annotation.text' }),
+      written: null,
+      cancelPause: () => {},
+    };
+    const current = typing;
+    const commit = store.commit(message, { into: current.hold });
+    current.written = commit.written;
+    current.cancelPause();
+    current.cancelPause = ctx.clock.after(TEXT_WRITE_DELAY_MS, () => {
+      if (typing === current) void sendTyping();
+    });
+    return commit;
   };
 
-  // Typing waiting for its write moves with its record to a new key.
-  identity.onFollow((from, to) => {
-    const moved = waiting.get(from);
-    if (!moved) return;
-    waiting.delete(from);
-    pauses.get(from)?.();
-    pauses.delete(from);
-    waiting.set(to, [...moved, ...(waiting.get(to) ?? [])]);
-    writeAfterPause(to);
+  // A record's text, as the engine writes it: its plain and rich text.
+  store.onEffect('text', (effect, model) => {
+    const record = model.byId[effect.id];
+    const ref = refOf(record);
+    if (!record || !ref) return;
+    const patch = textCommitPatch(record, richDocOf(record.annotation, fonts).paragraphs, fonts);
+    return [{ type: 'annotations.update', ref, patch: { subtype: 'free-text', ...patch } }];
   });
-
-  /** Write every record with typing still waiting. */
-  const flushAllText = (): Promise<void>[] => [...waiting.keys()].map(flushText);
-
-  // A keystroke waits for the next write of its record, after a pause in typing.
-  store.onEffect('text', (effect) => ({
-    ids: [effect.id],
-    perform: () =>
-      new Promise<void>((resolve, reject) => {
-        waiting.set(effect.id, [...(waiting.get(effect.id) ?? []), { resolve, reject }]);
-        writeAfterPause(effect.id);
-      }),
-  }));
 
   /** The `text` noun (its `getEditing` and `toggleFormat` come from the reads and the selection). */
   const text = {
@@ -104,12 +82,12 @@ export function createTextEditing(
       store.commit({ type: 'beginTextEdit', id: annotationKey(ref) });
     },
     end: async (options: { signal?: AbortSignal } = {}) => {
-      const writes = flushAllText();
+      const sent = sendTyping();
       if (ctx.state.get().textSelection) {
         ctx.state.update(setTextSelection, null);
       }
       store.commit({ type: 'endTextEdit' });
-      await ctx.cancellable(options.signal, Promise.all(writes));
+      await ctx.cancellable(options.signal, sent);
     },
   };
 
@@ -132,14 +110,12 @@ export function createTextEditing(
     },
     getEditingId: () => store.model().editing,
     draftContents: (ref: AnnotationRef, text: string) => {
-      store.commit({ type: 'setText', id: annotationKey(ref), text });
+      const id = annotationKey(ref);
+      type(id, { type: 'setText', id, text });
     },
     draftRichText: (ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }) => {
-      store.commit({
-        type: 'setRichText',
-        id: annotationKey(ref),
-        doc: { paragraphs: doc.paragraphs },
-      });
+      const id = annotationKey(ref);
+      type(id, { type: 'setRichText', id, doc: { paragraphs: doc.paragraphs } });
     },
     setTextSelection: (ref: AnnotationRef, range: { start: number; end: number } | null) => {
       const id = annotationKey(ref);
@@ -158,7 +134,7 @@ export function createTextEditing(
     getCssFontFamily: (family: string) => cssFontFamilyForFace(family, fonts),
   };
 
-  return { flushText, flushAllText, text, api };
+  return { type, sendTyping, text, api };
 }
 
 export type TextEditing = ReturnType<typeof createTextEditing>;

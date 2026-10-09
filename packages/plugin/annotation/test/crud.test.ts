@@ -81,15 +81,23 @@ describe('create, update and delete', () => {
     expect(harness.capability.isPending(shown.ref)).toBe(true);
 
     const { annotation } = await pending.then((result) => (order.push('resolved'), result));
-    expect(annotationKey(annotation.ref)).toBe('obj:42');
-    expect(order).toEqual(['created:obj:42:local', 'resolved']);
-    // The draft the engine saw: as given, named, and nothing added.
+    // Its key from the start is its key for life: the object number it took.
+    expect(annotationKey(annotation.ref)).toBe(id);
+    expect(order).toEqual([`created:${id}:local`, 'resolved']);
+    expect(harness.applied[0]!.change).toEqual({
+      ops: [
+        expect.objectContaining({
+          type: 'annotations.create',
+          objectNumber: Number(id!.slice('obj:'.length)),
+        }),
+      ],
+    });
+    // The draft the engine saw: as given, with nothing added (its /NM is the engine's to write).
     const written = harness.create.mock.calls[0]![0];
     expect(written).toMatchObject(draft);
     expect(written).not.toHaveProperty('print');
-    expect(typeof written.nm).toBe('string');
-    // Confirmed: the name's key is gone, the durable record is in the model.
-    expect(harness.model().order).toEqual(['obj:42']);
+    expect(written).not.toHaveProperty('nm');
+    expect(harness.model().order).toEqual([id]);
     expect(harness.capability.isPending(annotation.ref)).toBe(false);
   });
 
@@ -102,9 +110,10 @@ describe('create, update and delete', () => {
       undefined,
       { select: true },
     );
-    expect(harness.model().selected).toEqual(harness.model().order);
+    const [id] = harness.model().order;
+    expect(harness.model().selected).toEqual([id]);
     await pending;
-    expect(harness.model().selected).toEqual(['obj:43']);
+    expect(harness.model().selected).toEqual([id]);
   });
 
   it('rejects with the plugin vocabulary: unknown page, a draft the engine refuses, engine failure', async () => {
@@ -140,10 +149,10 @@ describe('create, update and delete', () => {
 
     harness.create.mockResolvedValueOnce({ annotation: squareDTO(43) });
     const { annotation: copy } = await harness.capability.create(PAGE, { ...read, nm: null });
-    expect(annotationKey(copy.ref)).toBe('obj:43');
+    // A new annotation under a number of its own.
+    expect(annotationKey(copy.ref)).not.toBe(annotationKey(original.ref));
     const written = harness.create.mock.calls[1]![0];
     expect(written).toMatchObject({ subtype: 'square', color: read.color });
-    expect(typeof written.nm).toBe('string');
 
     await expect(
       harness.capability.create(PAGE, { ...read, subtype: 'unsupported' } as never),
@@ -176,6 +185,7 @@ describe('create, update and delete', () => {
     });
     expect(dataOf(updated.annotation).opacity).toBe(0.5);
     await harness.capability.delete(annotation.ref);
-    expect(log).toEqual(['updated:obj:5:local', 'deleted:obj:5:local']);
+    const key = annotationKey(annotation.ref);
+    expect(log).toEqual([`updated:${key}:local`, `deleted:${key}:local`]);
   });
 });

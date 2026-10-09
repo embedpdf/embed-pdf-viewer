@@ -337,7 +337,8 @@ ctx.changes.stage({
 ### Predict
 
 `predict` is the engine's own rule for an op, from the engine-core functions
-the engine follows, in the plugin's `model.ts` next to `fold`.
+the engine follows, next to the mirror's `fold` (the annotation plugin's
+`predictRecords`, in `sync/records.ts`).
 
 - **Pure and absolute.** Ops say what to set, never by how much, so replaying
   an op over a value that already holds its answer changes nothing. Both
@@ -353,11 +354,11 @@ the engine follows, in the plugin's `model.ts` next to `fold`.
 
 ### When a change leaves the view
 
-| The engine…         | The change leaves…                                                                                                                                                                                  |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| applied it          | each mirror's view once that mirror holds the answer: at once when its events folded; after the read a `fold` asked for, when it asked; and a mirror that couldn't read keeps it until a load lands |
-| refused it          | every view, at once, together with its dependents                                                                                                                                                   |
-| the document closed | nothing is shown any more; its `result` rejects `instance-closed`                                                                                                                                   |
+| The engine…         | The change leaves…                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| applied it          | each mirror's view once that mirror holds the answer: once it folded the change's last event, even before the answer arrives; after the read a `fold` asked for, when it asked; and a mirror that couldn't read keeps it until a load lands |
+| refused it          | every view, at once, together with its dependents                                                                                                                                                                                           |
+| the document closed | nothing is shown any more; its `result` rejects `instance-closed`                                                                                                                                                                           |
 
 **Dependents.** A create can name its object (`objectNumber`, from
 `ctx.changes.takeObjectNumber()`), so later changes can refer to it before the
@@ -373,8 +374,10 @@ only it would have created can't apply: the queue refuses them too (`conflict`,
   `set(ops, undo?)` replaces its ops, and the views show the latest. Any later
   `stage` sends the open holds first, and `send()` sends the holds staged
   before it too, so send order is always staging order. `cancel()` drops it.
-  The plugin decides when it's done (a pause in typing, `ctx.clock.after`); the
-  kernel sends every open hold before a download.
+  `open` says whether it can still be amended: once sent, what comes after
+  goes into a new hold. `change` is the change it is once it has ops (its
+  `opId`, its answer). The plugin decides when it's done (a pause in typing,
+  `ctx.clock.after`); the kernel sends every open hold before a download.
 - **A group** makes everything staged while its `run` runs, by any plugin, one
   change: `ctx.changes.group(label, () => { … })`. Only what is staged before
   `run` returns joins; a verb that awaits first stages its own change. Nested
@@ -389,15 +392,16 @@ see a change land in one update, whoever made it.
 
 The kernel tests each rule in `packages/core/main/test/changes.test.ts`.
 
-The annotation plugin still keeps an overlay of its own in session state
-(`services/intents.ts`, `model.ts`'s `stage`, `writeSettled` and
-`followRecord`), from before the change queue; it moves onto the queue.
+The annotation plugin is the reference: one change per message
+(`services/store.ts`), its records mirror predicts (`sync/records.ts`), new
+records are named by the object numbers they take, and typing is a hold
+(`write/text-editing.ts`).
 
 ## Held-back writes
 
-Some writes wait on purpose: the annotation plugin writes typed text once
-typing pauses, the ink tool waits for the next stroke of a drawing, a form
-field is written on blur. A hold (see [Pending changes](#pending-changes)) is
+Some writes wait on purpose: the annotation plugin sends typed text once
+typing pauses (a hold), the ink tool waits for the next stroke of a drawing, a
+form field is written on blur. A hold (see [Pending changes](#pending-changes)) is
 how a change waits, and the kernel sends every open hold before a download
 itself. A write queue holds writes that are on their way.
 Before anything reads the whole file (`documents.download()`, `downloadLayer()`), the
@@ -406,9 +410,10 @@ flush plugins registered with `ctx.onSettle(flush)` and waits for them, so the
 file has everything the user sees.
 
 - A flush sends what the plugin holds back and resolves once the engine has
-  it: `flushAllText()` for typed text, the ink draft finished between strokes
-  (never a stroke still being drawn), the field being typed in committed
-  (matches Acrobat: the field being edited is committed before a save).
+  it: the ink draft finished between strokes (never a stroke still being
+  drawn), the field being typed in committed (matches Acrobat: the field being
+  edited is committed before a save). Holds need no flush: the kernel sends
+  them.
 - A plugin whose queue carries document writes registers it:
   `ctx.onSettle(() => queue.idle())`. A queue whose operations read the file
   themselves is never registered: the actions plugin runs every download

@@ -10,9 +10,10 @@
  *
  * What the user sees is `view()`: the mirror's value with this session's
  * pending changes (changes.ts) replayed on top, op by op, through the spec's
- * `predict`. An answered change leaves the view once the mirror holds the
- * answer: at once when its events folded, or, when a fold asked to read
- * again, once that read (or a later full load) lands.
+ * `predict`. A change leaves the view once the mirror holds its answer: when
+ * the last of its events folded (even before the answer itself arrives), or,
+ * when a fold asked to read again, once that read (or a later full load)
+ * lands.
  *
  * The load protocol:
  *   1. The mirror subscribes to the event stream when it is created.
@@ -154,12 +155,49 @@ export const statusOfFailure = (error: unknown): ResourceStatus =>
 export const changeIdOf = (event: DocumentEvent): string | null =>
   'origin' in event ? (event.origin.tx?.id ?? null) : null;
 
-/** The changes a view shows: the queue's, and the answered ones a mirror keeps, each once. */
+/** The `opId` of the change whose last event this is, or null. */
+export const lastEventOf = (event: DocumentEvent): string | null => {
+  const tx = 'origin' in event ? event.origin.tx : undefined;
+  return tx && tx.index === tx.count - 1 ? tx.id : null;
+};
+
+/**
+ * The changes of this session whose events a mirror folded, every one of
+ * them: the mirror holds their answer, so its view stops replaying them, even
+ * before the answer itself arrives. An entry goes once its change left the
+ * queue.
+ */
+export function createFoldedChanges(changes: ChangeViews) {
+  const folded = new Set<string>();
+  return {
+    has: (opId: string) => folded.has(opId),
+    /** The event folded: when it was a change's last, the change is held. True when that's new. */
+    add(event: DocumentEvent): boolean {
+      const opId = lastEventOf(event);
+      if (opId === null || folded.has(opId) || !changes.find(opId)) return false;
+      for (const each of folded) if (!changes.find(each)) folded.delete(each);
+      folded.add(opId);
+      return true;
+    },
+  };
+}
+
+/**
+ * The changes a view shows: the queue's, but those whose events the mirror
+ * folded already, and the answered ones a mirror keeps (it asked to read
+ * again), each once.
+ */
 export function showingWith(
   changes: ChangeViews,
   kept: Iterable<{ readonly change: QueuedChange }>,
+  folded: { has(opId: string): boolean },
 ): QueuedChange[] {
-  const shown = new Map(changes.shown().map((change) => [change.opId, change]));
+  const shown = new Map(
+    changes
+      .shown()
+      .filter((change) => !folded.has(change.opId))
+      .map((change) => [change.opId, change]),
+  );
   for (const { change } of kept) shown.set(change.opId, change);
   return [...shown.values()];
 }
@@ -213,6 +251,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
    */
   const kept = new Map<string, { change: QueuedChange; after: number }>();
   let keptVersion = 0;
+  const folded = createFoldedChanges(env.changes);
 
   /** Keep the change an event belongs to until a read lands, when it's one of ours. */
   const keepUntilRead = (event: DocumentEvent, after: number): string | null => {
@@ -248,7 +287,12 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
     ) {
       return viewMemo.view;
     }
-    const next = replay(value, showingWith(env.changes, kept.values()), spec.predict, env.report);
+    const next = replay(
+      value,
+      showingWith(env.changes, kept.values(), folded),
+      spec.predict,
+      env.report,
+    );
     viewMemo = { value, version, kept: keptVersion, view: next };
     return next;
   };
@@ -311,6 +355,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       }
       return;
     }
+    if (spec.predict && folded.add(event)) keptVersion += 1;
     commit(result, { cause: 'event', event, pages: null });
   };
 

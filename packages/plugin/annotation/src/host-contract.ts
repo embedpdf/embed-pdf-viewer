@@ -20,6 +20,7 @@ import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
   AnnotationRef,
+  ImageSource,
   PageMeasurementViewport,
   PageRef,
   PdfMeasure,
@@ -51,6 +52,18 @@ export {
   ANNOTATION_MARQUEE_PRIORITY,
   ANNOTATION_PLACE_PRIORITY,
 } from './priorities';
+
+/**
+ * One annotation's look at rest, as the render layer paints it: the engine's
+ * picture, or, while the annotation's create is on its way, the one this
+ * device made (a placed stamp's preview), which the engine's replaces.
+ */
+export interface AnnotationAppearancePicture extends Pick<
+  AnnotationAppearanceImage,
+  'ref' | 'mode' | 'state' | 'rect'
+> {
+  readonly image: ImageSource;
+}
 
 export interface RecalibrationReport {
   page: PageRef;
@@ -132,7 +145,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     scale: number,
     signal?: AbortSignal,
-  ): Promise<AnnotationAppearanceImage[]>;
+  ): Promise<AnnotationAppearancePicture[]>;
 
   // ── sync ──
   /**

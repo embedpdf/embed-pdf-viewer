@@ -26,8 +26,8 @@ import { createIcons } from './write/icons';
 import { createLinkWrites } from './write/links';
 import { createMarkupWrites } from './write/markup';
 import { createMeasurement } from './write/measurement';
+import { registerOpBuilders } from './write/ops';
 import { createPointer } from './write/pointer';
-import { registerEffectRunners } from './write/runners';
 import { createScriptEffects } from './write/script-effects';
 import { createSelectionWrites } from './write/selection';
 import { createStamps } from './write/stamps';
@@ -52,32 +52,24 @@ export function createAnnotationController(ctx: AnnotationContext) {
   followConfirmedChanges(ctx, services, createAnnouncer(events));
 
   // Writes: every change goes through the store, a gesture's through `commit`,
-  // one stated in code through `apply`, and each ends in the same writes.
+  // one stated in code through `apply`, and each is one change on the queue.
   const text = createTextEditing(ctx, services, chrome);
-  // Before the document's file is read (a download, an export), write the
-  // words typed in the last moment, and wait for every write on its way.
+  // Before an export reads the document, send the words typed in the last
+  // moment, and wait for every change on its way. (A download does the same
+  // through the kernel's queue.)
   const settle = async (): Promise<void> => {
-    await Promise.all(text.flushAllText());
+    await text.sendTyping();
     await services.store.whenWritten();
   };
-  ctx.onSettle(settle);
   const links = createLinkWrites(ctx, services);
-  registerEffectRunners(ctx, services, links);
+  registerOpBuilders(services);
   const crud = createCrud(ctx, services, annotations, settle);
   const stamps = createStamps(ctx, services);
   // The tool's ghost: what a click would make, which the page's items paint.
   const ghost = createGhost(ctx, services, stamps);
-  const render = createRenderReads(ctx, services, ghost);
+  const render = createRenderReads(ctx, services, ghost, stamps);
   const icons = createIcons(ctx, services, stamps);
-  const selection = createSelectionWrites(
-    ctx,
-    services,
-    annotations,
-    properties,
-    chrome,
-    text,
-    links,
-  );
+  const selection = createSelectionWrites(ctx, services, annotations, properties, chrome, text);
   const measurement = createMeasurement(ctx, services, crud);
   const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(ctx, services, annotations);

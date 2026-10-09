@@ -98,7 +98,7 @@ describe('after a change', () => {
     expect(applyChange(live, square({ box: { ...BOX, x: 130 } })).source).toBe('vector');
   });
 
-  it('a stamp always shows its raster, drawn where its shape is', () => {
+  it('a stamp always shows its raster, drawn where its shape is, at its own proportions', () => {
     const stamp = baked('stamp');
     const resized = applyChange(stamp, {
       subtype: 'stamp',
@@ -111,7 +111,8 @@ describe('after a change', () => {
       undefined,
       shapeOf(resized.annotation),
     );
-    expect(placed.box).toEqual({ ...BOX, width: 160 });
+    // Fit `contain` in the wider box, as the engine fits the drawing: whole, centred.
+    expect(placed.box).toEqual({ ...BOX, x: BOX.x + 30 });
     expect(drawnAfter(stamp, { subtype: 'stamp', opacity: 0.5 } as AnnotationPatch)).toEqual({});
   });
 

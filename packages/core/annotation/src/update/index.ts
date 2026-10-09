@@ -14,7 +14,7 @@
  *   text-markup.ts              markup, carets and replace-text over selected text
  *   selection-edits.ts          toolbar edits of the whole selection
  *   text.ts                     free-text typing
- *   session.ts                  the session itself: defaults, rekey, forget
+ *   session.ts                  the session itself: defaults, forget
  */
 import { annotContentsEditable } from '../flags';
 import { expandGroups } from '../group';
@@ -45,7 +45,7 @@ import {
   setLink,
   setTextFormat,
 } from './selection-edits';
-import { forget, initialSession, rekey, setDefaults } from './session';
+import { forget, initialSession, setDefaults } from './session';
 import { setRichText, setText } from './text';
 import { createCaret, createMarkup, createReplaceText, setMarkupPreview } from './text-markup';
 
@@ -60,6 +60,27 @@ export function update(model: Model, message: Message): UpdateResult {
   const [next, effects] = transition(model, message);
   const change = changeBetween(model, next);
   return { session: sessionOf(next), change, effects: [...effects, ...writesOf(change, effects)] };
+}
+
+/**
+ * The most records `message` can create: how many object numbers the session
+ * must hold before it runs (`Session.objectNumbers`). A pointer press or
+ * release of a creating tool can finish a drawing; a move never does.
+ */
+export function newRecordsAtMost(message: Message): number {
+  switch (message.type) {
+    case 'createReplaceText':
+      return 2;
+    case 'createPointer':
+      return message.phase === 'move' ? 0 : 1;
+    case 'finishInkDraft':
+    case 'finishCreationDraft':
+    case 'createCaret':
+    case 'createMarkup':
+      return 1;
+    default:
+      return 0;
+  }
 }
 
 /**
@@ -81,8 +102,7 @@ const SESSION_FIELDS = {
   hovered: true,
   draft: true,
   preview: true,
-  seq: true,
-  namePrefix: true,
+  objectNumbers: true,
   defaults: true,
   hitMargin: true,
   editing: true,
@@ -96,8 +116,7 @@ const sessionOf = (model: Model): Session => ({
   hovered: model.hovered,
   draft: model.draft,
   preview: model.preview,
-  seq: model.seq,
-  namePrefix: model.namePrefix,
+  objectNumbers: model.objectNumbers,
   defaults: model.defaults,
   hitMargin: model.hitMargin,
   editing: model.editing,
@@ -221,8 +240,6 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
       return deleteSelection(model);
     case 'cancel':
       return [{ ...model, draft: null }, []];
-    case 'rekey':
-      return [rekey(model, message.from, message.to), []];
     case 'forget':
       return [forget(model, message.ids), []];
     case 'hover':

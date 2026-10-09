@@ -55,7 +55,7 @@ export function createDrafts(
     const toolId = tools.activeTool()?.id;
     const commit = store.commit(
       { type: draft.kind === 'create-ink' ? 'finishInkDraft' : 'finishCreationDraft' },
-      afterCreate.shape(toolId),
+      { adjust: afterCreate.shape(toolId) },
     );
     afterCreate.done(toolId, commit);
     if (!commit.effects.some((effect) => effect.type === 'create')) return null;
@@ -76,7 +76,10 @@ export function createDrafts(
   const api = {
     finishInkDraft: () => {
       const toolId = tools.activeTool()?.id;
-      afterCreate.done(toolId, store.commit({ type: 'finishInkDraft' }, afterCreate.shape(toolId)));
+      afterCreate.done(
+        toolId,
+        store.commit({ type: 'finishInkDraft' }, { adjust: afterCreate.shape(toolId) }),
+      );
     },
     cancel: () => {
       store.commit({ type: 'cancel' });

@@ -3,73 +3,103 @@
  *
  *   commit(message)                       a gesture or a selection verb
  *     → update(model, message)            the core: next session, change set, effects
- *     → intents.begin(result)             the change shows at once (state: session + pending)
- *     → effect runners                    each effect becomes an engine write
- *     → intents.run(writes)               the writes run; their entries settle when they do
+ *     → op builders                       each effect becomes the engine's ops
  *
  *   apply(changes)                        a change stated in code (the API, comments, links…)
- *     → each change checked by the engine's own rules and shown the same way
- *     → the registered writer             each change becomes its engine write
- *     → intents.run(writes)               settled like a gesture's
+ *     → each change checked by the engine's own rules, as its op
  *
- * The model it hands out is the view's (read/view.ts): confirmed records with
- * the pending changes on top, composed with the session.
+ *   → ctx.changes.stage(…)                one door, one change: the view shows it at once
+ *                                         (the records mirror predicts it), and the queue
+ *                                         sends it after everything staged before it
+ *
+ * A change leaves the view once the engine answered: applied, the records
+ * hold it; refused, the view shows the engine's records again. New records
+ * are named by the object numbers they take, so a record keeps its key from
+ * its first frame, and a later change to it is simply staged after its create.
+ *
+ * The model it hands out is the view's (read/view.ts).
  */
-import { PluginError, toPluginError } from '@embedpdf/core';
 import {
-  annotationOfNew,
+  PluginError,
+  toPluginError,
+  toPluginErrorInfo,
+  type ChangeLabel,
+  type HeldChange,
+  type Mirror,
+  type PendingChange,
+} from '@embedpdf/core';
+import {
   creationDraftAnchor,
-  drawnAfter,
   type Effect,
-  fromDTO,
   type Id,
   type Message,
   type Model,
-  type ModelAnnotation,
+  newRecordsAtMost,
   refOf,
-  sourceOfNew,
   update,
   type UpdateResult,
 } from '@embedpdf/core-annotation';
 import {
-  annotationKey,
-  generateUuid,
-  resolveAnnotationPatch,
-  type AnnotationDraft,
   type Annotation,
+  type AnnotationDraft,
   type AnnotationPatch,
+  type AnnotationPosition,
   type AnnotationRef,
   type AnnotationResources,
+  type ChangeOp,
+  type ChangeResult,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { withPendingEdit, type RecordChange } from '../model';
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
-import type { CarriedWrite, IntentOutcome, Intents, IntentWrite } from './intents';
+import { createObjectNumbers } from './object-numbers';
+import {
+  checkedOpOf,
+  idsOf,
+  labelOf,
+  modelAfter,
+  modelOver,
+  withFollowUps,
+  withoutCoveredDeletes,
+  type FollowUp,
+} from './staging';
+import { withSession } from '../model';
 import type { View } from '../read/view';
+import { predictRecords, undoOf, type AnnotationRecords } from '../sync/records';
 
 /**
- * Turns one kind of effect into the engine write it asks for, reading the
- * records it names from `model` (which already shows the change). Registered
- * by the area that owns the kind. Returns nothing when there is nothing to write.
+ * Turns one kind of effect into the engine's ops, reading the records it
+ * names from `model`, the message's result (a record it deleted is in
+ * `before`). Registered by the area that owns the kind; one that writes
+ * nothing (a captured drawing) returns nothing. A create it adds without an
+ * object number gets one from the store.
  */
-export type EffectRunner<K extends Effect['type']> = (
+export type OpBuilder<K extends Effect['type']> = (
   effect: Extract<Effect, { type: K }>,
   model: Model,
-) => IntentWrite | void;
+  before: Model,
+) => readonly ChangeOp[] | void;
+
+/** How a change the store staged settled. Never a rejection: a refusal is data. */
+export interface Written {
+  /** The engine's refusal, with the records the change named; empty when it applied or wrote nothing. */
+  readonly failed: readonly { readonly ids: readonly Id[]; readonly error: PluginError }[];
+  /** What the engine answered, one item per op; `null` when it was refused or wrote nothing. */
+  readonly result: ChangeResult | null;
+}
 
 /** What committing a message started. */
 export interface Commit {
   readonly effects: readonly Effect[];
-  /** Settles when every engine write the message started has settled. Never rejects. */
-  readonly written: Promise<IntentOutcome>;
+  /** Settles when the engine answered the message's change. */
+  readonly written: Promise<Written>;
 }
 
 /**
- * A change stated in code, in the engine's own terms. A create names its
- * annotation (the draft's `nm`, else a fresh one), and the record is keyed by
- * that name until the engine confirms it. A patch is written as given.
+ * A change stated in code, in the engine's own terms. A create takes an
+ * object number, its record is keyed by it, and a later change in the same
+ * call can name it.
  */
 export type StoreChange =
   | {
@@ -84,171 +114,183 @@ export type StoreChange =
       readonly patch: AnnotationPatch;
       readonly resources?: AnnotationResources;
     }
-  | { readonly type: 'delete'; readonly ref: AnnotationRef };
+  | { readonly type: 'delete'; readonly ref: AnnotationRef }
+  /** Drawing order: the annotations go together to `position` among the page's others. */
+  | {
+      readonly type: 'reorder';
+      readonly page: PageRef;
+      readonly refs: readonly AnnotationRef[];
+      readonly position: AnnotationPosition;
+    };
+
+export interface ApplyOptions {
+  readonly select?: boolean;
+}
 
 /** What applying stated changes started: the record each change names, in order. */
 export interface Applied {
   readonly ids: readonly Id[];
-  /** Settles when every engine write has settled. Never rejects. */
+  /** Settles when the engine answered. */
   readonly written: Promise<AppliedOutcome>;
 }
 
-/** How stated changes settled, and what the engine answered each. */
-export interface AppliedOutcome extends IntentOutcome {
+/** How stated changes settled, and what the engine wrote for each. */
+export interface AppliedOutcome extends Written {
   /**
-   * What the engine wrote for each change, in order: the annotation a create
-   * or update left. `null` for a delete, a change with nothing to write, and
-   * a refused one.
+   * The annotation each create or update left, as the engine read it back, in
+   * the order of the changes. `null` for a delete, a reorder, a change with
+   * nothing to write, and a refused one.
    */
   readonly annotations: readonly (Annotation | null)[];
 }
 
 /**
- * Turns one stated change into its engine write, for the record `id` it
- * names. A create's draft carries its name by now. Registered by the write area.
+ * A change still being made, as typing is: every commit into it replaces its
+ * ops, and nothing is sent until it is (after a pause), or until anything
+ * else is staged.
  */
-export type ApplyWriter = (change: StoreChange, id: Id) => IntentWrite;
+export interface StoreHold {
+  /** Whether a commit can still go into it. Once it was sent, typing goes on in a new one. */
+  readonly open: boolean;
+  send(): void;
+  cancel(): void;
+}
 
 export interface AnnotationStore {
   /** The current model: what every read and gesture works on. */
   model(): Model;
   /**
-   * Run one message through the core, show its change, and start its engine
-   * writes. Throws, before anything shows, for a message the engine would
-   * refuse (a `rect` with a new shape), as `apply` does. `adjust` changes the
-   * core's result before it shows: a tool's `afterCreate` decides whether
-   * what it just made is selected (write/after-create.ts).
+   * Run one message through the core and stage its change: it shows at once
+   * and is sent in turn. Throws, before anything shows, for a message the
+   * engine would refuse (a `rect` with a new shape), as `apply` does.
+   * `adjust` changes the core's result before it shows: a tool's
+   * `afterCreate` decides whether what it just made is selected
+   * (write/after-create.ts). `into` makes the message part of a change still
+   * being made (typing).
+   *
+   * A message that may create needs object numbers. When the document's pool
+   * has none left (rare: it refills as it goes), the message runs once it
+   * has; its commit then reports no effects, and `written` settles after it ran.
    */
-  commit(message: Message, adjust?: (result: UpdateResult) => UpdateResult): Commit;
+  commit(
+    message: Message,
+    options?: { adjust?: (result: UpdateResult) => UpdateResult; into?: StoreHold },
+  ): Commit;
   /**
-   * Show changes stated in code at once and start their engine writes, exactly
-   * like a gesture's: pending until they settle, dropped when refused. Throws,
-   * before anything shows, for a change the engine would refuse or a record
-   * the view doesn't have.
+   * Show changes stated in code at once, as one change, exactly like a
+   * gesture's. Throws, before anything shows, for a change the engine would
+   * refuse, a record the view doesn't have, or, when the document's pool is
+   * out of object numbers, a create (`applyWhenNumbered` waits for them).
+   * `select`: the records it names are selected as they show.
    */
-  apply(changes: readonly StoreChange[]): Applied;
-  /** Claim the effects an area performs (one runner per kind; last wins). */
-  onEffect<K extends Effect['type']>(kind: K, runner: EffectRunner<K>): void;
-  /** Claim the engine writes of stated changes (one writer; last wins). */
-  onApply(writer: ApplyWriter): void;
-  /** Resolves once every engine write started so far, and while waiting, has its answer. */
+  apply(changes: readonly StoreChange[], options?: ApplyOptions): Applied;
+  /** `apply`, once the object numbers its creates take are there: at once, in this call, when they are. */
+  applyWhenNumbered(changes: readonly StoreChange[], options?: ApplyOptions): Promise<Applied>;
+  /** A change that later commits go into (`commit(…, { into })`); its label names it in history. */
+  hold(label: ChangeLabel): StoreHold;
+  /** Claim the ops of one kind of effect (one builder per kind; last wins). */
+  onEffect<K extends Effect['type']>(kind: K, build: OpBuilder<K>): void;
+  /** Claim what follows an update (one; last wins). */
+  onUpdate(followUp: FollowUp): void;
+  /** Resolves once every change staged so far has its answer. */
   whenWritten(): Promise<void>;
 }
 
-/** The refs behind a list of model ids (records not yet confirmed have none). */
+/** The refs behind a list of model ids. */
 export const refsOfIn = (model: Model, ids: readonly Id[]): AnnotationRef[] =>
   ids.map((id) => refOf(model.byId[id])).filter((ref): ref is AnnotationRef => ref != null);
 
 const sameIds = (left: readonly Id[], right: readonly Id[]): boolean =>
   left === right || (left.length === right.length && left.every((id, i) => id === right[i]));
 
-/**
- * The record a ref names: its key, or, for an `nm` ref, the record on that
- * page with that name (as the engine resolves one), confirmed or not.
- */
-export function recordOfRef(model: Model, ref: AnnotationRef): ModelAnnotation | null {
-  const byKey = model.byId[annotationKey(ref)];
-  if (byKey) return byKey;
-  if (ref.kind !== 'nm') return null;
-  for (const id of model.order) {
-    const record = model.byId[id];
-    if (
-      record &&
-      record.annotation.nm === ref.nm &&
-      record.annotation.page.objectNumber === ref.page.objectNumber
-    ) {
-      return record;
-    }
-  }
-  return null;
-}
+const NOTHING_WRITTEN: Written = { failed: [], result: null };
 
-/** A stated change, the record it names, and the pending change it makes (none: nothing to write). */
-interface StatedChange {
-  readonly id: Id;
-  readonly change: StoreChange;
-  readonly pending: RecordChange | null;
-}
-
-/**
- * The pending change a stated change makes, and the record it names. The
- * engine's own rules work it out (core `annotationOfNew`, and the engine's
- * `resolveAnnotationPatch`), so what shows is what the engine will write; they
- * throw for a change the engine would refuse.
- */
-function statedChangeOf(model: Model, change: StoreChange): StatedChange {
-  if (change.type === 'create') {
-    const nm = change.draft.nm ?? generateUuid();
-    const ref: AnnotationRef = { kind: 'nm', page: change.page, nm };
-    const draft = { ...change.draft, nm } as AnnotationDraft;
-    // The annotations it links to are the engine's to look up as it writes
-    // (as a change set links them): read without them, then stated.
-    const { reply, parent, ...fields } = draft as AnnotationDraft & {
-      reply?: { to: AnnotationRef; type?: 'reply' | 'group' } | null;
-      parent?: AnnotationRef | null;
-    };
-    const annotation = {
-      ...annotationOfNew(fields as AnnotationDraft, { ref }),
-      ...(reply ? { reply: { to: reply.to, type: reply.type ?? 'reply' } } : {}),
-      ...(parent ? { parent } : {}),
-    } as Annotation;
-    const record: ModelAnnotation = {
-      ...fromDTO(annotation),
-      unconfirmed: true,
-      source: sourceOfNew(annotation),
-    };
-    const id = record.id;
-    return { id, change: { ...change, draft }, pending: { kind: 'create', record } };
-  }
-  const record = recordOfRef(model, change.ref);
-  if (!record) {
-    throw new PluginError('not-found', 'annotation', `no annotation ${annotationKey(change.ref)}`);
-  }
-  if (change.type === 'delete') return { id: record.id, change, pending: { kind: 'delete' } };
-  const noFields = Object.keys(change.patch).every((name) => name === 'subtype');
-  // A patch that says nothing, with no bytes, is no write at all.
-  if (noFields && !change.resources) return { id: record.id, change, pending: null };
-  // The engine's resolve rules, run now: a patch it would refuse throws
-  // before anything shows. The record is then drawn as the appearance rule
-  // says, exactly as after a gesture (core `appearance.ts`).
-  resolveAnnotationPatch(record.annotation, change.patch);
-  return {
-    id: record.id,
-    change,
-    pending: { kind: 'edit', patch: change.patch, fields: drawnAfter(record, change.patch) },
-  };
-}
-
-/**
- * `model` with a stated change laid over it, as the view will show it. The
- * next change of the same call is worked out against it: two moves of one
- * record, or a create and then its edit, are seen as the engine will write
- * them, in order.
- */
-function withStated(model: Model, { id, pending }: StatedChange): Model {
-  if (!pending) return model;
-  if (pending.kind === 'create') {
-    return { ...model, byId: { ...model.byId, [id]: pending.record }, order: [...model.order, id] };
-  }
-  if (pending.kind === 'delete') {
-    const { [id]: _deleted, ...byId } = model.byId;
-    return { ...model, byId, order: model.order.filter((each) => each !== id) };
-  }
-  return { ...model, byId: { ...model.byId, [id]: withPendingEdit(model.byId[id]!, pending) } };
-}
+const noNumbers = (): PluginError =>
+  new PluginError(
+    'not-ready',
+    'annotation',
+    'the document holds no object number for a new annotation right now',
+  );
 
 export function createStore(
-  ctx: Pick<AnnotationContext, 'state'>,
+  ctx: Pick<AnnotationContext, 'state' | 'changes' | 'doc' | 'watch'>,
   view: View,
-  intents: Intents,
+  records: Pick<Mirror<AnnotationRecords>, 'view'>,
   events: AnnotationEvents,
 ): AnnotationStore {
-  // Keyed by effect type, so a runner only ever receives effects of its own kind.
-  const runners = new Map<Effect['type'], (effect: Effect, model: Model) => IntentWrite | void>();
-  let writer: ApplyWriter | null = null;
+  let followUp: FollowUp | null = null;
+  // Keyed by effect type, so a builder only ever receives effects of its own kind.
+  const builders = new Map<
+    Effect['type'],
+    (effect: Effect, model: Model, before: Model) => readonly ChangeOp[] | void
+  >();
   const model = view.model;
 
-  const commit = (message: Message, adjust?: (result: UpdateResult) => UpdateResult): Commit => {
+  /** The changes this plugin staged that the engine hasn't answered: their refusals are reported. */
+  const mine = new Set<string>();
+  ctx.changes.onSettled((settled) => {
+    if (!mine.delete(settled.change.opId) || settled.status !== 'refused') return;
+    if (settled.error.code === 'operation-cancelled' || settled.error.code === 'instance-closed') {
+      return;
+    }
+    const refs = settled.change.shows.flatMap((op) =>
+      op.type === 'annotations.create' && op.objectNumber !== undefined
+        ? [{ kind: 'objectNumber' as const, page: op.page, objectNumber: op.objectNumber }]
+        : op.type === 'annotations.update' || op.type === 'annotations.delete'
+          ? [op.ref]
+          : op.type === 'annotations.reorder'
+            ? [...op.refs]
+            : [],
+    );
+    events.writeFailed.emit({ refs, error: toPluginErrorInfo(settled.error) });
+  });
+
+  /** How a staged change settles, for the records it names. */
+  const writtenOf = (change: PendingChange, ids: readonly Id[]): Promise<Written> =>
+    change.result.then(
+      (result): Written => ({ failed: [], result }),
+      (error: unknown): Written => ({
+        failed: [{ ids, error: toPluginError('annotation', error) }],
+        result: null,
+      }),
+    );
+
+  const stage = (ops: readonly ChangeOp[], before: AnnotationRecords): PendingChange => {
+    const change = ctx.changes.stage({ label: labelOf(ops), ops, undo: undoOf(before, ops) });
+    mine.add(change.opId);
+    return change;
+  };
+
+  const numbers = createObjectNumbers(ctx);
+
+  /* ── the doors ───────────────────────────────────────────────────────── */
+
+  /** A change being made, and the records from before its first commit (what undoing it brings back). */
+  interface Hold extends StoreHold {
+    readonly held: HeldChange;
+    base: AnnotationRecords | null;
+  }
+
+  const hold = (label: ChangeLabel): StoreHold => {
+    const held = ctx.changes.hold(label);
+    const entry: Hold = {
+      held,
+      base: null,
+      get open() {
+        return held.open;
+      },
+      send: () => void held.send(),
+      cancel: () => {
+        if (held.change) mine.delete(held.change.opId);
+        held.cancel();
+      },
+    };
+    return entry;
+  };
+
+  const commit: AnnotationStore['commit'] = (message, options = {}) => {
+    const needed = newRecordsAtMost(message);
+    if (needed > 0 && !numbers.hold(needed)) return commitWhenNumbered(message, options, needed);
     const before = model();
     // A message the engine would refuse (a `rect` with a new shape) throws
     // before anything shows, as a stated change does.
@@ -258,57 +300,137 @@ export function createStore(
     } catch (error) {
       throw toPluginError('annotation', error);
     }
-    if (adjust) result = adjust(result);
-    const staged = intents.begin(before, result);
-    // A message changes each record once: an effect's write carries the changes of the records it names.
-    const tokenOf = new Map(staged.map((change) => [change.id, change.token]));
-    const writes: CarriedWrite[] = [];
-    for (const effect of result.effects) {
-      const write = runners.get(effect.type)?.(effect, model());
-      if (!write) continue;
-      const tokens = write.ids.flatMap((id) => (tokenOf.has(id) ? [tokenOf.get(id)!] : []));
-      writes.push({ write, tokens });
+    if (options.adjust) result = options.adjust(result);
+    const after = modelAfter(before, result);
+    const shown = records.view();
+    const built = withFollowUps(
+      result.effects.flatMap((effect) => builders.get(effect.type)?.(effect, after, before) ?? []),
+      followUp,
+      after,
+    );
+    const named = numbers.named(built, result.session.objectNumbers);
+    const ops = withoutCoveredDeletes(shown, named.ops);
+    if (named.held !== result.session.objectNumbers) {
+      result = { ...result, session: { ...result.session, objectNumbers: named.held } };
     }
-    return { effects: result.effects, written: intents.run(staged, writes) };
+    let written = Promise.resolve(NOTHING_WRITTEN);
+    if (ops.length) {
+      const into = options.into as Hold | undefined;
+      if (into) {
+        // Typing: the change keeps its place, its ops are the latest, and
+        // undoing it brings back what was there before its first keystroke.
+        into.base ??= shown;
+        into.held.set(ops, undoOf(into.base, ops));
+        const change = into.held.change;
+        if (change) {
+          mine.add(change.opId);
+          written = writtenOf(change, idsOf(ops));
+        }
+      } else {
+        written = writtenOf(stage(ops, shown), idsOf(ops));
+      }
+    }
+    // The records this message drew live render live from now on.
+    const vector = result.change.put
+      .filter((record) => record.source === 'vector')
+      .map((record) => record.id);
+    ctx.state.update(withSession, result.session, vector);
+    return { effects: result.effects, written };
   };
 
-  const apply = (changes: readonly StoreChange[]): Applied => {
+  /** A message that may create, run once the pool has the numbers it needs. */
+  const commitWhenNumbered = (
+    message: Message,
+    options: Parameters<AnnotationStore['commit']>[1],
+    needed: number,
+  ): Commit => {
+    // A gesture that moved on meanwhile (another press) made nothing to finish.
+    const draft = model().draft;
+    const written = ctx.changes.reserveObjectNumbers(needed).then(
+      () => (model().draft === draft ? commit(message, options).written : NOTHING_WRITTEN),
+      (error: unknown): Written => ({
+        failed: [{ ids: [], error: toPluginError('annotation', error) }],
+        result: null,
+      }),
+    );
+    return { effects: [], written };
+  };
+
+  const apply: AnnotationStore['apply'] = (changes, options = {}) => {
     // Everything is worked out before anything shows: one refused change
-    // stages none. Each change is worked out against the ones before it.
-    const stated: StatedChange[] = [];
-    let current = model();
+    // stages none. Each change is worked out against the ones before it, as
+    // the engine will apply them.
+    const shown = records.view();
+    const creates = changes.filter((change) => change.type === 'create').length;
+    const taken = creates ? numbers.take(creates) : [];
+    if (!taken) throw noNumbers();
+    const ops: ChangeOp[] = [];
+    /** Where each change's op is among `ops`, or -1 for a change that writes nothing. */
+    const opIndex: number[] = [];
+    const ids: Id[] = [];
+    const vector: Id[] = [];
+    let current = shown;
     try {
       for (const change of changes) {
-        const each = statedChangeOf(current, change);
-        stated.push(each);
-        current = withStated(current, each);
+        const op = checkedOpOf(change, current, taken, (id) => model().byId[id]);
+        ids.push(op.id);
+        opIndex.push(op.op ? ops.length : -1);
+        if (!op.op) continue;
+        ops.push(op.op);
+        if (op.live) vector.push(op.id);
+        current = predictRecords(current, op.op);
       }
     } catch (error) {
       throw toPluginError('annotation', error);
     }
-    const withPending = stated.filter(({ pending }) => pending !== null);
-    const staged = intents.beginStated(
-      withPending.map(({ id, pending }) => ({ id, change: pending! })),
+    if (!ops.length) {
+      return {
+        ids,
+        written: Promise.resolve({ ...NOTHING_WRITTEN, annotations: changes.map(() => null) }),
+      };
+    }
+    // What follows each update joins the change, after the ops stated (the
+    // answer's items stay in the order of the changes).
+    const following = numbers.named(
+      withFollowUps(ops, followUp, modelOver(model(), shown, current)).filter(
+        (op) => !ops.includes(op),
+      ),
+      ctx.state.get().session.objectNumbers,
     );
-    // Each stated change is written by its own write, which settles exactly
-    // its change: two changes to one record settle apart.
-    const writes: CarriedWrite[] = writer
-      ? withPending.map(({ id, change }, index) => ({
-          write: writer!(change, id),
-          tokens: [staged[index]!.token],
-        }))
-      : [];
-    const written = intents.run(staged, writes).then(
+    if (following.held !== ctx.state.get().session.objectNumbers) {
+      ctx.state.update((state) => ({
+        ...state,
+        session: { ...state.session, objectNumbers: following.held },
+      }));
+    }
+    const change = stage(withoutCoveredDeletes(shown, [...ops, ...following.ops]), shown);
+    if (vector.length) ctx.state.update(withSession, ctx.state.get().session, vector);
+    if (options.select) commit({ type: 'select', ids });
+    const written = writtenOf(change, idsOf(ops)).then(
       (outcome): AppliedOutcome => ({
         ...outcome,
-        annotations: stated.map((each) => {
-          const index = withPending.indexOf(each);
-          return index < 0 ? null : (outcome.answers[index]?.annotation ?? null);
+        annotations: opIndex.map((index) => {
+          const item = index < 0 ? undefined : outcome.result?.items[index];
+          return item && 'annotation' in item ? (item.annotation as Annotation) : null;
         }),
       }),
     );
-    return { ids: stated.map(({ id }) => id), written };
+    return { ids, written };
   };
+
+  const applyWhenNumbered: AnnotationStore['applyWhenNumbered'] = async (changes, options) => {
+    const creates = changes.filter((change) => change.type === 'create').length;
+    while (!numbers.hold(creates)) await ctx.changes.reserveObjectNumbers(creates);
+    return apply(changes, options);
+  };
+
+  // Session references follow the view. A record that left the view (deleted
+  // elsewhere, a refused create, a page read again) leaves the selection, the
+  // hover and the text editor, and a gesture on it ends.
+  ctx.watch(view.view, (next, previous) => {
+    const gone = previous.order.filter((id) => !(id in next.byId));
+    if (gone.length) commit({ type: 'forget', ids: gone });
+  });
 
   // The selection, draft and editing events, derived from each change of the
   // model's session (a record leaving the view changes the session too, via `forget`).
@@ -341,14 +463,16 @@ export function createStore(
     model,
     commit,
     apply,
-    onApply: (next) => {
-      writer = next;
+    applyWhenNumbered,
+    hold,
+    onUpdate: (next) => {
+      followUp = next;
     },
-    onEffect: (kind, runner) => {
-      runners.set(kind, (effect, current) =>
-        runner(effect as Extract<Effect, { type: typeof kind }>, current),
+    onEffect: (kind, build) => {
+      builders.set(kind, (effect, current, before) =>
+        build(effect as Extract<Effect, { type: typeof kind }>, current, before),
       );
     },
-    whenWritten: intents.idle,
+    whenWritten: () => ctx.changes.whenSettled(),
   };
 }

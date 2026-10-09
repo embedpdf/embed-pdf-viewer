@@ -10,23 +10,33 @@ import {
   viewable,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import { shownAppearances, type PageRef } from '@embedpdf/engine-core/runtime';
+import {
+  imageSourceOfBytes,
+  shownAppearances,
+  type DocumentHandle,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
 
 import type { LinkNavItem, TextItem } from '../contract';
+import type { AnnotationAppearancePicture } from '../host-contract';
 import type { AnnotationState } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { buildTextItems } from '../text-item';
 import type { Ghost } from '../tools/ghost';
+import type { Stamps } from '../write/stamps';
 
 /**
  * What a page paints: the vector items (drafts, previews and the tool's
  * ghost ride the same pipeline), the editable text items, the navigable link
- * areas, and the baked-appearance seam (epoch, bake scale, rasters).
+ * areas, and the baked-appearance seam (epoch, bake scale, rasters). A stamp
+ * this session placed shows the preview it was placed with until the
+ * engine's picture of it exists.
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc'>,
   { view: { pageModel } }: Pick<AnnotationServices, 'view'>,
   ghost: Pick<Ghost, 'itemsOn'>,
+  stamps: Pick<Stamps, 'lookOf'>,
 ) {
   const itemsCache = new Map<
     number,
@@ -148,60 +158,137 @@ export function createRenderReads(
     listTextItems: (page: PageRef, view?: ViewEnv) => textItemsOf(page, view),
     listLinkItems: (page: PageRef) => linkItemsOf(page.objectNumber),
     getAppearanceEpoch: (page: PageRef) => {
-      const pageObjectNumber = page.objectNumber;
-      // What a baked raster depends on, and nothing else: which annotations are
-      // baked on this page, and each one's /AP content version (`apVersion` —
-      // bumped when a size-changing patch resolves, or a remote edit folds in).
-      // Position and rotation are deliberately absent: the blit translates
-      // (`apBox`) and rotates (`apRot`) the same pixels, so a move or a spin
-      // costs zero re-renders — and because the version bumps when the engine
-      // confirms the re-bake, the fetch can never read a stale /AP ("one
-      // behind"). Render scale is the shell effect's own dependency.
-      const model = pageModel(pageObjectNumber);
-      const parts: string[] = [];
-      for (const id of model.order) {
-        const record = model.byId[id];
-        if (
-          !record ||
-          record.annotation.page.objectNumber !== pageObjectNumber ||
-          record.source !== 'baked' ||
-          !refOf(record)
-        )
-          continue;
-        // Conversation-plane annotations never paint — a remote reply or
-        // status change must not churn the page's raster cache key.
-        if (isSubstrateOnly(record)) continue;
-        // The state it shows picks its picture among those the page brought.
-        parts.push(`${id}@${record.apVersion ?? 0}:${record.annotation.appearanceState ?? ''}`);
-      }
-      return parts.sort().join('|');
+      const { engine, placed } = epochOf(page);
+      return [engine, placed].filter(Boolean).join('|');
     },
     getBakeScale: (renderScale: number) =>
       // The render policy is a document fact off the kernel registry (like
       // `pages`), interpreted by the pure engine-core helper — one lifecycle,
       // one interpretation, no plugin dependency. Identity under continuous.
       snapAppearanceScale(ctx.document()?.renderPolicy ?? CONTINUOUS_RENDER_POLICY, renderScale),
-    renderAppearances: (page: PageRef, scale: number, signal?: AbortSignal) => {
+    renderAppearances: (
+      page: PageRef,
+      scale: number,
+      signal?: AbortSignal,
+    ): Promise<AnnotationAppearancePicture[]> => {
       const doc = ctx.doc;
       if (!doc) return Promise.resolve([]);
-      // The look at rest only, in every state: a check box keeps both its
-      // pictures, and the looks under the pointer and pressed aren't drawn.
-      const task = doc
-        .page(page)
-        .annotations.renderAppearances({ viewport: { kind: 'scale', scale }, modes: ['normal'] });
-      if (signal) {
-        if (signal.aborted) task.abort(signal.reason);
-        else signal.addEventListener('abort', () => task.abort(signal.reason), { once: true });
-      }
-      return task.then(
-        (result) => {
-          const model = pageModel(page.objectNumber);
-          const annotations = model.order.map((id) => model.byId[id]!.annotation);
-          return shownAppearances(result.appearances, annotations);
-        },
-        () => [],
-      );
+      const { engine } = epochOf(page);
+      const kept = drawn.get(page.objectNumber);
+      const engines =
+        kept && kept.scale === scale && kept.engine === engine
+          ? Promise.resolve(kept.pictures)
+          : enginePictures(doc, page, scale, signal).then((pictures) => {
+              if (!pictures) return [];
+              drawn.set(page.objectNumber, { scale, engine, pictures });
+              return pictures;
+            });
+      return Promise.all([engines, placedPictures(page, scale)]).then(([theirs, placed]) => [
+        ...theirs,
+        ...placed,
+      ]);
     },
+  };
+
+  /**
+   * What a page's pictures depend on, and nothing else. `engine`: which
+   * annotations the engine draws on it, each one's appearance version
+   * (`apVersion`, which advances when the engine confirms a re-bake) and the
+   * state it shows. `placed`: the stamps this session placed that the engine
+   * hasn't written yet, which show the preview they were placed with.
+   * Position and rotation are absent: the blit translates (`apBox`) and turns
+   * (`apRot`) the same pixels, so a move or a spin costs no new picture.
+   */
+  const epochOf = (page: PageRef): { engine: string; placed: string } => {
+    const pageObjectNumber = page.objectNumber;
+    const model = pageModel(pageObjectNumber);
+    const engine: string[] = [];
+    const placed: string[] = [];
+    for (const id of model.order) {
+      const record = model.byId[id];
+      if (
+        !record ||
+        record.annotation.page.objectNumber !== pageObjectNumber ||
+        record.source !== 'baked'
+      )
+        continue;
+      // Conversation-plane annotations never paint — a remote reply or
+      // status change must not churn the page's raster cache key.
+      if (isSubstrateOnly(record)) continue;
+      if (record.unconfirmed) {
+        if (stamps.lookOf(record)) placed.push(`${id}@placed`);
+        continue;
+      }
+      engine.push(`${id}@${record.apVersion ?? 0}:${record.annotation.appearanceState ?? ''}`);
+    }
+    return { engine: engine.sort().join('|'), placed: placed.sort().join('|') };
+  };
+
+  /**
+   * The engine's pictures of each page, kept with the epoch and scale they
+   * were drawn at: a placed stamp coming or going asks the engine for nothing.
+   */
+  const drawn = new Map<
+    number,
+    { scale: number; engine: string; pictures: AnnotationAppearancePicture[] }
+  >();
+
+  /** The engine's pictures of `page` at rest, in the state each shows; `null` when the render failed. */
+  const enginePictures = (
+    doc: DocumentHandle,
+    page: PageRef,
+    scale: number,
+    signal?: AbortSignal,
+  ): Promise<AnnotationAppearancePicture[] | null> => {
+    // The look at rest only, in every state: a check box keeps both its
+    // pictures, and the looks under the pointer and pressed aren't drawn.
+    const task = doc.page(page).annotations.renderAppearances({
+      viewport: { kind: 'scale', scale },
+      modes: ['normal'],
+    });
+    if (signal) {
+      if (signal.aborted) task.abort(signal.reason);
+      else signal.addEventListener('abort', () => task.abort(signal.reason), { once: true });
+    }
+    return task.then(
+      (result) => {
+        const model = pageModel(page.objectNumber);
+        const annotations = model.order.map((id) => model.byId[id]!.annotation);
+        return shownAppearances(result.appearances, annotations);
+      },
+      () => null,
+    );
+  };
+
+  /**
+   * The pictures of the stamps this session placed on `page` that the engine
+   * hasn't written yet: each one's preview, at the size the page shows it,
+   * in its box (before its turn, which the layer puts back, as for the
+   * engine's).
+   */
+  const placedPictures = async (
+    page: PageRef,
+    scale: number,
+  ): Promise<AnnotationAppearancePicture[]> => {
+    const model = pageModel(page.objectNumber);
+    const pictures = model.order.map(async (id) => {
+      const record = model.byId[id]!;
+      const look = record.unconfirmed ? stamps.lookOf(record) : null;
+      const rect = record.apBox;
+      if (!look || !rect) return null;
+      const preview = await look(rect.width * scale);
+      if (!preview) return null;
+      return {
+        ref: record.annotation.ref,
+        mode: 'normal',
+        state: null,
+        rect,
+        image: imageSourceOfBytes(preview.bytes, preview.mimeType ?? 'image/png'),
+      } satisfies AnnotationAppearancePicture;
+    });
+    return (await Promise.all(pictures)).filter(
+      (picture): picture is NonNullable<typeof picture> => picture !== null,
+    );
   };
 
   return { api };

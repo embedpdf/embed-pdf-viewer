@@ -26,7 +26,7 @@ import type {
   Rect,
   KindName,
 } from '../types';
-import { draftOf, isPolySubtype, newRecord } from './changes';
+import { draftOf, isPolySubtype, newRecord, numbersLeft } from './changes';
 import { calloutPointer } from './draw-callout';
 import { distancePointer } from './draw-distance';
 import { clampPointToBox } from './page-bound';
@@ -262,7 +262,7 @@ export function createPointer(
   return [
     {
       ...model,
-      seq: model.seq + 1,
+      objectNumbers: numbersLeft(model, 1),
       byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
@@ -300,7 +300,7 @@ export function finishInkCreate(model: Model): [Model, Effect[]] {
   return [
     {
       ...model,
-      seq: model.seq + 1,
+      objectNumbers: numbersLeft(model, 1),
       byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
@@ -342,7 +342,7 @@ export function finishPolyCreate(model: Model): [Model, Effect[]] {
   return [
     {
       ...model,
-      seq: model.seq + 1,
+      objectNumbers: numbersLeft(model, 1),
       byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],

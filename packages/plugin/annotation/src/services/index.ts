@@ -1,5 +1,5 @@
 import type { Mirror, Settings } from '@embedpdf/core';
-import { refOf, type FontLookup } from '@embedpdf/core-annotation';
+import type { FontLookup } from '@embedpdf/core-annotation';
 import { isLocalEngine } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationSettings } from '../contract';
@@ -9,8 +9,6 @@ import type { AnnotationContext } from './context';
 import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';
 import { createPageLookup, type PageLookup } from './geometry';
-import { createIntents } from './intents';
-import { createRecordIdentity, type RecordIdentity } from './record-identity';
 import { createStore, type AnnotationStore } from './store';
 import { createRecordsMirror, type AnnotationRecords } from '../sync/records';
 import { createBehaviors, type Behaviors } from '../tools/behaviors';
@@ -29,14 +27,12 @@ export interface AnnotationServices {
   /** The plugin's settings, shared by every document: read `get()` where a setting is used. */
   readonly settings: Settings<AnnotationSettings>;
   readonly events: AnnotationEvents;
-  /** The confirmed layer: every record the engine confirmed. */
+  /** The records: what the engine confirmed (`get`), with this session's pending changes on top (`view`). */
   readonly records: Mirror<AnnotationRecords>;
-  /** Confirmed records with the pending changes on top, composed with the session. */
+  /** The records as shown, each drawn as its pending change says, composed with the session. */
   readonly view: View;
   /** The one door user actions go through. */
   readonly store: AnnotationStore;
-  /** Where a record changes its key, and how a write finds its engine ref. */
-  readonly identity: RecordIdentity;
   readonly geometry: PageLookup;
   readonly authority: Authority;
   readonly filePicker: FilePickerPort;
@@ -55,9 +51,7 @@ export function createServices(ctx: AnnotationContext): AnnotationServices {
   const geometry = createPageLookup(ctx);
   const records = createRecordsMirror(ctx, events);
   const view = createView(ctx, records);
-  const intents = createIntents(ctx, records, events, (id) => refOf(view.model().byId[id]));
-  const store = createStore(ctx, view, intents, events);
-  const identity = createRecordIdentity(ctx, store, view, records);
+  const store = createStore(ctx, view, records, events);
   // The tools a document has are read once, when it opens.
   const tools = createToolRegistry(ctx, settings.get().tools, store, events);
   return {
@@ -66,7 +60,6 @@ export function createServices(ctx: AnnotationContext): AnnotationServices {
     records,
     view,
     store,
-    identity,
     geometry,
     authority: createAuthority(ctx, store),
     filePicker: createFilePickerPort(ctx),

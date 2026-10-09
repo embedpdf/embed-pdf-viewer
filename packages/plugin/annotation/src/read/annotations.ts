@@ -1,6 +1,5 @@
-import { PluginError, memo } from '@embedpdf/core';
+import { PluginError } from '@embedpdf/core';
 import type { ModelAnnotation, Model } from '@embedpdf/core-annotation';
-import { refOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type Annotation,
@@ -10,7 +9,6 @@ import {
 
 import type { AnnotationFilter } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { recordOfRef } from '../services/store';
 
 /**
  * The public reads: the engine's records as the user sees them. Each is the
@@ -20,21 +18,16 @@ import { recordOfRef } from '../services/store';
  * reads before the engine confirms it.
  */
 export function createAnnotationReads(
-  ctx: Pick<AnnotationContext, 'state' | 'getPage'>,
-  { store }: Pick<AnnotationServices, 'store'>,
+  ctx: Pick<AnnotationContext, 'getPage'>,
+  { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
 ) {
-  /** The records with a change waiting for the engine. */
-  const pendingIds = memo(
-    () => [ctx.state.get().pending] as const,
-    (pending) => new Set(pending.map((change) => change.id)),
-  );
-
   const get = (ref: AnnotationRef): Annotation | null =>
-    recordOfRef(store.model(), ref)?.annotation ?? null;
+    store.model().byId[annotationKey(ref)]?.annotation ?? null;
 
+  /** Whether a change of this session to it waits for the engine: it shows other than the engine has it. */
   const isPending = (ref: AnnotationRef): boolean => {
-    const record = recordOfRef(store.model(), ref);
-    return !!record && pendingIds().has(record.id);
+    const key = annotationKey(ref);
+    return records.view().byKey[key] !== records.get().byKey[key];
   };
 
   /**
@@ -109,17 +102,17 @@ export function createAnnotationReads(
 
   const loadedOrThrow = (ref: AnnotationRef): ModelAnnotation => {
     const record = store.model().byId[annotationKey(ref)];
-    if (!record || !refOf(record)) {
+    if (!record) {
       throw new PluginError('not-found', 'annotation', 'annotation is not loaded in this document');
     }
     return record;
   };
-  /** Committed, data-backed annotations in the current selection. */
-  const selectedCommitted = (): ModelAnnotation[] => {
+  /** The records in the current selection. */
+  const selectedRecords = (): ModelAnnotation[] => {
     const model = store.model();
     return model.selected
       .map((id) => model.byId[id])
-      .filter((record): record is ModelAnnotation => !!record && !!refOf(record));
+      .filter((record): record is ModelAnnotation => !!record);
   };
 
   /** The annotation under the pointer, as the user sees it. */
@@ -142,7 +135,7 @@ export function createAnnotationReads(
     listSelected,
     getEditing,
     loadedOrThrow,
-    selectedCommitted,
+    selectedRecords,
     pageOf,
     api,
   };

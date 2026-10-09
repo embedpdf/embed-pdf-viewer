@@ -117,6 +117,7 @@ export { glyphLooseBounds, glyphLooseQuad, isRotatedGeometryRun } from './dto/Pa
 export type {
   PageImageHandle,
   PageImageBlobSource,
+  ImageSource,
   PageImageOptions,
   PageImageObjectUrl,
   PageImageResult,
@@ -135,7 +136,12 @@ export type {
   PageRenderTarget,
   PageRenderViewport,
 } from './dto/PageRender';
-export { checkImageQuality, createPageImageHandle, resolvePageLayers } from './dto/PageRender';
+export {
+  checkImageQuality,
+  createPageImageHandle,
+  imageSourceOfBytes,
+  resolvePageLayers,
+} from './dto/PageRender';
 export {
   ANNOTATION_APPEARANCE_MODES,
   appearanceModesOf,

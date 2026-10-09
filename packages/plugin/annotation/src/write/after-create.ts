@@ -13,13 +13,7 @@ import type { AnnotationContext, AnnotationServices } from '../services';
 
 /** The records a message created. */
 const createdIds = (result: UpdateResult): Id[] =>
-  result.effects.flatMap((effect) =>
-    effect.type === 'create'
-      ? [effect.id]
-      : effect.type === 'createGroup'
-        ? [effect.primary, ...effect.members]
-        : [],
-  );
+  result.effects.flatMap((effect) => (effect.type === 'create' ? [effect.id] : []));
 
 export function createAfterCreate(
   ctx: Pick<AnnotationContext, 'tryGet'>,
@@ -53,8 +47,7 @@ export function createAfterCreate(
 
   /** After a tool's create: go back to the default tool when the policy says so. */
   const done = (toolId: string | undefined, result: { effects: readonly { type: string }[] }) => {
-    if (!result.effects.some((effect) => effect.type === 'create' || effect.type === 'createGroup'))
-      return;
+    if (!result.effects.some((effect) => effect.type === 'create')) return;
     if (policyOf(toolId).tool !== 'default') return;
     ctx.tryGet(InteractionToken)?.activateDefaultTool();
   };

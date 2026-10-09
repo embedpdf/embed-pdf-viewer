@@ -24,6 +24,7 @@ import type { PredictedOp, QueuedChange } from './changes';
 import { isPluginError } from './errors';
 import {
   changeIdOf,
+  createFoldedChanges,
   isResync,
   replay,
   showingWith,
@@ -105,6 +106,8 @@ export function createPageMirror<V>(
    */
   const kept = new Map<string, Map<string, { change: QueuedChange; epoch: number }>>();
   let keptVersion = 0;
+  /** Changes every event of which reached the pages: each page holds its part, or keeps the change. */
+  const folded = createFoldedChanges(env.changes);
 
   const keepUntilRead = (key: string, event: DocumentEvent): void => {
     const opId = changeIdOf(event);
@@ -140,7 +143,7 @@ export function createPageMirror<V>(
     const predict = spec.predict;
     const next = replay(
       value,
-      showingWith(env.changes, kept.get(key)?.values() ?? []),
+      showingWith(env.changes, kept.get(key)?.values() ?? [], folded),
       (current: V, op: PredictedOp) => predict(current, op, page),
       env.report,
     );
@@ -208,6 +211,12 @@ export function createPageMirror<V>(
 
   env.onDocumentEvent((event) => {
     if (!cell.live) return;
+    foldEvent(event);
+    if (spec.predict && folded.add(event)) keptVersion += 1;
+  });
+
+  /** One event, into every loaded page it concerns. */
+  function foldEvent(event: DocumentEvent): void {
     if (isResync(event)) {
       for (const page of loadedPages()) reloadInBackground(page);
       return;
@@ -254,7 +263,7 @@ export function createPageMirror<V>(
       setEntry(key, { page, status: 'ready', value: next });
       announce({ page, cause: 'event', event, previous: entry.value, next });
     }
-  });
+  }
 
   return {
     get: (page) => entryOf(encodePageKey(page))?.value,

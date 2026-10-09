@@ -27,7 +27,6 @@ import {
 import type { AnnotationAnchor, AnnotationSelectionAnchor, ChromeSettings } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { viewEnv } from '../services/geometry';
-import { recordOfRef } from '../services/store';
 
 /** The view a pointer sample arrives in: px per page unit, display rotation, relative zoom. */
 export interface HitView {
@@ -226,7 +225,7 @@ export function createChromeReads(
     if (!boundsIn) {
       boundsIn = (view: ViewEnv) => {
         const model = store.model();
-        const record = recordOfRef(model, ref);
+        const record = model.byId[annotationKey(ref)];
         return record ? (annotationAnchor(model, record.id, view)?.bounds ?? null) : null;
       };
       boundsInByKey.set(key, boundsIn);
@@ -244,7 +243,7 @@ export function createChromeReads(
       cached.view?.rotation === view?.rotation
     )
       return cached.v;
-    const record = recordOfRef(model, ref);
+    const record = model.byId[annotationKey(ref)];
     if (!record) boundsInByKey.delete(key);
     const box = record ? annotationAnchor(model, record.id, view) : null;
     // Without a view, a note that keeps its size on screen says where it is in any view.

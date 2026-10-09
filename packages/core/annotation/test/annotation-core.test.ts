@@ -768,39 +768,24 @@ describe('annotation-core', () => {
     expect(irtOf(strikeout.annotation)).toBe(caret.id);
     expect(groupOf(strikeout.annotation)).toBe(caret.id);
     expect(model.selected).toEqual([caret.id, strikeout.id]);
-    // Each part is written from its own draft; the member answers the primary once it has a ref.
+    // Each part is written from its own draft, the caret first: the member
+    // answers the primary by the object number the primary takes.
     expect(fx).toEqual([
       {
-        type: 'createGroup',
-        primary: caret.id,
-        members: [strikeout.id],
-        drafts: {
-          [caret.id]: expect.objectContaining({ subtype: 'caret', intent: 'replace', nm: 'new-1' }),
-          [strikeout.id]: expect.objectContaining({
-            subtype: 'strikeout',
-            intent: 'strikeout-text-edit',
-            nm: 'new-2',
-          }),
-        },
+        type: 'create',
+        id: caret.id,
+        draft: expect.objectContaining({ subtype: 'caret', intent: 'replace' }),
+      },
+      {
+        type: 'create',
+        id: strikeout.id,
+        draft: expect.objectContaining({
+          subtype: 'strikeout',
+          intent: 'strikeout-text-edit',
+          reply: { to: caret.annotation.ref, type: 'group' },
+        }),
       },
     ]);
-    const drafts = fx[0]?.type === 'createGroup' ? fx[0].drafts : {};
-    expect(drafts[strikeout.id]).not.toHaveProperty('reply');
-  });
-
-  it('rekey moves the selection to the id a new record was confirmed under', () => {
-    const rect = { x: 20, y: 40, width: 80, height: 20 };
-    let model = step(initialModel, {
-      type: 'createReplaceText',
-      page: PAGE,
-      quads: [quadFromRect(rect)],
-      anchor: { glyphQuad: quadFromRect(rect), advance: 1 },
-    })[0];
-    const [caretId, strikeoutId] = model.order;
-    const result = update(model, { type: 'rekey', from: caretId, to: 'obj:42' });
-    expect(result.change).toBe(EMPTY_CHANGE);
-    model = { ...model, ...result.session };
-    expect(model.selected).toEqual(['obj:42', strikeoutId]);
   });
 
   it('forget drops the selection, hover, text editing and a gesture on records that left', () => {
@@ -3224,6 +3209,19 @@ describe('annotation-core opaqueBody (stamp) gestures', () => {
     expect(item.apBox).toMatchObject({ x: 100, y: 100, width: 160, height: 80 });
   });
 
+  it('a stamp that fits `contain` keeps its raster at its proportions in a box resized out of them', () => {
+    const resized = (fit: 'contain' | 'fill') => {
+      const record = withAnnotation(stamp(), { fit } as Partial<Annotation>);
+      let model = run(modelWith([record]), [editPtr('down', 150, 125), editPtr('up', 150, 125)]);
+      // Only wider: the box leaves the raster's 2:1.
+      model = run(model, [editPtr('down', 200, 150), editPtr('move', 260, 150)]);
+      return pageItems(model, PAGE).find((pageItem) => pageItem.subtype === 'stamp')!.apBox;
+    };
+    // As the engine fits the drawing into the new box: whole, centred.
+    expect(resized('contain')).toEqual({ x: 130, y: 100, width: 100, height: 50 });
+    expect(resized('fill')).toEqual({ x: 100, y: 100, width: 160, height: 50 });
+  });
+
   it('stays baked MID-rotate with the live rotation exposed as apRot (view transform)', () => {
     // select the stamp, grab its rotate knob, and drag without releasing
     let model = run(loadStamp(), [editPtr('down', 150, 125), editPtr('up', 150, 125)]);
@@ -4445,7 +4443,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     expect(next.byId['A1'].source).toBe('baked'); // …and still baked
   });
 
-  it('a stamp RESIZE stays baked, its raster drawn at the new box', () => {
+  it('a stamp RESIZE stays baked, its raster drawn in the new box at its own proportions', () => {
     let model = committed('stamp');
     [model] = step(model, editPtr('down', 200, 160)); // grab the SE handle
     [model] = step(model, editPtr('move', 240, 190));
@@ -4461,7 +4459,8 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     ]);
     expect(next.byId['A1'].source).toBe('baked'); // opaque-body: no vector render
     const item = pageItems(next, PAGE).find((pageItem) => pageItem.id === 'A1')!;
-    expect(item.apBox).toEqual({ x: 100, y: 100, width: 140, height: 90 });
+    // The 100 × 60 raster, fit `contain` in the 140 × 90 box: whole, centred.
+    expect(item.apBox).toEqual({ x: 100, y: 103, width: 140, height: 84 });
   });
 
   it('a stamp quarter turn commits a bare patch — rotation is stripped at the blit', () => {

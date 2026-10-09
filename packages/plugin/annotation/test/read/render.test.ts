@@ -184,3 +184,73 @@ describe('the frame a painter draws into', () => {
     expect(frameAt(harness, 2).scale).toBe(1);
   });
 });
+
+/** The first bytes of a PNG `width` × `height`: as much as a sniff reads. */
+const pngOf = (width: number, height: number): Uint8Array => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return bytes;
+};
+
+describe('a stamp before the engine wrote it', () => {
+  it('shows the picture it was placed with at once, and the engine’s once that exists', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    const png = pngOf(200, 100);
+    let answer!: () => void;
+    harness.create.mockImplementationOnce(
+      (draft: { box: { x: number; y: number; width: number; height: number } }) =>
+        new Promise((resolve) => {
+          const { x, y, width, height } = draft.box;
+          const rect = { left: x, bottom: 800 - y - height, right: x + width, top: 800 - y };
+          answer = () =>
+            resolve({
+              annotation: {
+                ref: { kind: 'objectNumber', page: PAGE, objectNumber: 1 },
+                page: PAGE,
+                subtype: 'stamp',
+                rect,
+                box: rect,
+                rotation: null,
+                fit: 'contain',
+                name: null,
+                opacity: 1,
+                hasAppearance: true,
+              } as unknown as FileAnnotation,
+            });
+        }),
+    );
+    // The page's pictures as the engine drew them, before the stamp.
+    expect(await harness.capability.renderAppearances(PAGE, 2)).toEqual([]);
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(1);
+    await harness.capability.stamps.arm({ source: png });
+    expect(harness.capability.placeArmedStamp(PAGE, { x: 300, y: 400 })).toBe(true);
+    await Promise.resolve();
+
+    const [id] = harness.model().order;
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${id}@placed`);
+    const [picture, ...rest] = await harness.capability.renderAppearances(PAGE, 2);
+    expect(rest).toEqual([]);
+    // The engine's pictures didn't change: it isn't asked again, so nothing waits for it.
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(1);
+    expect(picture).toMatchObject({
+      ref: harness.model().byId[id!]!.annotation.ref,
+      mode: 'normal',
+      state: null,
+      rect: harness.model().byId[id!]!.apBox,
+    });
+    const blob = await picture!.image.blob();
+    expect(blob.type).toBe('image/png');
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+
+    // The engine's picture is there now: the page fetches it, and the placed one is gone.
+    answer();
+    await harness.ctx.changes.whenSettled();
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${id}@1:`);
+    expect(await harness.capability.renderAppearances(PAGE, 2)).toEqual([]);
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(2);
+  });
+});

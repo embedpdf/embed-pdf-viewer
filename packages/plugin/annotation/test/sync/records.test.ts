@@ -1,6 +1,6 @@
 import type { DocumentEvent } from '@embedpdf/core';
 import { reload } from '@embedpdf/core';
-import type { Annotation, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { annotationKey, formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -34,15 +34,11 @@ const recordOn = (
     ...extra,
   }) as unknown as Annotation;
 
-/** A direct-object annotation without /NM, addressed by its position on the page. */
-const weakOn = (pageObjectNumber: number, index: number): Annotation =>
+/** An annotation born inline in the file's `/Annots`: named by its place there, for life. */
+const inlineOn = (pageObjectNumber: number, baseIndex: number): Annotation =>
   recordOn(pageObjectNumber, 0, {
-    ref: { kind: 'index', page: toPageRef(pageObjectNumber), index, revision: {} },
-    index,
+    ref: { kind: 'baseIndex', page: toPageRef(pageObjectNumber), baseIndex },
   });
-
-const named = (dto: Annotation, nm: string): Annotation =>
-  ({ ...dto, nm, ref: { kind: 'nm', page: dto.page, nm } as AnnotationRef }) as Annotation;
 
 const recordsOf = (...dtos: Annotation[]): AnnotationRecords => ({
   byKey: Object.fromEntries(dtos.map((dto) => [annotationKey(dto.ref), { dto, apVersion: 0 }])),
@@ -171,81 +167,20 @@ describe('appearance versions', () => {
   });
 });
 
-describe('weak annotations (addressed by position)', () => {
-  const page = toPageRef(11);
-
-  it('an update that made the engine name a weak record moves it to its new key, in place', () => {
-    const weak = weakOn(11, 3);
-    const records = recordsOf(weak, recordOn(11, 7));
+describe('annotations born inline in the file', () => {
+  it('keep their name for life: an update leaves them in place, under the same key', () => {
+    const inline = inlineOn(11, 3);
+    const records = recordsOf(inline, recordOn(11, 7));
     const next = applied(
       records,
       event({
         type: 'annotations.updated',
-        page,
-        annotation: named(weak, 'u-1'),
+        page: inline.page,
+        annotation: { ...inline, contents: 'Changed' } as Annotation,
         appearance: { changed: true },
       }),
     );
-    expect(next.order).toEqual(['nm:11:u-1', 'obj:7']);
-    expect(Object.keys(next.byKey).sort()).toEqual(['nm:11:u-1', 'obj:7']);
-    expect(next.byKey['nm:11:u-1']!.apVersion).toBe(1);
-  });
-
-  it('an update of a known record on a weak page is applied, not re-read', () => {
-    const records = recordsOf(weakOn(11, 3), recordOn(11, 7));
-    const next = foldRecords(
-      records,
-      event({
-        type: 'annotations.updated',
-        page,
-        annotation: recordOn(11, 7),
-        appearance: { changed: false },
-        meta: { changed: [{ kind: 'objectNumber', objectNumber: 7 }], shouldRefetch: null },
-      }),
-    );
-    expect(next).not.toEqual(reload({ pages: [page] }));
-  });
-
-  it('a change the engine says moved positions re-reads the page', () => {
-    const records = recordsOf(weakOn(11, 3));
-    const deleted = event({
-      type: 'annotations.deleted',
-      page,
-      deleted: [],
-      meta: { changed: [], shouldRefetch: { reason: 'weakRefsInvalidated' } },
-    });
-    expect(foldRecords(records, deleted)).toEqual(reload({ pages: [page] }));
-  });
-
-  it('a reply whose weak parent the engine named re-reads the page', () => {
-    const records = recordsOf(weakOn(11, 3));
-    const reply = recordOn(11, 9);
-    const created = event({
-      type: 'annotations.created',
-      page,
-      annotation: reply,
-      meta: {
-        changed: [
-          { kind: 'objectNumber', objectNumber: 9 },
-          { kind: 'nm', nm: 'u-2' },
-        ],
-        shouldRefetch: null,
-      },
-    });
-    expect(foldRecords(records, created)).toEqual(reload({ pages: [page] }));
-  });
-
-  it('pages without weak records never re-read for a name they do not know', () => {
-    const records = recordsOf(recordOn(11, 7));
-    const next = foldRecords(
-      records,
-      event({
-        type: 'annotations.created',
-        page,
-        annotation: recordOn(11, 9),
-        meta: { changed: [{ kind: 'nm', nm: 'elsewhere' }], shouldRefetch: null },
-      }),
-    );
-    expect((next as AnnotationRecords).order).toEqual(['obj:7', 'obj:9']);
+    expect(next.order).toEqual(['base:11:3', 'obj:7']);
+    expect(next.byKey['base:11:3']!.apVersion).toBe(1);
   });
 });

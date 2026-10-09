@@ -28,15 +28,14 @@ import type { ChromeReads } from '../read/chrome';
 import type { PropertyReads } from '../read/properties';
 import { runDeltaForFields, type TextFormat } from '../rich-text';
 import type { AnnotationServices } from '../services';
-import type { LinkWrites } from './links';
-import { batchResultOf, throwIfFailed } from './outcomes';
+import { appliedOrThrow, batchResultOf, throwIfFailed } from './outcomes';
 import type { TextEditing } from './text-editing';
-import { refsOfIn, type Commit } from '../services/store';
+import { refsOfIn, type Commit, type StoreChange } from '../services/store';
 
 /**
  * The selection: what is selected, and the verbs that change its fields,
  * link, delete, rotate, group and ungroup it as one, every member through the
- * same `update → patch effect` path a gesture takes.
+ * same `update → patch effect` path a gesture takes. Each verb is one change.
  */
 export function createSelectionWrites(
   ctx: Pick<AnnotationContext, 'pageOf' | 'getPage' | 'cancellable'>,
@@ -46,11 +45,10 @@ export function createSelectionWrites(
     fonts,
     behaviors,
   }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors'>,
-  annotations: Pick<AnnotationReads, 'selectedCommitted' | 'listSelected'>,
+  annotations: Pick<AnnotationReads, 'selectedRecords' | 'listSelected'>,
   properties: Pick<PropertyReads, 'activeTextRange' | 'selectionPropertiesOf'>,
   chrome: Pick<ChromeReads, 'selectionAnchor' | 'rotationAnchor'>,
-  text: Pick<TextEditing, 'flushAllText'>,
-  links: Pick<LinkWrites, 'writeRelationship'>,
+  text: Pick<TextEditing, 'type'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
 
@@ -67,11 +65,12 @@ export function createSelectionWrites(
   /**
    * Change the selection's fields, a patch per member (a function patches
    * each relative to itself), through the pure core like every gesture: each
-   * member takes the fields its kind has, the change shows at once and one
-   * engine write runs per member. While the text editor holds a range, the
-   * font, size, colour and formats restyle the runs it covers (a delta over
-   * the body, through the pure run algebra) and the rest goes to the
-   * annotation.
+   * member takes the fields its kind has, and the change shows at once, as
+   * one change. While the text editor holds a range, the font, size, colour
+   * and formats restyle the runs it covers (a delta over the body, through
+   * the pure run algebra) as part of the typing, and the rest goes to the
+   * annotation: its change sends the typing first, so the body it writes is
+   * the latest.
    */
   const restyle = (patch: FieldValues | ((annotation: Annotation) => FieldValues)): Commit[] => {
     const model = store.model();
@@ -93,14 +92,11 @@ export function createSelectionWrites(
           range,
           delta,
         );
-        commits.push(store.commit({ type: 'setRichText', id, doc: next }));
+        commits.push(text.type(id, { type: 'setRichText', id, doc: next }));
       }
       patches[id] = rest;
     }
     if (Object.values(patches).some((fields) => Object.keys(fields).length)) {
-      // A body restyle of the annotation being typed in: land the text first
-      // so the engine's body rewrite carries the latest paragraphs.
-      if (model.editing) text.flushAllText();
       commits.push(store.commit({ type: 'setFields', patches }));
     }
     return commits;
@@ -117,9 +113,7 @@ export function createSelectionWrites(
    */
   const toggleFormat = async (format: TextFormat, options: OperationOptions = {}) => {
     const on = properties.selectionPropertiesOf().values[format] !== true;
-    const model = store.model();
-    const range = properties.activeTextRange(model);
-    if (!range && model.editing) text.flushAllText();
+    const range = properties.activeTextRange(store.model());
     const commits = range
       ? restyle({ [format]: on })
       : [store.commit({ type: 'setTextFormat', format, on })];
@@ -184,10 +178,12 @@ export function createSelectionWrites(
     getAnchor: () => chrome.selectionAnchor(),
     getRotationAnchor: () => chrome.rotationAnchor(),
     // Grouping writes a relationship (`/IRT` + `/RT /Group`) onto every
-    // subordinate; ungrouping clears it, so each member becomes top-level again.
+    // subordinate; ungrouping clears it, so each member becomes top-level
+    // again. Either is one change; geometry and style are left alone, so no
+    // appearance is baked again.
     group: async (options: OperationOptions = {}): Promise<void> => {
       const model = store.model();
-      const members = annotations.selectedCommitted();
+      const members = annotations.selectedRecords();
       if (members.length < 2) return;
       const pageObjectNumber = members[0].annotation.page.objectNumber;
       if (members.some((record) => record.annotation.page.objectNumber !== pageObjectNumber))
@@ -198,29 +194,18 @@ export function createSelectionWrites(
       const [primary, ...rest] = ordered;
       const primaryRef = refOf(primary);
       if (!primaryRef) return;
-      await ctx.cancellable(
-        options.signal,
-        Promise.all(
-          rest.map((record) => links.writeRelationship(record, { to: primaryRef, type: 'group' })),
-        ),
-      );
+      await writeRelationships(rest, { to: primaryRef, type: 'group' }, options);
     },
     ungroup: async (options: OperationOptions = {}): Promise<void> => {
       const model = store.model();
       const subs = expandGroups(model, model.selected)
         .map((id) => model.byId[id])
-        .filter(
-          (record): record is ModelAnnotation =>
-            !!record && !!refOf(record) && !!groupOf(record.annotation),
-        );
-      await ctx.cancellable(
-        options.signal,
-        Promise.all(subs.map((record) => links.writeRelationship(record, null))),
-      );
+        .filter((record): record is ModelAnnotation => !!record && !!groupOf(record.annotation));
+      await writeRelationships(subs, null, options);
     },
     canGroup: (): boolean => {
       const model = store.model();
-      const members = annotations.selectedCommitted();
+      const members = annotations.selectedRecords();
       if (members.length < 2) return false;
       if (
         members.some(
@@ -258,6 +243,23 @@ export function createSelectionWrites(
         })
       );
     },
+  };
+
+  /** One relationship (`/IRT` + `/RT`) written onto every record, as one change. */
+  const writeRelationships = async (
+    targets: readonly ModelAnnotation[],
+    reply: { to: AnnotationRef; type: 'group' } | null,
+    options: OperationOptions,
+  ): Promise<void> => {
+    const changes = targets.flatMap((record): StoreChange[] => {
+      const ref = refOf(record);
+      if (!ref) return [];
+      const patch = { subtype: record.annotation.subtype, reply } as AnnotationPatch;
+      return [{ type: 'update', ref, patch }];
+    });
+    if (changes.length) {
+      await ctx.cancellable(options.signal, appliedOrThrow(store.apply(changes)));
+    }
   };
 
   return { selection, toggleFormat };

@@ -175,19 +175,21 @@ export interface PageImageObjectUrl {
   revoke(): void;
 }
 
-export interface PageImageHandle extends PageImageResult {
+/** An encoded image, as a renderer takes it: a blob, or a URL to paint. */
+export interface ImageSource {
   /**
    * A `blob:` URL for the image, and `revoke()` to free it. Cancel with
    * `.abort()`: a URL made after the cancel is revoked, never leaked.
    */
   objectUrl(): AbortablePromise<PageImageObjectUrl>;
   /**
-   * The encoded image, typed `contentType`. The same call on both engines:
-   * the cloud engine fetches it with the document's token. Cancel with
-   * `.abort()`.
+   * The encoded image. The same call on both engines: the cloud engine
+   * fetches it with the document's token. Cancel with `.abort()`.
    */
   blob(): AbortablePromise<Blob>;
 }
+
+export interface PageImageHandle extends PageImageResult, ImageSource {}
 
 /** What `render.image()` gives: the image, and how its pixels map to page space. */
 export interface PageRenderImage extends PageImageHandle {
@@ -207,8 +209,22 @@ export function createPageImageHandle(
   result: PageImageResult,
   blobSource: PageImageBlobSource,
 ): PageImageHandle {
+  return { ...result, ...imageSourceOf(blobSource) };
+}
+
+/**
+ * An image whose encoded bytes this device holds (a picture it made, such as
+ * a stamp's preview), to paint like one an engine rendered.
+ */
+export function imageSourceOfBytes(bytes: Uint8Array, contentType: string): ImageSource {
+  return imageSourceOf({
+    blob: async () => new Blob([bytes.slice()], { type: contentType }),
+  });
+}
+
+/** The image `blobSource` gives, as a blob and as an object URL. */
+function imageSourceOf(blobSource: PageImageBlobSource): ImageSource {
   return {
-    ...result,
     blob() {
       return AbortablePromise.run(async (signal) => {
         if (typeof Blob === 'undefined') {

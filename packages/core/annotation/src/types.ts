@@ -180,15 +180,14 @@ export type FieldValues = Readonly<Record<string, unknown>>;
  */
 export interface ModelAnnotation {
   /**
-   * The record's key: `annotationKey(annotation.ref)`. A record this session
-   * created is keyed by the `nm` ref it is written under until the engine
-   * confirms it, and by the engine's key from then on.
+   * The record's key: `annotationKey(annotation.ref)`, for life. A record
+   * this session creates has its final ref from the start: the object number
+   * its create names.
    */
   id: Id;
   /**
-   * A record this session created that the engine hasn't confirmed yet: it
-   * has no engine ref (`refOf` is `null`), and writes to it wait for its
-   * create. Its annotation's `ref` is the `nm` ref it is written under.
+   * A record this session created that the engine hasn't written yet: it
+   * has its ref, but no raster of its appearance.
    */
   unconfirmed?: true;
   /**
@@ -490,16 +489,12 @@ export interface Session {
   /** Transient ghost of an in-progress markup selection (null when idle). */
   preview: MarkupPreview | null;
   /**
-   * How many records this session has created; the next one is written under
-   * the name `<namePrefix><seq + 1>`.
+   * The object numbers this session holds for the records it creates next: a
+   * message's first new record takes the first, and so on. The plugin hands
+   * the session numbers from the document's pool before a message that may
+   * create (`newRecordsAtMost`).
    */
-  seq: number;
-  /**
-   * The start of the `/NM` name each record this session creates is written
-   * with: `<namePrefix><n>` for its `n`-th. A host gives each session its own,
-   * so two sessions never name two annotations alike.
-   */
-  namePrefix: string;
+  objectNumbers: readonly number[];
   /**
    * Each tool's defaults for the annotations it draws, keyed by the tool's
    * preset: the engine fields its creates state. The engine's own defaults
@@ -522,7 +517,7 @@ export interface Session {
 
 /**
  * The records a gesture works on, read-only: what the engine confirmed with
- * the user's unconfirmed changes on top. The plugin builds it; the core never
+ * this session's pending changes on top. The plugin builds it; the core never
  * stores a record.
  */
 export interface AnnotationView {
@@ -763,13 +758,11 @@ export type Message =
   | { type: 'resetRotation' }
   | { type: 'delete' }
   | { type: 'cancel' }
-  /** A record this session created was confirmed under a new id: selection, hover and editing follow it. */
-  | { type: 'rekey'; from: Id; to: Id }
   /** These records left the view (deleted elsewhere, a refused create): drop every reference to them. */
   | { type: 'forget'; ids: Id[] }
   // free-text editing: enter/leave the focused `contentEditable`, and apply the
   // browser's plain-text result. `setText` flips the annotation to `vector` so
-  // the live text shows; its `text` effect is written after a pause in typing.
+  // the live text shows; its `text` effect writes it.
   | { type: 'beginTextEdit'; id: Id }
   | { type: 'setText'; id: Id; text: string }
   // The editor's rich result (runs of deltas over the body), applied
@@ -779,34 +772,26 @@ export type Message =
 
 export type Effect =
   | { type: 'captured'; tool: string; page: PageRef; geometry: Shape }
-  /** Write a new record: the draft its annotation was read from, named as it is keyed. */
+  /** Write a new record: the draft its annotation was read from. Its ref names the object number it takes. */
   | { type: 'create'; id: Id; draft: AnnotationDraft }
-  /** Write a composite (a replace-text caret and its strikeout): the primary
-   *  first, then each member answering it. `drafts` holds each one's draft. */
-  | {
-      type: 'createGroup';
-      primary: Id;
-      members: Id[];
-      drafts: Readonly<Record<Id, AnnotationDraft>>;
-    }
   /** Write one record's change: its entry in the change set's `patches`. `update`
    *  asks for it for every changed record that has one, except typed text, which
-   *  its `text` effect writes after a pause. Whether the engine's re-baked
-   *  appearance differs is the engine's answer, not the core's guess. */
+   *  its `text` effect writes. Whether the engine's re-baked appearance differs
+   *  is the engine's answer, not the core's guess. */
   | { type: 'patch'; id: Id; patch: AnnotationPatch }
-  /** Write the edited text of one free-text record. The plugin waits for a
-   *  pause in typing and writes the latest text once. */
+  /** Write the edited text of one free-text record. While the user types, the
+   *  plugin keeps amending one change with the latest text, and sends it after
+   *  a pause. */
   | { type: 'text'; id: Id }
   /** The parent's `link` prop changed on a non-link kind: reconcile its
    *  attached link children (create / retarget / delete) toward `target`
    *  (null = remove them). Declarative — the plugin's reconciler is the only
    *  code that spells out child operations; parents store no link value, the
    *  committed children are the truth (`linkOf` reads them back). Geometry
-   *  commits don't emit this; the plugin re-runs the reconciler after any
-   *  `patch` of an annotation with attached children. */
+   *  commits don't emit this: the plugin's write of a `patch` brings an
+   *  annotation's attached children along. */
   | { type: 'syncLink'; id: Id; target: PdfLinkTarget | null }
-  /** Delete one record from the document. A record the engine has not
-   *  confirmed yet is deleted once its create is. */
+  /** Delete one record from the document. */
   | { type: 'delete'; id: Id };
 
 /** Per-annotation render data — its content geometry + style + live state. */

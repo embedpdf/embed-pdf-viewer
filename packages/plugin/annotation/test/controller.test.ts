@@ -1,7 +1,7 @@
 import type { DocumentEvent } from '@embedpdf/core';
 import { quadFromRect } from '@embedpdf/core-geometry';
 import type { AnnotationFlags, AnnotationRef, PdfQuad } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CommentsApi } from '../src/contract';
@@ -110,7 +110,7 @@ const commentChecks = (comments: CommentsApi, target: AnnotationRef) => ({
 });
 
 describe('Replace Text grouped persistence', () => {
-  it('creates the Caret first, then writes StrikeOut /IRT + /RT /Group', async () => {
+  it('is one change: the Caret, then the StrikeOut answering it by its number (/IRT + /RT /Group)', async () => {
     const harness = createHarness();
     harness.create
       .mockResolvedValueOnce({ annotation: caretDTO() })
@@ -123,8 +123,16 @@ describe('Replace Text grouped persistence', () => {
       { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
-    await vi.waitFor(() => expect(harness.create).toHaveBeenCalledTimes(2));
+    // Both show at once, keyed for life, the pair selected.
+    const [caretId, strikeoutId] = harness.model().order;
+    const caretRef = harness.model().byId[caretId!]!.annotation.ref;
+    const strikeout = harness.model().byId[strikeoutId!]!.annotation;
+    expect(irtOf(strikeout)).toBe(caretId);
+    expect(groupOf(strikeout)).toBe(caretId);
+    expect(harness.model().selected).toEqual([caretId, strikeoutId]);
 
+    await vi.waitFor(() => expect(harness.create).toHaveBeenCalledTimes(2));
+    expect(harness.applied).toHaveLength(1);
     expect(harness.create.mock.calls[0]![0]).toMatchObject({
       subtype: 'caret',
       intent: 'replace',
@@ -133,17 +141,13 @@ describe('Replace Text grouped persistence', () => {
     expect(harness.create.mock.calls[1]![0]).toMatchObject({
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
-      reply: { to: ref(10), type: 'group' },
+      reply: { to: caretRef, type: 'group' },
       print: true,
     });
-    const [caretId, strikeoutId] = harness.model().order;
-    const strikeout = harness.model().byId[strikeoutId]!.annotation;
-    expect(irtOf(strikeout)).toBe(caretId);
-    expect(groupOf(strikeout)).toBe(caretId);
-    expect(harness.model().selected).toEqual([caretId, strikeoutId]);
+    expect(harness.model().order).toEqual([caretId, strikeoutId]);
   });
 
-  it('deletes the Caret and removes both optimistic parts when StrikeOut creation fails', async () => {
+  it('a refused StrikeOut refuses the pair: both parts go, and nothing needs deleting', async () => {
     const harness = createHarness();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     harness.create
@@ -157,8 +161,10 @@ describe('Replace Text grouped persistence', () => {
       { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
-    await vi.waitFor(() => expect(harness.remove).toHaveBeenCalledWith(ref(10)));
+    expect(harness.model().order).toHaveLength(2);
     await vi.waitFor(() => expect(harness.model().order).toHaveLength(0));
+    expect(harness.remove).not.toHaveBeenCalled();
+    expect(harness.model().selected).toEqual([]);
   });
 });
 
@@ -412,8 +418,8 @@ describe('the records mirror', () => {
     await harness.load([hydrationSquare(40), hydrationSquare(41)], 40);
     expect(harness.model().order).toHaveLength(2);
 
-    // An optimistic create whose engine write never resolves: its temporary
-    // records (caret and strikeout) must survive a reload.
+    // A create the engine hasn't answered: its records (caret and strikeout)
+    // still show over the reloaded records.
     harness.create.mockReturnValue(new Promise(() => {}));
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     harness.capability.createReplaceText(
@@ -422,8 +428,8 @@ describe('the records mirror', () => {
       { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
-    const newIds = harness.model().order.filter((id) => id.startsWith('nm:'));
-    expect(newIds.length).toBeGreaterThan(0);
+    const newIds = harness.model().order.filter((id) => id !== 'obj:40' && id !== 'obj:41');
+    expect(newIds).toHaveLength(2);
 
     // obj:41 was deleted while the stream could not be trusted.
     harness.listAll.mockResolvedValueOnce(snapshot([hydrationSquare(40)], 60));
@@ -437,21 +443,22 @@ describe('the records mirror', () => {
     for (const id of newIds) expect(harness.model().byId[id]).toBeDefined();
   });
 
-  it("matches this session's create to its optimistic record by /NM, whatever arrives first", async () => {
+  it("keys this session's create by the number it takes, and the engine's record lands under it", async () => {
     const harness = createHarness();
     await harness.load([]);
-    harness.create.mockImplementationOnce(async (draft: { nm: string }) => ({
-      annotation: { ...hydrationSquare(60), nm: draft.nm },
-    }));
-    const created = await harness.capability.create(
+    harness.create.mockResolvedValueOnce({ annotation: hydrationSquare(60) });
+    const creating = harness.capability.create(
       PAGE,
       { subtype: 'square', box: { x: 10, y: 10, width: 50, height: 40 } },
       undefined,
       { select: true },
     );
-    expect(created.annotation.ref).toEqual(ref(60));
-    expect(harness.model().order).toEqual(['obj:60']);
-    expect(harness.model().selected).toEqual(['obj:60']);
+    const [id] = harness.model().order;
+    expect(harness.model().selected).toEqual([id]);
+    const created = await creating;
+    expect(annotationKey(created.annotation.ref)).toBe(id);
+    expect(harness.model().order).toEqual([id]);
+    expect(harness.model().selected).toEqual([id]);
   });
 
   it('announces its own changes with the engine session as origin', async () => {
@@ -471,6 +478,8 @@ describe('the records mirror', () => {
       sub: null,
       ts: 0,
       serverId: null,
+      // The change it belongs to: one event of one.
+      tx: { id: harness.applied[0]!.opId, index: 0, count: 1 },
     });
   });
 });
@@ -539,9 +548,10 @@ describe('links lens — substrate children, no ledger', () => {
     );
     // …and the lens reads the new value the moment the promise settles.
     expect(harness.capability.links.get(ref(20))).toEqual(TARGET);
+    const child = harness.capability.list().find((annotation) => annotation.subtype === 'link')!;
 
     await harness.capability.links.clear(ref(20));
-    expect(harness.remove).toHaveBeenCalledWith(ref(30));
+    expect(harness.remove).toHaveBeenCalledWith(child.ref);
     expect(harness.capability.links.get(ref(20))).toBe(null);
   });
 });
@@ -713,8 +723,7 @@ describe('the comments lens', () => {
         noRotate: true,
       }),
     );
-    expect(created.annotation.ref).toEqual(ref(40));
-    expect(harness.model().byId['obj:40']).toBeDefined();
+    expect(harness.model().byId[annotationKey(created.annotation.ref)]).toBeDefined();
   });
 
   it('setStatus chains: first to the root, the next to my previous status', async () => {
@@ -746,11 +755,12 @@ describe('the comments lens', () => {
         noRotate: true,
       }),
     );
-    expect(harness.capability.comments.getThread(ref(20))!.review.mine?.state).toBe('accepted');
+    const first = harness.capability.comments.getThread(ref(20))!.review.mine!;
+    expect(first.state).toBe('accepted');
 
     harness.create.mockResolvedValueOnce({
       annotation: textDto(42, {
-        reply: { to: ref(41), type: 'reply' },
+        reply: { to: first.ref, type: 'reply' },
         popup: null,
         groupId: null,
         createdBy: null,
@@ -765,7 +775,7 @@ describe('the comments lens', () => {
     });
     await harness.capability.comments.setStatus(ref(20), 'rejected');
     expect(harness.create).toHaveBeenLastCalledWith(
-      expect.objectContaining({ state: 'rejected', reply: { to: ref(41) } }), // the ISO chain
+      expect.objectContaining({ state: 'rejected', reply: { to: first.ref } }), // the ISO chain
     );
     expect(harness.capability.comments.getThread(ref(20))!.review.mine?.state).toBe('rejected');
   });
@@ -1174,11 +1184,12 @@ describe('distance authoring and recalibration', () => {
     );
     // The label is the engine's: it works it out from the points and the scale.
     expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('contents');
-    await vi.waitFor(() => expect(harness.capability.get(ref(71))).toBeTruthy());
+    const created = harness.capability.list()[0]!.ref;
+    await vi.waitFor(() => expect(harness.capability.isPending(created)).toBe(false));
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
-    expect(commentChecks(harness.capability.comments, ref(71)).canEditText).toBe(false);
-    await expect(harness.capability.comments.setText(ref(71), 'fake value')).rejects.toThrow(
+    expect(commentChecks(harness.capability.comments, created).canEditText).toBe(false);
+    await expect(harness.capability.comments.setText(created, 'fake value')).rejects.toThrow(
       'worked out',
     );
   });
@@ -1308,7 +1319,8 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     );
     // The label is the engine's: it works it out from the points and the scale.
     expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('contents');
-    await vi.waitFor(() => expect(harness.capability.get(ref(75))).toBeTruthy());
+    const created = harness.capability.list()[0]!.ref;
+    await vi.waitFor(() => expect(harness.capability.isPending(created)).toBe(false));
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
   });

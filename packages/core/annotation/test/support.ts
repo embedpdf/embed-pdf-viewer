@@ -31,7 +31,7 @@ import type {
   TextStyle,
   UpdateResult,
 } from '../src/types';
-import { initialModel, sameSession, update } from '../src/update';
+import { initialModel, newRecordsAtMost, sameSession, update } from '../src/update';
 import { draftOf } from '../src/update/changes';
 
 /**
@@ -92,12 +92,30 @@ function draftExtras(input: RecordInput): FieldValues {
   };
 }
 
+/** The object number each test name stands for: one per name, the same every time it is asked. */
+const numbers = new Map<string, number>();
+const numberOf = (name: string): number => {
+  let number = numbers.get(name);
+  if (number === undefined) {
+    number = 9000 + numbers.size;
+    numbers.set(name, number);
+  }
+  return number;
+};
+
+/** The ref a test record named `name` has on `page`: the object number the name stands for. */
+export const refNamed = (name: string, page: PageRef): AnnotationRef => ({
+  kind: 'objectNumber',
+  page,
+  objectNumber: numberOf(name),
+});
+
 /**
  * The key and ref of a confirmed test record named `name` on `page`: keyed as
  * the engine keys it, so the records that answer it find it.
  */
 export function named(name: string, page: PageRef): { id: Id; ref: AnnotationRef } {
-  const ref: AnnotationRef = { kind: 'nm', page, nm: name };
+  const ref = refNamed(name, page);
   return { id: annotationKey(ref), ref };
 }
 
@@ -113,8 +131,8 @@ export const answering = (
  * the annotation fields the test states laid over it, read as the engine
  * writes a create (`annotationOfNew`); a measurement's stated label
  * stands where the engine can't work one out (no scale), as a file's stored
- * label does. A confirmed record keeps its ref; one not written yet is named
- * by its id.
+ * label does. A confirmed record keeps its ref; one not written yet takes the
+ * object number its id stands for.
  */
 export function recordOf(input: RecordInput): ModelAnnotation {
   const { annotation: stated, ref, page, subtype, geometry, style, text, flags, measure } = input;
@@ -123,8 +141,8 @@ export function recordOf(input: RecordInput): ModelAnnotation {
     Object.entries({ ...style, ...text }).filter(([name]) => edited.has(name)),
   );
   const draft = draftOf(subtype, sidebar, geometry, draftExtras(input), flags);
-  const at = ref ?? { kind: 'nm' as const, page, nm: input.id };
-  const written = annotationOfNew(draft, { ref: at, index: 0 });
+  const at = ref ?? refNamed(input.id, page);
+  const written = annotationOfNew(draft, { ref: at });
   const label = measure?.contents && !written.contents ? { contents: measure.contents } : {};
   return {
     id: input.id,
@@ -170,10 +188,27 @@ export function apply(model: Model, result: UpdateResult): Model {
   return { ...result.session, byId, order };
 }
 
-/** One message, applied: the next model and the effects it asked for. */
+/**
+ * `model` holding the object numbers `message` may need, as the plugin hands
+ * them out before it runs: numbers above every one the model holds or uses,
+ * so the same steps always make the same refs.
+ */
+export function withNumbersFor(model: Model, message: Message): Model {
+  const missing = newRecordsAtMost(message) - model.objectNumbers.length;
+  if (missing <= 0) return model;
+  const used = Object.values(model.byId).map((record) =>
+    record.annotation.ref.kind === 'objectNumber' ? record.annotation.ref.objectNumber : 0,
+  );
+  const next = Math.max(99, ...model.objectNumbers, ...used) + 1;
+  const numbers = Array.from({ length: missing }, (_, index) => next + index);
+  return { ...model, objectNumbers: [...model.objectNumbers, ...numbers] };
+}
+
+/** One message, applied as the plugin runs it: the next model and the effects it asked for. */
 export function step(model: Model, message: Message): [Model, Effect[]] {
-  const result = update(model, message);
-  return [apply(model, result), [...result.effects]];
+  const ready = withNumbersFor(model, message);
+  const result = update(ready, message);
+  return [apply(ready, result), [...result.effects]];
 }
 
 /** Several messages, applied in order. */

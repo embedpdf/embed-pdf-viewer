@@ -58,8 +58,7 @@ const annot = (): ModelAnnotation => {
     ...DRAWN_FLAGS,
   } as AnnotationDraft;
   const annotation = annotationOfDraft(draft, {
-    ref: { kind: 'nm', page: toPageRef(1), nm: 'a' },
-    index: 0,
+    ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 1 },
   });
   return { id: 'a', unconfirmed: true, source: 'vector', annotation };
 };

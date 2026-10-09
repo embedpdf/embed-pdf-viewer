@@ -1,17 +1,12 @@
 /**
- * Create, update, delete and move: the public verbs, in the engine's own
+ * Create, update, delete and reorder: the public verbs, in the engine's own
  * terms, and the transfers (export, import, a resource's bytes). Each change
- * states itself through `store.apply` (a move through the pending moves), so
- * it shows at once and is written, settled and refused exactly like a
- * gesture's, and each resolves with what the engine wrote for it: its own
- * write's answer, never another change still on its way.
+ * states itself through `store.apply`, so it shows at once and is sent,
+ * answered and refused exactly like a gesture's, and each resolves with what
+ * the engine wrote for it: its own change's answer, never another change
+ * still on its way.
  */
-import {
-  PluginError,
-  toPluginError,
-  toPluginErrorInfo,
-  type OperationOptions,
-} from '@embedpdf/core';
+import { PluginError, type OperationOptions } from '@embedpdf/core';
 import { defaultsFor } from '@embedpdf/core-annotation';
 import {
   ANNOTATION_FIELD_NAMES,
@@ -26,25 +21,17 @@ import {
   type AnnotationRef,
   type AnnotationResourceRole,
   type AnnotationResources,
-  type ListPosition,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationExportSelection, AnnotationImportResult } from '../contract';
-import { addReorder, dropReorder } from '../model';
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { recordOfRef } from '../services/store';
 import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
 
 export function createCrud(
-  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'pageOf' | 'assertAllowed' | 'cancellable'>,
-  {
-    store,
-    tools,
-    records,
-    events,
-  }: Pick<AnnotationServices, 'store' | 'tools' | 'records' | 'events'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'pageOf' | 'assertAllowed' | 'cancellable'>,
+  { store, tools, records }: Pick<AnnotationServices, 'store' | 'tools' | 'records'>,
   annotations: Pick<AnnotationReads, 'get' | 'pageOf'>,
   /** Write what is held back (typed text) and wait for every write on its way. */
   settle: () => Promise<void>,
@@ -92,10 +79,10 @@ export function createCrud(
     }
     const draft = fields as AnnotationDraft;
     const stated = options.tool ? withTool(draft, options.tool) : draft;
-    const applied = store.apply([
-      { type: 'create', page: ref, draft: stated, ...(resources ? { resources } : {}) },
-    ]);
-    if (options.select) store.commit({ type: 'select', ids: [...applied.ids] });
+    const applied = await store.applyWhenNumbered(
+      [{ type: 'create', page: ref, draft: stated, ...(resources ? { resources } : {}) }],
+      { select: options.select },
+    );
     const annotation = await ctx.cancellable(options.signal, appliedAnnotationOf(applied));
     if (!annotation) {
       throw new PluginError(
@@ -126,14 +113,10 @@ export function createCrud(
     await ctx.cancellable(options.signal, appliedOrThrow(store.apply([{ type: 'delete', ref }])));
   };
 
-  /** The last pending reorder's token: each reorder is removed by its own. */
-  let reorderToken = 0;
-
   /**
    * Move annotations on one page to a new place in its drawing order, next to
-   * a neighbour or to the bottom or top. The new order shows at once; once
-   * the engine confirmed it, the confirmed records hold it and the pending
-   * reorder goes. A refused reorder goes at once.
+   * a neighbour or to the bottom or top. The new order shows at once, and goes
+   * away if the engine refuses it.
    */
   const reorder = async (
     refs: readonly AnnotationRef[],
@@ -143,7 +126,7 @@ export function createCrud(
     if (!refs.length) return;
     const model = store.model();
     const recordOf = (ref: AnnotationRef) => {
-      const record = recordOfRef(model, ref);
+      const record = model.byId[annotationKey(ref)];
       if (!record) {
         throw new PluginError('not-found', 'annotation', `no annotation ${annotationKey(ref)}`);
       }
@@ -162,39 +145,19 @@ export function createCrud(
         'a reorder stays on one page: the annotations and their neighbour',
       );
     }
-    // The same position, by record for the view and by ref for the engine.
-    const at = <T>(name: (record: (typeof moving)[number]) => T): ListPosition<T> => {
-      if (!neighbour || typeof position !== 'object') return position as 'start' | 'end';
-      return 'before' in position ? { before: name(neighbour) } : { after: name(neighbour) };
-    };
-    const token = ++reorderToken;
-    ctx.state.update(addReorder, {
-      token,
-      page: page.objectNumber,
-      ids: moving.map((record) => record.id),
-      position: at((record) => record.id),
-    });
-    try {
-      await ctx.cancellable(
-        options.signal,
-        ctx.doc.page(page).annotations.reorder(
-          moving.map((record) => record.annotation.ref),
-          at((record) => record.annotation.ref),
-        ),
-      );
-      await records.settled();
-    } catch (error) {
-      const refused = toPluginError('annotation', error);
-      if (refused.code !== 'operation-cancelled') {
-        events.writeFailed.emit({
-          refs: moving.map((record) => record.annotation.ref),
-          error: toPluginErrorInfo(refused),
-        });
-      }
-      throw refused;
-    } finally {
-      ctx.state.update(dropReorder, token);
-    }
+    await ctx.cancellable(
+      options.signal,
+      appliedOrThrow(
+        store.apply([
+          {
+            type: 'reorder',
+            page,
+            refs: moving.map((record) => record.annotation.ref),
+            position,
+          },
+        ]),
+      ),
+    );
   };
 
   /** The pages a selection names, as refs: an index becomes its page's ref. */

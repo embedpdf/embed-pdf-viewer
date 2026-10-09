@@ -3,70 +3,53 @@ import {
   type Id,
   kindOf,
   linkChildrenOf,
+  linkChildRects,
   linkOf,
-  type ModelAnnotation,
+  type Model,
   refOf,
   shapeOf,
   styleOf,
+  writableTarget,
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationDraft,
-  type Annotation,
-  type AnnotationPatch,
   type AnnotationRef,
   type PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 
-import { linkChildRects, writableTarget } from '@embedpdf/core-annotation';
+import { appliedOrThrow } from './outcomes';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { opOfStated } from '../services/staging';
 import type { StoreChange } from '../services/store';
-import { appliedOrThrow, throwIfFailed } from './outcomes';
 
 /**
- * Attached links (a Link child riding an editable annotation) and group
- * relationships: the one reconciler that creates, retargets, re-rects and
- * deletes link children, and the relationship-only patch grouping uses.
+ * Attached links (a Link child riding an editable annotation): the one
+ * reconciler that creates, retargets, re-rects and deletes link children. Its
+ * changes join the change that made them needed: a restyle that set a link,
+ * a move of the parent.
  */
 export function createLinkWrites(
-  ctx: Pick<AnnotationContext, 'doc' | 'cancellable'>,
-  { store, geometry, identity }: Pick<AnnotationServices, 'store' | 'geometry' | 'identity'>,
+  ctx: Pick<AnnotationContext, 'cancellable'>,
+  { store }: Pick<AnnotationServices, 'store'>,
 ) {
   /**
-   * Per-parent serialization of attached-link reconciles: rapid edits chain
-   * instead of interleaving (two overlapping runs could double-create
-   * children). Each run reads the current model at execution time, so a
-   * chained run converges on the latest desired state. A chain moves with
-   * its parent to a new key, and its runs reconcile the parent's key then.
+   * The changes that bring the attached link children of `id` to `desired`,
+   * read from `model`. Declarative: desired state = `desired` target + the
+   * parent's geometry (`linkChildRects`); current state is read straight from
+   * the records (`linkChildrenOf`), new children included: no join-key
+   * ledger. Idempotent: foreign inconsistencies heal on the next local edit.
    */
-  const chains = new Map<Id, { parent: Id; tail: Promise<void> }>();
-  identity.onFollow((from, to) => {
-    const chain = chains.get(from);
-    if (!chain) return;
-    chains.delete(from);
-    chain.parent = to;
-    chains.set(to, chain);
-  });
-
-  /**
-   * The one place attached link children are created, retargeted, re-rected,
-   * or deleted. Declarative: desired state = `desired` target + the parent's
-   * committed geometry (`linkChildRects`); current state is read straight
-   * from the substrate (`linkChildrenOf`), children not confirmed yet
-   * included — no join-key ledger. The changes go through `store.apply`, so
-   * they show at once and the `linkOf` lens converges as the run goes, here
-   * and in every other session. Idempotent — foreign inconsistencies heal on
-   * the next local edit.
-   */
-  const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
-    const record = store.model().byId[id];
-    if (!ctx.doc || !record || !refOf(record) || kindOf(record.annotation).name === 'link') return;
+  const childChanges = (id: Id, desired: PdfLinkTarget | null, model: Model): StoreChange[] => {
+    const record = model.byId[id];
+    const parent = refOf(record);
+    if (!record || !parent || kindOf(record.annotation).name === 'link') return [];
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
     const rects =
       desired == null ? [] : linkChildRects(shapeOf(record.annotation), styleOf(record.annotation));
-    const current = linkChildrenOf(store.model(), id);
+    const current = linkChildrenOf(model, id);
     const changes: StoreChange[] = [];
     const paired = Math.min(current.length, rects.length);
     for (let i = 0; i < paired; i++) {
@@ -84,75 +67,39 @@ export function createLinkWrites(
           subtype: 'link',
           rect: rects[i],
           target,
-          reply: { to: refOf(record), type: 'group' },
+          reply: { to: parent, type: 'group' },
         } as AnnotationDraft,
       });
     }
     for (let i = rects.length; i < current.length; i++) {
       changes.push({ type: 'delete', ref: current[i].annotation.ref });
     }
+    return changes;
+  };
+
+  /** Set or clear a parent's link from code: its children's changes, as one change. */
+  const setLink = async (
+    ref: AnnotationRef,
+    target: PdfLinkTarget | null,
+    options: OperationOptions,
+  ): Promise<void> => {
+    const changes = childChanges(annotationKey(ref), target, store.model());
     if (!changes.length) return;
-    try {
-      throwIfFailed(await store.apply(changes).written);
-    } catch (error) {
-      console.error('[annotation] attached-link sync failed:', error);
-    }
+    await ctx.cancellable(options.signal, store.applyWhenNumbered(changes).then(appliedOrThrow));
   };
 
-  /**
-   * Queue a reconcile. `intent` is either an explicit target (a set/clear —
-   * captured by this run's closure, so chained sets stay latest-wins) or
-   * `'keep'` (a geometry follow: re-rect the children toward whatever target
-   * the substrate holds at run time — so a remote retarget is never undone
-   * by a local move). Returns the chain, so `links.set()` can await commit.
-   */
-  const scheduleSync = (
-    id: Id,
-    intent: { target: PdfLinkTarget | null } | 'keep',
-  ): Promise<void> => {
-    const chain = chains.get(id) ?? { parent: id, tail: Promise.resolve() };
-    chains.set(id, chain);
-    const next = chain.tail.then(() =>
-      reconcileChildren(
-        chain.parent,
-        intent === 'keep' ? linkOf(store.model(), chain.parent) : intent.target,
-      ),
-    );
-    chain.tail = next;
-    void next.finally(() => {
-      if (chain.tail === next && chains.get(chain.parent) === chain) chains.delete(chain.parent);
-    });
-    return next;
-  };
+  // A restyle that set or cleared a link: the children's changes join it.
+  store.onEffect('syncLink', (effect, model) =>
+    childChanges(effect.id, effect.target, model).map(opOfStated),
+  );
 
-  /** A relationship-only engine patch (sets/clears `/IRT` + `/RT`) — geometry and
-   *  style are left untouched, so grouping never re-bakes an appearance. */
-  const relationshipPatch = (
-    subtype: Annotation['subtype'],
-    reply: { to: AnnotationRef; type?: 'group' } | null,
-  ): AnnotationPatch => ({ subtype, reply }) as AnnotationPatch;
-
-  /** Write a relationship change to one committed annotation: shown at once, then written. */
-  const writeRelationship = async (
-    record: ModelAnnotation,
-    reply: { to: AnnotationRef; type?: 'group' } | null,
-  ): Promise<void> => {
-    const ref = refOf(record);
-    if (!ref) return;
-    const patch = relationshipPatch(record.annotation.subtype, reply);
-    await appliedOrThrow(store.apply([{ type: 'update', ref, patch }]));
-  };
-
-  // A restyle that set or cleared a link: the verb that made it waits for the
-  // children. A new record's children are written once its create is.
-  store.onEffect('syncLink', (effect) => ({
-    ids: [],
-    perform: () =>
-      identity
-        .withRef(effect.id, (ref) => scheduleSync(annotationKey(ref), { target: effect.target }))
-        // A record never created has no children; its create reports the refusal.
-        .catch(() => {}),
-  }));
+  // An update of a parent, from either door: its children follow its new
+  // shape, toward the target they hold, in the same change.
+  store.onUpdate((op, model) => {
+    const id = annotationKey(op.ref);
+    if (!linkChildrenOf(model, id).length) return [];
+    return childChanges(id, linkOf(model, id), model).map(opOfStated);
+  });
 
   const api = {
     links: {
@@ -165,17 +112,15 @@ export function createLinkWrites(
           ? (annotation.target ?? null)
           : linkOf(model, record.id);
       },
-      // The verbs go straight to the reconciler chain (latest-wins per
-      // parent) and resolve when the children are committed — `get` reads
-      // the new value the moment the promise settles.
+      // Resolve once the engine answered: `get` reads the new value at once,
+      // and still does then.
       set: (ref: AnnotationRef, target: PdfLinkTarget, options: OperationOptions = {}) =>
-        ctx.cancellable(options.signal, scheduleSync(annotationKey(ref), { target })),
-      clear: (ref: AnnotationRef, options: OperationOptions = {}) =>
-        ctx.cancellable(options.signal, scheduleSync(annotationKey(ref), { target: null })),
+        setLink(ref, target, options),
+      clear: (ref: AnnotationRef, options: OperationOptions = {}) => setLink(ref, null, options),
     },
   };
 
-  return { scheduleSync, writeRelationship, api };
+  return { childChanges, api };
 }
 
 export type LinkWrites = ReturnType<typeof createLinkWrites>;

@@ -8,6 +8,7 @@
  */
 export {
   update,
+  newRecordsAtMost,
   initialModel,
   initialSession,
   sameSession,

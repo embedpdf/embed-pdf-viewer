@@ -8,7 +8,13 @@ import {
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { reload, type Mirror, type PageMirror, type PredictedOp } from '../src/index';
+import {
+  reload,
+  type Mirror,
+  type MirrorReload,
+  type PageMirror,
+  type PredictedOp,
+} from '../src/index';
 import { createTestContext } from '../src/testing';
 
 /**
@@ -110,7 +116,12 @@ const resultOf = (opId: string): ChangeResult => ({
 });
 
 /** A document whose `apply` answers when the test says, recording every call. */
-function harness(options: { fold?: typeof foldNotes; pageReads?: boolean } = {}) {
+function harness(
+  options: {
+    fold?: (notes: Notes, event: DocumentEvent) => Notes | MirrorReload;
+    pageReads?: boolean;
+  } = {},
+) {
   const calls: {
     change: Change;
     opId: string;
@@ -231,6 +242,26 @@ describe('when a change leaves the view', () => {
     expect(notes.view()).toEqual({ 1: 'uno', 2: 'two' });
   });
 
+  it('its events folded, the mirror holds the answer before it arrives: what comes next shows', async () => {
+    const { ctx, notes, calls } = await loaded();
+    const mine = ctx.changes.stage({
+      label: { key: 'note.edit' },
+      ops: [write(1, 'uno'), write(2, 'dos')],
+    });
+    // The engine publishes the change's events; its answer is still on the way.
+    ctx.emitDocumentEvent(updated(1, 'uno', own(mine.opId, 0, 2)));
+    expect(notes.view()).toEqual({ 1: 'uno', 2: 'dos' });
+    ctx.emitDocumentEvent(updated(2, 'dos', own(mine.opId, 1, 2)));
+    // Another session changes a note the change wrote: the view shows theirs.
+    ctx.emitDocumentEvent(updated(1, 'theirs', origin('remote')));
+    expect(ctx.changes.pending()).toEqual([mine]);
+    expect(notes.view()).toEqual({ 1: 'theirs', 2: 'dos' });
+
+    calls[0]!.answer.resolve(resultOf(mine.opId));
+    await tick();
+    expect(notes.view()).toBe(notes.get());
+  });
+
   it('a fold that reads the page again: once the read lands', async () => {
     const { ctx, notes, answer, pageLoads } = await loaded({
       pageReads: true,
@@ -339,15 +370,22 @@ describe('a held change', () => {
     const second = ctx.changes.hold({ key: 'note.type' });
     first.set([write(1, 'uno')]);
     second.set([write(2, 'dos')]);
+    expect([first.open, second.open]).toEqual([true, true]);
+    expect(first.change?.held).toBe(true);
     second.send();
     expect(calls.map((call) => call.change)).toEqual([
       { ops: [write(1, 'uno')] },
       { ops: [write(2, 'dos')] },
     ]);
+    // Sent, by its own send or another's: what comes next is a new change.
+    expect([first.open, second.open]).toEqual([false, false]);
+    expect(calls.map((call) => call.opId)).toEqual([first.change?.opId, second.change?.opId]);
 
     const third = ctx.changes.hold({ key: 'note.type' });
     third.set([write(1, 'tres')]);
     third.cancel();
+    expect(third.open).toBe(false);
+    third.set([write(1, 'cuatro')]);
     expect(notes.view()).toEqual({ 1: 'uno', 2: 'dos' });
     expect(calls).toHaveLength(2);
   });

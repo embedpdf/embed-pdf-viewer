@@ -32,6 +32,7 @@
  * drew live stays live for the session, and another session's edit hands it
  * back to the engine's raster (`plugin-annotation`, `sync/confirmed.ts`).
  */
+import { containedRect } from '@embedpdf/core-geometry';
 import {
   appearanceChangeOf,
   resolveAnnotationPatch,
@@ -124,11 +125,25 @@ export function sourceDuring(model: Model, id: Id): ModelAnnotation['source'] {
 }
 
 /**
+ * Where the raster of a kind without a live drawing goes in `box`, its shape
+ * now: filling it, or, for a stamp that fits its drawing `contain`, at the
+ * raster's own proportions, centred, as the engine fits the drawing into a
+ * resized box. A resize never stretches it.
+ */
+function rasterInShape(record: ModelAnnotation, box: Rect): Rect {
+  const { annotation, apBox } = record;
+  return annotation.subtype === 'stamp' && annotation.fit === 'contain' && apBox
+    ? containedRect(apBox, box)
+    : box;
+}
+
+/**
  * Where a record's raster is drawn right now, in view space: its box and the
  * turn to put back about its middle.
  *
  * - A stamp or form widget: where its shape is (`shapeNow`, the gesture in
- *   progress included), turned with it: its raster is its drawing.
+ *   progress included), turned with it: its raster is its drawing. A
+ *   stamp's keeps its proportions in a resized box (`rasterInShape`).
  * - Every other kind: at the raster's box (`apBox`), carried along by a move
  *   in progress. A screen-anchored annotation's box rides the same
  *   similarity its shape projects through (`anchoredBox`), composed with any
@@ -143,7 +158,7 @@ export function rasterPlacement(
   const record = model.byId[id];
   if (!drawsLive(record.annotation)) {
     return {
-      box: shapeNow.kind === 'box' ? shapeNow.box : record.apBox,
+      box: shapeNow.kind === 'box' ? rasterInShape(record, shapeNow.box) : record.apBox,
       rot: geomRotation(shapeNow) || undefined,
     };
   }

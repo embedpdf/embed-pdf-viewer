@@ -1,16 +1,21 @@
 /**
  * A test harness for the annotation controller on the kernel's real test
- * context. Its fake engine behaves like the real ones: every write publishes
- * its confirmed event before the write's promise resolves, so the model
- * changes through the same event path as in production. Its annotations are
- * the file's values, as tests write them; it hands them out in page space,
- * as the engines do (`pageAnnotationOf`).
+ * context. Its fake engine behaves like the real ones: a change
+ * (`doc.apply`) runs its ops in order, all or nothing, and publishes their
+ * events as one burst before its promise resolves, so the model changes
+ * through the same event path as in production. A create that names an
+ * object number gets that ref. The engine's answer to each op comes from the
+ * per-verb mocks (`create`, `update`, `remove`, `reorder`), which tests hold
+ * or refuse. Its annotations are the file's values, as tests write them; it
+ * hands them out in page space, as the engines do (`pageAnnotationOf`).
  */
 import { createEventHook, type DocumentEvent } from '@embedpdf/core';
 import { createTestContext } from '@embedpdf/core/testing';
 import type {
   Annotation,
   AnnotationRef,
+  Change,
+  ChangeItem,
   PageRef,
   PdfCoordinates,
   PdfRect,
@@ -37,14 +42,8 @@ export const PAGE2 = toPageRef(2);
 
 const localOrigin = { kind: 'local', sessionId: 'me', sub: null, ts: 0, serverId: null };
 
-/** The mutation meta a write's event carries; a weak (index-addressed) write invalidates positions. */
-const metaOf = (weakRefsInvalidated = false) => ({
-  affectedPages: [],
-  cacheDelta: null,
-  changed: [],
-  weakRefsInvalidated,
-  shouldRefetch: weakRefsInvalidated ? { reason: 'weakRefsInvalidated' } : null,
-});
+/** The mutation meta a write's event carries. */
+const metaOf = () => ({ affectedPages: [], cacheDelta: null, changed: [] });
 
 /** An annotation as the fake engine keeps it: the file's values. */
 export type FileAnnotation = Annotation<PdfCoordinates>;
@@ -89,6 +88,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     order: [] as AnnotationRef[],
   }));
   const downloadResource = vi.fn(async (_ref: AnnotationRef, _role: string) => new Uint8Array([1]));
+  /** A page's appearance pictures: none, unless a test gives some. */
+  const renderAppearances = vi.fn(async (_options: unknown) => ({
+    appearances: [] as unknown[],
+  }));
   const exportBundle = vi.fn(async (_selection?: unknown) => ({ version: 1 }) as unknown);
   const importBundle = vi.fn(async (_bundle: unknown, _options?: unknown) => ({
     annotations: [] as Annotation[],
@@ -106,17 +109,112 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   const allowsAnnotationMutation = vi.fn(
     (_action: 'update' | 'delete', _target: { userId?: string; groupId?: string }) => true,
   );
+  /** Every change the plugin sent, with its `opId`. */
+  const applied: { change: Change; opId: string }[] = [];
+  /** The object numbers the fake engine hands this session: never the same twice. */
+  let nextNumber = 900;
+  const lostListeners = new Set<(lost: { numbers: number[]; reason: 'reclaimed' }) => void>();
 
   // A minimal interaction hub, enough for the plugin's `connect` wiring.
   const toolChanged = createEventHook<unknown>();
   const interaction = {
     activateDefaultTool: vi.fn(),
+    activateTool: vi.fn(),
     registerTool: () => () => {},
     registerHandler: () => () => {},
     hasTool: () => false,
     getActiveTool: () => ({ id: 'pointer', cursor: 'default', enables: new Set<string>() }),
     getActiveToolId: () => 'pointer',
     onToolChanged: toolChanged.on,
+  };
+
+  /** The changes before the one being sent, and how many there are: each waits for them. */
+  let line: Promise<unknown> = Promise.resolve();
+  let waiting = 0;
+  /** One change, as the engine applies it: its ops in order, all or nothing, then its events. */
+  const runChange = async (change: Change, opId: string) => {
+    if (!('ops' in change)) throw new Error('the fake engine does not undo');
+    // Each op answered by its verb's mock, in order; the first refusal refuses all.
+    const items: ChangeItem[] = [];
+    const events: Record<string, unknown>[] = [];
+    for (const op of change.ops) {
+      switch (op.type) {
+        case 'annotations.create': {
+          const result = readResult(
+            await create(op.data, ...(op.resources ? [{ resources: op.resources }] : [])),
+          );
+          const annotation =
+            op.objectNumber === undefined
+              ? result.annotation
+              : {
+                  ...result.annotation,
+                  ref: { kind: 'objectNumber', page: op.page, objectNumber: op.objectNumber },
+                };
+          items.push({ type: op.type, page: op.page, annotation, meta: metaOf() } as never);
+          events.push({
+            type: 'annotations.created',
+            page: annotation.page ?? op.page,
+            annotation,
+            meta: metaOf(),
+          });
+          break;
+        }
+        case 'annotations.update': {
+          const answer = readResult(
+            await update(op.ref, op.patch, ...(op.resources ? [{ resources: op.resources }] : [])),
+          );
+          // The engine reads the annotation back under the ref it was asked about.
+          const result = answer?.annotation
+            ? { ...answer, annotation: { ...answer.annotation, ref: op.ref } }
+            : answer;
+          items.push({
+            type: op.type,
+            page: op.ref.page,
+            appearance: { changed: false },
+            meta: metaOf(),
+            ...result,
+          } as never);
+          if (result?.annotation) {
+            events.push({
+              type: 'annotations.updated',
+              page: result.annotation.page,
+              appearance: { changed: false },
+              meta: metaOf(),
+              ...result,
+            });
+          }
+          break;
+        }
+        case 'annotations.delete': {
+          const { ref } = op;
+          await remove(ref);
+          items.push({ type: op.type, page: ref.page, meta: metaOf() } as never);
+          events.push({
+            type: 'annotations.deleted',
+            page: ref.page,
+            deleted: [ref],
+            meta: metaOf(),
+          });
+          break;
+        }
+        case 'annotations.reorder': {
+          const { order } = await reorder([...op.refs], op.position);
+          items.push({ type: op.type, page: op.page, order, meta: metaOf() } as never);
+          events.push({ type: 'annotations.reordered', page: op.page, order, meta: metaOf() });
+          break;
+        }
+        default:
+          throw new Error(`the fake engine does not apply ${op.type}`);
+      }
+    }
+    // Published before the answer, as one burst: every event names the change.
+    events.forEach((event, index) =>
+      ctx.emitDocumentEvent({
+        ...event,
+        origin: { ...localOrigin, tx: { id: opId, index, count: events.length } },
+      } as unknown as DocumentEvent),
+    );
+    return { items, meta: { ...metaOf(), opId, undoable: true } };
   };
 
   const ctx = createTestContext<AnnotationState, AnnotationSettings>({
@@ -134,65 +232,46 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
       { ref: PAGE2, size: { width: 600, height: 800 } },
     ],
     doc: {
+      objectNumbers: {
+        take: () => nextNumber++,
+        held: Infinity,
+        reserve: async () => {},
+        onLost: (listener: (lost: { numbers: number[]; reason: 'reclaimed' }) => void) => {
+          lostListeners.add(listener);
+          return () => lostListeners.delete(listener);
+        },
+      },
+      // One change at a time, in the order they came: as both engines answer.
+      apply: (change: Change, options?: { opId?: string }) => {
+        const opId = options?.opId ?? 'no-op-id';
+        applied.push({ change, opId });
+        let aborted = false;
+        const start = () => {
+          if (aborted) throw new Error('aborted');
+          return runChange(change, opId);
+        };
+        // Nothing ahead of it: it starts at once.
+        const run = waiting === 0 ? start() : line.then(start);
+        waiting += 1;
+        const done = () => {
+          waiting -= 1;
+        };
+        void run.then(done, done);
+        line = run.catch(() => {});
+        return Object.assign(run, {
+          abort: () => {
+            aborted = true;
+          },
+        });
+      },
       page: (page: PageRef) => ({
         annotations: {
-          create: async (draft: unknown, resources?: unknown) => {
-            // Every create this plugin sends to the viewed document carries an /NM.
-            if (!(draft as { nm?: string }).nm) throw new Error('a create without an /NM');
-            const result = readResult(await create(draft, ...(resources ? [resources] : [])));
-            ctx.emitDocumentEvent({
-              type: 'annotations.created',
-              page: result.annotation.page ?? page,
-              origin: localOrigin,
-              meta: metaOf(),
-              ...result,
-            } as unknown as DocumentEvent);
-            return result;
-          },
-          update: async (ref: AnnotationRef, patch: unknown, resources?: unknown) => {
-            const result = readResult(await update(ref, patch, ...(resources ? [resources] : [])));
-            if (result?.annotation) {
-              ctx.emitDocumentEvent({
-                type: 'annotations.updated',
-                page: result.annotation.page,
-                origin: localOrigin,
-                appearance: { changed: false },
-                meta: metaOf(),
-                ...result,
-              } as unknown as DocumentEvent);
-            }
-            return { appearance: { changed: false }, ...result };
-          },
-          delete: async (ref: AnnotationRef) => {
-            const result = await remove(ref);
-            // A weak delete reports no stable id and says the page's positions moved.
-            const weak = ref.kind === 'index';
-            ctx.emitDocumentEvent({
-              type: 'annotations.deleted',
-              page: ref.page,
-              origin: localOrigin,
-              deleted:
-                ref.kind === 'objectNumber'
-                  ? [{ kind: 'objectNumber', objectNumber: ref.objectNumber }]
-                  : ref.kind === 'nm'
-                    ? [{ kind: 'nm', nm: ref.nm }]
-                    : [],
-              meta: metaOf(weak),
-            } as unknown as DocumentEvent);
-            return result;
-          },
+          renderAppearances: (options: unknown) =>
+            Object.assign(
+              renderAppearances(options).then((result) => ({ page, ...result })),
+              { abort: () => {} },
+            ),
           list: async () => readAll(await list()),
-          reorder: async (refs: AnnotationRef[], position: unknown) => {
-            const { order } = await reorder(refs, position);
-            ctx.emitDocumentEvent({
-              type: 'annotations.reordered',
-              page,
-              origin: localOrigin,
-              order,
-              meta: metaOf(),
-            } as unknown as DocumentEvent);
-            return { order, meta: metaOf() };
-          },
           downloadResource: (ref: AnnotationRef, role: string) => downloadResource(ref, role),
         },
       }),
@@ -257,6 +336,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     remove,
     reorder,
     downloadResource,
+    renderAppearances,
     exportBundle,
     importBundle,
     interaction,
@@ -265,7 +345,15 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     allows,
     allowsAnnotationCreate,
     allowsAnnotationMutation,
+    /** Every change the plugin sent, in order, with its `opId`. */
+    applied,
+    /** The engine reclaims these object numbers (another session took them over). */
+    loseNumbers: (numbers: number[]) => {
+      for (const listener of lostListeners) listener({ numbers, reason: 'reclaimed' });
+    },
     state: () => ctx.state.get(),
+    /** This session's changes the engine hasn't answered, in staging order. */
+    pending: () => ctx.changes.pending(),
     /** The composed model: confirmed records, pending changes and the session. */
     model: () => instance.model(),
     /** Run a core message through the store's `commit` door, as a gesture does. */

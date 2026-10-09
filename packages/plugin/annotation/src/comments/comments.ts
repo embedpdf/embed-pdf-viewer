@@ -43,7 +43,9 @@ export function createComments(
     pageObjectNumber: number,
     draft: AnnotationDraft,
   ): Promise<AnnotationRef> =>
-    appliedRefOf(store.apply([{ type: 'create', page: toPageRef(pageObjectNumber), draft }]));
+    store
+      .applyWhenNumbered([{ type: 'create', page: toPageRef(pageObjectNumber), draft }])
+      .then((applied) => appliedRefOf(applied));
 
   const deleteOne = async (ref: AnnotationRef, signal?: AbortSignal): Promise<void> => {
     await ctx.cancellable(signal, appliedOrThrow(store.apply([{ type: 'delete', ref }])));
@@ -69,7 +71,7 @@ export function createComments(
       ctx.assertAllowed('annotations:create', 'annotation.comments.reply');
       const root = threads.rootRefOf(ref);
       const thread = threads.threadOf(ref);
-      const applied = store.apply([
+      const applied = await store.applyWhenNumbered([
         {
           type: 'create',
           page: toPageRef(thread.page.objectNumber),

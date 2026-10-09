@@ -754,6 +754,7 @@ export function useRichTextEditor(annotation: Annotation): RichTextEditor {
  * `@embedpdf/web`'s `registerRendererBehaviors`: counted per capability and
  * entry, since the layer mounts once per page. Entry identity is the key,
  * hence the "define entries outside render" rule on {@link AnnotationRenderer}.
+ * Once they are registered the layer draws again: its drawings ask them.
  */
 function useRendererBehaviors(
   anno: Parameters<typeof registerRendererBehaviors<Annotation>>[0],
@@ -762,9 +763,12 @@ function useRendererBehaviors(
 ): void {
   const toolRef = useRef(activeToolId);
   toolRef.current = activeToolId;
+  const [, setRegistrations] = useState(0);
   useEffect(() => {
     if (!renderers) return;
-    return registerRendererBehaviors(anno, renderers, () => toolRef.current());
+    const release = registerRendererBehaviors(anno, renderers, () => toolRef.current());
+    setRegistrations((count) => count + 1);
+    return release;
   }, [anno, renderers]);
 }
 

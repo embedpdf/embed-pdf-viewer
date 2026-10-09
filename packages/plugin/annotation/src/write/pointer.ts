@@ -213,7 +213,7 @@ export function createPointer(
             upright: resolvedTool?.upright,
           },
         },
-        afterCreate.shape(resolvedTool?.id),
+        { adjust: afterCreate.shape(resolvedTool?.id) },
       );
       afterCreate.done(resolvedTool?.id, committed);
     },
