@@ -26,7 +26,7 @@
     {/snippet}
     <AddAnnotations />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
       {#snippet overlay()}
         <AnnotationMenu placement="bottom">

@@ -132,7 +132,8 @@ function makeSignature(
   config: SignatureConfig = {},
   options: { stamp?: Record<string, unknown>; form?: Record<string, unknown> } = {},
 ) {
-  const form = { getFieldForWidget: () => null, ...options.form };
+  // Every field in no group: the document's own `doc.sign` and `doc.forms.fill` decide.
+  const form = { getFieldForWidget: () => null, get: () => ({ groupId: null }), ...options.form };
   const capabilities: [CapabilityToken<unknown>, unknown][] = [[FormToken, form]];
   if (options.stamp) capabilities.push([StampToken, options.stamp]);
   const ctx = createTestContext({
@@ -173,11 +174,11 @@ describe('mode', () => {
       const { signature: visual } = makeSignature(doc, {});
       expect(visual.getMode()).toBe('visual');
       // Signing is a permission: a per-call key or two-step signing needs no key setting.
-      expect(visual.canSign()).toBe(true);
+      expect(visual.canSign(SIG)).toBe(true);
       const signer = await createTestSigner();
       const { signature: signing } = makeSignature(doc, { key: signer });
       expect(signing.getMode()).toBe('sign');
-      expect(signing.canSign()).toBe(true);
+      expect(signing.canSign(SIG)).toBe(true);
       expect(signing.canCertify()).toBe(false);
       const { signature: asking } = makeSignature(doc, {
         key: signer,
@@ -218,8 +219,8 @@ describe('settings, permissions and cancelling', () => {
     try {
       const signer = await createTestSigner();
       const { signature } = makeSignature(doc, { key: signer }, { stamp: stampStub(artwork) });
-      expect(signature.canSign()).toBe(false);
-      expect(signature.canFill()).toBe(false);
+      expect(signature.canSign(SIG)).toBe(false);
+      expect(signature.canFill(SIG)).toBe(false);
       expect(signature.canReadRevision()).toBe(false);
       await expect(
         signature.sign({ field: SIG, mark: { assetId: 'people:signature' } }),
@@ -232,6 +233,31 @@ describe('settings, permissions and cancelling', () => {
         permission: 'doc.download',
       });
       expect(signature.isBusy()).toBe(false);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  it('lets a signer of one group sign only that group’s fields', async () => {
+    const doc = await engine.open(
+      { kind: 'bytes', id: `sig-plugin-${++openCount}`, bytes: base },
+      { scope: ['doc.open', 'doc.render', 'fields:*:group=buyer'] },
+    );
+    try {
+      const SELLER: FormFieldRef = { kind: 'fqn', name: 'seller' };
+      const groupOf = (ref: FormFieldRef) => ({
+        groupId: ref.kind === 'fqn' && ref.name === 'seller' ? 'seller' : 'buyer',
+      });
+      const { signature } = makeSignature(doc, {}, { form: { get: groupOf } });
+      expect(signature.canSign(SIG)).toBe(true);
+      expect(signature.canFill(SIG)).toBe(true);
+      expect(signature.canSign(SELLER)).toBe(false);
+      await expect(
+        signature.sign({ field: SELLER, mark: { assetId: 'people:signature' } }),
+      ).rejects.toMatchObject({
+        code: 'permission-denied',
+        permission: 'fields:sign:group=seller',
+      });
     } finally {
       await doc.close();
     }

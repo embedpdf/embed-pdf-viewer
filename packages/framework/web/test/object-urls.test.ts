@@ -3,8 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   bakedAppearanceOf,
   loadAppearanceUrls,
+  loadFieldPictureUrls,
   loadObjectUrl,
   objectUrlOf,
+  shownFieldPicture,
 } from '../src/object-urls';
 
 let made = 0;
@@ -104,5 +106,37 @@ describe('bakedAppearanceOf', () => {
     const urls = { 'obj:7': { url: 'blob:7', box: { x: 0, y: 0, width: 10, height: 10 } } };
     expect(bakedAppearanceOf(urls, 'obj:7')).toEqual({ url: 'blob:7' });
     expect(bakedAppearanceOf(urls, 'obj:8')).toBeNull();
+  });
+});
+
+describe('field pictures', () => {
+  const box = { x: 0, y: 0, width: 10, height: 10 };
+  const picture = (widget: string, state: string | null) => ({
+    ref: widget,
+    state,
+    rect: box,
+    image: {
+      objectUrl: () => ({
+        abortWith: async () => ({ url: `url:${widget}:${state}`, revoke: () => {} }),
+      }),
+    },
+  });
+
+  it('loads every state, and a widget shows the one it is in', async () => {
+    const onLoaded = vi.fn();
+    loadFieldPictureUrls(
+      async () => [picture('check', 'Yes'), picture('check', 'Off'), picture('name', null)],
+      (ref) => `obj:${ref}`,
+      onLoaded,
+    );
+    await flush();
+    const urls = onLoaded.mock.calls[0]![0];
+    expect(shownFieldPicture(urls, 'obj:check', 'Yes')?.url).toBe('url:check:Yes');
+    // A widget with states that names none shows `Off`.
+    expect(shownFieldPicture(urls, 'obj:check', null)?.url).toBe('url:check:Off');
+    // A widget without states shows its only picture.
+    expect(shownFieldPicture(urls, 'obj:name', null)?.url).toBe('url:name:null');
+    expect(shownFieldPicture(urls, 'obj:check', 'Maybe')).toBeNull();
+    expect(shownFieldPicture(urls, 'obj:other', null)).toBeNull();
   });
 });

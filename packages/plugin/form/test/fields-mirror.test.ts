@@ -107,7 +107,7 @@ async function boot() {
       lastServerId: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
-    security: { allows: () => true },
+    security: { allows: () => true, allowsField: () => true },
     forms: {
       list: () => new Promise<FormSnapshot>((resolve) => reads.push(resolve)),
       setValue: (_ref: unknown, value: { value: string }) =>

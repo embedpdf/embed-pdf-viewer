@@ -54,7 +54,7 @@ const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontS
       <div class="viewer">
         <epdf-stage class="stage">
           <ng-template epdfPage>
-            <epdf-render-layer [annotations]="false" />
+            <epdf-render-layer />
             <epdf-annotation-layer />
             <epdf-form-layer />
           </ng-template>

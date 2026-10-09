@@ -84,7 +84,7 @@ export class SelectionActions {
     <ng-container *epdfDocumentGate="let document; fallback: loading">
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer />
         </ng-template>
         <epdf-annotation-menu placement="bottom">

@@ -5,7 +5,6 @@ import { annotationKey, formWidget, toPageRef } from '@embedpdf/engine-core/runt
 import { describe, expect, it } from 'vitest';
 
 import { foldRecords, NO_RECORDS, type AnnotationRecords } from '../../src/sync/records';
-import { annotationHarness } from '../harness';
 
 /**
  * The confirmed layer: a pure fold over confirmed events from every origin,
@@ -123,34 +122,18 @@ describe('foldRecords', () => {
     ).toBe(records);
   });
 
-  it('re-reads everything after a form repair that linked widgets or baked appearances', () => {
+  it('leaves the records alone on form and signing events: widgets come with the form', () => {
     const records = recordsOf(recordOn(11, 1));
-    const repair = (widgetsLinked: number, appearancesBaked: number) =>
-      event({ type: 'forms.repaired', widgetsLinked, appearancesBaked });
-    expect(foldRecords(records, repair(1, 0))).toEqual(reload());
-    expect(foldRecords(records, repair(0, 2))).toEqual(reload());
-    expect(foldRecords(records, repair(0, 0))).toBe(records);
-  });
-
-  it('re-reads the widget pages a script changed: effects can change display flags and colors', () => {
-    expect(
-      foldRecords(
-        recordsOf(recordOn(11, 5)),
-        event({
-          type: 'forms.effectsApplied',
-          meta: { changedWidgets: [formWidget(5, toPageRef(11))] },
-        }),
-      ),
-    ).toEqual(reload({ pages: [toPageRef(11)] }));
-  });
-
-  it('re-reads the pages of a new form field, from any session', () => {
-    expect(
-      foldRecords(
-        NO_RECORDS,
-        event({ type: 'forms.created', field: { widgets: [formWidget(5, toPageRef(11))] } }),
-      ),
-    ).toEqual(reload({ pages: [toPageRef(11)] }));
+    const widgets = [formWidget(5, toPageRef(11))];
+    for (const formEvent of [
+      { type: 'forms.repaired', widgetsLinked: 1, appearancesBaked: 2 },
+      { type: 'forms.created', field: { widgets } },
+      { type: 'forms.effectsApplied', meta: { changedWidgets: widgets } },
+      { type: 'forms.valueSet', meta: { changedWidgets: widgets } },
+      { type: 'signatures.completed', signature: { widget: widgets[0] } },
+    ]) {
+      expect(foldRecords(records, event(formEvent))).toBe(records);
+    }
   });
 });
 
@@ -179,30 +162,12 @@ describe('appearance versions', () => {
     expect(versionOf(applied(records, updated(true)))).toBe(1);
   });
 
-  it('a z-order move never changes an appearance', () => {
+  it('a z-order change never changes an appearance', () => {
     const records = applied(
       recordsOf(square),
-      event({ type: 'annotations.moved', page: square.page, annotations: [square] }),
+      event({ type: 'annotations.reordered', page: square.page, order: [square.ref] }),
     );
     expect(versionOf(records)).toBe(0);
-  });
-
-  it.each(['forms.valueSet'])('%s repaints the changed widgets', (type) => {
-    const records = recordsOf(recordOn(11, 5));
-    const next = applied(
-      records,
-      event({ type, meta: { changedWidgets: [formWidget(5, toPageRef(11))] } }),
-    );
-    expect(versionOf(next, 'obj:5')).toBe(1);
-  });
-
-  it('a signature repaints its widget', () => {
-    const records = recordsOf(recordOn(11, 5));
-    const next = applied(
-      records,
-      event({ type: 'signatures.completed', signature: { widget: formWidget(5, toPageRef(11)) } }),
-    );
-    expect(versionOf(next, 'obj:5')).toBe(1);
   });
 });
 
@@ -282,44 +247,5 @@ describe('weak annotations (addressed by position)', () => {
       }),
     );
     expect((next as AnnotationRecords).order).toEqual(['obj:7', 'obj:9']);
-  });
-});
-
-describe('records mirror through the controller', () => {
-  it('a form value write bumps the repainted widget appearance version', async () => {
-    const harness = annotationHarness();
-    const widget = {
-      ...recordOn(1, 5),
-      index: 0,
-      hasAppearance: true,
-      appearanceState: null,
-      nm: null,
-      print: true,
-      contents: null,
-      rect: { left: 100, bottom: 700, right: 180, top: 760 },
-      box: { left: 100, bottom: 700, right: 180, top: 760 },
-      color: '#000000',
-      opacity: 1,
-      strokeWidth: 1,
-      reply: null,
-      popup: null,
-      groupId: null,
-      userId: null,
-      createdBy: null,
-      modifiedBy: null,
-      importedBy: null,
-      actions: null,
-    } as unknown as Annotation;
-    harness.listAll.mockResolvedValueOnce({
-      annotations: [widget],
-      pages: [{ page: toPageRef(1) }],
-    });
-    harness.connectAll();
-    await harness.capability.whenSynced();
-    expect(harness.model().byId['obj:5']?.apVersion ?? 0).toBe(0);
-    harness.emit(
-      event({ type: 'forms.valueSet', meta: { changedWidgets: [formWidget(5, toPageRef(1))] } }),
-    );
-    expect(harness.model().byId['obj:5']?.apVersion).toBe(1);
   });
 });

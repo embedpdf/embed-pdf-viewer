@@ -100,7 +100,7 @@ export type {
   TextStyle,
 } from '@embedpdf/core-annotation';
 import { devWarn } from './dev';
-import { usePageLayerFact } from './dev-registry';
+import { usePaintsPagePart } from './page-layers';
 import { useAnnotationSettings } from './annotation-hooks';
 import {
   shallowArray,
@@ -775,8 +775,9 @@ const INERT = { inert: '' } as Record<string, string>;
 
 /**
  * Draws a page's annotations, the selection's outline and handles, the tool's
- * preview and the text boxes being typed in. Put it above the rendered page,
- * with the render layer leaving annotations out (`annotations={false}`).
+ * preview and the text boxes being typed in. Put it above the rendered page:
+ * while it's there, the render layer leaves the annotations out of the
+ * page's picture.
  */
 export function AnnotationLayer({ renderers, components }: AnnotationLayerProps = {}) {
   const page = usePage();
@@ -803,7 +804,7 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
   );
   const [urls, setUrls] = useState<Record<string, AppearanceUrl>>({});
   useRendererBehaviors(anno, () => (interaction?.getActiveToolId() as string) ?? '', renderers);
-  usePageLayerFact(page, 'annotationRenderers', renderers ?? null);
+  usePaintsPagePart(page.ref, 'annotations');
   // Entry identity keys the behavior registration, so an inline `renderers`
   // array registers again on every render. Detect it once: a fresh array
   // whose entries are the previous ones.

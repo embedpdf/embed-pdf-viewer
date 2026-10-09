@@ -13,13 +13,13 @@
 import { computed, shallowRef, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 import { RenderToken, samePageViewDemand } from '@embedpdf/plugin-render/contract/host';
-import type { ViewDemand } from '@embedpdf/plugin-render/contract/host';
+import type { PageLayerOptions, ViewDemand } from '@embedpdf/plugin-render/contract/host';
 import { useOptionalCapability } from '../runtime/capabilities';
 import { useKernelValue } from '../runtime/kernel';
 import { usePage } from '../runtime/page';
 import TileImage from './TileImage.vue';
 
-const props = defineProps<{ annotations: boolean; fadeMs: number }>();
+const props = defineProps<{ layers: PageLayerOptions; fadeMs: number }>();
 
 const page = usePage();
 const render = useOptionalCapability(RenderToken);
@@ -71,9 +71,9 @@ const demand = useKernelValue(
 // re-plans; reading the plan is pure. Before the render, so a camera move
 // re-plans in the same update.
 watch(
-  [view, demand, pageRef, () => props.annotations],
-  ([handle, wanted, ref, annotations]) => {
-    handle?.setDemand(ref, wanted, { includeAnnotations: annotations });
+  [view, demand, pageRef, () => props.layers],
+  ([handle, wanted, ref, layers]) => {
+    handle?.setDemand(ref, wanted, layers);
   },
   { immediate: true },
 );

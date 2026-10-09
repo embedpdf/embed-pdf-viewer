@@ -170,7 +170,9 @@ draws for that page. Later layers sit on top:
 <Snippet name="concepts/layers" />
 
 A layer zooms, scrolls and rotates with its page, and you never convert a position: everything a
-plugin gives you is in page coordinates, and the layer places it.
+plugin gives you is in page coordinates, and the layer places it. A page's layers also keep out of
+each other's way: while an annotation layer or a form layer is on the page, the render layer leaves
+what it draws out of the page picture, so nothing is drawn twice.
 
 **Overlays** float above the pages, attached to something on them: a menu next to the selected
 text, a card next to an annotation. They go <Fw only="react">in the Stage's `overlay`</Fw><Fw only="vue">in the Stage's `#overlay` slot</Fw><Fw only="svelte">in the Stage's `overlay` snippet</Fw><Fw only="angular">inside `<epdf-stage>`, next to the page template</Fw>, which keeps them attached

@@ -6,7 +6,9 @@
  * - {@link objectUrlOf}: bytes (a stamp's gallery preview) as a URL, now;
  * - {@link loadObjectUrl}: bytes still to load (the armed stamp's ghost);
  * - {@link loadAppearanceUrls}: a page's baked annotation appearances, and
- *   {@link bakedAppearanceOf}, one of them as a renderer's `appearance`.
+ *   {@link bakedAppearanceOf}, one of them as a renderer's `appearance`;
+ * - {@link loadFieldPictureUrls}: a page's form field pictures, every state,
+ *   and {@link shownFieldPicture}, the one a widget shows.
  */
 import type { ObjectUrlImageSource } from './painted-image';
 
@@ -94,6 +96,59 @@ export function loadAppearanceUrls<Ref>(
   keyOf: (ref: Ref) => string,
   onLoaded: (urls: Record<string, AppearanceUrl>) => void,
 ): () => void {
+  return loadPictureUrls(load, (picture) => keyOf(picture.ref), onLoaded);
+}
+
+/** One form field picture as the render plugin renders it: a widget in one of its states. */
+export interface FieldPicture<Ref> extends AppearancePicture<Ref> {
+  /** The state it draws (`/AS`), or `null` for a widget without states. */
+  readonly state: string | null;
+}
+
+/** A field picture's key: its widget's key and the state it draws. */
+const fieldPictureKey = (widgetKey: string, state: string | null): string =>
+  `${widgetKey}|${state ?? ''}`;
+
+/**
+ * Load a page's form field pictures, every state of every widget, and hand
+ * their URLs to `onLoaded` once all of them are there; {@link shownFieldPicture}
+ * picks a widget's. A check box that changes shows its other picture at
+ * once, before the next pictures arrive. Cancel like {@link loadAppearanceUrls}.
+ */
+export function loadFieldPictureUrls<Ref>(
+  load: (signal: AbortSignal) => Promise<readonly FieldPicture<Ref>[]>,
+  keyOf: (ref: Ref) => string,
+  onLoaded: (urls: Record<string, AppearanceUrl>) => void,
+): () => void {
+  return loadPictureUrls(
+    load,
+    (picture) => fieldPictureKey(keyOf(picture.ref), picture.state),
+    onLoaded,
+  );
+}
+
+/**
+ * The picture a widget shows, from {@link loadFieldPictureUrls}: the one of
+ * the state it's in (`'Off'` when it names none), or its only picture when it
+ * has no states; `null` until it's loaded.
+ */
+export function shownFieldPicture(
+  urls: Readonly<Record<string, AppearanceUrl>>,
+  widgetKey: string,
+  appearanceState: string | null,
+): AppearanceUrl | null {
+  return (
+    urls[fieldPictureKey(widgetKey, appearanceState ?? 'Off')] ??
+    urls[fieldPictureKey(widgetKey, null)] ??
+    null
+  );
+}
+
+function loadPictureUrls<Picture extends AppearancePicture<unknown>>(
+  load: (signal: AbortSignal) => Promise<readonly Picture[]>,
+  keyOf: (picture: Picture) => string,
+  onLoaded: (urls: Record<string, AppearanceUrl>) => void,
+): () => void {
   const controller = new AbortController();
   const revokers: Array<() => void> = [];
   void (async () => {
@@ -108,7 +163,7 @@ export function loadAppearanceUrls<Ref>(
         }
         revokers.push(made.revoke);
         // Placed by its own rect (the box it was rendered into), never a recomputed bound.
-        urls[keyOf(picture.ref)] = { url: made.url, box: picture.rect };
+        urls[keyOf(picture)] = { url: made.url, box: picture.rect };
       }
       if (!controller.signal.aborted) onLoaded(urls);
     } catch {

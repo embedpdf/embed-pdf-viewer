@@ -36,7 +36,7 @@ import { localEngine } from '@embedpdf/engine';
     {/snippet}
     <ArmBar />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
       <FormLayer />
     </Stage>

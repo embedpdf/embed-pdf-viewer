@@ -1,11 +1,13 @@
 /**
  * The render service and layer: the settings with no document (and their changes), redraws as
  * `invalidated$`, and one `<epdf-render-layer>` picture per page on a Stage, never handed a
- * revoked URL.
+ * revoked URL, leaving out what a layer on the page paints.
  */
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EpdfRender, EpdfRenderLayer, RENDER_DEFAULTS, withRender } from '@embedpdf/angular/render';
+import { injectPage, paintsPagePart } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import type { Engine } from '@embedpdf/core';
 import { bytesInput, fakeEngine, handleFor, kernelOf, mount, viewerHost } from './fixtures';
@@ -62,7 +64,45 @@ describe('EpdfRender', () => {
   });
 });
 
+/** A layer that paints the page's annotations itself, as `<epdf-annotation-layer>` does. */
+@Component({ selector: 'test-annotation-painter', template: '' })
+class AnnotationPainter {
+  constructor() {
+    const page = injectPage('<test-annotation-painter>');
+    paintsPagePart(() => page.ref, 'annotations');
+  }
+}
+
 describe('<epdf-render-layer>', () => {
+  it('leaves out what a layer on the page paints, from the first request', async () => {
+    const asked: Record<string, unknown>[] = [];
+    const fixture = await mount(
+      viewerHost({
+        imports: [EpdfStage, EpdfPageTemplate, EpdfRenderLayer, AnnotationPainter],
+        config: { engine: recordingEngine(asked) },
+        features: [withStage({ zoom: { pageWidth: 100 } }), withRender()],
+        template: `
+          <epdf-stage>
+            <ng-template epdfPage>
+              <epdf-render-layer />
+              <test-annotation-painter />
+            </ng-template>
+          </epdf-stage>
+        `,
+      }),
+    );
+    await kernelOf(fixture).documents.open(bytesInput('a'));
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(asked.length).toBeGreaterThan(0);
+    });
+    const parts = asked.map(({ includeAnnotations, includeFormFields }) => [
+      includeAnnotations,
+      includeFormFields,
+    ]);
+    expect(parts).toEqual(asked.map(() => [false, true]));
+  });
+
   it('draws one picture on every page of a Stage', async () => {
     const fixture = await mount(
       viewerHost({
@@ -142,6 +182,27 @@ function task<T>(value: T) {
  * An engine whose one page renders at once. `onUrl` hears each picture's URL as it's handed out,
  * `onRevoke` each one let go of.
  */
+/** An engine whose pictures record the options they were asked with. */
+function recordingEngine(asked: Record<string, unknown>[]) {
+  const handle = {
+    ...handleFor('a', 2),
+    render: { getPolicy: () => Promise.resolve({ kind: 'continuous' }) },
+    page: () => ({
+      render: {
+        image: (options: Record<string, unknown>) => {
+          asked.push(options);
+          const url = `blob:picture-${asked.length}`;
+          return task({ objectUrl: () => task({ url, revoke: () => {} }) });
+        },
+      },
+    }),
+  };
+  return {
+    open: () => Promise.resolve(handle),
+    destroy: () => Promise.resolve(),
+  } as unknown as Engine;
+}
+
 function renderingEngine(onUrl: (url: string) => void, onRevoke: (url: string) => void) {
   let calls = 0;
   const handle = {

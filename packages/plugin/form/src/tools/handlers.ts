@@ -1,5 +1,5 @@
+import { gesturePlacement, widgetAppearanceOf } from '@embedpdf/core-annotation';
 import type { FormFieldDraft, PageRef, WidgetPlacement } from '@embedpdf/engine-core/runtime';
-import { gesturePlacement, widgetAppearanceOf } from '@embedpdf/plugin-annotation/authoring';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
 import {
   samplePointOn,

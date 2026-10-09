@@ -5,9 +5,11 @@
  * verb and read has a home in `read/`, `write/` or `sync/`.
  */
 import { composeApi } from '@embedpdf/core';
+import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
 import { connectForm } from './connect';
 import type { FormHostCapability } from './host-contract';
+import { fieldByRef } from './model';
 import { createFieldReads } from './read/fields';
 import { createWidgetReads } from './read/widgets';
 import { createServices, type FormContext } from './services';
@@ -21,7 +23,7 @@ import { createValueWrites } from './write/values';
 
 export function createFormController(ctx: FormContext) {
   const services = createServices(ctx);
-  const { events } = services;
+  const { events, rights } = services;
   const settings = ctx.settings();
 
   const fields = createFieldReads(ctx, services);
@@ -48,7 +50,10 @@ export function createFormController(ctx: FormContext) {
     scripts.api,
     {
       canRead: () => ctx.allows('doc.forms.read'),
-      canFill: () => ctx.allows('doc.forms.fill'),
+      canFill: (ref: FormFieldRef) => {
+        const field = fieldByRef(services.fields.get(), ref);
+        return field !== null && rights.mayFill(field);
+      },
       canDesign: () => ctx.allows('doc.forms.modify'),
       canRestoreAttribution: () => ctx.allows('doc.forms.import'),
       canWriteScripts: () => ctx.allows('doc.forms.script'),

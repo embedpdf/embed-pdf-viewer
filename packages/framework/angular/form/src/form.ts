@@ -143,7 +143,7 @@ export class EpdfForm extends pluginService({
     const fillable = this.binding.select(
       (form) => {
         const current = form.get(refOf());
-        return current !== null && !current.readOnly && form.canFill();
+        return current !== null && !current.readOnly && form.canFill(current.ref);
       },
       false,
     );

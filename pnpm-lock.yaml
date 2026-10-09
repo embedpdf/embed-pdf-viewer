@@ -1764,6 +1764,9 @@ importers:
       '@embedpdf/core-acrojs':
         specifier: workspace:*
         version: link:../../core/acrojs
+      '@embedpdf/core-annotation':
+        specifier: workspace:*
+        version: link:../../core/annotation
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../../core/geometry

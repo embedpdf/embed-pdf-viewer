@@ -19,8 +19,6 @@ import { beginWrite, endWrite, fieldByRef } from '../model';
 import { writeOfPlainValue } from '../read/fields';
 import type { FormContext, FormServices } from '../services';
 
-const FILL = 'doc.forms.fill';
-
 /** A batch that stops when its caller cancels it. */
 function throwIfCancelled(options?: OperationOptions): void {
   if (options?.signal?.aborted) {
@@ -40,10 +38,10 @@ const rejection = (result: FormSetValueResult): PluginErrorInfo => ({
 
 export function createValueWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'events' | 'scripting' | 'enqueue' | 'keyOf' | 'fields'>,
+  services: Pick<FormServices, 'events' | 'scripting' | 'enqueue' | 'keyOf' | 'fields' | 'rights'>,
 ) {
   const { validationRejected } = services.events;
-  const { enqueue, keyOf, fields, scripting } = services;
+  const { enqueue, keyOf, fields, rights, scripting } = services;
   // A download waits for the values on their way.
   ctx.onSettle(() => enqueue.idle());
 
@@ -99,14 +97,26 @@ export function createValueWrites(
     }, options);
   };
 
+  /** One value write, once the session may fill the field in. */
+  const fill = (
+    ref: FormFieldRef,
+    value: FormFieldValue,
+    operation: string,
+    options?: OperationOptions,
+  ): Promise<FormSetValueResult> => {
+    const field = fieldByRef(fields.get(), ref);
+    // A field the form doesn't show yet is the engine's to answer (`not-found`).
+    if (field) rights.assertMayFill(field, operation);
+    return write(ref, value, options);
+  };
+
   const setValues: FormCapability['setValues'] = async (entries, options) => {
-    ctx.assertAllowed(FILL, 'form.setValues');
     const applied: FormFieldRef[] = [];
     const failed: { ref: FormFieldRef; error: PluginErrorInfo }[] = [];
     for (const entry of entries) {
       throwIfCancelled(options);
       try {
-        const result = await write(entry.ref, entry.value, options);
+        const result = await fill(entry.ref, entry.value, 'form.setValues', options);
         if (result.status === 'rejected') failed.push({ ref: entry.ref, error: rejection(result) });
         else applied.push(entry.ref);
       } catch (error) {
@@ -117,7 +127,6 @@ export function createValueWrites(
   };
 
   const importValues: FormCapability['importValues'] = async (values, options) => {
-    ctx.assertAllowed(FILL, 'form.importValues');
     const result: {
       applied: FormFieldRef[];
       skipped: { ref: string; reason: string }[];
@@ -128,6 +137,10 @@ export function createValueWrites(
       const field = fieldByRef(fields.get(), { kind: 'fqn', name });
       if (!field) {
         result.skipped.push({ ref: name, reason: 'the form has no field with this name' });
+        continue;
+      }
+      if (!rights.mayFill(field)) {
+        result.skipped.push({ ref: name, reason: 'you may not fill in this field' });
         continue;
       }
       const value = writeOfPlainValue(field, plain);
@@ -151,15 +164,10 @@ export function createValueWrites(
 
   return {
     /** A text field's write, for the text being typed (write/typing.ts). */
-    setText: async (ref: FormFieldRef, text: string): Promise<FormSetValueResult> => {
-      ctx.assertAllowed(FILL, 'form.setValue');
-      return write(ref, { value: text });
-    },
+    setText: async (ref: FormFieldRef, text: string): Promise<FormSetValueResult> =>
+      fill(ref, { value: text }, 'form.setValue'),
     api: {
-      setValue: async (ref, value, options) => {
-        ctx.assertAllowed(FILL, 'form.setValue');
-        return write(ref, value, options);
-      },
+      setValue: async (ref, value, options) => fill(ref, value, 'form.setValue', options),
       setValues,
       importValues,
     } satisfies Partial<FormCapability>,

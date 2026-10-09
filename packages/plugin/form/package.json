@@ -50,6 +50,7 @@
   "dependencies": {
     "@embedpdf/core": "workspace:*",
     "@embedpdf/core-acrojs": "workspace:*",
+    "@embedpdf/core-annotation": "workspace:*",
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core-js-sandbox": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",

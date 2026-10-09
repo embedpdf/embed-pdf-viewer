@@ -2,7 +2,8 @@
  * The confirmed layer: every annotation record the engine confirmed, held in
  * a mirror. It is loaded whole once, kept current by folding confirmed events
  * from every origin, and re-reads a page only when an event describes it too
- * coarsely (a redaction, an inserted page, a new form field).
+ * coarsely (a redaction, an inserted page). Form fields' widgets aren't
+ * annotation records: they come with the form, and so do their events.
  *
  * Nothing unconfirmed ever enters it: the user's changes wait in the plugin
  * state's `pending` entries (model.ts) and the view lays them on top
@@ -10,12 +11,7 @@
  * their keys, record events fire) is in sync/confirmed.ts.
  */
 import { reload, type DocumentEvent, type Mirror, type PageRef } from '@embedpdf/core';
-import {
-  annotationKey,
-  reorderPart,
-  type Annotation,
-  type FormWidget,
-} from '@embedpdf/engine-core/runtime';
+import { annotationKey, reorderPart, type Annotation } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from '../services/context';
 import type { AnnotationEvents } from '../services/events';
@@ -25,7 +21,7 @@ export interface AnnotationRecord {
   readonly dto: Annotation;
   /**
    * Revision of the engine-baked appearance. It advances when the engine
-   * reports new raster content (a re-bake, a repainted widget, a reload), and
+   * reports new raster content (a re-bake, a reload), and
    * only then: the page's rasters are fetched again exactly when it changes.
    */
   readonly apVersion: number;
@@ -73,15 +69,6 @@ function drop(records: AnnotationRecords, keys: readonly string[]): AnnotationRe
   return { byKey, order: records.order.filter((key) => !gone.has(key)) };
 }
 
-/** The engine repainted these records without changing them (a form value, a signature). */
-function bumpAppearance(records: AnnotationRecords, keys: readonly string[]): AnnotationRecords {
-  const present = keys.filter((key) => key in records.byKey);
-  if (!present.length) return records;
-  const byKey = { ...records.byKey };
-  for (const key of present) byKey[key] = { ...byKey[key]!, apVersion: byKey[key]!.apVersion + 1 };
-  return { ...records, byKey };
-}
-
 const keysOnPages = (records: AnnotationRecords, pages: readonly PageRef[]): string[] => {
   const wanted = new Set(pages.map((page) => page.objectNumber));
   return records.order.filter((key) => wanted.has(records.byKey[key]!.dto.page.objectNumber));
@@ -115,17 +102,7 @@ function withPages(
   return put(drop(records, stale), dtos, true);
 }
 
-const pagesOfWidgets = (widgets: readonly FormWidget[]): PageRef[] =>
-  widgets.flatMap((widget) => (widget.page ? [widget.page] : []));
-
-const widgetKeys = (widgets: readonly FormWidget[]): string[] =>
-  widgets.flatMap((widget) => (widget.ref ? [annotationKey(widget.ref)] : []));
-
-/**
- * Apply one confirmed document event to the records. Pure, and the same for
- * every origin. Events that change widgets through the form plane re-read
- * the widgets' pages: the form result carries fields, not annotation records.
- */
+/** Apply one confirmed document event to the records. Pure, and the same for every origin. */
 export function foldRecords(
   records: AnnotationRecords,
   event: DocumentEvent,
@@ -167,32 +144,6 @@ export function foldRecords(
     case 'annotations.flattened':
       return event.results.some((result) => result.status === 'applied')
         ? reload({ pages: [event.page] })
-        : records;
-    // A repair links stray widgets into fields and re-bakes appearances, and
-    // its result names none of them.
-    case 'forms.repaired':
-      return event.widgetsLinked > 0 || event.appearancesBaked > 0 ? reload() : records;
-    case 'forms.created':
-    case 'forms.widgetAdded':
-    case 'forms.widgetRemoved': {
-      const pages = pagesOfWidgets(event.field.widgets);
-      return pages.length ? reload({ pages }) : records;
-    }
-    case 'forms.deleted':
-      return drop(records, widgetKeys(event.meta.changedWidgets));
-    case 'forms.effectsApplied': {
-      // A script can change a widget's display flags.
-      const pages = pagesOfWidgets(event.meta.changedWidgets);
-      return pages.length ? reload({ pages }) : records;
-    }
-    // The form plane and signatures repaint widgets without changing their records.
-    case 'forms.valueSet':
-      return bumpAppearance(records, widgetKeys(event.meta.changedWidgets));
-    case 'forms.updated':
-      return bumpAppearance(records, widgetKeys(event.field.widgets));
-    case 'signatures.completed':
-      return event.signature.widget
-        ? bumpAppearance(records, widgetKeys([event.signature.widget]))
         : records;
     default:
       return records;

@@ -29,7 +29,7 @@
   <DocumentGate>
     <HighlightButton />
     <Stage style="height: 500px">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <SelectionLayer />
       <AnnotationLayer />
     </Stage>

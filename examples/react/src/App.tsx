@@ -1530,7 +1530,7 @@ function DocumentView() {
           {() => (
             <>
               {/* the overlay owns annotation rendering, so the page bitmap excludes them */}
-              <RenderLayer annotations={false} />
+              <RenderLayer />
               <WatermarkLayer />
               <SelectionLayer />
               <SearchLayer />

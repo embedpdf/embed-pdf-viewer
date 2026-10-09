@@ -52,7 +52,7 @@
       <TurnButton />
     </div>
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer renderers={mine ? RENDERERS : NONE} />
     </Stage>
   </DocumentGate>

@@ -104,7 +104,7 @@ export default function App() {
         <Stage className="stage" style={ghostOpacity as CSSProperties | undefined}>
           {() => (
             <>
-              <RenderLayer annotations={false} />
+              <RenderLayer />
               <AnnotationLayer />
             </>
           )}

@@ -1034,10 +1034,10 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
     const harness = createHarness();
     await seed(harness, hydrationSquare(70));
     harness.emit({
-      type: 'annotations.moved',
+      type: 'annotations.reordered',
       page: PAGE,
       origin: remoteOrigin(45),
-      annotations: [hydrationSquare(70)],
+      order: [hydrationSquare(70).ref],
       meta: META,
     } as unknown as DocumentEvent);
     expect(harness.model().byId['obj:70']!.apVersion ?? 0).toBe(0);

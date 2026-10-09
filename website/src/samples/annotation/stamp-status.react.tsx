@@ -128,7 +128,7 @@ export default function App() {
         <Stage className="stage" overlay={<Approvals />}>
           {() => (
             <>
-              <RenderLayer annotations={false} />
+              <RenderLayer />
               <AnnotationLayer />
             </>
           )}

@@ -1,4 +1,9 @@
-import { memo, type EngineRenderPolicy, type PageImageHandle } from '@embedpdf/core';
+import {
+  memo,
+  type EngineRenderPolicy,
+  type PageImageHandle,
+  type PageRenderLayers,
+} from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
 import {
@@ -8,6 +13,7 @@ import {
   type TilePaintPlan,
   type TilePaintSource,
 } from './paint-plan';
+import { layersKeyOf } from './model';
 import type { RasterStore } from './raster-store';
 import { baseAskWidth, resolveStrategy } from './strategy';
 import {
@@ -97,7 +103,7 @@ export class TileManager {
        *  materializes it (continuous fallback) before the doc publishes. */
       getPolicy(): EngineRenderPolicy;
       getPageSize(pageObjectNumber: number): PageSizePt | undefined;
-      getEpoch(pageObjectNumber: number, includeAnnotations: boolean): number;
+      getEpoch(pageObjectNumber: number, layers: PageRenderLayers): number;
       /** Run `run` once, `ms` from now; returns its cancel (the plugin's `ctx.clock.after`). */
       after(ms: number, run: () => void): () => void;
       /**
@@ -109,7 +115,7 @@ export class TileManager {
         pageObjectNumber: number,
         rect: Rect,
         scale: number,
-        includeAnnotations: boolean,
+        layers: PageRenderLayers,
         signal: AbortSignal,
       ): Promise<PageImageHandle>;
       /** A page's plans changed outside `plan()`: re-plan it and wake subscribed layers. */
@@ -123,7 +129,7 @@ export class TileManager {
     view: string,
     pageObjectNumber: number,
     demand: PageViewDemand,
-    includeAnnotations: boolean,
+    layers: PageRenderLayers,
   ): TilePaintPlan {
     const options = this.deps.getOptions();
     if (!options.tiles.enabled) return EMPTY_TILE_PLAN;
@@ -131,7 +137,7 @@ export class TileManager {
     const page = this.deps.getPageSize(pageObjectNumber);
     if (!page) return EMPTY_TILE_PLAN;
 
-    const epoch = this.deps.getEpoch(pageObjectNumber, includeAnnotations);
+    const epoch = this.deps.getEpoch(pageObjectNumber, layers);
     const state = this.pageState(pageObjectNumber, view);
 
     // Epoch exception: old-epoch pixels are wrong, not blurry — drop all.
@@ -238,7 +244,7 @@ export class TileManager {
       grid,
       wantScale,
       wantWidth,
-      includeAnnotations,
+      layers,
       epoch,
       visibleCoords,
       prefetchCoords,
@@ -248,7 +254,7 @@ export class TileManager {
     // Release retained generations covered by the current painted set —
     // evaluated here, not only on painted reports, so release can never be
     // stranded by report ordering.
-    if (this.releaseCovered(pageObjectNumber, state, page, includeAnnotations)) {
+    if (this.releaseCovered(pageObjectNumber, state, page, layers)) {
       state.version += 1;
       state.planCache = null;
     }
@@ -324,7 +330,7 @@ export class TileManager {
     if (!state || !entry || entry.painted) return;
     entry.painted = true;
     const page = this.deps.getPageSize(pageObjectNumber);
-    if (page) this.releaseCovered(pageObjectNumber, state, page, annotationsOf(key));
+    if (page) this.releaseCovered(pageObjectNumber, state, page, layersOfKey(key));
     state.version += 1;
     state.planCache = null;
     this.deps.onAdvance(pageObjectNumber);
@@ -384,7 +390,7 @@ export class TileManager {
     grid: TileGrid,
     wantScale: number,
     wantWidth: number,
-    includeAnnotations: boolean,
+    layers: PageRenderLayers,
     epoch: number,
     visibleCoords: TileCoord[],
     prefetchCoords: TileCoord[],
@@ -404,7 +410,7 @@ export class TileManager {
     // those are the release rules' business. Without this, panning at deep
     // zoom accumulates every tile ever visited.
     const keyOf = (coord: TileCoord) =>
-      this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
+      this.tileKey(pageObjectNumber, wantWidth, coord, layers, epoch);
     const wanted = new Set([...visibleCoords, ...prefetchCoords].map(keyOf));
     for (const [key, entry] of state.entries) {
       if (wanted.has(key)) continue;
@@ -448,7 +454,7 @@ export class TileManager {
         page,
         grid,
         wantWidth,
-        includeAnnotations,
+        layers,
         epoch,
       };
       this.pump();
@@ -522,7 +528,7 @@ export class TileManager {
         state.pageObjectNumber,
         queue.wantWidth,
         coord,
-        queue.includeAnnotations,
+        queue.layers,
         queue.epoch,
       );
       // A key that failed (non-abort) at this level is not retried until the
@@ -536,9 +542,9 @@ export class TileManager {
 
   /** Starts one queued tile's fetch, in a transit slot. */
   private start(state: PageTileState, coord: TileCoord): void {
-    const { page, grid, wantWidth, includeAnnotations, epoch } = state.queue!;
+    const { page, grid, wantWidth, layers, epoch } = state.queue!;
     const pageObjectNumber = state.pageObjectNumber;
-    const key = this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
+    const key = this.tileKey(pageObjectNumber, wantWidth, coord, layers, epoch);
     const bleedPt = this.deps.getOptions().tiles.bleedPx / grid.scale;
     this.inFlight += 1;
     const abort = new AbortController();
@@ -567,7 +573,7 @@ export class TileManager {
             // placement rect the paint list emits for this entry.
             bleedPt > 0 ? bleedRect(logical, bleedPt, page) : logical,
             grid.scale,
-            includeAnnotations,
+            layers,
             signal,
           ),
         abort.signal,
@@ -623,13 +629,13 @@ export class TileManager {
     pageObjectNumber: number,
     state: PageTileState,
     page: PageSizePt,
-    includeAnnotations: boolean,
+    layers: PageRenderLayers,
   ): boolean {
     const { wantScale, wantWidth } = state;
     if (wantScale === null || wantWidth === null) return false;
     const grid = tileGrid(page, wantScale, this.strategy().tileSize);
     const wantKeyOf = (coord: TileCoord) =>
-      this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, state.epoch);
+      this.tileKey(pageObjectNumber, wantWidth, coord, layers, state.epoch);
     const paintedAt = (coord: TileCoord) => state.entries.get(wantKeyOf(coord))?.painted === true;
     let released = false;
     for (const [key, entry] of state.entries) {
@@ -700,7 +706,7 @@ export class TileManager {
     pageObjectNumber: number,
     levelWidth: number,
     coord: TileCoord,
-    includeAnnotations: boolean,
+    layers: PageRenderLayers,
     epoch: number,
   ): string {
     const { tiles } = this.deps.getOptions();
@@ -708,7 +714,7 @@ export class TileManager {
     const geometry = `g${tiles.size}.${tiles.bleedPx}${format ? `.${format}` : ''}`;
     return (
       `t:${pageObjectNumber}|w${levelWidth}|${coord.ix},${coord.iy}` +
-      `|a${includeAnnotations ? 1 : 0}|e${epoch}|${geometry}`
+      `|${layersKeyOf(layers)}|e${epoch}|${geometry}`
     );
   }
 }
@@ -740,7 +746,7 @@ interface TileQueue {
   page: PageSizePt;
   grid: TileGrid;
   wantWidth: number;
-  includeAnnotations: boolean;
+  layers: PageRenderLayers;
   epoch: number;
 }
 
@@ -772,4 +778,8 @@ const coordKey = (coord: TileCoord): string => `${coord.ix},${coord.iy}`;
 const rectKey = (rect: Rect): string =>
   `${Math.round(rect.x)},${Math.round(rect.y)},${Math.round(rect.width)},${Math.round(rect.height)}`;
 
-const annotationsOf = (key: string): boolean => key.includes('|a1|');
+/** What a tile key's picture draws, as {@link layersKeyOf} wrote it into the key. */
+const layersOfKey = (key: string): PageRenderLayers => {
+  const drawn = /\|a([01])f([01])\|/.exec(key);
+  return { includeAnnotations: drawn?.[1] === '1', includeFormFields: drawn?.[2] === '1' };
+};

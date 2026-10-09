@@ -1,8 +1,8 @@
 <!--
   <AnnotationLayer>: a page's annotations, the selection's outline and
   handles, the tool's preview and the text boxes being typed in. Put it in the
-  Stage's #page slot above the rendered page, with the render layer leaving
-  annotations out (`<RenderLayer :annotations="false" />`).
+  Stage's #page slot above the rendered page: while it's there, the render
+  layer leaves the annotations out of the page's picture.
 
   Pure paint: it reads the plugin's per-page render items and chrome and draws
   them. Pointer events reach the plugin through the interaction hub (the
@@ -31,7 +31,7 @@ import {
 } from '@embedpdf/web';
 import type { AnnotationDrawing, AppearanceUrl } from '@embedpdf/web';
 import { devWarn } from '../dev';
-import { usePageLayerFact } from '../dev-registry';
+import { usePaintsPagePart } from '../page-layers';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
 import { usePage } from '../runtime/page';
 import AnnotationChrome from './AnnotationChrome.vue';
@@ -63,6 +63,11 @@ const NO_ITEMS: readonly RenderItem[] = Object.freeze([]);
 const NO_TEXTS: readonly TextItem[] = Object.freeze([]);
 
 const page = usePage();
+// While it's here, the page's picture leaves the annotations to it.
+usePaintsPagePart(
+  computed(() => page.value.ref),
+  'annotations',
+);
 const annotation = useOptionalCapability(AnnotationHostToken);
 const interaction = useOptionalCapability(InteractionToken);
 // The active tool decides which interactive renderers take the pointer, so a
@@ -96,8 +101,6 @@ const texts = useOptionalSelector(
 );
 
 // ── your renderers ───────────────────────────────────────────────────────────
-
-usePageLayerFact(page, 'annotationRenderers', () => props.renderers ?? null);
 
 /** Bumped when the renderers' behaviors register again, so the drawings are read again. */
 const registrations = shallowRef(0);

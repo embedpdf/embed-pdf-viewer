@@ -23,10 +23,11 @@ import type {
 } from '@embedpdf/plugin-actions/contract';
 
 import type { FormCapability, FormCommitResult, FormSetValueResult } from './contract';
-import type { Box } from './model';
+import type { Box, ShownWidget } from './model';
 import { FormToken as PublicFormToken } from './token';
 
 export * from './contract';
+export type { ShownWidget } from './model';
 
 /**
  * The host lens: members for the framework layers and sibling plugins (the
@@ -36,6 +37,11 @@ export * from './contract';
 export interface FormHostCapability extends FormCapability {
   /** Load a page's widgets (one annotation read per page), so `listWidgets(page)` has them. */
   ensureLoaded(page: PageRef): Promise<void>;
+  /**
+   * The widgets a page shows, in the order the page draws them, each with the appearance state it
+   * shows; hidden ones are left out. The form layer paints their pictures from it.
+   */
+  listShownWidgets(page: PageRef): readonly ShownWidget[];
   /** The page box in page space, for keeping a placement on the page; `null` for a page that isn't there. */
   getPageBox(page: PageRef): Box | null;
   /** Send a widget's pointer or focus event to the actions plugin, which runs its `/AA` actions. */

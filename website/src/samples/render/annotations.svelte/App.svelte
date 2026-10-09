@@ -53,7 +53,7 @@
       {#if painter === 'picture'}
         <RenderLayer />
       {:else}
-        <RenderLayer annotations={false} />
+        <RenderLayer />
         <AnnotationLayer />
       {/if}
     </Stage>

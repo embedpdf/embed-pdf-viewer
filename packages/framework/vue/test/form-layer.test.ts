@@ -5,10 +5,13 @@ import { computed, h, nextTick, shallowRef, watch } from 'vue';
 import type { Ref } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pageTransform } from '@embedpdf/core-geometry';
-import type { Engine } from '@embedpdf/core';
+import { annotationKey, type Engine } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
+import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
+import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
 import { interactionPlugin } from '../src/interaction';
+import { renderPlugin } from '../src/render';
 import {
   FormLayer,
   FormToken,
@@ -24,10 +27,10 @@ import { probe, settle, viewerWith } from './counter-plugin';
 
 /**
  * `<FormLayer>` without the annotation plugin, against the real engine: the
- * field's picture comes from the page raster, and the layer puts a real
- * control over each field box, in the colors of the form settings. Typing
- * commits on blur, a click toggles, and a press stays out of the page below
- * while still reaching the field's PDF actions.
+ * layer puts a real control over each field box, in the colors of the form
+ * settings. Typing commits on blur, a click toggles, and a press stays out of
+ * the page below while still reaching the field's PDF actions. With the render
+ * plugin, it paints each field's picture too.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -170,6 +173,94 @@ describe('<FormLayer> over fields made from code', () => {
       } finally {
         wrapper.unmount();
         // The kernel closes its documents first (a second destroy joins the Viewer's).
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
+/**
+ * With the render plugin, `<FormLayer>` paints each field as the engine draws
+ * it: one picture per widget, the one of the state it shows. The engine
+ * encodes pictures with a 2D canvas, which happy-dom doesn't have, so the
+ * render plugin's pictures are stand-ins here: a URL naming widget and state.
+ */
+describe('<FormLayer> field pictures', () => {
+  it(
+    'paints each field, and a checkbox its new state once it changes',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const engine = await realEngine();
+      const context = shallowRef<PageContextValue | null>(null);
+      const { kernel, wrapper } = await viewerWith(
+        [interactionPlugin(), renderPlugin(), formPlugin()],
+        () => h(pageWith(context, () => h(FormLayer))),
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await vi.waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        await form.refresh();
+        const page = kernel.documents.getPage(0, 'blank')!.ref;
+        await form.create({
+          family: 'text',
+          name: 'name',
+          widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+        });
+        await form.create({
+          family: 'checkbox',
+          name: 'agree',
+          widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
+        });
+        const [text, check] = kernel.capability(FormHostToken).listShownWidgets(page);
+        const checkBox = { x: 72, y: 140, width: 14, height: 14 };
+        const picture = (ref: AnnotationRef, state: string | null, rect: typeof checkBox) => ({
+          ref,
+          mode: 'normal' as const,
+          state,
+          rect,
+          image: {
+            objectUrl: () => ({
+              abortWith: async () => ({
+                url: `blob:${annotationKey(ref)}:${state}`,
+                revoke: () => {},
+              }),
+            }),
+          },
+        });
+        vi.spyOn(kernel.capability(RenderHostToken), 'renderFieldAppearances').mockResolvedValue([
+          picture(text!.ref, null, { x: 72, y: 100, width: 160, height: 20 }),
+          picture(check!.ref, 'Off', checkBox),
+          picture(check!.ref, 'Yes', checkBox),
+        ] as never);
+        context.value = letterPage('blank', page);
+
+        const pictures = () =>
+          [...wrapper.element.ownerDocument.querySelectorAll('img')].map((image) =>
+            image.getAttribute('src'),
+          );
+        await vi.waitFor(() => expect(pictures()).toHaveLength(2));
+        const checkKey = annotationKey(check!.ref);
+        expect(pictures()).toEqual([
+          `blob:${annotationKey(text!.ref)}:null`,
+          `blob:${checkKey}:Off`,
+        ]);
+        // Placed by the box the engine drew it into, in page pixels.
+        expect(document.querySelectorAll('img')[1]!.style.top).toBe('140px');
+
+        document.querySelector<HTMLElement>('[role="checkbox"][aria-label="agree"]')!.click();
+        await vi.waitFor(() =>
+          expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }),
+        );
+        await vi.waitFor(() => expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`));
+      } finally {
+        wrapper.unmount();
         await kernel.destroy();
         await engine.destroy();
       }

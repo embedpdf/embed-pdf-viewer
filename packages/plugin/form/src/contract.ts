@@ -134,10 +134,13 @@ export interface FormSetValueResult {
  */
 export type FormPlainValue = string | boolean | readonly string[] | null;
 
-/** What `validate()` returns: whether every required field has a value, and the ones that don't. */
+/** What `validate()` returns: whether every required field you fill in has a value, and the ones that don't. */
 export interface FormValidation {
   readonly valid: boolean;
-  /** The required fields that are empty, in page order (page, then top to bottom, then left to right). */
+  /**
+   * The required fields you may fill in that are empty, in page order (page,
+   * then top to bottom, then left to right).
+   */
   readonly missing: readonly FormFieldDTO[];
 }
 
@@ -288,7 +291,10 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   getWidgetAt(page: PageRef | number, point: { x: number; y: number }): WidgetHit | null;
   /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
   getSelectedField(): FormFieldDTO | null;
-  /** Check the required fields: `missing` lists the empty ones in page order. */
+  /**
+   * Check the required fields you may fill in: `missing` lists the empty ones
+   * in page order. Another signer's fields are theirs to fill.
+   */
   validate(): FormValidation;
   /** Every value, keyed by full name, as plain data. Fields without a value are left out. */
   exportValues(): Readonly<Record<string, FormPlainValue>>;
@@ -298,9 +304,9 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    * Fill in a field with `{ value }`, `{ checked }` or `{ selectedValues }`,
    * running the form's checks and scripts when the `validation` setting says
    * so. Fires `onValueChanged`, or `onValidationRejected` when the form
-   * refuses the value. Rejects `permission-denied` without `doc.forms.fill`,
-   * `not-found`, `invalid-input` for a value the field can't take,
-   * `operation-cancelled`.
+   * refuses the value. Rejects `permission-denied` for a field you may not
+   * fill in (`canFill`), `not-found`, `invalid-input` for a value the field
+   * can't take, `operation-cancelled`.
    */
   setValue(
     ref: FormFieldRef,
@@ -308,8 +314,8 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     options?: OperationOptions,
   ): Promise<FormSetValueResult>;
   /**
-   * Fill in several fields, in order; one that fails doesn't stop the rest.
-   * Rejects `permission-denied` without `doc.forms.fill`.
+   * Fill in several fields, in order; one that fails, such as a field you may
+   * not fill in, doesn't stop the rest.
    */
   setValues(
     entries: readonly { readonly ref: FormFieldRef; readonly value: FormFieldValue }[],
@@ -317,18 +323,18 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   ): Promise<BatchResult<FormFieldRef, FormFieldRef>>;
   /**
    * Fill in fields by full name from plain values (as `exportValues()` gives
-   * them). A name the form doesn't have, or a value its field can't take, is
-   * skipped; the rest still land. Rejects `permission-denied` without
-   * `doc.forms.fill`.
+   * them). A name the form doesn't have, a field you may not fill in, or a
+   * value its field can't take, is skipped; the rest still land.
    */
   importValues(
     values: Readonly<Record<string, FormPlainValue>>,
     options?: OperationOptions,
   ): Promise<BatchResult<FormFieldRef, string>>;
   /**
-   * Put back each field's default, for the whole form or the fields you
-   * pass, then run the form's calculations. Fires `onValueChanged` per
-   * changed field. Rejects `permission-denied` without `doc.forms.fill`.
+   * Put back each field's default, for the fields you pass, or every field
+   * you may fill in, then run the form's calculations. Fires
+   * `onValueChanged` per changed field. Rejects `permission-denied` when you
+   * pass a field you may not fill in.
    */
   reset(refs?: readonly FormFieldRef[], options?: OperationOptions): Promise<FormResetResult>;
   /** Do what a click on a widget does, such as running a button's action. Rejects `not-found` for a widget of no field. */
@@ -421,8 +427,12 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   // ── permissions ──
   /** Whether reading the form is allowed: `doc.forms.read`. */
   canRead(): boolean;
-  /** Whether filling it in is allowed: `doc.forms.fill`. */
-  canFill(): boolean;
+  /**
+   * Whether filling in this field is allowed: `doc.forms.fill`, or a
+   * `fields:fill` permission for the field's group. `false` for a field the
+   * form doesn't have.
+   */
+  canFill(field: FormFieldRef): boolean;
   /** Whether adding, changing and removing fields is allowed: `doc.forms.modify`. */
   canDesign(): boolean;
   /**

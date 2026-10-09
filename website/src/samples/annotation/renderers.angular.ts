@@ -68,7 +68,7 @@ const ebook = async (): Promise<OpenInput> => {
       </div>
       <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer>
             @if (mine()) {
               <!-- A note drawn as your app's comment bubble, the author's initials in it. It

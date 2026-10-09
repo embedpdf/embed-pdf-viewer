@@ -113,7 +113,7 @@ export function SignDialog() {
           >
             {t('demo.cancel')}
           </button>
-          {signature.canFill() ? (
+          {signature.canFill(field) ? (
             <button
               type="button"
               disabled={busy != null}
@@ -123,7 +123,7 @@ export function SignDialog() {
               {t('demo.signFill')}
             </button>
           ) : null}
-          {signature.canSign() ? (
+          {signature.canSign(field) ? (
             <button
               type="button"
               disabled={busy != null}

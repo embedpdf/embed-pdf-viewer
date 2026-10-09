@@ -29,9 +29,16 @@ import type { PageViewDemand, TilePaintSource } from '@embedpdf/plugin-render/co
 import { RenderToken as RenderPublicToken } from '@embedpdf/plugin-render';
 import type { RenderCapability } from '@embedpdf/plugin-render';
 import type { EventHook } from '@embedpdf/core';
-import { bindPaintedImage } from '@embedpdf/web';
+import {
+  bindPaintedImage,
+  pageLayersOf,
+  partsDrawnTwice,
+  pictureLayerOptionsOf,
+  type PicturePartProps,
+} from '@embedpdf/web';
+import { devWarn } from './dev';
+import { usePaintedParts } from './page-layers';
 import { useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
-import { usePageLayerFact } from './dev-registry';
 import { settingsHook } from './state';
 
 /** The render capability (renderPage / renderThumbnail / invalidation / settings) for app code. */
@@ -52,10 +59,13 @@ export function useRenderEvent<T>(
 
 export interface RenderLayerProps {
   /**
-   * Bake annotations into the page bitmap (default true). Pass false when an
-   * <AnnotationLayer> owns annotation rendering, so they aren't drawn twice.
+   * Draw the annotations into the page's picture (`true`) or leave them out
+   * (`false`). Left unset, the picture leaves them to an `<AnnotationLayer>`
+   * on the page, and otherwise draws them when the user may read them.
    */
   annotations?: boolean;
+  /** The same for the form fields, which a `<FormLayer>` paints. */
+  formFields?: boolean;
   /**
    * Mount the tile plane (default true). Whether it spends anything is
    * demand arithmetic — leave it on; pass false only for a lens that must
@@ -66,27 +76,38 @@ export interface RenderLayerProps {
 
 let warnedTileSize = false;
 
-export function RenderLayer({ annotations = true, tiles = true }: RenderLayerProps = {}) {
+export function RenderLayer({ annotations, formFields, tiles = true }: RenderLayerProps = {}) {
   const page = usePage();
   const render = useCapability(RenderToken);
   // The same object until a setting it reads changes, so a settings change re-renders the layer.
   const settings = useSelector(RenderToken, (render) => render.getPaintSettings());
   const ref = useRef<HTMLImageElement>(null);
-  usePageLayerFact(page, 'renderBakesAnnotations', annotations);
+  const parts: PicturePartProps = { annotations, formFields };
+  const painted = usePaintedParts(page.ref);
+  const may = useSelector(RenderToken, (render) => render.getLayerRights());
+  const layers = pictureLayerOptionsOf(painted, parts, may);
+  if (partsDrawnTwice(painted, parts).length > 0) {
+    devWarn(
+      'render-layer-draws-what-a-layer-paints',
+      '<RenderLayer annotations> or <RenderLayer formFields> draws what an <AnnotationLayer> or a ' +
+        '<FormLayer> on the page paints too, so it shows twice. Leave the prop out: the picture ' +
+        'leaves out what a layer paints.',
+    );
+  }
 
   // One dependency: the raster's canonical identity — conformed width +
-  // annotations flag + epoch. Under a lattice it moves only at rung
+  // the parts it draws + epoch. Under a lattice it moves only at rung
   // crossings; under exact mode it tracks the demand and is constant above
   // the budget — so the deep-zoom backdrop never refetches, and the sub-
   // budget range refetches once per settled demand.
   const sourceKey = useSelector(RenderToken, (render) =>
-    render.getSourceKey(page.ref, {
-      scale: page.transform.renderScale,
-      includeAnnotations: annotations,
-    }),
+    render.getSourceKey(page.ref, { scale: page.transform.renderScale, ...layers }),
   );
 
   useEffect(() => {
+    // A layer that paints part of the page arrived in this commit, after this
+    // render read the page's layers: the render it causes fetches instead.
+    if (pageLayersOf(page.ref).painted() !== painted) return;
     const controller = new AbortController();
     let revoke: (() => void) | undefined;
     (async () => {
@@ -97,7 +118,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
         // produces this key's canonical request.
         const image = await render.renderSource(page.ref, {
           scale: page.transform.renderScale,
-          includeAnnotations: annotations,
+          ...layers,
           view: page.view,
           signal: controller.signal,
         });
@@ -120,8 +141,9 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
       revoke?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sourceKey is the
-    // render identity; scale/annotations/epoch are folded into it upstream.
-  }, [render, page.ref, sourceKey]);
+    // render identity; scale/parts/epoch are folded into it upstream. `painted`
+    // runs the fetch skipped above even when the key comes out the same.
+  }, [render, page.ref, sourceKey, painted]);
 
   return (
     <>
@@ -137,9 +159,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
           pointerEvents: 'none',
         }}
       />
-      {tiles && settings.tiles ? (
-        <TilePlane annotations={annotations} fadeMs={settings.fadeMs} />
-      ) : null}
+      {tiles && settings.tiles ? <TilePlane parts={parts} fadeMs={settings.fadeMs} /> : null}
     </>
   );
 }
@@ -157,7 +177,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
  * seams and per-zoom-step letter shifts that grow with depth. In view
  * space the same quantization is a fixed ~1/64 CSS px at every zoom.
  */
-function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: number }) {
+function TilePlane({ parts, fadeMs }: { parts: PicturePartProps; fadeMs: number }) {
   const page = usePage();
   const render = useCapability(RenderToken);
   // Demand: the host's live camera view (Stage) or whole-page (PageView).
@@ -174,9 +194,13 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
   useEffect(() => () => view.dispose(), [view]);
   // Demand in, plan out: setting the demand is the one call that schedules
   // fetches (and re-plans); the read below is pure. Layout-timed so a camera
-  // move re-plans before the browser paints this commit.
+  // move re-plans before the browser paints this commit. The page's layers
+  // are read now, not at render: one mounted in this commit has said what it
+  // paints by the time layout effects run.
   useLayoutEffect(() => {
-    view.setDemand(page.ref, demand, { includeAnnotations: annotations });
+    const painted = pageLayersOf(page.ref).painted();
+    const layers = pictureLayerOptionsOf(painted, parts, render.getLayerRights());
+    view.setDemand(page.ref, demand, layers);
   });
   const plan = useSelector(RenderToken, () => view.getPlan(page.ref));
   // View unmounted its plane: stop in-flight fetches; resolved bytes stay cached.

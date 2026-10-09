@@ -1,10 +1,10 @@
 /**
- * The built-in event → pixels map: which pages' rasters a confirmed fact
- * repaints, and at which scope. `annotations` scope repaints the annotated
- * rasters only; `content` scope repaints the page content as well (a
- * redaction or a flatten rewrites the content stream). Over-invalidation is
- * acceptable (a z-order move that changes nothing repaints one thumbnail);
- * under-invalidation is the bug.
+ * The built-in event → pixels map: which pages' pictures a confirmed fact
+ * repaints, and at which scope. `annotations` scope repaints the pictures
+ * that draw annotations, `fields` the ones that draw form fields, and
+ * `content` every picture (a redaction or a flatten rewrites the content
+ * stream). Over-invalidation is acceptable (a z-order move that changes
+ * nothing repaints one thumbnail); under-invalidation is the bug.
  *
  * The map ignores origin: a baked raster is stale whether this session moved
  * the highlight or a collaborator did. Events fire only for confirmed
@@ -23,11 +23,25 @@ export interface PixelChange {
 const placedPages = (widgets: ReadonlyArray<{ page: PageRef | null }>): PageObjectNumber[] =>
   widgets.flatMap((widget) => (widget.page ? [widget.page.objectNumber] : []));
 
-const annotations = (pages: readonly PageObjectNumber[]): PixelChange | null =>
-  pages.length ? { pages, scope: 'annotations' } : null;
+const changeOf = (
+  pages: readonly PageObjectNumber[],
+  scope: InvalidateScope,
+): PixelChange | null => (pages.length ? { pages: [...new Set(pages)], scope } : null);
 
-const content = (pages: readonly PageObjectNumber[]): PixelChange | null =>
-  pages.length ? { pages, scope: 'content' } : null;
+/**
+ * The pages a form fact repaints. Every form fact names the widgets whose
+ * look changed or that went (`meta.changedWidgets`), each with its page; the
+ * widget rows it carries, and a deleted widget's page, are counted too. An
+ * unplaced widget (`page: null`) has no pixels to repaint.
+ */
+function formPagesOf(
+  event: Extract<DocumentEvent, { meta: { changedWidgets: unknown } }>,
+): PageObjectNumber[] {
+  const pages = placedPages(event.meta.changedWidgets);
+  if ('widgets' in event) pages.push(...placedPages(event.widgets));
+  if ('page' in event && event.page) pages.push(event.page.objectNumber);
+  return pages;
+}
 
 export function pixelChangeOf(
   event: DocumentEvent,
@@ -37,46 +51,54 @@ export function pixelChangeOf(
     case 'annotations.created':
     case 'annotations.updated':
     case 'annotations.deleted':
-    case 'annotations.moved': // z-order move: baked stacking can change
-      return annotations([event.page.objectNumber]);
-    // A field's widgets can live on several pages; `meta.changedWidgets`
-    // names exactly the widgets whose appearance changed, each with its page.
-    // An unplaced widget (`page: null`) has no pixels to repaint.
+    case 'annotations.restored':
+    case 'annotations.reordered': // z-order: baked stacking can change
+      return changeOf([event.page.objectNumber], 'annotations');
     case 'forms.valueSet':
     case 'forms.effectsApplied':
-    case 'forms.deleted':
-      return annotations(placedPages(event.meta.changedWidgets));
     case 'forms.created':
     case 'forms.updated':
+    case 'forms.deleted':
+    case 'forms.restored':
     case 'forms.widgetAdded':
     case 'forms.widgetRemoved':
-      return annotations(placedPages(event.field.widgets));
+    case 'forms.widgetDeleted':
+    case 'forms.widgetRestored':
+    case 'forms.widgetUpdated':
+    case 'forms.widgetsReordered':
+      return changeOf(formPagesOf(event), 'fields');
     // A coarse result (counts only, no per-widget detail): repaint every page.
     case 'forms.repaired':
-      return annotations(allPageObjectNumbers());
+      return changeOf(allPageObjectNumbers(), 'fields');
     // Sealing bakes the signature into its widget's appearance.
     case 'signatures.completed':
-      return annotations(event.signature.widget ? placedPages([event.signature.widget]) : []);
+      return changeOf(
+        event.signature.widget ? placedPages([event.signature.widget]) : [],
+        'fields',
+      );
     // These rewrite the page content itself.
     case 'redaction.applied':
     case 'pages.flattened':
-      return content(
+      return changeOf(
         event.results
           .filter((result) => result.status === 'applied')
           .map((result) => result.page.objectNumber),
+        'content',
       );
     case 'annotations.flattened':
-      return content(
+      return changeOf(
         event.results.some((result) => result.status === 'applied')
           ? [event.page.objectNumber]
           : [],
+        'content',
       );
     // The stream lost events that will never arrive: any page may be stale.
     case 'stream.desynced':
-      return content(allPageObjectNumbers());
+      return changeOf(allPageObjectNumbers(), 'content');
     // pages.* replace the page registry: the kernel's `revision` bump already
     // re-keys every layout, and metadata never touches pixels. A new saved
-    // version changes no pixels beyond the signature it seals.
+    // version changes no pixels beyond the signature it seals. The
+    // calculation order changes no pixels.
     default:
       return null;
   }

@@ -231,15 +231,15 @@ for (const signature of signatures) {
 }
 ```
 
-| Field       | What it is                                                                                          |
-| :---------- | :-------------------------------------------------------------------------------------------------- |
-| `field`     | The signature field's ref. Pass it to `sign()` and `prepare()`.                                     |
-| `fieldName` | The field's full name.                                                                              |
-| `signed`    | Whether the field holds a signature.                                                                |
-| `signer`    | What the signer wrote: `name`, `reason`, `location`, `contactInfo` and `signedAt`.                  |
-| `kind`      | `'signature'`, or `'timestamp'` for a document timestamp.                                           |
-| `docMdp`    | The [certification](#certify-a-document) level the signature declares (`1`, `2` or `3`), or `null`. |
-| `widget`    | The field's widget, with its `page`, `rect` and `ref`, or `null` when the field has none.           |
+| Field       | What it is                                                                                                                         |
+| :---------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `field`     | The signature field's ref. Pass it to `sign()` and `prepare()`.                                                                    |
+| `fieldName` | The field's full name.                                                                                                             |
+| `signed`    | Whether the field holds a signature.                                                                                               |
+| `signer`    | What the signer wrote: `name`, `reason`, `location`, `contactInfo` and `signedAt`.                                                 |
+| `kind`      | `'signature'`, or `'timestamp'` for a document timestamp.                                                                          |
+| `docMdp`    | The [certification](#certify-a-document) level the signature declares (`1`, `2` or `3`), or `null`.                                |
+| `widget`    | The field's widget, with its `page` and `ref`, or `null` when the field has none. Where it shows is its row in `doc.forms.list()`. |
 
 The `signer` fields are claims, the same ones you pass when you sign: anyone can write any name.
 Who really signed is in the signature's certificate, which

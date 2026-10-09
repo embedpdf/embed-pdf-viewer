@@ -177,9 +177,9 @@ is the API.
    selector, never once at setup, so it follows the page's geometry; place things in view space
    with `page.value.transform` (`pageToViewRect`, `viewScale`), and remember Vue doesn't add
    `px` to numbers in `:style`. Work with the DOM in a `watch` with `flush: 'post'` and clean up
-   with `onCleanup`. A layer that must know its neighbours publishes a fact with
-   `usePageLayerFact(page, …)` (see `src/dev-registry.ts`). `RenderLayer.vue` is the example to
-   copy.
+   with `onCleanup`. A layer that paints a part of the page itself (the annotations, the form
+   fields) says so with `usePaintsPagePart` (`src/page-layers.ts`), and `<RenderLayer>` leaves that
+   part out of the page's picture. `RenderLayer.vue` is the example to copy.
 
 8. **UI that floats over a page** goes in the Stage's `#overlay` slot and positions with
    `<Anchored :anchor>`; a component of yours that needs the projection reads

@@ -292,7 +292,7 @@ describe('widget /AA events (Phase 2/3 — the DOM-event feed, full ISO)', () =>
       'doc.forms.read',
       'doc.annotate.read',
     ]);
-    expect(harness.form.canFill()).toBe(false); // the scope really is narrowed
+    expect(harness.form.canFill({ kind: 'fqn', name: 'tip' })).toBe(false); // the scope really is narrowed
     const tipId = harness.widgetId('tip');
     expect(harness.paintedIds()).not.toContain(tipId);
 

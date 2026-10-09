@@ -2,8 +2,9 @@
  * The form layer and the form service against a real kernel and the real engine (the forms are
  * the engine's): a text box fills in on blur and a checkbox on a click, a field without a border
  * gets the settings' edge, a press on a field stays out of the page below and still reaches the
- * field's PDF "mouse down" action, a click on a read-only "button" runs its action, and the
- * service's `valueOf()` and `controlOf()` follow one field both ways.
+ * field's PDF "mouse down" action, a click on a read-only "button" runs its action, with the
+ * render plugin each field's picture shows the state it's in, and the service's `valueOf()` and
+ * `controlOf()` follow one field both ways.
  */
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -12,12 +13,14 @@ import { Component, inject, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Engine, PageRef } from '@embedpdf/core';
+import { annotationKey, type Engine, type PageRef } from '@embedpdf/core';
 import { pageTransform } from '@embedpdf/core-geometry';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin, ActionsToken, type ActionExecutedEvent } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
+import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
+import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
 import {
   createPageContext,
   EPDF_PAGE,
@@ -25,6 +28,7 @@ import {
   type EmbedPdfFeature,
 } from '@embedpdf/angular/runtime';
 import { withInteraction } from '@embedpdf/angular/interaction';
+import { withRender } from '@embedpdf/angular/render';
 import { EpdfForm, EpdfFormLayer, FormToken, toFieldRef, withForm } from '@embedpdf/angular/form';
 import { EpdfSignature, withSignature } from '@embedpdf/angular/signature';
 import { kernelOf, mount, viewerHost } from './fixtures';
@@ -187,6 +191,80 @@ describe('<epdf-form-layer> over fields made from code', () => {
         (node) => node.componentInstance instanceof FormPage,
       );
       expect((shell.componentInstance as FormPage).presses).toBe(0);
+    },
+  );
+});
+
+/**
+ * With the render plugin, the layer paints each field as the engine draws it: one picture per
+ * widget, the one of the state it shows. The engine encodes pictures with a 2D canvas, which
+ * happy-dom doesn't have, so the render plugin's pictures are stand-ins here: a URL naming widget
+ * and state.
+ */
+describe('<epdf-form-layer> field pictures', () => {
+  it(
+    'paints each field, and a checkbox its new state once it changes',
+    { timeout: 45_000 },
+    async () => {
+      const { fixture, form } = await openForm('hello_world.pdf', 'blank', [
+        withInteraction(),
+        withRender(),
+        withForm(),
+      ]);
+      const page = kernelOf(fixture).documents.getPage(0, 'blank')!.ref;
+      await form.create({
+        family: 'text',
+        name: 'name',
+        widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+      });
+      await form.create({
+        family: 'checkbox',
+        name: 'agree',
+        widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
+      });
+      const [text, check] = kernelOf(fixture).capability(FormHostToken).listShownWidgets(page);
+      const checkBox = { x: 72, y: 140, width: 14, height: 14 };
+      const picture = (widget: AnnotationRef, state: string | null, rect: typeof checkBox) => ({
+        ref: widget,
+        mode: 'normal' as const,
+        state,
+        rect,
+        image: {
+          objectUrl: () => ({
+            abortWith: async () => ({
+              url: `blob:${annotationKey(widget)}:${state}`,
+              revoke: () => {},
+            }),
+          }),
+        },
+      });
+      vi.spyOn(
+        kernelOf(fixture).capability(RenderHostToken),
+        'renderFieldAppearances',
+      ).mockResolvedValue([
+        picture(text!.ref, null, { x: 72, y: 100, width: 160, height: 20 }),
+        picture(check!.ref, 'Off', checkBox),
+        picture(check!.ref, 'Yes', checkBox),
+      ] as never);
+      await showPage(fixture, 'blank', page);
+
+      const images = () => [...element(fixture).querySelectorAll('epdf-field-pictures img')];
+      const pictures = () => images().map((image) => image.getAttribute('src'));
+      await vi.waitFor(async () => {
+        await fixture.whenStable();
+        expect(pictures()).toHaveLength(2);
+      });
+      const checkKey = annotationKey(check!.ref);
+      expect(pictures()).toEqual([`blob:${annotationKey(text!.ref)}:null`, `blob:${checkKey}:Off`]);
+      // Placed by the box the engine drew it into, in page pixels.
+      expect((images()[1] as HTMLElement).style.top).toBe('140px');
+
+      element(fixture).querySelector<HTMLElement>('[role="checkbox"][aria-label="agree"]')!.click();
+      await vi.waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
+      await vi.waitFor(async () => {
+        await fixture.whenStable();
+        expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`);
+      });
     },
   );
 });

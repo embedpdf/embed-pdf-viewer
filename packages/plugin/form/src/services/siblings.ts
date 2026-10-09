@@ -7,7 +7,7 @@ import type { FormContext } from './context';
 
 export function resolveSiblings(ctx: FormContext) {
   return {
-    /** The widget plane: geometry, live boxes, page reloads after structural writes. */
+    /** The annotation plugin: design mode's selection, tools, ghosts and placement previews. */
     annotation: ctx.tryGet(AnnotationHostToken),
     /** The script realm owner and the one surface port for script results. */
     actions: ctx.tryGet(ActionsHostToken),

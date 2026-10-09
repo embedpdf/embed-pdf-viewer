@@ -16,7 +16,9 @@ put `<FormLayer>` in each page, and people can fill them in:
 
 Each field becomes a real HTML control, placed and styled like the field in the PDF: people type in text
 boxes, tick checkboxes, pick from lists, and move between fields with Tab. A value is saved into the
-document as it's entered, so it's there when the PDF is downloaded, and every PDF app shows it.
+document as it's entered, so it's there when the PDF is downloaded, and every PDF app shows it. The
+form layer paints the fields as the engine draws them, so while it's on the page, the render layer
+leaves them out of the page picture.
 
 ## Read the form
 
@@ -92,7 +94,7 @@ if (widget) stage.reveal(widget.page, { rect: widget.rect });
 ```
 
 `missing` lists the required fields that are empty, in page order, so you can take the user to the
-first one.
+first one. Only the fields the user may fill in count: another signer's are theirs to fill.
 
 <Example name="form/validate" />
 
@@ -109,7 +111,7 @@ When a script refuses a value, such as a date in the wrong format, the field kee
 ## Reset the form
 
 ```ts
-await form.reset(); // every field, back to its default
+await form.reset(); // every field the user may fill in, back to its default
 await form.reset([name.ref, email.ref]); // some fields
 ```
 
@@ -163,12 +165,12 @@ on [Building forms](forms/building#methods).
 | `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |
 | `export(selection?)`       | Whole fields with their boxes, values and scripts, as a bundle: every field, or `{ fields }` or `{ pages }`. [Move form data in and out](#move-form-data-in-and-out) |
 | `import(bundle, options?)` | Adds a bundle's fields, as one change. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
-| `reset(refs?)`             | Puts back each field's default, for the whole form or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
-| `validate()`               | Checks the required fields. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields)        |
+| `reset(refs?)`             | Puts back each field's default, for every field the user may fill in or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
+| `validate()`               | Checks the required fields the user may fill in. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields) |
 | `activateWidget(widget)`   | Does what a click on a field box does, such as running a button's action                                                                       |
 | `getSnapshot()`            | Everything at once, as the engine's `list()` returns it: `fields`, `widgets`, `formKind`, `needsAppearances` and `calculationOrder`             |
 | `refresh()`                | Reads the whole form again, and <Fw only={['react', 'vue', 'svelte']}>`onResynced`</Fw><Fw only="angular">`resynced$`</Fw> fires. You rarely need it: the plugin follows every change, whoever made it.                      |
-| `canRead()`, `canFill()`   | Whether reading the form, and filling it in, are allowed. [Permissions](#permissions)                                                         |
+| `canRead()`, `canFill(ref)` | Whether reading the form, and filling in a field, are allowed. [Permissions](#permissions)                                                   |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useFormSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
@@ -224,12 +226,15 @@ Fields that are added, changed or removed have their own events; see
 
 ## Permissions
 
-| Permission       | What it allows            | Check              |
-| :--------------- | :------------------------ | :----------------- |
-| `doc.forms.read` | Reading the form          | `form.canRead()`   |
-| `doc.forms.fill` | Filling it in             | `form.canFill()`   |
+| Permission       | What it allows   | Check               |
+| :--------------- | :--------------- | :------------------ |
+| `doc.forms.read` | Reading the form | `form.canRead()`    |
+| `doc.forms.fill` | Filling it in    | `form.canFill(ref)` |
 
-Without `doc.forms.fill`, the fields show their values but can't be changed.
+Without it, the fields show their values but can't be changed. A user with a `fields:fill`
+permission for one group fills in that group's fields only: `form.canFill(ref)` answers per field,
+the other fields can't be changed and Tab skips them, `validate()` leaves them out, and `reset()`
+leaves them as they are. See [Signers and groups](/docs/engine/forms/groups).
 
 ## Good to know
 

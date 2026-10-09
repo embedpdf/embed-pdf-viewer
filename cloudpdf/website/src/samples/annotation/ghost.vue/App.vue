@@ -41,7 +41,7 @@ const ghostOpacity = computed(() =>
       <Toolbar v-model:opacity="opacity" />
       <Stage class="stage" :style="ghostOpacity">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
         </template>
       </Stage>

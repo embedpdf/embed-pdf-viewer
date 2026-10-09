@@ -316,6 +316,22 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * `error.permission` set. Document-scoped plugins only, like `allows`.
    */
   assertAllowed(permission: Permission, operation: string): void;
+  /**
+   * Whether the session may fill in (`fill`) or sign (`sign`) this form
+   * field: a `fields:<action>` permission for its group, or `doc.forms.fill`
+   * (`doc.sign`) for every field. The same answer the engine enforces with.
+   * Document-scoped plugins only, like `allows`.
+   */
+  allowsField(action: 'fill' | 'sign', field: { readonly groupId: string | null }): boolean;
+  /**
+   * Refuse a write to a field the session may not fill in or sign: throws
+   * `permission-denied` naming what it would take (`fields:fill:group=buyer`).
+   */
+  assertAllowedField(
+    action: 'fill' | 'sign',
+    field: { readonly groupId: string | null },
+    operation: string,
+  ): void;
 
   // ── capabilities ──
   get<T>(token: CapabilityToken<T>): T;

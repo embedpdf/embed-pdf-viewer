@@ -12,7 +12,7 @@ import type { Scope } from './scope';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
 import { findPage, pageOf } from './page-of';
-import { permissionDenied, sessionAllows } from './permissions';
+import { fieldPermissionDenied, permissionDenied, sessionAllows } from './permissions';
 import type { Settings, SettingsStore } from './settings';
 import type { SettleFlush } from './settle';
 import type { SliceLease, Store } from './store';
@@ -240,6 +240,12 @@ export function createPluginContext(
     assertAllowed: (permission, operation) => {
       if (!sessionAllows(doc().security, permission)) {
         throw permissionDenied(capability, permission, operation);
+      }
+    },
+    allowsField: (action, field) => doc().security.allowsField(action, { groupId: field.groupId }),
+    assertAllowedField: (action, field, operation) => {
+      if (!doc().security.allowsField(action, { groupId: field.groupId })) {
+        throw fieldPermissionDenied(capability, action, field, operation);
       }
     },
 

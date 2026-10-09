@@ -51,6 +51,7 @@ const text = (
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,

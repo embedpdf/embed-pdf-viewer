@@ -15,9 +15,12 @@ import { initialFormState } from '../src/model';
 
 const byObjectNumber = (objectNumber: number) => ({ kind: 'objectNumber' as const, objectNumber });
 
-const field = (): FormFieldDTO => ({
-  ref: { kind: 'objectNumber', objectNumber: 5 },
-  name: 'name',
+const field = (
+  objectNumber = 5,
+  over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {},
+): FormFieldDTO => ({
+  ref: { kind: 'objectNumber', objectNumber },
+  name: `name-${objectNumber}`,
   family: 'text',
   origin: 'acroform',
   readOnly: false,
@@ -25,6 +28,7 @@ const field = (): FormFieldDTO => ({
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -33,33 +37,49 @@ const field = (): FormFieldDTO => ({
   importedBy: null,
   valueEntry: { kind: 'scalar', value: '' },
   defaultValueEntry: { kind: 'scalar', value: '' },
-  widgets: [formWidget(9, toPageRef(1))],
+  widgets: [formWidget(objectNumber + 4, toPageRef(1))],
   value: '',
   defaultValue: '',
   maxLength: null,
   multiline: false,
   password: false,
   comb: false,
+  ...over,
 });
 
-const SNAPSHOT: FormSnapshot = {
+/** The form of these fields, each with one widget on page 1. */
+const snapshotOf = (fields: readonly FormFieldDTO[]): FormSnapshot => ({
   formKind: 'acroform',
   needsAppearances: false,
-  widgets: [
-    {
-      subtype: 'widget',
-      ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 9 },
-      page: toPageRef(1),
-      rect: { x: 0, y: 0, width: 100, height: 20 },
-    } as unknown as WidgetAnnotation,
-  ],
-  fields: [field()],
+  widgets: fields.map(
+    (each, index) =>
+      ({
+        subtype: 'widget',
+        ref: {
+          kind: 'objectNumber',
+          page: toPageRef(1),
+          objectNumber: each.widgets[0]!.objectNumber,
+        },
+        page: toPageRef(1),
+        rect: { x: 0, y: index * 30, width: 100, height: 20 },
+      }) as unknown as WidgetAnnotation,
+  ),
+  fields: [...fields],
   calculationOrder: [],
-};
+});
 
-function harness(granted: readonly string[]) {
-  const list = vi.fn(async () => SNAPSHOT);
+/**
+ * A session with these permissions, as the engine answers them: a field takes
+ * a `fields:fill` (`fields:sign`) permission for its group, or
+ * `doc.forms.fill` (`doc.sign`) for every field.
+ */
+function harness(granted: readonly string[], fields: readonly FormFieldDTO[] = [field()]) {
+  const list = vi.fn(async () => snapshotOf(fields));
   const setValue = vi.fn(async () => ({ meta: { changedWidgets: [] } }));
+  const reset = vi.fn(async () => ({ fields: [] }));
+  const allowsField = (action: 'fill' | 'sign', { groupId }: { groupId: string | null }) =>
+    granted.includes(action === 'fill' ? 'doc.forms.fill' : 'doc.sign') ||
+    (groupId !== null && granted.includes(`fields:${action}:group=${groupId}`));
   const interaction = {
     registerTool: () => () => {},
     registerHandler: () => () => {},
@@ -73,20 +93,30 @@ function harness(granted: readonly string[]) {
     pages: [{ ref: toPageRef(1) }],
     capabilities: [[InteractionToken, interaction]],
     doc: {
-      forms: { list, setValue, create },
-      security: { allows: (capability: string) => granted.includes(capability) },
+      forms: { list, setValue, create, reset },
+      security: { allows: (capability: string) => granted.includes(capability), allowsField },
     } as never,
   });
-  return { capability: ctx.connect(createFormController(ctx)), list, setValue, create };
+  return { capability: ctx.connect(createFormController(ctx)), list, setValue, create, reset };
+}
+
+/** The harness with its form read. */
+async function loaded(granted: readonly string[], fields?: readonly FormFieldDTO[]) {
+  const fixture = harness(granted, fields);
+  await fixture.capability.refresh();
+  await vi.waitFor(() => expect(fixture.capability.getSnapshot()).not.toBeNull());
+  await fixture.capability.ensureLoaded(toPageRef(1));
+  return fixture;
 }
 
 const ALL = ['doc.forms.read', 'doc.forms.fill', 'doc.forms.modify'];
 
 describe('form authority twins', () => {
-  it('the three twins mirror their capabilities independently', () => {
-    const fixture = harness(['doc.forms.read', 'doc.forms.fill']);
+  it('the three twins mirror their capabilities independently', async () => {
+    const fixture = await loaded(['doc.forms.read', 'doc.forms.fill']);
     expect(fixture.capability.canRead()).toBe(true);
-    expect(fixture.capability.canFill()).toBe(true);
+    expect(fixture.capability.canFill(byObjectNumber(5))).toBe(true);
+    expect(fixture.capability.canFill(byObjectNumber(99))).toBe(false); // not in the form
     expect(fixture.capability.canDesign()).toBe(false);
   });
 
@@ -143,5 +173,45 @@ describe('form authority twins', () => {
       });
     }
     expect(fixture.create).not.toHaveBeenCalled();
+  });
+
+  describe('a signer of one group', () => {
+    const BUYER = ['doc.forms.read', 'fields:fill:group=buyer'];
+    const fields = [
+      field(5, { groupId: 'buyer', required: true }),
+      field(6, { groupId: 'seller', required: true }),
+    ];
+
+    it('may fill in the group’s fields, and the other fields render disabled', async () => {
+      const fixture = await loaded(BUYER, fields);
+      expect(fixture.capability.canFill(byObjectNumber(5))).toBe(true);
+      expect(fixture.capability.canFill(byObjectNumber(6))).toBe(false);
+      expect(fixture.capability.listWidgets(toPageRef(1)).map((item) => item.disabled)).toEqual([
+        false,
+        true,
+      ]);
+    });
+
+    it('is refused a write to another group’s field, naming what it takes', async () => {
+      const fixture = await loaded(BUYER, fields);
+      await expect(
+        fixture.capability.setValue(byObjectNumber(6), { value: 'x' }),
+      ).rejects.toMatchObject({
+        code: 'permission-denied',
+        permission: 'fields:fill:group=seller',
+      });
+      await fixture.capability.setValue(byObjectNumber(5), { value: 'x' });
+      expect(fixture.setValue).toHaveBeenCalledTimes(1);
+    });
+
+    it('validates only its own fields, and a reset puts back only those', async () => {
+      const fixture = await loaded(BUYER, fields);
+      expect(fixture.capability.validate().missing.map((each) => each.name)).toEqual(['name-5']);
+      await fixture.capability.reset();
+      expect(fixture.reset).toHaveBeenCalledWith([byObjectNumber(5)]);
+      await expect(fixture.capability.reset([byObjectNumber(6)])).rejects.toMatchObject({
+        code: 'permission-denied',
+      });
+    });
   });
 });

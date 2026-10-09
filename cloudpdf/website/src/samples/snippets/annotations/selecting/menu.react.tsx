@@ -32,7 +32,7 @@ export function Pages() {
     >
       {() => (
         <>
-          <RenderLayer annotations={false} />
+          <RenderLayer />
           <AnnotationLayer />
         </>
       )}

@@ -13,13 +13,15 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { RenderToken } from '@embedpdf/plugin-render/contract/host';
-  import { usePageLayerFact } from '../runtime/dev-registry.svelte';
+  import { partsDrawnTwice, pictureLayerOptionsOf } from '@embedpdf/web';
+  import { devWarn } from '../runtime/dev';
   import { usePage } from '../runtime/page';
+  import { usePaintedParts } from '../runtime/page-layers.svelte';
   import { useOptionalCapability, useOptionalSelector } from '../runtime/readers.svelte';
   import type { RenderLayerProps } from './props';
   import TilePlane from './TilePlane.svelte';
 
-  let { annotations = true, tiles = true }: RenderLayerProps = $props();
+  let { annotations, formFields, tiles = true }: RenderLayerProps = $props();
 
   const page = usePage();
   // The layer is a host of the render plugin: it paints conformed sources and drives a view's
@@ -31,18 +33,36 @@
     (renderer) => renderer.getPaintSettings(),
     null,
   );
-  usePageLayerFact(page, 'renderBakesAnnotations', () => annotations);
 
-  // The raster's identity: its conformed width, the annotations flag and the epoch. Under a
+  const painted = usePaintedParts(() => page.ref);
+  const may = useOptionalSelector(RenderToken, (renderer) => renderer.getLayerRights(), null);
+  const parts = $derived({ annotations, formFields });
+  /** The parts the picture draws; `null` until the page's layers have said what they paint. */
+  const layers = $derived(
+    painted.current && may.current
+      ? pictureLayerOptionsOf(painted.current, parts, may.current)
+      : null,
+  );
+  $effect(() => {
+    if (painted.current && partsDrawnTwice(painted.current, parts).length > 0) {
+      devWarn(
+        'render-layer-draws-what-a-layer-paints',
+        '<RenderLayer annotations> or <RenderLayer formFields> draws what an <AnnotationLayer> ' +
+          'or a <FormLayer> on the page paints too, so it shows twice. Leave the prop out: the ' +
+          'picture leaves out what a layer paints.',
+      );
+    }
+  });
+
+  // The raster's identity: its conformed width, the parts it draws and the epoch. Under a
   // ladder it moves only at rung crossings; on a local engine it follows the demand up to the
   // budget, so the deep-zoom backdrop never fetches again.
   const sourceKey = useOptionalSelector(
     RenderToken,
     (renderer) =>
-      renderer.getSourceKey(page.ref, {
-        scale: page.transform.renderScale,
-        includeAnnotations: annotations,
-      }),
+      layers
+        ? renderer.getSourceKey(page.ref, { scale: page.transform.renderScale, ...layers })
+        : null,
     null,
   );
 
@@ -52,13 +72,14 @@
     const renderer = render.current;
     const key = sourceKey.current;
     const ref = page.ref;
-    if (!renderer || key === null) return;
+    const drawn = layers;
+    if (!renderer || key === null || !drawn) return;
     const controller = new AbortController();
     let revoke: (() => void) | undefined;
     // Any scale that maps to this key gives this key's request: the plugin conforms it.
     const options = untrack(() => ({
       scale: page.transform.renderScale,
-      includeAnnotations: annotations,
+      ...drawn,
       view: page.view,
     }));
     void (async () => {
@@ -90,6 +111,6 @@
   draggable="false"
   style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none"
 />
-{#if tiles && settings.current?.tiles}
-  <TilePlane {annotations} fadeMs={settings.current.fadeMs} />
+{#if tiles && settings.current?.tiles && layers}
+  <TilePlane {layers} fadeMs={settings.current.fadeMs} />
 {/if}

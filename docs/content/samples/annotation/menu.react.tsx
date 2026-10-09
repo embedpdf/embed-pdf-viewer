@@ -103,7 +103,7 @@ export default function App() {
         >
           {() => (
             <>
-              <RenderLayer annotations={false} />
+              <RenderLayer />
               <AnnotationLayer />
             </>
           )}

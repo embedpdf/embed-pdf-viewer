@@ -25,7 +25,7 @@ export function createServices(ctx: SignatureContext): SignatureServices {
   return {
     events: createEvents(ctx),
     store: createStore(ctx),
-    authority: createAuthority(ctx),
+    authority: createAuthority(ctx, siblings),
     siblings,
     marks: createMarks(siblings),
   };

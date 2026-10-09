@@ -25,7 +25,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
       <p class="hint">Sign a stamp off, then move it: its status goes with it.</p>
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
         </template>
         <template #overlay><Approvals /></template>

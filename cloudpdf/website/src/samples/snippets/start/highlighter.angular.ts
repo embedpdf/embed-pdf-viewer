@@ -37,7 +37,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 
     <epdf-stage *epdfDocumentGate style="height: 500px">
       <ng-template epdfPage>
-        <epdf-render-layer [annotations]="false" />
+        <epdf-render-layer />
         <epdf-selection-layer />
         <epdf-annotation-layer />
       </ng-template>

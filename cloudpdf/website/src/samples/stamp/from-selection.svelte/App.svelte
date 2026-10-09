@@ -33,7 +33,7 @@ import { localEngine } from '@embedpdf/engine';
     <DrawSeal />
     <MakeStamp />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
     </Stage>
   </DocumentGate>

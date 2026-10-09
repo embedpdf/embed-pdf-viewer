@@ -26,19 +26,20 @@ const tile = {
 const task = <T>(value: T) => Object.assign(Promise.resolve(value), { abortWith: () => Promise.resolve(value) });
 
 export function fakeRender() {
-  /** Every demand the plane sends: the page and how wide it wants it. */
-  const demands: { page: number; width: number; visible?: string }[] = [];
+  /** Every demand the plane sends: the page, how wide it wants it, and the parts it draws. */
+  const demands: { page: number; width: number; visible?: string; parts?: object }[] = [];
   let plan: TilePaintPlan = { engaged: true, paint: [tile], fetching: [], stamp: 'one' };
   /** Plan again: the same tile, with the same picture, as a new object (as the plugin hands it). */
   const replan = () => {
     plan = { ...plan, paint: plan.paint.map((source) => ({ ...source })) };
   };
   const view: ViewDemand = {
-    setDemand: (page, demand) =>
+    setDemand: (page, demand, parts) =>
       demands.push({
         page: page.objectNumber,
         width: demand.desiredDeviceWidth,
         visible: demand.visibleRect && JSON.stringify(demand.visibleRect),
+        parts,
       }),
     getPlan: () => plan, // the same plan until it changes, as the plugin's
     markPainted: () => {},
@@ -48,9 +49,11 @@ export function fakeRender() {
   };
   const createViewDemand = vi.fn(() => view);
   const paint = { fadeMs: 0, tiles: true };
+  const rights = { annotations: true, formFields: true };
   const keyOf = (page: PageRef) => `page-${page.objectNumber}`;
   const api = {
     getPaintSettings: () => paint,
+    getLayerRights: () => rights,
     getSourceKey: (page: PageRef) => keyOf(page),
     renderSource: (page: PageRef) =>
       Promise.resolve({ objectUrl: () => task({ url: `blob:${keyOf(page)}`, revoke: () => {} }) }),

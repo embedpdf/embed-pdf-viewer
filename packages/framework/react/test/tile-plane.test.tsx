@@ -7,13 +7,15 @@ import type { AnyPlugin, CapabilityToken, DocumentHandle, Engine, PageRef } from
 import { RenderToken } from '@embedpdf/plugin-render';
 import type {
   RenderHostCapability,
+  RenderSourceOptions,
   TilePaintPlan,
   ViewDemand,
 } from '@embedpdf/plugin-render/contract/host';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { PageView } from '../src/page-view';
+import { usePaintsPagePart } from '../src/page-layers';
 import { RenderLayer } from '../src/render';
-import { DocumentGate } from '../src/runtime';
+import { DocumentGate, usePage } from '../src/runtime';
 import { Stage, StageToken, stagePlugin } from '../src/stage';
 import { bytesInput, viewerWith } from './counter-plugin';
 
@@ -37,19 +39,22 @@ const tile = {
 
 /** A render plugin whose view's handle records what the tile plane does with it. */
 function fakeRender() {
-  /** Every demand the plane sends: the page and how wide it wants it. */
-  const demands: { page: number; width: number; visible?: string }[] = [];
+  /** Every demand the plane sends: the page, how wide it wants it, and the parts it draws. */
+  const demands: { page: number; width: number; visible?: string; parts?: object }[] = [];
+  /** The parts every whole-page picture is asked with. */
+  const sources: object[] = [];
   let plan: TilePaintPlan = { engaged: true, paint: [tile], fetching: [], stamp: 'one' };
   /** Plan again: the same tile, with the same picture, as a new object (as the plugin hands it). */
   const replan = () => {
     plan = { ...plan, paint: plan.paint.map((source) => ({ ...source })) };
   };
   const view: ViewDemand = {
-    setDemand: (page, demand) =>
+    setDemand: (page, demand, parts) =>
       demands.push({
         page: page.objectNumber,
         width: demand.desiredDeviceWidth,
         visible: demand.visibleRect && JSON.stringify(demand.visibleRect),
+        parts,
       }),
     getPlan: () => plan, // the same plan until it changes, as the plugin's
     markPainted: () => {},
@@ -59,16 +64,28 @@ function fakeRender() {
   };
   const createViewDemand = vi.fn(() => view);
   const paint = { fadeMs: 0, tiles: true };
+  const rights = { annotations: true, formFields: true };
   const api = {
     getPaintSettings: () => paint,
+    getLayerRights: () => rights,
     getSourceKey: (page: PageRef) => `page-${page.objectNumber}`,
-    renderSource: (page: PageRef) =>
-      Promise.resolve({
+    renderSource: (
+      page: PageRef,
+      {
+        scale: _scale,
+        view: _view,
+        signal: _signal,
+        ...parts
+      }: RenderSourceOptions & { signal?: AbortSignal },
+    ) => {
+      sources.push(parts);
+      return Promise.resolve({
         objectUrl: () => ({
           abortWith: () =>
             Promise.resolve({ url: `blob:page-${page.objectNumber}`, revoke: () => {} }),
         }),
-      }),
+      });
+    },
     createViewDemand,
   } as unknown as RenderHostCapability;
   const plugin: AnyPlugin = {
@@ -80,7 +97,7 @@ function fakeRender() {
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
     (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls.length;
-  return { plugin, demands, view, createViewDemand, replan, pictureAsks };
+  return { plugin, demands, sources, view, createViewDemand, replan, pictureAsks };
 }
 
 const box = { x: 0, y: 0, width: 600, height: 800 };
@@ -196,5 +213,83 @@ describe('the tile plane', () => {
     act(() => rerender(null));
     expect(render.view.release).toHaveBeenLastCalledWith(toPageRef(2));
     expect(render.view.dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** A layer that paints the page's annotations itself, as `<AnnotationLayer>` does. */
+function AnnotationPainter() {
+  usePaintsPagePart(usePage().ref, 'annotations');
+  return null;
+}
+
+describe('the parts the page picture draws', () => {
+  it('leaves out what a layer mounted alongside paints, from the first request, and draws the rest', async () => {
+    const render = fakeRender();
+    const { kernel } = await viewerWith(
+      [stagePlugin(), render.plugin],
+      <DocumentGate>
+        <Stage>
+          {() => (
+            <>
+              <RenderLayer />
+              <AnnotationPainter />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>,
+      engineWith(1),
+    );
+    await act(() => kernel.documents.open(bytesInput('a')));
+    const stage = kernel.capability(StageToken as unknown as CapabilityToken<StageHostCapability>);
+    act(() => stage.setViewportSize({ width: 800, height: 600 }));
+    await waitFor(() => expect(render.sources.length).toBeGreaterThan(0));
+
+    const rest = { includeAnnotations: false, includeFormFields: true };
+    expect(render.sources).toEqual(render.sources.map(() => rest));
+    expect(render.demands.map((demand) => demand.parts)).toEqual(render.demands.map(() => rest));
+  });
+
+  it('lets the props decide', async () => {
+    const render = fakeRender();
+    const { kernel } = await viewerWith(
+      [stagePlugin(), render.plugin],
+      <DocumentGate>
+        <Stage>
+          {() => (
+            <>
+              <RenderLayer formFields={false} />
+              <AnnotationPainter />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>,
+      engineWith(1),
+    );
+    await act(() => kernel.documents.open(bytesInput('a')));
+    const stage = kernel.capability(StageToken as unknown as CapabilityToken<StageHostCapability>);
+    act(() => stage.setViewportSize({ width: 800, height: 600 }));
+    await waitFor(() => expect(render.sources.length).toBeGreaterThan(0));
+
+    expect(render.sources.at(-1)).toEqual({ includeAnnotations: false, includeFormFields: false });
+  });
+
+  it('draws a part again once the layer that painted it goes', async () => {
+    const render = fakeRender();
+    const shown = (painter: boolean) => (
+      <PageView page={0} width={300}>
+        <RenderLayer />
+        {painter ? <AnnotationPainter /> : null}
+      </PageView>
+    );
+    const { kernel, rerender } = await viewerWith([render.plugin], shown(true), engineWith(1));
+    await act(() => kernel.documents.open(bytesInput('a')));
+    await waitFor(() => expect(render.sources.length).toBeGreaterThan(0));
+    expect(render.sources.at(-1)).toEqual({ includeAnnotations: false, includeFormFields: true });
+
+    act(() => rerender(shown(false)));
+
+    const everything = { includeAnnotations: true, includeFormFields: true };
+    await waitFor(() => expect(render.sources.at(-1)).toEqual(everything));
+    expect(render.demands.at(-1)!.parts).toEqual(everything);
   });
 });

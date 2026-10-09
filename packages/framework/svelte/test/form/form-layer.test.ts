@@ -6,25 +6,28 @@ import { flushSync } from 'svelte';
 import { fireEvent, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import { pageTransform } from '@embedpdf/core-geometry';
-import type { Engine, PageRef } from '@embedpdf/core';
+import { annotationKey, type Engine, type PageRef } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin, ActionsToken } from '@embedpdf/plugin-actions';
 import type { ActionExecutedEvent } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
+import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
+import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
 import { FormToken, formPlugin, toFieldRef } from '../../src/form';
 import { interactionPlugin } from '../../src/interaction';
+import { renderPlugin } from '../../src/render';
 import { makePageContext, type PageContextValue } from '../../src/runtime';
 import FormHarness from '../fixtures/FormHarness.svelte';
 import { signal } from '../fixtures/signal.svelte';
 import { viewerWith } from '../fixtures/viewer';
 
 /**
- * `<FormLayer>` over a real kernel and engine. Without the annotation plugin the field's picture
- * comes from the page raster, and the layer puts a real control over each field box, in the
- * colors of the form settings: typing commits on blur, a click toggles, and a press stops at the
- * box yet still reaches the field's "mouse down" action. A click on a widget runs its `/A`
- * action, the read-only "fake button" too.
+ * `<FormLayer>` over a real kernel and engine, without the annotation plugin: the layer puts a
+ * real control over each field box, in the colors of the form settings: typing commits on blur, a
+ * click toggles, and a press stops at the box yet still reaches the field's "mouse down" action. A
+ * click on a widget runs its `/A` action, the read-only "fake button" too. With the render plugin
+ * it paints each field's picture.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -242,6 +245,92 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
       } finally {
         view.unmount();
         // The kernel closes its documents first (a second destroy joins the viewer's).
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
+});
+
+/**
+ * With the render plugin, `<FormLayer>` paints each field as the engine draws it: one picture per
+ * widget, the one of the state it shows. The engine encodes pictures with a 2D canvas, which
+ * happy-dom doesn't have, so the render plugin's pictures are stand-ins here: a URL naming widget
+ * and state.
+ */
+describe('<FormLayer> field pictures', () => {
+  it(
+    'paints each field, and a checkbox its new state once it changes',
+    { timeout: 45_000 },
+    async () => {
+      const bytes = new Uint8Array(await readFile(resolve(fixtures, 'hello_world.pdf')));
+      const engine = await wasmEngine();
+      const page = signal<PageContextValue | null>(null);
+      const { kernel, view } = await viewerWith(
+        [interactionPlugin(), renderPlugin(), formPlugin()],
+        FormHarness,
+        { page },
+        engine,
+      );
+
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: 'blank', bytes });
+        await waitFor(() => expect(kernel.tryCapability(FormToken, undefined)).toBeTruthy(), {
+          timeout: 20_000,
+        });
+        const form = kernel.capability(FormToken);
+        await form.refresh();
+        const ref = kernel.documents.getPage(0, 'blank')!.ref;
+        await form.create({
+          family: 'text',
+          name: 'name',
+          widgets: [{ page: ref, rect: { x: 72, y: 100, width: 160, height: 20 } }],
+        });
+        await form.create({
+          family: 'checkbox',
+          name: 'agree',
+          widgets: [{ page: ref, rect: { x: 72, y: 140, width: 14, height: 14 } }],
+        });
+        const [text, check] = kernel.capability(FormHostToken).listShownWidgets(ref);
+        const checkBox = { x: 72, y: 140, width: 14, height: 14 };
+        const picture = (widget: AnnotationRef, state: string | null, rect: typeof checkBox) => ({
+          ref: widget,
+          mode: 'normal' as const,
+          state,
+          rect,
+          image: {
+            objectUrl: () => ({
+              abortWith: async () => ({
+                url: `blob:${annotationKey(widget)}:${state}`,
+                revoke: () => {},
+              }),
+            }),
+          },
+        });
+        vi.spyOn(kernel.capability(RenderHostToken), 'renderFieldAppearances').mockResolvedValue([
+          picture(text!.ref, null, { x: 72, y: 100, width: 160, height: 20 }),
+          picture(check!.ref, 'Off', checkBox),
+          picture(check!.ref, 'Yes', checkBox),
+        ] as never);
+        page.value = letterPage('blank', ref);
+        flushSync();
+
+        const pictures = () =>
+          [...view.container.querySelectorAll('img')].map((image) => image.getAttribute('src'));
+        await waitFor(() => expect(pictures()).toHaveLength(2));
+        const checkKey = annotationKey(check!.ref);
+        expect(pictures()).toEqual([
+          `blob:${annotationKey(text!.ref)}:null`,
+          `blob:${checkKey}:Off`,
+        ]);
+        // Placed by the box the engine drew it into, in page pixels.
+        expect(view.container.querySelectorAll('img')[1]!.style.top).toBe('140px');
+
+        await fireEvent.click(await waitFor(() => view.getByRole('checkbox', { name: 'agree' })));
+        await waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
+        await waitFor(() => expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`));
+      } finally {
+        view.unmount();
         await kernel.destroy();
         await engine.destroy();
       }

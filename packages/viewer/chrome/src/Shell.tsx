@@ -208,7 +208,7 @@ export function Shell() {
                       demand arithmetic when the view wants more pixels than
                       the base budget supplies — the thumbnail rail's demand
                       never does, so it mounts the same layer for free. */}
-                    <RenderLayer annotations={false} />
+                    <RenderLayer />
                     <SelectionLayer />
                     <SearchLayer />
                     {/* Clickable links (nav plane): anchors under the default
@@ -220,9 +220,10 @@ export function Shell() {
                       anchors everywhere else. */}
                     <LinkLayer />
                     <AnnotationLayer />
-                    {/* Fill controls over the fields' pictures while the
-                      active tool fills forms; under the Form tab fields are
-                      plain editable annotations and the layer stands down. */}
+                    {/* The fields' pictures, and fill controls over them
+                      while the active tool fills forms; the render layer
+                      leaves the fields to it, as it leaves the annotations
+                      to the annotation layer. */}
                     <FormLayer />
                   </>
                 )}

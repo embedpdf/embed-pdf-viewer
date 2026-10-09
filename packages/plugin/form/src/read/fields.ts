@@ -109,7 +109,7 @@ function isEmpty(field: FormFieldDTO): boolean {
 
 export function createFieldReads(
   ctx: FormContext,
-  { fields, siblings }: Pick<FormServices, 'fields' | 'siblings'>,
+  { fields, rights, siblings }: Pick<FormServices, 'fields' | 'rights' | 'siblings'>,
 ) {
   const all = (): readonly FormFieldDTO[] => fields.get().snapshot?.fields ?? NO_FIELDS;
 
@@ -169,11 +169,13 @@ export function createFieldReads(
   };
 
   // The page order is an input too: moving a page moves its fields in the list.
+  // Only the fields the user may fill in count: another signer's empty field
+  // isn't theirs to fill.
   const validate = memo(
-    () => [fields.get(), ctx.document()],
+    () => [fields.get(), ctx.document(), rights.key()],
     (index): FormValidation => {
       const missing = (index.snapshot?.fields ?? [])
-        .filter((field) => field.required && isEmpty(field))
+        .filter((field) => field.required && isEmpty(field) && rights.mayFill(field))
         .map((field) => ({ field, place: placeOf(field) }))
         .sort(
           (left, right) =>

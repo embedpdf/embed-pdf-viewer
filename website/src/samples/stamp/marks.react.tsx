@@ -131,7 +131,7 @@ export default function App() {
         <Stage className="stage">
           {() => (
             <>
-              <RenderLayer annotations={false} />
+              <RenderLayer />
               <AnnotationLayer />
             </>
           )}

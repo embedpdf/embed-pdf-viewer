@@ -30,19 +30,20 @@ import {
 } from '@angular/core';
 import {
   RenderToken,
+  type PageLayerOptions,
   type PaintSettings,
   type RenderHostCapability,
   type TilePaintPlan,
   type TilePaintSource,
   type ViewDemand,
 } from '@embedpdf/plugin-render/contract/host';
-import { bindPaintedImage } from '@embedpdf/web';
+import { bindPaintedImage, partsDrawnTwice, pictureLayerOptionsOf } from '@embedpdf/web';
 import {
   CapabilityBinding,
   devWarn,
   injectKernelHost,
   injectPage,
-  publishPageLayerFact,
+  injectPaintedParts,
   type EpdfPageContext,
 } from '@embedpdf/angular/runtime';
 
@@ -137,7 +138,7 @@ export class EpdfTileImage {
   `,
 })
 export class EpdfTilePlane {
-  readonly annotations = input.required<boolean>();
+  readonly layers = input.required<PageLayerOptions>();
   readonly fadeMs = input.required<number>();
 
   protected readonly page = injectPage('<epdf-render-layer>');
@@ -182,13 +183,13 @@ export class EpdfTilePlane {
       const view = this.view();
       const page = this.pageRef();
       const transform = this.page.transform();
-      const includeAnnotations = this.annotations();
+      const layers = this.layers();
       if (!view) return;
       untracked(() => {
         const demand = this.page.getViewDemand?.() ?? {
           desiredDeviceWidth: transform.deviceWidth,
         };
-        view.setDemand(page, demand, { includeAnnotations });
+        view.setDemand(page, demand, layers);
       });
     });
   }
@@ -218,17 +219,20 @@ export class EpdfTilePlane {
       draggable="false"
       style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none"
     />
-    @if (tiles() && paintSettings().tiles) {
-      <epdf-tile-plane [annotations]="annotations()" [fadeMs]="paintSettings().fadeMs" />
+    @if (tiles() && paintSettings().tiles && layers(); as drawn) {
+      <epdf-tile-plane [layers]="drawn" [fadeMs]="paintSettings().fadeMs" />
     }
   `,
 })
 export class EpdfRenderLayer {
   /**
-   * Bake annotations into the picture (default true). Set it to false when an annotation
-   * layer draws them, so they aren't drawn twice.
+   * Draw the annotations into the page's picture (`true`) or leave them out (`false`). Left
+   * unset, the picture leaves them to an `<epdf-annotation-layer>` on the page, and otherwise
+   * draws them when the user may read them.
    */
-  readonly annotations = input(true);
+  readonly annotations = input<boolean | undefined>(undefined);
+  /** The same for the form fields, which an `<epdf-form-layer>` paints. */
+  readonly formFields = input<boolean | undefined>(undefined);
   /**
    * The sharp tiles over the picture when zoomed in (default true). Whether they cost anything
    * is decided by what the view wants; set it to false only for a view that must never tile.
@@ -243,30 +247,56 @@ export class EpdfRenderLayer {
     NO_PAINT_SETTINGS,
     Object.is,
   );
+  private readonly parts = computed(() => ({
+    annotations: this.annotations(),
+    formFields: this.formFields(),
+  }));
+  private readonly painted = injectPaintedParts(() => this.page.ref);
+  private readonly may = this.render.select((render) => render.getLayerRights(), null, Object.is);
+  /** The parts the picture draws; `null` until the page's layers have said what they paint. */
+  protected readonly layers = computed(() => {
+    const painted = this.painted();
+    const may = this.may();
+    return painted && may ? pictureLayerOptionsOf(painted, this.parts(), may) : null;
+  });
   /**
-   * The picture's identity: its size, the annotations flag and the page's version. Within a
+   * The picture's identity: its size, the parts it draws and the page's version. Within a
    * size step it doesn't move as you zoom (the page's transform scales the picture), so
    * nothing is fetched again; it moves at a step and when the page changes.
    */
   private readonly sourceKey = this.render.select(
-    (render) =>
-      render.getSourceKey(this.page.ref, {
-        scale: this.page.transform().renderScale,
-        includeAnnotations: this.annotations(),
-      }),
+    (render) => {
+      const layers = this.layers();
+      return layers
+        ? render.getSourceKey(this.page.ref, {
+            scale: this.page.transform().renderScale,
+            ...layers,
+          })
+        : null;
+    },
     null,
     Object.is,
   );
   private readonly picture = viewChild.required<ElementRef<HTMLImageElement>>('picture');
 
   constructor() {
-    publishPageLayerFact(this.page, 'renderBakesAnnotations', () => this.annotations());
+    effect(() => {
+      const painted = this.painted();
+      if (painted && partsDrawnTwice(painted, this.parts()).length > 0) {
+        devWarn(
+          'render-layer-draws-what-a-layer-paints',
+          '<epdf-render-layer [annotations]> or [formFields] draws what an ' +
+            '<epdf-annotation-layer> or an <epdf-form-layer> on the page paints too, so it shows ' +
+            'twice. Leave the input out: the picture leaves out what a layer paints.',
+        );
+      }
+    });
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
     effect((onCleanup) => {
       const render = this.render.capability();
       const key = this.sourceKey();
-      const includeAnnotations = this.annotations();
-      if (!render || key === null) return;
+      const layers = this.layers();
+      if (!render || key === null || !layers) return;
       const controller = new AbortController();
       let revoke: (() => void) | undefined;
       onCleanup(() => {
@@ -279,7 +309,7 @@ export class EpdfRenderLayer {
         try {
           const image = await render.renderSource(this.page.ref, {
             scale,
-            includeAnnotations,
+            ...layers,
             view: this.page.view,
             signal: controller.signal,
           });

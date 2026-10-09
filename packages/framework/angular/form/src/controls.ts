@@ -2,7 +2,7 @@
  * The controls `<epdf-form-layer>` puts over a page's fields, one per widget. Each is a
  * component whose host element is the widget's box (`widget-box.ts`), with a real HTML control
  * inside. The field's own picture (the engine's drawing of its value, borders and fonts) is
- * drawn below, by the render layer or the annotation layer; the controls add what people work
+ * drawn below, by the form layer's `<epdf-field-pictures>`; the controls add what people work
  * with on top of it:
  *
  *   text       the picture at rest; focus shows an editor in the field's own font (the plugin

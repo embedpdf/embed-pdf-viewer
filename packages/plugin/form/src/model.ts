@@ -290,11 +290,15 @@ export interface PageWidget {
 /** One page's widgets: widget annotation object number → where it is and how it looks. */
 export type PageWidgets = Readonly<Record<number, PageWidget>>;
 
+/** Whether a widget shows on screen: its `hidden` and `noView` flags hide it. */
+export const shownOnScreen = (row: WidgetAnnotation): boolean => !row.hidden && !row.noView;
+
 /** The widgets one page shows, from the form's widget rows. */
 export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): PageWidgets {
   const widgets: Record<number, PageWidget> = {};
   for (const row of index.snapshot?.widgets ?? []) {
     if (row.page.objectNumber !== pageObjectNumber || row.ref.kind !== 'objectNumber') continue;
+    if (!shownOnScreen(row)) continue;
     widgets[row.ref.objectNumber] = {
       box: row.rect,
       look: {
@@ -310,6 +314,23 @@ export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): Page
     };
   }
   return widgets;
+}
+
+/** A widget a page shows: its address and the appearance state it shows. */
+export interface ShownWidget {
+  readonly ref: AnnotationRef;
+  /** The state it shows (`/AS`), or `null` for a widget without states. */
+  readonly appearanceState: string | null;
+}
+
+/** The widgets one page shows, in the order the page draws them. */
+export function shownWidgetsOf(index: FieldIndex, pageObjectNumber: number): ShownWidget[] {
+  const shown: ShownWidget[] = [];
+  for (const row of index.snapshot?.widgets ?? []) {
+    if (row.page.objectNumber !== pageObjectNumber || !shownOnScreen(row)) continue;
+    shown.push({ ref: row.ref, appearanceState: row.appearanceState });
+  }
+  return shown;
 }
 
 /** A widget's row, by its object number; `null` when no page shows it. */

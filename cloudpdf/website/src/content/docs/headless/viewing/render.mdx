@@ -52,15 +52,20 @@ its layer.
 > **Try it:** turn the tiles off, then pick a smaller budget. At 200% the page goes soft: the
 > whole-page picture is all there is.
 
-## Annotations in the picture
+## What the picture draws
 
-By default the page picture includes the annotations, so a plain `<RenderLayer>` shows the document
-as it is: right for thumbnails and read-only views. When an [annotation layer](../annotations) draws
-the annotations so people can edit them, leave them out of the picture:
-
-<Snippet name="viewing/render-without-annotations" />
+A page's picture draws the page with its annotations and its form fields, each when the user may
+read it: the document as it is, right for thumbnails and read-only views. A layer on the page that
+paints a part itself takes that part out of the picture: an [annotation layer](../annotations) the
+annotations, so people can select and change them, and a [form layer](../forms) the form fields.
+You write nothing for it:
 
 <Example name="render/annotations" />
+
+To decide yourself, set `annotations` or `formFields` on the render layer: `false` leaves the part
+out, `true` draws it. A clean preview without the annotations:
+
+<Snippet name="viewing/render-without-annotations" />
 
 ## Render a page yourself
 
@@ -84,14 +89,17 @@ const { applied } = await render.renderPages(
 );
 ```
 
-| Option               | What it is                                                     | Default   |
-| :------------------- | :------------------------------------------------------------- | :-------- |
-| `width`              | The width of the image, in pixels                              | —         |
-| `scale`              | Or a scale: `1` is the page's size in points                   | `1`       |
-| `includeAnnotations` | Draw the annotations into the image                            | `true`    |
-| `format`             | `'png'`, `'webp'` or `'bmp'`                                   | per engine |
-| `quality`            | For WebP, from `0` to `1`                                      | per engine |
-| `concurrency`        | For `renderPages`, how many pages render at once               | `4`       |
+| Option               | What it is                                       | Default                                                           |
+| :------------------- | :----------------------------------------------- | :---------------------------------------------------------------- |
+| `width`              | The width of the image, in pixels                | —                                                                 |
+| `scale`              | Or a scale: `1` is the page's size in points     | `1`                                                               |
+| `includeAnnotations` | Draw the annotations into the image              | when the user may read them                                       |
+| `includeFormFields`  | Draw the form fields into the image              | `false` without annotations; else when the user may read the form |
+| `format`             | `'png'`, `'webp'` or `'bmp'`                     | per engine                                                        |
+| `quality`            | For WebP, from `0` to `1`                        | per engine                                                        |
+| `concurrency`        | For `renderPages`, how many pages render at once | `4`                                                               |
+
+Asking for annotations or form fields the user may not read fails with `permission-denied`.
 
 <Example name="render/render-page" />
 
@@ -106,6 +114,7 @@ For a change the plugin can't see, tell it:
 ```ts
 render.invalidate({ pages: [page.ref] }); // redraw these pages
 render.invalidate({ pages: [page.ref], scope: 'annotations' }); // only their annotations changed
+render.invalidate({ pages: [page.ref], scope: 'fields' }); // only their form fields changed
 ```
 
 Your own long-lived renders can keep up the same way: `render.getRenderEpoch(page.ref)` changes
@@ -123,7 +132,7 @@ Everything `useRender()` gives you.
 | `renderThumbnail(page, { maxWidth })`      | Renders a small picture of a page, `maxWidth` pixels wide                                                                                        |
 | `renderPages(pages, options?)`             | Renders several pages, a few at a time. Resolves `{ applied, failed }`: each page with its image, in the order you gave, and the pages that failed with why. |
 | `invalidate({ pages?, scope? })`           | Redraws pages after a change the plugin can't see; without `pages`, every page. [When a page changes](#when-a-page-changes)                      |
-| `getRenderEpoch(page, includeAnnotations?)` | A number that changes whenever the page's pixels do, with the annotations unless you pass `false`. Key your own long-lived renders on it.        |
+| `getRenderEpoch(page, layers?)`            | A number that changes whenever the page's pixels do, for a picture that draws what `layers` says (`includeAnnotations`, `includeFormFields`, as above). Key your own long-lived renders on it. |
 | `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
 | `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRenderSettings()`. [Settings](#settings) |
@@ -151,7 +160,8 @@ Set them when you register the plugin, and change them while the app runs with
 | `quality`                     | WebP quality, from `0` to `1`                                         | per engine       |
 | `debug`                       | Log what the plugin renders, and why, to the console                  | `false`          |
 
-`<RenderLayer>` takes two <Word of="props" />: `annotations` (default `true`) and `tiles` (default `true`).
+`<RenderLayer>` takes three <Word of="props" />: `annotations` and `formFields`, unset by default
+(see [What the picture draws](#what-the-picture-draws)), and `tiles` (default `true`).
 
 ## Events
 

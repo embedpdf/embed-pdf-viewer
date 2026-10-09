@@ -9,12 +9,16 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { RenderToken, type ViewDemand } from '@embedpdf/plugin-render/contract/host';
+  import {
+    RenderToken,
+    type PageLayerOptions,
+    type ViewDemand,
+  } from '@embedpdf/plugin-render/contract/host';
   import { usePage } from '../runtime/page';
   import { useKernelValue, useOptionalCapability } from '../runtime/readers.svelte';
   import TileImage from './TileImage.svelte';
 
-  let { annotations, fadeMs }: { annotations: boolean; fadeMs: number } = $props();
+  let { layers, fadeMs }: { layers: PageLayerOptions; fadeMs: number } = $props();
 
   const TILE_FADE_KEYFRAMES =
     '<style>@keyframes epdf-tile-in { from { opacity: 0 } to { opacity: 1 } }</style>';
@@ -49,8 +53,8 @@
     if (!surface) return;
     const demand = page.getViewDemand?.() ?? { desiredDeviceWidth: page.transform.deviceWidth };
     const ref = pageRef;
-    const includeAnnotations = annotations;
-    untrack(() => surface.setDemand(ref, demand, { includeAnnotations }));
+    const drawn = layers;
+    untrack(() => surface.setDemand(ref, demand, drawn));
   });
 
   // The same object until the demand, an epoch or an arriving tile changes it.

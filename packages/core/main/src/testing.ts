@@ -48,7 +48,7 @@ import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
 import { findPage, pageOf } from './page-of';
 import { readWrapped, type DownloadWrap } from './context';
-import { permissionDenied, sessionAllows } from './permissions';
+import { fieldPermissionDenied, permissionDenied, sessionAllows } from './permissions';
 import { createSettingsStore, type NoSettings, type SettingsDeclaration } from './settings';
 import { settle, type SettleFlush } from './settle';
 import { createStore } from './store';
@@ -232,7 +232,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
                 subscribeToType(documentEvents.on, type, listener),
               lastServerId: () => null,
             },
-            security: { allows: () => true, allowsAnnotation: () => true },
+            security: { allows: () => true, allowsAnnotation: () => true, allowsField: () => true },
             ...options.doc,
           });
   const requireDoc = (): DocumentHandle => {
@@ -409,6 +409,13 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     assertAllowed: (permission, operation) => {
       if (!sessionAllows(requireDoc().security, permission)) {
         throw permissionDenied(id, permission, operation);
+      }
+    },
+    allowsField: (action, field) =>
+      requireDoc().security.allowsField(action, { groupId: field.groupId }),
+    assertAllowedField: (action, field, operation) => {
+      if (!requireDoc().security.allowsField(action, { groupId: field.groupId })) {
+        throw fieldPermissionDenied(id, action, field, operation);
       }
     },
     cancellable: (signal, task) => cancellable(id, signal, task),

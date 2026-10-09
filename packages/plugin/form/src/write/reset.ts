@@ -1,16 +1,19 @@
 /**
  * Resets: one shared core (an effects batch, then recalculation when the
  * document's scripts run) used by both the ResetForm action executor and the
- * public `reset`, so the two cannot diverge.
+ * public `reset`, so the two cannot diverge. A reset resets the fields it
+ * selects that the user may fill in: another signer's fields stay as they are.
  */
 import { PluginError, toPluginError } from '@embedpdf/core';
 import type { FormFieldRef, PdfActionTargetRef } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
 
+import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
+
 import type { FormCommitResult, FormResetResult } from '../contract';
 import { resolveFieldSelection } from '../field-selection';
 import type { FormHostCapability } from '../host-contract';
-import { fieldsWithChangedValues } from '../model';
+import { fieldByRef, fieldsWithChangedValues } from '../model';
 import type { FormContext, FormServices } from '../services';
 
 const NOT_SCRIPTED: FormCommitResult = {
@@ -29,9 +32,16 @@ const targetOf = (ref: FormFieldRef): PdfActionTargetRef =>
 
 export function createResetWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'fields' | 'scripting' | 'enqueue'>,
+  services: Pick<FormServices, 'fields' | 'rights' | 'scripting' | 'enqueue'>,
 ) {
-  const { fields, enqueue, scripting } = services;
+  const { fields, rights, enqueue, scripting } = services;
+
+  /**
+   * Whether a reset puts this field back: the engine refuses push button and
+   * signature refs, and another signer's fields are theirs.
+   */
+  const resettable = (field: FormFieldDTO): boolean =>
+    field.family !== 'pushbutton' && field.family !== 'signature' && rights.mayFill(field);
 
   /**
    * The shared reset core: one effects batch, then recalculation when the
@@ -96,28 +106,30 @@ export function createResetWrites(
     const snapshot = await ctx.doc.forms.list();
     // ISO 32000-2 Tables 241/242: a parent name resets its descendants too.
     const { selected } = resolveFieldSelection(snapshot.fields, targets, exclude);
-    // Skip fields with nothing to restore: the engine refuses push button
-    // and signature refs, and an exclude-mode complement always includes
-    // the form's buttons.
-    const resettable = selected.filter(
-      (field) => field.family !== 'pushbutton' && field.family !== 'signature',
-    );
+    // An exclude-mode complement always includes the form's buttons.
     return applyResetBatch(
-      resettable.map((field) => field.ref),
+      selected.filter(resettable).map((field) => field.ref),
       origin,
     );
   };
 
   const reset: FormHostCapability['reset'] = async (refs, options) => {
-    ctx.assertAllowed('doc.forms.fill', 'form.reset');
+    // A field you name is one you mean: one you may not fill in refuses the reset.
+    for (const ref of refs ?? []) {
+      const field = fieldByRef(fields.get(), ref);
+      if (field) rights.assertMayFill(field, 'form.reset');
+    }
     return enqueue(async (): Promise<FormResetResult> => {
       try {
         if (refs && refs.length === 0) return { fields: [] };
         // An engine without the effects batch resets on its own, without recalculating.
         if (!ctx.doc.forms.applyEffects) {
+          const mine = (fields.get().snapshot?.fields ?? [])
+            .filter(resettable)
+            .map((field) => field.ref);
           const result = await ctx.cancellable(
             options?.signal,
-            ctx.doc.forms.reset(refs ? [...refs] : undefined),
+            ctx.doc.forms.reset(refs ? [...refs] : mine),
           );
           return { fields: result.fields };
         }

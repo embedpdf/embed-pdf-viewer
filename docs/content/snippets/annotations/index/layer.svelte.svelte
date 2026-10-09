@@ -12,7 +12,7 @@
 
 <Viewer {engine} {plugins}>
   <Stage>
-    <RenderLayer annotations={false} />
+    <RenderLayer />
     <AnnotationLayer />
   </Stage>
 </Viewer>

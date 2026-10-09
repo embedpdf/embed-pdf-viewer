@@ -162,10 +162,10 @@ it with its layer, and a button that turns on the highlight tool:
 <Snippet name="start/highlighter" />
 
 With the tool on, select text and it's highlighted. Click a highlight with the `pointer` tool to
-select it. <Fw only={['react', 'svelte']}>`annotations={false}`</Fw><Fw only="vue">`:annotations="false"`</Fw><Fw only="angular">`[annotations]="false"`</Fw>
-leaves annotations out of the page picture, because the annotation layer draws them now.
-<Fw only="angular">The component that provides the viewer can inject its services too, so the
-button needs no component of its own. </Fw>See [Annotations](annotations) for every tool.
+select it. The page picture leaves the annotations out by itself, because the annotation layer
+draws them now. <Fw only="angular">The component that provides the viewer can inject its services
+too, so the button needs no component of its own. </Fw>See [Annotations](annotations) for every
+tool.
 
 ## 6. Save
 

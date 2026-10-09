@@ -35,7 +35,7 @@
     <DrawSeal />
     <MakeStamp />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
     </Stage>
   </DocumentGate>

@@ -80,7 +80,11 @@ export function createPlacement(
         });
         return { kind: 'placed', annotation: placed.annotation.ref };
       }
-      const placed = await annotation().stamps.place({ source: mark.source }, target, options);
+      const annotations = annotation();
+      if (!annotations) {
+        throw new PluginError('unsupported', 'signature', 'no annotation plugin to place a mark');
+      }
+      const placed = await annotations.stamps.place({ source: mark.source }, target, options);
       return { kind: 'placed', annotation: placed.annotation.ref };
     }
     switch (mode()) {

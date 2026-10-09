@@ -8,8 +8,10 @@
  */
 import {
   createHostToken,
+  type AnnotationAppearanceImage,
   type EventHook,
   type OperationOptions,
+  type PageLayerRights,
   type PageRef,
   type PageRenderViewport,
   type PluginErrorInfo,
@@ -17,6 +19,7 @@ import {
 import {
   RenderToken as PublicRenderToken,
   type PageImage,
+  type PageLayerOptions,
   type RenderCapability,
 } from './contract';
 import type { PageViewDemand, TilePaintPlan } from './paint-plan';
@@ -32,11 +35,9 @@ export interface PaintSettings {
   readonly tiles: boolean;
 }
 
-export interface RenderSourceOptions {
+export interface RenderSourceOptions extends PageLayerOptions {
   /** Device px per PDF point (the page transform's `renderScale`). */
   scale: number;
-  /** Bake annotations (default true). Pass false when an annotation layer paints them. */
-  includeAnnotations?: boolean;
   /**
    * The view the picture is for (the page context's `view`): the engine ranks
    * the render by where the page is in that view (`doc.with({ view })`).
@@ -59,11 +60,7 @@ export interface RenderSourceOptions {
  */
 export interface ViewDemand {
   /** What this view wants for a page right now. Idempotent; schedules the want set. */
-  setDemand(
-    page: PageRef,
-    demand: PageViewDemand,
-    options?: { includeAnnotations?: boolean },
-  ): void;
+  setDemand(page: PageRef, demand: PageViewDemand, options?: PageLayerOptions): void;
   /** The current paint plan for a page under this view's demand. Pure. */
   getPlan(page: PageRef): TilePaintPlan;
   /** The image for this plan key had a presentation opportunity. */
@@ -75,6 +72,12 @@ export interface ViewDemand {
   release(page: PageRef): void;
   /** Release every page of this view and drop the handle's reference. */
   dispose(): void;
+}
+
+/** What {@link RenderHostCapability.renderFieldAppearances} takes. */
+export interface FieldAppearancesOptions extends OperationOptions {
+  /** Device px per PDF point, conformed through {@link RenderHostCapability.getAppearanceScale}. */
+  scale: number;
 }
 
 export interface RenderCompletedEvent {
@@ -99,7 +102,7 @@ export interface RenderHostCapability extends RenderCapability {
   renderSource(page: PageRef, options: RenderSourceOptions & OperationOptions): Promise<PageImage>;
   /**
    * The identity of the raster `renderSource` would produce — conformed
-   * width + annotations flag + epoch (+ format), as one stable string.
+   * width + the parts it draws + epoch (+ format), as one stable string.
    * Under a lattice it moves only at rung crossings; under exact-mode
    * `continuous` it tracks the demand and is constant above the budget.
    */
@@ -107,8 +110,29 @@ export interface RenderHostCapability extends RenderCapability {
   /** The canonical viewport a desired scale conforms to for this page (always width-kind). */
   conformViewport(page: PageRef, scale: number): PageRenderViewport;
   getPaintSettings(): PaintSettings;
+  /**
+   * What the user may read of the parts a picture draws beside the page
+   * content, so a view that leaves one part to a layer of its own can still
+   * ask for the other. The same object until a right changes.
+   */
+  getLayerRights(): PageLayerRights;
   /** This view's tile surface. Stable per view id; pair with `dispose`. */
   createViewDemand(viewId: string): ViewDemand;
+  /**
+   * Every form field picture of a page: each widget's look at rest, in every
+   * state it stores, each labelled with its state, so a checkbox switches
+   * picture with no request. The form plane paints them. Asks for the same
+   * page, scale and version share one fetch. Rejects `permission-denied`
+   * without `doc.forms.read`.
+   */
+  renderFieldAppearances(
+    page: PageRef,
+    options: FieldAppearancesOptions,
+  ): Promise<readonly AnnotationAppearanceImage[]>;
+  /** The version of a page's form field pictures: key a fetch on it. Bumps on confirmed form facts. */
+  getFieldAppearanceEpoch(page: PageRef): number;
+  /** The appearance scale a render scale conforms to under the deployment's policy. */
+  getAppearanceScale(renderScale: number): number;
   /** A base raster resolved / failed (the conforming and exact doors alike). */
   readonly onRenderCompleted: EventHook<RenderCompletedEvent>;
   readonly onRenderFailed: EventHook<RenderFailedEvent>;

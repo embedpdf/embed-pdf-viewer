@@ -33,7 +33,7 @@
     <AddTextBox />
     <FormatButtons />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer renderers={RENDERERS} />
     </Stage>
   </DocumentGate>

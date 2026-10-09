@@ -1,20 +1,23 @@
-import { h, ref } from 'vue';
+import { computed, h, ref } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enableAutoUnmount } from '@vue/test-utils';
 import { toPageRef } from '@embedpdf/core';
 import type { AnyPlugin, CapabilityToken, DocumentHandle, Engine, PageRef } from '@embedpdf/core';
 import { RenderToken } from '@embedpdf/plugin-render';
 import type {
+  PageLayerOptions,
   RenderHostCapability,
+  RenderSourceOptions,
   TilePaintPlan,
   ViewDemand,
 } from '@embedpdf/plugin-render/contract/host';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
-import { DocumentGate } from '../src/runtime';
+import { usePaintsPagePart } from '../src/page-layers';
+import { DocumentGate, usePage } from '../src/runtime';
 import { PageView } from '../src/page-view';
 import { RenderLayer } from '../src/render';
 import { Stage, StageToken, stagePlugin } from '../src/stage';
-import { bytesInput, settle, until, viewerWith } from './counter-plugin';
+import { bytesInput, probe, settle, until, viewerWith } from './counter-plugin';
 
 /**
  * `<RenderLayer>` paints what the render plugin gives it: the page's picture,
@@ -39,20 +42,22 @@ const tile = {
 
 /** A render plugin that answers every page with a picture named after its key, and one tile. */
 function fakeRender({ tiles }: { tiles: boolean }) {
-  const asked: { page: PageRef; includeAnnotations?: boolean }[] = [];
-  /** Every demand the plane sends: the page and how wide it wants it. */
-  const demands: { page: number; width: number; visible?: string }[] = [];
+  /** Every picture asked for: the page and the parts it draws. */
+  const asked: { page: PageRef; parts: PageLayerOptions }[] = [];
+  /** Every demand the plane sends: the page, how wide it wants it, and the parts it draws. */
+  const demands: { page: number; width: number; visible?: string; parts?: PageLayerOptions }[] = [];
   let plan: TilePaintPlan = { engaged: true, paint: [tile], fetching: [], stamp: 'one' };
   /** Plan again: the same tile, with the same picture, as a new object (as the plugin hands it). */
   const replan = () => {
     plan = { ...plan, paint: plan.paint.map((source) => ({ ...source })) };
   };
   const view: ViewDemand = {
-    setDemand: (page, demand) =>
+    setDemand: (page, demand, parts) =>
       demands.push({
         page: page.objectNumber,
         width: demand.desiredDeviceWidth,
         visible: demand.visibleRect && JSON.stringify(demand.visibleRect),
+        parts,
       }),
     getPlan: () => plan, // the same plan until it changes, as the plugin's
     markPainted: () => {},
@@ -61,14 +66,22 @@ function fakeRender({ tiles }: { tiles: boolean }) {
     dispose: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
+  const rights = { annotations: true, formFields: true };
   const keyOf = (page: PageRef, includeAnnotations = true) =>
     `page-${page.objectNumber}-${includeAnnotations ? 'with' : 'without'}`;
   const api = {
     getPaintSettings: () => ({ fadeMs: 0, tiles }),
+    getLayerRights: () => rights,
     getSourceKey: (page: PageRef, options: { includeAnnotations?: boolean }) =>
       keyOf(page, options.includeAnnotations),
-    renderSource: (page: PageRef, options: { includeAnnotations?: boolean }) => {
-      asked.push({ page, includeAnnotations: options.includeAnnotations });
+    renderSource: (page: PageRef, options: RenderSourceOptions) => {
+      const {
+        scale: _scale,
+        view: _view,
+        signal: _signal,
+        ...parts
+      } = options as RenderSourceOptions & { signal?: AbortSignal };
+      asked.push({ page, parts });
       const url = `blob:${keyOf(page, options.includeAnnotations)}`;
       return Promise.resolve({
         objectUrl: () => ({ abortWith: () => Promise.resolve({ url, revoke: () => {} }) }),
@@ -119,10 +132,28 @@ const engineWith = (pageCount: number) =>
   }) as unknown as Engine;
 const engine = engineWith(1);
 
-async function renderWith(render: AnyPlugin, layer: Record<string, unknown> = {}) {
+/** A layer that paints the page's annotations itself, as `<AnnotationLayer>` does. */
+const AnnotationPainter = probe(() => {
+  const page = usePage();
+  usePaintsPagePart(
+    computed(() => page.value.ref),
+    'annotations',
+  );
+});
+
+async function renderWith(
+  render: AnyPlugin,
+  layer: Record<string, unknown> = {},
+  { painter = false }: { painter?: boolean } = {},
+) {
   const viewer = await viewerWith(
     [stagePlugin(), render],
-    () => h(DocumentGate, null, () => h(Stage, null, { page: () => h(RenderLayer, layer) })),
+    () =>
+      h(DocumentGate, null, () =>
+        h(Stage, null, {
+          page: () => [h(RenderLayer, layer), painter ? h(AnnotationPainter) : null],
+        }),
+      ),
     engine,
   );
   await viewer.kernel.documents.open(bytesInput('a'));
@@ -137,19 +168,38 @@ async function renderWith(render: AnyPlugin, layer: Record<string, unknown> = {}
 enableAutoUnmount(afterEach);
 
 describe('RenderLayer', () => {
-  it('shows the picture the plugin renders for the page, with annotations by default', async () => {
+  it('shows the picture the plugin renders for the page, with what the user may read', async () => {
     const render = fakeRender({ tiles: false });
     const { wrapper } = await renderWith(render.plugin);
     await until(() => wrapper.find('img').attributes('src') !== undefined);
     expect(wrapper.find('img').attributes('src')).toBe('blob:page-1-with');
-    expect(render.asked[0]).toMatchObject({ includeAnnotations: true });
+    expect(render.asked.map((ask) => ask.parts)).toEqual([
+      { includeAnnotations: true, includeFormFields: true },
+    ]);
   });
 
-  it('leaves the annotations out when an annotation layer draws them', async () => {
-    const render = fakeRender({ tiles: false });
-    const { wrapper } = await renderWith(render.plugin, { annotations: false });
-    await until(() => wrapper.find('img').attributes('src') !== undefined);
+  it('leaves out what a layer on the page paints, from the first request', async () => {
+    const render = fakeRender({ tiles: true });
+    const { wrapper } = await renderWith(render.plugin, {}, { painter: true });
+    await until(() => wrapper.findAll('img').length === 2);
     expect(wrapper.find('img').attributes('src')).toBe('blob:page-1-without');
+    const rest = { includeAnnotations: false, includeFormFields: true };
+    expect(render.asked.map((ask) => ask.parts)).toEqual([rest]);
+    expect(render.demands.map((demand) => demand.parts)).toEqual(render.demands.map(() => rest));
+  });
+
+  it('lets the props decide', async () => {
+    const render = fakeRender({ tiles: false });
+    const { wrapper } = await renderWith(
+      render.plugin,
+      { annotations: true, formFields: false },
+      { painter: true },
+    );
+    await until(() => wrapper.find('img').attributes('src') !== undefined);
+    expect(render.asked.at(-1)!.parts).toEqual({
+      includeAnnotations: true,
+      includeFormFields: false,
+    });
   });
 
   it('paints the view’s tile plan above the picture, and lets go of it on unmount', async () => {

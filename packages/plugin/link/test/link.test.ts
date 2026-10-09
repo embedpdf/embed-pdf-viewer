@@ -214,22 +214,19 @@ describe('link plugin', () => {
     await harness.kernel.destroy();
   });
 
-  it('re-reads every page an annotation move touched, each once', async () => {
+  it('re-reads the page whose annotations were reordered', async () => {
     const harness = await boot();
     await harness.link.listAllLinks();
     expect(harness.reads).toEqual([1, 2]);
     harness.emit({
-      type: 'annotations.moved',
+      type: 'annotations.reordered',
       page: toPageRef(1),
-      annotations: [
-        PAGE_ONE_LINKS[0],
-        PAGE_ONE_LINKS[1],
-        linkDto(20, 2, { x: 0, y: 0, width: 600, height: 800 }, null),
-      ],
+      order: [PAGE_ONE_LINKS[1]!.ref, PAGE_ONE_LINKS[0]!.ref],
+      meta: { changed: [PAGE_ONE_LINKS[1]!.ref] },
       origin: ORIGIN,
     });
     await settle();
-    expect(harness.reads.slice(2).sort()).toEqual([1, 2]);
+    expect(harness.reads.slice(2)).toEqual([1]);
     await harness.kernel.destroy();
   });
 

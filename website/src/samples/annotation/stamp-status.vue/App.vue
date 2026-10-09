@@ -28,7 +28,7 @@ const ebook = async (): Promise<OpenInput> => {
       <p class="hint">Sign a stamp off, then move it: its status goes with it.</p>
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
         </template>
         <template #overlay><Approvals /></template>

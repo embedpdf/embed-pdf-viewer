@@ -1,12 +1,11 @@
 /**
  * The React view of @embedpdf/plugin-form.
  *
- * `<FormLayer />` puts a real HTML control over each field box of its page,
- * with or without the annotation plugin. The field's own picture, the
- * engine's drawing of its value, borders and fonts, is drawn below it: by the
- * `<RenderLayer>` raster, or by the `<AnnotationLayer>` while the form plugin
- * keeps widgets inert for filling. The controls add what people interact
- * with on top of it:
+ * `<FormLayer />` paints the fields of its page as the engine draws them
+ * (their values, borders and fonts) and puts a real HTML control over each
+ * field box, with or without the annotation plugin. While it's on the page,
+ * the `<RenderLayer>` leaves the fields out of the page's picture. The
+ * controls add what people interact with on top of the pictures:
  *
  *   text   → the picture at rest; focus shows an editor in the field's font
  *            (the plugin keeps what is typed, so a download writes it);
@@ -34,7 +33,7 @@
 export * from '@embedpdf/plugin-form';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { EventHook } from '@embedpdf/core';
+import { annotationKey, type EventHook } from '@embedpdf/core';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import {
@@ -47,6 +46,7 @@ import {
 } from '@embedpdf/plugin-form';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
   createTextFieldEditor,
@@ -54,15 +54,19 @@ import {
   formColorsOf,
   isolatePointerDown,
   listBoxControlStyleOf,
+  loadFieldPictureUrls,
   pressToggle,
   rectInPixels,
+  shownFieldPicture,
   textFieldEditorStyleOf,
   widgetBoxStyleOf,
+  type AppearanceUrl,
   type FormColors,
 } from '@embedpdf/web';
 
 import { NativeListBox } from './form-listbox';
 import { FormFocusRing } from './form-focus-ring';
+import { usePaintsPagePart } from './page-layers';
 import {
   shallowArray,
   useCapability,
@@ -428,11 +432,13 @@ function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
 }
 
 /**
- * The form's fields on one page, as controls people fill in. Put it above the
- * page's picture (`<RenderLayer>`, and `<AnnotationLayer>` when the
- * annotation plugin is registered). It shows while the active tool fills
- * forms (the `pointer` and `pan` tools do), and stands down in design mode,
- * where fields are boxes you select and move.
+ * The form's fields on one page: their pictures, and the controls people fill
+ * them in with. Put it above the page's picture (`<RenderLayer>`, and
+ * `<AnnotationLayer>` when the annotation plugin is registered); while it's
+ * there, the render layer leaves the fields out of the page's picture. The
+ * controls show while the active tool fills forms (the `pointer` and `pan`
+ * tools do), and stand down in design mode, where fields are boxes you
+ * select and move.
  */
 export function FormLayer() {
   const page = usePage();
@@ -441,21 +447,22 @@ export function FormLayer() {
   const active = useSelector(InteractionToken, (interaction) =>
     interaction.activeToolEnables('form-fill'),
   );
+  usePaintsPagePart(page.ref, 'formFields');
 
   useEffect(() => {
-    if (active) void form.ensureLoaded(page.ref);
-  }, [active, form, page.ref]);
+    void form.ensureLoaded(page.ref);
+  }, [form, page.ref]);
 
   const items = useSelector(
     FormHostToken,
     (capability) => capability.listWidgets(page.ref),
     shallowArray,
   );
-  if (!active) return null;
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      {items.map((item) => {
+      <FieldPictures page={page} />
+      {(active ? items : []).map((item) => {
         const key = `${item.key}:${item.annotObjectNumber}`;
         switch (item.control) {
           case 'text':
@@ -475,6 +482,71 @@ export function FormLayer() {
         }
       })}
     </div>
+  );
+}
+
+/**
+ * The pictures of the page's fields, as the engine draws them, from the render
+ * plugin's shared field pictures. Every state is loaded, so a check box shows
+ * its new state as soon as its value changes; hidden widgets aren't drawn.
+ */
+function FieldPictures({ page }: { page: PageContextValue }) {
+  const render = useOptionalCapability(RenderToken);
+  const widgets = useSelector(
+    FormHostToken,
+    (form) => form.listShownWidgets(page.ref),
+    shallowArray,
+  );
+  // Loaded again when the page's fields change, and at appearance-scale crossings.
+  const epoch = useOptionalSelector(
+    RenderToken,
+    (render) => render.getFieldAppearanceEpoch(page.ref),
+    0,
+  );
+  const scale = useOptionalSelector(
+    RenderToken,
+    (render) => render.getAppearanceScale(page.transform.renderScale),
+    0,
+  );
+  const [urls, setUrls] = useState<Record<string, AppearanceUrl>>({});
+
+  useEffect(() => {
+    if (!render || !scale) return;
+    return loadFieldPictureUrls(
+      (signal) => render.renderFieldAppearances(page.ref, { scale, signal }),
+      annotationKey,
+      setUrls,
+    );
+  }, [render, page.ref, scale, epoch]);
+
+  return (
+    <>
+      {widgets.map((widget) => {
+        const key = annotationKey(widget.ref);
+        const picture = shownFieldPicture(urls, key, widget.appearanceState);
+        if (!picture) return null;
+        const frame = rectInPixels(picture.box, page.transform);
+        return (
+          <img
+            key={key}
+            src={picture.url}
+            alt=""
+            draggable={false}
+            style={{
+              position: 'absolute',
+              left: frame.left,
+              top: frame.top,
+              width: frame.width,
+              height: frame.height,
+              // A global `img { max-width: 100% }` reset would clamp it.
+              maxWidth: 'none',
+              maxHeight: 'none',
+              pointerEvents: 'none',
+            }}
+          />
+        );
+      })}
+    </>
   );
 }
 

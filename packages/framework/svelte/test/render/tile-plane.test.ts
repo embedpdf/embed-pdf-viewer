@@ -128,4 +128,19 @@ describe('the tile plane', () => {
     expect(render.view.release).toHaveBeenCalledWith(toPageRef(1));
     expect(render.view.dispose).toHaveBeenCalledTimes(1);
   });
+
+  it('plans without what a layer on the page paints, from the first demand', async () => {
+    const render = fakeRender();
+    const { kernel, view } = await viewerWith(
+      [render.plugin],
+      TilePageView,
+      { page: signal(0), shown: signal(true), painter: true },
+      renderEngine(1).engine,
+    );
+    await kernel.documents.open(bytesInput('a'));
+    flushSync();
+    await waitFor(() => expect(tiles(view.container)).toHaveLength(1));
+    const rest = { includeAnnotations: false, includeFormFields: true };
+    expect(render.demands.map((demand) => demand.parts)).toEqual(render.demands.map(() => rest));
+  });
 });

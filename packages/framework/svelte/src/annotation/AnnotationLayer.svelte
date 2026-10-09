@@ -1,7 +1,7 @@
 <!--
   A page's annotations, the selection's outline and handles, the tool's preview and the text boxes
-  being typed in. Put it in the Stage's page content above the rendered page, with the render
-  layer leaving annotations out (`<RenderLayer annotations={false} />`).
+  being typed in. Put it in the Stage's page content above the rendered page: while it's there,
+  the render layer leaves the annotations out of the page's picture.
 
   Pure paint: it reads the plugin's per-page render items and chrome and draws them. Presses reach
   the plugin through the interaction hub (the Stage forwards them), and so does the cursor. Each
@@ -29,8 +29,8 @@
     type AppearanceUrl,
   } from '@embedpdf/web';
   import { devWarn } from '../runtime/dev';
-  import { usePageLayerFact } from '../runtime/dev-registry.svelte';
   import { usePage } from '../runtime/page';
+  import { usePaintsPagePart } from '../runtime/page-layers.svelte';
   import {
     shallowArray,
     useOptionalCapability,
@@ -53,6 +53,8 @@
   let { renderers, handle, rotationHandle }: AnnotationLayerProps = $props();
 
   const page = usePage();
+  // While it's here, the page's picture leaves the annotations to it.
+  usePaintsPagePart(() => page.ref, 'annotations');
   const annotation = useOptionalCapability(AnnotationHostToken);
   const interaction = useOptionalCapability(InteractionToken);
   // The active tool decides which interactive renderers take the pointer, so a tool change draws
@@ -88,8 +90,6 @@
   );
 
   // ── your renderers ─────────────────────────────────────────────────────────
-
-  usePageLayerFact(page, 'annotationRenderers', () => renderers ?? null);
 
   /** Bumped when the renderers' behaviors register again, so the drawings are read again. */
   let registrations = $state(0);

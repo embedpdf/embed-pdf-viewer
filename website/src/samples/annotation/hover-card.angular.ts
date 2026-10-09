@@ -76,7 +76,7 @@ export class HoverCard {
       <p class="hint">Point at a note or the green rectangle</p>
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer />
         </ng-template>
         <demo-hover-card />

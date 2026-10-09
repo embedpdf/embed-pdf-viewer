@@ -1,16 +1,18 @@
 /**
- * `<epdf-form-layer>`: the form's fields on one page, as controls people fill in. Put it above
- * the page's picture (`<epdf-render-layer>`, and `<epdf-annotation-layer>` when the annotation
- * plugin is registered):
+ * `<epdf-form-layer>`: the form's fields on one page, painted as the engine draws them (their
+ * values, borders and fonts), with the controls people fill them in with. Put it above the
+ * page's picture (`<epdf-render-layer>`, and `<epdf-annotation-layer>` when the annotation
+ * plugin is registered); while it's there, the render layer leaves the fields out of the page's
+ * picture:
  *
  *   <ng-template epdfPage>
  *     <epdf-render-layer />
  *     <epdf-form-layer />
  *   </ng-template>
  *
- * It works with or without the annotation plugin. It shows while the active tool fills forms
- * (the `pointer` and `pan` tools do), and stands down in design mode, where fields are boxes
- * you select and move. Each field becomes a real HTML control (`controls.ts`), placed and
+ * It works with or without the annotation plugin. The controls show while the active tool fills
+ * forms (the `pointer` and `pan` tools do), and stand down in design mode, where fields are
+ * boxes you select and move. Each field becomes a real HTML control (`controls.ts`), placed and
  * styled like the field in the PDF, in the colors of the form settings, which the
  * `--epdf-form-*` CSS variables override.
  */
@@ -24,7 +26,12 @@ import {
   type Signal,
 } from '@angular/core';
 import type { CapabilityToken } from '@embedpdf/core';
-import { CapabilityBinding, injectKernelHost, injectPage } from '@embedpdf/angular/runtime';
+import {
+  CapabilityBinding,
+  injectKernelHost,
+  injectPage,
+  paintsPagePart,
+} from '@embedpdf/angular/runtime';
 import {
   FORM_DEFAULTS,
   FormToken,
@@ -42,12 +49,14 @@ import {
   FormTextControl,
   FormToggleControl,
 } from './controls';
+import { EpdfFieldPictures } from './field-pictures';
 
 const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
 
 @Component({
   selector: 'epdf-form-layer',
   imports: [
+    EpdfFieldPictures,
     FormTextControl,
     FormToggleControl,
     FormComboControl,
@@ -57,8 +66,9 @@ const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (active()) {
-      <div style="position: absolute; inset: 0; pointer-events: none">
+    <div style="position: absolute; inset: 0; pointer-events: none">
+      <epdf-field-pictures />
+      @if (active()) {
         <!-- One control per widget: a field with several boxes has one per box. -->
         @for (item of widgets(); track item.key + ':' + item.annotObjectNumber) {
           @switch (item.control) {
@@ -83,8 +93,8 @@ const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
             }
           }
         }
-      </div>
-    }
+      }
+    </div>
   `,
 })
 export class EpdfFormLayer {
@@ -126,10 +136,12 @@ export class EpdfFormLayer {
   });
 
   constructor() {
-    // Read the page's widgets once the layer shows: one annotation read per page.
+    // While it's here with the form plugin, the page's picture leaves the fields to it.
+    paintsPagePart(() => (this.form.capability() ? this.page.ref : null), 'formFields');
+    // Read the page's widgets when the layer comes to it: one read for the form.
     effect(() => {
       const form = this.form.capability();
-      if (form && this.active()) untracked(() => void form.ensureLoaded(this.page.ref));
+      if (form) untracked(() => void form.ensureLoaded(this.page.ref));
     });
   }
 }

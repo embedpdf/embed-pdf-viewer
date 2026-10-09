@@ -38,7 +38,7 @@ const ebook = async (): Promise<OpenInput> => {
       <MarkFromCode />
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <SelectionLayer />
           <AnnotationLayer />
         </template>

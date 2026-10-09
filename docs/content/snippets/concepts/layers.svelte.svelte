@@ -7,7 +7,7 @@
 </script>
 
 <Stage>
-  <RenderLayer annotations={false} />
+  <RenderLayer />
   <SearchLayer />
   <SelectionLayer />
   <AnnotationLayer />

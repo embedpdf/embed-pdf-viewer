@@ -79,29 +79,41 @@ export type RenderConfig = DeepPartial<RenderSettings>;
 // ── the raster vocabulary ───────────────────────────────────────────────────
 
 /**
+ * What a picture draws beside the page content. An option left out draws
+ * what the user may read: the annotations with `doc.annotate.read`, the form
+ * fields with `doc.forms.read`, and no form fields when `includeAnnotations`
+ * is `false`. `true` for something the user may not read is refused
+ * (`permission-denied`). Leave out what you paint yourself: a layer that
+ * paints annotations passes `includeAnnotations: false`, which leaves the
+ * form fields out too unless you ask for them (`includeFormFields: true`).
+ */
+export interface PageLayerOptions {
+  /** Draw the annotations (form fields' widgets excepted). */
+  includeAnnotations?: boolean;
+  /** Draw the form fields, each in the state its field shows. */
+  includeFormFields?: boolean;
+}
+
+/**
  * An encoded page image: `source` is bytes or a URL, `format`/`contentType`
  * say what they are, `width`/`height` its pixel size, and
  * `objectUrl()` mints a revocable object URL for an `<img>`.
  */
 export type PageImage = PageImageHandle;
 
-export interface RenderPageOptions extends OperationOptions {
+export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
   /** Exact output width in device pixels (height keeps the page's aspect). */
   width?: number;
   /** Device pixels per PDF point; ignored when `width` is given. Default 1. */
   scale?: number;
-  /** Bake annotations into the bitmap (default true). */
-  includeAnnotations?: boolean;
   /** Per-call encode overrides; default to the plugin's strategy. */
   format?: RenderFormat;
   quality?: number;
 }
 
-export interface RenderThumbnailOptions extends OperationOptions {
+export interface RenderThumbnailOptions extends OperationOptions, PageLayerOptions {
   /** The thumbnail's width in device pixels. */
   maxWidth: number;
-  /** Bake annotations (default true). */
-  includeAnnotations?: boolean;
 }
 
 export interface RenderPagesOptions extends RenderPageOptions {
@@ -116,14 +128,16 @@ export interface PageRender {
 }
 
 /**
- * The two invalidation scopes — every pixel-changing fact is one of them:
+ * The invalidation scopes — every pixel-changing fact is one of them:
  *
- *   'annotations' — only baked appearances changed (an annotation mutated, a
- *                   form widget re-baked). Base renders keep their pixels.
- *   'content'     — the page itself changed (redaction applied, text edited).
- *                   Invalidates everything: content strictly contains annotations.
+ *   'annotations' — an annotation changed. Pictures without annotations keep
+ *                   their pixels.
+ *   'fields'      — a form field changed: a fill, a widget's place or look,
+ *                   a signing. Pictures without form fields keep their pixels.
+ *   'content'     — the page itself changed (redaction applied, flattened).
+ *                   Invalidates every picture of the page.
  */
-export type InvalidateScope = 'content' | 'annotations';
+export type InvalidateScope = 'content' | 'annotations' | 'fields';
 
 export interface InvalidateOptions {
   /** The pages whose pixels changed, by ref or index; omitted = every page. */
@@ -179,13 +193,13 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
   /** The deployment's advertised render policy (a document fact). */
   getRenderPolicy(): EngineRenderPolicy;
   /**
-   * The version of the raster the given options would produce. Key a
-   * long-lived render on it: when it bumps, refetch. Base renders version on
-   * content facts; annotated renders on content and annotation facts. Bumps
-   * only on confirmed mutations — never optimistically. 0 for a page that
-   * isn't in the document.
+   * The version of the picture the given options would produce. Key a
+   * long-lived render on it: when it bumps, refetch. A picture versions on
+   * content facts, plus annotation facts when it draws annotations and form
+   * facts when it draws form fields. Bumps only on confirmed mutations —
+   * never optimistically. 0 for a page that isn't in the document.
    */
-  getRenderEpoch(page: PageRef | number, includeAnnotations?: boolean): number;
+  getRenderEpoch(page: PageRef | number, layers?: PageLayerOptions): number;
   /**
    * Declare that page pixels changed — the open door for facts the built-in
    * event map doesn't know (a plugin's own mutation vocabulary, anything

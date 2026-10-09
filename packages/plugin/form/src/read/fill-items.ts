@@ -4,9 +4,8 @@
  * annotation render items use, so layers position with the page transform
  * and never re-derive scale.
  *
- * Where a widget is and how it looks come from the widget plane (widgets are
- * annotations; their records carry `/Rect` and `/MK`), identity, value and
- * behavior from the field plane.
+ * Where a widget is and how it looks come from the form's widget rows (`/Rect`
+ * and `/MK`), identity, value and behavior from its field.
  */
 import type {
   AnnotationRef,
@@ -83,14 +82,16 @@ export type FormWidgetItem = FormWidgetItemBase &
   );
 
 /**
- * Project one widget of a field into a fill control. Null for families with
- * no fill control (the annotation plane draws those alone).
+ * Project one widget of a field into a fill control; `fillable`: the user may
+ * fill the field in (a signature field: sign it). Null for families with no
+ * fill control.
  */
 export function projectWidget(
   field: FormFieldDTO,
   annotObjectNumber: number,
   writing: FormState['writing'],
   widget: PageWidget,
+  fillable: boolean,
 ): FormWidgetItem | null {
   const key = fieldKeyOf(field);
   const base: FormWidgetItemBase = {
@@ -101,7 +102,7 @@ export function projectWidget(
       field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber)?.ref ?? null,
     box: widget.box,
     look: widget.look,
-    disabled: field.readOnly || writing[key] === true,
+    disabled: field.readOnly || !fillable || writing[key] === true,
     label: field.alternateName ?? field.name,
   };
   switch (field.family) {
@@ -169,15 +170,17 @@ export function projectWidget(
 }
 
 /**
- * Project one page's widgets into fill controls. Widgets whose page has not
- * loaded (or that are direct objects with no join key) are skipped; the
- * projection runs again when the page's widgets land.
+ * Project one page's widgets into fill controls, each disabled when the user
+ * may not fill its field in, or sign it (`mayFill`). Widgets whose page has not loaded (or
+ * that are direct objects with no join key) are skipped; the projection runs
+ * again when the page's widgets land.
  */
 export function fillItems(
   index: FieldIndex,
   pageObjectNumber: number,
   widgets: PageWidgets | undefined,
   writing: FormState['writing'],
+  mayFill: (field: FormFieldDTO) => boolean,
 ): FormWidgetItem[] {
   if (!index.snapshot || !widgets) return [];
   const items: FormWidgetItem[] = [];
@@ -186,7 +189,7 @@ export function fillItems(
       if (widget.page?.objectNumber !== pageObjectNumber) continue;
       const placed = widgets[widget.objectNumber];
       if (!placed) continue;
-      const item = projectWidget(field, widget.objectNumber, writing, placed);
+      const item = projectWidget(field, widget.objectNumber, writing, placed, mayFill(field));
       if (item) items.push(item);
     }
   }

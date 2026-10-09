@@ -226,8 +226,9 @@ A layer reads the page it draws on with `usePage()`, and the plugin through an o
   the root, so a `stopPropagation()` there runs after the Stage's own listener. For a press, use
   `isolatePointerDown(element, onPress)` from `@embedpdf/web` (as `<Anchored>` does); for the
   wheel, `isolateWheel`.
-- A layer that conflicts with another publishes a fact with `usePageLayerFact`
-  (`src/runtime/dev-registry.svelte.ts`), as `<RenderLayer>` does.
+- A layer that paints a part of the page itself (the annotations, the form fields) says so with
+  `usePaintsPagePart` (`src/runtime/page-layers.svelte.ts`), and `<RenderLayer>` leaves that part
+  out of the page's picture.
 - Shared, framework-free browser code belongs in `@embedpdf/web`; if what you need isn't there,
   write it small, here, and say so (it's a candidate to move).
 

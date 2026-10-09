@@ -7,6 +7,7 @@
  *   [epdfDocumentScope], *epdfDocumentGate  which document a part of the template talks to
  *   pluginService(), EpdfPluginService      how a plugin's service is built
  *   EPDF_PAGE, injectPage()                 the page a layer draws on
+ *   paintsPagePart(), injectPaintedParts()  which parts of a page its layers paint
  */
 
 // The core's types and helpers, so app code has one import for the viewer.
@@ -25,5 +26,6 @@ export * from './services';
 export { provideEmbedPdf, EPDF_SCOPED_SERVICES } from './provide';
 export * from './scope';
 export * from './page-context';
+export * from './page-layers';
 export * from './dev';
 export * from './theme';

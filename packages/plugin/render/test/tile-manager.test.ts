@@ -77,7 +77,11 @@ function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
       demand: Parameters<TileManager['plan']>[2],
       includeAnnotations: boolean,
       view = 'test',
-    ) => tileManager.plan(view, pageObjectNumber, demand, includeAnnotations),
+    ) =>
+      tileManager.plan(view, pageObjectNumber, demand, {
+        includeAnnotations,
+        includeFormFields: includeAnnotations,
+      }),
     sourcePainted: (pageObjectNumber: number, key: string, view = 'test') =>
       tileManager.sourcePainted(view, pageObjectNumber, key),
     sourceUnpainted: (pageObjectNumber: number, key: string, view = 'test') =>

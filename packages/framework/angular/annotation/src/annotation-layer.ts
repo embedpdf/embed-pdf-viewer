@@ -1,10 +1,10 @@
 /**
  * `<epdf-annotation-layer>`: a page's annotations, the selection's outline and handles, the
  * tool's preview, and the text boxes being typed in. Put it in each page, above the rendered
- * page, with the render layer leaving annotations out:
+ * page; while it's there, the render layer leaves the annotations out of the page's picture:
  *
  *   <ng-template epdfPage>
- *     <epdf-render-layer [annotations]="false" />
+ *     <epdf-render-layer />
  *     <epdf-annotation-layer />
  *   </ng-template>
  *
@@ -40,7 +40,7 @@ import {
   CapabilityBinding,
   injectKernelHost,
   injectPage,
-  publishPageLayerFact,
+  paintsPagePart,
 } from '@embedpdf/angular/runtime';
 import type { Annotation, TextItem } from '@embedpdf/plugin-annotation';
 import { previewBucket } from '@embedpdf/plugin-annotation/contract/host';
@@ -418,7 +418,8 @@ export class EpdfAnnotationLayer {
   });
 
   constructor() {
-    publishPageLayerFact(this.page, 'annotationRenderers', () => this.renderers());
+    // While it's here, the page's picture leaves the annotations to it.
+    paintsPagePart(() => this.page.ref, 'annotations');
     this.registerBehaviors();
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
     this.loadAppearances();

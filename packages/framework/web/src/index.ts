@@ -207,8 +207,21 @@ export type {
   RendererEntry,
   RendererInteractiveContext,
 } from './annotation-renderers';
-export { bakedAppearanceOf, loadAppearanceUrls, loadObjectUrl, objectUrlOf } from './object-urls';
-export type { AppearancePicture, AppearanceUrl, ObjectUrl, PictureBytes } from './object-urls';
+export {
+  bakedAppearanceOf,
+  loadAppearanceUrls,
+  loadFieldPictureUrls,
+  loadObjectUrl,
+  objectUrlOf,
+  shownFieldPicture,
+} from './object-urls';
+export type {
+  AppearancePicture,
+  AppearanceUrl,
+  FieldPicture,
+  ObjectUrl,
+  PictureBytes,
+} from './object-urls';
 export { enrichCommentThreads } from './comment-threads';
 export type { CommentPageLayout, CommentThreadPage } from './comment-threads';
 export {
@@ -280,6 +293,15 @@ export type {
   PageContextTransform,
   PageFrameShape,
 } from './page-context';
+export { pageLayersOf, partsDrawnTwice, pictureLayerOptionsOf } from './page-layers';
+export type {
+  PageLayers,
+  PagePart,
+  PaintedParts,
+  PartRights,
+  PictureLayerOptions,
+  PicturePartProps,
+} from './page-layers';
 export { pageSurfaceLayout, pageViewTransformInput, stagePageDemand } from './page-surface';
 export type {
   PageSurfaceLayout,

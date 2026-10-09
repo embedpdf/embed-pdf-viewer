@@ -102,7 +102,7 @@ const TOOL_OF_MODE: Record<Mode, string> = { view: 'pointer', annotate: 'highlig
       </div>
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>

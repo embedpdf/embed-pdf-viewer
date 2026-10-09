@@ -21,7 +21,9 @@ import {
   foldFormEvent,
   indexFields,
   initialFormState,
+  pageWidgetsOf,
   removeWidgets,
+  shownWidgetsOf,
   upsertWidgets,
   widgetAt,
   widgetRowOf,
@@ -41,6 +43,7 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -71,6 +74,8 @@ const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
 const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
 const event = (value: object) => ({ origin, widgets: [], ...value }) as unknown as DocumentEvent;
 const NO_WRITES = {};
+/** A user who may fill in every field. */
+const ALWAYS = () => true;
 const LOOK: FormWidgetLook = {
   border: '#6b7280',
   borderWidth: 1,
@@ -123,6 +128,32 @@ describe('field index', () => {
     index = removeWidgets(index, [formWidget(4, toPageRef(3))]);
     expect(widgetRowOf(index, 4)).toBeNull();
     expect(widgetRowOf(index, 9)?.rect.x).toBe(60);
+  });
+
+  test("a page's widgets leave out the hidden ones, and say the state each shows", () => {
+    const row = (objectNumber: number, flags: object, appearanceState: string | null = null) =>
+      ({
+        subtype: 'widget',
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber },
+        page: toPageRef(3),
+        rect: { x: 0, y: 0, width: 10, height: 10 },
+        hidden: false,
+        noView: false,
+        appearanceState,
+        ...flags,
+      }) as unknown as WidgetAnnotation;
+    const index = indexFields({
+      ...snapshot([text()]),
+      widgets: [row(4, {}, 'Off'), row(5, { hidden: true }), row(6, { noView: true }), row(7, {})],
+    });
+    expect(shownWidgetsOf(index, 3).map((widget) => widget.appearanceState)).toEqual(['Off', null]);
+    expect(
+      shownWidgetsOf(index, 3).map(
+        (widget) => (widget.ref as { objectNumber: number }).objectNumber,
+      ),
+    ).toEqual([4, 7]);
+    expect(Object.keys(pageWidgetsOf(index, 3))).toEqual(['4', '7']);
+    expect(shownWidgetsOf(index, 99)).toEqual([]);
   });
 
   test('folds value, structural and batch events from their data', () => {
@@ -231,8 +262,8 @@ describe('field index', () => {
 describe('fill projection', () => {
   test('joins the field plane with widget geometry', () => {
     const index = indexFields(snapshot([text()]));
-    expect(fillItems(index, 3, undefined, NO_WRITES)).toEqual([]);
-    const items = fillItems(index, 3, BOXES, NO_WRITES);
+    expect(fillItems(index, 3, undefined, NO_WRITES, ALWAYS)).toEqual([]);
+    const items = fillItems(index, 3, BOXES, NO_WRITES, ALWAYS);
     expect(items.length).toBe(1);
     const item = items[0]!;
     expect(item.control).toBe('text');
@@ -242,16 +273,18 @@ describe('fill projection', () => {
       expect(item.value).toBe('abc');
       expect(item.maxLength).toBe(5);
     }
-    expect(fillItems(index, 99, BOXES, NO_WRITES)).toEqual([]);
+    expect(fillItems(index, 99, BOXES, NO_WRITES, ALWAYS)).toEqual([]);
   });
 
   test('read-only and in-flight fields project as disabled', () => {
     const readOnly = text({ readOnly: true });
-    expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES)[0]!.disabled).toBe(
+    expect(
+      fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES, ALWAYS)[0]!.disabled,
+    ).toBe(true);
+    const writing = beginWrite(initialFormState(), 'obj:4').writing;
+    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, writing, ALWAYS)[0]!.disabled).toBe(
       true,
     );
-    const writing = beginWrite(initialFormState(), 'obj:4').writing;
-    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, writing)[0]!.disabled).toBe(true);
   });
 });
 
@@ -267,6 +300,7 @@ const signature = (
   noExport: false,
   alternateName: 'Sign here',
   mappingName: null,
+  groupId: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -281,13 +315,13 @@ const signature = (
 
 describe('signature widgets', () => {
   test('an unsigned signature field projects a "signature" fill item', () => {
-    const item = projectWidget(signature(), 9, NO_WRITES, BOXES[4]!);
+    const item = projectWidget(signature(), 9, NO_WRITES, BOXES[4]!, true);
     expect(item).toMatchObject({ control: 'signature', signed: false, label: 'Sign here' });
   });
 
   test('a /V on the field marks the item signed', () => {
     const signed = signature({ valueEntry: { kind: 'unsupported' } });
-    expect(projectWidget(signed, 9, NO_WRITES, BOXES[4]!)).toMatchObject({
+    expect(projectWidget(signed, 9, NO_WRITES, BOXES[4]!, true)).toMatchObject({
       control: 'signature',
       signed: true,
     });
