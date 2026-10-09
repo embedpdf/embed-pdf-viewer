@@ -1,3 +1,4 @@
+import { materializePdfPermissions } from './builders';
 import { parseScope } from './parser';
 import type {
   CollabAction,
@@ -258,61 +259,9 @@ export function filterMatches(filter: CollabFilter, target: CollabTarget, id: Id
 
 /**
  * Translate `pdf.permissions` (virtual scope) into the concrete
- * capabilities it represents under the current PDF bit configuration.
- *
- * Always adds `doc.open` and `doc.render` — these are cloud-only
- * capabilities with no PDF bit, but `pdf.permissions` is meant to be
- * the "give the user a working session" shorthand. Without them, a
- * token with just `['pdf.permissions']` would be useless.
- *
- * Reads are unconditional: ISO 32000 / Acrobat let any reader see
- * existing annotations and form values regardless of permission bits.
- * Bit 6 governs *writing*, not visibility.
- *
- * Bit-derived expansions follow ISO 32000:
- *   bit 5   → doc.text.{select, copy, search}, doc.content.copy
- *   bit 3   → doc.print
- *   bit 12  → doc.print.high (requires bit 3 also set)
- *   bit 4   → doc.pages.modify, doc.redact, doc.metadata.modify, doc.attachments.modify
- *   bit 11  → doc.pages.assemble
- *   bit 6   → doc.annotate.modify
- *   bit 6/9 → doc.forms.fill
- *   bit 6+4 → doc.forms.modify
- *
- * Note: this same expansion lives in builders.ts as
- * `materializePdfPermissions` for SDK-side use. The two must stay in
- * sync; a test in resolver.test.ts pins them together.
+ * capabilities it represents under the current PDF bit configuration:
+ * {@link materializePdfPermissions}, the one reading of the bits.
  */
 function addPdfPermissions(out: Set<DocCapability>, b: PdfBits): void {
-  // Always — pdf.permissions means "give me a working session"
-  out.add('doc.open');
-  out.add('doc.render');
-  // Reading existing annotations and form values is unconditional —
-  // PDF bit 6 governs writes, not visibility.
-  out.add('doc.annotate.read');
-  out.add('doc.forms.read');
-
-  if (b.bit5) {
-    out.add('doc.text.select');
-    out.add('doc.text.copy');
-    out.add('doc.text.search');
-    out.add('doc.content.copy');
-  }
-  if (b.bit3) out.add('doc.print');
-  if (b.bit12 && b.bit3) out.add('doc.print.high');
-  if (b.bit4) {
-    out.add('doc.pages.modify');
-    out.add('doc.redact');
-    out.add('doc.metadata.modify');
-    out.add('doc.attachments.modify');
-  }
-  if (b.bit11) out.add('doc.pages.assemble');
-  if (b.bit6) {
-    out.add('doc.annotate.modify');
-  }
-  if (b.bit6 || b.bit9) {
-    out.add('doc.forms.fill');
-    out.add('doc.sign');
-  }
-  if (b.bit6 && b.bit4) out.add('doc.forms.modify');
+  for (const capability of materializePdfPermissions(b)) out.add(capability);
 }

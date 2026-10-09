@@ -16,10 +16,9 @@ export type DocumentAccessReason = 'password' | 'cdn' | 'permissions-unknown';
  * not the raw bit names — so docs can render "Print: disabled" without
  * the reader needing to know PDF bit positions.
  *
- * Computed from {@link PdfBits} via the strict ISO 32000 rules:
- *   bit 12 only meaningful when bit 3 is also set
- *   form modification requires both bit 6 and bit 4
- *   form fill is satisfied by bit 6 or bit 9
+ * Computed from {@link PdfBits} as `pdf.permissions` reads them, which
+ * is what Acrobat allows on the file: for example, form fill comes with
+ * bit 4, 6 or 9, and form modification needs both bit 4 and bit 6.
  */
 export interface PdfPermissionAdvisory {
   readonly canPrint: boolean;

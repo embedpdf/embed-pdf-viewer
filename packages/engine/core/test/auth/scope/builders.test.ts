@@ -3,7 +3,6 @@ import {
   caps,
   collab,
   decodePdfBits,
-  expandRawScope,
   materializePdfPermissions,
   parseScope,
   pdfPermissions,
@@ -183,9 +182,10 @@ describe('materializePdfPermissions', () => {
     expect(set.has('doc.annotate.read')).toBe(true); // unconditional, already in set
   });
 
-  it('bit 9 adds doc.forms.fill; doc.forms.read is unconditional', () => {
+  it('bit 9 adds doc.forms.fill and doc.sign; doc.forms.read is unconditional', () => {
     const set = new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.FILL_FORMS)));
     expect(set.has('doc.forms.fill')).toBe(true);
+    expect(set.has('doc.sign')).toBe(true);
     expect(set.has('doc.forms.read')).toBe(true); // unconditional
   });
 
@@ -214,42 +214,6 @@ describe('materializePdfPermissions', () => {
         'doc.print.high',
       ),
     ).toBe(true);
-  });
-});
-
-describe('materialize-vs-resolver parity (CRITICAL: keep in sync)', () => {
-  // Iterate every relevant bit configuration; the set produced by
-  // materializePdfPermissions must equal the set produced by
-  // expandRawScope(['pdf.permissions'], bits). If this test ever fails,
-  // someone has changed one of the two expansion implementations without
-  // updating the other.
-  const allMasks = [
-    0,
-    PDF_BITS.PRINT,
-    PDF_BITS.MODIFY,
-    PDF_BITS.COPY,
-    PDF_BITS.ANNOTATE_FILL,
-    PDF_BITS.FILL_FORMS,
-    PDF_BITS.ACCESSIBILITY,
-    PDF_BITS.ASSEMBLE,
-    PDF_BITS.PRINT_HIGH,
-    PDF_BITS.PRINT | PDF_BITS.PRINT_HIGH,
-    PDF_BITS.ANNOTATE_FILL | PDF_BITS.MODIFY,
-    PDF_BITS.ANNOTATE_FILL | PDF_BITS.FILL_FORMS,
-    PDF_BITS.PRINT |
-      PDF_BITS.MODIFY |
-      PDF_BITS.COPY |
-      PDF_BITS.ANNOTATE_FILL |
-      PDF_BITS.FILL_FORMS |
-      PDF_BITS.ASSEMBLE |
-      PDF_BITS.PRINT_HIGH,
-  ];
-
-  it.each(allMasks)('mask=%i: materialize matches expandRawScope', (mask) => {
-    const bits = decodePdfBits(mask);
-    const fromMaterialize = new Set<DocCapability>(materializePdfPermissions(bits));
-    const fromExpand = expandRawScope(['pdf.permissions'], bits);
-    expect(fromMaterialize).toEqual(fromExpand);
   });
 });
 

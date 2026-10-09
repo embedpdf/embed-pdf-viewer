@@ -4,7 +4,7 @@ import type {
   PdfPermissionAdvisory,
   PdfPermissionInfo,
 } from './DocumentSecurityService';
-import type { PdfBits } from '../auth/scope';
+import { materializePdfPermissions, type PdfBits } from '../auth/scope';
 import type { DocumentSecurityProbeInfo } from '../wire/worker-protocol';
 
 export interface DocumentHeadLike {
@@ -66,20 +66,20 @@ export function permissionInfoWithAdvisory(
 
 /**
  * Translate a {@link PdfBits} view into the capability-shaped
- * {@link PdfPermissionAdvisory}. The rules here must mirror the bit
- * combinations the scope resolver uses for `pdf.permissions`
- * expansion — `doc.print.high` requires bit 12 and bit 3, etc.
+ * {@link PdfPermissionAdvisory}: what `pdf.permissions` grants on a file
+ * with these bits.
  */
 export function advisoryFromPdfBits(b: PdfBits): PdfPermissionAdvisory {
+  const granted = new Set(materializePdfPermissions(b));
   return {
-    canPrint: b.bit3,
-    canPrintHigh: b.bit12 && b.bit3,
-    canCopy: b.bit5,
-    canAnnotate: b.bit6,
-    canFillForms: b.bit6 || b.bit9,
-    canModifyForms: b.bit6 && b.bit4,
-    canModifyPages: b.bit4,
-    canAssemble: b.bit11,
+    canPrint: granted.has('doc.print'),
+    canPrintHigh: granted.has('doc.print.high'),
+    canCopy: granted.has('doc.text.copy'),
+    canAnnotate: granted.has('doc.annotate.modify'),
+    canFillForms: granted.has('doc.forms.fill'),
+    canModifyForms: granted.has('doc.forms.modify'),
+    canModifyPages: granted.has('doc.pages.modify'),
+    canAssemble: granted.has('doc.pages.assemble'),
   };
 }
 

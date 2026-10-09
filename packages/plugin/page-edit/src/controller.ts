@@ -20,7 +20,7 @@ import type {
 
 import type { PageEditCapability, PageEditInsertResult, PagePlacement } from './contract';
 
-/** PDF permission bit 11 (assemble: insert, rotate and delete pages). The engine enforces it too. */
+/** Inserting, rotating and deleting pages (PDF permission bit 4 or 11). The engine enforces it too. */
 const ASSEMBLE: DocCapability = 'doc.pages.assemble';
 /** Copying pages out of a document is a partial download. The engine enforces it too. */
 const DOWNLOAD: DocCapability = 'doc.download';

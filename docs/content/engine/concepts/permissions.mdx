@@ -153,6 +153,25 @@ Put `pdf.permissions` in the token's scope, next to the other permissions.
 
 </Engine>
 
+`pdf.permissions` gives what Acrobat allows on the same file. The names are the ones in Acrobat's
+security summary for the file:
+
+| The file allows                      | `pdf.permissions` gives                                                                                                                  |
+| :----------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| Printing                             | `doc.print`, and `doc.print.high` when it allows printing at full quality                                                                |
+| Content copying                      | `doc.text.select`, `doc.text.search` and `doc.text.copy`                                                                                 |
+| Changing the document                | `doc.pages.modify`, `doc.pages.assemble`, `doc.redact`, `doc.metadata.modify`, `doc.attachments.modify`, `doc.forms.fill` and `doc.sign` |
+| Commenting                           | `doc.annotate.modify`, `doc.forms.fill` and `doc.sign`                                                                                   |
+| Changing the document and commenting | all of those, and `doc.forms.modify`                                                                                                     |
+| Filling in form fields               | `doc.forms.fill` and `doc.sign`                                                                                                          |
+| Document assembly                    | `doc.pages.assemble`                                                                                                                     |
+
+It always gives `doc.open`, `doc.render`, `doc.annotate.read` and `doc.forms.read` too: the file's
+restrictions are about changing it, never about seeing its annotations and fields. Signing a
+signature field counts as filling it in, so whatever allows filling in allows signing. Designing
+the form takes both changing the document and commenting, as in Acrobat, where a file that only
+allows commenting and filling in offers no form tools.
+
 When the user unlocks the file with its owner password, the file's restrictions no longer apply.
 See [Opening documents](/docs/engine/documents/opening#password-protected-files).
 

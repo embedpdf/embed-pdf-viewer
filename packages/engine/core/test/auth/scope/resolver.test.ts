@@ -121,9 +121,11 @@ describe('pdf.permissions expansion — bit-derived', () => {
     expect(checkCapability('doc.metadata.modify', ['pdf.permissions'], bits)).toBe(true);
   });
 
-  it('bit 11 grants doc.pages.assemble', () => {
-    const bits = decodePdfBits(PDF_BITS.ASSEMBLE);
-    expect(checkCapability('doc.pages.assemble', ['pdf.permissions'], bits)).toBe(true);
+  it('bit 11 or bit 4 grants doc.pages.assemble', () => {
+    const onlyB11 = decodePdfBits(PDF_BITS.ASSEMBLE);
+    const onlyB4 = decodePdfBits(PDF_BITS.MODIFY);
+    expect(checkCapability('doc.pages.assemble', ['pdf.permissions'], onlyB11)).toBe(true);
+    expect(checkCapability('doc.pages.assemble', ['pdf.permissions'], onlyB4)).toBe(true);
   });
 
   it('bit 6 grants doc.annotate.read AND doc.annotate.modify', () => {
@@ -132,14 +134,15 @@ describe('pdf.permissions expansion — bit-derived', () => {
     expect(checkCapability('doc.annotate.modify', ['pdf.permissions'], bits)).toBe(true);
   });
 
-  it('bit 6 OR bit 9 grants doc.forms.fill', () => {
-    const onlyB6 = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
-    const onlyB9 = decodePdfBits(PDF_BITS.FILL_FORMS);
-    expect(checkCapability('doc.forms.fill', ['pdf.permissions'], onlyB6)).toBe(true);
-    expect(checkCapability('doc.forms.fill', ['pdf.permissions'], onlyB9)).toBe(true);
+  it('bit 4, 6 or 9 grants doc.forms.fill and doc.sign', () => {
+    for (const bit of [PDF_BITS.MODIFY, PDF_BITS.ANNOTATE_FILL, PDF_BITS.FILL_FORMS]) {
+      const bits = decodePdfBits(bit);
+      expect(checkCapability('doc.forms.fill', ['pdf.permissions'], bits)).toBe(true);
+      expect(checkCapability('doc.sign', ['pdf.permissions'], bits)).toBe(true);
+    }
   });
 
-  it('doc.forms.modify requires bit 6 AND bit 4 (strict PDF spec)', () => {
+  it('doc.forms.modify requires bit 6 AND bit 4', () => {
     const onlyB6 = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
     const onlyB4 = decodePdfBits(PDF_BITS.MODIFY);
     const both = decodePdfBits(PDF_BITS.ANNOTATE_FILL | PDF_BITS.MODIFY);

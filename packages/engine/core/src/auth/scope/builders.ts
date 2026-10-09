@@ -145,8 +145,10 @@ export const pdfPermissions = (): 'pdf.permissions' => 'pdf.permissions';
  *     'doc.download',
  *   ];
  *
- * Important: this must stay in sync with `addPdfPermissions` inside
- * resolver.ts. A test pins them together.
+ * This is the one reading of the bits: the scope resolver and the
+ * permission advisory both use it. It follows what Acrobat allows on a
+ * file with these bits, which is broader than ISO 32000 in one place:
+ * bit 4 ("changing the document") also allows filling in and signing.
  */
 export function materializePdfPermissions(b: PdfBits): DocCapability[] {
   const out = new Set<DocCapability>();
@@ -173,12 +175,17 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
     out.add('doc.metadata.modify');
     out.add('doc.attachments.modify');
   }
-  if (b.bit11) out.add('doc.pages.assemble');
+  // Bit 11 assembles pages even when bit 4 is clear; bit 4 includes it.
+  if (b.bit4 || b.bit11) out.add('doc.pages.assemble');
   if (b.bit6) out.add('doc.annotate.modify');
-  if (b.bit6 || b.bit9) {
+  // Signing a signature field is filling it in. Acrobat (and PDFium's form
+  // filler) let any of the three bits fill in.
+  if (b.bit4 || b.bit6 || b.bit9) {
     out.add('doc.forms.fill');
     out.add('doc.sign');
   }
+  // Changing existing fields takes both: Acrobat keeps them in fill mode
+  // under bit 4 alone, and offers no form tools under bit 6 or 9 alone.
   if (b.bit6 && b.bit4) out.add('doc.forms.modify');
 
   return [...out];
