@@ -61,6 +61,7 @@ import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
   requireDocAccessOnly,
   requireLayerCapability,
+  requireLayerFieldWrite,
   requireLayerDocAccessOnly,
   requireLayerResource,
   requireResource,
@@ -204,7 +205,8 @@ export async function registerSignatureRoutes(
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+    // Whether this field is the token's to sign (its group) is checked in the worker.
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
     // Appearance artwork is a page of a PDF: the stamp rule (sniffed, never declared).
     const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
     const parsed = parseOrInvalidArg(
@@ -229,7 +231,7 @@ export async function registerSignatureRoutes(
     setNoStore(reply);
     const prepared = await layerService.prepareSignature(
       ctx,
-      { docId, layerName, input },
+      { docId, layerName, input, authority: ctx.authority },
       abortSignalOf(reply),
     );
     return encodePrepared(prepared);
@@ -245,7 +247,9 @@ export async function registerSignatureRoutes(
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+      // Its field was checked when the signing was prepared; the signing id
+      // goes only to whoever prepared it.
+      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
       const body = parseOrInvalidArg(
         SignatureCompleteBodySchema as unknown as SchemaLike<
           ReturnType<typeof SignatureCompleteBodySchema.parse>
@@ -276,7 +280,7 @@ export async function registerSignatureRoutes(
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
     setNoStore(reply);
     return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });

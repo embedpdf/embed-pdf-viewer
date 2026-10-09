@@ -4,4 +4,5 @@ export default {
   authoring: 'Creating form fields',
   'import-export': 'Import & export',
   signatures: 'Digital signatures',
+  groups: 'Signers and groups',
 };

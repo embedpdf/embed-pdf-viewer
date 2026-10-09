@@ -104,6 +104,12 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   /** Effective inherited field `/AA` actions. */
   actions?: PdfFieldActions<C['destination']>;
   /**
+   * The group the field belongs to: who fills it in (the buyer's fields).
+   * `fields:` scopes grant filling in and signing by group. `null` for a
+   * field in no group.
+   */
+  groupId: string | null;
+  /**
    * The user who created the field, as the creating session's identity
    * named them; `null` for a field another tool made, or an anonymous
    * session.

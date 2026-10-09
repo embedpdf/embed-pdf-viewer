@@ -2,7 +2,14 @@ import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import type { AnnotationRef } from '../../identity/AnnotationRef';
 import { PermissionDenied } from './errors';
-import { checkCapability, checkCollab, checkSetGroup, collabTargetOf } from './resolver';
+import {
+  checkAnyFieldAction,
+  checkCapability,
+  checkCollab,
+  checkFieldAction,
+  checkSetGroup,
+  collabTargetOf,
+} from './resolver';
 import type { AnnotationActor, DocCapability, Identity, PdfBits } from './types';
 import { describeProtection, protectedCapabilities } from '../../signature/protection';
 import type { DocumentProtection } from '../../signature/types';
@@ -137,7 +144,7 @@ export function authorizeAnnotationCreate(
   if (grants) {
     if (
       group !== undefined &&
-      !checkSetGroup(group, identity.groupId, grants.scope, grants.pdfBits)
+      !checkSetGroup('annotations', group, identity.groupId, grants.scope)
     ) {
       throw new PermissionDenied(`annotations:set-group:group=${group}`, 'target');
     }
@@ -178,7 +185,7 @@ export function authorizeAnnotationUpdate(
   if (
     reassigning &&
     grants &&
-    !checkSetGroup(patchGroupId, identity.groupId, grants.scope, grants.pdfBits)
+    !checkSetGroup('annotations', patchGroupId, identity.groupId, grants.scope)
   ) {
     throw new PermissionDenied(`annotations:set-group:group=${patchGroupId}`, 'target');
   }
@@ -215,4 +222,68 @@ export function authorizeAnnotationDelete(
       refused.map((member) => member.ref),
     );
   }
+}
+
+/** Whether a form-field write may fill in a field, or sign a signature field. */
+export type FieldWriteAction = 'fill' | 'sign';
+
+/**
+ * Check that the caller may `action` (fill in, or sign) the field in
+ * `groupId`: `ProtectedDocument` when a signature in the document took the
+ * capability away, `PermissionDenied` naming the scope it would take when
+ * the grants don't reach the field's group.
+ */
+export function authorizeFieldWrite(
+  authority: ChangeAuthority,
+  groupId: string | null,
+  action: FieldWriteAction,
+): void {
+  authorizeUnprotected(authority, fieldCapability(action));
+  if (!allowsFieldWrite(authority, groupId, action)) {
+    throw new PermissionDenied(
+      groupId === null ? fieldCapability(action) : `fields:${action}:group=${groupId}`,
+      'target',
+    );
+  }
+}
+
+/** Whether the caller may `action` the field in `groupId`: what {@link authorizeFieldWrite} checks. */
+export function allowsFieldWrite(
+  authority: ChangeAuthority,
+  groupId: string | null,
+  action: FieldWriteAction,
+): boolean {
+  const { grants, protection } = authority;
+  if (protection && protectedCapabilities(protection).has(fieldCapability(action))) return false;
+  return !grants || checkFieldAction(action, groupId, grants.scope, grants.pdfBits, protection);
+}
+
+/**
+ * Whether the caller may `action` some field: what a form verb checks
+ * before it knows which fields it writes. Each field is then checked in
+ * the write with {@link authorizeFieldWrite}.
+ */
+export function allowsSomeFieldWrite(
+  authority: ChangeAuthority,
+  action: FieldWriteAction,
+): boolean {
+  const { grants, protection } = authority;
+  if (protection && protectedCapabilities(protection).has(fieldCapability(action))) return false;
+  return !grants || checkAnyFieldAction(action, grants.scope, grants.pdfBits, protection);
+}
+
+/**
+ * Check that the caller may put a form field in `groupId`: their own
+ * default group always, another with `fields:set-group` for it.
+ */
+export function authorizeFieldGroup(authority: ChangeAuthority, groupId: string): void {
+  const { identity, grants } = authority;
+  if (grants && !checkSetGroup('fields', groupId, identity.groupId, grants.scope)) {
+    throw new PermissionDenied(`fields:set-group:group=${groupId}`, 'target');
+  }
+}
+
+/** The broad capability a field action takes without a `fields:` scope. */
+function fieldCapability(action: FieldWriteAction): DocCapability {
+  return action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
 }

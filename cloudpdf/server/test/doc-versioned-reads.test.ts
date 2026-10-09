@@ -313,36 +313,49 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     expect(res.status).toBe(403);
   });
 
-  test('a picture with annotations takes doc.annotate.read, at both tiers', async () => {
+  test('each picture takes doc.render and the read of what it draws, at both tiers', async () => {
     const tenantId = 'tenant-annotatedperm';
     const docId = 'doctxx009';
     await seedDocument(fx, tenantId, docId);
-    const token =
-      'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
+    const options = 'background=white,format=webp,viewport.kind=width,viewport.width=320';
     const fetchAs = (scope: string[], path: string) =>
       fetch(`${fx.baseUrl}/v1/docs/${docId}${path}`, {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, { scope })}` },
       });
+    const families = [
+      { path: 'render/pages', pins: 'contentVersion=1', reads: [] },
+      {
+        path: 'render/annotations/pages',
+        pins: 'annotationVersion=1,contentVersion=1',
+        reads: ['doc.annotate.read'],
+      },
+      {
+        path: 'render/fields/pages',
+        pins: 'contentVersion=1,widgetVersion=1',
+        reads: ['doc.forms.read'],
+      },
+      {
+        path: 'render/all/pages',
+        pins: 'annotationVersion=1,contentVersion=1,widgetVersion=1',
+        reads: ['doc.annotate.read', 'doc.forms.read'],
+      },
+    ];
 
-    for (const path of [
-      `/render/annotated/pages/obj:1/data@${token}`,
-      `/layers/default/render/annotated/pages/obj:1/data@${token}`,
-    ]) {
-      expect((await fetchAs(['doc.open', 'doc.render'], path)).status).toBe(403);
-      expect((await fetchAs(['doc.open', 'doc.render', 'doc.forms.fill'], path)).status).toBe(403);
-      expect(
-        (await fetchAs(['doc.open', 'doc.render', 'doc.annotate.read'], path)).status,
-      ).toBe(200);
+    for (const family of families) {
+      // The token's fields in their canonical (alphabetical) order.
+      const token = [...family.pins.split(','), ...options.split(',')].sort().join(',');
+      for (const path of [
+        `/${family.path}/obj:1/data@${token}`,
+        `/layers/default/${family.path}/obj:1/data@${token}`,
+      ]) {
+        const scope = ['doc.open', 'doc.render', ...family.reads];
+        expect((await fetchAs(scope, path)).status).toBe(200);
+        for (const missing of family.reads) {
+          const short = scope.filter((s) => s !== missing);
+          expect((await fetchAs(short, path)).status).toBe(403);
+        }
+      }
     }
-    // The page alone still takes doc.render only.
-    expect(
-      (
-        await fetchAs(
-          ['doc.open', 'doc.render'],
-          '/render/pages/obj:1/data@background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320',
-        )
-      ).status,
-    ).toBe(200);
   });
 
   test('missing Authorization header returns 401', async () => {

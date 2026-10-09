@@ -30,16 +30,17 @@ for (const field of fields) {
 
 Every field has these:
 
-| Field           | What it is                                                                                                  |
-| :-------------- | :---------------------------------------------------------------------------------------------------------- |
-| `name`          | The full name, with the groups it's in: `billing.name`.                                                     |
-| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'`, `'signature'` or `'unknown'`. |
-| `ref`           | Its address. Keep it: it's how you fill, reset or change the field.                                         |
-| `readOnly`      | `true` when PDF apps don't let the user change the value.                                                   |
-| `required`      | `true` when PDF apps ask for a value before the form is submitted.                                          |
-| `noExport`      | `true` when the field is left out when the form is submitted.                                               |
-| `alternateName` | The tooltip PDF apps show, also read by screen readers, or `null`.                                          |
-| `widgets`       | Where the field shows on the pages (see [Widgets](#widgets)).                                               |
+| Field           | What it is                                                                                                                          |
+| :-------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
+| `name`          | The full name, with the groups it's in: `billing.name`.                                                                             |
+| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'`, `'signature'` or `'unknown'`.                         |
+| `ref`           | Its address. Keep it: it's how you fill, reset or change the field.                                                                 |
+| `readOnly`      | `true` when PDF apps don't let the user change the value.                                                                           |
+| `required`      | `true` when PDF apps ask for a value before the form is submitted.                                                                  |
+| `noExport`      | `true` when the field is left out when the form is submitted.                                                                       |
+| `alternateName` | The tooltip PDF apps show, also read by screen readers, or `null`.                                                                  |
+| `groupId`       | The group the field belongs to: who fills it in, such as `'buyer'`, or `null`. See [Signers and groups](/docs/engine/forms/groups). |
+| `widgets`       | Where the field shows on the pages (see [Widgets](#widgets)).                                                                       |
 
 A document without a form returns an empty `fields`. The list's `formKind` says what the document
 has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'` (see [Good to know](#xfa-forms)).

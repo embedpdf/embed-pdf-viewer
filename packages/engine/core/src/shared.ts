@@ -128,6 +128,7 @@ export type {
   PageRenderEncodedFormat,
   PageRenderFormat,
   PageRenderImage,
+  PageRenderLayers,
   PageRenderOptions,
   PageRenderRaster,
   PageRenderQuery,
@@ -847,6 +848,8 @@ export type {
   CollabEntity,
   CollabFilter,
   DocCapability,
+  FieldAction,
+  FieldFilter,
   Identity,
   ParsedCapability,
   ParsedCollab,
@@ -858,7 +861,7 @@ export type {
 export { PDF_BITS, decodePdfBits } from './auth/scope';
 export { parseScope, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
-export type { AnnotationAuthority, ChangeAuthority } from './auth/scope';
+export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {
   annotationWriteCapabilities,
   annotationWriteCapability,
@@ -868,13 +871,19 @@ export {
   authorizeUnprotected,
   authorizeAnnotationDelete,
   authorizeAnnotationUpdate,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
+  authorizeFieldGroup,
+  authorizeFieldWrite,
 } from './auth/scope';
 export type { CollabTarget } from './auth/scope';
 export { collabTargetOf } from './auth/scope';
 export {
   checkAnyCapability,
+  checkAnyFieldAction,
   checkCapability,
   checkCollab,
+  checkFieldAction,
   checkSetGroup,
   expandedCapabilities,
   expandRawScope,

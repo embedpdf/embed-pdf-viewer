@@ -2,6 +2,7 @@ import { materializePdfPermissions } from './builders';
 import { parseScope } from './parser';
 import type {
   CollabAction,
+  CollabEntity,
   CollabFilter,
   DocCapability,
   Identity,
@@ -100,7 +101,7 @@ export function checkCollab(
   if (parsed.some((s) => s.kind === 'wildcard')) return true;
 
   const applicableCollab = parsed.filter(
-    (s): s is Extract<ParsedScope, { kind: 'collab' }> =>
+    (s): s is Extract<ParsedScope, { entity: 'annotations' }> =>
       s.kind === 'collab' &&
       s.entity === 'annotations' &&
       (s.action === action || s.action === '*'),
@@ -128,6 +129,9 @@ export function checkCollab(
  *   - any annotation collab scope implies `doc.annotate.read`, because
  *     mutation routes need to see the target row to evaluate the
  *     collab filter against its current owner.
+ *   - any field collab scope implies `doc.forms.read`: filling in or
+ *     signing a field means seeing the form. Groups limit writes, never
+ *     reads.
  *
  * Does not short-circuit on wildcard — callers do that themselves
  * before calling this. Returning the expanded set is useful for the
@@ -140,6 +144,7 @@ export function expandedCapabilities(
 ): Set<DocCapability> {
   const out = new Set<DocCapability>();
   let hasAnnotationCollab = false;
+  let hasFieldCollab = false;
 
   for (const s of parsed) {
     if (s.kind === 'capability') {
@@ -148,6 +153,8 @@ export function expandedCapabilities(
       addPdfPermissions(out, pdfBits);
     } else if (s.kind === 'collab' && s.entity === 'annotations') {
       hasAnnotationCollab = true;
+    } else if (s.kind === 'collab' && s.entity === 'fields') {
+      hasFieldCollab = true;
     }
   }
 
@@ -159,6 +166,7 @@ export function expandedCapabilities(
   }
   if (out.has('doc.forms.fill')) out.add('doc.forms.read');
   if (hasAnnotationCollab) out.add('doc.annotate.read');
+  if (hasFieldCollab) out.add('doc.forms.read');
 
   // Subtraction last: a signed document's own restrictions win over any
   // grant or implication.
@@ -181,48 +189,34 @@ export function expandRawScope(
 }
 
 /**
- * Test a single collab filter against a target record + the caller's
- * identity. Pure function — no side effects, no implicit rules.
+ * Authority to put a record of `entity` in a specific group: an annotation,
+ * or a form field.
  *
- *   all              → always matches
- *   self             → matches if identity.userId === target.userId
- *   createdBy=<X>    → matches if target.userId === X
- *   group=<X>        → matches if target.groupId === X
- *                      and identity.groups includes X
- *
- * The group-membership check on `group=X` prevents a token from
- * matching annotations in a group it doesn't belong to, even if the
- * target row carries that groupId.
- */
-/**
- * Authority to assign a specific groupId to an annotation.
- *
- * Set-group is decoupled from `doc.annotate.modify`. The reasoning:
- * capabilities like `modify` describe row access — what kind of write
- * you can do to which existing rows — and map to PDF permission bits.
- * Set-group is a cloud-only *assignment authority*: which destination
- * group can you put an annotation into? There is no PDF-bit
- * counterpart, so it doesn't inherit from `modify`.
+ * Set-group is decoupled from the write capabilities (`doc.annotate.modify`,
+ * `doc.forms.modify`). The reasoning: those describe row access — what kind
+ * of write you can do to which existing rows — and map to PDF permission
+ * bits. Set-group is a cloud-only *assignment authority*: which destination
+ * group can you put a record into? There is no PDF-bit counterpart, so it
+ * doesn't inherit from them.
  *
  * Resolution order:
  *   1. newGroupId === callerDefaultGroupId → true (no real reassignment
- *      is happening; the annotation gets the caller's default group)
+ *      is happening; the record gets the caller's default group)
  *   2. wildcard `*` → true (global escape hatch)
- *   3. `annotations:set-group:all` → true
- *   4. `annotations:set-group:group=<newGroupId>` → true
- *   5. `annotations:*:all` or `annotations:*:group=<newGroupId>` → true
+ *   3. `<entity>:set-group:all` → true
+ *   4. `<entity>:set-group:group=<newGroupId>` → true
+ *   5. `<entity>:*:all` or `<entity>:*:group=<newGroupId>` → true
  *      (action wildcard includes set-group)
  *   6. otherwise → false
  *
- * Note: independent from membership. A user with
- * `set-group:group=legal` can assign annotations to the legal group
- * even if they're not a member — that's the whole point.
+ * A user with `set-group:group=legal` can put records in the legal group
+ * whatever their own group is — that's the whole point.
  */
 export function checkSetGroup(
+  entity: CollabEntity,
   newGroupId: string,
   callerDefaultGroupId: string | undefined,
   rawScope: ReadonlyArray<string>,
-  _pdfBits: PdfBits,
 ): boolean {
   // No authority needed when the caller is assigning their default group.
   if (newGroupId === callerDefaultGroupId) return true;
@@ -232,7 +226,7 @@ export function checkSetGroup(
 
   for (const s of parsed) {
     if (s.kind !== 'collab') continue;
-    if (s.entity !== 'annotations') continue;
+    if (s.entity !== entity) continue;
     if (s.action !== 'set-group' && s.action !== '*') continue;
     if (s.filter.kind === 'all') return true;
     if (s.filter.kind === 'group' && s.filter.groupId === newGroupId) return true;
@@ -244,6 +238,80 @@ export function checkSetGroup(
   return false;
 }
 
+/**
+ * True iff the scope lets the caller `action` (fill in, or sign) a form
+ * field in `groupId` (`null` for a field in no group).
+ *
+ * Narrowing, per action, as for annotations:
+ *   1. wildcard `*` → allow;
+ *   2. if any `fields:<action>` scope exists (or `fields:*`) → only those
+ *      decide: the field must match one of their filters, even when the
+ *      broad capability is also present. A field in no group then matches
+ *      only `:all`;
+ *   3. otherwise the broad capability decides, for every field:
+ *      `doc.forms.fill` to fill, `doc.sign` to sign.
+ *
+ * Nothing here narrows form design (`doc.forms.modify`).
+ */
+export function checkFieldAction(
+  action: 'fill' | 'sign',
+  groupId: string | null,
+  rawScope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
+): boolean {
+  const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
+  if (protectedCapabilities(protection).has(broad)) return false;
+  const parsed = rawScope.map(parseScope);
+  if (parsed.some((s) => s.kind === 'wildcard')) return true;
+
+  const applicable = parsed.filter(
+    (s) =>
+      s.kind === 'collab' && s.entity === 'fields' && (s.action === action || s.action === '*'),
+  ) as Extract<ParsedScope, { entity: 'fields' }>[];
+  if (applicable.length > 0) {
+    return applicable.some(
+      (s) => s.filter.kind === 'all' || (groupId !== null && s.filter.groupId === groupId),
+    );
+  }
+  return expandedCapabilities(parsed, pdfBits, protection).has(broad);
+}
+
+/**
+ * Whether the scope lets the caller `action` some form field: the broad
+ * capability, or any `fields:<action>` scope. What a form verb checks
+ * before its fields are known; each field is checked in the write.
+ */
+export function checkAnyFieldAction(
+  action: 'fill' | 'sign',
+  rawScope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
+): boolean {
+  const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
+  if (protectedCapabilities(protection).has(broad)) return false;
+  const parsed = rawScope.map(parseScope);
+  if (parsed.some((s) => s.kind === 'wildcard')) return true;
+  if (
+    parsed.some(
+      (s) =>
+        s.kind === 'collab' && s.entity === 'fields' && (s.action === action || s.action === '*'),
+    )
+  ) {
+    return true;
+  }
+  return expandedCapabilities(parsed, pdfBits, protection).has(broad);
+}
+
+/**
+ * Test a single collab filter against a target record. Every filter but
+ * `self` compares one fact on the record with the value the scope names:
+ *
+ *   all              → always matches
+ *   self             → matches if identity.userId === target.userId
+ *   createdBy=<X>    → matches if target.userId === X
+ *   group=<X>        → matches if target.groupId === X
+ */
 export function filterMatches(filter: CollabFilter, target: CollabTarget, id: Identity): boolean {
   switch (filter.kind) {
     case 'all':
@@ -253,7 +321,7 @@ export function filterMatches(filter: CollabFilter, target: CollabTarget, id: Id
     case 'createdBy':
       return target.userId === filter.userId;
     case 'group':
-      return target.groupId === filter.groupId && (id.groups?.includes(filter.groupId) ?? false);
+      return target.groupId === filter.groupId;
   }
 }
 

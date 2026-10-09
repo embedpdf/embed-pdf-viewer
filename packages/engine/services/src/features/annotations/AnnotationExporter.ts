@@ -60,7 +60,7 @@ export class AnnotationExporter {
     const annotations = closeExportSelection(
       selection,
       records.map((record) => toPageRef(record.pageObjectNumber)),
-      // A bundle holds no widgets: form data travels as FDF or XFDF.
+      // A bundle holds no widgets: the form travels in a form bundle (`forms.export`).
       (page) => reader.listOne(page.objectNumber, signal, 'annotations').annotations,
     );
     assertWithinLimit('annotation', limits, 'items', annotations.length);

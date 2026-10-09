@@ -47,6 +47,7 @@ import {
   type FormSnapshot,
   type FormEffect,
   type FormEffectsResult,
+  type FieldWriteAction,
 } from '@embedpdf/engine-core/runtime';
 
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -112,7 +113,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     value: FormFieldValue,
     options?: WriteOptions,
   ): AbortablePromise<FormSetValueResult> {
-    const write = this.beginWrite('doc.forms.fill', options);
+    const write = this.beginFieldWrite('fill', options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -125,7 +126,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           docId,
           ref,
           value,
-          ...this.actor(),
+          authority: this.guard.changeAuthority(),
         }),
     });
     return this.await(submission, 'forms.setValue', (payload) => {
@@ -138,7 +139,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     fields?: FormFieldRef | FormFieldRef[],
     options?: WriteOptions,
   ): AbortablePromise<FormResetResult> {
-    const write = this.beginWrite('doc.forms.fill', options);
+    const write = this.beginFieldWrite('fill', options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
@@ -151,6 +152,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           opId: write.opId,
           docId,
           ...(refs ? { refs } : {}),
+          authority: this.guard.changeAuthority(),
         }),
     });
     return this.await(submission, 'forms.reset', (payload) => {
@@ -167,7 +169,8 @@ export class LocalDocumentFormsService implements DocumentFormsService {
   }
 
   applyEffects(effects: FormEffect[], options?: WriteOptions): AbortablePromise<FormEffectsResult> {
-    const write = this.beginWrite('doc.forms.fill', options);
+    // The effects aren't checked field by field: they take a filler of every field.
+    const write = this.beginEveryFieldWrite(options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -216,7 +219,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
 
   import(bundle: FormBundle, options: FormImportOptions = {}): AbortablePromise<FormImportResult> {
     const attribution = options.attribution ?? 'restore';
-    const write = this.beginImport('doc.forms.modify', attribution, options);
+    const write = this.beginImport(this.beginWrite('doc.forms.modify', options), attribution);
     if (write.rejected) return write.rejected;
     // Without `doc.forms.script`, scripts, submits and links are left out, not refused.
     const mayScript = this.guard.can('doc.forms.script');
@@ -235,7 +238,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
             ...(options.pages !== undefined ? { pages: options.pages } : {}),
             attribution,
             values: options.values ?? true,
-            ...this.actor(),
+            authority: this.guard.changeAuthority(),
             mayScript,
           },
           Object.values(resources),
@@ -259,7 +262,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     options: FormValuesImportOptions = {},
   ): AbortablePromise<FormValuesImportResult> {
     const attribution = options.attribution ?? 'restore';
-    const write = this.beginImport('doc.forms.fill', attribution, options);
+    const write = this.beginImport(this.beginFieldWrite('fill', options), attribution);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const resources = transferableResources(bundle.resources);
@@ -274,7 +277,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
             docId,
             bundle: { ...bundle, resources },
             attribution,
-            ...this.actor(),
+            authority: this.guard.changeAuthority(),
           },
           Object.values(resources),
         ),
@@ -312,7 +315,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           ...(options.widgetObjectNumbers
             ? { widgetObjectNumbers: [...options.widgetObjectNumbers] }
             : {}),
-          ...this.actor(),
+          authority: this.guard.changeAuthority(),
         }),
     });
     return this.await(submission, 'forms.createField', (payload) => {
@@ -326,7 +329,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     appearance: SignatureAppearanceInput,
     options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult> {
-    const write = this.beginWrite('doc.forms.fill', options);
+    const write = this.beginFieldWrite('sign', options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
     const pdf = appearance.pdf.slice().buffer as ArrayBuffer;
@@ -341,6 +344,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
             docId,
             ref,
             pdf,
+            authority: this.guard.changeAuthority(),
           },
           [pdf],
         ),
@@ -369,6 +373,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           docId,
           ref,
           patch,
+          authority: this.guard.changeAuthority(),
         }),
     });
     return this.await(submission, 'forms.updateField', (payload) => {
@@ -623,18 +628,53 @@ export class LocalDocumentFormsService implements DocumentFormsService {
   }
 
   /**
-   * An import: `cap`, and `doc.forms.import` too when it restores
-   * attribution that isn't the session's (`'restore'`).
+   * An import: its write's checks (`write`), and `doc.forms.import` too when
+   * it restores attribution that isn't the session's (`'restore'`).
    */
   private beginImport(
-    cap: 'doc.forms.fill' | 'doc.forms.modify',
+    write: ReturnType<LocalDocumentFormsService['beginWrite']>,
     attribution: 'restore' | 'stamp',
-    options: WriteOptions | undefined,
   ): ReturnType<LocalDocumentFormsService['beginWrite']> {
-    const write = this.beginWrite(cap, options);
     if (write.rejected || attribution !== 'restore') return write;
     const rejected = this.gate('doc.forms.import');
     return rejected ? { rejected } : write;
+  }
+
+  /**
+   * A write that fills in or signs fields: the handle may `action` some
+   * field. The job checks each field it writes against the handle's grants.
+   */
+  private beginFieldWrite(
+    action: FieldWriteAction,
+    options: WriteOptions | undefined,
+  ): ReturnType<LocalDocumentFormsService['beginWrite']> {
+    return this.begin(() => this.guard.assertSomeFieldWrite(action), options);
+  }
+
+  /** A write that fills in fields without checking each: the handle may fill in every field. */
+  private beginEveryFieldWrite(
+    options: WriteOptions | undefined,
+  ): ReturnType<LocalDocumentFormsService['beginWrite']> {
+    return this.begin(() => this.guard.assertEveryFieldFill(), options);
+  }
+
+  private begin(
+    check: () => void,
+    options: WriteOptions | undefined,
+  ): ReturnType<LocalDocumentFormsService['beginWrite']> {
+    if (this.view.isClosed()) {
+      return {
+        rejected: AbortablePromise.rejectReason(
+          new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+        ),
+      };
+    }
+    try {
+      check();
+      return { opId: opIdOf(options) };
+    } catch (err) {
+      return { rejected: AbortablePromise.rejectReason(err) };
+    }
   }
 
   private beginWrite(

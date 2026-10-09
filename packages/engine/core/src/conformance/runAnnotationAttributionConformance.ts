@@ -43,7 +43,6 @@ const ALICE: Identity = {
   organization: 'Example Inc.',
   organizationalUnit: 'Legal',
   groupId: 'legal',
-  groups: ['legal'],
 };
 const BOB: Identity = { userId: 'bob', displayName: 'Bob Builder', groupId: 'ops' };
 /** A host's sync job, restoring annotations from its own store. */

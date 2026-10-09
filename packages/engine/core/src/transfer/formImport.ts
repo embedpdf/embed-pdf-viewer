@@ -111,7 +111,9 @@ export type FormValuesImportDropReason =
   /** The field can't take the value: an option it doesn't have, a button it lacks. */
   | 'value-not-allowed'
   /** A signature locked the field. */
-  | 'locked';
+  | 'locked'
+  /** The session may not fill the field in: its group is one the session's scopes don't reach. */
+  | 'fill-not-allowed';
 
 export interface FormValuesImportDrop {
   /** The field, as the bundle names it. */
@@ -292,7 +294,8 @@ export interface PlannedValueWrite<T extends FormValuesImportTarget = FormValues
  * name. Left out, in bundle order: a field the document doesn't have
  * (`no-field`), one of another family (`wrong-family`), and one `refusal`
  * names a reason for: a value the field can't take, a field a signature
- * locked. So everything is decided before the first write.
+ * locked, a field the session may not fill in. So everything is decided
+ * before the first write.
  */
 export function planFormValuesImport<T extends FormValuesImportTarget>(input: {
   readonly bundle: Pick<FormBundle, 'fields'>;
@@ -300,7 +303,10 @@ export function planFormValuesImport<T extends FormValuesImportTarget>(input: {
   readonly refusal?: (
     target: T,
     value: FormFieldValue,
-  ) => Extract<FormValuesImportDropReason, 'value-not-allowed' | 'locked'> | null;
+  ) => Extract<
+    FormValuesImportDropReason,
+    'value-not-allowed' | 'locked' | 'fill-not-allowed'
+  > | null;
 }): {
   readonly writes: readonly PlannedValueWrite<T>[];
   readonly dropped: readonly FormValuesImportDrop[];
@@ -464,6 +470,8 @@ function draftOf(
     noExport: field.noExport,
     ...(field.alternateName !== null ? { alternateName: field.alternateName } : {}),
     ...(field.mappingName !== null ? { mappingName: field.mappingName } : {}),
+    // The group the field was in; the import decides whether it keeps it.
+    ...(field.groupId !== null ? { groupId: field.groupId } : {}),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     widgets,
   };

@@ -72,6 +72,9 @@ export const caps = {
  *   collab.annotations.delete.createdBy("u-7") → "annotations:delete:createdBy=u-7"
  *   collab.annotations.setGroup.group("legal") → "annotations:set-group:group=legal"
  *   collab.annotations.all.all()               → "annotations:*:all"  (action wildcard)
+ *   collab.fields.fill.group("buyer")          → "fields:fill:group=buyer"
+ *   collab.fields.sign.group("buyer")          → "fields:sign:group=buyer"
+ *   collab.fields.all.group("seller")          → "fields:*:group=seller"
  *
  * On create, the filter is evaluated against the caller's own identity
  * (no impersonation), so `:self` and `:all` trivially pass; `:group=X`
@@ -83,9 +86,17 @@ export const collab = {
     create: makeFilterBuilder('annotations', 'create'),
     update: makeFilterBuilder('annotations', 'update'),
     delete: makeFilterBuilder('annotations', 'delete'),
-    setGroup: makeSetGroupBuilder(),
+    setGroup: makeGroupFilterBuilder('annotations', 'set-group'),
     /** Action wildcard — matches create, update, delete, and set-group with the given filter. */
     all: makeFilterBuilder('annotations', '*'),
+  },
+  /** Form fields, by group: a field records no creator, so only `:all` and `:group=X`. */
+  fields: {
+    fill: makeGroupFilterBuilder('fields', 'fill'),
+    sign: makeGroupFilterBuilder('fields', 'sign'),
+    setGroup: makeGroupFilterBuilder('fields', 'set-group'),
+    /** Action wildcard — matches fill, sign, and set-group with the given filter. */
+    all: makeGroupFilterBuilder('fields', '*'),
   },
 } as const;
 
@@ -106,21 +117,21 @@ function makeFilterBuilder(entity: string, action: string): FilterBuilder {
 }
 
 /**
- * `set-group` is an authority filter, not a per-record collab filter:
- * only `:all` and `:group=X` are meaningful (assign-to-any vs
- * assign-to-X). The builder exposes exactly those two — a typo at JWT
- * mint time is caught by the compiler instead of producing a JWT that
- * fails at verify.
+ * The scopes that take only `:all` and `:group=X`: `set-group`, an
+ * assignment authority rather than a per-record filter (assign-to-any vs
+ * assign-to-X), and every field scope, since a field records no creator.
+ * The builder exposes exactly those two — a typo at JWT mint time is caught
+ * by the compiler instead of producing a JWT that fails at verify.
  */
-interface SetGroupBuilder {
+interface GroupFilterBuilder {
   all(): string;
   group(groupId: string): string;
 }
 
-function makeSetGroupBuilder(): SetGroupBuilder {
+function makeGroupFilterBuilder(entity: string, action: string): GroupFilterBuilder {
   return {
-    all: () => 'annotations:set-group:all',
-    group: (groupId: string) => `annotations:set-group:group=${groupId}`,
+    all: () => `${entity}:${action}:all`,
+    group: (groupId: string) => `${entity}:${action}:group=${groupId}`,
   };
 }
 

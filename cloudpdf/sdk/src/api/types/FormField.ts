@@ -26,6 +26,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldTextValueEntry;
         defaultValueEntry: CloudPDF.FormFieldTextDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -62,6 +63,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldCheckboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldCheckboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -106,6 +108,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldRadioValueEntry;
         defaultValueEntry: CloudPDF.FormFieldRadioDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -151,6 +154,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldComboboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldComboboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -194,6 +198,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldListboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldListboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -237,6 +242,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldPushbuttonValueEntry;
         defaultValueEntry: CloudPDF.FormFieldPushbuttonDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -267,6 +273,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldSignatureValueEntry;
         defaultValueEntry: CloudPDF.FormFieldSignatureDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;
@@ -297,6 +304,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldUnknownValueEntry;
         defaultValueEntry: CloudPDF.FormFieldUnknownDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
+        groupId: string | null;
         createdBy: string | null;
         createdAt: string | null;
         filledBy: string | null;

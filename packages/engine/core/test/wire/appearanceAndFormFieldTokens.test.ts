@@ -7,12 +7,10 @@ import {
   annotationAppearancesImageOptionsToToken,
   pageRenderOptionsFromImageOptions,
   renderImageOptionsToToken,
+  type RenderVersions,
 } from '../../src/wire/renderOptionsCodec';
-import {
-  AnnotationAppearancesQuerySchema,
-  PageRenderAnnotatedQuerySchema,
-  PageRenderQuerySchema,
-} from '../../src/wire/schemas';
+import { PAGE_RENDER_FAMILIES, pageRenderFamilyOf } from '../../src/wire/renderFamilies';
+import { AnnotationAppearancesQuerySchema, PageRenderQuerySchemas } from '../../src/wire/schemas';
 import { decodeAnnotationAppearancesRenderToken, decodeRenderToken } from '../../src/wire/tokens';
 
 const appearanceQueryOf = (token: string) =>
@@ -52,38 +50,52 @@ describe('the appearance render token', () => {
 });
 
 describe('the page render token', () => {
-  const versions = { contentVersion: 2, annotationVersion: 5 };
+  const queryOf = (family: keyof typeof PAGE_RENDER_FAMILIES, token: string) =>
+    PageRenderQuerySchemas[family].parse(unflatten(decodeRenderToken(token)));
 
-  test('carries no form fields: who may read the form is not in the path', () => {
+  test('says nothing of what the picture draws: the family is the path', () => {
     for (const includeFormFields of [undefined, true, false]) {
       const token = renderImageOptionsToToken(
-        { format: 'webp', ...(includeFormFields === undefined ? {} : { includeFormFields }) },
-        versions,
+        {
+          format: 'webp',
+          includeAnnotations: true,
+          ...(includeFormFields === undefined ? {} : { includeFormFields }),
+        },
+        { contentVersion: 2 },
       );
-      expect(token).not.toContain('formFields');
+      expect(token).toBe('contentVersion=2,format=webp');
     }
-    expect(() =>
-      PageRenderAnnotatedQuerySchema.parse(
-        unflatten(
-          decodeRenderToken('annotationVersion=5,contentVersion=2,format=webp,formFields=false'),
-        ),
-      ),
-    ).toThrow();
-    expect(() =>
-      PageRenderQuerySchema.parse(
-        unflatten(decodeRenderToken('contentVersion=2,format=webp,formFields=false')),
-      ),
-    ).toThrow();
+    expect(() => queryOf('all', 'contentVersion=2,format=webp,formFields=false')).toThrow();
   });
 
-  test('a cloud picture never draws form fields', () => {
-    const query = PageRenderAnnotatedQuerySchema.parse(
-      unflatten(decodeRenderToken(renderImageOptionsToToken({ format: 'webp' }, versions))),
-    );
-    expect(pageRenderOptionsFromImageOptions(query.options, true)).toMatchObject({
-      includeAnnotations: true,
-      includeFormFields: false,
-    });
+  test("each family's token carries exactly its own pins", () => {
+    const pins = { contentVersion: 2, annotationVersion: 5, widgetVersion: 7 };
+    for (const spec of Object.values(PAGE_RENDER_FAMILIES)) {
+      const own: RenderVersions = { contentVersion: pins.contentVersion };
+      for (const pin of spec.pins) own[pin] = pins[pin];
+      const query = queryOf(spec.family, renderImageOptionsToToken({ format: 'webp' }, own));
+      expect(query).toMatchObject(own);
+      // The family stamps what it draws; the worker options follow.
+      expect(pageRenderOptionsFromImageOptions(query.options)).toMatchObject(spec.draws);
+      expect(pageRenderFamilyOf(spec.draws)).toBe(spec.family);
+      // Without one of its pins a versioned request is refused...
+      for (const pin of spec.pins.filter((p) => p !== 'contentVersion')) {
+        const missing = { ...own, [pin]: undefined };
+        expect(() =>
+          queryOf(spec.family, renderImageOptionsToToken({ format: 'webp' }, missing)),
+        ).toThrow();
+      }
+      // ...and so is a pin of a plane it doesn't draw.
+      for (const pin of ['annotationVersion', 'widgetVersion'] as const) {
+        if (spec.pins.includes(pin)) continue;
+        expect(() =>
+          queryOf(
+            spec.family,
+            renderImageOptionsToToken({ format: 'webp' }, { ...own, [pin]: pins[pin] }),
+          ),
+        ).toThrow();
+      }
+    }
   });
 });
 

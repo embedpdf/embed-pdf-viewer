@@ -114,11 +114,12 @@ describe('Hs256Verifier', () => {
         identity: {
           userId: '44',
           groupId: '4',
-          groups: ['4', 'engineering'],
           displayName: 'Alice Example',
           organization: 'Example Inc.',
           title: '',
           unknownKey: 'dropped',
+          // No longer part of the claim: a scope's group= names its group.
+          groups: ['4', 'engineering'],
         },
       },
     });
@@ -127,7 +128,6 @@ describe('Hs256Verifier', () => {
     expect(claims.identity).toEqual({
       userId: '44',
       groupId: '4',
-      groups: ['4', 'engineering'],
       displayName: 'Alice Example',
       organization: 'Example Inc.',
     });
@@ -153,9 +153,6 @@ describe('Hs256Verifier', () => {
     await expect(v.verify(sign('alice'))).rejects.toThrow(/identity must be an object/);
     await expect(v.verify(sign({ userId: 44 }))).rejects.toThrow(
       /identity\.userId must be a string/,
-    );
-    await expect(v.verify(sign({ groups: ['4', 42] }))).rejects.toThrow(
-      /identity\.groups\[1\] must be a string/,
     );
   });
 });

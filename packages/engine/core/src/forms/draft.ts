@@ -77,6 +77,11 @@ interface FormFieldDraftBase {
   /** /TM — the export mapping name. */
   mappingName?: string;
   /**
+   * The group the field goes in: who fills it in. Default: the session's own
+   * group (`identity.groupId`). Another group takes `fields:set-group` for it.
+   */
+  groupId?: string;
+  /**
    * The field's scripts, by event (JavaScript only). A `calculate` script
    * puts the field at the end of the form's calculation order. Writing a
    * script takes `doc.forms.script` too.

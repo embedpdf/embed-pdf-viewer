@@ -18832,6 +18832,10 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "groupId": {
+                "type": "string",
+                "nullable": true
+              },
               "createdBy": {
                 "type": "string",
                 "nullable": true
@@ -18904,6 +18908,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -18956,6 +18961,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19036,6 +19044,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19084,6 +19093,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19134,6 +19146,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19183,6 +19196,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19249,6 +19265,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19299,6 +19316,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19358,6 +19378,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19409,6 +19430,9 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
               },
@@ -19446,6 +19470,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19492,6 +19517,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19530,6 +19558,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19576,6 +19605,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19617,6 +19649,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19701,6 +19734,11 @@
               "mappingName": {
                 "type": "string"
               },
+              "groupId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
               },
@@ -19756,6 +19794,9 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
               },
@@ -19790,6 +19831,9 @@
               },
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -19831,6 +19875,9 @@
               },
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -19889,6 +19936,9 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
               },
@@ -19939,6 +19989,9 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
               },
@@ -19973,6 +20026,9 @@
               },
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
               },
               "actions": {
                 "$ref": "#/components/schemas/FieldActionsPatch"
@@ -20013,6 +20069,11 @@
           "mappingName": {
             "type": "string",
             "nullable": true
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
           },
           "actions": {
             "$ref": "#/components/schemas/FieldActionsPatch"
@@ -22878,15 +22939,6 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 256
-                  },
-                  "groups": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256
-                    },
-                    "maxItems": 64
                   }
                 },
                 "additionalProperties": false

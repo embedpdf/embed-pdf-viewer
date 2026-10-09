@@ -191,3 +191,10 @@ export {
   runAnnotationPredictionConformance,
   type AnnotationPredictionConformanceOptions,
 } from './conformance/runAnnotationPredictionConformance';
+export {
+  FIELD_GROUP_TOKENS,
+  FIELD_GROUPS_PDF,
+  runFieldGroupsConformance,
+  type FieldGroupToken,
+  type FieldGroupsConformanceOptions,
+} from './conformance/runFieldGroupsConformance';

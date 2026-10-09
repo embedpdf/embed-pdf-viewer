@@ -18,7 +18,13 @@ import {
   checkImageQuality,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
-import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
+import {
+  PAGE_RENDER_FAMILIES,
+  pageRenderFamilyOf,
+  renderImageOptionsToWire,
+  wirePaths,
+  type RenderVersions,
+} from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
@@ -46,19 +52,14 @@ export class CloudPageRenderService implements PageRenderService {
     return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
-      // A picture draws the annotations the caller may read. Cloud pictures
-      // draw no form fields yet: the path doesn't say whether the caller may
-      // read the form (see `RenderTokenSchema`).
-      const rights = this.layerRights();
-      const includeAnnotations = rights
-        ? resolvePageLayers(options, rights).includeAnnotations
-        : (options.includeAnnotations ?? true);
-      if (options.includeFormFields === true) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          'cloud page pictures draw no form fields yet: leave includeFormFields out, or pass false',
-        );
-      }
+      // A picture draws what the caller may read, and the family it draws is
+      // its path. Without the caller's rights (a tenant or API token), it asks
+      // for everything and the server decides.
+      const layers = resolvePageLayers(
+        options,
+        this.layerRights() ?? { annotations: true, formFields: true },
+      );
+      const family = PAGE_RENDER_FAMILIES[pageRenderFamilyOf(layers)];
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         const pageObjectNumber = this.pageRef.objectNumber;
@@ -72,37 +73,25 @@ export class CloudPageRenderService implements PageRenderService {
         // `format` flows through `options` and ends up in the token like
         // every other render option — the wire format treats it uniformly.
         // Normalized above so the URL always carries an explicit,
-        // network-supported format (PNG or WebP; default WebP).
-        // Annotatedness itself is path-expressed (the token/path law): the
-        // token never carries it; the annotated family's token carries the
-        // `annotationVersion` pin instead.
-        const wireToken = renderImageOptionsToWire(
-          { ...options, format },
-          {
-            contentVersion: page.cache.contentVersion,
-            ...(includeAnnotations ? { annotationVersion: page.cache.annotationVersion } : {}),
-          },
-        );
-        // Plane-scope rule: a render resolves at the doc-level (shared base)
-        // path iff every plane it depends on is inherited — annotation-free
-        // renders (full pages and tiles; the rect target rides the same
-        // token) depend on `content`, annotated ones on
-        // `content + annotations`. Each is its own family at both tiers
-        // (prefix law: edge grants see only prefixes). 1,000 inheriting
-        // visitors → one URL set, one origin render, no layer session.
-        if (includeAnnotations) {
-          return planesInherited(manifest, ['content', 'annotations'])
-            ? wirePaths.docPageRenderAnnotated(this.docId, this.pageRef, wireToken)
-            : wirePaths.layerPageRenderAnnotated(
-                this.docId,
-                this.layerName,
-                this.pageRef,
-                wireToken,
-              );
-        }
-        return planesInherited(manifest, ['content'])
-          ? wirePaths.docPageRender(this.docId, this.pageRef, wireToken)
-          : wirePaths.layerPageRender(this.docId, this.layerName, this.pageRef, wireToken);
+        // network-supported format (PNG or WebP; default WebP). What the
+        // picture draws is its family's path; the token carries the family's
+        // pins.
+        const pins: RenderVersions = { contentVersion: page.cache.contentVersion };
+        for (const pin of family.pins) pins[pin] = page.cache[pin];
+        const wireToken = renderImageOptionsToWire({ ...options, format }, pins);
+        // Plane-scope rule: a picture resolves at the doc-level (shared base)
+        // path iff every plane its family depends on is inherited, so 1,000
+        // inheriting visitors share one URL set, one origin render, and no
+        // layer session.
+        return planesInherited(manifest, family.planes)
+          ? wirePaths.docPageRender(this.docId, family.family, this.pageRef, wireToken)
+          : wirePaths.layerPageRender(
+              this.docId,
+              this.layerName,
+              family.family,
+              this.pageRef,
+              wireToken,
+            );
       };
       // The advertised URL reflects the current manifest; the blob loader
       // re-resolves per fetch through the 404 → manifest-refresh rail, so a

@@ -7,11 +7,13 @@ import { formatPdfDate, pdfDateToIso } from '../../../shared/pdf-date';
 import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/writeEmbedMetadata';
 
 /**
- * Who made a field and who last filled it in, kept in the field's own
- * `/EMBD_Metadata` the way an annotation keeps its author:
+ * Who made a field and who last filled it in, and the group it belongs to,
+ * kept in the field's own `/EMBD_Metadata` the way an annotation keeps its
+ * author and group:
  *
  *   /EMBD_Metadata <<
  *     /SchemaVersion 1
+ *     /GroupID      (buyer)                     % who fills it in
  *     /CreatedBy    (u-17)                      % the creating session's user
  *     /CreatedAt    (D:20261008104200+00'00')
  *     /FilledBy     (u-42)                      % the user whose write set the value
@@ -20,9 +22,10 @@ import { EMBD_METADATA_SCHEMA_VERSION } from '../../annotations/internal/write/w
  *     /ImportedBy   (u-9)                       % set only by a restoring import
  *   >>
  *
- * The engine stamps it from the session's identity, never from what a
- * caller sends. An anonymous session names nobody: it stamps no creation,
- * and a fill clears the last filler, who no longer filled the value.
+ * The engine stamps the attribution from the session's identity, never from
+ * what a caller sends. An anonymous session names nobody: it stamps no
+ * creation, and a fill clears the last filler, who no longer filled the
+ * value. The group is what the caller sets, with the authority to set it.
  */
 export interface FieldAttribution {
   readonly createdBy: string | null;
@@ -34,6 +37,7 @@ export interface FieldAttribution {
 }
 
 const KEY_SCHEMA_VERSION = 'SchemaVersion';
+const KEY_GROUP_ID = 'GroupID';
 const KEY_CREATED_BY = 'CreatedBy';
 const KEY_CREATED_AT = 'CreatedAt';
 const KEY_FILLED_BY = 'FilledBy';
@@ -77,6 +81,32 @@ export function readFieldAttribution(
     filledAt: date(KEY_FILLED_AT),
     importedBy: text(KEY_IMPORTED_BY),
   };
+}
+
+/** The group of field `fieldIndex` of a loaded form model; `null` in no group. */
+export function readFieldGroup(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+): string | null {
+  const { fn, mem } = runtime;
+  if (!fn.EPDFForm_HasFieldEmbedMetadata(model, fieldIndex)) return null;
+  return readUtf16String(
+    mem,
+    (buf, cap) =>
+      fn.EPDFForm_GetFieldEmbedMetadataString(model, fieldIndex, KEY_GROUP_ID, buf, cap),
+    null,
+  );
+}
+
+/** Put a field in `groupId`. A group is changed, never removed, so there is no clearing. */
+export function writeFieldGroup(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  fieldObjectNumber: number,
+  groupId: string,
+): void {
+  writeAttribution(runtime, docPtr, fieldObjectNumber, [[KEY_GROUP_ID, groupId]]);
 }
 
 /** Stamp a new field with who created it, and when. An anonymous session stamps nothing. */
@@ -209,6 +239,6 @@ function clearEntry(
 function attributionFailed(fieldObjectNumber: number): EngineError {
   return new EngineError(
     EngineErrorCode.Unknown,
-    `the attribution of field ${fieldObjectNumber} could not be written`,
+    `the metadata of field ${fieldObjectNumber} could not be written`,
   );
 }

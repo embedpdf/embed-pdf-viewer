@@ -25,7 +25,6 @@ export namespace TokensIssueRequest {
             organization?: string | undefined;
             organizationalUnit?: string | undefined;
             groupId?: string | undefined;
-            groups?: string[] | undefined;
         }
     }
 

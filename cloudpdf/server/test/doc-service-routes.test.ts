@@ -620,7 +620,6 @@ describe('Phase 6 access route — POST /v1/access', () => {
             identity: {
               userId: '44',
               groupId: '4',
-              groups: ['4', 'engineering'],
               displayName: 'Alice Example',
               email: 'alice@example.com',
             },
@@ -647,7 +646,6 @@ describe('Phase 6 access route — POST /v1/access', () => {
     expect(body.identity).toEqual({
       userId: '44',
       groupId: '4',
-      groups: ['4', 'engineering'],
       displayName: 'Alice Example',
       email: 'alice@example.com',
     });

@@ -12,9 +12,11 @@ import {
 } from '../dto/AnnotationRender';
 import type { PageImageOptions, PageRenderOptions } from '../dto/PageRender';
 
+/** A picture's pins: `contentVersion`, and the pins of what its family draws. */
 export interface RenderVersions {
   contentVersion: number;
   annotationVersion?: number;
+  widgetVersion?: number;
 }
 
 /**
@@ -25,40 +27,22 @@ export interface RenderVersions {
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * Token/path rule: tokens carry version pins and render
- * parameters; anything that changes the artifact's plane-dependency set is
- * path-expressed. Annotatedness changes the planes (`content` vs
- * `content + annotations`), so the wire map never carries
- * `includeAnnotations` — the caller picks the path family
- * (`…/render/pages/` vs `…/render/annotated/pages/`) and passes
- * `annotationVersion` iff it chose the annotated one. Contradictory states
- * are unrepresentable; each family's query schema enforces its own pin
- * grammar structurally.
- *
- * Semantic validation (viewport-kind invariants, per-family pin presence,
- * rect coherence) lives in `PageRenderQuerySchema` /
- * `PageRenderAnnotatedQuerySchema` and runs when the resulting URL is
- * decoded server-side. Round-tripping (flatten → encode → decode →
- * unflatten → schema parse) recovers the original SDK options.
+ * What the picture draws is never in the token: the caller picks the
+ * family's path (`PAGE_RENDER_FAMILIES`) and passes that family's pins.
+ * Each family's query schema checks its own pins when the URL is decoded
+ * server-side. Round-tripping (flatten → encode → decode → unflatten →
+ * schema parse) recovers the original SDK options.
  */
 export function renderImageOptionsToWire(
   options: PageImageOptions,
   versions: RenderVersions,
 ): WireFlat {
-  // Annotations are path-expressed, never token-expressed (see above); form
-  // fields aren't drawn in cloud pictures (see `RenderTokenSchema`).
   const {
-    includeAnnotations: _pathExpressed,
-    includeFormFields: _notDrawn,
+    includeAnnotations: _inThePath,
+    includeFormFields: _alsoInThePath,
     ...wireOptions
   } = options;
-  return flatten({
-    ...wireOptions,
-    contentVersion: versions.contentVersion,
-    ...(versions.annotationVersion !== undefined
-      ? { annotationVersion: versions.annotationVersion }
-      : {}),
-  });
+  return flatten({ ...wireOptions, ...versions });
 }
 
 /**
@@ -73,23 +57,18 @@ export function renderImageOptionsToToken(
 }
 
 /**
- * Re-attach `includeAnnotations` onto the worker-side `PageRenderOptions`
- * shape. Pure shape transform; consumed by the server route after
- * `PageRenderQuerySchema` has produced the SDK-shaped options. Form fields
- * are never drawn: an annotated picture is read with `doc.annotate.read`,
- * and the fields would show the form to a caller who may not read it.
+ * The worker-side `PageRenderOptions` of a parsed picture request: the
+ * render options, and what its family draws (stamped by the family's query
+ * schema). Pure shape transform; image encoding stays out.
  */
-export function pageRenderOptionsFromImageOptions(
-  options: PageImageOptions,
-  includeAnnotations: boolean,
-): PageRenderOptions {
+export function pageRenderOptionsFromImageOptions(options: PageImageOptions): PageRenderOptions {
   return {
     ...(options.target ? { target: options.target } : {}),
     ...(options.viewport ? { viewport: options.viewport } : {}),
     ...(options.rotation !== undefined ? { rotation: options.rotation } : {}),
     ...(options.background !== undefined ? { background: options.background } : {}),
-    includeAnnotations,
-    includeFormFields: false,
+    includeAnnotations: options.includeAnnotations ?? false,
+    includeFormFields: options.includeFormFields ?? false,
   };
 }
 

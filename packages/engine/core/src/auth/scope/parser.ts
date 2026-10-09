@@ -1,5 +1,5 @@
 import { InvalidScope } from './errors';
-import type { CollabAction, CollabFilter, DocCapability, ParsedScope } from './types';
+import type { CollabAction, CollabFilter, DocCapability, FieldAction, ParsedScope } from './types';
 
 /**
  * Closed set of recognized capability strings. Membership is the
@@ -82,6 +82,7 @@ function parseCollab(raw: string): ParsedScope {
   const action = raw.slice(idx1 + 1, idx2);
   const filterStr = raw.slice(idx2 + 1);
 
+  if (entity === 'fields') return parseFieldScope(raw, action, filterStr);
   if (entity !== 'annotations') {
     throw new InvalidScope(raw, `unknown collab entity: ${entity}`);
   }
@@ -114,6 +115,25 @@ function parseCollab(raw: string): ParsedScope {
     action: action as CollabAction | '*',
     filter,
   };
+}
+
+/**
+ * `fields:<fill|sign|set-group|*>:<all|group=NAME>`. A field's group is who
+ * fills it, and a field records no creator, so `self` and `createdBy=` are
+ * refused.
+ */
+function parseFieldScope(raw: string, action: string, filterStr: string): ParsedScope {
+  if (action !== 'fill' && action !== 'sign' && action !== 'set-group' && action !== '*') {
+    throw new InvalidScope(raw, `unknown fields action: ${action}`);
+  }
+  const filter = parseFilter(filterStr, raw);
+  if (filter.kind !== 'all' && filter.kind !== 'group') {
+    throw new InvalidScope(
+      raw,
+      `fields only support :all or :group=<id> filters (got :${filter.kind})`,
+    );
+  }
+  return { kind: 'collab', entity: 'fields', action: action as FieldAction | '*', filter };
 }
 
 function parseFilter(s: string, raw: string): CollabFilter {

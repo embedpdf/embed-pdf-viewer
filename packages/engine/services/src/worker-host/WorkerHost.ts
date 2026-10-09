@@ -1000,7 +1000,7 @@ export class WorkerHost {
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).prepare(req.input);
+    ).prepare(req.input, req.authority);
     return wirePack({ tag: 'signatures.prepare', result });
   }
 
@@ -1013,7 +1013,7 @@ export class WorkerHost {
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).complete(req.input, req.opId);
+    ).complete(req.input, req.opId, req.authority);
     if (result.status === 'already-completed') {
       return wirePack({ tag: 'signatures.complete', result });
     }
@@ -2385,7 +2385,7 @@ export class WorkerHost {
       session,
       req.opId,
       { type: 'forms.setValue', field: req.ref, value: req.value },
-      checkedAuthority(req.actor),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.setValue', result }, req.artifactPath);
@@ -2404,7 +2404,7 @@ export class WorkerHost {
       session,
       req.opId,
       { type: 'forms.reset', ...(req.refs ? { fields: req.refs } : {}) },
-      checkedAuthority(),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
@@ -2458,11 +2458,11 @@ export class WorkerHost {
         ...(req.pages !== undefined ? { pages: req.pages } : {}),
         attribution: req.attribution,
         values: req.values,
-        ...(req.actor ? { actor: req.actor } : {}),
+        actor: actorOf(req.authority),
         limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
         mayScript: req.mayScript,
       },
-      checkedAuthority(req.actor),
+      req.authority,
       signal,
     );
     // Everything left out: nothing was written.
@@ -2483,10 +2483,10 @@ export class WorkerHost {
         type: 'forms.importValues',
         bundle: req.bundle,
         attribution: req.attribution,
-        ...(req.actor ? { actor: req.actor } : {}),
+        actor: actorOf(req.authority),
         limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
       },
-      checkedAuthority(req.actor),
+      req.authority,
       signal,
     );
     // Nothing filled: nothing was written.
@@ -2518,7 +2518,7 @@ export class WorkerHost {
         ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
         ...(req.widgetObjectNumbers ? { widgetObjectNumbers: req.widgetObjectNumbers } : {}),
       },
-      checkedAuthority(req.actor),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.createField', result }, req.artifactPath);
@@ -2537,7 +2537,7 @@ export class WorkerHost {
       session,
       req.opId,
       { type: 'forms.update', field: req.ref, patch: req.patch },
-      checkedAuthority(),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.updateField', result }, req.artifactPath);
@@ -2556,7 +2556,7 @@ export class WorkerHost {
         field: req.ref,
         appearance: { pdf: new Uint8Array(req.pdf) },
       },
-      checkedAuthority(),
+      req.authority,
       signal,
     );
     return this.finishMutation(
@@ -2789,6 +2789,15 @@ function pageEffectOf(job: PageSpaceJob): PageEffect {
  */
 function checkedAuthority(actor?: AnnotationActor): ChangeAuthority {
   return { identity: actor ?? {}, grants: null, protection: null };
+}
+
+/** Who an authority acts for, as the actor an op stamps. */
+function actorOf({ identity }: ChangeAuthority): AnnotationActor {
+  return {
+    ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
+    ...(identity.groupId !== undefined ? { groupId: identity.groupId } : {}),
+    ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
+  };
 }
 
 /**

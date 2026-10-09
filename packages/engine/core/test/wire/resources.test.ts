@@ -240,7 +240,9 @@ describe('cdnCoverageForScope', () => {
     );
     for (const id of [
       'page-render',
-      'page-render-annotated',
+      'page-render-annotations',
+      'page-render-fields',
+      'page-render-all',
       'page-annotations',
       'layout',
       'metadata',
@@ -251,8 +253,8 @@ describe('cdnCoverageForScope', () => {
     ] as const) {
       expect(shared.has(id)).toBe(true);
     }
-    // Content owned (redaction apply / page surgery): the content trio and
-    // the annotated family (content+annotations) go; annotation-plane and
+    // Content owned (redaction apply / page surgery): text, geometry and
+    // every picture family go; annotation-plane and
     // attachments-plane resources stay — a redacted layer still shares the
     // base annotations and attachments it never touched.
     const contentOwned = ids(
@@ -266,7 +268,9 @@ describe('cdnCoverageForScope', () => {
       'page-render',
       'page-text',
       'page-geometry',
-      'page-render-annotated',
+      'page-render-annotations',
+      'page-render-fields',
+      'page-render-all',
     ] as const) {
       expect(contentOwned.has(id)).toBe(false);
     }
@@ -285,8 +289,8 @@ describe('cdnCoverageForScope', () => {
 
   it('scopes: every plane is an independent axis', () => {
     const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
-    // Annotations owned: annotation lists + the annotated render family go;
-    // the annotation-free content trio survives — this is the most common
+    // Annotations owned: annotation lists and the pictures that draw
+    // annotations go; the others survive — this is the most common
     // divergence and it must not cost raster sharing.
     const annotationsOwned = ids(
       cdnCoverageForScope(['*'], NO_BITS, {
@@ -296,7 +300,9 @@ describe('cdnCoverageForScope', () => {
       }),
     );
     expect(annotationsOwned.has('page-annotations')).toBe(false);
-    expect(annotationsOwned.has('page-render-annotated')).toBe(false);
+    expect(annotationsOwned.has('page-render-annotations')).toBe(false);
+    expect(annotationsOwned.has('page-render-all')).toBe(false);
+    expect(annotationsOwned.has('page-render-fields')).toBe(true);
     expect(annotationsOwned.has('page-render')).toBe(true);
     expect(annotationsOwned.has('attachments')).toBe(true);
     // attachment-files stays granted on annotation divergence by design: the
@@ -330,8 +336,9 @@ describe('cdnCoverageForScope', () => {
     expect(layoutOwned.has('page-render')).toBe(true);
     expect(layoutOwned.has('page-annotations')).toBe(true);
 
-    // Forms owned (a layer that only fills): the form and its widget images
-    // go; the annotations and every picture without fields stay shared.
+    // Forms owned (a layer that only fills): the form, its widget images and
+    // the pictures with fields go; the annotations and every picture without
+    // fields stay shared.
     const formsOwned = ids(
       cdnCoverageForScope(['*'], NO_BITS, {
         docId: 'doc_1',
@@ -343,7 +350,9 @@ describe('cdnCoverageForScope', () => {
     expect(formsOwned.has('page-form')).toBe(false);
     expect(formsOwned.has('annotations-all')).toBe(true);
     expect(formsOwned.has('page-annotations')).toBe(true);
-    expect(formsOwned.has('page-render-annotated')).toBe(true);
+    expect(formsOwned.has('page-render-annotations')).toBe(true);
+    expect(formsOwned.has('page-render-fields')).toBe(false);
+    expect(formsOwned.has('page-render-all')).toBe(false);
     expect(formsOwned.has('layer-form')).toBe(true);
     expect(annotationsOwned.has('form')).toBe(true);
     expect(annotationsOwned.has('page-form')).toBe(true);
@@ -396,11 +405,15 @@ describe('cdnCoverageForScope', () => {
       'page-annotations',
       'layer-annotations-all',
       'annotations-read',
-      'page-render-annotated',
-      'layer-page-render-annotated',
+      'page-render-annotations',
+      'layer-page-render-annotations',
+      'page-render-all',
+      'layer-page-render-all',
     ] as const) {
       expect(filler.has(id)).toBe(false);
     }
+    expect(filler.has('page-render-fields')).toBe(true);
+    expect(filler.has('layer-page-render-fields')).toBe(true);
     const commenter = covered(['doc.open', 'doc.render', 'doc.annotate.read']);
     expect(commenter.has('annotations-all')).toBe(true);
     for (const id of ['form', 'page-form', 'layer-form', 'layer-page-form'] as const) {
@@ -424,21 +437,34 @@ describe('cdnCoverageForScope', () => {
     );
   });
 
-  it('pictures with annotations take doc.render and doc.annotate.read', () => {
+  it('each picture takes doc.render and the read of what it draws', () => {
     const covered = (scope: string[]) =>
       new Set(
         cdnCoverageForScope(scope, NO_BITS, { docId: 'doc_1' }).map((entry) => entry.resourceId),
       );
-    for (const scope of [['doc.render'], ['doc.annotate.read']]) {
-      expect(covered(scope).has('page-render-annotated')).toBe(false);
-      expect(covered(scope).has('layer-page-render-annotated')).toBe(false);
+    const families: ReadonlyArray<[DocResourceId, DocResourceId, string[]]> = [
+      ['page-render', 'layer-page-render', ['doc.render']],
+      [
+        'page-render-annotations',
+        'layer-page-render-annotations',
+        ['doc.render', 'doc.annotate.read'],
+      ],
+      ['page-render-fields', 'layer-page-render-fields', ['doc.render', 'doc.forms.read']],
+      [
+        'page-render-all',
+        'layer-page-render-all',
+        ['doc.render', 'doc.annotate.read', 'doc.forms.read'],
+      ],
+    ];
+    for (const [id, layerId, needs] of families) {
+      expect(covered(needs).has(id)).toBe(true);
+      expect(covered(needs).has(layerId)).toBe(true);
+      for (const missing of needs) {
+        const short = covered(needs.filter((need) => need !== missing));
+        expect(short.has(id)).toBe(false);
+        expect(short.has(layerId)).toBe(false);
+      }
     }
-    const both = covered(['doc.render', 'doc.annotate.read']);
-    expect(both.has('page-render-annotated')).toBe(true);
-    expect(both.has('layer-page-render-annotated')).toBe(true);
-    expect(
-      checkResourceAccess('page-render-annotated', ['doc.render', 'doc.forms.fill'], NO_BITS),
-    ).toBe(false);
   });
 
   it('layer-bearing entries use the supplied layerName', () => {
@@ -511,9 +537,13 @@ describe('cdnCoverageForScope', () => {
         'layer-metadata-custom',
         'layer-actions',
         'page-render',
-        'page-render-annotated',
+        'page-render-annotations',
+        'page-render-fields',
+        'page-render-all',
         'layer-page-render',
-        'layer-page-render-annotated',
+        'layer-page-render-annotations',
+        'layer-page-render-fields',
+        'layer-page-render-all',
         'page-text',
         'layer-page-text',
         'page-geometry',

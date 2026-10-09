@@ -74,7 +74,7 @@ describe('derived renders', () => {
     expect(firstBytes.byteLength).toBeGreaterThan(0);
 
     // The artifact exists at the canonical base-tier key.
-    const key = StorageKeys.derivedRenderBase(tenantId, baseSha, 1, THUMB_TOKEN);
+    const key = StorageKeys.derivedRenderBase(tenantId, baseSha, 1, THUMB_TOKEN, 'pages');
     expect(await fx.storage.exists(key)).toBe(true);
 
     // Second read: identical bytes, zero additional worker renders.
@@ -106,10 +106,10 @@ describe('derived renders', () => {
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
     // Default fixture: enforce=false → width-kind renders still work. The
-    // token is annotated, so it lives under the annotated family (the prefix
-    // rule makes `/render/pages/` serve annotation-free tokens only).
+    // token pins annotations, so it belongs to the picture with annotations
+    // (`/render/pages/` refuses an `annotationVersion`).
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
+      `${fx.baseUrl}/v1/docs/${docId}/render/annotations/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
       {
         headers,
       },
@@ -127,7 +127,7 @@ describe('derived renders', () => {
       await seedDocument(strict, tenantId, strictDoc, { pageCount: 1 });
       const strictHeaders = { Authorization: `Bearer ${docToken(tenantId, strictDoc)}` };
       const rejected = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/render/annotated/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/annotations/pages/obj:1/data@${OFFLATTICE_TOKEN}`,
         { headers: strictHeaders },
       );
       expect(rejected.status).toBe(400);
@@ -323,7 +323,9 @@ describe('derived renders', () => {
     // read-through would produce — one door.
     const baseSha = createHash('sha256').update(bytes).digest('hex');
     expect(
-      await fx.storage.exists(StorageKeys.derivedRenderBase(tenantId, baseSha, 1, THUMB_TOKEN)),
+      await fx.storage.exists(
+        StorageKeys.derivedRenderBase(tenantId, baseSha, 1, THUMB_TOKEN, 'pages'),
+      ),
     ).toBe(true);
   });
 
@@ -379,29 +381,31 @@ describe('derived renders', () => {
     expect(a.thumbnailUrl).not.toBeNull();
     expect(b.thumbnailUrl).not.toBeNull();
     expect(
-      await fx.storage.exists(StorageKeys.derivedRenderBase(tenantId, baseSha, 1, THUMB_TOKEN)),
+      await fx.storage.exists(
+        StorageKeys.derivedRenderBase(tenantId, baseSha, 1, THUMB_TOKEN, 'pages'),
+      ),
     ).toBe(true);
   });
 
-  test('layer tier: annotated-family layer render persists under the doc prefix', async () => {
+  test('layer tier: a layer picture persists under the doc prefix, keyed by family', async () => {
     const tenantId = 'tenant-layer-tier';
     const docId = 'doclayertier01';
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId, 'alice')}` };
 
-    // Layer view at the base epoch. Annotatedness is path-only (token/path
-    // law): the annotated family pins both counters, its token carrying the
-    // annotationVersion pin — never an includeAnnotations key.
+    // Layer view at the base epoch. What the picture draws is its path: the
+    // picture of everything pins every page counter, and its token says
+    // nothing else of what it draws.
     const token =
-      'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
+      'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320,widgetVersion=1';
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/annotated/pages/obj:1/data@${token}`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/all/pages/obj:1/data@${token}`,
       { headers },
     );
     expect(res.status).toBe(200);
     expect(
       await fx.storage.exists(
-        StorageKeys.derivedRenderLayer(tenantId, docId, 'alice', 1, token, true),
+        StorageKeys.derivedRenderLayer(tenantId, docId, 'alice', 1, token, 'all'),
       ),
     ).toBe(true);
   });

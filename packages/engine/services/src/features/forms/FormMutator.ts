@@ -48,7 +48,12 @@ import {
   writeCalculationOrder,
   type OrderChange,
 } from './internal/calculationOrder';
-import { clearFieldFill, stampFieldCreation, stampFieldFill } from './internal/fieldAttribution';
+import {
+  clearFieldFill,
+  stampFieldCreation,
+  stampFieldFill,
+  writeFieldGroup,
+} from './internal/fieldAttribution';
 import { writeFieldScripts } from './internal/fieldScripts';
 import {
   applyNativeWrite,
@@ -316,6 +321,9 @@ export class FormMutator {
     const fieldObjectNumber = this.createFieldNode(draft, objectNumber);
     this.configureNewField(draft, fieldObjectNumber);
     stampFieldCreation(this.runtime, docPtr, fieldObjectNumber, actor);
+    if (draft.groupId !== undefined) {
+      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, draft.groupId);
+    }
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
         this.runtime,
@@ -572,6 +580,9 @@ export class FormMutator {
         patch.mappingName ?? '',
         'mapping name rejected',
       );
+    }
+    if (patch.groupId !== undefined && patch.groupId !== before.groupId) {
+      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, patch.groupId);
     }
     if ('options' in patch && patch.options) {
       this.applyOptions(fieldObjectNumber, patch.options);
@@ -948,6 +959,7 @@ const PATCH_BASE_MEMBERS = [
   'noExport',
   'alternateName',
   'mappingName',
+  'groupId',
   'actions',
 ];
 

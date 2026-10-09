@@ -20,6 +20,11 @@ interface FormFieldPatchBase {
   alternateName?: string | null;
   mappingName?: string | null;
   /**
+   * Move the field to another group: the session's own, or one it has
+   * `fields:set-group` for. A group can be changed, never removed.
+   */
+  groupId?: string;
+  /**
    * The field's scripts, by event (JavaScript only): a script sets one,
    * `null` removes it, an event left out keeps what it has. Adding a
    * `calculate` script puts the field at the end of the calculation order;

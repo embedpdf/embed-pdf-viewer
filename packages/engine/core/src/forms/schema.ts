@@ -66,6 +66,7 @@ const FormFieldBaseShape = {
   valueEntry: FormValueEntrySchema,
   defaultValueEntry: FormValueEntrySchema,
   actions: PdfFieldActionsSchema.optional(),
+  groupId: z.string().nullable(),
   createdBy: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
   filledBy: z.string().nullable(),
@@ -187,6 +188,7 @@ const FormFieldDraftBaseShape = {
   noExport: z.boolean().optional(),
   alternateName: z.string().optional(),
   mappingName: z.string().optional(),
+  groupId: z.string().min(1).max(256).optional(),
   actions: FieldActionsPatchSchema.optional(),
   widgets: z.array(WidgetPlacementSchema).optional(),
 };
@@ -242,6 +244,7 @@ const FormFieldPatchBaseShape = {
   noExport: z.boolean().optional(),
   alternateName: z.string().nullable().optional(),
   mappingName: z.string().nullable().optional(),
+  groupId: z.string().min(1).max(256).optional(),
   actions: FieldActionsPatchSchema.optional(),
 };
 

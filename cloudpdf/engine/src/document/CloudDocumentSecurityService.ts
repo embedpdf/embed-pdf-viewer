@@ -4,6 +4,7 @@ import {
   EngineErrorCode,
   checkCapability,
   checkCollab,
+  checkFieldAction,
   checkSetGroup,
   collabTargetOf,
   decodePdfBits,
@@ -151,10 +152,10 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
         return checkCollab('create', selfTarget(id), this.rawScope(), id, this.pdfBits());
       case 'set-group':
         return checkSetGroup(
+          'annotations',
           (target as { groupId: string }).groupId,
           id.groupId,
           this.rawScope(),
-          this.pdfBits(),
         );
       default: {
         const annotation = (target ?? {}) as AnnotationOwner;
@@ -164,6 +165,23 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
         return checkCollab(action, owner, this.rawScope(), id, this.pdfBits());
       }
     }
+  }
+
+  /** Per-field form authorization mirrors: the checks the server's writes run, over the same inputs. */
+  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'set-group', target: { groupId: string }): boolean;
+  allowsField(action: 'fill' | 'sign' | 'set-group', target: { groupId: string | null }): boolean {
+    if (action === 'set-group') {
+      const groupId = target.groupId ?? '';
+      return checkSetGroup('fields', groupId, this.identity?.groupId, this.rawScope());
+    }
+    return checkFieldAction(
+      action,
+      target.groupId,
+      this.rawScope(),
+      this.pdfBits(),
+      this.protection,
+    );
   }
 
   /** Raw scope for the collab resolver: server-canonical post-/access, else the JWT claim. */
@@ -345,7 +363,7 @@ const IDENTITY_STRING_FIELDS = [
 
 /**
  * The token's `identity` claim, read the way the server reads it: string
- * fields and a `groups` array, empty values absent. The server rejects a
+ * fields, empty values absent. The server rejects a
  * malformed claim; unverified here, anything else is skipped.
  */
 function identityFromClaims(claims: Record<string, unknown>): Identity | null {
@@ -356,12 +374,6 @@ function identityFromClaims(claims: Record<string, unknown>): Identity | null {
   for (const key of IDENTITY_STRING_FIELDS) {
     const value = record[key];
     if (typeof value === 'string' && value.length > 0) out[key] = value;
-  }
-  if (Array.isArray(record['groups'])) {
-    const groups = (record['groups'] as unknown[]).filter(
-      (g): g is string => typeof g === 'string' && g.length > 0,
-    );
-    if (groups.length > 0) out.groups = groups;
   }
   return Object.keys(out).length > 0 ? out : null;
 }

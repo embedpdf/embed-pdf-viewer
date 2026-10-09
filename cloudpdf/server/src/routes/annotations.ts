@@ -465,7 +465,7 @@ export async function registerAnnotationRoutes(
       if (groups.size === 0) groups.add(undefined);
       let checked: ReturnType<typeof requireLayerCollabAction> | undefined;
       for (const groupId of groups) {
-        const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft, pdfBits);
+        const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft);
         const target = targetForSelfCreate(accessCtx.jwt, group);
         checked = requireLayerCollabAction(
           req,
@@ -526,7 +526,7 @@ export async function registerAnnotationRoutes(
       // constrains that group to X. Under the narrowing model,
       // `doc.annotate.modify` covers create when no create-collab filter
       // is present.
-      const groupId = createGroupOf(accessCtx.jwt, draft, pdfBits);
+      const groupId = createGroupOf(accessCtx.jwt, draft);
       const target = targetForSelfCreate(accessCtx.jwt, groupId);
       const ctx = requireLayerCollabAction(
         req,
@@ -837,14 +837,10 @@ export async function registerAnnotationRoutes(
  * caller's own needs `annotations:set-group` authority for it, as a
  * reassignment on update does.
  */
-function createGroupOf(
-  jwt: RequestJwtContext,
-  draft: AnnotationDraft,
-  pdfBits: PdfBits,
-): string | undefined {
+function createGroupOf(jwt: RequestJwtContext, draft: AnnotationDraft): string | undefined {
   const groupId = (draft as { groupId?: string | null }).groupId ?? jwt.identity.groupId;
   if (groupId !== undefined && groupId !== jwt.identity.groupId) {
-    if (!checkSetGroup(groupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
+    if (!checkSetGroup('annotations', groupId, jwt.identity.groupId, jwt.scope)) {
       throw new PermissionDenied('annotations:set-group', `group=${groupId}`);
     }
   }

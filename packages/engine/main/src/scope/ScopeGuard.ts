@@ -8,6 +8,8 @@ import {
   checkCapability,
   checkCollab,
   checkSetGroup,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
   decodePdfBits,
   describeProtection,
   expandRawScope,
@@ -17,6 +19,7 @@ import {
   type CollabAction,
   type CollabTarget,
   type DocCapability,
+  type FieldWriteAction,
 } from '@embedpdf/engine-core/runtime';
 
 import type { HandleScopeContext } from './HandleScopeContext';
@@ -148,7 +151,36 @@ export class ScopeGuard {
 
   /** Non-throwing destination-group check — see `assertSetGroup`. */
   canSetGroup(newGroupId: string): boolean {
-    return checkSetGroup(newGroupId, this.ctx.identity.groupId, this.ctx.scope, this.ctx.pdfBits);
+    return checkSetGroup('annotations', newGroupId, this.ctx.identity.groupId, this.ctx.scope);
+  }
+
+  /** Whether the handle may put a form field in `groupId`. */
+  canSetFieldGroup(groupId: string): boolean {
+    return checkSetGroup('fields', groupId, this.ctx.identity.groupId, this.ctx.scope);
+  }
+
+  /** Whether the handle may `action` (fill in, or sign) the field in `groupId`. */
+  canFieldWrite(groupId: string | null, action: FieldWriteAction): boolean {
+    return allowsFieldWrite(this.changeAuthority(), groupId, action);
+  }
+
+  /**
+   * Throws unless the handle may `action` some field: what a form write
+   * checks before the job, which checks each field it writes.
+   */
+  assertSomeFieldWrite(action: FieldWriteAction): void {
+    if (allowsSomeFieldWrite(this.changeAuthority(), action)) return;
+    this.assertCapability(action === 'fill' ? 'doc.forms.fill' : 'doc.sign');
+  }
+
+  /**
+   * Throws unless the handle may fill in every field: a write that checks
+   * no field (script effects) takes a filler no `fields:fill` scope narrows.
+   */
+  assertEveryFieldFill(): void {
+    this.assertCapability('doc.forms.fill');
+    if (!this.canFieldWrite(null, 'fill'))
+      throw new PermissionDenied('doc.forms.fill', 'engine-local');
   }
 
   assertCollab(action: CollabAction, target: CollabTarget): void {

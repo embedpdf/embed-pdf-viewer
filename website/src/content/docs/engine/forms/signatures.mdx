@@ -179,6 +179,11 @@ await sign(doc, {
 covers the fields in its group: `'invoice'` locks `invoice.total` too. Once signed, writing a
 locked field fails with `ProtectedDocument`, and an import skips it.
 
+A signature field in a group (`groupId`, see [Signers and groups](/docs/engine/forms/groups))
+locks the rest of its group when you name no `lock`: the group's other fields as they are when you
+sign, but not its signature fields, which their signers still sign. Name a `lock` to choose
+yourself.
+
 ## Signature fields and their look
 
 A signature field is a form field of family `'signature'`. Create one like any field (see
@@ -330,8 +335,8 @@ Everyone else with the document open receives the `signatures.*` events too, wit
 
 Reading signatures (`list()`, `analyze()`, `getContents()`, `getDigest()`) needs
 `doc.forms.read`; `downloadRevision()` needs `doc.download`. Signing (`prepare()`, `complete()`,
-`cancel()`) needs `doc.sign`, and certifying also `doc.sign.certify`. See
-[Permissions](/docs/engine/concepts/permissions).
+`cancel()`) needs `doc.sign`, or `fields:sign` for the field's group, and certifying also
+`doc.sign.certify`. See [Permissions](/docs/engine/concepts/permissions).
 
 A call the document's own signatures forbid fails with `ProtectedDocument`, whatever the user's
 permissions. A field that can't be signed (already signed, read-only, or locked by an earlier

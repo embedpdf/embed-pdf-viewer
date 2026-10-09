@@ -53,6 +53,11 @@ export interface FormImportRequest {
   readonly limits: BundleLimits;
   /** Whether scripts, submits and links are kept (`doc.forms.script`); without it they're left out. */
   readonly mayScript: boolean;
+  /**
+   * The group a field goes in, given the one it had in the bundle (if any):
+   * checked by the caller, which refuses one it may not set.
+   */
+  readonly groupOf: (groupId: string | undefined) => string | undefined;
 }
 
 /** What a values import writes, decided before the first write. */
@@ -109,8 +114,10 @@ export class FormImporter {
     const importedBy = request.actor.userId ?? null;
     const created = plan.creates.map((planned) => {
       const source = bundle.fields[planned.field]!.data;
+      const { groupId: bundleGroup, ...draft } = pdfFormFieldDraftOf(planned.draft, boxOf);
+      const groupId = request.groupOf(bundleGroup);
       const { field } = forms.createField(
-        pdfFormFieldDraftOf(planned.draft, boxOf),
+        { ...draft, ...(groupId !== undefined ? { groupId } : {}) },
         signal,
         request.actor,
       );
@@ -166,6 +173,8 @@ export class FormImporter {
     bundle: WireFormBundle,
     limits: BundleLimits,
     signal: AbortSignal,
+    /** Whether the session may fill the field in; one it may not is left out. */
+    mayFill: (field: FormFieldDTO<PdfCoordinates>) => boolean,
   ): FormValuesImportPlan {
     throwIfAborted(signal);
     checkWireBundle(this.runtime, 'form', bundle, limits, assertFormBundleManifest);
@@ -181,7 +190,8 @@ export class FormImporter {
           if (EngineError.is(error)) return 'value-not-allowed';
           throw error;
         }
-        return locks?.(field.name) ? 'locked' : null;
+        if (locks?.(field.name)) return 'locked';
+        return mayFill(field) ? null : 'fill-not-allowed';
       },
     });
     return {

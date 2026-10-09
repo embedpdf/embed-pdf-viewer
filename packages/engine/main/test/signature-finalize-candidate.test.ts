@@ -130,6 +130,8 @@ describe('signatures.finalizeCandidate', () => {
           certify: { permission: 2 },
           contentsSize: CONTENTS_SIZE,
         },
+        // A tenant's write: no grants to check.
+        authority: { identity: {}, grants: null, protection: null },
       },
       'signatures.prepare',
     );

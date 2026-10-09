@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
+  allowsSomeFieldWrite,
   checkAnyCapability,
   checkCapability,
   checkCollab,
@@ -14,6 +15,7 @@ import {
   type CollabTarget,
   type DocCapability,
   type DocumentProtection,
+  type FieldWriteAction,
   type Identity,
   type PdfBits,
   type ProtectableCapability,
@@ -823,15 +825,47 @@ export function requireLayerChangeWrite(
   protection: DocumentProtection | null,
 ): LayerGuardContext & { authority: ChangeAuthority } {
   const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+  return { ...ctx, ...writeRequestOf(req), authority: changeAuthorityOf(ctx, pdfBits, protection) };
+}
+
+/**
+ * What a write carries for the worker to check inside it: who it acts for,
+ * the token's grants (none for a tenant, which owns its documents), and what
+ * the document's signatures forbid.
+ */
+export function changeAuthorityOf(
+  ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): ChangeAuthority {
   return {
-    ...ctx,
-    ...writeRequestOf(req),
-    authority: {
-      identity: ctx.jwt.identity,
-      grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
-      protection,
-    },
+    identity: ctx.jwt.identity,
+    grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+    protection,
   };
+}
+
+/**
+ * A write that fills in or signs form fields (`action`): the token reaches
+ * this document's layer and may `action` some field (`doc.forms.fill` /
+ * `doc.sign`, or a `fields:` scope). The worker checks each field the write
+ * touches against the authority it carries, inside the write.
+ */
+export function requireLayerFieldWrite(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  action: FieldWriteAction,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): LayerGuardContext & { authority: ChangeAuthority } {
+  const ctx = requireLayerChangeWrite(req, docId, layerName, pdfBits, protection);
+  if (!allowsSomeFieldWrite(ctx.authority, action)) {
+    const capability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
+    refuseProtected(capability, protection);
+    throw new PermissionDenied(capability, 'target');
+  }
+  return ctx;
 }
 
 /**
@@ -901,12 +935,7 @@ function jwtContext(claims: JwtClaims): RequestJwtContext {
     exp: typeof claims.exp === 'number' ? claims.exp : null,
     unlockKey: readUnlockKey(claims),
     scope: claims.scope,
-    identity: claims.identity
-      ? {
-          ...claims.identity,
-          ...(claims.identity.groups ? { groups: [...claims.identity.groups] } : {}),
-        }
-      : {},
+    identity: claims.identity ? { ...claims.identity } : {},
   };
 }
 

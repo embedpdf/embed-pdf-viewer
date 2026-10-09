@@ -1,0 +1,141 @@
+---
+title: Signers and groups
+description: Let several people fill in and sign one form, each only their own fields, by putting fields in groups and giving each signer the permissions for theirs.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Signers and groups
+
+A contract has the buyer's part and the seller's part. The buyer fills in and signs the buyer's
+fields, the seller the seller's, and once the buyer has signed, nobody changes what the buyer
+filled in. Groups do this: each field belongs to a group, and each user's permissions say which
+groups they fill in and sign.
+
+```ts
+const { fields } = await doc.forms.list();
+fields.map((field) => [field.name, field.groupId]);
+// [['buyer.name', 'buyer'], ['buyer.signature', 'buyer'], ['seller.name', 'seller'], …]
+```
+
+## Put fields in groups
+
+A field's group is its `groupId`. Give it when you create the field, or change it later:
+
+```ts
+await doc.forms.create({
+  family: 'text',
+  name: 'buyer.name',
+  groupId: 'buyer',
+  widgets: [{ page, rect: { x: 72, y: 120, width: 200, height: 24 } }],
+});
+await doc.forms.update(field.ref, { groupId: 'seller' });
+```
+
+A field you create without a `groupId` goes in your own group (`identity.groupId`). Putting it in
+another group takes `fields:set-group` for that group, so a designer who prepares the contract
+gets one for each party:
+
+```ts
+const designer = [
+  'doc.open',
+  'doc.render',
+  'doc.forms.modify',
+  'fields:set-group:group=buyer',
+  'fields:set-group:group=seller',
+];
+```
+
+A group can be changed, never removed. It's a setting of the field: it's saved in the PDF (in the
+field's `/EMBD_Metadata`), other PDF apps ignore it, and a form [export](/docs/engine/forms/import-export)
+carries it.
+
+## Give each signer their group
+
+Each signer gets the permissions to fill in and sign their own group's fields:
+
+```ts
+const buyer = ['doc.open', 'doc.render', 'fields:fill:group=buyer', 'fields:sign:group=buyer'];
+const seller = ['doc.open', 'doc.render', 'fields:*:group=seller'];
+```
+
+<Engine local>
+
+```ts
+const doc = await engine.open(
+  { kind: 'bytes', bytes },
+  { scope: buyer, identity: { userId: 'u_381', displayName: 'Dana Smith' } },
+);
+```
+
+</Engine>
+
+<Engine cloud>
+
+Put them in each signer's token, with the signer's identity. A share link for "whoever is the
+seller" needs no identity: its permissions name the group.
+
+</Engine>
+
+Every user who may read the form sees every field and every value: groups decide who changes a
+field, not who sees it. When one signer must not see another's answers, give each their own
+document.
+
+Leave `doc.forms.modify` and `pdf.permissions` out of a signer's permissions. Designing the form
+can delete and recreate any field, and `pdf.permissions` gives what the PDF file allows to
+everyone, which can include designing it.
+
+## Filling in
+
+A signer fills in their fields as anyone does. A field of another group fails with `Forbidden`,
+naming the permission it would take:
+
+```ts
+await doc.forms.setValue(buyerName.ref, { value: 'Dana Smith' });
+await doc.forms.setValue(sellerName.ref, { value: 'x' });
+// Forbidden: details.required is 'fields:fill:group=seller'
+```
+
+A field a script calculates, such as a total, may be in another group or in none. Write it in
+the same change as the field it's calculated from, and it's allowed:
+
+```ts
+await doc.apply({
+  ops: [
+    { type: 'forms.setValue', field: price.ref, value: { value: '1200' } },
+    { type: 'forms.setValue', field: total.ref, value: { value: '1452' } },
+  ],
+});
+```
+
+A reset that names a field the signer may not fill in is refused, and so is a reset of the whole
+form, so pass their own: `doc.forms.reset(myFields)`. A [values import](/docs/engine/forms/import-export#fill-in-from-a-bundle)
+leaves out the other fields, with the reason `fill-not-allowed`.
+
+## Signing
+
+A signer signs their own signature field, and only theirs:
+
+```ts
+const prepared = await doc.signatures.prepare({ field: buyerSignature.ref });
+```
+
+When the signature field is in a group and you name no `lock`, signing locks the rest of the
+group: every field in it as it is when the buyer signs, except its signature fields. After that,
+writing one of them fails with `ProtectedDocument` for everyone, in this engine and in other PDF
+apps. Name a [`lock`](/docs/engine/forms/signatures#lock-fields) to choose the fields yourself.
+
+The engine doesn't order the signers. Give the seller their permissions when the buyer is done.
+
+## Build the interface from it
+
+Ask before you show a control:
+
+```ts
+doc.security.allowsField('fill', field); // may the user fill this field in?
+doc.security.allowsField('sign', field); // …sign this signature field?
+doc.security.allowsField('set-group', { groupId: 'buyer' }); // …put fields in the buyer's group?
+```
+
+The engine checks every write the same way, so these answers never disagree with a call. See
+[Permissions](/docs/engine/concepts/permissions#form-fields).

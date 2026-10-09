@@ -29,6 +29,7 @@ import {
   ImageResourceKeysSchema,
   SourceResourceKeysSchema,
 } from './resourceKeys';
+import { PAGE_RENDER_FAMILIES, type PageRenderFamily, type PageRenderPin } from './renderFamilies';
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
@@ -166,7 +167,6 @@ export const IdentitySchema: z.ZodType<Identity> = z
     organization: z.string().min(1).max(256).optional(),
     organizationalUnit: z.string().min(1).max(256).optional(),
     groupId: z.string().min(1).max(256).optional(),
-    groups: z.array(z.string().min(1).max(256)).max(64).optional(),
   })
   .strict();
 
@@ -515,10 +515,9 @@ export const CachePinsSchema: z.ZodType<CachePins> = z.object({
 });
 
 /**
- * Plane scopes are derived from the version counters at every emission
- * point (layer manifests, mutation cache envelopes, SSE rows), never stored.
- * Additive/optional both ways: old clients ignore it, old servers omit it
- * (consumers treat absence as all-'layer' — never wrong, only unshared).
+ * Plane scopes are derived from the version counters when a layer manifest
+ * is built, never stored. Absent on base manifests: consumers treat absence
+ * as all-'layer' (never wrong, only unshared).
  */
 const LayerScopeValueSchema = z.enum(['base', 'layer']);
 export const LayerScopesSchema: z.ZodType<LayerScopes> = z.object({
@@ -793,31 +792,27 @@ const AppearanceModesSchema = z.string().transform((value, ctx) => {
 });
 
 /**
- * Token/path rule: annotatedness is path-expressed —
- * the render family the route belongs to — never token/query-expressed.
- * Each family therefore gets its own query schema, built from one shared
- * base:
+ * The query/token schema of one picture family (`PAGE_RENDER_FAMILIES`).
+ * What a picture draws is in its path, never its token, so each family has
+ * its own schema, built from one shared base:
  *
- *   - the annotation-free family (`…/render/pages/`) has no
- *     `annotationVersion` field at all — `.strict()` rejects it as an
- *     unrecognized key, so the illegal combination is unrepresentable;
- *   - the annotated family (`…/render/annotated/pages/`) requires
- *     `annotationVersion` on versioned requests — its artifact depends on
- *     the `annotations` plane, so the pin must be in the cache key.
+ *   - its pins are the family's own (`contentVersion`, plus
+ *     `annotationVersion` and `widgetVersion` for the planes it draws), and
+ *     `.strict()` refuses any other, so a pin the family doesn't depend on
+ *     is unrepresentable;
+ *   - a versioned request (one with `contentVersion`) carries every one of
+ *     them, since the picture changes with each.
  *
- * Both transforms stamp `includeAnnotations` onto the parsed SDK options
- * from the family, so downstream consumers (worker options, classify) are
- * family-blind.
+ * The transform stamps what the family draws onto the parsed options, so
+ * the worker options downstream need no family.
  */
-function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQuery> {
+function buildPageRenderQuerySchema(family: PageRenderFamily): z.ZodType<PageRenderQuery> {
+  const { draws, pins } = PAGE_RENDER_FAMILIES[family];
+  const pinFields: Record<string, z.ZodTypeAny> = {};
+  for (const pin of pins) pinFields[pin] = z.coerce.number().int().positive().optional();
   return z
     .object({
-      contentVersion: z.coerce.number().int().positive().optional(),
-      ...(annotated
-        ? {
-            annotationVersion: z.coerce.number().int().positive().optional(),
-          }
-        : {}),
+      ...pinFields,
       format: PageNetworkRenderFormatSchema.optional(),
       viewport: RenderViewportSchema.optional(),
       target: RenderTargetSchema.optional(),
@@ -827,38 +822,36 @@ function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQue
     })
     .strict()
     .superRefine((v, ctx) => {
-      // The object shape is family-dependent (the free family has no
-      // `annotationVersion` key at all), so read the pins through one
-      // explicit view instead of letting the conditional spread's union
-      // type leak into the refinement.
-      const pins = v as { contentVersion?: number; annotationVersion?: number };
-      if (pins.contentVersion !== undefined && v.format === undefined) {
+      const pinned = v as Partial<Record<PageRenderPin, number>>;
+      if (pinned.contentVersion === undefined) {
+        for (const pin of pins) {
+          if (pinned[pin] === undefined) continue;
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [pin],
+            message: `${pin} requires contentVersion`,
+          });
+        }
+        return;
+      }
+      if (v.format === undefined) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['format'],
           message: 'versioned render requires format',
         });
       }
-      if (annotated && pins.annotationVersion !== undefined && pins.contentVersion === undefined) {
+      for (const pin of pins) {
+        if (pinned[pin] !== undefined) continue;
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['annotationVersion'],
-          message: 'annotationVersion requires contentVersion',
-        });
-      }
-      if (annotated && pins.contentVersion !== undefined && pins.annotationVersion === undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['annotationVersion'],
-          message: 'versioned annotated render requires annotationVersion',
+          path: [pin],
+          message: `a versioned ${family} picture requires ${pin}`,
         });
       }
     })
     .transform((v) => {
-      const pins = v as {
-        contentVersion?: number;
-        annotationVersion?: number;
-      };
+      const pinned = v as Partial<Record<PageRenderPin, number>>;
       const options: PageImageOptions = {
         ...(v.target ? { target: v.target } : {}),
         ...(v.viewport ? { viewport: v.viewport } : {}),
@@ -866,22 +859,25 @@ function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQue
         ...(v.background !== undefined ? { background: v.background } : {}),
         ...(v.quality !== undefined ? { quality: v.quality } : {}),
         ...(v.format !== undefined ? { format: v.format } : {}),
-        includeAnnotations: annotated,
+        ...draws,
       };
-      return {
-        options,
-        ...(pins.contentVersion !== undefined ? { contentVersion: pins.contentVersion } : {}),
-        ...(pins.annotationVersion !== undefined
-          ? { annotationVersion: pins.annotationVersion }
-          : {}),
-      };
+      const query: PageRenderQuery = { options };
+      for (const pin of pins) {
+        if (pinned[pin] !== undefined) query[pin] = pinned[pin];
+      }
+      return query;
     }) as unknown as z.ZodType<PageRenderQuery>;
 }
 
-/** Query/token schema for the annotation-free render family (`page-render`). */
-export const PageRenderQuerySchema = buildPageRenderQuerySchema(false);
-/** Query/token schema for the annotated render family (`page-render-annotated`). */
-export const PageRenderAnnotatedQuerySchema = buildPageRenderQuerySchema(true);
+/** Query/token schemas of the four picture families, by family. */
+export const PageRenderQuerySchemas: Readonly<
+  Record<PageRenderFamily, z.ZodType<PageRenderQuery>>
+> = {
+  pages: buildPageRenderQuerySchema('pages'),
+  annotations: buildPageRenderQuerySchema('annotations'),
+  fields: buildPageRenderQuerySchema('fields'),
+  all: buildPageRenderQuerySchema('all'),
+};
 
 /**
  * Query/token schema of an appearance batch, keyed by `pin`. Mirrors
@@ -1207,7 +1203,13 @@ export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z
   dropped: z.array(
     z.object({
       ref: FormFieldRefSchema,
-      reason: z.enum(['no-field', 'wrong-family', 'value-not-allowed', 'locked']),
+      reason: z.enum([
+        'no-field',
+        'wrong-family',
+        'value-not-allowed',
+        'locked',
+        'fill-not-allowed',
+      ]),
     }),
   ),
   meta: FormMutationMetaSchema,

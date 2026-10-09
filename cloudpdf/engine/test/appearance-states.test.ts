@@ -53,5 +53,4 @@ runAppearanceStatesConformance(runner, {
     return cloudEngine({ baseUrl: fx.baseUrl, token: tenantToken(fx, TENANT_ID) });
   },
   open: (engine) => engine.open({ kind: 'id', id: `appearance-states-${opened++}` }),
-  pageRendersDrawFormFields: false,
 });

@@ -7,11 +7,14 @@ import { describe, expect, test } from 'vitest';
 import {
   decodeRenderToken,
   encodeRenderToken,
-  PageRenderQuerySchema,
+  PageRenderQuerySchemas,
   renderImageOptionsToToken,
   renderImageOptionsToWire,
   unflatten,
 } from '@embedpdf/engine-core/wire';
+
+// The picture family these stale cases were written against.
+const PageRenderQuerySchema = PageRenderQuerySchemas.annotations;
 
 describe.skip('wire token codec', () => {
   test('render tokens use dotted SDK paths in canonical alphabetical order', () => {

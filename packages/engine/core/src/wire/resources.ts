@@ -19,6 +19,7 @@
 
 import type { DocCapability, PdfBits } from '../auth/scope';
 import { checkAnyCapability, checkCapability } from '../auth/scope';
+import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
 
 /**
  * Canonical id for every read resource the server exposes.
@@ -33,11 +34,12 @@ export type DocResourceId =
   | 'head'
   | 'manifest'
   | 'page-render'
-  // Plane-prefix rule: annotated renders are their own family — they depend
-  // on content+annotations while `/render/pages/` depends on content alone,
-  // and edge grants see only prefixes, so the dependency set must be
-  // visible in the path.
-  | 'page-render-annotated'
+  // The other picture families (`PAGE_RENDER_FAMILIES`): each is its own
+  // path, since each depends on its own planes and needs its own rights,
+  // and edge grants see only prefixes.
+  | 'page-render-annotations'
+  | 'page-render-fields'
+  | 'page-render-all'
   | 'page-text'
   | 'page-geometry'
   // Plane-scope model: doc-level shared variants, one per plane-dependent
@@ -90,10 +92,9 @@ export type DocResourceId =
   | 'version-revisions'
   | 'layer-actions'
   | 'layer-page-render'
-  // Layer twin of `page-render-annotated`: annotatedness is path-only at
-  // both tiers (uniform grammar), and both take `doc.annotate.read` — see
-  // the token/path law in wire/paths.ts.
-  | 'layer-page-render-annotated'
+  | 'layer-page-render-annotations'
+  | 'layer-page-render-fields'
+  | 'layer-page-render-all'
   | 'layer-page-text'
   | 'layer-page-geometry'
   // Search slices, one resource per permission tier: rects-only results
@@ -190,6 +191,44 @@ export interface DocResourceDescriptor {
   cdnCacheable: boolean;
 }
 
+/** A page picture of one family, at the document's shared path. */
+function pageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
+  const { resource, path, needs } = PAGE_RENDER_FAMILIES[family];
+  return {
+    id: resource,
+    pathPattern: `/v1/docs/{docId}/${path}/*/data@*`,
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/${path}/*/data@*`,
+    pathPrefix: `/v1/docs/{docId}/${path}/`,
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/${path}/`,
+    requirement: requirementOf(needs),
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  };
+}
+
+/** A page picture of one family, at a layer's path. */
+function layerPageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
+  const { layerResource, path, needs } = PAGE_RENDER_FAMILIES[family];
+  return {
+    id: layerResource,
+    pathPattern: `/v1/docs/{docId}/layers/{layerName}/${path}/*/data@*`,
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/${path}/*/data@*`,
+    pathPrefix: `/v1/docs/{docId}/layers/{layerName}/${path}/`,
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/${path}/`,
+    requirement: requirementOf(needs),
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  };
+}
+
+function requirementOf(needs: ReadonlyArray<DocCapability>): CapabilityRequirement {
+  return needs.length === 1
+    ? { kind: 'single', capability: needs[0]! }
+    : { kind: 'all', capabilities: needs };
+}
+
 /**
  * URL layout: each resource type lives at a distinct path
  * prefix so prefix-matching CDNs (Bunny, Cloud CDN, Azure FD) can
@@ -229,28 +268,10 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'page-render': {
-    id: 'page-render',
-    pathPattern: '/v1/docs/{docId}/render/pages/*/data@*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/render/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/render/pages/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/render/pages/`,
-    requirement: { kind: 'single', capability: 'doc.render' },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
-  'page-render-annotated': {
-    id: 'page-render-annotated',
-    pathPattern: '/v1/docs/{docId}/render/annotated/pages/*/data@*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/render/annotated/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/render/annotated/pages/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/render/annotated/pages/`,
-    // The annotations drawn are read like the annotation list: the family
-    // depends on the `annotations` plane and on who may read it.
-    requirement: { kind: 'all', capabilities: ['doc.render', 'doc.annotate.read'] },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
+  'page-render': pageRenderResource('pages'),
+  'page-render-annotations': pageRenderResource('annotations'),
+  'page-render-fields': pageRenderResource('fields'),
+  'page-render-all': pageRenderResource('all'),
   'page-annotations': {
     id: 'page-annotations',
     pathPattern: '/v1/docs/{docId}/annotations/pages/*/items@*',
@@ -452,30 +473,10 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'layer-page-render': {
-    id: 'layer-page-render',
-    pathPattern: '/v1/docs/{docId}/layers/{layerName}/render/pages/*/data@*',
-    resolvePathPattern: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/render/pages/',
-    resolvePathPrefix: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/pages/`,
-    requirement: { kind: 'single', capability: 'doc.render' },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
-  'layer-page-render-annotated': {
-    id: 'layer-page-render-annotated',
-    pathPattern: '/v1/docs/{docId}/layers/{layerName}/render/annotated/pages/*/data@*',
-    resolvePathPattern: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/annotated/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/render/annotated/pages/',
-    resolvePathPrefix: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/annotated/pages/`,
-    requirement: { kind: 'all', capabilities: ['doc.render', 'doc.annotate.read'] },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
+  'layer-page-render': layerPageRenderResource('pages'),
+  'layer-page-render-annotations': layerPageRenderResource('annotations'),
+  'layer-page-render-fields': layerPageRenderResource('fields'),
+  'layer-page-render-all': layerPageRenderResource('all'),
   'page-text': {
     id: 'page-text',
     pathPattern: '/v1/docs/{docId}/text/pages/*/data@*',

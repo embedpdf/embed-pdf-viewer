@@ -251,6 +251,5 @@ function buildAccessResponse(
 }
 
 function identityForResponse(jwt: RequestJwtContext): DocumentAccessInfo['identity'] {
-  const id = jwt.identity;
-  return { ...id, ...(id.groups !== undefined ? { groups: [...id.groups] } : {}) };
+  return { ...jwt.identity };
 }

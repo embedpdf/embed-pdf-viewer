@@ -97,6 +97,16 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
     }
   }
 
+  /** Per-field form authorization mirrors: the guard's own field checks. */
+  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'set-group', target: { groupId: string }): boolean;
+  allowsField(action: 'fill' | 'sign' | 'set-group', target: { groupId: string | null }): boolean {
+    const guard = this.guard;
+    if (!guard) return false;
+    if (action === 'set-group') return guard.canSetFieldGroup(target.groupId ?? '');
+    return guard.canFieldWrite(target.groupId, action);
+  }
+
   /** Identity claims supplied at `engine.open()`, or null when none. */
   get identity(): Identity | null {
     if (!this.guard) return null;

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
+  allowsFieldWrite,
   DEFAULT_BUNDLE_LIMITS,
   EngineError,
   EngineErrorCode,
@@ -7,6 +8,7 @@ import {
   decodeFieldRefKey,
   toPageRef,
   draftWritesScripts,
+  PermissionDenied,
   wirePack,
   writesScripts,
   type BundleLimits,
@@ -46,9 +48,11 @@ import {
   type FormExportToken,
 } from '@embedpdf/engine-core/wire';
 import {
+  changeAuthorityOf,
   holdsCapability,
   requireLayerCapability,
   requireLayerDocAccessOnly,
+  requireLayerFieldWrite,
   requireLayerResource,
 } from '../app/jwt-plugin';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
@@ -506,6 +510,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         // Without it, scripts, submits and links are left out, not refused.
         mayScript: holdsCapability(ctx, 'doc.forms.script', pdfBits, protection),
         limits: bundleLimits,
+        authority: changeAuthorityOf(ctx, pdfBits, protection),
       },
       abortSignalOf(reply),
     );
@@ -523,14 +528,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       bodySchema: FormValuesImportBodySchema as unknown as SchemaLike<FormValuesImportBody>,
     });
     const attribution = body.options.attribution ?? 'restore';
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.forms.fill',
-      pdfBits,
-      protection,
-    );
+    // A field the token may not fill is left out (`fill-not-allowed`), checked in the write.
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', pdfBits, protection);
     // Restoring writes attribution that isn't the caller's.
     if (attribution === 'restore') {
       requireLayerCapability(req, docId, layerName, 'doc.forms.import', pdfBits, protection);
@@ -544,6 +543,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         bundle: { ...body.bundle, resources },
         attribution,
         limits: bundleLimits,
+        authority: ctx.authority,
       },
       abortSignalOf(reply),
     );
@@ -607,6 +607,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         draft,
         ...(objectNumber !== undefined ? { objectNumber } : {}),
         ...(widgetObjectNumbers ? { widgetObjectNumbers } : {}),
+        // Which group the field may go in is checked in the write.
+        authority: changeAuthorityOf(ctx, pdfBits, protection),
       },
       abortSignalOf(reply),
     );
@@ -638,7 +640,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     setNoStore(reply);
     return layerService.updateFormField(
       ctx,
-      { docId, layerName, ref, patch },
+      { docId, layerName, ref, patch, authority: changeAuthorityOf(ctx, pdfBits, protection) },
       abortSignalOf(reply),
     );
   });
@@ -667,14 +669,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.forms.fill',
-      pdfBits,
-      protection,
-    );
+    // Whether this field is the token's to fill (its group) is checked in the write.
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', pdfBits, protection);
     const body = (req.body ?? {}) as { value?: unknown };
     const value = parseOrInvalidArg<FormFieldValue>(
       FormFieldValueSchema as unknown as SchemaLike<FormFieldValue>,
@@ -682,7 +678,11 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       'body.value',
     );
     setNoStore(reply);
-    return layerService.setFormValue(ctx, { docId, layerName, ref, value }, abortSignalOf(reply));
+    return layerService.setFormValue(
+      ctx,
+      { docId, layerName, ref, value, authority: ctx.authority },
+      abortSignalOf(reply),
+    );
   });
 
   app.post('/v1/docs/:docId/layers/:layerName/form/reset', async (req, reply) => {
@@ -690,14 +690,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.forms.fill',
-      pdfBits,
-      protection,
-    );
+    // Each field it resets must be the token's to fill, checked in the write.
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'fill', pdfBits, protection);
     const body = parseOrInvalidArg<{ refs?: FormFieldRef[] }>(
       FormResetBodySchema as unknown as SchemaLike<{ refs?: FormFieldRef[] }>,
       req.body ?? {},
@@ -706,7 +700,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     setNoStore(reply);
     return layerService.resetForm(
       ctx,
-      { docId, layerName, ...(body.refs ? { refs: body.refs } : {}) },
+      { docId, layerName, ...(body.refs ? { refs: body.refs } : {}), authority: ctx.authority },
       abortSignalOf(reply),
     );
   });
@@ -718,14 +712,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(
-        req,
-        docId,
-        layerName,
-        'doc.forms.fill',
-        pdfBits,
-        protection,
-      );
+      // A signature's look is signing: the field must be the token's to sign, checked in the write.
+      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, protection);
       const ref = fieldRefFromParams(req);
       // The mark is a page of a PDF (sniffed, never declared), riding the multipart envelope.
       const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
@@ -748,6 +736,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
           layerName,
           ref,
           pdf: new Uint8Array(resource.bytes),
+          authority: ctx.authority,
         },
         abortSignalOf(reply),
       );
@@ -767,6 +756,10 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       pdfBits,
       protection,
     );
+    // The effects aren't checked field by field: they take a filler no `fields:fill` scope narrows.
+    if (!allowsFieldWrite(changeAuthorityOf(ctx, pdfBits, protection), null, 'fill')) {
+      throw new PermissionDenied('doc.forms.fill', 'target');
+    }
     const body = (req.body ?? {}) as { effects?: unknown };
     const effects = parseOrInvalidArg<FormEffect[]>(
       FormEffectSchema.array() as unknown as SchemaLike<FormEffect[]>,

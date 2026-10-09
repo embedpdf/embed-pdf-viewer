@@ -37,9 +37,12 @@ const SECRET = 'view-sharing-secret';
 /** Canonical lattice token: durable read-through → countable single render. */
 const W320_TOKEN =
   'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
-/** The annotated twin — its own path family (`/render/annotated/…`). */
-const W320_ANNOTATED_TOKEN =
+/** The picture with annotations: its own path (`/render/annotations/…`), its own pins. */
+const W320_ANNOTATIONS_TOKEN =
   'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
+/** The picture with form fields (`/render/fields/…`). */
+const W320_FIELDS_TOKEN =
+  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320,widgetVersion=1';
 
 const ALL_BASE = {
   content: 'base',
@@ -117,9 +120,13 @@ describe('plane-scoped view sharing', () => {
       expect(bytesA.equals(bytesB), path).toBe(true);
     }
 
-    // The annotated render family shares too — a base's own annotations are
-    // visible through every pristine layer (content + annotations planes).
-    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${W320_ANNOTATED_TOKEN}`;
+    // The pictures that draw annotations or fields share too — a base's own
+    // annotations and form are visible through every pristine layer.
+    const fields = `${fx.baseUrl}/v1/docs/${docId}/render/fields/pages/obj:1/data@${W320_FIELDS_TOKEN}`;
+    expect(
+      (await fetch(fields, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
+    ).toBe(200);
+    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotations/pages/obj:1/data@${W320_ANNOTATIONS_TOKEN}`;
     expect(
       (await fetch(annotated, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
     ).toBe(200);
@@ -130,9 +137,9 @@ describe('plane-scoped view sharing', () => {
     // The key sharing property: 1,000 pristine visitors are
     // this test's two — zero layer worker sessions were ever created, and
     // the durable read-through collapsed the annotation-free render into a
-    // single worker render.
+    // single worker render. Each picture family is one more at most.
     expect(spy.count('open.layerFileBase')).toBe(0);
-    expect(spy.count('pages.render')).toBeLessThanOrEqual(2);
+    expect(spy.count('pages.render')).toBeLessThanOrEqual(3);
   });
 
   test('annotation writes own the annotations plane only', async () => {
@@ -188,11 +195,14 @@ describe('plane-scoped view sharing', () => {
       ).status,
     ).toBe(200);
 
-    // The annotated render family depends on content+annotations → refused
-    // for alice, still shared for bob.
-    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${W320_ANNOTATED_TOKEN}`;
+    // The picture with annotations depends on content+annotations → refused
+    // for alice, still shared for bob. The picture with fields doesn't draw
+    // annotations, so alice still shares it.
+    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotations/pages/obj:1/data@${W320_ANNOTATIONS_TOKEN}`;
     expect((await fetch(annotated, { headers: aliceAuth })).status).toBe(404);
     expect((await fetch(annotated, { headers: bobAuth })).status).toBe(200);
+    const fields = `${fx.baseUrl}/v1/docs/${docId}/render/fields/pages/obj:1/data@${W320_FIELDS_TOKEN}`;
+    expect((await fetch(fields, { headers: aliceAuth })).status).toBe(200);
   });
 
   test('move/rotate own the LAYOUT plane only: normalized artifacts keep sharing', async () => {
@@ -327,7 +337,9 @@ describe('plane-scoped view sharing', () => {
     expect(before.resourceIds).toEqual(
       expect.arrayContaining([
         'page-render',
-        'page-render-annotated',
+        'page-render-annotations',
+        'page-render-fields',
+        'page-render-all',
         'page-annotations',
         'page-text',
         'page-geometry',
@@ -347,9 +359,17 @@ describe('plane-scoped view sharing', () => {
     });
     const afterAnno = await accessFor('alice');
     expect(afterAnno.resourceIds).not.toEqual(expect.arrayContaining(['page-annotations']));
-    expect(afterAnno.resourceIds).not.toEqual(expect.arrayContaining(['page-render-annotated']));
+    for (const gone of ['page-render-annotations', 'page-render-all']) {
+      expect(afterAnno.resourceIds, gone).not.toEqual(expect.arrayContaining([gone]));
+    }
     expect(afterAnno.resourceIds).toEqual(
-      expect.arrayContaining(['page-render', 'page-text', 'attachments', 'layout']),
+      expect.arrayContaining([
+        'page-render',
+        'page-render-fields',
+        'page-text',
+        'attachments',
+        'layout',
+      ]),
     );
 
     // Page delete: the content trio + layout follow.
@@ -369,7 +389,7 @@ describe('plane-scoped view sharing', () => {
     // Bob's untouched layer keeps the full grant.
     const bob = await accessFor('bob');
     expect(bob.resourceIds).toEqual(
-      expect.arrayContaining(['page-render', 'page-render-annotated', 'page-annotations']),
+      expect.arrayContaining(['page-render', 'page-render-annotations', 'page-annotations']),
     );
   });
 

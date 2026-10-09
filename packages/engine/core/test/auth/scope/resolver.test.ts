@@ -30,8 +30,8 @@ const ALL_BITS: PdfBits = decodePdfBits(
     PDF_BITS.PRINT_HIGH,
 );
 
-const ALICE: Identity = { userId: 'alice', groupId: '4', groups: ['4', 'engineering'] };
-const BOB: Identity = { userId: 'bob', groupId: '5', groups: ['5'] };
+const ALICE: Identity = { userId: 'alice', groupId: '4' };
+const BOB: Identity = { userId: 'bob', groupId: '5' };
 const ANON: Identity = {};
 
 // ============================================================================
@@ -359,7 +359,7 @@ describe('checkCollab — narrowing model', () => {
         'create',
         { userId: 'alice', groupId: '99' },
         ['annotations:create:group=4'],
-        { ...ALICE, groupId: '99', groups: ['99'] },
+        { ...ALICE, groupId: '99' },
         NO_BITS,
       ),
     ).toBe(false);
@@ -430,19 +430,17 @@ describe('checkCollab — filter: createdBy=<X>', () => {
 });
 
 describe('checkCollab — filter: group=<X>', () => {
-  it('matches when target groupId equals filter AND identity is in that group', () => {
+  it('matches when the target is in the group, whoever the caller is', () => {
     const target = { userId: 'bob', groupId: '4' };
     expect(checkCollab('update', target, ['annotations:update:group=4'], ALICE, NO_BITS)).toBe(
       true,
     );
+    // The scope names the group: who the caller is, or which group is
+    // theirs, plays no part.
+    expect(checkCollab('update', target, ['annotations:update:group=4'], BOB, NO_BITS)).toBe(true);
   });
 
-  it('denies when target is in the group but identity is NOT', () => {
-    const target = { userId: 'alice', groupId: '4' };
-    expect(checkCollab('update', target, ['annotations:update:group=4'], BOB, NO_BITS)).toBe(false);
-  });
-
-  it('denies when identity is in the group but target is NOT', () => {
+  it('denies when the target is in another group', () => {
     const target = { userId: 'bob', groupId: '5' };
     expect(checkCollab('update', target, ['annotations:update:group=4'], ALICE, NO_BITS)).toBe(
       false,
@@ -542,62 +540,62 @@ describe('filterMatches', () => {
 
 describe('checkSetGroup', () => {
   it('always allows when newGroupId equals caller default (no authority needed)', () => {
-    expect(checkSetGroup('engineering', 'engineering', [], NO_BITS)).toBe(true);
-    expect(checkSetGroup('engineering', 'engineering', ['doc.open'], NO_BITS)).toBe(true);
+    expect(checkSetGroup('annotations', 'engineering', 'engineering', [])).toBe(true);
+    expect(checkSetGroup('annotations', 'engineering', 'engineering', ['doc.open'])).toBe(true);
   });
 
   it('denies when newGroupId differs from default and no set-group scope', () => {
-    expect(checkSetGroup('legal', 'engineering', ['annotations:update:self'], NO_BITS)).toBe(false);
+    expect(checkSetGroup('annotations', 'legal', 'engineering', ['annotations:update:self'])).toBe(
+      false,
+    );
   });
 
   it('wildcard scope grants any group assignment', () => {
-    expect(checkSetGroup('legal', 'engineering', ['*'], NO_BITS)).toBe(true);
+    expect(checkSetGroup('annotations', 'legal', 'engineering', ['*'])).toBe(true);
   });
 
   it('doc.annotate.modify alone does NOT grant cross-group set-group (decoupled)', () => {
     // Set-group is a cloud-only assignment authority — it does not inherit
     // from modify (which is row-access). To reassign across groups you need
     // an explicit set-group scope or the wildcard.
-    expect(checkSetGroup('legal', 'engineering', ['doc.annotate.modify'], NO_BITS)).toBe(false);
+    expect(checkSetGroup('annotations', 'legal', 'engineering', ['doc.annotate.modify'])).toBe(
+      false,
+    );
   });
 
   it('pdf.permissions + bit 6 grants modify but NOT cross-group set-group', () => {
     const bits = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
-    expect(checkSetGroup('legal', 'engineering', ['pdf.permissions'], bits)).toBe(false);
+    expect(checkSetGroup('annotations', 'legal', 'engineering', ['pdf.permissions'])).toBe(false);
   });
 
   it('modify combined with an explicit set-group scope works as expected', () => {
     expect(
-      checkSetGroup(
-        'legal',
-        'engineering',
-        ['doc.annotate.modify', 'annotations:set-group:group=legal'],
-        NO_BITS,
-      ),
+      checkSetGroup('annotations', 'legal', 'engineering', [
+        'doc.annotate.modify',
+        'annotations:set-group:group=legal',
+      ]),
     ).toBe(true);
     expect(
-      checkSetGroup(
-        'marketing',
-        'engineering',
-        ['doc.annotate.modify', 'annotations:set-group:group=legal'],
-        NO_BITS,
-      ),
+      checkSetGroup('annotations', 'marketing', 'engineering', [
+        'doc.annotate.modify',
+        'annotations:set-group:group=legal',
+      ]),
     ).toBe(false);
   });
 
   it('set-group:all allows any group assignment regardless of membership', () => {
-    expect(checkSetGroup('legal', 'engineering', ['annotations:set-group:all'], NO_BITS)).toBe(
-      true,
-    );
-    expect(checkSetGroup('marketing', 'engineering', ['annotations:set-group:all'], NO_BITS)).toBe(
-      true,
-    );
+    expect(
+      checkSetGroup('annotations', 'legal', 'engineering', ['annotations:set-group:all']),
+    ).toBe(true);
+    expect(
+      checkSetGroup('annotations', 'marketing', 'engineering', ['annotations:set-group:all']),
+    ).toBe(true);
   });
 
   it('set-group:group=X only allows that specific group', () => {
     const scope = ['annotations:set-group:group=legal'];
-    expect(checkSetGroup('legal', 'engineering', scope, NO_BITS)).toBe(true);
-    expect(checkSetGroup('marketing', 'engineering', scope, NO_BITS)).toBe(false);
+    expect(checkSetGroup('annotations', 'legal', 'engineering', scope)).toBe(true);
+    expect(checkSetGroup('annotations', 'marketing', 'engineering', scope)).toBe(false);
   });
 
   it('multiple set-group:group=X grants stack additively', () => {
@@ -606,26 +604,28 @@ describe('checkSetGroup', () => {
       'annotations:set-group:group=under-review',
       'annotations:set-group:group=approved',
     ];
-    expect(checkSetGroup('needs-review', 'workflow', scope, NO_BITS)).toBe(true);
-    expect(checkSetGroup('approved', 'workflow', scope, NO_BITS)).toBe(true);
-    expect(checkSetGroup('legal', 'workflow', scope, NO_BITS)).toBe(false);
+    expect(checkSetGroup('annotations', 'needs-review', 'workflow', scope)).toBe(true);
+    expect(checkSetGroup('annotations', 'approved', 'workflow', scope)).toBe(true);
+    expect(checkSetGroup('annotations', 'legal', 'workflow', scope)).toBe(false);
   });
 
   it('annotations:*:all covers set-group via action wildcard', () => {
-    expect(checkSetGroup('legal', 'engineering', ['annotations:*:all'], NO_BITS)).toBe(true);
+    expect(checkSetGroup('annotations', 'legal', 'engineering', ['annotations:*:all'])).toBe(true);
   });
 
   it('annotations:*:group=X covers set-group for that group via action wildcard', () => {
     const scope = ['annotations:*:group=legal'];
-    expect(checkSetGroup('legal', 'engineering', scope, NO_BITS)).toBe(true);
-    expect(checkSetGroup('marketing', 'engineering', scope, NO_BITS)).toBe(false);
+    expect(checkSetGroup('annotations', 'legal', 'engineering', scope)).toBe(true);
+    expect(checkSetGroup('annotations', 'marketing', 'engineering', scope)).toBe(false);
   });
 
   it('callerDefaultGroupId undefined → any change needs explicit set-group authority', () => {
-    expect(checkSetGroup('legal', undefined, ['annotations:update:self'], NO_BITS)).toBe(false);
-    expect(checkSetGroup('legal', undefined, ['annotations:set-group:group=legal'], NO_BITS)).toBe(
-      true,
+    expect(checkSetGroup('annotations', 'legal', undefined, ['annotations:update:self'])).toBe(
+      false,
     );
+    expect(
+      checkSetGroup('annotations', 'legal', undefined, ['annotations:set-group:group=legal']),
+    ).toBe(true);
   });
 });
 

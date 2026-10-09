@@ -703,8 +703,6 @@ function coerceIdentityClaim(payload: JWTPayload): Identity | undefined {
     const field = optionalString(claim, key);
     if (field) identity[key] = field;
   }
-  const groups = optionalStringArray(claim, 'groups');
-  if (groups.length > 0) identity.groups = groups;
   return Object.keys(identity).length > 0 ? identity : undefined;
 }
 
@@ -713,18 +711,6 @@ function optionalString(record: Record<string, unknown>, key: string): string | 
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'string') throw new Error(`identity.${key} must be a string`);
   return value.length > 0 ? value : undefined;
-}
-
-function optionalStringArray(record: Record<string, unknown>, key: string): string[] {
-  const value = record[key];
-  if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) throw new Error(`identity.${key} must be an array`);
-  return value
-    .map((item, i) => {
-      if (typeof item !== 'string') throw new Error(`identity.${key}[${i}] must be a string`);
-      return item;
-    })
-    .filter((item) => item.length > 0);
 }
 
 /**

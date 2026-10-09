@@ -62,8 +62,7 @@ export {
   PageTextSnapshotSchema,
   PageGeometrySnapshotSchema,
   PageNetworkRenderFormatSchema,
-  PageRenderQuerySchema,
-  PageRenderAnnotatedQuerySchema,
+  PageRenderQuerySchemas,
   AnnotationAppearancesQuerySchema,
   WidgetAppearancesQuerySchema,
   AnnotationAppearanceBatchSchema,
@@ -202,6 +201,9 @@ export {
   ResourceKeySchema,
   SourceResourceKeysSchema,
 } from './wire/resourceKeys';
+// The four page pictures: what each draws, needs, depends on and pins.
+export { PAGE_RENDER_FAMILIES, pageRenderFamilyOf } from './wire/renderFamilies';
+export type { PageRenderFamily, PageRenderFamilySpec, PageRenderPin } from './wire/renderFamilies';
 // General resource catalog + route-guard helper (server uses this for
 // every read endpoint, not just CDN-cacheable ones).
 export { checkResourceAccess, DOC_RESOURCES } from './wire/resources';

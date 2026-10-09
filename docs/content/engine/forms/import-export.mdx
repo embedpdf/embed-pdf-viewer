@@ -102,6 +102,10 @@ it needs `doc.forms.import` beside `doc.forms.modify`.
 With `attribution: 'stamp'`, each field is made as `create()` makes it: the user who imports
 created it, and filled it in when it gets a value.
 
+A field keeps its group (`groupId`) with `'restore'`. With `'stamp'`, it goes in the group it had,
+when the user may put fields there (their own, or one they have `fields:set-group` for), and in
+their own group when it had none. A group they may not set refuses the import.
+
 ### Scripts and actions
 
 A field's scripts and its widgets' actions come along. A script, a submit or a link
@@ -151,12 +155,13 @@ Each field the bundle holds a value for fills the document's field of the same f
 `fields`. The import runs no scripts: no keystroke, format, validate or calculate script runs, as
 for every value the engine writes.
 
-| `reason`            | What was left out                                                           |
-| :------------------ | :-------------------------------------------------------------------------- |
-| `no-field`          | The document has no field of that name.                                     |
-| `wrong-family`      | The document's field of that name is of another kind.                       |
-| `value-not-allowed` | A value the field can't take: an option it doesn't have, a button it lacks. |
-| `locked`            | A field a signature locked.                                                 |
+| `reason`            | What was left out                                                              |
+| :------------------ | :----------------------------------------------------------------------------- |
+| `no-field`          | The document has no field of that name.                                        |
+| `wrong-family`      | The document's field of that name is of another kind.                          |
+| `value-not-allowed` | A value the field can't take: an option it doesn't have, a button it lacks.    |
+| `locked`            | A field a signature locked.                                                    |
+| `fill-not-allowed`  | A field the user may not fill in: its group isn't one their permissions reach. |
 
 All of this is decided before the first value is written.
 
@@ -209,11 +214,11 @@ An export is cached until the document's form or pages change, so exporting agai
 | `export()`                                       | `doc.forms.read` and `doc.download`                                           |
 | `import(bundle, { attribution: 'stamp' })`       | `doc.forms.modify`; `doc.forms.script` to keep scripts                        |
 | `import(bundle)`                                 | `doc.forms.modify` and `doc.forms.import`; `doc.forms.script` to keep scripts |
-| `importValues(bundle, { attribution: 'stamp' })` | `doc.forms.fill`                                                              |
-| `importValues(bundle)`                           | `doc.forms.fill` and `doc.forms.import`                                       |
+| `importValues(bundle, { attribution: 'stamp' })` | `doc.forms.fill`, or `fields:fill` for a group                                |
+| `importValues(bundle)`                           | that, and `doc.forms.import`                                                  |
 
-Undoing an import takes what the import took. See
-[Permissions](/docs/engine/concepts/permissions).
+A values import leaves out the fields the user may not fill in (`fill-not-allowed`). Undoing an
+import takes what the import took. See [Permissions](/docs/engine/concepts/permissions).
 
 ## Good to know
 

@@ -133,6 +133,42 @@ A form field's widget is an annotation in the PDF, but changing it is designing 
 resizing, restyling or deleting a widget takes `doc.forms.modify`, and the `annotations:…`
 permissions never apply to it. `allowsAnnotation('update', widget)` answers the same way.
 
+## Form fields
+
+When several people fill in one form, each fills in and signs their own fields: the buyer the
+buyer's, the seller the seller's. A field belongs to a group (`groupId`, see
+[Signers and groups](/docs/engine/forms/groups)), and permissions for fields name the action and
+the group:
+
+```ts
+// The buyer: fills in and signs the buyer's fields, and nothing else.
+const scope = ['doc.open', 'doc.render', 'fields:fill:group=buyer', 'fields:sign:group=buyer'];
+```
+
+| Part   | Values                                            |
+| :----- | :------------------------------------------------ |
+| action | `fill`, `sign`, `set-group`, or `*` for all three |
+| which  | `all`, or `group=<id>` (the fields of one group)  |
+
+A `fields:fill:…` permission replaces `doc.forms.fill` for filling in, and `fields:sign:…`
+replaces `doc.sign` for signing, so `['doc.forms.fill', 'fields:fill:group=buyer']` fills in the
+buyer's fields only. A field in no group is then left to users without a `fields:fill` permission.
+Any `fields:` permission lets the user read the form: groups limit what they change, never what
+they see.
+
+A field a script calculates, such as a total, is filled in together with the field it's
+calculated from. Writing it is allowed when the same change also fills in one of the user's own
+fields, so the result travels with its input.
+
+Designing the form (`doc.forms.modify`) isn't narrowed by any `fields:` permission. A signer's
+token lists the permissions it needs and leaves out `doc.forms.modify` and `pdf.permissions`.
+
+```ts
+doc.security.allowsField('fill', field); // may the user fill this field in?
+doc.security.allowsField('sign', field); // …sign it?
+doc.security.allowsField('set-group', { groupId: 'buyer' }); // …put fields in this group?
+```
+
 ## The PDF's own restrictions
 
 A PDF can restrict itself: a file protected with an owner password may forbid printing or
@@ -240,10 +276,14 @@ will fail. See [Permissions](/docs/headless/concepts/permissions) in the headles
 
 ### Groups
 
-An annotation can belong to a group (`groupId`), for example a team or a department. New
-annotations go in the user's own group. `annotations:set-group:group=<id>` lets a user move
-annotations into that group; `annotations:update:group=<id>` lets them edit that group's
-annotations.
+An annotation or a form field can belong to a group (`groupId`): a team or a department for
+annotations, whoever fills them in for fields. What a user creates goes in their own group
+(`identity.groupId`). `annotations:set-group:group=<id>` and `fields:set-group:group=<id>` let a
+user put annotations or fields in that group; `annotations:update:group=<id>` lets them edit that
+group's annotations, and `fields:fill:group=<id>` fill in that group's fields.
+
+A `group=<id>` permission names the group it covers: the user doesn't need to be in it. To give
+someone several groups, give them one permission per group.
 
 ### Importing with original authors
 

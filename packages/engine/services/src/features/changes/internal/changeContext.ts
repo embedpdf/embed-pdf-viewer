@@ -21,6 +21,12 @@ export interface ChangeContext {
   /** Who the change acts for: each op and step is checked against it. */
   readonly authority: ChangeAuthority;
   readonly signal: AbortSignal;
+  /**
+   * Whether the change fills in a field the caller may fill (an undo: puts
+   * one back). Then a field a script calculates, or shows or hides, may be
+   * written whatever its group: the scripts' outputs travel with their inputs.
+   */
+  readonly fillsOwnField: () => boolean;
 }
 
 /** What running an op or a step did: its item, and the steps that reverse it, in the order they run. */

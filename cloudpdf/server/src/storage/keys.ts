@@ -1,4 +1,10 @@
+import type { PageRenderFamily } from '@embedpdf/engine-core/wire';
 import { createHash } from 'node:crypto';
+
+/** A picture family's part of a stored render's key: `pages`, `annotations/pages`, … */
+function familyPath(family: PageRenderFamily): string {
+  return family === 'pages' ? 'pages' : `${family}/pages`;
+}
 
 /**
  * Single source of truth for storage key construction.
@@ -72,19 +78,18 @@ export const StorageKeys = {
     baseSha: string,
     pageObjectNumber: number,
     token: string,
-    /** Render family (token/path law): annotatedness lives in the key path
-     *  like it lives in the URL path, never inside the token. The sha
-     *  subtree still covers both families, so per-sha GC sweeps stay one
-     *  prefix. */
-    annotated = false,
+    /** The picture family: in the key's path, as in the URL's, never inside
+     *  the token. The sha subtree still covers every family, so per-sha GC
+     *  sweeps stay one prefix. */
+    family: PageRenderFamily,
   ): string {
-    return `${tenantId}/derived/render/${baseSha}/${annotated ? 'annotated/' : ''}pages/${pageObjectNumber}/${token}.webp`;
+    return `${tenantId}/derived/render/${baseSha}/${familyPath(family)}/${pageObjectNumber}/${token}.webp`;
   },
   /**
    * Layer-tier derived render: under the doc prefix so the
    * `documents.delete` prefix cascade reaps it for free. Version pins ride
-   * inside the token (contentVersion / annotationVersion); the render
-   * family rides the path, mirroring the URL grammar.
+   * inside the token (the family's pins); the family rides the path,
+   * mirroring the URL grammar.
    */
   derivedRenderLayer(
     tenantId: string,
@@ -92,11 +97,11 @@ export const StorageKeys = {
     layerName: string,
     pageObjectNumber: number,
     token: string,
-    annotated = false,
+    family: PageRenderFamily,
   ): string {
     return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(
       layerName,
-    )}/derived/render/${annotated ? 'annotated/' : ''}pages/${pageObjectNumber}/${token}.webp`;
+    )}/derived/render/${familyPath(family)}/${pageObjectNumber}/${token}.webp`;
   },
   /**
    * Per-attempt layer artifact key: `v{version}-{attempt}.layer`.

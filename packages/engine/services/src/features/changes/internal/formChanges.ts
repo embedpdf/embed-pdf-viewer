@@ -1,7 +1,12 @@
 import {
   allowsCapability,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
   annotationKey,
   authorizeCapability,
+  authorizeFieldGroup,
+  authorizeFieldWrite,
+  authorizeUnprotected,
   fieldValueOf,
   deserializeError,
   EngineError,
@@ -25,6 +30,7 @@ import {
   type AnnotationRef,
   type FormWidget,
   type PdfCoordinates,
+  type RecordedOp,
   type WidgetAnnotation,
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
@@ -103,15 +109,15 @@ const FILLS: ReadonlySet<ChangeItemType> = new Set([
 
 /** `forms.setValue`; its reverse puts back the value, and the widgets as they were. */
 export function setValue(ctx: ChangeContext, op: Op<'forms.setValue'>, opIndex: number): Done {
-  authorizeCapability(ctx.authority, 'doc.forms.fill');
   const before = readField(ctx, op.field);
+  authorizeFill(ctx, before);
   assertExpected(opIndex, valueOf(before.field), op.expect);
   return writeValue(ctx, before, op.value);
 }
 
 /** `forms.setDisplay`: a script's visibility effect. */
 export function setDisplay(ctx: ChangeContext, op: Op<'forms.setDisplay'>): Done {
-  authorizeCapability(ctx.authority, 'doc.forms.fill');
+  authorizeScriptOutput(ctx, readField(ctx, op.field));
   return writeEffect(ctx, 'forms.setDisplay', op.field, {
     kind: 'setDisplay',
     ref: op.field,
@@ -121,7 +127,7 @@ export function setDisplay(ctx: ChangeContext, op: Op<'forms.setDisplay'>): Done
 
 /** `forms.setAppearanceText`: a script's formatted text, drawn without changing the value. */
 export function setAppearanceText(ctx: ChangeContext, op: Op<'forms.setAppearanceText'>): Done {
-  authorizeCapability(ctx.authority, 'doc.forms.fill');
+  authorizeFill(ctx, readField(ctx, op.field));
   return writeEffect(ctx, 'forms.setAppearanceText', op.field, {
     kind: 'setAppearanceText',
     ref: op.field,
@@ -131,10 +137,12 @@ export function setAppearanceText(ctx: ChangeContext, op: Op<'forms.setAppearanc
 
 /** `forms.reset`; its reverse puts back each field it changed. */
 export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
-  authorizeCapability(ctx.authority, 'doc.forms.fill');
+  authorizeSomeFill(ctx);
   const targets = op.fields
     ? op.fields.map((ref) => readField(ctx, ref))
     : allFields(ctx).filter(({ field }) => VALUE_FAMILIES.has(field.family));
+  // A reset fills in every field it puts back: each must be the caller's to fill.
+  for (const target of targets) authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
   const pending = captureBefore(ctx.runtime, ctx.session, targets.flatMap(objectsOf));
   const result = new FormMutator(ctx.runtime, ctx.session).reset(
     op.fields ? [...op.fields] : undefined,
@@ -169,8 +177,9 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
 export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (draftWritesScripts(op.draft)) authorizeCapability(ctx.authority, 'doc.forms.script');
+  const groupId = newFieldGroup(ctx, op.draft.groupId);
   const { field, calculationOrder } = new FormMutator(ctx.runtime, ctx.session).createField(
-    op.draft,
+    { ...op.draft, ...(groupId !== undefined ? { groupId } : {}) },
     ctx.signal,
     ctx.authority.identity,
     {
@@ -194,6 +203,9 @@ export function updateField(ctx: ChangeContext, op: Op<'forms.update'>, opIndex:
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (writesScripts(op.patch.actions)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const before = readField(ctx, op.field);
+  if (op.patch.groupId !== undefined && op.patch.groupId !== before.field.groupId) {
+    authorizeFieldGroup(ctx.authority, op.patch.groupId);
+  }
   assertExpected(opIndex, propertiesOf(before.field), op.expect);
   return writeUpdate(ctx, before, op.patch);
 }
@@ -446,8 +458,8 @@ export function setSignatureAppearance(
   ctx: ChangeContext,
   op: Op<'forms.setSignatureAppearance'>,
 ): Done {
-  authorizeCapability(ctx.authority, 'doc.forms.fill');
   const before = readField(ctx, op.field);
+  authorizeFieldWrite(ctx.authority, before.field.groupId, 'sign');
   return recordRevert(ctx, before, 'forms.setSignatureAppearance', () =>
     new FormMutator(ctx.runtime, ctx.session).setSignatureAppearance(
       op.field,
@@ -475,6 +487,9 @@ export function importForm(ctx: ChangeContext, op: FormImportOp): Done {
       actor: op.actor ?? {},
       limits: op.limits,
       mayScript: (op.mayScript ?? false) && allowsCapability(ctx.authority, 'doc.forms.script'),
+      // A restoring import keeps each field's group, under the import's
+      // rights; a copy is the caller's own create.
+      groupOf: (groupId) => (rights ? groupId : newFieldGroup(ctx, groupId)),
     },
     ctx.signal,
   );
@@ -495,10 +510,12 @@ export function importForm(ctx: ChangeContext, op: FormImportOp): Done {
  * its value and who filled it, as a `setValue`'s does.
  */
 export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
-  authorizeCapability(ctx.authority, 'doc.forms.fill');
+  authorizeSomeFill(ctx);
   const rights = importRights(ctx, op);
   const importer = new FormImporter(ctx.runtime, ctx.session, ctx.fonts);
-  const plan = importer.planValues(op.bundle, op.limits, ctx.signal);
+  const plan = importer.planValues(op.bundle, op.limits, ctx.signal, (field) =>
+    allowsFieldWrite(ctx.authority, field.groupId, 'fill'),
+  );
   const fields: FormFieldDTO<PdfCoordinates>[] = [];
   const reverse: ReverseStep[] = [];
   for (const write of plan.writes) {
@@ -550,6 +567,106 @@ function importRights(ctx: ChangeContext, op: FormImportOp): StepRights | undefi
 }
 
 // ---------------------------------------------------------------------------
+// Who may fill in which field
+// ---------------------------------------------------------------------------
+
+/**
+ * Check that the caller may fill in `target`: its group is theirs to fill;
+ * or a script calculates it and the change also fills in a field of their
+ * own, so the script's output travels with its input.
+ */
+function authorizeFill(ctx: ChangeContext, target: ReadField): void {
+  if (allowsFieldWrite(ctx.authority, target.field.groupId, 'fill')) return;
+  if (isCalculated(ctx, target) && ctx.fillsOwnField()) {
+    authorizeUnprotected(ctx.authority, 'doc.forms.fill');
+    return;
+  }
+  authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
+}
+
+/**
+ * Check a script's visibility output on `target` (`forms.setDisplay`): the
+ * caller may fill the field in, or the change fills in a field of their own.
+ */
+function authorizeScriptOutput(ctx: ChangeContext, target: ReadField): void {
+  if (allowsFieldWrite(ctx.authority, target.field.groupId, 'fill')) return;
+  if (ctx.fillsOwnField()) {
+    authorizeUnprotected(ctx.authority, 'doc.forms.fill');
+    return;
+  }
+  authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
+}
+
+/** Check that the caller may fill in some field, before the write knows which. */
+function authorizeSomeFill(ctx: ChangeContext): void {
+  if (!allowsSomeFieldWrite(ctx.authority, 'fill')) {
+    authorizeCapability(ctx.authority, 'doc.forms.fill');
+  }
+}
+
+/**
+ * Check an undo or redo of a fill: each field it puts back, as the fill
+ * would be (a signature's look is signing, the rest filling in).
+ */
+function authorizeRevertedFills(
+  ctx: ChangeContext,
+  step: ObjectsRevertStep & { subject: { fields: readonly number[] } },
+): void {
+  const action = step.reports === 'forms.setSignatureAppearance' ? 'sign' : 'fill';
+  authorizeUnprotected(ctx.authority, action === 'sign' ? 'doc.sign' : 'doc.forms.fill');
+  for (const objectNumber of step.subject.fields) {
+    const target = tryReadFieldByNumber(ctx, objectNumber);
+    if (!target) continue;
+    if (action === 'sign') authorizeFieldWrite(ctx.authority, target.field.groupId, 'sign');
+    else authorizeFill(ctx, target);
+  }
+}
+
+/**
+ * The group a new field goes in: the one the write names, else the caller's
+ * own (`identity.groupId`); another group than their own takes
+ * `fields:set-group` for it.
+ */
+function newFieldGroup(ctx: ChangeContext, named: string | undefined): string | undefined {
+  const groupId = named ?? ctx.authority.identity.groupId;
+  if (groupId !== undefined) authorizeFieldGroup(ctx.authority, groupId);
+  return groupId;
+}
+
+/** Whether a script calculates the field: it has a calculate script and is in the calculation order. */
+function isCalculated(ctx: ChangeContext, target: ReadField): boolean {
+  if (!target.field.actions?.calculate) return false;
+  const order = readCalculationOrder(ctx.runtime, acquireFormModel(ctx.runtime, ctx.session));
+  return order.includes(target.objectNumber);
+}
+
+/** Whether `ops` fill in a field the caller may fill: its value, or its displayed text. */
+export function opsFillOwnField(
+  ctx: ChangeContext,
+  ops: readonly RecordedOp<PdfCoordinates, WireAnnotationResources>[],
+): boolean {
+  return ops.some((op) => {
+    if (op.type !== 'forms.setValue' && op.type !== 'forms.setAppearanceText') return false;
+    const target = tryReadField(ctx, op.field);
+    return target !== null && allowsFieldWrite(ctx.authority, target.field.groupId, 'fill');
+  });
+}
+
+/** Whether an undo's `steps` put back a fill of a field the caller may fill. */
+export function stepsFillOwnField(ctx: ChangeContext, steps: readonly ReverseStep[]): boolean {
+  return steps.some(
+    (step) =>
+      step.kind === 'objects.revert' &&
+      (step.reports === 'forms.setValue' || step.reports === 'forms.setAppearanceText') &&
+      'fields' in step.subject &&
+      step.subject.fields.some((objectNumber) => {
+        const target = tryReadFieldByNumber(ctx, objectNumber);
+        return target !== null && allowsFieldWrite(ctx.authority, target.field.groupId, 'fill');
+      }),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Steps
 // ---------------------------------------------------------------------------
 
@@ -562,10 +679,8 @@ export function revertForm(
   ctx: ChangeContext,
   step: ObjectsRevertStep & { subject: { fields: readonly number[] } },
 ): Done {
-  authorizeCapability(
-    ctx.authority,
-    FILLS.has(step.reports) ? 'doc.forms.fill' : 'doc.forms.modify',
-  );
+  if (FILLS.has(step.reports)) authorizeRevertedFills(ctx, step);
+  else authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (step.rights) authorizeCapability(ctx.authority, 'doc.forms.import');
   if (unchangedSince(ctx.runtime, ctx.session, step.objects)) {
     const redo = revertObjects(ctx.runtime, ctx.session, step.objects);
@@ -1033,6 +1148,8 @@ function propertiesOf(field: FormFieldDTO<PdfCoordinates>): FormFieldPatch {
     noExport: field.noExport,
     alternateName: field.alternateName,
     mappingName: field.mappingName,
+    // A group is changed, never removed: a field in none has nothing to put back.
+    ...(field.groupId !== null ? { groupId: field.groupId } : {}),
     actions: scriptsOf(field),
   };
   const hasDefault = field.defaultValueEntry.kind !== 'none';

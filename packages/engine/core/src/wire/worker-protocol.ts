@@ -314,6 +314,8 @@ export interface SignaturesPrepareWorkerRequest {
   docId: string;
   layerName?: string;
   input: SignaturePrepareInput;
+  /** Who signs and their grants: the field must be theirs to sign. */
+  authority: ChangeAuthority;
 }
 
 export interface SignaturesCompleteWorkerRequest extends WriteJobFields {
@@ -324,6 +326,8 @@ export interface SignaturesCompleteWorkerRequest extends WriteJobFields {
   layerName?: string;
   input: SignatureCompleteInput;
   artifactPath?: string;
+  /** Who signs and their grants: the field must still be theirs to sign. */
+  authority: ChangeAuthority;
 }
 
 export interface SignaturesCancelWorkerRequest {
@@ -702,8 +706,11 @@ export interface FormsSetValueWorkerRequest extends WriteJobFields {
   ref: FormFieldRef;
   value: FormFieldValue;
   artifactPath?: string;
-  /** Who fills the field in, stamped as its filler when the value changes; absent when anonymous. */
-  actor?: AnnotationActor;
+  /**
+   * Who the write acts for (stamped as its filler or creator) and their
+   * grants, checked field by field inside the write.
+   */
+  authority: ChangeAuthority;
 }
 
 export interface FormsResetWorkerRequest extends WriteJobFields {
@@ -715,6 +722,11 @@ export interface FormsResetWorkerRequest extends WriteJobFields {
   /** The fields to reset; absent resets the whole form. */
   refs?: FormFieldRef[];
   artifactPath?: string;
+  /**
+   * Who the write acts for (stamped as its filler or creator) and their
+   * grants, checked field by field inside the write.
+   */
+  authority: ChangeAuthority;
 }
 
 export interface FormsApplyEffectsWorkerRequest extends WriteJobFields {
@@ -753,8 +765,12 @@ export interface FormsImportWorkerRequest extends WriteJobFields {
   pages?: BundleImportPages;
   attribution: 'restore' | 'stamp';
   values: boolean;
-  /** Whom `'stamp'` makes the creator and filler; whose user `'restore'` records as `importedBy`. */
-  actor?: AnnotationActor;
+  /**
+   * Who imports and their grants: whom `'stamp'` makes the creator and
+   * filler, whose user `'restore'` records as `importedBy`, and who may put
+   * the fields in which groups.
+   */
+  authority: ChangeAuthority;
   limits?: BundleLimits;
   /** Whether the caller holds `doc.forms.script`: without it, scripts, submits and links are left out. */
   mayScript: boolean;
@@ -770,8 +786,11 @@ export interface FormsImportValuesWorkerRequest extends WriteJobFields {
   layerName?: string;
   bundle: WireFormBundle;
   attribution: 'restore' | 'stamp';
-  /** Whom `'stamp'` makes the filler; whose user `'restore'` records as `importedBy`. */
-  actor?: AnnotationActor;
+  /**
+   * Who imports and their grants: whom `'stamp'` makes the filler, whose
+   * user `'restore'` records as `importedBy`, and which fields they may fill.
+   */
+  authority: ChangeAuthority;
   limits?: BundleLimits;
   artifactPath?: string;
 }
@@ -800,8 +819,11 @@ export interface FormsCreateFieldWorkerRequest<
   /** Its widgets' object numbers, in `draft.widgets` order; the next free ones when absent. */
   widgetObjectNumbers?: number[];
   artifactPath?: string;
-  /** Who creates the field, stamped as its creator; absent when anonymous. */
-  actor?: AnnotationActor;
+  /**
+   * Who creates the field (stamped as its creator, and whose group it goes
+   * in by default) and their grants: which groups they may put it in.
+   */
+  authority: ChangeAuthority;
 }
 
 export interface FormsUpdateFieldWorkerRequest extends WriteJobFields {
@@ -813,6 +835,8 @@ export interface FormsUpdateFieldWorkerRequest extends WriteJobFields {
   ref: FormFieldRef;
   patch: FormFieldPatch;
   artifactPath?: string;
+  /** Who changes the field and their grants: which group they may move it to. */
+  authority: ChangeAuthority;
 }
 
 /** Draw a PDF page into every widget of an unsigned signature field (the visual fill). */
@@ -825,6 +849,8 @@ export interface FormsSetSignatureAppearanceWorkerRequest extends WriteJobFields
   ref: FormFieldRef;
   pdf: ArrayBuffer;
   artifactPath?: string;
+  /** Who draws the look and their grants: the field must be theirs to sign. */
+  authority: ChangeAuthority;
 }
 
 export interface FormsDeleteFieldWorkerRequest extends WriteJobFields {

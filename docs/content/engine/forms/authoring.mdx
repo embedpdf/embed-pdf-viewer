@@ -37,16 +37,17 @@ field can have widgets on several pages that all show the same value.
 pages, one entry per place it shows; leave it out to create a field that isn't on any page yet,
 and [add a widget](#add-a-widget) later.
 
-| Field           | What it is                                                                                                                               | Default    |
-| :-------------- | :--------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
-| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                            |            |
-| `name`          | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                        |            |
-| `widgets`       | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look). | not placed |
-| `readOnly`      | PDF apps don't let the user change it.                                                                                                   | `false`    |
-| `required`      | PDF apps ask for a value before the form is submitted.                                                                                   | `false`    |
-| `noExport`      | Left out when the form is submitted.                                                                                                     | `false`    |
-| `alternateName` | The tooltip PDF apps show, also read by screen readers.                                                                                  | none       |
-| `mappingName`   | A second name, for other apps that export the form's data.                                                                               | none       |
+| Field           | What it is                                                                                                                                                | Default    |
+| :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
+| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                                             |            |
+| `name`          | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                                         |            |
+| `widgets`       | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look).                  | not placed |
+| `readOnly`      | PDF apps don't let the user change it.                                                                                                                    | `false`    |
+| `required`      | PDF apps ask for a value before the form is submitted.                                                                                                    | `false`    |
+| `noExport`      | Left out when the form is submitted.                                                                                                                      | `false`    |
+| `alternateName` | The tooltip PDF apps show, also read by screen readers.                                                                                                   | none       |
+| `mappingName`   | A second name, for other apps that export the form's data.                                                                                                | none       |
+| `groupId`       | The group it goes in: who fills it in. Another group than your own takes `fields:set-group` for it (see [Signers and groups](/docs/engine/forms/groups)). | your own   |
 
 `create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails

@@ -1,6 +1,7 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { ModificationLevel } from '../signature/types';
 import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
+import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
 import type { AnalysisToken, AnnotationsExportToken, FormExportToken } from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
@@ -18,6 +19,7 @@ import type { AnalysisToken, AnnotationsExportToken, FormExportToken } from './t
  *   /v1/docs/{id}                                       — doc root
  *   /v1/docs/{id}/manifest@{ver}                        — doc-level read
  *   /v1/docs/{id}/render/pages/{N}/data@{ver}                — render is its own prefix
+ *   /v1/docs/{id}/render/{annotations,fields,all}/pages/{N}/data@{ver} — and each picture family
  *   /v1/docs/{id}/text/pages/{N}/data@{ver}                  — text is its own prefix
  *   /v1/docs/{id}/geometry/pages/{N}/data@{ver}              — geometry is its own prefix
  *   /v1/docs/{id}/layers/{L}/manifest@{ver}
@@ -353,24 +355,17 @@ export const wirePaths = {
   docPageGeometryCurrent: (docId: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  docPageRender: (docId: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
-
-  docPageRenderCurrent: (docId: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
-
   /**
-   * Immutable base annotated render (plane-scope model). Its own path family,
-   * not a token flag under `/render/pages/`: an annotated render depends on
-   * `content + annotations`, an annotation-free one on `content` alone, and
-   * edge grants are prefix-scoped — the prefix law says a path's prefix must
-   * identify its full plane-dependency set. Annotatedness is therefore
-   * path-only (the token/path law): the wire token has no
-   * `includeAnnotations` key at all; the annotated family's token carries
-   * `annotationVersion`, the free family's cannot.
+   * A page picture of one family (`PAGE_RENDER_FAMILIES`). The family is a
+   * path of its own, never a token field: each depends on its own planes and
+   * needs its own rights, and an edge grant sees only prefixes. Its token
+   * carries the family's pins.
    */
-  docPageRenderAnnotated: (docId: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+  docPageRender: (docId: string, family: PageRenderFamily, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+
+  docPageRenderCurrent: (docId: string, family: PageRenderFamily, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
   layerPageGeometry: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
@@ -378,19 +373,22 @@ export const wirePaths = {
   layerPageGeometryCurrent: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  layerPageRender: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+  layerPageRender: (
+    docId: string,
+    layerName: string,
+    family: PageRenderFamily,
+    page: PageRef,
+    token: TokenInput,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
 
-  layerPageRenderCurrent: (docId: string, layerName: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
-
-  /** Layer twin of `docPageRenderAnnotated` — the grammar is uniform:
-   *  annotatedness is path-only at both tiers. */
-  layerPageRenderAnnotated: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
-
-  layerPageRenderAnnotatedCurrent: (docId: string, layerName: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data`,
+  layerPageRenderCurrent: (
+    docId: string,
+    layerName: string,
+    family: PageRenderFamily,
+    page: PageRef,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /**
    * Immutable base annotation list for a single page (plane-scope model):

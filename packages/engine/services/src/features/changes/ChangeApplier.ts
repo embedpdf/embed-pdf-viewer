@@ -28,6 +28,7 @@ import {
   deleteWidget,
   importForm,
   importFormValues,
+  opsFillOwnField,
   removeField,
   removeWidget,
   reorderWidgets,
@@ -41,6 +42,7 @@ import {
   setDisplay,
   setSignatureAppearance,
   setValue,
+  stepsFillOwnField,
   updateField,
   updateWidget,
 } from './internal/formChanges';
@@ -79,7 +81,7 @@ export class ChangeApplier {
     authority: ChangeAuthority,
     signal: AbortSignal,
   ): AppliedChange {
-    const ctx = this.context(authority, signal);
+    const ctx = this.context(authority, signal, (self) => opsFillOwnField(self, ops));
     return collect(
       authority,
       ops.map((op, at) => () => runOp(ctx, op, at)),
@@ -88,7 +90,7 @@ export class ChangeApplier {
   }
 
   undo(record: ChangeRecord, authority: ChangeAuthority, signal: AbortSignal): AppliedChange {
-    const ctx = this.context(authority, signal);
+    const ctx = this.context(authority, signal, (self) => stepsFillOwnField(self, record.steps));
     return collect(
       authority,
       record.steps.map((step) => () => runStep(ctx, step)),
@@ -96,14 +98,23 @@ export class ChangeApplier {
     );
   }
 
-  private context(authority: ChangeAuthority, signal: AbortSignal): ChangeContext {
-    return {
+  private context(
+    authority: ChangeAuthority,
+    signal: AbortSignal,
+    ownFill: (ctx: ChangeContext) => boolean,
+  ): ChangeContext {
+    // Asked only when a field outside the caller's groups is written, and
+    // answered once: before that write, from the fields as they are.
+    let answer: boolean | undefined;
+    const ctx: ChangeContext = {
       runtime: this.runtime,
       session: this.session,
       ...(this.fonts ? { fonts: this.fonts } : {}),
       authority,
       signal,
+      fillsOwnField: () => (answer ??= ownFill(ctx)),
     };
+    return ctx;
   }
 }
 

@@ -263,6 +263,21 @@ export interface DocumentSecurityService {
   allowsAnnotation(action: 'set-group', target: { groupId: string }): boolean;
 
   /**
+   * Per-field form authorization, mirroring what the engine checks on every
+   * fill, signing and form design write:
+   *   - `fill`/`sign` take the field (its `groupId`): a `fields:fill` /
+   *     `fields:sign` scope for its group, or, without one, `doc.forms.fill`
+   *     / `doc.sign` for every field;
+   *   - `set-group` takes the destination group (`fields:set-group:` ladder;
+   *     the caller's own default group is always assignable).
+   *
+   * A courtesy for UI gating, like {@link allowsAnnotation}: the engine
+   * enforces every write with the same predicates.
+   */
+  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'set-group', target: { groupId: string }): boolean;
+
+  /**
    * Who the session acts for: from the document token's `identity` claim on
    * the cloud, from `engine.open()` locally. Null when anonymous.
    */

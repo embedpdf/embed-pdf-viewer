@@ -1255,14 +1255,21 @@ export class LayerService {
 
   async setFormValue(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef; value: FormFieldValue },
+    input: {
+      docId: string;
+      layerName: string;
+      ref: FormFieldRef;
+      value: FormFieldValue;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<FormSetValueResult> {
     return this.applySingleOp<FormSetValueResult>(
       ctx,
       input,
       { type: 'forms.setValue', field: input.ref, value: input.value },
-      checkedAuthority(actorFromContext(ctx)),
+      input.authority,
       'form.setValue',
       signal,
     );
@@ -1271,14 +1278,20 @@ export class LayerService {
   /** Reset the fields named, or the whole form without `refs`. */
   async resetForm(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; refs?: FormFieldRef[] },
+    input: {
+      docId: string;
+      layerName: string;
+      refs?: FormFieldRef[];
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<FormResetResult> {
     return this.applySingleOp<FormResetResult>(
       ctx,
       input,
       { type: 'forms.reset', ...(input.refs ? { fields: input.refs } : {}) },
-      checkedAuthority(),
+      input.authority,
       'form.reset',
       signal,
     );
@@ -1360,6 +1373,8 @@ export class LayerService {
       /** Whether the caller holds `doc.forms.script`, which the route checked. */
       mayScript: boolean;
       limits: BundleLimits;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
     },
     signal?: AbortSignal,
   ): Promise<FormImportResult> {
@@ -1377,7 +1392,7 @@ export class LayerService {
         limits: input.limits,
         mayScript: input.mayScript,
       },
-      checkedAuthority(actor),
+      input.authority,
       'form.import',
       signal,
     );
@@ -1395,6 +1410,8 @@ export class LayerService {
       bundle: WireFormBundle;
       attribution: 'restore' | 'stamp';
       limits: BundleLimits;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
     },
     signal?: AbortSignal,
   ): Promise<FormValuesImportResult> {
@@ -1409,7 +1426,7 @@ export class LayerService {
         ...(actor ? { actor } : {}),
         limits: input.limits,
       },
-      checkedAuthority(actor),
+      input.authority,
       'form.importValues',
       signal,
     );
@@ -1456,6 +1473,8 @@ export class LayerService {
       objectNumber?: number;
       /** Its widgets', in `draft.widgets` order: ones the editing session holds. */
       widgetObjectNumbers?: readonly number[];
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
     },
     signal?: AbortSignal,
   ): Promise<FormFieldCreateResult> {
@@ -1468,7 +1487,7 @@ export class LayerService {
         ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
         ...(input.widgetObjectNumbers ? { widgetObjectNumbers: input.widgetObjectNumbers } : {}),
       },
-      checkedAuthority(actorFromContext(ctx)),
+      input.authority,
       'form.createField',
       signal,
     );
@@ -1476,14 +1495,21 @@ export class LayerService {
 
   async updateFormField(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef; patch: FormFieldPatch },
+    input: {
+      docId: string;
+      layerName: string;
+      ref: FormFieldRef;
+      patch: FormFieldPatch;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
     return this.applySingleOp<FormFieldUpdateResult>(
       ctx,
       input,
       { type: 'forms.update', field: input.ref, patch: input.patch },
-      checkedAuthority(),
+      input.authority,
       'form.updateField',
       signal,
     );
@@ -1497,6 +1523,8 @@ export class LayerService {
       layerName: string;
       ref: FormFieldRef;
       pdf: Uint8Array;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
     },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
@@ -1508,7 +1536,7 @@ export class LayerService {
         field: input.ref,
         appearance: { pdf: input.pdf },
       },
-      checkedAuthority(),
+      input.authority,
       'form.setSignatureAppearance',
       signal,
     );
@@ -3575,7 +3603,13 @@ export class LayerService {
    */
   async prepareSignature(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; input: SignaturePrepareInput },
+    input: {
+      docId: string;
+      layerName: string;
+      input: SignaturePrepareInput;
+      /** Who signs and their grants: the worker checks the field is theirs to sign. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<SignaturePrepared> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
@@ -3610,6 +3644,7 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             input: input.input,
+            authority: input.authority,
           }),
         signal,
       );

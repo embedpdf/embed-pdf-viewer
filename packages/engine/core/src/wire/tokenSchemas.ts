@@ -78,15 +78,13 @@ export const DownloadTokenSchema = {
  * dotted path here and a matching branch in `PageImageOptionsWireSchema`.
  * No encoder/decoder code changes.
  *
- * `includeAnnotations` is deliberately not a token field: annotatedness
- * changes the artifact's plane-dependency
- * set, so it is expressed by the path family (`…/render/pages/` vs
- * `…/render/annotated/pages/`), never inside the token. `annotationVersion`
- * belongs to the annotated family's tokens only — each family's query
- * schema enforces its own pin grammar. Form fields have no token field:
- * who may read the form isn't who may read the annotations, and a CDN grant
- * is a path prefix, so a picture with fields needs a path of its own. Cloud
- * pictures draw none until it has one.
+ * What a picture draws (`includeAnnotations`, `includeFormFields`) is not a
+ * token field: it's the picture's family, which is its path
+ * (`PAGE_RENDER_FAMILIES`). Each family needs its own rights and depends on
+ * its own planes, and a CDN grant is a path prefix. The pins are: every
+ * family's `contentVersion`, and `annotationVersion` and `widgetVersion` in
+ * the families that draw annotations and form fields; each family's query
+ * schema refuses the others.
  */
 export const RenderTokenSchema = {
   fields: [
@@ -104,6 +102,7 @@ export const RenderTokenSchema = {
     'viewport.kind',
     'viewport.scale',
     'viewport.width',
+    'widgetVersion',
   ],
   maxLength: 512,
 } as const satisfies TokenSchema;

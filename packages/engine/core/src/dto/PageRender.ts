@@ -26,6 +26,12 @@ export interface PageLayerRights {
   readonly formFields: boolean;
 }
 
+/** What a page picture draws beside the page content. */
+export interface PageRenderLayers {
+  readonly includeAnnotations: boolean;
+  readonly includeFormFields: boolean;
+}
+
 /**
  * What a page picture draws: the options as passed, and for each one left
  * out, what the caller may read. A left-out option never asks for more than
@@ -35,7 +41,7 @@ export interface PageLayerRights {
 export function resolvePageLayers(
   options: { includeAnnotations?: boolean; includeFormFields?: boolean } | undefined,
   may: PageLayerRights,
-): { includeAnnotations: boolean; includeFormFields: boolean } {
+): PageRenderLayers {
   const { includeAnnotations, includeFormFields } = options ?? {};
   if (includeAnnotations === true && !may.annotations) {
     throw new PermissionDenied('doc.annotate.read', 'includeAnnotations');
@@ -135,6 +141,7 @@ export interface PageRenderQuery {
   options: PageImageOptions;
   contentVersion?: number;
   annotationVersion?: number;
+  widgetVersion?: number;
 }
 
 /**
