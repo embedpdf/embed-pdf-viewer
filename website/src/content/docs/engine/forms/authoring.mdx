@@ -303,8 +303,8 @@ A widget is the form's, so `page.annotations.update()` refuses one with `Invalid
 A widget's contents can turn a quarter, so that a field on a turned page reads upright, or a label
 runs up the page. A widget then reads like every shape that turns: its `box` is the frame its
 contents are laid out in, its `rotation` the turn (0, 90, 180 or 270, clockwise; `null` upright),
-and its `rect` where it stands on the page, the box turned. A placement takes the `rect` and the
-turn:
+and its `rect` where it stands on the page, the box turned. A placement takes the turn, and either
+the `rect` or the `box`, as a create of any shape that turns does:
 
 ```ts
 await doc.forms.create({
@@ -313,7 +313,12 @@ await doc.forms.create({
   // 24 wide and 160 tall: the text runs up the page
   widgets: [{ page: page.ref, rect: { x: 20, y: 120, width: 24, height: 160 }, rotation: 270 }],
 });
+
+// The same widget, by the frame its text runs in
+widgets: [{ page: page.ref, box: { x: -48, y: 188, width: 160, height: 24 }, rotation: 270 }];
 ```
+
+A placement with both takes the `box`; one with neither fails with `InvalidArg`.
 
 An update turns a widget as it turns any shape:
 

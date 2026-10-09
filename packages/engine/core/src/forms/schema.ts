@@ -166,7 +166,8 @@ export { WidgetAppearanceSchema };
 export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z
   .object({
     page: PageRefSchema,
-    rect: PageBoxSchema,
+    rect: PageBoxSchema.optional(),
+    box: PageBoxSchema.optional(),
     rotation: PdfRotationSchema.optional(),
     exportValue: z.string().min(1).optional(),
     actions: WidgetActionsPatchSchema.optional(),

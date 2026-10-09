@@ -185,6 +185,26 @@ export function runWidgetRotationConformance(
       });
     });
 
+    test('a placement gives where the widget stands or its frame: the same widget either way', async () => {
+      await withDoc(async (doc) => {
+        const rect = { x: 150, y: 40, width: 24, height: 160 };
+        const { field } = await doc.forms.create({
+          family: 'text',
+          name: 'by-box',
+          widgets: [{ page: FIRST, box: swapped(rect), rotation: 270 }],
+        });
+        const row = await rowOf(doc, field.name);
+        expect(row.rotation).toBe(270);
+        expectBox(row.rect, rect);
+        expectBox(row.box, swapped(rect));
+
+        const neither = await refusalOf(
+          doc.forms.create({ family: 'text', name: 'nowhere', widgets: [{ page: FIRST }] }),
+        );
+        expect(EngineError.is(neither, EngineErrorCode.InvalidArg)).toBe(true);
+      });
+    });
+
     test('a turn turns the widget about its middle; a new box with it keeps the widget in place', async () => {
       await withDoc(async (doc) => {
         const before = await rowOf(doc, 'upright');

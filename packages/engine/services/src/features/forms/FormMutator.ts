@@ -21,9 +21,10 @@ import {
   EngineError,
   EngineErrorCode,
   formWidget,
+  placedWidgetOf,
   reorderedList,
 } from '@embedpdf/engine-core/runtime';
-import type { AnnotationActor, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationActor, AnnotationRef, PlacedWidget } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -282,7 +283,7 @@ export class FormMutator {
     const docPtr = this.session.requireDocPtr();
 
     const placements = (draft.widgets ?? []).map((placement) =>
-      fitCaptionToFamily(draft.family, placement),
+      placedWidgetOf(fitCaptionToFamily(draft.family, placement)),
     );
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     const onStates = placements.map((placement) => onStateOf(draft.family, placement));
@@ -355,21 +356,13 @@ export class FormMutator {
   }
 
   /** Check a widget placement before anything is written; returns its page index. */
-  private preflightPlacement(placement: WidgetPlacement<PdfCoordinates>): number {
+  private preflightPlacement(placement: PlacedWidget): number {
     const record = this.session.resolvePageRef(placement.page);
     const { left, bottom, right, top } = placement.rect;
     if (![left, bottom, right, top].every(Number.isFinite)) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'widget rect must be finite numbers', {
         details: { field: 'rect' },
       });
-    }
-    const { rotation } = placement;
-    if (rotation !== undefined && ![0, 90, 180, 270].includes(rotation)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `a widget turns by a quarter turn (0, 90, 180 or 270), not ${rotation}`,
-        { details: { field: 'rotation' } },
-      );
     }
     return record.pageIndex;
   }
@@ -724,7 +717,7 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    const fitted = fitCaptionToFamily(before.family, placement);
+    const fitted = placedWidgetOf(fitCaptionToFamily(before.family, placement));
     const pageIndex = this.preflightPlacement(fitted);
     const onState = onStateOf(before.family, fitted);
     // A merged field/widget splits: its widget half becomes a new widget, at
@@ -1008,7 +1001,7 @@ function assertPatchFitsFamily(patch: FormFieldPatch, family: FormFieldFamily): 
  * radio button needs one other than `'Off'`; a checkbox's is `'Yes'` when
  * left out; other families take none.
  */
-function onStateOf(family: FormFieldFamily, placement: WidgetPlacement<PdfCoordinates>): string {
+function onStateOf(family: FormFieldFamily, placement: PlacedWidget): string {
   const { exportValue } = placement;
   if (family !== 'checkbox' && family !== 'radio') {
     if (exportValue !== undefined) {

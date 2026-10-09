@@ -5,20 +5,26 @@ import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
- * Where a widget goes and how it looks: its page, where it stands on it,
- * its turn, and the same style fields a widget annotation's update takes.
+ * Where a widget goes and how it looks: its page, its place on it and its
+ * turn, and the same style fields a widget annotation's update takes.
  * `create()` places a field's widgets with these, and `addWidget()` adds one.
+ *
+ * The place is `rect` or `box`, as for every kind that turns: where the
+ * widget stands on the page, or the frame its contents are laid out in,
+ * before the turn. Give one; with both, `box` is the shape.
  */
 export interface WidgetPlacement<
   C extends Coordinates = PageCoordinates,
 > extends WidgetStyleDraftFields {
   page: PageRef;
-  /** Where the widget stands on the page; with a turn, its contents run along the turned box. */
-  rect: C['box'];
+  /** Where the widget stands on the page: its `box`, turned. */
+  rect?: C['box'];
+  /** The frame its contents are laid out in, before the turn: `rect` with its sides swapped under 90 and 270. */
+  box?: C['box'];
   /**
-   * How its contents turn inside `rect`, degrees clockwise: a quarter turn
-   * (`/MK /R`). With 90 or 270 the text runs along the rect's height, as
-   * Acrobat's Orientation turns it. Upright when left out.
+   * How its contents turn, degrees clockwise: a quarter turn (`/MK /R`).
+   * With 90 or 270 the text runs along the rect's height, as Acrobat's
+   * Orientation turns it. Upright when left out.
    */
   rotation?: PdfRotation;
   /**

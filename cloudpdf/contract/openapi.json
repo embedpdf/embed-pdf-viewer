@@ -20128,6 +20128,9 @@
             "required": ["x", "y", "width", "height"],
             "additionalProperties": false
           },
+          "box": {
+            "$ref": "#/components/schemas/WidgetPlacement/properties/rect"
+          },
           "rotation": {
             "anyOf": [
               {
@@ -20218,7 +20221,7 @@
             "nullable": true
           }
         },
-        "required": ["page", "rect"],
+        "required": ["page"],
         "additionalProperties": false
       },
       "WidgetAnnotation": {

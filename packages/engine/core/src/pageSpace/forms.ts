@@ -21,9 +21,11 @@ export function pdfWidgetPlacementOf(
   boxOf: VisibleBoxOf,
 ): WidgetPlacement<PdfCoordinates> {
   const { actions, ...rest } = placement;
+  const visible = boxOf(placement.page);
   return {
     ...rest,
-    rect: pdfRectOf(placement.rect, boxOf(placement.page)),
+    ...(placement.rect ? { rect: pdfRectOf(placement.rect, visible) } : {}),
+    ...(placement.box ? { box: pdfRectOf(placement.box, visible) } : {}),
     ...(actions
       ? {
           actions: mapTriggerActions(actions, (destination: PageDestination) =>

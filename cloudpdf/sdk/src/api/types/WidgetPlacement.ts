@@ -4,7 +4,8 @@ import type * as CloudPDF from "../index.js";
 
 export interface WidgetPlacement {
     page: CloudPDF.PageRef;
-    rect: WidgetPlacement.Rect;
+    rect?: WidgetPlacement.Rect | undefined;
+    box?: WidgetPlacement.Box | undefined;
     rotation?: number | undefined;
     exportValue?: string | undefined;
     actions?: CloudPDF.WidgetActionsPatch | undefined;
@@ -21,6 +22,13 @@ export interface WidgetPlacement {
 
 export namespace WidgetPlacement {
     export interface Rect {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }
+
+    export interface Box {
         x: number;
         y: number;
         width: number;

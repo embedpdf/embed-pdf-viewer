@@ -602,6 +602,7 @@ export type {
   FormFieldDraft,
 } from './forms/draft';
 export { draftWritesScripts } from './forms/draft';
+export { placedWidgetOf, type PlacedWidget } from './forms/placement';
 export type {
   TextFieldPatch,
   CheckboxFieldPatch,
