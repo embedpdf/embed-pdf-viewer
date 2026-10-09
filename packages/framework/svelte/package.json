@@ -1,0 +1,328 @@
+{
+  "name": "@embedpdf/svelte",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Svelte 5 adapter for EmbedPDF v3: rune-based functions, components with bind: and snippets, headless layers. The whole framework surface, one entry point per feature.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/framework/svelte"
+  },
+  "files": [
+    "dist"
+  ],
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./actions": {
+      "types": "./src/actions.ts",
+      "svelte": "./src/actions.ts",
+      "default": "./src/actions.ts"
+    },
+    "./metadata": {
+      "types": "./src/metadata.ts",
+      "svelte": "./src/metadata.ts",
+      "default": "./src/metadata.ts"
+    },
+    "./history": {
+      "types": "./src/history.ts",
+      "svelte": "./src/history.ts",
+      "default": "./src/history.ts"
+    },
+    "./page-edit": {
+      "types": "./src/page-edit.ts",
+      "svelte": "./src/page-edit.ts",
+      "default": "./src/page-edit.ts"
+    },
+    "./view-manager": {
+      "types": "./src/view-manager.ts",
+      "svelte": "./src/view-manager.ts",
+      "default": "./src/view-manager.ts"
+    },
+    "./link": {
+      "types": "./src/link.ts",
+      "svelte": "./src/link.ts",
+      "default": "./src/link.ts"
+    },
+    "./page-view": {
+      "types": "./src/page-view.ts",
+      "svelte": "./src/page-view.ts",
+      "default": "./src/page-view.ts"
+    },
+    "./search": {
+      "types": "./src/search.ts",
+      "svelte": "./src/search.ts",
+      "default": "./src/search.ts"
+    },
+    "./selection": {
+      "types": "./src/selection.ts",
+      "svelte": "./src/selection.ts",
+      "default": "./src/selection.ts"
+    },
+    "./anchored": {
+      "types": "./src/anchored.ts",
+      "svelte": "./src/anchored.ts",
+      "default": "./src/anchored.ts"
+    },
+    "./interaction": {
+      "types": "./src/interaction.ts",
+      "svelte": "./src/interaction.ts",
+      "default": "./src/interaction.ts"
+    },
+    "./render": {
+      "types": "./src/render.ts",
+      "svelte": "./src/render.ts",
+      "default": "./src/render.ts"
+    },
+    "./runtime": {
+      "types": "./src/runtime.ts",
+      "svelte": "./src/runtime.ts",
+      "default": "./src/runtime.ts"
+    },
+    "./stage": {
+      "types": "./src/stage.ts",
+      "svelte": "./src/stage.ts",
+      "default": "./src/stage.ts"
+    },
+    "./commands": {
+      "types": "./src/commands.ts",
+      "svelte": "./src/commands.ts",
+      "default": "./src/commands.ts"
+    },
+    "./toolbar": {
+      "types": "./src/toolbar.ts",
+      "svelte": "./src/toolbar.ts",
+      "default": "./src/toolbar.ts"
+    },
+    "./shell": {
+      "types": "./src/shell.ts",
+      "svelte": "./src/shell.ts",
+      "default": "./src/shell.ts"
+    },
+    "./i18n": {
+      "types": "./src/i18n.ts",
+      "svelte": "./src/i18n.ts",
+      "default": "./src/i18n.ts"
+    },
+    "./annotation": {
+      "types": "./src/annotation.ts",
+      "svelte": "./src/annotation.ts",
+      "default": "./src/annotation.ts"
+    },
+    "./stamp": {
+      "types": "./src/stamp.ts",
+      "svelte": "./src/stamp.ts",
+      "default": "./src/stamp.ts"
+    },
+    "./measurement": {
+      "types": "./src/measurement.ts",
+      "svelte": "./src/measurement.ts",
+      "default": "./src/measurement.ts"
+    },
+    "./redaction": {
+      "types": "./src/redaction.ts",
+      "svelte": "./src/redaction.ts",
+      "default": "./src/redaction.ts"
+    },
+    "./form": {
+      "types": "./src/form.ts",
+      "svelte": "./src/form.ts",
+      "default": "./src/form.ts"
+    },
+    "./signature": {
+      "types": "./src/signature.ts",
+      "svelte": "./src/signature.ts",
+      "default": "./src/signature.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "svelte": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./actions": {
+        "types": "./dist/actions.d.ts",
+        "svelte": "./dist/actions.js",
+        "default": "./dist/actions.js"
+      },
+      "./metadata": {
+        "types": "./dist/metadata.d.ts",
+        "svelte": "./dist/metadata.js",
+        "default": "./dist/metadata.js"
+      },
+      "./history": {
+        "types": "./dist/history.d.ts",
+        "svelte": "./dist/history.js",
+        "default": "./dist/history.js"
+      },
+      "./page-edit": {
+        "types": "./dist/page-edit.d.ts",
+        "svelte": "./dist/page-edit.js",
+        "default": "./dist/page-edit.js"
+      },
+      "./view-manager": {
+        "types": "./dist/view-manager.d.ts",
+        "svelte": "./dist/view-manager.js",
+        "default": "./dist/view-manager.js"
+      },
+      "./link": {
+        "types": "./dist/link.d.ts",
+        "svelte": "./dist/link.js",
+        "default": "./dist/link.js"
+      },
+      "./page-view": {
+        "types": "./dist/page-view.d.ts",
+        "svelte": "./dist/page-view.js",
+        "default": "./dist/page-view.js"
+      },
+      "./search": {
+        "types": "./dist/search.d.ts",
+        "svelte": "./dist/search.js",
+        "default": "./dist/search.js"
+      },
+      "./selection": {
+        "types": "./dist/selection.d.ts",
+        "svelte": "./dist/selection.js",
+        "default": "./dist/selection.js"
+      },
+      "./anchored": {
+        "types": "./dist/anchored.d.ts",
+        "svelte": "./dist/anchored.js",
+        "default": "./dist/anchored.js"
+      },
+      "./interaction": {
+        "types": "./dist/interaction.d.ts",
+        "svelte": "./dist/interaction.js",
+        "default": "./dist/interaction.js"
+      },
+      "./render": {
+        "types": "./dist/render.d.ts",
+        "svelte": "./dist/render.js",
+        "default": "./dist/render.js"
+      },
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "svelte": "./dist/runtime.js",
+        "default": "./dist/runtime.js"
+      },
+      "./stage": {
+        "types": "./dist/stage.d.ts",
+        "svelte": "./dist/stage.js",
+        "default": "./dist/stage.js"
+      },
+      "./commands": {
+        "types": "./dist/commands.d.ts",
+        "svelte": "./dist/commands.js",
+        "default": "./dist/commands.js"
+      },
+      "./toolbar": {
+        "types": "./dist/toolbar.d.ts",
+        "svelte": "./dist/toolbar.js",
+        "default": "./dist/toolbar.js"
+      },
+      "./shell": {
+        "types": "./dist/shell.d.ts",
+        "svelte": "./dist/shell.js",
+        "default": "./dist/shell.js"
+      },
+      "./i18n": {
+        "types": "./dist/i18n.d.ts",
+        "svelte": "./dist/i18n.js",
+        "default": "./dist/i18n.js"
+      },
+      "./annotation": {
+        "types": "./dist/annotation.d.ts",
+        "svelte": "./dist/annotation.js",
+        "default": "./dist/annotation.js"
+      },
+      "./stamp": {
+        "types": "./dist/stamp.d.ts",
+        "svelte": "./dist/stamp.js",
+        "default": "./dist/stamp.js"
+      },
+      "./measurement": {
+        "types": "./dist/measurement.d.ts",
+        "svelte": "./dist/measurement.js",
+        "default": "./dist/measurement.js"
+      },
+      "./redaction": {
+        "types": "./dist/redaction.d.ts",
+        "svelte": "./dist/redaction.js",
+        "default": "./dist/redaction.js"
+      },
+      "./form": {
+        "types": "./dist/form.d.ts",
+        "svelte": "./dist/form.js",
+        "default": "./dist/form.js"
+      },
+      "./signature": {
+        "types": "./dist/signature.d.ts",
+        "svelte": "./dist/signature.js",
+        "default": "./dist/signature.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist && node ../../../tooling/build/src/fully-specify-imports.mjs && node ../../../tooling/build/src/check-framework-package.mjs",
+    "clean": "rimraf dist",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json --threshold error",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-form": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-link": "workspace:*",
+    "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-page-edit": "workspace:*",
+    "@embedpdf/plugin-redaction": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-shell": "workspace:*",
+    "@embedpdf/plugin-signature": "workspace:*",
+    "@embedpdf/plugin-stage": "workspace:*",
+    "@embedpdf/plugin-stamp": "workspace:*",
+    "@embedpdf/core-signature": "workspace:*",
+    "@embedpdf/plugin-view-manager": "workspace:*",
+    "@embedpdf/core-stage": "workspace:*",
+    "@embedpdf/core-ui": "workspace:*",
+    "@embedpdf/web": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*",
+    "@embedpdf/plugin-measurement": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5.29.0"
+  },
+  "devDependencies": {
+    "@embedpdf/engine": "workspace:*",
+    "@sveltejs/package": "^2.5.0",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
+    "@testing-library/svelte": "^5.2.0",
+    "happy-dom": "^20.11.0",
+    "svelte": "^5.39.5",
+    "svelte-check": "^4.3.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
+  }
+}

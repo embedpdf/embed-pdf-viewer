@@ -1,28 +1,39 @@
 /**
  * @embedpdf/core-annotation — the pure annotation brain.
  *
- * model · update(msg)→[model,effects] · view (pageItems + chrome). Per-kind
- * content-space geometry (rect/ellipse · line · poly · quads), stroke+fill
- * hit-testing, cursors, the select + create tools. No DOM, no engine, no
- * framework — the part that ports to Rust/Crux.
+ * `update(model, message)` → { session, change, effects } · view (pageItems +
+ * chrome). Per-kind page-space geometry (rect/ellipse · line · poly ·
+ * quads), stroke+fill hit-testing, cursors, the select + create tools. No DOM,
+ * no engine, no framework — the part that ports to Rust/Crux. See README.md.
  */
 export {
   update,
+  newRecordsAtMost,
   initialModel,
-  initialStyle,
+  initialSession,
+  sameSession,
+  EMPTY_CHANGE,
   defaultsFor,
+  lineEndingsOf,
+  toolAnnotation,
   rotateDraftDelta,
-  MIN_DRAG,
+  selectionInBox,
 } from './update';
 export {
   clampRectToBox,
-  clickCreateGeom,
+  gesturePlacement,
+  isDrag,
+  MIN_DRAG,
+  placedShape,
   resolveClickPlacement,
-  type ClickPlacement,
+  type GestureForm,
+  type PlacementFrame,
 } from './placement';
 export { computeMoveSnap, type SnapResult } from './snap';
 export {
   pageItems,
+  unmadeItem,
+  iconOf,
   chrome,
   selectedItems,
   textBoxes,
@@ -30,30 +41,44 @@ export {
   selectionAnchor,
   selectionKnob,
   creationDraftAnchor,
+  rotationAnchor,
+  annotationAnchor,
 } from './view';
 export type { TextBox } from './view';
-export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
+export {
+  hitTest,
+  cursorAt,
+  isSelectable,
+  canMove,
+  isOnTextBox,
+  paintedOf,
+  type Target,
+} from './hit';
 // Rich text run algebra (pure): what the editor binding and the plugin's
 // selection styling compute with.
 export {
   applyStyleToRange,
+  bodyFromTextStyle,
+  faceForFont,
   isPlainRichText,
   locateOffset,
   normalizeRuns,
   paragraphsFromPlainText,
   plainTextOf,
   rangeHasStyle,
+  richDocOf,
   richTextLength,
   sameStyleDelta,
   splitRunsAt,
   styleAt,
+  type FontLookup,
   type RichTextRange,
   type RichTextStyleDelta,
 } from './richtext';
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
 export { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
 export { linkChildrenOf, linkOf } from './links';
-// `/F` annotation flags: the predicates are the ONE spec interpretation.
+// `/F` annotation flags: the predicates are the one spec interpretation.
 export {
   DRAWN_FLAGS,
   FLAG_KEYS,
@@ -82,121 +107,157 @@ export {
   type AnchorMode,
   type ViewEnv,
 } from './anchor';
+// The kinds: one declaration per kind (kinds/), by name.
 export {
+  defineKind,
   KINDS,
-  capsFor,
-  propsFor,
-  type KindCaps,
+  kindNamed,
+  NO_CAPS,
   type AnnotationKind,
-  type PropSpec,
+  type AnnotationProperty,
+  type FlagKey,
+  type KindCaps,
 } from './kinds';
-export {
-  applyProps,
-  initialTextStyle,
-  readProp,
-  sharedProps,
-  styleFromProps,
-  textStyleFromProps,
-} from './props';
+export { initialTextStyle, kindTakesLink, propertiesOf, sharedProperties } from './props';
+export { FLAG_PROPERTIES, LINE_ENDING_NAMES } from './kinds/fields';
+export { engineSubtypeOf, readOfDefaults, widgetAppearanceOf } from './record/defaults';
 export {
   geomScene,
-  textPlateInset,
   geomBounds,
   geomVisualBounds,
   geomHit,
+  geomPainted,
   geomHandles,
   geomTranslate,
   geomDragHandle,
-  geomPdfBounds,
-  calloutConnection,
-  calloutLinePoints,
-  pdfToContentRect,
-  contentToPdfRect,
-  pdfToContentPoint,
-  contentToPdfPoint,
-  rectFromPoints,
-  caretGeomFromAnchor,
-  caretRectFromAnchor,
-  caretRectFromTextEnd,
   selectionBounds,
   selectionQuad,
-  selectionCenter,
+  turnPivotOf,
   pointInQuad,
-  quadIntersectsRect,
-  shapeRectFor,
-  unionRect,
-  RECT_HANDLES,
-  rotatedHandleCursor,
-  type RectHandle,
   // rotation
-  centroidOf,
   geomRotation,
   geomRotateAbout,
   geomResetRotation,
   obbFromGeom,
   rotateKnob,
   placeRotateKnob,
-  rotatedAabb,
-  DEFAULT_CHROME_GEOM,
-  normalizeDeg,
+  DEFAULT_CHROME_GEOMETRY,
   isRotatableGeom,
   // upright placement
   uprightRotation,
-  transposedAboutCenter,
   uprightAnchoredRect,
   fitStampBox,
   ROTATE_KNOB_OFFSET,
-  MITER_LIMIT,
   // group scaling
   geomScaleAbout,
   groupResizeAnchor,
   groupResizeBox,
   groupResizeFactors,
 } from './geometry';
-export { cloudyPath, cloudyBorderExtent } from './cloudy';
+export {
+  rectFromPoints,
+  unionRect,
+  RECT_HANDLES,
+  rotatedHandleCursor,
+  rotatedAabb,
+  normalizeDeg,
+  transposedAboutCenter,
+  type RectHandle,
+} from './rect';
+// The shape families: everything the core does with one kind of shape.
+export {
+  boxFamily,
+  caretFamily,
+  familyChosenBy,
+  familyOf,
+  pointsFamily,
+  quadsFamily,
+  textBoxFamily,
+  type Corners,
+  type ShapeFamily,
+} from './shapes';
+export type { BoxShape, TurnedBox } from './shapes/box';
+export { caretFromAnchor, caretRectFromAnchor, type CaretShape } from './shapes/caret';
+export type { QuadsShape } from './shapes/quads';
+export {
+  MITER_LIMIT,
+  drawnStrokesOf,
+  type InkShape,
+  type LineShape,
+  type PointsShape,
+  type PolyShape,
+} from './shapes/points';
+export { calloutEnd, textPlateInset, type CalloutLine, type TextBoxShape } from './shapes/text-box';
+// A record: the engine annotation it holds, read (who it is, its shape, how
+// it is drawn, how its text is set), written back as engine fields, and
+// read as the engine writes it while a write is on its way.
+export {
+  annotationAfter,
+  annotationOfNew,
+  fromDTO,
+  groupOf,
+  irtOf,
+  kindOf,
+  linkChildRects,
+  refOf,
+  shapeOf,
+  styleOf,
+  textOf,
+  withShape,
+  withValues,
+  writableTarget,
+} from './record';
+export { cloudyPath } from './cloudy';
+// What an annotation paints, and the two questions a click and the marquee ask of it.
+export { bodyPieces, paintedNear, paintedTouches, type PaintedPiece } from './painted';
 export * from './measurement';
 export * from './measurement-shape';
+// How an annotation is drawn: the engine's raster, or live (see appearance.ts).
+export { drawnAfter, sourceOfConfirmed, sourceOfNew, type DrawState } from './appearance';
 export { annotationSelectionFrame, type SelectionFrame } from './selection';
 export { scene } from './scene';
 export { straightenInkStroke } from './ink';
 export type { BlendMode } from '@embedpdf/engine-core/runtime';
 export type {
-  Annot,
-  AnnotationProps,
-  AnnotationPropsPatch,
-  Border,
-  Callout,
-  ChromeGeom,
+  AnnotationView,
+  ChangeSet,
+  ModelAnnotation,
+  ChromeGeometry,
   ChromeNode,
+  HandleRole,
   Cursor,
   CreationDraftAnchor,
+  RotationAnchor,
   Draft,
   Effect,
-  Geom,
+  Shape,
   Guide,
   Handle,
   Id,
   InkStraightenOptions,
   Model,
-  Msg,
+  Message,
   ClickCreate,
+  Placement,
   PointerInput,
-  PatchScope,
-  PropKey,
-  Quad,
+  FieldValues,
+  QuadRing,
   Rect,
   LineEnding,
   LineEndings,
   Paint,
+  Session,
+  UpdateResult,
   RenderItem,
   RenderNode,
   SceneNode,
   SnapSettings,
+  Stroke,
   Style,
-  Subtype,
+  KindName,
   TextAlign,
   TextEndAnchor,
-  TextQuad,
+  Quad,
   TextStyle,
-  Vec,
+  Point,
 } from './types';

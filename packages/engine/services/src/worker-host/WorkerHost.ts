@@ -2,10 +2,18 @@ import type {
   MeasureViewportsWorkerRequest,
   MeasureSetScaleWorkerRequest,
 } from '@embedpdf/engine-core/runtime';
-import { MeasureReader, MeasureMutator } from '../features/measure';
 import {
+  DEFAULT_BUNDLE_LIMITS,
+  AbortError,
   EMPTY_TRANSFER,
   EngineError,
+  PermissionDenied,
+  changeFingerprint,
+  deserializeError,
+  isKeptRefusal,
+  isSkippedItem,
+  isUndoChange,
+  itemWrote,
   EngineErrorCode,
   serializeError,
   wirePack,
@@ -17,12 +25,17 @@ import {
   type DocumentSaveBufferWorkerRequest,
   type DocumentSaveFileWorkerRequest,
   type DocumentSaveLayerBufferWorkerRequest,
-  type FormsAttachWidgetWorkerRequest,
+  type FormsAddWidgetWorkerRequest,
   type FormsCreateFieldWorkerRequest,
   type FormsDeleteFieldWorkerRequest,
+  type FormsDeleteWidgetWorkerRequest,
   type FormsDetachWidgetWorkerRequest,
+  type FormsReorderWidgetsWorkerRequest,
+  type FormsReorderCalculationsWorkerRequest,
+  type FormsUpdateWidgetWorkerRequest,
   type FormsExportWorkerRequest,
   type FormsImportWorkerRequest,
+  type FormsImportValuesWorkerRequest,
   type FormsListWorkerRequest,
   type FormsRepairWorkerRequest,
   type FormsUpdateFieldWorkerRequest,
@@ -32,7 +45,7 @@ import {
   type SignaturesListWorkerRequest,
   type SignaturesPrepareWorkerRequest,
   type SignaturesCompleteWorkerRequest,
-  type SignaturesAbortWorkerRequest,
+  type SignaturesCancelWorkerRequest,
   type SignaturesAnalyzeWorkerRequest,
   type SignaturesFinalizeCandidateWorkerRequest,
   type SignaturesContentsWorkerRequest,
@@ -40,27 +53,28 @@ import {
   type SignaturesRevisionBytesWorkerRequest,
   type DocumentVersionWorkerRequest,
   type DocumentProtection,
+  type PdfSaveMode,
   type FontsRegisterWorkerRequest,
   type FontsAddFallbackWorkerRequest,
   type FontsClearFallbacksWorkerRequest,
   type FontsClearWorkerRequest,
   type FontsAuthorizeEditingWorkerRequest,
   type DocumentSetFontSettingsWorkerRequest,
-  type AnnotationsListFullPageWorkerRequest,
-  type AnnotationsListRawAllWorkerRequest,
-  type AnnotationsListRawPageWorkerRequest,
+  type AnnotationsListWorkerRequest,
   type AnnotationsRenderAppearancesWorkerRequest,
-  type AnnotationsMoveWorkerRequest,
+  type AnnotationsReorderWorkerRequest,
   type AnnotationsUpdateWorkerRequest,
   type CloseWorkerRequest,
   type LayerCloseWorkerRequest,
   type MetadataReadWorkerRequest,
   type MetadataUpdateWorkerRequest,
+  type MetadataReadCustomWorkerRequest,
+  type MetadataUpdateCustomWorkerRequest,
   type ActionsReadWorkerRequest,
   type OpenWorkerRequest,
   type PagesListWorkerRequest,
   type PagesGeometryWorkerRequest,
-  type PagesMoveWorkerRequest,
+  type PagesReorderWorkerRequest,
   type PagesRotateWorkerRequest,
   type PagesDeleteWorkerRequest,
   type PagesSetNameWorkerRequest,
@@ -75,24 +89,27 @@ import {
   type AttachmentsCreateWorkerRequest,
   type AttachmentsDeleteWorkerRequest,
   type AnnotationsReadFileWorkerRequest,
+  type AnnotationsReadAppearanceWorkerRequest,
+  type AnnotationsExportWorkerRequest,
+  type AnnotationsImportWorkerRequest,
   type PagesFlattenWorkerRequest,
   type RedactionApplyWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
-  type PieceInfoClearWorkerRequest,
+  type PieceInfoDeleteWorkerRequest,
   type PieceInfoReadWorkerRequest,
   type PieceInfoUpdateWorkerRequest,
   type PageNetworkRenderFormat,
   type PageRaster,
   type PagesRenderWorkerRequest,
-  type PagesRenderEncodedWorkerRequest,
-  type DocumentRenderPageFileEncodedWorkerRequest,
-  type AnnotationsRenderAppearancesEncodedWorkerRequest,
   type EncodedAppearanceWire,
   type EncodedImageWire,
   type RenderEncode,
   type PagesTextWorkerRequest,
   type SearchQueryWorkerRequest,
   type FormsApplyEffectsWorkerRequest,
+  type PageRef,
+  type PagesWorkingSetWorkerRequest,
+  type RequestEffect,
   type SerializedEngineError,
   type ShutdownWorkerRequest,
   type WirePack,
@@ -100,35 +117,72 @@ import {
   type WorkerRequest,
   type WorkerResponse,
   type WorkerResultPayload,
+  type PdfCoordinates,
+  type ChangeItem,
+  type ChangeResult,
+  type DocumentApplyWorkerRequest,
+  type DocumentApplyChangesWorkerRequest,
+  type ServerChange,
+  type ServerChangeOutcome,
+  type AnnotationActor,
+  type ChangeAuthority,
+  type Change,
+  type RecordedOp,
+  type WireAnnotationResources,
+  type VisibleBoxOf,
+  type LayerArtifactFileWorkerPayload,
+  type LayerArtifactWorkerPayload,
 } from '@embedpdf/engine-core/runtime';
-import type { MutationMeta } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
+import {
+  renderOptionsInFileSpace,
+  requestInFileSpace,
+  resultInPageSpace,
+  type FileSpaceJob,
+  type PageSpaceJob,
+} from './pageSpaceBoundary';
 import { DocumentSession } from '../document-session/DocumentSession';
 import { BaseDocumentRegistry } from '../document-session/lifecycle/BaseDocumentRegistry';
+import { openLayerDocument } from '../document-session/lifecycle/PdfDocumentOpener';
+import { DecodedImageStore } from '../document-session/pages/DecodedImageStore';
 import {
-  openFatMemoryDocument,
-  openLayerDocument,
-} from '../document-session/lifecycle/PdfDocumentOpener';
+  DEFAULT_PAGE_RESIDENCY_POLICY,
+  PageResidency,
+} from '../document-session/pages/PageResidency';
 import { DocumentActionsReader } from '../features/actions';
 import {
-  AnnotationReader,
   AnnotationAppearanceReader,
+  AnnotationExporter,
   AnnotationFlattener,
-  AnnotationMutator,
   RawAnnotationReader,
 } from '../features/annotations';
 import { AttachmentMutator, AttachmentReader } from '../features/attachments';
+import {
+  ChangeApplier,
+  changeLedgerOf,
+  type AppliedChange,
+  type ChangeOutcome,
+  type ChangeRecord,
+} from '../features/changes';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
-import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
+import {
+  FormExporter,
+  FormMutator,
+  FormReader,
+  FormsEffectsApplier,
+  disposeFormModel,
+} from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
-import { MetadataMutator, MetadataReader } from '../features/metadata';
+import { MeasureReader, MeasureMutator } from '../features/measure';
+import { MetadataReader } from '../features/metadata';
 import {
   PagesExtractor,
   PagesFlattener,
   PagesInserter,
   PagesMutator,
   PagesReader,
+  visibleBoxReader,
 } from '../features/pages';
 import { PieceInfoAccessor } from '../features/pieceinfo';
 import { RedactionApplier } from '../features/redaction';
@@ -142,13 +196,14 @@ import {
   SignatureMutator,
   SignatureReader,
   disposeSignatureModel,
-  hasSignedSignature,
 } from '../features/signature';
 import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
+import type { Slices } from '../shared/slices';
 import { generateUuid } from '../shared/uuid';
+import { createEventLoopYield } from '../shared/yield';
 
-/** The image a {@link WorkerImageEncoder} produced. `bytes` must OWN its
+/** The image a {@link WorkerImageEncoder} produced. `bytes` must own its
  *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
  *  placed on the transfer manifest and moved zero-copy. */
 export interface WorkerEncodedImage {
@@ -158,7 +213,7 @@ export interface WorkerEncodedImage {
 
 /**
  * Injected image-encode capability for the `*.renderEncoded` wire kinds.
- * Dependency inversion keeps the native encoder OUT of this shared
+ * Dependency inversion keeps the native encoder out of this shared
  * package: the cloud server's worker entry injects a sharp/libvips
  * implementation; browser/local entries inject nothing (they encode via
  * canvas) and the encoded kinds reject with `NotImplemented`.
@@ -179,6 +234,59 @@ export interface WorkerHostOptions {
    * the sealed file can be published by rename.
    */
   signingCandidatePath?: (basePath: string, signingId: string) => string;
+  /**
+   * Bytes of decoded images kept between jobs that write nothing (see
+   * {@link DecodedImageStore}). Defaults to 128 MB; 0 keeps none.
+   */
+  decodedImageBudgetBytes?: number;
+  /**
+   * Bytes of parsed pages kept between jobs, for every document on this
+   * thread (see {@link PageResidency}). Defaults to
+   * {@link DEFAULT_PAGE_RESIDENCY_POLICY}'s; 0 keeps none.
+   */
+  parsedPageBudgetBytes?: number;
+  /**
+   * Milliseconds a job's PDFium work runs (a page render, a page load, a loop
+   * over glyphs or annotations) before it lets this thread receive messages,
+   * so an abort stops it about this soon. Defaults to {@link DEFAULT_SLICE_MS}.
+   */
+  sliceMs?: number;
+}
+
+/** See {@link WorkerHostOptions.sliceMs}. */
+export const DEFAULT_SLICE_MS = 8;
+
+/**
+ * The work of a job that pauses between slices (see {@link WorkerHost.runSliced}):
+ * its PDFium part, and for an encoded kind the image encode that follows it.
+ */
+interface SlicedWork {
+  pdfium(signal: AbortSignal): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>>;
+  encode?(
+    pdfium: WirePack<WorkerResultPayload<PdfCoordinates>>,
+    signal: AbortSignal,
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>>;
+}
+
+/** A page render as it arrives, in page space: what the held list reorders. */
+type HeldPageRender = Extract<
+  PageSpaceJob,
+  {
+    kind:
+      | 'pages.render'
+      | 'pages.renderEncoded'
+      | 'document.renderPageFile'
+      | 'document.renderPageFileEncoded';
+  }
+>;
+
+function isPageRender(job: PageSpaceJob): job is HeldPageRender {
+  return (
+    job.kind === 'pages.render' ||
+    job.kind === 'pages.renderEncoded' ||
+    job.kind === 'document.renderPageFile' ||
+    job.kind === 'document.renderPageFileEncoded'
+  );
 }
 
 /**
@@ -203,6 +311,21 @@ export class WorkerHost {
    */
   private readonly fontIds = new Map<string, number>();
   private readonly fonts: FontRegistrar;
+  /** Parsed pages kept between jobs, for every session on this runtime. */
+  private readonly residency: PageResidency;
+  /** Image decodes kept between jobs that write nothing, for every session on this runtime. */
+  private readonly decodedImages: DecodedImageStore;
+  private readonly slices: Slices;
+  /**
+   * True while a job's PDFium work is in progress across slices (a render, a
+   * page load, a glyph loop). It pauses between slices so this thread can
+   * receive an abort, but nothing else may use PDFium meanwhile (a render
+   * holds its page until it ends): requests that arrive are held (see
+   * {@link receive}).
+   */
+  private busy = false;
+  /** Requests that arrived while a job was busy, in arrival order (see {@link takeHeld}). */
+  private readonly held: PageSpaceJob[] = [];
   private destroyed = false;
 
   constructor(
@@ -222,6 +345,20 @@ export class WorkerHost {
     ensureInitialized(this.runtime);
     this.baseDocuments = new BaseDocumentRegistry(this.runtime);
     this.fonts = new FontRegistrar(this.runtime, this.fontIds);
+    this.residency = new PageResidency(
+      this.runtime,
+      {
+        ...DEFAULT_PAGE_RESIDENCY_POLICY,
+        budgetBytes:
+          this.options.parsedPageBudgetBytes ?? DEFAULT_PAGE_RESIDENCY_POLICY.budgetBytes,
+      },
+      () => this.busy,
+    );
+    this.decodedImages = new DecodedImageStore(this.runtime, this.options.decodedImageBudgetBytes);
+    this.slices = {
+      budgetMs: this.options.sliceMs ?? DEFAULT_SLICE_MS,
+      between: createEventLoopYield(),
+    };
   }
 
   /**
@@ -237,22 +374,119 @@ export class WorkerHost {
 
   receive(msg: WorkerRequest): void {
     if (msg.kind === 'abort') {
-      this.aborts.get(msg.jobId)?.abort();
+      this.abort(msg.jobId);
+      return;
+    }
+    // Bookkeeping only, so it is taken at once, even while a render runs.
+    if (msg.kind === 'pages.workingSet') {
+      this.setWorkingSet(msg);
+      return;
+    }
+    // While a job is busy, and until every request held meanwhile has run,
+    // requests wait their turn in arrival order.
+    if (this.busy || this.held.length > 0) {
+      this.held.push(msg);
+      return;
+    }
+    this.run(msg);
+  }
+
+  /** What a view shows of a document: the order its kept pages close in. Never answered. */
+  private setWorkingSet(msg: PagesWorkingSetWorkerRequest): void {
+    const session = this.sessions.get(sessionKey(msg.docId, msg.layerName));
+    if (!session?.isOpen()) return;
+    session.pagePool().setWorkingSet(
+      msg.view,
+      msg.pages.map(({ page, role, pixels }) => ({
+        pageObjectNumber: page.objectNumber,
+        role,
+        pixels,
+      })),
+    );
+  }
+
+  /** Stops a running job, or answers a held one as aborted without running it. */
+  private abort(jobId: WorkerJobId): void {
+    const index = this.held.findIndex((msg) => msg.jobId === jobId);
+    if (index < 0) {
+      this.aborts.get(jobId)?.abort();
+      return;
+    }
+    this.held.splice(index, 1);
+    const error = serializeError(new AbortError('aborted before it ran'));
+    this.post(wirePack({ kind: 'reject', jobId, error }, EMPTY_TRANSFER));
+  }
+
+  /** Runs held requests until one is busy across slices. */
+  private drain(): void {
+    while (!this.busy) {
+      const next = this.takeHeld();
+      if (!next) return;
+      this.run(next);
+    }
+  }
+
+  /**
+   * The next held request. Requests run in arrival order, except that of page
+   * renders held one after another, a render whose page is parsed runs before
+   * one that must parse it. A render never passes another kind of request, nor
+   * the other way round.
+   */
+  private takeHeld(): PageSpaceJob | undefined {
+    const first = this.held[0];
+    if (!first || !isPageRender(first)) return this.held.shift();
+    let next = 0;
+    let best = first;
+    for (let i = 1; i < this.held.length; i++) {
+      const candidate = this.held[i]!;
+      if (!isPageRender(candidate)) break;
+      if (this.pageIsKept(candidate) && !this.pageIsKept(best)) {
+        next = i;
+        best = candidate;
+      }
+    }
+    this.held.splice(next, 1);
+    return best;
+  }
+
+  /** Whether the render's page is kept, so the render parses nothing. */
+  private pageIsKept(msg: HeldPageRender): boolean {
+    if (!('docId' in msg)) return false;
+    const session = this.sessions.get(sessionKey(msg.docId, msg.layerName));
+    if (!session) return false;
+    try {
+      return session.pagePool().isKept(session.resolvePageRef(msg.page).pageObjectNumber);
+    } catch {
+      // No such page: the render fails when it runs, at its place in line.
+      return false;
+    }
+  }
+
+  private run(job: PageSpaceJob): void {
+    // Before any route below: a write drops every kept image decode, and a
+    // write that changes content closes the pages it may change, so no change
+    // can meet a page or an image decoded before it (see pageEffectOf).
+    const effect = pageEffectOf(job);
+    this.closePagesChangedBy(job, effect);
+    this.decodedImages.beginJob(effect === 'none');
+
+    // The handlers work in the file's coordinates: the places a caller sent
+    // convert here, as the job runs.
+    let msg: FileSpaceJob;
+    try {
+      msg = requestInFileSpace(job, this.visibleBoxesFor(job));
+    } catch (err) {
+      this.post(
+        wirePack({ kind: 'reject', jobId: job.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
+      );
       return;
     }
 
-    // The encoded render kinds are the protocol's ONLY async ops: their
-    // raster comes from the SAME sync handlers as the raw kinds (all
-    // session/registry use completes before the first await), and only
-    // the injected image encode awaits. They run on a parallel async
-    // path with identical resolve/reject/abort bookkeeping; everything
-    // else stays on the synchronous switch below, unchanged.
-    if (
-      msg.kind === 'pages.renderEncoded' ||
-      msg.kind === 'document.renderPageFileEncoded' ||
-      msg.kind === 'annotations.renderAppearancesEncoded'
-    ) {
-      void this.receiveEncoded(msg);
+    // Renders and the reads that load pages pause between slices (see
+    // runSliced); everything else runs in one go, on the switch below.
+    const sliced = this.slicedWork(msg);
+    if (sliced) {
+      void this.runSliced(job, msg, effect, sliced);
       return;
     }
 
@@ -264,13 +498,22 @@ export class WorkerHost {
     // operations — open, document save, security probe, close, shutdown —
     // are effectively atomic from our side and intentionally non-abortable,
     // so they do not receive the signal.
-    let resultPack: WirePack<WorkerResultPayload>;
+    let resultPack: WirePack<WorkerResultPayload<PdfCoordinates>>;
+    // A write runs as one layer transaction: it commits in finishMutation,
+    // before the layer is saved, or below when the write had nothing to do,
+    // and any throw before then aborts it, leaving the document as it was.
+    const transacted = this.transactedSession(msg);
     try {
       // A parked signing candidate freezes the session: every mutating kind
-      // is refused at DISPATCH, before any native write, until the signing
-      // completes or aborts. Reads keep seeing the live document, which the
+      // is refused at dispatch, before any native write, until the signing
+      // completes or is cancelled. Reads keep seeing the live document, which the
       // candidate never changed.
       this.assertNoPendingSigning(msg);
+      if (transacted && writesDocument(msg)) transacted.beginTransaction(msg.opId);
+      // The write's own objects go at or above the floor its caller set.
+      if (transacted && 'objectNumberFloor' in msg && msg.objectNumberFloor !== undefined) {
+        transacted.raiseLastObjectNumber(msg.objectNumberFloor - 1);
+      }
       switch (msg.kind) {
         case 'open.fatMem':
         case 'open.layerMemBase':
@@ -283,20 +526,17 @@ export class WorkerHost {
         case 'metadata.update':
           resultPack = this.handleMetadataUpdate(msg, ctrl.signal);
           break;
+        case 'metadata.readCustom':
+          resultPack = this.handleMetadataReadCustom(msg, ctrl.signal);
+          break;
+        case 'metadata.updateCustom':
+          resultPack = this.handleMetadataUpdateCustom(msg, ctrl.signal);
+          break;
         case 'actions.read':
           resultPack = this.handleActionsRead(msg, ctrl.signal);
           break;
-        case 'annotations.listRawAll':
-          resultPack = this.handleAnnotationsListRawAll(msg, ctrl.signal);
-          break;
-        case 'annotations.listRawPage':
-          resultPack = this.handleAnnotationsListRawPage(msg, ctrl.signal);
-          break;
-        case 'annotations.listFullPage':
-          resultPack = this.handleAnnotationsListFullPage(msg, ctrl.signal);
-          break;
-        case 'annotations.renderAppearances':
-          resultPack = this.handleAnnotationsRenderAppearances(msg, ctrl.signal);
+        case 'annotations.list':
+          resultPack = this.handleAnnotationsList(msg, ctrl.signal);
           break;
         case 'annotations.create':
           resultPack = this.handleAnnotationsCreate(msg, ctrl.signal);
@@ -307,8 +547,14 @@ export class WorkerHost {
         case 'annotations.delete':
           resultPack = this.handleAnnotationsDelete(msg, ctrl.signal);
           break;
-        case 'annotations.move':
-          resultPack = this.handleAnnotationsMove(msg, ctrl.signal);
+        case 'annotations.reorder':
+          resultPack = this.handleAnnotationsReorder(msg, ctrl.signal);
+          break;
+        case 'document.apply':
+          resultPack = this.handleDocumentApply(msg, ctrl.signal);
+          break;
+        case 'document.applyChanges':
+          resultPack = this.handleDocumentApplyChanges(msg, ctrl.signal);
           break;
         case 'signatures.list':
           resultPack = this.handleSignaturesList(msg);
@@ -331,8 +577,8 @@ export class WorkerHost {
         case 'signatures.complete':
           resultPack = this.handleSignaturesComplete(msg);
           break;
-        case 'signatures.abort':
-          resultPack = this.handleSignaturesAbort(msg);
+        case 'signatures.cancel':
+          resultPack = this.handleSignaturesCancel(msg);
           break;
         case 'signatures.analyze':
           resultPack = this.handleSignaturesAnalyze(msg);
@@ -358,6 +604,9 @@ export class WorkerHost {
         case 'forms.import':
           resultPack = this.handleFormsImport(msg, ctrl.signal);
           break;
+        case 'forms.importValues':
+          resultPack = this.handleFormsImportValues(msg, ctrl.signal);
+          break;
         case 'forms.repair':
           resultPack = this.handleFormsRepair(msg, ctrl.signal);
           break;
@@ -373,17 +622,29 @@ export class WorkerHost {
         case 'forms.deleteField':
           resultPack = this.handleFormsDeleteField(msg, ctrl.signal);
           break;
-        case 'forms.attachWidget':
-          resultPack = this.handleFormsAttachWidget(msg, ctrl.signal);
+        case 'forms.addWidget':
+          resultPack = this.handleFormsAddWidget(msg, ctrl.signal);
           break;
         case 'forms.detachWidget':
           resultPack = this.handleFormsDetachWidget(msg, ctrl.signal);
           break;
+        case 'forms.updateWidget':
+          resultPack = this.handleFormsUpdateWidget(msg, ctrl.signal);
+          break;
+        case 'forms.deleteWidget':
+          resultPack = this.handleFormsDeleteWidget(msg, ctrl.signal);
+          break;
+        case 'forms.reorderWidgets':
+          resultPack = this.handleFormsReorderWidgets(msg, ctrl.signal);
+          break;
+        case 'forms.reorderCalculations':
+          resultPack = this.handleFormsReorderCalculations(msg, ctrl.signal);
+          break;
         case 'pages.list':
           resultPack = this.handlePagesList(msg, ctrl.signal);
           break;
-        case 'pages.move':
-          resultPack = this.handlePagesMove(msg, ctrl.signal);
+        case 'pages.reorder':
+          resultPack = this.handlePagesReorder(msg, ctrl.signal);
           break;
         case 'pages.rotate':
           resultPack = this.handlePagesRotate(msg, ctrl.signal);
@@ -399,6 +660,15 @@ export class WorkerHost {
           break;
         case 'annotations.exportAppearance':
           resultPack = this.handleAnnotationsExportAppearance(msg, ctrl.signal);
+          break;
+        case 'annotations.readAppearance':
+          resultPack = this.handleAnnotationsReadAppearance(msg, ctrl.signal);
+          break;
+        case 'annotations.export':
+          resultPack = this.handleAnnotationsExport(msg, ctrl.signal);
+          break;
+        case 'annotations.import':
+          resultPack = this.handleAnnotationsImport(msg, ctrl.signal);
           break;
         case 'pages.removeName':
           resultPack = this.handlePagesRemoveName(msg, ctrl.signal);
@@ -430,12 +700,6 @@ export class WorkerHost {
         case 'attachments.delete':
           resultPack = this.handleAttachmentsDelete(msg, ctrl.signal);
           break;
-        case 'annotations.readFile':
-          resultPack = this.handleAnnotationsReadFile(msg, ctrl.signal);
-          break;
-        case 'measure.viewports':
-          resultPack = this.handleMeasureViewports(msg, ctrl.signal);
-          break;
         case 'measure.setScale':
           resultPack = this.handleMeasureSetScale(msg, ctrl.signal);
           break;
@@ -448,20 +712,8 @@ export class WorkerHost {
         case 'pieceInfo.applications':
           resultPack = this.handlePieceInfoApplications(msg, ctrl.signal);
           break;
-        case 'pieceInfo.clear':
-          resultPack = this.handlePieceInfoClear(msg, ctrl.signal);
-          break;
-        case 'pages.text':
-          resultPack = this.handlePagesText(msg, ctrl.signal);
-          break;
-        case 'pages.geometry':
-          resultPack = this.handlePagesGeometry(msg, ctrl.signal);
-          break;
-        case 'pages.render':
-          resultPack = this.handlePagesRender(msg, ctrl.signal);
-          break;
-        case 'search.query':
-          resultPack = this.handleSearchQuery(msg, ctrl.signal);
+        case 'pieceInfo.delete':
+          resultPack = this.handlePieceInfoDelete(msg, ctrl.signal);
           break;
         case 'document.saveBuffer':
           resultPack = this.handleDocumentSaveBuffer(msg);
@@ -474,9 +726,6 @@ export class WorkerHost {
           break;
         case 'document.probeSecurityFile':
           resultPack = this.handleDocumentProbeSecurityFile(msg);
-          break;
-        case 'document.renderPageFile':
-          resultPack = this.handleDocumentRenderPageFile(msg, ctrl.signal);
           break;
         case 'document.checkPasswordPermissions':
           resultPack = this.handleDocumentCheckPasswordPermissions(msg);
@@ -499,6 +748,12 @@ export class WorkerHost {
         case 'document.setFontSettings':
           resultPack = this.handleDocumentSetFontSettings(msg);
           break;
+        case 'objectNumbers.reserve':
+          resultPack = wirePack({
+            tag: 'objectNumbers.reserve',
+            range: this.requireSession(msg).reserveObjectNumbers(msg.count),
+          });
+          break;
         case 'layer.close':
           resultPack = this.handleLayerClose(msg);
           break;
@@ -514,69 +769,129 @@ export class WorkerHost {
             `unknown request kind: ${(msg as WorkerRequest).kind}`,
           );
       }
-      // Lift the handler's transfer manifest onto the response envelope
-      // unchanged. The handler decided which buffers to move; the host
-      // just relays that decision through the `resolve` envelope.
-      this.post(
-        wirePack(
-          { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
-          resultPack.transfer,
-        ),
-      );
+      if (transacted?.inTransaction()) transacted.commitTransaction();
+      this.resolve(msg, resultPack);
     } catch (err) {
+      if (transacted?.inTransaction()) transacted.abortTransaction();
       const error: SerializedEngineError = serializeError(err);
       // Reject envelopes never carry binary; explicit EMPTY_TRANSFER
       // documents that intent.
       this.post(wirePack({ kind: 'reject', jobId: msg.jobId, error }, EMPTY_TRANSFER));
     } finally {
       this.aborts.delete(msg.jobId);
+      // And after it: the pages the write itself released, done or failed.
+      this.closePagesChangedBy(job, effect);
     }
   }
 
-  private handleOpen(req: OpenWorkerRequest): WirePack<WorkerResultPayload> {
+  /**
+   * The session a job writes to, when it runs as a transaction: a write to an
+   * open, usable layer document. Anything else (no such session, a locked
+   * one) gets its handler's own error.
+   */
+  private transactedSession(msg: FileSpaceJob): DocumentSession | undefined {
+    if (!writesDocument(msg)) return undefined;
+    const layerName = 'layerName' in msg ? msg.layerName : undefined;
+    const session = this.sessions.get(sessionKey(msg.docId, layerName));
+    if (!session?.isOpen() || session.kind !== 'layer') return undefined;
+    session.assertUsable();
+    return session;
+  }
+
+  /** Closes the pages a job of this effect may change, as no job holds them. */
+  private closePagesChangedBy(job: PageSpaceJob, effect: PageEffect): void {
+    if (effect === 'runtime') {
+      this.residency.closeIdle();
+      return;
+    }
+    if (effect !== 'document' || !('docId' in job)) return;
+    const layerName = 'layerName' in job ? job.layerName : undefined;
+    this.sessions.get(sessionKey(job.docId, layerName))?.pagePool().closeIdle();
+  }
+
+  /**
+   * Answers a job with its result in page space. The handler decided which
+   * buffers to move; the host relays that decision on the `resolve` envelope.
+   */
+  private resolve(msg: FileSpaceJob, pack: WirePack<WorkerResultPayload<PdfCoordinates>>): void {
+    const result = resultInPageSpace(pack.payload, this.visibleBoxesFor(msg));
+    this.post(wirePack({ kind: 'resolve', jobId: msg.jobId, result }, pack.transfer));
+  }
+
+  /** The visible boxes of the request's document, read only when a result asks for one. */
+  private visibleBoxesFor(msg: PageSpaceJob | FileSpaceJob): VisibleBoxOf {
+    let read: VisibleBoxOf | null = null;
+    return (page) => {
+      if (!('docId' in msg)) {
+        throw new EngineError(EngineErrorCode.InvalidArg, `${msg.kind} has no document`);
+      }
+      read ??= visibleBoxReader(this.runtime, this.requireSession(msg));
+      return read(page);
+    };
+  }
+
+  private handleOpen(req: OpenWorkerRequest): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const key = sessionKey(req.docId, req.kind === 'open.fatMem' ? undefined : req.layerName);
     if (this.sessions.has(key)) {
       throw new EngineError(EngineErrorCode.InvalidArg, `document session already open: ${key}`);
     }
     const session = new DocumentSession(this.runtime);
+    session.residency = this.residency;
     session.signedDocumentPolicy = req.signedDocumentPolicy ?? 'protect';
     session.password = req.password;
+    session.objectNumberAuthority = req.objectNumbers ?? 'session';
+    // Every input kind loads the same way with or without a password, so a
+    // locked file parks and unlocks the same way whatever it came from.
+    let load: (password: string | null) => void;
     if (req.kind === 'open.fatMem') {
-      session.sessionKind = req.sessionKind ?? 'layer';
       const bytes = new Uint8Array(req.bytes);
-      try {
-        this.openSignedAware(session, bytes, req.password);
-      } catch (error) {
-        // Password failures are a STATE, not an error: park the session with
-        // the already-transferred bytes and answer with a security probe that
-        // says "password required". The client handle comes up locked
-        // (`security.passwordPrompt === 'required'`); a later
-        // `document.checkPasswordPermissions` performs the actual load.
-        if (!isPasswordOpenError(error)) throw error;
-        session.parkLocked(bytes);
-        this.sessions.set(key, session);
-        return wirePack({
-          tag: 'open',
-          docId: req.docId,
-          security: passwordRequiredProbe(),
-        });
-      }
+      load = (password) => this.openBytesAsLayer(session, bytes, password);
     } else if (req.kind === 'open.layerMemBase') {
-      const base = this.baseDocuments.acquireMemoryBase({
-        key: req.baseKey,
-        bytes: new Uint8Array(req.baseBytes),
-        password: req.password,
-        knownSha256: req.baseSha256,
-      });
-      session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, req.password));
+      const baseBytes = new Uint8Array(req.baseBytes);
+      load = (password) => {
+        const base = this.baseDocuments.acquireMemoryBase({
+          key: req.baseKey,
+          bytes: baseBytes,
+          password,
+          knownSha256: req.baseSha256,
+        });
+        session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, password));
+      };
     } else {
-      const base = this.baseDocuments.acquireFileBase({
-        key: req.baseKey,
-        path: req.basePath,
-        password: req.password,
-        knownSha256: req.baseSha256,
+      // A base read from disk needs the native runtime's file access.
+      if (this.runtime.kind !== 'native') {
+        throw new EngineError(
+          EngineErrorCode.NotImplemented,
+          "'layerFile' needs the native Node runtime; open the file's bytes instead",
+        );
+      }
+      load = (password) => {
+        const base = this.baseDocuments.acquireFileBase({
+          key: req.baseKey,
+          path: req.basePath,
+          password,
+          knownSha256: req.baseSha256,
+        });
+        session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, password));
+      };
+    }
+    try {
+      load(req.password);
+    } catch (error) {
+      // A password failure is a state, not an error: park the session and
+      // answer with a security probe that says "password required". The
+      // client handle comes up locked (`security.passwordPrompt` is
+      // `'required'`, `incorrect` when a password was given and wrong); a
+      // later `document.checkPasswordPermissions` performs the actual load.
+      if (!isPasswordOpenError(error)) throw error;
+      session.parkLocked(load);
+      this.sessions.set(key, session);
+      return wirePack({
+        tag: 'open',
+        docId: req.docId,
+        security: passwordRequiredProbe(),
+        ...(req.password ? { passwordRejected: true } : {}),
       });
-      session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, req.password));
     }
     this.sessions.set(key, session);
     return wirePack({
@@ -587,47 +902,30 @@ export class WorkerHost {
         req.password ?? '',
       ),
       protection: this.probeProtection(session),
+      ...(req.reserveObjectNumbers
+        ? { objectNumbers: session.reserveObjectNumbers(req.reserveObjectNumbers) }
+        : {}),
+      lastObjectNumber: session.lastObjectNumber(),
     });
   }
 
   /**
-   * Open plain bytes into `session` in the shape it asked for. The default,
-   * `layer`, makes the bytes an immutable base with a fresh layer on top:
-   * reads fall through to the base, a write promotes only what it touches,
-   * a save appends exactly that, and a signature keeps its validity across
-   * later edits because the signature dictionary is never rewritten. The
-   * `plain` shape keeps one in-memory document — unless the bytes already
-   * carry a signature value, which always opens as a layer, because a plain
-   * save rewrites every loaded object into the new revision and strict
-   * validators reject that. Auto-layered sessions serialize no artifact per
-   * mutation: the caller never asked for one.
+   * Open bytes into `session` as an immutable base with a fresh layer on top:
+   * reads fall through to the base, a write promotes only what it touches and
+   * runs as a layer transaction, a save appends exactly that, and a signature
+   * keeps its validity across later edits because the signature dictionary is
+   * never rewritten. The session serializes no artifact per mutation: the
+   * caller holds the document, not a layer.
    */
-  private openSignedAware(
+  private openBytesAsLayer(
     session: DocumentSession,
     bytes: Uint8Array,
     password: string | null,
   ): void {
-    if (session.sessionKind === 'plain') {
-      const plain = openFatMemoryDocument(this.runtime, bytes, password);
-      // A SIGNED signature, not merely a signature field: an unsigned form
-      // with empty signature fields is an ordinary document and honours the
-      // plain request. (FPDF_GetSignatureCount counts fields.)
-      let signed = false;
-      try {
-        signed = hasSignedSignature(this.runtime, plain.docPtr);
-      } catch {
-        signed = false;
-      }
-      if (!signed) {
-        session.openFromHandle(plain);
-        return;
-      }
-      plain.close();
-    }
     // The base registry reports a password failure the way a plain open
-    // does, so a locked document parks and unlocks exactly as before.
+    // does, so a locked document parks and unlocks the same way.
     const base = this.baseDocuments.acquireMemoryBase({
-      key: `signed-open:${generateUuid()}`,
+      key: `bytes-open:${generateUuid()}`,
       bytes,
       password,
     });
@@ -650,7 +948,9 @@ export class WorkerHost {
     }
   }
 
-  private handleSignaturesList(req: SignaturesListWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleSignaturesList(
+    req: SignaturesListWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const snapshot = req.workingCopy
       ? new SignatureAnalyzer(this.runtime, session).readWorkingCopySnapshot()
@@ -660,7 +960,7 @@ export class WorkerHost {
 
   private handleSignaturesContents(
     req: SignaturesContentsWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const bytes = new SignatureReader(this.runtime, session).readContents(req.ref);
     return wirePack({ tag: 'signatures.contents', bytes }, [bytes]);
@@ -668,7 +968,7 @@ export class WorkerHost {
 
   private handleSignaturesDigest(
     req: SignaturesDigestWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const digest = new SignatureReader(this.runtime, session).digest(req.ref, req.algorithm);
     return wirePack({ tag: 'signatures.digest', digest }, [digest]);
@@ -676,13 +976,15 @@ export class WorkerHost {
 
   private handleSignaturesRevisionBytes(
     req: SignaturesRevisionBytesWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const bytes = new SignatureReader(this.runtime, session).revisionBytes(req.revisionIndex);
     return wirePack({ tag: 'signatures.revisionBytes', bytes, size: bytes.byteLength }, [bytes]);
   }
 
-  private handleDocumentVersion(req: DocumentVersionWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleDocumentVersion(
+    req: DocumentVersionWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const version = new SignatureReader(this.runtime, session).version();
     return wirePack({ tag: 'document.version', version });
@@ -690,7 +992,7 @@ export class WorkerHost {
 
   private handleSignaturesPrepare(
     req: SignaturesPrepareWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     // The live document is untouched: no mutation, no artifact.
     const result = new SignatureMutator(
@@ -698,20 +1000,20 @@ export class WorkerHost {
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).prepare(req.input);
+    ).prepare(req.input, req.authority);
     return wirePack({ tag: 'signatures.prepare', result });
   }
 
   private handleSignaturesComplete(
     req: SignaturesCompleteWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new SignatureMutator(
       this.runtime,
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).complete(req.input);
+    ).complete(req.input, req.opId, req.authority);
     if (result.status === 'already-completed') {
       return wirePack({ tag: 'signatures.complete', result });
     }
@@ -722,7 +1024,7 @@ export class WorkerHost {
 
   private handleSignaturesAnalyze(
     req: SignaturesAnalyzeWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const analysis = new SignatureAnalyzer(this.runtime, session).analyze(req.input);
     return wirePack({ tag: 'signatures.analyze', analysis });
@@ -735,7 +1037,7 @@ export class WorkerHost {
    */
   private handleSignaturesFinalizeCandidate(
     req: SignaturesFinalizeCandidateWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const finalized = new CandidateFinalizer(this.runtime, this.baseDocuments).finalize({
       path: req.path,
       byteRange: req.byteRange,
@@ -747,30 +1049,32 @@ export class WorkerHost {
     return wirePack({ tag: 'signatures.finalizeCandidate', ...finalized });
   }
 
-  private handleSignaturesAbort(req: SignaturesAbortWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleSignaturesCancel(
+    req: SignaturesCancelWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new SignatureMutator(
       this.runtime,
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).abort(req.signingId);
-    return wirePack({ tag: 'signatures.abort', result });
+    ).cancel(req.signingId);
+    return wirePack({ tag: 'signatures.cancel', result });
   }
 
   /**
-   * The dispatch fence for a parked signing candidate. Only mutating kinds
-   * are refused; a request for a session that is not open falls through
-   * to its handler's own `DocNotOpen`.
+   * The dispatch fence for a parked signing candidate. Only writes are
+   * refused, except the signing's own completion; a request for a session
+   * that is not open falls through to its handler's own `DocNotOpen`.
    */
-  private assertNoPendingSigning(msg: WorkerRequest): void {
-    if (!MUTATING_KINDS.has(msg.kind) || !('docId' in msg)) return;
+  private assertNoPendingSigning(msg: FileSpaceJob): void {
+    if (!writesDocument(msg)) return;
     const layerName = 'layerName' in msg ? msg.layerName : undefined;
     const session = this.sessions.get(sessionKey(msg.docId, layerName));
     if (session?.pendingSigning) {
       throw new EngineError(
         EngineErrorCode.SigningPending,
-        `a signing is pending (${session.pendingSigning.prepared.signingId}); complete or abort it before mutating the document`,
+        `a signing is pending (${session.pendingSigning.prepared.signingId}); complete or cancel it before mutating the document`,
       );
     }
   }
@@ -778,7 +1082,7 @@ export class WorkerHost {
   private handleMetadataRead(
     req: MetadataReadWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const metadata = new MetadataReader(this.runtime, session).read(signal);
     return wirePack({ tag: 'metadata.read', metadata });
@@ -787,102 +1091,161 @@ export class WorkerHost {
   private handleMetadataUpdate(
     req: MetadataUpdateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new MetadataMutator(this.runtime, session);
-    const result = mutator.update(req.patch, signal);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'metadata.update', patch: req.patch },
+      checkedAuthority(),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'metadata.update', result }, req.artifactPath);
+  }
+
+  private handleMetadataReadCustom(
+    req: MetadataReadCustomWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const custom = new MetadataReader(this.runtime, session).readCustom(signal);
+    return wirePack({ tag: 'metadata.readCustom', custom });
+  }
+
+  private handleMetadataUpdateCustom(
+    req: MetadataUpdateCustomWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'metadata.updateCustom', patch: req.patch },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'metadata.updateCustom', result }, req.artifactPath);
   }
 
   private handleActionsRead(
     req: ActionsReadWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const snapshot = new DocumentActionsReader(this.runtime, session).read(signal);
     return wirePack({ tag: 'actions.read', snapshot });
   }
 
-  private handleAnnotationsListRawAll(
-    req: AnnotationsListRawAllWorkerRequest,
+  private handleAnnotationsList(
+    req: AnnotationsListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
+    const pages = req.pages?.map((page) => session.resolvePageRef(page).pageObjectNumber);
     const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.listAll(signal);
-    return wirePack({ tag: 'annotations.listRawAll', snapshot });
+    return wirePack({ tag: 'annotations.list', list: reader.list(pages, signal, 'annotations') });
   }
 
-  private handleAnnotationsListRawPage(
-    req: AnnotationsListRawPageWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
-    const session = this.requireSession(req);
-    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.listOne(pageObjectNumber, signal);
-    return wirePack({ tag: 'annotations.listRawPage', snapshot });
-  }
-
-  private handleAnnotationsListFullPage(
-    req: AnnotationsListFullPageWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
-    const session = this.requireSession(req);
-    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const reader = new AnnotationReader(this.runtime, session, this.fonts);
-    const snapshot = reader.list(pageObjectNumber, signal);
-    return wirePack({ tag: 'annotations.listFullPage', snapshot });
-  }
-
-  private handleAnnotationsRenderAppearances(
+  private async handleAnnotationsRenderAppearances(
     req: AnnotationsRenderAppearancesWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const reader = new AnnotationAppearanceReader(this.runtime, session);
-    const result = reader.render(pageObjectNumber, req.options ?? {}, signal);
+    const result = await reader.render(
+      pageObjectNumber,
+      req.family,
+      req.options ?? {},
+      signal,
+      this.slices,
+    );
     // Transfer every appearance raster buffer back zero-copy, like pages.render.
     const transfer = result.appearances.map((a) => a.raster.data);
-    return wirePack({ tag: 'annotations.renderAppearances', result }, transfer);
+    return wirePack({ tag: 'annotations.renderAppearances', page: req.page, result }, transfer);
   }
 
   private handleAnnotationsCreate(
-    req: AnnotationsCreateWorkerRequest,
+    req: AnnotationsCreateWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.create(pageObjectNumber, req.draft, signal, req.actor, req.resources);
+    const {
+      type: _type,
+      page: _page,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'annotations.create',
+        page: req.page,
+        data: req.draft,
+        ...(req.resources ? { resources: req.resources } : {}),
+        ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+      },
+      checkedAuthority(req.actor),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'annotations.create', result }, req.artifactPath);
   }
 
   private handleAnnotationsUpdate(
-    req: AnnotationsUpdateWorkerRequest,
+    req: AnnotationsUpdateWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.update(req.ref, req.patch, signal, req.actor, req.resources);
+    const {
+      type: _type,
+      page: _page,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'annotations.update',
+        ref: req.ref,
+        patch: req.patch,
+        ...(req.resources ? { resources: req.resources } : {}),
+      },
+      { ...req.authority, protection: null },
+      signal,
+    );
     return this.finishMutation(session, { tag: 'annotations.update', result }, req.artifactPath);
   }
 
   private handleAnnotationsDelete(
     req: AnnotationsDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new AnnotationMutator(this.runtime, session);
-    const result = mutator.delete(req.ref, signal);
+    const {
+      type: _type,
+      page: _page,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'annotations.delete', ref: req.ref },
+      { ...req.authority, protection: null },
+      signal,
+    );
     return this.finishMutation(session, { tag: 'annotations.delete', result }, req.artifactPath);
   }
 
   private handleAnnotationsFlatten(
     req: AnnotationsFlattenWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const result = new AnnotationFlattener(this.runtime, session).flatten(
@@ -891,14 +1254,20 @@ export class WorkerHost {
       req.usage,
       signal,
     );
-    if (result.meta === null) return wirePack({ tag: 'annotations.flatten', result });
-    return this.finishMutation(session, { tag: 'annotations.flatten', result }, req.artifactPath);
+    // A write always names its pages; applying nothing names none.
+    const wrote = result.meta.affectedPages.length > 0;
+    if (!wrote) return wirePack({ tag: 'annotations.flatten', result, wrote });
+    return this.finishMutation(
+      session,
+      { tag: 'annotations.flatten', result, wrote },
+      req.artifactPath,
+    );
   }
 
   private handleAnnotationsExportAppearance(
     req: AnnotationsExportAppearanceWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const exported = new AnnotationFlattener(this.runtime, session).exportAppearance(
@@ -913,41 +1282,277 @@ export class WorkerHost {
     );
   }
 
-  private handleAnnotationsMove(
-    req: AnnotationsMoveWorkerRequest,
+  private handleAnnotationsExport(
+    req: AnnotationsExportWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const bundle = new AnnotationExporter(this.runtime, session, this.fonts).export(
+      req.selection,
+      req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      signal,
+    );
+    return wirePack({ tag: 'annotations.export', bundle }, Object.values(bundle.resources));
+  }
+
+  /**
+   * An import, as a one-op change: kept under its `opId` with the record
+   * that undoes it, and a retry under it gets the first answer.
+   */
+  private handleAnnotationsImport(
+    req: AnnotationsImportWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'annotations.import',
+        bundle: req.bundle,
+        ...(req.pages !== undefined ? { pages: req.pages } : {}),
+        attribution: req.attribution,
+        ...(req.actor ? { actor: req.actor } : {}),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      },
+      checkedAuthority(req.actor),
+      signal,
+    );
+    // Everything left out: nothing was written.
+    if (result.annotations.length === 0) return wirePack({ tag: 'annotations.import', result });
+    return this.finishMutation(session, { tag: 'annotations.import', result }, req.artifactPath);
+  }
+
+  private handleAnnotationsReadAppearance(
+    req: AnnotationsReadAppearanceWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const mutator = new AnnotationMutator(this.runtime, session);
-    const result = mutator.move(pageObjectNumber, req.refs, req.toIndex, signal);
-    return this.finishMutation(session, { tag: 'annotations.move', result }, req.artifactPath);
+    const drawing = new AnnotationFlattener(this.runtime, session).readAppearance(
+      pageObjectNumber,
+      req.ref,
+      signal,
+    );
+    return wirePack(
+      { tag: 'annotations.readAppearance', bytes: drawing.bytes, size: drawing.size },
+      [drawing.bytes],
+    );
+  }
+
+  private handleAnnotationsReorder(
+    req: AnnotationsReorderWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const {
+      type: _type,
+      page: _page,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'annotations.reorder', page: req.page, refs: req.refs, position: req.position },
+      { ...req.authority, protection: null },
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'annotations.reorder', result }, req.artifactPath);
+  }
+
+  /**
+   * `doc.apply`: one change, in the job's transaction. A change asked again
+   * under its `opId` answers what it answered the first time, refusals
+   * included, and a different change under it is refused. An undo runs the
+   * record its change left, when the same user asks and nothing ended undo
+   * since.
+   */
+  private handleDocumentApply(
+    req: DocumentApplyWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    assertNoImport(req.change);
+    const fingerprint = changeFingerprint(req.change);
+    const prior = changeLedgerOf(session).outcome(req.opId);
+    if (prior) {
+      const result = this.replayed(prior, fingerprint, req.opId);
+      return wirePack({ tag: 'document.apply', result, replayed: true });
+    }
+    const result = this.recorded(session, req.opId, fingerprint, () =>
+      this.runChange(session, req, signal),
+    );
+    const payload = { tag: 'document.apply' as const, result, replayed: false };
+    // A change that wrote nothing needs no save.
+    if (!result.items.some(itemWrote)) return wirePack(payload);
+    return this.finishMutation(session, payload, req.artifactPath);
+  }
+
+  /**
+   * A single verb as a one-op change: the same op, checks and record as
+   * `doc.apply`, so its `opId` undoes it, and a retry under it gets the first
+   * answer. What the handle may do was checked before the job; `authority`
+   * carries who the write acts for, and what it checks per annotation.
+   */
+  private applyOne<Op extends RecordedOp<PdfCoordinates, WireAnnotationResources>>(
+    session: DocumentSession,
+    opId: string,
+    op: Op,
+    authority: ChangeAuthority,
+    signal: AbortSignal,
+  ): Extract<ChangeItem<PdfCoordinates>, { type: Op['type'] }> {
+    const change = { ops: [op] };
+    const ledger = changeLedgerOf(session);
+    const fingerprint = changeFingerprint(change);
+    const prior = ledger.outcome(opId);
+    let result: ChangeResult<PdfCoordinates>;
+    if (prior) {
+      result = this.replayed(prior, fingerprint, opId);
+    } else {
+      result = this.recorded(session, opId, fingerprint, () =>
+        new ChangeApplier(this.runtime, session, this.fonts).apply(change.ops, authority, signal),
+      );
+    }
+    const item = result.items[0];
+    if (!item || isSkippedItem(item)) {
+      throw new EngineError(EngineErrorCode.Unknown, `${op.type} wrote nothing`);
+    }
+    return item as Extract<ChangeItem<PdfCoordinates>, { type: Op['type'] }>;
+  }
+
+  /** A change's answer the first time, kept under its `opId`; a retry's checks. */
+  private replayed(
+    prior: ChangeOutcome,
+    fingerprint: string,
+    opId: string,
+  ): ChangeResult<PdfCoordinates> {
+    if (prior.fingerprint !== fingerprint) {
+      throw new EngineError(
+        EngineErrorCode.IdempotencyKeyReused,
+        `opId ${opId} already answered a different change`,
+      );
+    }
+    if (prior.kind === 'refused') throw deserializeError(prior.error);
+    return prior.result;
+  }
+
+  /**
+   * Runs a change and keeps its answer under `opId`: the result and the record
+   * that undoes it, or a refusal the change keeps (see `isKeptRefusal`).
+   */
+  private recorded(
+    session: DocumentSession,
+    opId: string,
+    fingerprint: string,
+    run: () => AppliedChange,
+  ): ChangeResult<PdfCoordinates> {
+    const ledger = changeLedgerOf(session);
+    try {
+      const applied = run();
+      const result = resultOf(session, applied);
+      ledger.keepApplied(opId, fingerprint, result, result.meta.undoable ? applied.record : null);
+      return result;
+    } catch (err) {
+      if (EngineError.is(err) && isKeptRefusal(err.code)) {
+        ledger.keepRefused(opId, fingerprint, serializeError(err));
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * A server request's changes (`POST …/changes`) as one job: each in its own
+   * transaction, committed or rolled back on its own, its record handed back
+   * for the server to keep. An undo of an earlier change of the same request
+   * runs the record this job kept for it. One artifact for all that applied.
+   */
+  private handleDocumentApplyChanges(
+    req: DocumentApplyChangesWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    session.assertUsable();
+    // The changes' own objects go at or above the floor its caller set.
+    if (req.objectNumberFloor !== undefined) {
+      session.raiseLastObjectNumber(req.objectNumberFloor - 1);
+    }
+    const applier = new ChangeApplier(this.runtime, session, this.fonts);
+    const records = new Map<string, ChangeRecord | null>();
+    const outcomes: ServerChangeOutcome<PdfCoordinates>[] = [];
+    for (const entry of req.changes) {
+      session.beginTransaction(entry.opId);
+      try {
+        const applied = runServerChange(applier, entry, records, signal);
+        const result = resultOf(session, applied);
+        session.commitTransaction();
+        const record = result.meta.undoable ? applied.record : null;
+        records.set(entry.opId, record);
+        outcomes.push({ opId: entry.opId, status: 'applied', result, record });
+      } catch (err) {
+        if (session.inTransaction()) session.abortTransaction();
+        // Anything but a refusal the change keeps fails the whole job.
+        if (!EngineError.is(err) || !isKeptRefusal(err.code)) throw err;
+        records.set(entry.opId, null);
+        outcomes.push({ opId: entry.opId, status: 'refused', error: serializeError(err) });
+      }
+    }
+    const payload = { tag: 'document.applyChanges' as const, outcomes };
+    const wrote = outcomes.some(
+      (outcome) => outcome.status === 'applied' && outcome.result.items.some(itemWrote),
+    );
+    if (!wrote) return wirePack(payload);
+    return this.finishMutation(session, payload, req.artifactPath);
+  }
+
+  /** A change's ops, or the steps of the record an undo names. */
+  private runChange(
+    session: DocumentSession,
+    req: DocumentApplyWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): AppliedChange {
+    const applier = new ChangeApplier(this.runtime, session, this.fonts);
+    const userId = req.authority.identity.userId ?? null;
+    if (!isUndoChange(req.change)) return applier.apply(req.change.ops, req.authority, signal);
+    const kept = changeLedgerOf(session).record(req.change.undoOf);
+    if (!kept || 'unavailable' in kept) {
+      throw new EngineError(
+        EngineErrorCode.UndoUnavailable,
+        `change ${req.change.undoOf} can no longer be undone`,
+        { details: { reason: kept ? kept.unavailable : 'expired' } },
+      );
+    }
+    // A change that was refused, or wrote nothing, leaves nothing to undo.
+    if (!kept.record) return { items: [], record: { userId, steps: [] } };
+    // Only the user who made a change may undo it; one made by no one, anyone.
+    if (kept.record.userId !== null && kept.record.userId !== userId) {
+      throw new PermissionDenied('changes:undo', 'target');
+    }
+    return applier.undo(kept.record, req.authority, signal);
   }
 
   private handlePagesList(
     req: PagesListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const reader = new PagesReader(this.runtime, session);
     const snapshot = reader.read(signal);
     return wirePack({ tag: 'pages.list', snapshot });
   }
 
-  private handlePagesMove(
-    req: PagesMoveWorkerRequest,
+  private handlePagesReorder(
+    req: PagesReorderWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
-    const result = mutator.move(req.pages, req.destIndex, signal);
-    return this.finishMutation(session, { tag: 'pages.move', result }, req.artifactPath);
+    const result = mutator.reorder(req.pages, req.position, signal);
+    return this.finishMutation(session, { tag: 'pages.reorder', result }, req.artifactPath);
   }
 
   private handlePagesRotate(
     req: PagesRotateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.rotate(req.pages, req.rotation, signal);
@@ -957,7 +1562,7 @@ export class WorkerHost {
   private handlePagesDelete(
     req: PagesDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.delete(req.pages, signal);
@@ -967,7 +1572,7 @@ export class WorkerHost {
   private handlePagesSetName(
     req: PagesSetNameWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.setName(
@@ -984,7 +1589,7 @@ export class WorkerHost {
   private handlePagesRemoveName(
     req: PagesRemoveNameWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.removeName({ name: req.name }, signal);
@@ -994,27 +1599,35 @@ export class WorkerHost {
   private handlePagesFlatten(
     req: PagesFlattenWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new PagesFlattener(this.runtime, session).flatten(req.pages, req.usage, signal);
-    if (result.meta === null) return wirePack({ tag: 'pages.flatten', result });
-    return this.finishMutation(session, { tag: 'pages.flatten', result }, req.artifactPath);
+    // A write always names its pages; applying nothing names none.
+    const wrote = result.meta.affectedPages.length > 0;
+    if (!wrote) return wirePack({ tag: 'pages.flatten', result, wrote });
+    return this.finishMutation(session, { tag: 'pages.flatten', result, wrote }, req.artifactPath);
   }
 
   private handleRedactionApply(
     req: RedactionApplyWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new RedactionApplier(this.runtime, session).apply(req.scope, signal);
-    if (result.meta === null) return wirePack({ tag: 'redaction.apply', result });
-    return this.finishMutation(session, { tag: 'redaction.apply', result }, req.artifactPath);
+    // A write always names its pages; applying nothing names none.
+    const wrote = result.meta.affectedPages.length > 0;
+    if (!wrote) return wirePack({ tag: 'redaction.apply', result, wrote });
+    return this.finishMutation(
+      session,
+      { tag: 'redaction.apply', result, wrote },
+      req.artifactPath,
+    );
   }
 
   private handlePagesExtract(
     req: PagesExtractWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const extracted = new PagesExtractor(this.runtime, session).extract(req.pages, signal);
     // A read: no finishMutation, no layer artifact. Bytes transfer zero-copy.
@@ -1026,23 +1639,24 @@ export class WorkerHost {
   private handlePagesInsert(
     req: PagesInsertWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
-    const result = inserter.insert(req.bytes, req.destIndex, signal);
+    const result = inserter.insert(req.bytes, req.position ?? 'end', signal);
     return this.finishMutation(session, { tag: 'pages.insert', result }, req.artifactPath);
   }
 
   private handlePagesInsertBlank(
     req: PagesInsertBlankWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
     const result = inserter.insertBlank(
       { size: req.size, count: req.count },
-      req.destIndex,
+      req.position ?? 'end',
       signal,
+      req.objectNumbers,
     );
     return this.finishMutation(session, { tag: 'pages.insertBlank', result }, req.artifactPath);
   }
@@ -1050,16 +1664,16 @@ export class WorkerHost {
   private handleAttachmentsList(
     req: AttachmentsListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const items = new AttachmentReader(this.runtime, session).list(signal);
-    return wirePack({ tag: 'attachments.list', items });
+    const attachments = new AttachmentReader(this.runtime, session).list(signal);
+    return wirePack({ tag: 'attachments.list', attachments });
   }
 
   private handleAttachmentsReadFile(
     req: AttachmentsReadFileWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const content = new AttachmentReader(this.runtime, session).readFile(
       req.ref,
@@ -1078,7 +1692,7 @@ export class WorkerHost {
   private handleAttachmentsCreate(
     req: AttachmentsCreateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AttachmentMutator(this.runtime, session);
     const result = mutator.create(req.file, req.resources, signal);
@@ -1088,24 +1702,25 @@ export class WorkerHost {
   private handleAttachmentsDelete(
     req: AttachmentsDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AttachmentMutator(this.runtime, session);
     const result = mutator.delete(req.ref, signal);
     return this.finishMutation(session, { tag: 'attachments.delete', result }, req.artifactPath);
   }
 
-  private handleAnnotationsReadFile(
+  private async handleAnnotationsReadFile(
     req: AnnotationsReadFileWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
-    const content = new AttachmentReader(this.runtime, session).readAnnotationFile(
+    const content = await new AttachmentReader(this.runtime, session).readAnnotationFile(
       session.resolvePageRef(req.page).pageObjectNumber,
       req.ref,
       req.path,
       req.maxDecodedBytes,
       signal,
+      this.slices,
     );
     return wirePack(
       { tag: 'annotations.readFile', content },
@@ -1113,23 +1728,22 @@ export class WorkerHost {
     );
   }
 
-  private handleMeasureViewports(
+  private async handleMeasureViewports(
     req: MeasureViewportsWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
-    return wirePack({
-      tag: 'measure.viewports',
-      viewports: new MeasureReader(this.runtime, session).viewports(
-        session.resolvePageRef(req.page).pageObjectNumber,
-        signal,
-      ),
-    });
+    const viewports = await new MeasureReader(this.runtime, session).viewports(
+      session.resolvePageRef(req.page).pageObjectNumber,
+      signal,
+      this.slices,
+    );
+    return wirePack({ tag: 'measure.viewports', page: req.page, viewports });
   }
   private handleMeasureSetScale(
     req: MeasureSetScaleWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     new MeasureMutator(this.runtime, session).setScale(
       session.resolvePageRef(req.page).pageObjectNumber,
@@ -1142,7 +1756,7 @@ export class WorkerHost {
         tag: 'measure.setScale',
         result: {
           page: req.page,
-          meta: { affectedPages: [], cacheDelta: null },
+          meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() },
         },
       },
       req.artifactPath,
@@ -1152,7 +1766,7 @@ export class WorkerHost {
   private handlePieceInfoRead(
     req: PieceInfoReadWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
@@ -1166,7 +1780,7 @@ export class WorkerHost {
   private handlePieceInfoUpdate(
     req: PieceInfoUpdateWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
@@ -1174,14 +1788,18 @@ export class WorkerHost {
       req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
     );
     accessor.update(req.application, req.patch, signal);
+    const result = {
+      pieceInfo: accessor.read(req.application, signal),
+      meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() },
+    };
     // A mutation: layer sessions persist the artifact like every other write.
-    return this.finishMutation(session, { tag: 'pieceInfo.update' }, req.artifactPath);
+    return this.finishMutation(session, { tag: 'pieceInfo.update', result }, req.artifactPath);
   }
 
   private handlePieceInfoApplications(
     req: PieceInfoApplicationsWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
@@ -1192,118 +1810,160 @@ export class WorkerHost {
     return wirePack({ tag: 'pieceInfo.applications', applications });
   }
 
-  private handlePieceInfoClear(
-    req: PieceInfoClearWorkerRequest,
+  private handlePieceInfoDelete(
+    req: PieceInfoDeleteWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const accessor = new PieceInfoAccessor(
       this.runtime,
       session,
       req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
     );
-    accessor.clear(req.application, signal);
-    return this.finishMutation(session, { tag: 'pieceInfo.clear' }, req.artifactPath);
+    accessor.delete(req.application, signal);
+    const result = { meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() } };
+    return this.finishMutation(session, { tag: 'pieceInfo.delete', result }, req.artifactPath);
   }
 
-  private handlePagesText(
+  private async handlePagesText(
     req: PagesTextWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageTextReader(this.runtime, session);
-    const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
+    const snapshot = await reader.read(pageObjectNumber, signal, this.slices);
     return wirePack({ tag: 'pages.text', snapshot });
   }
 
-  private handlePagesGeometry(
+  private async handlePagesGeometry(
     req: PagesGeometryWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageGeometryReader(this.runtime, session);
-    const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
-    return wirePack({ tag: 'pages.geometry', snapshot });
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
+    const snapshot = await reader.read(pageObjectNumber, signal, this.slices);
+    return wirePack({ tag: 'pages.geometry', page: req.page, snapshot });
   }
 
-  private handleSearchQuery(
+  private async handleSearchQuery(
     req: SearchQueryWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new SearchReader(this.runtime, session);
-    const slice = reader.query(req.request, signal);
+    const slice = await reader.query(req.request, signal, this.slices);
     return wirePack({ tag: 'search.query', slice });
   }
 
-  private handlePagesRender(
-    req: PagesRenderWorkerRequest,
+  private async handlePagesRender(
+    req: PagesRenderWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageRenderReader(this.runtime, session);
-    const raster = reader.render(
+    const { raster, area } = await reader.render(
       session.resolvePageRef(req.page).pageObjectNumber,
       req.options ?? {},
       signal,
+      this.slices,
     );
-    return wirePack({ tag: 'pages.render', raster }, [raster.data]);
+    return wirePack({ tag: 'pages.render', page: req.page, area, raster }, [raster.data]);
   }
 
-  private async receiveEncoded(
-    msg:
-      | PagesRenderEncodedWorkerRequest
-      | DocumentRenderPageFileEncodedWorkerRequest
-      | AnnotationsRenderAppearancesEncodedWorkerRequest,
-  ): Promise<void> {
-    // Fail-fast BEFORE any native work: a host without an injected
-    // encoder (browser/local workers) rejects the job without paying for
-    // a raster it could never encode.
-    if (!this.options.imageEncoder) {
-      this.post(
-        wirePack(
-          {
-            kind: 'reject',
-            jobId: msg.jobId,
-            error: serializeError(
-              new EngineError(
-                EngineErrorCode.NotImplemented,
-                'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)',
-              ),
+  /**
+   * The work of a job that pauses between slices, or null for one that runs in
+   * one go: renders, and the reads that load a page (its text, geometry,
+   * annotation appearances, measurement viewports, an annotation's file) or
+   * many (a search). Writes never pause: a read must never see half of one.
+   */
+  private slicedWork(msg: FileSpaceJob): SlicedWork | null {
+    switch (msg.kind) {
+      case 'pages.render':
+        return { pdfium: (signal) => this.handlePagesRender(msg, signal) };
+      case 'pages.renderEncoded':
+        return {
+          pdfium: (signal) => this.handlePagesRender({ ...msg, kind: 'pages.render' }, signal),
+          encode: (rendered, signal) => this.encodeRendered(rendered, msg.encode, signal),
+        };
+      case 'document.renderPageFile':
+        return { pdfium: (signal) => this.handleDocumentRenderPageFile(msg, signal) };
+      case 'document.renderPageFileEncoded':
+        return {
+          pdfium: (signal) =>
+            this.handleDocumentRenderPageFile({ ...msg, kind: 'document.renderPageFile' }, signal),
+          encode: (rendered, signal) => this.encodeRendered(rendered, msg.encode, signal),
+        };
+      case 'annotations.renderAppearances':
+        return { pdfium: (signal) => this.handleAnnotationsRenderAppearances(msg, signal) };
+      case 'annotations.renderAppearancesEncoded':
+        return {
+          pdfium: (signal) =>
+            this.handleAnnotationsRenderAppearances(
+              { ...msg, kind: 'annotations.renderAppearances' },
+              signal,
             ),
-          },
-          EMPTY_TRANSFER,
-        ),
+          encode: (rendered, signal) =>
+            this.encodeAppearances(rendered, msg.page, msg.encode, signal),
+        };
+      case 'pages.text':
+        return { pdfium: (signal) => this.handlePagesText(msg, signal) };
+      case 'pages.geometry':
+        return { pdfium: (signal) => this.handlePagesGeometry(msg, signal) };
+      case 'measure.viewports':
+        return { pdfium: (signal) => this.handleMeasureViewports(msg, signal) };
+      case 'annotations.readFile':
+        return { pdfium: (signal) => this.handleAnnotationsReadFile(msg, signal) };
+      case 'search.query':
+        return { pdfium: (signal) => this.handleSearchQuery(msg, signal) };
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * A job that pauses between slices of its PDFium work, so this thread can
+   * receive an abort meanwhile. Until that work ends (`busy`), requests are
+   * held. An encoded kind then encodes while other requests run.
+   */
+  private async runSliced(
+    job: PageSpaceJob,
+    msg: FileSpaceJob,
+    effect: PageEffect,
+    work: SlicedWork,
+  ): Promise<void> {
+    // Fail-fast before any native work: a host without an injected encoder
+    // (browser/local workers) rejects the job without paying for a raster it
+    // could never encode.
+    if (work.encode && !this.options.imageEncoder) {
+      this.post(
+        wirePack({ kind: 'reject', jobId: msg.jobId, error: noEncoderError() }, EMPTY_TRANSFER),
       );
       return;
     }
     const ctrl = new AbortController();
     this.aborts.set(msg.jobId, ctrl);
+    // Set before the work's first await, so a request that arrives while it
+    // pauses is held.
+    this.busy = true;
     try {
-      let resultPack: WirePack<WorkerResultPayload>;
-      switch (msg.kind) {
-        case 'pages.renderEncoded':
-          resultPack = await this.handlePagesRenderEncoded(msg, ctrl.signal);
-          break;
-        case 'document.renderPageFileEncoded':
-          resultPack = await this.handleDocumentRenderPageFileEncoded(msg, ctrl.signal);
-          break;
-        case 'annotations.renderAppearancesEncoded':
-          resultPack = await this.handleAnnotationsRenderAppearancesEncoded(msg, ctrl.signal);
-          break;
+      let pdfium: WirePack<WorkerResultPayload<PdfCoordinates>>;
+      try {
+        pdfium = await work.pdfium(ctrl.signal);
+      } finally {
+        this.busy = false;
+        // After this job's own reply below, which follows synchronously.
+        queueMicrotask(() => this.drain());
       }
-      this.post(
-        wirePack(
-          { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
-          resultPack.transfer,
-        ),
-      );
+      this.resolve(msg, work.encode ? await work.encode(pdfium, ctrl.signal) : pdfium);
     } catch (err) {
       this.post(
         wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
       );
     } finally {
       this.aborts.delete(msg.jobId);
+      this.closePagesChangedBy(job, effect);
     }
   }
 
@@ -1314,10 +1974,7 @@ export class WorkerHost {
   ): Promise<EncodedImageWire> {
     const encoder = this.options.imageEncoder;
     if (!encoder) {
-      throw new EngineError(
-        EngineErrorCode.NotImplemented,
-        'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)',
-      );
+      throw new EngineError(EngineErrorCode.NotImplemented, NO_ENCODER_MESSAGE);
     }
     const { bytes, contentType } = await encoder.encode(raster, encode);
     // The encoder is not abortable; honor a cancellation that arrived
@@ -1328,80 +1985,92 @@ export class WorkerHost {
     return { contentType, width: raster.width, height: raster.height, bytes };
   }
 
-  private async handlePagesRenderEncoded(
-    req: PagesRenderEncodedWorkerRequest,
+  /** The encoded reply of a page render's raw one. */
+  private async encodeRendered(
+    rendered: WirePack<WorkerResultPayload<PdfCoordinates>>,
+    encode: RenderEncode,
     signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
-    const inner = this.handlePagesRender({ ...req, kind: 'pages.render' }, signal);
-    if (inner.payload.tag !== 'pages.render') {
-      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
+    const { payload } = rendered;
+    if (payload.tag === 'pages.render') {
+      const image = await this.encodeRaster(payload.raster, encode, signal);
+      return wirePack({ tag: 'pages.renderEncoded', image }, [image.bytes.buffer]);
     }
-    const image = await this.encodeRaster(inner.payload.raster, req.encode, signal);
-    return wirePack({ tag: 'pages.renderEncoded', image }, [image.bytes.buffer]);
+    if (payload.tag === 'document.renderPageFile') {
+      // The transient session closed when the render ended; the raster owns
+      // its pixels, so encoding after close is sound.
+      const image = await this.encodeRaster(payload.raster, encode, signal);
+      return wirePack(
+        {
+          tag: 'document.renderPageFileEncoded',
+          page: payload.page,
+          pageCount: payload.pageCount,
+          image,
+        },
+        [image.bytes.buffer],
+      );
+    }
+    throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${payload.tag}`);
   }
 
-  private async handleDocumentRenderPageFileEncoded(
-    req: DocumentRenderPageFileEncodedWorkerRequest,
+  /** The encoded reply of an appearance render's raw one, its rasters encoded one by one. */
+  private async encodeAppearances(
+    rendered: WirePack<WorkerResultPayload<PdfCoordinates>>,
+    page: PageRef,
+    encode: RenderEncode,
     signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
-    // The transient session closes inside the sync handler's finally —
-    // the raster owns its pixels, so encoding after close is sound.
-    const inner = this.handleDocumentRenderPageFile(
-      { ...req, kind: 'document.renderPageFile' },
-      signal,
-    );
-    if (inner.payload.tag !== 'document.renderPageFile') {
-      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
+    if (rendered.payload.tag !== 'annotations.renderAppearances') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${rendered.payload.tag}`);
     }
-    const image = await this.encodeRaster(inner.payload.raster, req.encode, signal);
-    return wirePack(
-      {
-        tag: 'document.renderPageFileEncoded',
-        page: inner.payload.page,
-        pageCount: inner.payload.pageCount,
-        image,
-      },
-      [image.bytes.buffer],
-    );
-  }
-
-  private async handleAnnotationsRenderAppearancesEncoded(
-    req: AnnotationsRenderAppearancesEncodedWorkerRequest,
-    signal: AbortSignal,
-  ): Promise<WirePack<WorkerResultPayload>> {
-    const inner = this.handleAnnotationsRenderAppearances(
-      { ...req, kind: 'annotations.renderAppearances' },
-      signal,
-    );
-    if (inner.payload.tag !== 'annotations.renderAppearances') {
-      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
-    }
-    const { pageState, appearances } = inner.payload.result;
-    // SEQUENTIAL encode, deliberately: the whole raster batch already
-    // exists in `inner` (peak memory is set by the render, not by encode
+    const { appearances } = rendered.payload.result;
+    // Sequential encode, deliberately: the whole raster batch already
+    // exists in `rendered` (peak memory is set by the render, not by encode
     // order), so fanning every appearance into the process-wide encoder
     // pool at once would only let one big batch monopolize it and starve
     // the encodes of interleaved jobs. One at a time matches the
     // previous API-side encoding loop exactly and keeps the pool fair.
-    const encoded: EncodedAppearanceWire[] = [];
+    const encoded: EncodedAppearanceWire<PdfCoordinates>[] = [];
     for (const a of appearances) {
       encoded.push({
         ref: a.ref,
         mode: a.mode,
+        state: a.state,
         rect: a.rect,
-        image: await this.encodeRaster(a.raster, req.encode, signal),
+        image: await this.encodeRaster(a.raster, encode, signal),
       });
     }
     return wirePack(
-      { tag: 'annotations.renderAppearancesEncoded', result: { pageState, appearances: encoded } },
+      {
+        tag: 'annotations.renderAppearancesEncoded',
+        page,
+        result: { page: rendered.payload.result.page, appearances: encoded },
+      },
       encoded.map((e) => e.image.bytes.buffer),
     );
   }
 
+  /**
+   * A rewrite drops every revision, and with them every signature: a signed
+   * document refuses it unless the session permits breaking signatures
+   * (`signedDocumentPolicy: 'permit'`). One rule for both engines.
+   */
+  private assertRewriteKeepsSignatures(session: DocumentSession, mode: PdfSaveMode): void {
+    if (mode !== 'rewrite' || session.signedDocumentPolicy !== 'protect') return;
+    const protection = this.probeProtection(session);
+    if (protection && protection.judged !== null) {
+      throw new EngineError(
+        EngineErrorCode.ProtectedDocument,
+        'the document is signed: a rewrite save would void every signature (use an incremental save)',
+      );
+    }
+  }
+
   private handleDocumentSaveBuffer(
     req: DocumentSaveBufferWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
+    this.assertRewriteKeepsSignatures(session, req.mode);
     // A save that changes nothing returns the loaded bytes verbatim: a
     // signed file must come back exactly as it was sealed. Whether anything
     // changed is the saver's answer (`snapshot`): the session's counter when
@@ -1422,11 +2091,12 @@ export class WorkerHost {
 
   private handleDocumentSaveFile(
     req: DocumentSaveFileWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
+    this.assertRewriteKeepsSignatures(session, req.mode);
     // The no-op save law for files: a session whose document is still the
     // one it was opened with streams its loaded bytes — for a layer, the
-    // base PLUS the loaded delta, never the base file alone — verbatim. The
+    // base plus the loaded delta, never the base file alone — verbatim. The
     // decision is the saver's (see handleDocumentSaveBuffer); when its pass
     // wrote nothing, nothing reached the file yet.
     const unchanged =
@@ -1447,7 +2117,7 @@ export class WorkerHost {
 
   private handleDocumentSaveLayerBuffer(
     req: DocumentSaveLayerBufferWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     if (session.kind !== 'layer') {
       throw new EngineError(
@@ -1464,7 +2134,7 @@ export class WorkerHost {
 
   private handleDocumentProbeSecurityFile(
     req: DocumentProbeSecurityFileWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const reader = new SecurityReader(this.runtime);
     const security = reader.probeFile(req.path, req.password);
     return wirePack({ tag: 'document.probeSecurityFile', security });
@@ -1472,16 +2142,16 @@ export class WorkerHost {
 
   /**
    * One-shot file render (the derived-artifact warmer's producer): open the
-   * base from a file path into a TRANSIENT session — never stored in
+   * base from a file path into a transient session — never stored in
    * `this.sessions`, so it can't collide with (or leak into) live document
    * sessions — resolve the display index to its durable page object number,
    * render, close. Shares the base parse with concurrent ad-hoc opens of
    * the same file via the registry refcount.
    */
-  private handleDocumentRenderPageFile(
+  private async handleDocumentRenderPageFile(
     req: DocumentRenderPageFileWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = new DocumentSession(this.runtime);
     const base = this.baseDocuments.acquireFileBase({
       key: `adhoc-file:${req.path}`,
@@ -1500,10 +2170,13 @@ export class WorkerHost {
           `renderPageFile: no page at index ${req.pageIndex} (pageCount=${layout.pageCount})`,
         );
       }
-      const raster = new PageRenderReader(this.runtime, session).render(
-        page.ref.pageObjectNumber,
-        req.options ?? {},
+      // No session carried this document to the boundary, so the target
+      // converts here, on the page it opened.
+      const { raster } = await new PageRenderReader(this.runtime, session).render(
+        page.ref.objectNumber,
+        renderOptionsInFileSpace(req.options ?? {}, () => page.pdfCropBox),
         signal,
+        this.slices,
       );
       return wirePack(
         {
@@ -1523,15 +2196,15 @@ export class WorkerHost {
 
   private handleDocumentCheckPasswordPermissions(
     req: DocumentCheckPasswordPermissionsWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
-    // The one handler that accepts a LOCKED session: on a locked session,
-    // "check this password" means "load the parked bytes with it". A wrong
-    // password throws DocPasswordIncorrect and the session stays parked
-    // (bytes retained) for the next attempt.
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    // The one handler that accepts a locked session: on a locked session,
+    // "check this password" means "load the parked document with it". A
+    // wrong password throws DocPasswordIncorrect and the session stays
+    // parked for the next attempt.
     const parked = this.sessions.get(sessionKey(req.docId));
     let session: DocumentSession;
     if (parked?.isLocked()) {
-      this.openSignedAware(parked, parked.lockedBytes(), req.password);
+      parked.unlockWith(req.password);
       parked.password = req.password;
       session = parked;
     } else {
@@ -1549,7 +2222,9 @@ export class WorkerHost {
     });
   }
 
-  private handleFontsRegister(req: FontsRegisterWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleFontsRegister(
+    req: FontsRegisterWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.register(
       req.fontKey,
       req.familyName,
@@ -1566,7 +2241,7 @@ export class WorkerHost {
 
   private handleFontsAuthorizeEditing(
     req: FontsAuthorizeEditingWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     return wirePack({
       tag: 'fonts.authorizeEditing',
       identity: this.fonts.authorizeEditing(req.fontKey),
@@ -1576,7 +2251,7 @@ export class WorkerHost {
   /** Per-document font and text-layout settings (session state). */
   private handleDocumentSetFontSettings(
     req: DocumentSetFontSettingsWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const docPtr = session.requireDocPtr();
     const { fn } = this.runtime;
@@ -1596,32 +2271,36 @@ export class WorkerHost {
 
   private handleFontsAddFallback(
     req: FontsAddFallbackWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.addFallback(req.fontKey);
     return wirePack({ tag: 'fonts.addFallback' });
   }
 
   private handleFontsClearFallbacks(
     _req: FontsClearFallbacksWorkerRequest,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.clearFallbacks();
     return wirePack({ tag: 'fonts.clearFallbacks' });
   }
 
-  private handleFontsClear(_req: FontsClearWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleFontsClear(
+    _req: FontsClearWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.clear();
     return wirePack({ tag: 'fonts.clear' });
   }
 
   /**
-   * Close exactly ONE layer session — the reload seam for layer-session
+   * Close exactly one layer session — the reload seam for layer-session
    * freshness. The base document's refcount releases through the session's
    * close stack, so sibling layer sessions (and the base session) are
    * untouched. Idempotent: closing an absent session is a no-op ack,
    * because the caller may be reloading a layer this worker never held
    * (e.g. after a pool eviction).
    */
-  private handleLayerClose(req: LayerCloseWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleLayerClose(
+    req: LayerCloseWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const key = sessionKey(req.docId, req.layerName);
     const session = this.sessions.get(key);
     if (session) {
@@ -1633,7 +2312,7 @@ export class WorkerHost {
     return wirePack({ tag: 'close' });
   }
 
-  private handleClose(req: CloseWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleClose(req: CloseWorkerRequest): WirePack<WorkerResultPayload<PdfCoordinates>> {
     for (const [key, session] of Array.from(this.sessions.entries())) {
       if (!sessionKeyBelongsToDoc(key, req.docId)) continue;
       disposeFormModel(this.runtime, session);
@@ -1644,7 +2323,9 @@ export class WorkerHost {
     return wirePack({ tag: 'close' });
   }
 
-  private handleShutdown(_req: ShutdownWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleShutdown(
+    _req: ShutdownWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     if (!this.destroyed) {
       this.destroyed = true;
       for (const session of this.sessions.values()) {
@@ -1653,6 +2334,7 @@ export class WorkerHost {
         session.close();
       }
       this.sessions.clear();
+      this.residency.closeIdle();
       this.baseDocuments.releaseAll();
       destroyLibrary(this.runtime);
     }
@@ -1673,6 +2355,7 @@ export class WorkerHost {
     if (!session || !session.isOpen()) {
       throw new EngineError(EngineErrorCode.DocNotOpen, `document session not open: ${key}`);
     }
+    session.assertUsable();
     return session;
   }
 
@@ -1687,68 +2370,134 @@ export class WorkerHost {
   private handleFormsList(
     req: FormsListWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const reader = new FormReader(this.runtime, session);
+    const reader = new FormReader(this.runtime, session, this.fonts);
     return wirePack({ tag: 'forms.list', snapshot: reader.snapshot(signal) });
   }
 
   private handleFormsSetValue(
     req: FormsSetValueWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.setValue(req.ref, req.value, signal);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.setValue', field: req.ref, value: req.value },
+      req.authority,
+      signal,
+    );
     return this.finishMutation(session, { tag: 'forms.setValue', result }, req.artifactPath);
   }
 
   private handleFormsReset(
     req: FormsResetWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.reset(req.ref, signal);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.reset', ...(req.refs ? { fields: req.refs } : {}) },
+      req.authority,
+      signal,
+    );
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
   }
 
   private handleFormsApplyEffects(
     req: FormsApplyEffectsWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const result = new FormsEffectsApplier(this.runtime, session).apply(req.effects, signal);
-    if (result.meta === null) return wirePack({ tag: 'forms.applyEffects', result });
-    return this.finishMutation(session, { tag: 'forms.applyEffects', result }, req.artifactPath);
+    const { result, wrote } = new FormsEffectsApplier(this.runtime, session, req.actor ?? {}).apply(
+      req.effects,
+      signal,
+    );
+    if (!wrote) return wirePack({ tag: 'forms.applyEffects', result, wrote });
+    return this.finishMutation(
+      session,
+      { tag: 'forms.applyEffects', result, wrote },
+      req.artifactPath,
+    );
   }
 
   private handleFormsExport(
     req: FormsExportWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const reader = new FormReader(this.runtime, session);
-    const exported = reader.exportData(req.format, signal);
-    return wirePack({ tag: 'forms.export', format: exported.format, bytes: exported.bytes }, [
-      exported.bytes,
-    ]);
+    const bundle = new FormExporter(this.runtime, session, this.fonts).export(
+      req.selection,
+      req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      signal,
+    );
+    return wirePack({ tag: 'forms.export', bundle }, Object.values(bundle.resources));
   }
 
+  /**
+   * A design import, as a one-op change: kept under its `opId` with the
+   * record that undoes it, and a retry under it gets the first answer.
+   */
   private handleFormsImport(
     req: FormsImportWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.importData(req.data, req.format, signal);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.import',
+        bundle: req.bundle,
+        ...(req.pages !== undefined ? { pages: req.pages } : {}),
+        attribution: req.attribution,
+        values: req.values,
+        actor: actorOf(req.authority),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+        mayScript: req.mayScript,
+      },
+      req.authority,
+      signal,
+    );
+    // Everything left out: nothing was written.
+    if (result.fields.length === 0) return wirePack({ tag: 'forms.import', result });
     return this.finishMutation(session, { tag: 'forms.import', result }, req.artifactPath);
+  }
+
+  /** A values import, as a one-op change (see {@link handleFormsImport}). */
+  private handleFormsImportValues(
+    req: FormsImportValuesWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.importValues',
+        bundle: req.bundle,
+        attribution: req.attribution,
+        actor: actorOf(req.authority),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      },
+      req.authority,
+      signal,
+    );
+    // Nothing filled: nothing was written.
+    if (result.fields.length === 0) return wirePack({ tag: 'forms.importValues', result });
+    return this.finishMutation(session, { tag: 'forms.importValues', result }, req.artifactPath);
   }
 
   private handleFormsRepair(
     req: FormsRepairWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const result = mutator.repair(req.bakeAppearances ?? false, signal);
@@ -1756,51 +2505,63 @@ export class WorkerHost {
   }
 
   private handleFormsCreateField(
-    req: FormsCreateFieldWorkerRequest,
+    req: FormsCreateFieldWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.createField(req.draft, signal);
-    return this.finishMutation(
+    const { type: _type, ...result } = this.applyOne(
       session,
-      { tag: 'forms.createField', result: { field, meta: EMPTY_FORM_META } },
-      req.artifactPath,
+      req.opId,
+      {
+        type: 'forms.create',
+        draft: req.draft,
+        ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+        ...(req.widgetObjectNumbers ? { widgetObjectNumbers: req.widgetObjectNumbers } : {}),
+      },
+      req.authority,
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.createField', result }, req.artifactPath);
   }
 
   private handleFormsUpdateField(
     req: FormsUpdateFieldWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.updateField(req.ref, req.patch, signal);
-    return this.finishMutation(
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
       session,
-      { tag: 'forms.updateField', result: { field, meta: EMPTY_FORM_META } },
-      req.artifactPath,
+      req.opId,
+      { type: 'forms.update', field: req.ref, patch: req.patch },
+      req.authority,
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.updateField', result }, req.artifactPath);
   }
 
   private handleFormsSetSignatureAppearance(
     req: FormsSetSignatureAppearanceWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const { field, pages } = new FormMutator(this.runtime, session).setSignatureAppearance(
-      req.ref,
-      new Uint8Array(req.pdf),
-      req.pageIndex,
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.setSignatureAppearance',
+        field: req.ref,
+        appearance: { pdf: new Uint8Array(req.pdf) },
+      },
+      req.authority,
       signal,
     );
-    const meta: MutationMeta = {
-      affectedPages: pages.map((pon) => session.pageState(pon)),
-      cacheDelta: null,
-    };
     return this.finishMutation(
       session,
-      { tag: 'forms.setSignatureAppearance', result: { field, meta } },
+      { tag: 'forms.setSignatureAppearance', result },
       req.artifactPath,
     );
   }
@@ -1808,84 +2569,155 @@ export class WorkerHost {
   private handleFormsDeleteField(
     req: FormsDeleteFieldWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { deletedFieldObjectNumber, detachedWidgets } = mutator.deleteField(req.ref, signal);
-
-    // Cascade: the mutator detached the widgets (inert annotations now);
-    // deleting them through the annotation feature keeps /Annots
-    // bookkeeping, weak-ref invalidation, and page revisions in ONE place.
-    const annotations = new AnnotationMutator(this.runtime, session);
-    for (const widget of detachedWidgets) {
-      if (!widget.ref) continue; // direct or unplaced: nothing the annotation plane can delete
-      annotations.delete(widget.ref, signal);
-    }
-    // The annotation deletes above mutated /Annots after the form
-    // mutator's own bump; bump again so the form-model cache rebuilds.
-    session.noteMutation();
-
-    return this.finishMutation(
+    const { type: _type, ...result } = this.applyOne(
       session,
-      {
-        tag: 'forms.deleteField',
-        result: {
-          deletedFieldObjectNumber,
-          removedWidgets: detachedWidgets,
-          meta: EMPTY_FORM_META,
-        },
-      },
-      req.artifactPath,
+      req.opId,
+      { type: 'forms.delete', field: req.ref },
+      checkedAuthority(),
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.deleteField', result }, req.artifactPath);
   }
 
-  private handleFormsAttachWidget(
-    req: FormsAttachWidgetWorkerRequest,
+  private handleFormsAddWidget(
+    req: FormsAddWidgetWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.attachWidget(req.ref, req.widget, req.onState, signal);
-    return this.finishMutation(
+    const { type: _type, ...result } = this.applyOne(
       session,
-      { tag: 'forms.attachWidget', result: { field, meta: EMPTY_FORM_META } },
-      req.artifactPath,
+      req.opId,
+      {
+        type: 'forms.addWidget',
+        field: req.ref,
+        placement: req.placement,
+        ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+        ...(req.splitObjectNumber !== undefined
+          ? { splitObjectNumber: req.splitObjectNumber }
+          : {}),
+      },
+      checkedAuthority(),
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.addWidget', result }, req.artifactPath);
   }
 
   private handleFormsDetachWidget(
     req: FormsDetachWidgetWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload> {
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.detachWidget(req.ref, req.widget, signal);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.removeWidget', field: req.ref, widget: req.widget },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'forms.detachWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsUpdateWidget(
+    req: FormsUpdateWidgetWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.updateWidget', widget: req.widget, patch: req.patch },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'forms.updateWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsDeleteWidget(
+    req: FormsDeleteWidgetWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.deleteWidget', widget: req.widget },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'forms.deleteWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsReorderCalculations(
+    req: FormsReorderCalculationsWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.reorderCalculations', fields: req.fields, position: req.position },
+      checkedAuthority(),
+      signal,
+    );
     return this.finishMutation(
       session,
-      { tag: 'forms.detachWidget', result: { field, meta: EMPTY_FORM_META } },
+      { tag: 'forms.reorderCalculations', result },
       req.artifactPath,
     );
   }
 
-  private finishMutation<P extends WorkerResultPayload>(
+  private handleFormsReorderWidgets(
+    req: FormsReorderWidgetsWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.reorderWidgets',
+        page: req.page,
+        widgets: req.widgets,
+        position: req.position,
+      },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'forms.reorderWidgets', result }, req.artifactPath);
+  }
+
+  private finishMutation<P extends WorkerResultPayload<PdfCoordinates>>(
     session: DocumentSession,
     payload: P,
     artifactPath?: string,
-  ): WirePack<WorkerResultPayload> {
-    // Every successful mutation funnels through here; the sequence bump
-    // invalidates version-keyed caches (the forms model). Forms mutators
-    // bump themselves before reading back, so their tags are skipped to
-    // avoid rebuilding the model cache twice per write — as do the
-    // flattener and redaction applier, which note the mutation before
-    // their post-apply annotation re-read.
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    // The write is done and read back: keep it. Nothing after this point
+    // can abort it; a failure from here on (the layer save) leaves a
+    // committed write that the caller must not mistake for a refused one.
+    if (session.inTransaction()) session.commitTransaction();
+    // A final change ends undo for itself and everything before it.
+    if (FINAL_CHANGES.has(payload.tag)) changeLedgerOf(session).endUndo();
+    // Every successful write funnels through here. Forms mutators
+    // invalidate the derived caches themselves before reading back, so their
+    // tags are skipped to avoid rebuilding the model cache twice per write,
+    // as do the flattener and redaction applier, which invalidate before
+    // their post-apply annotation re-read. A completed signing installed new
+    // bytes, which already counted.
     if (
       !payload.tag.startsWith('forms.') &&
       payload.tag !== 'pages.flatten' &&
       payload.tag !== 'redaction.apply' &&
       payload.tag !== 'signatures.complete'
     ) {
-      session.noteMutation();
+      session.invalidateDerived();
     }
+    if (payload.tag !== 'signatures.complete') session.noteEdit();
     if (session.kind !== 'layer' || !session.persistLayerArtifact) {
       return wirePack(payload);
     }
@@ -1895,62 +2727,172 @@ export class WorkerHost {
 
   private saveLayerArtifact(session: DocumentSession, artifactPath?: string): LayerArtifactSave {
     const saver = new DocumentSaver(this.runtime, session);
+    const lastObjectNumber = session.lastObjectNumber();
     if (artifactPath) {
-      const artifactFile = saver.saveLayerArtifactToFile(artifactPath);
+      const artifactFile = { ...saver.saveLayerArtifactToFile(artifactPath), lastObjectNumber };
       return { payload: { artifactFile }, transfer: [] };
     }
-    const artifact = saver.saveLayerArtifact();
+    const artifact = { ...saver.saveLayerArtifact(), lastObjectNumber };
     return { payload: { artifact }, transfer: [artifact.bytes] };
   }
 }
 
 interface LayerArtifactSave {
-  payload: { artifact: { bytes: ArrayBuffer; size: number } } | { artifactFile: { path: string } };
+  payload:
+    | { artifact: LayerArtifactWorkerPayload }
+    | { artifactFile: LayerArtifactFileWorkerPayload };
   transfer: ArrayBuffer[];
 }
 
-/** Form mutations are non-structural at the page-list level. */
-const EMPTY_FORM_META: MutationMeta = { affectedPages: [], cacheDelta: null };
+/**
+ * What a job does to the parsed pages the runtime keeps ({@link PageResidency})
+ * and to the image decodes kept between jobs, from its effect (see
+ * `RequestEffect`, stated on each request's definition):
+ * - `none`: it writes nothing, so both stay.
+ * - `keepsPages`: a `write` changes annotations, form fields, metadata,
+ *   attachments or names - what a page reads afresh at every render, never its
+ *   parsed content - so pages stay.
+ * - `document`: a `contentWrite` changes content or the page tree in place
+ *   (redaction, flattening, page edits), so the document's pages close before
+ *   and after it.
+ * - `runtime`: a `runtimeWrite` changes the fonts text is set in, for every
+ *   document on the runtime, so every page closes.
+ * Every write drops the kept image decodes. A page also closes when it is next
+ * taken after a write in a layer transaction changed it
+ * (`EPDFPage_IsContentCurrent`).
+ */
+type PageEffect = 'none' | 'keepsPages' | 'document' | 'runtime';
+
+const PAGE_EFFECT: Record<RequestEffect, PageEffect> = {
+  read: 'none',
+  snapshot: 'none',
+  session: 'none',
+  open: 'none',
+  close: 'none',
+  write: 'keepsPages',
+  contentWrite: 'document',
+  runtimeWrite: 'runtime',
+};
+
+function pageEffectOf(job: PageSpaceJob): PageEffect {
+  return job.kind === 'shutdown' ? 'none' : PAGE_EFFECT[job.effect];
+}
+
+/**
+ * Whether a job writes to an open document: a `write` or `contentWrite`,
+ * except a signing's completion, which replaces the document's bytes instead.
+ * Such a job runs as one layer transaction, and a parked signing refuses it.
+ */
+/**
+ * The authority of a write whose handle was checked before the job: it acts
+ * for `actor`, stamping it on what it creates, and checks nothing more.
+ */
+function checkedAuthority(actor?: AnnotationActor): ChangeAuthority {
+  return { identity: actor ?? {}, grants: null, protection: null };
+}
+
+/** Who an authority acts for, as the actor an op stamps. */
+function actorOf({ identity }: ChangeAuthority): AnnotationActor {
+  return {
+    ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
+    ...(identity.groupId !== undefined ? { groupId: identity.groupId } : {}),
+    ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
+  };
+}
+
+/**
+ * A change's result once it ran: its items, which were read back before the
+ * change knew whether it could be undone, carry that now, as its meta does.
+ */
+function resultOf(session: DocumentSession, applied: AppliedChange): ChangeResult<PdfCoordinates> {
+  const undoable = applied.record.steps.length > 0;
+  if (undoable) session.markUndoable();
+  const items = applied.items.map(
+    (item) => ({ ...item, meta: { ...item.meta, undoable } }) as ChangeItem<PdfCoordinates>,
+  );
+  return {
+    items,
+    meta: { affectedPages: pagesOf(items), cacheDelta: null, ...session.writeStamp() },
+  };
+}
+
+/**
+ * One change of a server request: its ops, or an undo running the record
+ * this job kept for an earlier change of the request, or the one the server
+ * sent. A change that left no record leaves nothing to undo.
+ */
+function runServerChange(
+  applier: ChangeApplier,
+  entry: ServerChange<PdfCoordinates>,
+  records: ReadonlyMap<string, ChangeRecord | null>,
+  signal: AbortSignal,
+): AppliedChange {
+  const { change, authority } = entry;
+  if (!isUndoChange(change)) return applier.apply(change.ops, authority, signal);
+  const userId = authority.identity.userId ?? null;
+  const record = records.has(change.undoOf)
+    ? records.get(change.undoOf)!
+    : (entry.record as ChangeRecord | null | undefined);
+  if (record === undefined) {
+    throw new EngineError(
+      EngineErrorCode.UndoUnavailable,
+      `change ${change.undoOf} can no longer be undone`,
+      { details: { reason: 'expired' } },
+    );
+  }
+  if (!record) return { items: [], record: { userId, steps: [] } };
+  return applier.undo(record, authority, signal);
+}
+
+/** Every page a change's items touched, once each, in order. */
+function pagesOf(items: readonly ChangeItem<PdfCoordinates>[]): PageRef[] {
+  const pages = new Map<number, PageRef>();
+  for (const item of items) {
+    for (const page of item.meta.affectedPages) pages.set(page.objectNumber, page);
+  }
+  return [...pages.values()];
+}
+
+function writesDocument(
+  msg: FileSpaceJob,
+): msg is Extract<FileSpaceJob, { docId: string; opId: string }> {
+  // These run their own transactions: a signing completes outside one, and a
+  // server request's changes each run in their own.
+  if (
+    msg.kind === 'shutdown' ||
+    msg.kind === 'signatures.complete' ||
+    msg.kind === 'document.applyChanges'
+  ) {
+    return false;
+  }
+  if (msg.effect !== 'write' && msg.effect !== 'contentWrite') return false;
+  return 'docId' in msg;
+}
+
+/**
+ * The writes nothing undoes: what they destroy or seal can't be put back, so
+ * each ends undo for every change before it.
+ */
+const FINAL_CHANGES: ReadonlySet<string> = new Set([
+  'redaction.apply',
+  'pages.flatten',
+  'annotations.flatten',
+  'forms.repair',
+  'signatures.complete',
+]);
 
 const BASE_SESSION_SUFFIX = '__base__';
 
-/** Every request kind that writes to a session's document. */
-const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
-  'metadata.update',
-  'annotations.create',
-  'annotations.update',
-  'annotations.delete',
-  'annotations.move',
-  'annotations.flatten',
-  'forms.setValue',
-  'forms.reset',
-  'forms.applyEffects',
-  'forms.import',
-  'forms.repair',
-  'forms.createField',
-  'forms.updateField',
-  'forms.setSignatureAppearance',
-  'forms.deleteField',
-  'forms.attachWidget',
-  'forms.detachWidget',
-  'pages.move',
-  'pages.rotate',
-  'pages.delete',
-  'pages.setName',
-  'pages.removeName',
-  'pages.flatten',
-  'pages.insert',
-  'pages.insertBlank',
-  'redaction.apply',
-  'attachments.create',
-  'attachments.delete',
-  'measure.setScale',
-  'pieceInfo.update',
-  'pieceInfo.clear',
-]);
-
 function sessionKey(docId: string, layerName?: string): string {
   return `${docId}::${layerName ? `layer:${layerName}` : BASE_SESSION_SUFFIX}`;
+}
+
+const NO_ENCODER_MESSAGE =
+  'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)';
+
+/** What an encoded kind answers on a host without an image encoder. */
+function noEncoderError(): SerializedEngineError {
+  return serializeError(new EngineError(EngineErrorCode.NotImplemented, NO_ENCODER_MESSAGE));
 }
 
 function sessionKeyBelongsToDoc(key: string, docId: string): boolean {
@@ -1982,4 +2924,24 @@ function passwordRequiredProbe() {
     pdfOpenedAs: null,
     securityProbedAt: Date.now(),
   };
+}
+
+/**
+ * `doc.apply` takes no import: an import runs through its own verb, which
+ * alone may write restored attribution.
+ */
+function assertNoImport(change: Change<PdfCoordinates, WireAnnotationResources>): void {
+  if (isUndoChange(change)) return;
+  const verbs: Record<string, string> = {
+    'annotations.import': 'doc.annotations.import',
+    'forms.import': 'doc.forms.import',
+    'forms.importValues': 'doc.forms.importValues',
+  };
+  const op = (change.ops as readonly { type: string }[]).find(({ type }) => type in verbs);
+  if (op) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `doc.apply takes no import: import a bundle with ${verbs[op.type]}`,
+    );
+  }
 }

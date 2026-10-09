@@ -17,10 +17,10 @@ type SharedReadCtx = {
 };
 
 /**
- * Plane guard at the ORIGIN (the truth; the `/v1/access` edge grant is
+ * Plane guard at the origin (the truth; the `/v1/access` edge grant is
  * only the TTL-bounded optimization). Every doc-user token is layer-pinned
  * (`layer_name`, default 'default'), and a doc-level shared resource is
- * visible through it only while EVERY plane the resource depends on is
+ * visible through it only while every plane the resource depends on is
  * inherited (`'base'`) by that layer — a view that diverged on a plane must
  * never read base artifacts that plane produced. Tenant/admin tokens are not
  * layer-pinned and pass.
@@ -49,8 +49,8 @@ export async function assertPlanesVisible(
 }
 
 /**
- * The full auth chain for a doc-level SHARED read: doc access → effective
- * PDF bits for the CLAIMED layer (password sessions bind to the pin while
+ * The full auth chain for a doc-level shared read: doc access → effective
+ * PDF bits for the claimed layer (password sessions bind to the pin while
  * execution dispatches to the base session) → capability/resource check →
  * plane guard. One door for every doc-level route, so the chain can't drift
  * between resource families.

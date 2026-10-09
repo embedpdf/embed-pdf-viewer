@@ -1,15 +1,27 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
+  allowsSomeFieldWrite,
   checkAnyCapability,
   checkCapability,
   checkCollab,
+  describeProtection,
+  EngineError,
+  EngineErrorCode,
+  protectedCapabilities,
+  type AnnotationAuthority,
+  type ChangeAuthority,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
+  type DocumentProtection,
+  type FieldWriteAction,
+  type Identity,
   type PdfBits,
+  type ProtectableCapability,
+  PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
-import { checkResourceAccess, type DocResourceId } from '@embedpdf/engine-core/wire';
+import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 // checkResourceAccess + DocResourceId live in /wire (resource descriptor
 // table is HTTP-wire surface, used by route guards on every read endpoint).
@@ -22,7 +34,6 @@ import {
   isDocUserClaims,
   isTenantClaims,
   type DocScope,
-  type IdentityClaims,
   type JwtClaims,
   type JwtVerifier,
   type JwtVerifierConfig,
@@ -30,6 +41,8 @@ import {
 } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
 import type { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
+import type { EditRequest } from '../services/LayerWriteObjectNumbers';
+import { MAX_OBJECT_NUMBER_TOP_UP } from '../services/ObjectNumberService';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -46,6 +59,12 @@ declare module 'fastify' {
      * hook. Never logged; carried into `RequestJwtContext.docPassword`.
      */
     docPassword?: string;
+    /**
+     * The request's editing session asks (see `editSessionOf`): set by the
+     * layer guards, read back for the `EmbedPDF-Object-Numbers` response
+     * header.
+     */
+    editRequest?: EditRequest;
   }
 }
 
@@ -68,7 +87,7 @@ export interface JwtPluginOptions {
    */
   apiAuthTokens?: ReadonlyArray<string>;
   /**
-   * Throttle on authentication FAILURES per client IP (never on
+   * Throttle on authentication failures per client IP (never on
    * successful traffic — valid tokens are not counted). A source over
    * budget gets `429` + `Retry-After` until its window expires; note this
    * covers every request from that IP for the remainder of the window,
@@ -301,7 +320,7 @@ export type DocAccessMode = 'doc' | 'tenant';
  * authorised to perform at least one of `needed` doc-scopes on the
  * URL's `docId`. Two legal paths:
  *
- *   1. **Doc-scoped token**: `doc_id` claim matches the URL, AND
+ *   1. **Doc-scoped token**: `doc_id` claim matches the URL, and
  *      the token's `DocScope[]` contains one of `needed` (or `*`).
  *   2. **Tenant token**: `scope` contains `docs.read` (or `*`).
  *      The doc-tenant binding is enforced one layer down by
@@ -319,7 +338,7 @@ export interface RequestJwtContext {
   exp: number | null;
   unlockKey: string | null;
   scope: ReadonlyArray<string>;
-  identity: IdentityClaims;
+  identity: Identity;
   /**
    * Per-request document password (decoded `X-Document-Password`),
    * present only on API-token requests — backends supply the password
@@ -398,7 +417,7 @@ export function requireLayerDocAccess(
 // Route handlers migrate to them in two stages:
 //   1. Read routes call `requireResource(req, docId, '<id>', pdfBits)` — the
 //      DOC_RESOURCES table is the source of truth for capability checks
-//      AND CDN coverage.
+//      and CDN coverage.
 //   2. Mutation routes that have collab semantics call `requireCollab(...)`
 //      with the target row's userId/groupId.
 //
@@ -408,14 +427,14 @@ export function requireLayerDocAccess(
 // for the tenant branch.
 
 /**
- * Doc-scope-only preHandler that performs NO capability check. Verifies
+ * Doc-scope-only preHandler that performs no capability check. Verifies
  * the JWT is doc-scoped to this `docId` (or that the bearer is a tenant
  * token with `docs.read`). Used by the next-layer capability/collab
  * helpers; the tenant branch they exit through is the same as the legacy
  * `requireDocAccess`.
  *
  * Reading is implicit only in the sense that having a valid doc-scoped
- * token gets you THIS far — the capability/collab/resource helper layered
+ * token gets you this far — the capability/collab/resource helper layered
  * on top then decides whether the actual operation is allowed.
  */
 export function requireDocAccessOnly(
@@ -459,44 +478,77 @@ export function requireDocAccessOnly(
   return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
 }
 
+/** A capability no signature can take away: its check never needs the document's protection. */
+export type UnprotectableCapability = Exclude<DocCapability, ProtectableCapability>;
+
+/**
+ * The protection a capability's check takes: required exactly when a
+ * signature can take the capability away, so a route can't forget it.
+ */
+type ProtectionArg<C extends DocCapability> = C extends ProtectableCapability
+  ? [protection: DocumentProtection | null]
+  : [];
+
+const protectionOf = (rest: readonly unknown[]): DocumentProtection | null =>
+  (rest[0] as DocumentProtection | null | undefined) ?? null;
+
+/**
+ * `ProtectedDocument` when the document's signatures forbid `capability`.
+ * Document-derived, like the file's own permission bits: it binds every
+ * caller, tenant tokens included, and comes before the scope, exactly as the
+ * local engine's scope guard orders it.
+ */
+function refuseProtected(capability: DocCapability, protection: DocumentProtection | null): void {
+  if (protection && protectedCapabilities(protection).has(capability)) {
+    throw new EngineError(
+      EngineErrorCode.ProtectedDocument,
+      describeProtection(capability, protection),
+    );
+  }
+}
+
 /**
  * Assert the bearer's scope grants the named capability for the given
  * document. Throws `Forbidden` on deny.
  *
- * Tenant tokens bypass the capability check entirely (existing policy:
+ * A capability a signature can take away also takes the document's
+ * protection (`DocumentService.getProtection`), checked first, for every
+ * caller. Tenant tokens then bypass the scope check (existing policy:
  * tenant owns every doc in the tenant). Doc-scoped tokens evaluate the
  * capability against their JWT scope array + the document's PDF bits
  * (the bits matter for `pdf.permissions` expansion only).
  */
-export function requireCapability(
+export function requireCapability<C extends DocCapability>(
   req: FastifyRequest,
   docId: string,
-  capability: DocCapability,
+  capability: C,
   pdfBits: PdfBits,
+  ...protection: ProtectionArg<C>
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
+  refuseProtected(capability, protectionOf(protection));
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCapability(capability, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`capability required: ${capability}`);
+    throw new PermissionDenied(capability);
   }
   return ctx;
 }
 
 /**
- * Assert the bearer's scope grants AT LEAST ONE of the listed capabilities.
+ * Assert the bearer's scope grants at least one of the listed capabilities.
  * Currently unused by the resource table (every entry maps to a single cap),
  * but kept available for routes that need the disjunction directly.
  */
 export function requireAnyCapability(
   req: FastifyRequest,
   docId: string,
-  capabilities: ReadonlyArray<DocCapability>,
+  capabilities: ReadonlyArray<UnprotectableCapability>,
   pdfBits: PdfBits,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkAnyCapability(capabilities, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`one of: ${capabilities.join(', ')}`);
+    throw new PermissionDenied(capabilities[0] ?? 'doc.open', undefined, capabilities);
   }
   return ctx;
 }
@@ -516,7 +568,7 @@ export function requireResource(
   const ctx = requireDocAccessOnly(req, docId);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkResourceAccess(resourceId, ctx.jwt.scope, pdfBits)) {
-    throwForbidden(`resource access denied: ${resourceId}`);
+    throwResourceDenied(resourceId, ctx.jwt.scope, pdfBits);
   }
   return ctx;
 }
@@ -526,6 +578,8 @@ export function requireResource(
  * annotation's `userId` / `groupId` from the EMBD_Metadata reader
  * first, then call this. POST (create) passes the caller's own
  * identity as the target since creators always act as themselves.
+ * A signature that forbids annotation writes refuses them first, for
+ * every caller.
  */
 export function requireCollabAction(
   req: FastifyRequest,
@@ -533,13 +587,54 @@ export function requireCollabAction(
   action: CollabAction,
   target: CollabTarget,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
+  refuseProtected('doc.annotate.modify', protection);
   if (ctx.mode === 'tenant') return ctx;
   if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, pdfBits)) {
-    throwForbidden(`annotations:${action} denied for target`);
+    throw new PermissionDenied(`annotations:${action}`, 'target');
   }
   return ctx;
+}
+
+/**
+ * Whether the token may make new objects on the document, so its editing
+ * session is handed object numbers: create annotations (as itself, in its
+ * own group), insert pages, or add form fields. What the document's
+ * signatures forbid doesn't count. A tenant owns its documents.
+ */
+export function mayCreateObjects(
+  ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): boolean {
+  if (ctx.mode === 'tenant') return true;
+  const { scope, identity } = ctx.jwt;
+  if (checkAnyCapability(['doc.pages.assemble', 'doc.forms.modify'], scope, pdfBits, protection)) {
+    return true;
+  }
+  if (protection && protectedCapabilities(protection).has('doc.annotate.modify')) return false;
+  const self: CollabTarget = {
+    ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
+    ...(identity.groupId !== undefined ? { groupId: identity.groupId } : {}),
+  };
+  return checkCollab('create', self, scope, identity, pdfBits);
+}
+
+/**
+ * Whether the token holds `capability` on the document: what
+ * `requireCapability` checks, as a yes or no, for a write that leaves out
+ * what the caller may not write instead of refusing it.
+ */
+export function holdsCapability(
+  ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
+  capability: DocCapability,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): boolean {
+  if (protection && protectedCapabilities(protection).has(capability)) return false;
+  return ctx.mode === 'tenant' || checkCapability(capability, ctx.jwt.scope, pdfBits);
 }
 
 // Layer-scoped variants — wrap the doc-only versions with the existing
@@ -548,9 +643,9 @@ export function requireCollabAction(
 
 /**
  * Layer-scoped equivalent of `requireDocAccessOnly`. Verifies the JWT
- * is doc-scoped to this `docId` AND that its `layer_name` claim (if
+ * is doc-scoped to this `docId` and that its `layer_name` claim (if
  * present, defaulting to 'default') matches the URL layer. Performs
- * NO capability check — used by /access and other endpoints where
+ * no capability check — used by /access and other endpoints where
  * the work itself defines what's authorized.
  */
 export function requireLayerDocAccessOnly(
@@ -563,50 +658,104 @@ export function requireLayerDocAccessOnly(
   return ctx;
 }
 
-export function requireLayerCapability(
-  req: FastifyRequest,
-  docId: string,
-  layerName: string,
-  capability: DocCapability,
-  pdfBits: PdfBits,
-): {
+type LayerGuardContext = {
   tenantId: string;
   sub: string;
   mode: DocAccessMode;
   jwt: RequestJwtContext;
   originSessionId: string | null;
-} {
-  const ctx = requireCapability(req, docId, capability, pdfBits);
+  edit?: EditRequest;
+  idempotencyKey?: string;
+};
+
+export function requireLayerCapability<C extends DocCapability>(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  capability: C,
+  pdfBits: PdfBits,
+  ...protection: ProtectionArg<C>
+): LayerGuardContext {
+  const ctx = requireCapability(
+    req,
+    docId,
+    capability as ProtectableCapability,
+    pdfBits,
+    protectionOf(protection),
+  );
   enforceLayerPin(req, layerName);
-  // The mutating client's engine-instance id (X-Engine-Session-Id). Stored on
-  // the audit row so SSE subscribers can drop their own echoes. Advisory only
-  // — it never participates in auth — so it's length-capped, not validated.
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
 }
 
-function originSessionIdFromRequest(req: FastifyRequest): string | null {
+/**
+ * The request's editing session. `originSessionId` is the client's session
+ * id (X-Engine-Session-Id, one per open document), stored on the audit row
+ * so SSE subscribers can drop their own echoes; it is length-capped, not
+ * validated. With it, `edit` says how many object numbers to top the session
+ * up by (EmbedPDF-Reserve-Object-Numbers, at most 32) and collects what a
+ * write hands out, for the response's `EmbedPDF-Object-Numbers`. Object
+ * numbers belong to the session id and the token's subject together, so
+ * the id alone grants nothing.
+ */
+export function editSessionOf(req: FastifyRequest): {
+  originSessionId: string | null;
+  edit?: EditRequest;
+} {
   const raw = req.headers['x-engine-session-id'];
   const value = Array.isArray(raw) ? raw[0] : raw;
-  if (typeof value !== 'string' || value.length === 0) return null;
-  return value.slice(0, 128);
+  if (typeof value !== 'string' || value.length === 0) return { originSessionId: null };
+  req.editRequest ??= { topUp: reserveCountOf(req), issued: [] };
+  return { originSessionId: value.slice(0, 128), edit: req.editRequest };
+}
+
+/** What a layer request carries for a write: its editing session and its `Idempotency-Key`. */
+function writeRequestOf(req: FastifyRequest): {
+  originSessionId: string | null;
+  edit?: EditRequest;
+  idempotencyKey?: string;
+} {
+  const idempotencyKey = idempotencyKeyOf(req);
+  return { ...editSessionOf(req), ...(idempotencyKey ? { idempotencyKey } : {}) };
+}
+
+/** The `Idempotency-Key` header: printable ASCII, 1 to 255 characters. */
+function idempotencyKeyOf(req: FastifyRequest): string | undefined {
+  const header = req.headers['idempotency-key'];
+  if (header === undefined) return undefined;
+  if (typeof header !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(header)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'Idempotency-Key must be 1 to 255 printable ASCII characters',
+    );
+  }
+  return header;
+}
+
+/** `EmbedPDF-Reserve-Object-Numbers`: how many numbers to top the session up by, at most 32. */
+function reserveCountOf(req: FastifyRequest): number {
+  const raw = req.headers['embedpdf-reserve-object-numbers'];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === undefined || value === '') return 0;
+  const count = Number(value);
+  if (!Number.isInteger(count) || count < 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'EmbedPDF-Reserve-Object-Numbers must be a whole number of object numbers',
+    );
+  }
+  return Math.min(count, MAX_OBJECT_NUMBER_TOP_UP);
 }
 
 export function requireLayerAnyCapability(
   req: FastifyRequest,
   docId: string,
   layerName: string,
-  capabilities: ReadonlyArray<DocCapability>,
+  capabilities: ReadonlyArray<UnprotectableCapability>,
   pdfBits: PdfBits,
-): {
-  tenantId: string;
-  sub: string;
-  mode: DocAccessMode;
-  jwt: RequestJwtContext;
-  originSessionId: string | null;
-} {
+): LayerGuardContext {
   const ctx = requireAnyCapability(req, docId, capabilities, pdfBits);
   enforceLayerPin(req, layerName);
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
 }
 
 export function requireLayerResource(
@@ -615,16 +764,10 @@ export function requireLayerResource(
   layerName: string,
   resourceId: DocResourceId,
   pdfBits: PdfBits,
-): {
-  tenantId: string;
-  sub: string;
-  mode: DocAccessMode;
-  jwt: RequestJwtContext;
-  originSessionId: string | null;
-} {
+): LayerGuardContext {
   const ctx = requireResource(req, docId, resourceId, pdfBits);
   enforceLayerPin(req, layerName);
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
 }
 
 export function requireLayerCollabAction(
@@ -634,21 +777,100 @@ export function requireLayerCollabAction(
   action: CollabAction,
   target: CollabTarget,
   pdfBits: PdfBits,
-): {
-  tenantId: string;
-  sub: string;
-  mode: DocAccessMode;
-  jwt: RequestJwtContext;
-  originSessionId: string | null;
-} {
-  const ctx = requireCollabAction(req, docId, action, target, pdfBits);
+  protection: DocumentProtection | null,
+): LayerGuardContext {
+  const ctx = requireCollabAction(req, docId, action, target, pdfBits, protection);
   enforceLayerPin(req, layerName);
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
+}
+
+/**
+ * An annotation write whose permission the worker checks against what the
+ * write finds, inside the write (an update, a delete): the token reaches
+ * this document's layer, no signature forbids annotation writes, and the
+ * authority the write carries names who it acts for and the token's grants
+ * (none to check for a tenant, which owns its documents).
+ */
+export function requireLayerAnnotationWrite(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): LayerGuardContext & { authority: AnnotationAuthority } {
+  const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+  refuseProtected('doc.annotate.modify', protection);
+  return {
+    ...ctx,
+    ...writeRequestOf(req),
+    authority: {
+      identity: ctx.jwt.identity,
+      grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+    },
+  };
+}
+
+/**
+ * A request's changes (`POST …/changes`): the token reaches this document's
+ * layer, and the authority the changes carry names who they act for, the
+ * token's grants (none for a tenant, which owns its documents) and what the
+ * document's signatures forbid. The worker checks each op against it inside
+ * the write, the ops of an undo included.
+ */
+export function requireLayerChangeWrite(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): LayerGuardContext & { authority: ChangeAuthority } {
+  const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+  return { ...ctx, ...writeRequestOf(req), authority: changeAuthorityOf(ctx, pdfBits, protection) };
+}
+
+/**
+ * What a write carries for the worker to check inside it: who it acts for,
+ * the token's grants (none for a tenant, which owns its documents), and what
+ * the document's signatures forbid.
+ */
+export function changeAuthorityOf(
+  ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): ChangeAuthority {
+  return {
+    identity: ctx.jwt.identity,
+    grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+    protection,
+  };
+}
+
+/**
+ * A write that fills in or signs form fields (`action`): the token reaches
+ * this document's layer and may `action` some field (`doc.forms.fill` /
+ * `doc.sign`, or a `fields:` scope). The worker checks each field the write
+ * touches against the authority it carries, inside the write.
+ */
+export function requireLayerFieldWrite(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  action: FieldWriteAction,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): LayerGuardContext & { authority: ChangeAuthority } {
+  const ctx = requireLayerChangeWrite(req, docId, layerName, pdfBits, protection);
+  if (!allowsSomeFieldWrite(ctx.authority, action)) {
+    const capability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
+    refuseProtected(capability, protection);
+    throw new PermissionDenied(capability, 'target');
+  }
+  return ctx;
 }
 
 /**
  * The layer a doc-user token is pinned to (`layer_name`, default
- * `'default'`). THE one reader of the claim: origin plane guards, password
+ * `'default'`). The one reader of the claim: origin plane guards, password
  * bindings, and the `/v1/access` scope computation all route through here so
  * "which layer does this caller claim to be" has exactly one answer.
  * Tenant/admin contexts are not layer-pinned — callers branch on `mode`
@@ -679,11 +901,21 @@ function enforceLayerPin(req: FastifyRequest, layerName: string): void {
   }
 }
 
-function throwForbidden(message: string): never {
-  const err = new Error(message) as Error & { code: string; status: number };
-  err.code = 'Forbidden';
-  err.status = 403;
-  throw err;
+/** A resource the scope doesn't grant, naming what it needs as a local refusal does. */
+function throwResourceDenied(
+  resourceId: DocResourceId,
+  scope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+): never {
+  const { requirement } = DOC_RESOURCES[resourceId];
+  if (requirement.kind === 'single') throw new PermissionDenied(requirement.capability, resourceId);
+  const capabilities = requirement.capabilities;
+  if (requirement.kind === 'any') {
+    throw new PermissionDenied(capabilities[0] ?? 'doc.open', resourceId, capabilities);
+  }
+  // All of them: name the first one the scope lacks.
+  const missing = capabilities.find((cap) => !checkCapability(cap, scope, pdfBits));
+  throw new PermissionDenied(missing ?? capabilities[0] ?? 'doc.open', resourceId);
 }
 
 /**
@@ -703,12 +935,7 @@ function jwtContext(claims: JwtClaims): RequestJwtContext {
     exp: typeof claims.exp === 'number' ? claims.exp : null,
     unlockKey: readUnlockKey(claims),
     scope: claims.scope,
-    identity: {
-      ...(claims.user_id ? { user_id: claims.user_id } : {}),
-      ...(claims.group_id ? { group_id: claims.group_id } : {}),
-      ...(claims.display_name ? { display_name: claims.display_name } : {}),
-      ...(claims.groups ? { groups: [...claims.groups] } : {}),
-    },
+    identity: claims.identity ? { ...claims.identity } : {},
   };
 }
 

@@ -1,10 +1,10 @@
 export type { DeletePagesRequest } from "./DeletePagesRequest.js";
+export type { DocPagesReorderRequest } from "./DocPagesReorderRequest.js";
 export { DocPagesSetScaleRequest } from "./DocPagesSetScaleRequest.js";
 export type { ExtractPagesRequest } from "./ExtractPagesRequest.js";
 export type { FlattenPagesRequest } from "./FlattenPagesRequest.js";
 export type { InsertBlankPagesRequest } from "./InsertBlankPagesRequest.js";
 export type { InsertPagesRequest } from "./InsertPagesRequest.js";
-export type { MovePagesRequest } from "./MovePagesRequest.js";
 export type { RemoveNamePagesRequest } from "./RemoveNamePagesRequest.js";
 export type { RotatePagesRequest } from "./RotatePagesRequest.js";
 export type { SetNamePagesRequest } from "./SetNamePagesRequest.js";

@@ -1,9 +1,11 @@
+import { materializePdfPermissions } from './builders';
 import { parseScope } from './parser';
 import type {
   CollabAction,
+  CollabEntity,
   CollabFilter,
   DocCapability,
-  IdentityClaims,
+  Identity,
   ParsedScope,
   PdfBits,
 } from './types';
@@ -11,13 +13,24 @@ import { protectedCapabilities } from '../../signature/protection';
 import type { DocumentProtection } from '../../signature/types';
 
 /**
- * Resolved collab subject — the per-record identity bits used to test
- * collab filters against. Sourced from the target record's stored
+ * Resolved collab subject — the per-record identity bits that collab
+ * filters are tested against. Sourced from the target record's stored
  * `/EMBD_Metadata/UserID` and `/GroupID` at mutation time.
  */
 export interface CollabTarget {
   userId?: string;
   groupId?: string;
+}
+
+/** The collab target of a record read with nullable owner fields (an annotation). */
+export function collabTargetOf(owner: {
+  userId?: string | null;
+  groupId?: string | null;
+}): CollabTarget {
+  return {
+    ...(owner.userId ? { userId: owner.userId } : {}),
+    ...(owner.groupId ? { groupId: owner.groupId } : {}),
+  };
 }
 
 /**
@@ -42,9 +55,9 @@ export function checkCapability(
 }
 
 /**
- * True iff the scope grants AT LEAST ONE of `capabilities`. Convenience
- * for routes like `/text` (`doc.text.copy` OR `doc.text.search`) and
- * `/geometry` (`doc.text.select` OR `doc.text.search`).
+ * True iff the scope grants at least one of `capabilities`. Convenience
+ * for routes like `/text` (`doc.text.copy` or `doc.text.search`) and
+ * `/geometry` (`doc.text.select` or `doc.text.search`).
  */
 export function checkAnyCapability(
   capabilities: ReadonlyArray<DocCapability>,
@@ -60,7 +73,7 @@ export function checkAnyCapability(
  *
  * Narrowing model. For each action independently:
  *   1. wildcard `*` → allow (global escape hatch)
- *   2. if any collab scope applies to this action → NARROW: only those
+ *   2. if any collab scope applies to this action → narrow: only those
  *      collab filters decide. If none match the target, deny — even if
  *      `doc.annotate.modify` is also present. This is what makes
  *      `[modify, update:self]` correctly mean "edit own only" rather
@@ -71,7 +84,7 @@ export function checkAnyCapability(
  *   4. otherwise → deny.
  *
  * For create: `target` should be built by the caller from JWT identity
- * (`{ userId: caller.user_id, groupId: caller.group_id }`). `:self` and
+ * (`{ userId: caller.userId, groupId: caller.groupId }`). `:self` and
  * `:all` then trivially pass; `:group=X` is the meaningful filter (only
  * matches when the caller's default group is X).
  *
@@ -81,14 +94,14 @@ export function checkCollab(
   action: CollabAction,
   target: CollabTarget,
   rawScope: ReadonlyArray<string>,
-  identity: IdentityClaims,
+  identity: Identity,
   pdfBits: PdfBits,
 ): boolean {
   const parsed = rawScope.map(parseScope);
   if (parsed.some((s) => s.kind === 'wildcard')) return true;
 
   const applicableCollab = parsed.filter(
-    (s): s is Extract<ParsedScope, { kind: 'collab' }> =>
+    (s): s is Extract<ParsedScope, { entity: 'annotations' }> =>
       s.kind === 'collab' &&
       s.entity === 'annotations' &&
       (s.action === action || s.action === '*'),
@@ -116,8 +129,11 @@ export function checkCollab(
  *   - any annotation collab scope implies `doc.annotate.read`, because
  *     mutation routes need to see the target row to evaluate the
  *     collab filter against its current owner.
+ *   - any field collab scope implies `doc.forms.read`: filling in or
+ *     signing a field means seeing the form. Groups limit writes, never
+ *     reads.
  *
- * Does NOT short-circuit on wildcard — callers do that themselves
+ * Does not short-circuit on wildcard — callers do that themselves
  * before calling this. Returning the expanded set is useful for the
  * `/access` response's `effectiveScope` and for advisory UI surfacing.
  */
@@ -128,6 +144,7 @@ export function expandedCapabilities(
 ): Set<DocCapability> {
   const out = new Set<DocCapability>();
   let hasAnnotationCollab = false;
+  let hasFieldCollab = false;
 
   for (const s of parsed) {
     if (s.kind === 'capability') {
@@ -136,6 +153,8 @@ export function expandedCapabilities(
       addPdfPermissions(out, pdfBits);
     } else if (s.kind === 'collab' && s.entity === 'annotations') {
       hasAnnotationCollab = true;
+    } else if (s.kind === 'collab' && s.entity === 'fields') {
+      hasFieldCollab = true;
     }
   }
 
@@ -147,6 +166,7 @@ export function expandedCapabilities(
   }
   if (out.has('doc.forms.fill')) out.add('doc.forms.read');
   if (hasAnnotationCollab) out.add('doc.annotate.read');
+  if (hasFieldCollab) out.add('doc.forms.read');
 
   // Subtraction last: a signed document's own restrictions win over any
   // grant or implication.
@@ -169,48 +189,34 @@ export function expandRawScope(
 }
 
 /**
- * Test a single collab filter against a target record + the caller's
- * identity. Pure function — no side effects, no implicit rules.
+ * Authority to put a record of `entity` in a specific group: an annotation,
+ * or a form field.
  *
- *   all              → always matches
- *   self             → matches if identity.user_id === target.userId
- *   createdBy=<X>    → matches if target.userId === X
- *   group=<X>        → matches if target.groupId === X
- *                      AND identity.groups includes X
- *
- * The group-membership check on `group=X` prevents a token from
- * matching annotations in a group it doesn't belong to, even if the
- * target row carries that groupId.
- */
-/**
- * Authority to assign a specific groupId to an annotation.
- *
- * Set-group is decoupled from `doc.annotate.modify`. The reasoning:
- * capabilities like `modify` describe row access — what kind of write
- * you can do to which existing rows — and map to PDF permission bits.
- * Set-group is a cloud-only *assignment authority*: which destination
- * group can you put an annotation into? There is no PDF-bit
- * counterpart, so it doesn't inherit from `modify`.
+ * Set-group is decoupled from the write capabilities (`doc.annotate.modify`,
+ * `doc.forms.modify`). The reasoning: those describe row access — what kind
+ * of write you can do to which existing rows — and map to PDF permission
+ * bits. Set-group is a cloud-only *assignment authority*: which destination
+ * group can you put a record into? There is no PDF-bit counterpart, so it
+ * doesn't inherit from them.
  *
  * Resolution order:
  *   1. newGroupId === callerDefaultGroupId → true (no real reassignment
- *      is happening; the annotation gets the caller's default group)
+ *      is happening; the record gets the caller's default group)
  *   2. wildcard `*` → true (global escape hatch)
- *   3. `annotations:set-group:all` → true
- *   4. `annotations:set-group:group=<newGroupId>` → true
- *   5. `annotations:*:all` or `annotations:*:group=<newGroupId>` → true
+ *   3. `<entity>:set-group:all` → true
+ *   4. `<entity>:set-group:group=<newGroupId>` → true
+ *   5. `<entity>:*:all` or `<entity>:*:group=<newGroupId>` → true
  *      (action wildcard includes set-group)
  *   6. otherwise → false
  *
- * Note: independent from membership. A user with
- * `set-group:group=legal` can assign annotations to the legal group
- * even if they're not a member — that's the whole point.
+ * A user with `set-group:group=legal` can put records in the legal group
+ * whatever their own group is — that's the whole point.
  */
 export function checkSetGroup(
+  entity: CollabEntity,
   newGroupId: string,
   callerDefaultGroupId: string | undefined,
   rawScope: ReadonlyArray<string>,
-  _pdfBits: PdfBits,
 ): boolean {
   // No authority needed when the caller is assigning their default group.
   if (newGroupId === callerDefaultGroupId) return true;
@@ -220,7 +226,7 @@ export function checkSetGroup(
 
   for (const s of parsed) {
     if (s.kind !== 'collab') continue;
-    if (s.entity !== 'annotations') continue;
+    if (s.entity !== entity) continue;
     if (s.action !== 'set-group' && s.action !== '*') continue;
     if (s.filter.kind === 'all') return true;
     if (s.filter.kind === 'group' && s.filter.groupId === newGroupId) return true;
@@ -232,80 +238,98 @@ export function checkSetGroup(
   return false;
 }
 
-export function filterMatches(
-  filter: CollabFilter,
-  target: CollabTarget,
-  id: IdentityClaims,
+/**
+ * True iff the scope lets the caller `action` (fill in, or sign) a form
+ * field in `groupId` (`null` for a field in no group).
+ *
+ * Narrowing, per action, as for annotations:
+ *   1. wildcard `*` → allow;
+ *   2. if any `fields:<action>` scope exists (or `fields:*`) → only those
+ *      decide: the field must match one of their filters, even when the
+ *      broad capability is also present. A field in no group then matches
+ *      only `:all`;
+ *   3. otherwise the broad capability decides, for every field:
+ *      `doc.forms.fill` to fill, `doc.sign` to sign.
+ *
+ * Nothing here narrows form design (`doc.forms.modify`).
+ */
+export function checkFieldAction(
+  action: 'fill' | 'sign',
+  groupId: string | null,
+  rawScope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
 ): boolean {
+  const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
+  if (protectedCapabilities(protection).has(broad)) return false;
+  const parsed = rawScope.map(parseScope);
+  if (parsed.some((s) => s.kind === 'wildcard')) return true;
+
+  const applicable = parsed.filter(
+    (s) =>
+      s.kind === 'collab' && s.entity === 'fields' && (s.action === action || s.action === '*'),
+  ) as Extract<ParsedScope, { entity: 'fields' }>[];
+  if (applicable.length > 0) {
+    return applicable.some(
+      (s) => s.filter.kind === 'all' || (groupId !== null && s.filter.groupId === groupId),
+    );
+  }
+  return expandedCapabilities(parsed, pdfBits, protection).has(broad);
+}
+
+/**
+ * Whether the scope lets the caller `action` some form field: the broad
+ * capability, or any `fields:<action>` scope. What a form verb checks
+ * before its fields are known; each field is checked in the write.
+ */
+export function checkAnyFieldAction(
+  action: 'fill' | 'sign',
+  rawScope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
+): boolean {
+  const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
+  if (protectedCapabilities(protection).has(broad)) return false;
+  const parsed = rawScope.map(parseScope);
+  if (parsed.some((s) => s.kind === 'wildcard')) return true;
+  if (
+    parsed.some(
+      (s) =>
+        s.kind === 'collab' && s.entity === 'fields' && (s.action === action || s.action === '*'),
+    )
+  ) {
+    return true;
+  }
+  return expandedCapabilities(parsed, pdfBits, protection).has(broad);
+}
+
+/**
+ * Test a single collab filter against a target record. Every filter but
+ * `self` compares one fact on the record with the value the scope names:
+ *
+ *   all              → always matches
+ *   self             → matches if identity.userId === target.userId
+ *   createdBy=<X>    → matches if target.userId === X
+ *   group=<X>        → matches if target.groupId === X
+ */
+export function filterMatches(filter: CollabFilter, target: CollabTarget, id: Identity): boolean {
   switch (filter.kind) {
     case 'all':
       return true;
     case 'self':
-      return !!id.user_id && target.userId === id.user_id;
+      return !!id.userId && target.userId === id.userId;
     case 'createdBy':
       return target.userId === filter.userId;
     case 'group':
-      return target.groupId === filter.groupId && (id.groups?.includes(filter.groupId) ?? false);
+      return target.groupId === filter.groupId;
   }
 }
 
 /**
  * Translate `pdf.permissions` (virtual scope) into the concrete
- * capabilities it represents under the current PDF bit configuration.
- *
- * Always adds `doc.open` and `doc.render` — these are cloud-only
- * capabilities with no PDF bit, but `pdf.permissions` is meant to be
- * the "give the user a working session" shorthand. Without them, a
- * token with just `['pdf.permissions']` would be useless.
- *
- * Reads are unconditional: ISO 32000 / Acrobat let any reader see
- * existing annotations and form values regardless of permission bits.
- * Bit 6 governs *writing*, not visibility.
- *
- * Bit-derived expansions follow ISO 32000:
- *   bit 5   → doc.text.{select, copy, search}, doc.content.copy
- *   bit 3   → doc.print
- *   bit 12  → doc.print.high (requires bit 3 also set)
- *   bit 4   → doc.pages.modify, doc.redact, doc.metadata.modify, doc.attachments.modify
- *   bit 11  → doc.pages.assemble
- *   bit 6   → doc.annotate.modify
- *   bit 6/9 → doc.forms.fill
- *   bit 6+4 → doc.forms.modify
- *
- * Note: this same expansion lives in builders.ts as
- * `materializePdfPermissions` for SDK-side use. The two MUST stay in
- * sync; a test in resolver.test.ts pins them together.
+ * capabilities it represents under the current PDF bit configuration:
+ * {@link materializePdfPermissions}, the one reading of the bits.
  */
 function addPdfPermissions(out: Set<DocCapability>, b: PdfBits): void {
-  // Always — pdf.permissions means "give me a working session"
-  out.add('doc.open');
-  out.add('doc.render');
-  // Reading existing annotations and form values is unconditional —
-  // PDF bit 6 governs writes, not visibility.
-  out.add('doc.annotate.read');
-  out.add('doc.forms.read');
-
-  if (b.bit5) {
-    out.add('doc.text.select');
-    out.add('doc.text.copy');
-    out.add('doc.text.search');
-    out.add('doc.content.copy');
-  }
-  if (b.bit3) out.add('doc.print');
-  if (b.bit12 && b.bit3) out.add('doc.print.high');
-  if (b.bit4) {
-    out.add('doc.pages.modify');
-    out.add('doc.redact');
-    out.add('doc.metadata.modify');
-    out.add('doc.attachments.modify');
-  }
-  if (b.bit11) out.add('doc.pages.assemble');
-  if (b.bit6) {
-    out.add('doc.annotate.modify');
-  }
-  if (b.bit6 || b.bit9) {
-    out.add('doc.forms.fill');
-    out.add('doc.sign');
-  }
-  if (b.bit6 && b.bit4) out.add('doc.forms.modify');
+  for (const capability of materializePdfPermissions(b)) out.add(capability);
 }

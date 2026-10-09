@@ -5,9 +5,9 @@ import { createPostgresDb, migrate, postgresMigrations } from '../src/index';
 import { runAdminE2e } from './_helpers/admin-e2e-suite';
 
 /**
- * Phase 2 acceptance test #1 — the entire Phase 1 admin E2E (upload,
- * commit, dedup, sha mismatch, tenant isolation, cascade delete, scope
- * gates, sweeper) runs against Postgres without changing the source.
+ * The entire admin E2E (upload, commit, dedup, sha mismatch, tenant
+ * isolation, cascade delete, scope gates, sweeper) runs against
+ * Postgres without changing the source.
  *
  * If this passes, the (sqlite|postgres) abstraction is real.
  *

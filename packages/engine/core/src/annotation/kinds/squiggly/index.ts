@@ -1,18 +1,31 @@
-import type { SquigglyDraft } from './draft';
-import type { SquigglyAnnotationDTO } from './dto';
-import type { SquigglyPatch } from './patch';
-import { SquigglyDTOSchema, SquigglyDraftSchema, SquigglyPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { SquigglyDeclaration } from './declaration';
 
-export type { SquigglyAnnotationDTO } from './dto';
-export type { SquigglyDraft } from './draft';
-export type { SquigglyPatch } from './patch';
-export { SquigglyDTOSchema, SquigglyDraftSchema, SquigglyPatchSchema } from './schema';
+export { SquigglyDeclaration } from './declaration';
+
+export type SquigglyAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof SquigglyDeclaration,
+  C
+>;
+export type SquigglyDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof SquigglyDeclaration,
+  C
+>;
+export type SquigglyPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof SquigglyDeclaration,
+  C
+>;
+
+export const SquigglyDTOSchema = SquigglyDeclaration.readSchema;
+export const SquigglyDraftSchema = SquigglyDeclaration.createSchema;
+export const SquigglyPatchSchema = SquigglyDeclaration.updateSchema;
 
 export const SquigglyKind: AnnotationKindModule<
   'squiggly',
-  SquigglyAnnotationDTO,
+  SquigglyAnnotation,
   SquigglyDraft,
   SquigglyPatch
 > = {
@@ -21,4 +34,5 @@ export const SquigglyKind: AnnotationKindModule<
   dtoSchema: SquigglyDTOSchema,
   draftSchema: SquigglyDraftSchema,
   patchSchema: SquigglyPatchSchema,
+  readBackWrites: SquigglyDeclaration.readBackWrites,
 };

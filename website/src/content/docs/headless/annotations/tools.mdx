@@ -1,0 +1,385 @@
+---
+title: Tools & defaults
+description: Change what each tool draws, add your own tools, and choose the cursor, the preview and what happens after drawing.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Tools & defaults
+
+A tool says what a click or a drag on the page creates: the kind of annotation, its default
+colors and sizes, the cursor, and whether a preview follows the pointer. Change the built-in
+tools, or add your own, with the `tools` setting of `annotationPlugin()`:
+
+```ts
+annotationPlugin({
+  tools: [
+    { id: 'ink', defaults: { color: '#1e90ff', strokeWidth: 3 } },
+    {
+      id: 'arrow',
+      extends: 'line',
+      defaults: { lineEndings: { start: 'none', end: 'closed-arrow' } },
+    },
+  ],
+});
+```
+
+The first entry changes the built-in `ink` tool. The second adds an `arrow` tool: a line with an
+arrowhead. Activate a tool with `interaction.activateTool('arrow')`, as on the
+[overview](../annotations#let-people-draw).
+
+## Change the default color, width and font
+
+A tool's `defaults` are the fields every annotation it draws starts with. They're the same fields
+the annotation has, so the [engine's page for each kind](/docs/engine/annotations) lists what you
+can set:
+
+```ts
+annotationPlugin({
+  tools: [
+    { id: 'square', defaults: { color: '#dc143c', strokeWidth: 2, interiorColor: '#ffe4e1' } },
+    { id: 'highlight', defaults: { color: '#90ee90', opacity: 0.6 } },
+    { id: 'free-text', defaults: { fontFamily: 'helvetica', fontSize: 16, fontColor: '#1e1e1e' } },
+    { id: 'note', defaults: { icon: 'help', color: '#ffd700' } },
+  ],
+});
+```
+
+Defaults can be any field except where the annotation goes (`box`, points, `rect`), since that
+comes from the drawing. Flags are fields too: `{ id: 'note', defaults: { locked: true } }` makes
+every new note locked.
+
+A field the tool's kind doesn't have (a `fontSize` on a square) stops the app at startup with an
+error that names the tool and the field.
+
+## Make your own tool
+
+`extends` starts from a tool and changes what you name. The new tool keeps everything else: its
+kind, cursor, preview and behavior:
+
+```ts
+annotationPlugin({
+  tools: [
+    { id: 'red-pen', extends: 'ink', defaults: { color: '#ff0000', strokeWidth: 2 } },
+    { id: 'marker', extends: 'ink-highlight', defaults: { color: '#ffa500' } },
+    { id: 'todo', extends: 'note', defaults: { icon: 'key', contents: 'TODO' } },
+    {
+      id: 'docs-link',
+      extends: 'link',
+      defaults: { target: { kind: 'uri', uri: 'https://example.com/docs' } },
+    },
+  ],
+});
+```
+
+Give a tool a label and an icon for your toolbar in `meta`. The plugin keeps it and never reads
+it:
+
+```ts
+annotationPlugin({
+  tools: [{ id: 'red-pen', extends: 'ink', meta: { label: 'Red pen', icon: 'pen' } }],
+});
+```
+
+`annotation.tools.list()` returns every tool, so a toolbar can build itself from it.
+
+<Example name="annotation/custom-tools" />
+
+> **Try it:** every button but **Select** comes from a tool's `meta`. Draw with **Red pen**, then
+> place a **To do** note.
+
+Tools can also be added while the app runs. `register()` returns a function that removes the tool
+again:
+
+```ts
+const remove = annotation.tools.register({
+  id: 'green-pen',
+  extends: 'ink',
+  defaults: { color: '#00a000' },
+});
+```
+
+## Let people change the defaults
+
+A color picker or a width slider in your toolbar changes a tool's defaults for the drawings that
+follow:
+
+<Snippet name="annotations/tools/ink-color" />
+
+`useAnnotationDefaults()` <Word of="rerenders" /> when the defaults change, so the picker always
+shows the current color. To build a whole style panel for any tool, ask for its fields; they come in
+the same shape as a [style panel for the selection](selecting#a-style-panel):
+
+```ts
+const { properties, values } = annotation.tools.getProperties('ink'); // color, opacity, strokeWidth, …
+```
+
+Defaults belong to the person drawing: they're kept in this viewer and never shared with others on
+the same document.
+
+### Remember them
+
+To keep a person's choices for next time, save them when they change:
+
+<Snippet name="annotations/tools/remember" />
+
+Then pass them back at startup:
+
+```ts
+annotationPlugin({
+  tools: ['ink', 'highlight'].map((id) => ({
+    id,
+    defaults: JSON.parse(localStorage.getItem(`tool:${id}`) ?? '{}'),
+  })),
+});
+```
+
+<Example name="annotation/tool-defaults" />
+
+> **Try it:** pick a color and a width, and draw. Reload the page: the pen still has them.
+
+## What happens after drawing
+
+By default the new annotation is selected, so its handles and your menu appear at once, and the
+tool stays active, so people can draw another. Change it for every tool, or for one:
+
+```ts
+annotationPlugin({
+  afterCreate: { select: false, tool: 'stay' }, // every tool: keep drawing, don't select
+  tools: [
+    { id: 'stamp', afterCreate: { select: true, tool: 'default' } }, // one stamp, then back
+  ],
+});
+```
+
+| Setting    | What it does                                                                                  | Default  |
+| :--------- | :-------------------------------------------------------------------------------------------- | :------- |
+| `select`   | Select the new annotation.                                                                    | `true`   |
+| `tool`     | `'stay'` keeps the tool active. `'default'` goes back to the default tool, usually `pointer`. | `'stay'` |
+| `editText` | For text boxes: start typing in the new box right away.                                       | `true`   |
+
+A tool's own `afterCreate` wins over the one for every tool.
+
+The setting can change while the app runs. A "keep tool" button in your toolbar is one call:
+
+```ts
+annotation.updateSettings({ afterCreate: { tool: keepTool ? 'stay' : 'default' } });
+```
+
+<Example name="annotation/after-create" />
+
+> **Try it:** draw a rectangle, then turn off **Keep the tool** and draw another: the tool goes back
+> to selecting.
+
+Annotations your code creates are never selected unless you ask for it; see
+[Create an annotation](with-code#create-an-annotation).
+
+## Click or drag
+
+Most drawing tools also work with a single click: it places an annotation of a default size where
+you click. `clickCreate` sets that size, or turns it off:
+
+```ts
+annotationPlugin({
+  tools: [
+    { id: 'square', clickCreate: { width: 120, height: 80 } },
+    { id: 'line', clickCreate: { length: 100 } },
+    { id: 'circle', clickCreate: false }, // drag only
+  ],
+});
+```
+
+| Tool                 | A click makes                                         |
+| :------------------- | :---------------------------------------------------- |
+| `square`, `circle`   | 80 × 60 points, centered on the click                 |
+| `line`               | 80 points long, pointing right, centered on the click |
+| `free-text`          | 180 × 40 points, its top-left at the click            |
+| `note`, `attachment` | A 20 × 20 icon                                        |
+| `stamp`              | The stamp, 150 points wide, centered on the click     |
+
+`anchor` says which part of it lands on the click. A box takes `'center'` (the default) or
+`'top-left'`; a line takes `'center'` (the default), `'start'` or `'end'`. A line's `rotation` turns it
+clockwise from pointing right, in degrees. An arrow whose tip lands where you click, pointing down:
+
+```ts
+annotationPlugin({
+  tools: [{ id: 'arrow', clickCreate: { length: 80, rotation: 90, anchor: 'end' } }],
+});
+```
+
+<Example name="annotation/click-create" />
+
+> **Try it:** click the page with each tool. The arrow's tip lands where you click.
+
+What a click makes always stays on the page: near an edge, it's moved inside.
+
+## The cursor
+
+While a tool is active, the pointer shows the tool's cursor. Over an annotation the viewer switches
+to a move or resize cursor by itself, and over text to a text cursor, so people always see what a
+click will do. You choose the cursor for the rest of the page. There are three steps, from simple
+to fully yours.
+
+**A standard cursor.** Any CSS cursor name:
+
+```ts
+annotationPlugin({ tools: [{ id: 'square', cursor: 'cell' }] });
+```
+
+**An image.** `svgCursor()`, from `@embedpdf/react/interaction`, turns an SVG into a cursor. The
+SVG needs a `width` and a `height`, and `hotspot` is the point in it that clicks:
+
+```ts
+annotationPlugin({
+  tools: [{ id: 'ink', cursor: svgCursor({ svg: penIcon, hotspot: { x: 2, y: 22 } }) }],
+});
+```
+
+**An image that follows the defaults.** `useToolCursor()` sets a tool's cursor from a component, so
+it can change with the tool's color:
+
+<Snippet name="annotations/tools/ink-cursor" />
+
+`cursors` replaces cursors by name: `crosshair` is the ink tool's own cursor. Name `text` too to
+replace the text cursor a markup tool shows over text. The cursor goes back to the tool's own when
+the component is removed.
+
+<Example name="annotation/cursor" />
+
+> **Try it:** move the pointer over the page, then pick another color. **Rectangle** shows the
+> standard `cell` cursor.
+
+## Show a preview before placing
+
+A **preview** (a ghost) is a see-through copy of what a click would place, following the pointer. It
+shows exactly where the annotation will land and how big it will be:
+
+```ts
+annotationPlugin({
+  tools: [
+    { id: 'square', ghost: true },
+    { id: 'note', ghost: { opacity: 0.3 } },
+    { id: 'todo', extends: 'note', ghost: false },
+  ],
+});
+```
+
+The preview is the annotation the click will make, drawn with the tool's current defaults: its
+color, its width, an arrow's head, a form field's border and background. Change a default and the
+preview changes with it. It's half see-through unless you set `opacity`; `--epdf-ghost-opacity`
+sets it from CSS for every tool (see [Colors & theming](../ui/theming)).
+
+<Example name="annotation/ghost" />
+
+> **Try it:** move the pointer over the page: the note follows it, faintly. Then move the slider.
+
+It shows only where a click would place something. Over an annotation the click selects it, and
+over text a text tool selects text, so the preview hides there. It hides too when the person may
+not create annotations. A tool whose click makes nothing, like ink, a polygon, or a tool with
+`clickCreate: false`, never shows one. While you press, the preview stays, since letting go is
+still a click; once you drag, the drawing takes its place.
+
+It's on by default for tools you use by clicking: stamps, notes, attachments, and the form
+plugin's field tools, which show the field a click places (a radio button round, as it will be).
+It's off for tools you mostly drag, like shapes and lines, since the size usually comes from the
+drag. `ghost: true` turns it on for them.
+
+The cursor and the preview do different jobs. The cursor says _which_ tool is active; the preview
+says _where_ the annotation will land. You can use either, or both.
+
+## Stamps and files
+
+The `stamp` and `attachment` tools ask for a file after the click.
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+The file dialog comes from a small <Word of="hook" />: call it once, in a component that's always
+mounted, such as your toolbar:
+
+</Fw>
+<Fw only="angular">
+
+The file dialog comes from a provider feature: add `withFilePicker()` to `provideEmbedPdf()`, next
+to your other features:
+
+</Fw>
+
+<Snippet name="annotations/tools/file-picker" />
+
+<Example name="annotation/file-picker" />
+
+> **Try it:** click the page with **Stamp**, and pick a PNG or a JPEG. The paper clip on the cover
+> is a file attached from code.
+
+To pick from your own library or a cloud drive instead, pass a function. It gets the tool and the
+spot, and returns the file, or `null` to cancel:
+
+<Snippet name="annotations/tools/file-picker-custom" />
+
+A stamp tool can also carry fixed bytes, so a click places it at once:
+
+```ts
+annotationPlugin({
+  tools: [{ id: 'approved', extends: 'stamp', source: { kind: 'bytes', source: approvedPng } }],
+});
+```
+
+For libraries of stamps, see [Stamps](stamps).
+
+## Methods
+
+What `useAnnotation()` gives you for tools and stamps: its `tools` and `stamps` parts. The rest is on
+[Annotations in code](with-code#methods).
+
+| Method                                  | What it does                                                                                                                                                                                             |
+| :-------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools.list()`                          | Every tool, the built-in ones and yours, so a toolbar can build itself from it. [Make your own tool](#make-your-own-tool)                                                                                |
+| `tools.get(id)`                         | One tool, or `null`                                                                                                                                                                                      |
+| `tools.register(tool)`                  | Adds a tool while the app runs, or replaces the one with the same id, and returns a function that removes it                                                                                             |
+| `tools.getDefaults(id)`                 | The fields a tool's next annotation starts with. In a component, use `useAnnotationDefaults(id)`. [Let people change the defaults](#let-people-change-the-defaults)                                      |
+| `tools.updateDefaults(id, changes)`     | Changes a tool's defaults for the drawings that follow. They stay in this viewer and are never shared.                                                                                                   |
+| `tools.getProperties(id)`               | What a style panel for the tool shows: `{ properties, values, mixed }`, the same shape as for the [selection](selecting#a-style-panel)                                                                   |
+| `stamps.arm(stamp)`, `stamps.disarm()`  | Arms a stamp's bytes so the next click places them, as the `stamp` tool does after picking a file, or disarms them. For stamps from a library, use [Stamps](stamps).                                     |
+| `stamps.isArmed()`                      | Whether a stamp is armed                                                                                                                                                                                 |
+| `stamps.place(stamp, { page, center })` | Places a stamp's bytes with its middle on `center`, without a click. Resolves `{ annotation }`.                                                                                                          |
+| `setFilePickerProvider(provider)`       | Sets the function that gives the `stamp` and `attachment` tools their file, and returns a function that removes it. In a component, use `useFilePickerProvider()`. [Stamps and files](#stamps-and-files) |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## Events
+
+<Snippet name="annotations/tools/defaults-changed" />
+
+| Event                     | Fires when                                           | Carries              |
+| :------------------------ | :--------------------------------------------------- | :------------------- |
+| `tools.onDefaultsChanged` | A tool's defaults changed, from your UI or your code | `toolId`, `defaults` |
+
+## Good to know
+
+### Rotated pages
+
+On a rotated page, what a tool places looks the way its author saw it. Stamps and text boxes are
+turned so they read upright. A clicked square or circle keeps its `clickCreate` size as the page
+shows (it isn't turned, its sides swap), and a clicked line points the way its `clickCreate` says.
+`upright: false` turns that off; `upright: true` turns it on for your own tools.
+
+### Touch
+
+On a touch screen, drawing tools take a single finger: it draws, and two fingers still scroll and
+zoom. Click tools (notes, stamps) place with a tap, and a drag still scrolls.
+
+### Every option
+
+| Option        | What it is                                                                              |
+| :------------ | :-------------------------------------------------------------------------------------- |
+| `id`          | The tool's name, used with `interaction.activateTool(id)`.                              |
+| `extends`     | A tool to start from.                                                                   |
+| `subtype`     | The kind of annotation it draws, for a tool that doesn't extend another.                |
+| `defaults`    | The fields every new annotation starts with.                                            |
+| `cursor`      | The cursor while the tool is active.                                                    |
+| `ghost`       | A preview that follows the pointer: `true`, `false` or `{ opacity }`.                   |
+| `clickCreate` | What a single click makes, and which part lands on the click, or `false` for drag only. |
+| `afterCreate` | Select the new annotation? Keep the tool? Start typing?                                 |
+| `upright`     | Turn new annotations upright on rotated pages.                                          |
+| `source`      | For stamp tools: fixed bytes, or ask for a file.                                        |
+| `meta`        | Your own data, such as a label and an icon for a toolbar.                               |

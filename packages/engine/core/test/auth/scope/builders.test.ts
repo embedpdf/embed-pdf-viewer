@@ -3,7 +3,6 @@ import {
   caps,
   collab,
   decodePdfBits,
-  expandRawScope,
   materializePdfPermissions,
   parseScope,
   pdfPermissions,
@@ -40,11 +39,14 @@ describe('caps — capability builders return the expected literal strings', () 
     expect(caps.doc.forms.read()).toBe('doc.forms.read');
     expect(caps.doc.forms.fill()).toBe('doc.forms.fill');
     expect(caps.doc.forms.modify()).toBe('doc.forms.modify');
+    expect(caps.doc.forms.import()).toBe('doc.forms.import');
+    expect(caps.doc.forms.script()).toBe('doc.forms.script');
   });
 
   it('annotate read/modify split + metadata + redact', () => {
     expect(caps.doc.annotate.read()).toBe('doc.annotate.read');
     expect(caps.doc.annotate.modify()).toBe('doc.annotate.modify');
+    expect(caps.doc.annotate.import()).toBe('doc.annotate.import');
     expect(caps.doc.metadata.modify()).toBe('doc.metadata.modify');
     expect(caps.doc.redact()).toBe('doc.redact');
   });
@@ -66,8 +68,11 @@ describe('caps — capability builders return the expected literal strings', () 
       caps.doc.forms.read(),
       caps.doc.forms.fill(),
       caps.doc.forms.modify(),
+      caps.doc.forms.import(),
+      caps.doc.forms.script(),
       caps.doc.annotate.read(),
       caps.doc.annotate.modify(),
+      caps.doc.annotate.import(),
       caps.doc.metadata.modify(),
       caps.doc.redact(),
     ];
@@ -177,9 +182,10 @@ describe('materializePdfPermissions', () => {
     expect(set.has('doc.annotate.read')).toBe(true); // unconditional, already in set
   });
 
-  it('bit 9 adds doc.forms.fill; doc.forms.read is unconditional', () => {
+  it('bit 9 adds doc.forms.fill and doc.sign; doc.forms.read is unconditional', () => {
     const set = new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.FILL_FORMS)));
     expect(set.has('doc.forms.fill')).toBe(true);
+    expect(set.has('doc.sign')).toBe(true);
     expect(set.has('doc.forms.read')).toBe(true); // unconditional
   });
 
@@ -211,38 +217,46 @@ describe('materializePdfPermissions', () => {
   });
 });
 
-describe('materialize-vs-resolver parity (CRITICAL: keep in sync)', () => {
-  // Iterate every relevant bit configuration; the set produced by
-  // materializePdfPermissions must equal the set produced by
-  // expandRawScope(['pdf.permissions'], bits). If this test ever fails,
-  // someone has changed one of the two expansion implementations without
-  // updating the other.
-  const allMasks = [
-    0,
-    PDF_BITS.PRINT,
-    PDF_BITS.MODIFY,
-    PDF_BITS.COPY,
-    PDF_BITS.ANNOTATE_FILL,
-    PDF_BITS.FILL_FORMS,
-    PDF_BITS.ACCESSIBILITY,
-    PDF_BITS.ASSEMBLE,
-    PDF_BITS.PRINT_HIGH,
-    PDF_BITS.PRINT | PDF_BITS.PRINT_HIGH,
-    PDF_BITS.ANNOTATE_FILL | PDF_BITS.MODIFY,
-    PDF_BITS.ANNOTATE_FILL | PDF_BITS.FILL_FORMS,
-    PDF_BITS.PRINT |
-      PDF_BITS.MODIFY |
-      PDF_BITS.COPY |
-      PDF_BITS.ANNOTATE_FILL |
-      PDF_BITS.FILL_FORMS |
-      PDF_BITS.ASSEMBLE |
-      PDF_BITS.PRINT_HIGH,
-  ];
-
-  it.each(allMasks)('mask=%i: materialize matches expandRawScope', (mask) => {
-    const bits = decodePdfBits(mask);
-    const fromMaterialize = new Set<DocCapability>(materializePdfPermissions(bits));
-    const fromExpand = expandRawScope(['pdf.permissions'], bits);
-    expect(fromMaterialize).toEqual(fromExpand);
+describe('caps — covers every capability', () => {
+  it('has a builder for each one the scope grammar knows', () => {
+    // A Record over the union: a capability added to DocCapability without an
+    // entry here fails to compile, and one without a builder fails below.
+    const every: Record<DocCapability, true> = {
+      'doc.open': true,
+      'doc.render': true,
+      'doc.text.select': true,
+      'doc.text.copy': true,
+      'doc.text.search': true,
+      'doc.content.copy': true,
+      'doc.download': true,
+      'doc.download.flattened': true,
+      'doc.print': true,
+      'doc.print.high': true,
+      'doc.pages.modify': true,
+      'doc.pages.assemble': true,
+      'doc.forms.read': true,
+      'doc.forms.fill': true,
+      'doc.forms.modify': true,
+      'doc.forms.import': true,
+      'doc.forms.script': true,
+      'doc.forms.submit': true,
+      'doc.annotate.read': true,
+      'doc.annotate.modify': true,
+      'doc.annotate.import': true,
+      'doc.metadata.modify': true,
+      'doc.attachments.modify': true,
+      'doc.redact': true,
+      'doc.sign': true,
+      'doc.sign.certify': true,
+    };
+    const built = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (typeof node === 'function') built.add((node as () => string)());
+      if (node && (typeof node === 'object' || typeof node === 'function')) {
+        for (const child of Object.values(node)) walk(child);
+      }
+    };
+    walk(caps);
+    expect([...built].sort()).toEqual(Object.keys(every).sort());
   });
 });

@@ -1,19 +1,20 @@
 import { useCapability } from '@embedpdf/react/runtime';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { annotationKey } from '@embedpdf/react/annotation';
-import { usePendingRedactions, useRedaction } from '@embedpdf/react/redaction';
+import { usePendingRedactions, useRedaction, useRedactionState } from '@embedpdf/react/redaction';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
 
 /**
- * The pending-redactions review panel (right sidebar). The list is a LIVE view
+ * The pending-redactions review panel (right sidebar). The list is a live view
  * over the annotation plane — deleting a mark here is deleting the annotation.
  * "Apply all" routes through the confirm modal: the apply is irreversible.
  */
 export function RedactionPanel() {
   const t = useT();
   const redaction = useRedaction();
+  const applying = useRedactionState((state) => state.applying);
   const pending = usePendingRedactions();
   const anno = useCapability(AnnotationToken);
   const confirm = useSurface('redact-confirm');
@@ -33,8 +34,8 @@ export function RedactionPanel() {
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => anno.select(item.ref)}
-                  onKeyDown={(e) => e.key === 'Enter' && anno.select(item.ref)}
+                  onClick={() => anno.selection.set([item.ref])}
+                  onKeyDown={(event) => event.key === 'Enter' && anno.selection.set([item.ref])}
                   className="hover:bg-hover group flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left"
                 >
                   <Icon
@@ -53,8 +54,8 @@ export function RedactionPanel() {
                   </span>
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={(event) => {
+                      event.stopPropagation();
                       void anno.delete(item.ref);
                     }}
                     className="text-fg-muted hover:text-fg grid h-6 w-6 shrink-0 place-items-center rounded opacity-0 group-hover:opacity-100"
@@ -81,7 +82,7 @@ export function RedactionPanel() {
         </button>
         <button
           type="button"
-          disabled={pending.length === 0 || !redaction.canApply() || redaction.applying}
+          disabled={pending.length === 0 || !redaction.canApply() || applying}
           onClick={() => confirm.open()}
           className="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-40"
         >

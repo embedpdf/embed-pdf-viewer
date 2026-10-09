@@ -55,6 +55,7 @@ export class DocumentSecurityProbe {
         (jobId) =>
           wirePack({
             kind: 'document.probeSecurityFile' as const,
+            effect: 'read' as const,
             jobId,
             path: handle!.path,
             password: input.password ?? null,
@@ -69,7 +70,7 @@ export class DocumentSecurityProbe {
       }
       return { security: result.security };
     } catch (err) {
-      // A quarantine refusal is a VERDICT, not a probe failure: letting
+      // A quarantine refusal is a verdict, not a probe failure: letting
       // it degrade to security:'unknown' would admit an upload of a sha
       // that repeatedly crashed the engine. Rethrow → the ingestion
       // pipeline surfaces the 422; everything else stays best-effort.

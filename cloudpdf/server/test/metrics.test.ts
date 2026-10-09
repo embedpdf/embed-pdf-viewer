@@ -26,7 +26,7 @@ describe('/metrics', () => {
         expect(res.statusCode).toBe(200);
         expect(res.headers['content-type']).toContain('text/plain');
         expect(res.body).toContain('cloudpdf_http_request_duration_seconds');
-        expect(res.body).toContain('route="/healthz"'); // route PATTERN labels, seeded above
+        expect(res.body).toContain('route="/healthz"'); // route pattern labels, seeded above
         expect(res.body).toContain('cloudpdf_worker_pool_slots 1');
         expect(res.body).toContain('cloudpdf_license_access{access=');
         expect(res.body).toContain('process_cpu_user_seconds_total'); // default process metrics

@@ -1,15 +1,18 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
   type DocumentRedactionService,
   type RedactionApplyResult,
   type RedactionApplyScope,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import { RedactionApplyResultSchema, wirePaths } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -17,8 +20,8 @@ import type { HttpClient } from '../transport/HttpClient';
  * HTTP (POST /redactions/apply); the server enforces the capability gate
  * (`doc.pages.modify` + `doc.annotate.modify` + `doc.redact`) and persists
  * the rewritten layer artifact. See `DocumentRedactionService` for the
- * two-stage model and the layer trust boundary — an apply rewrites THIS
- * LAYER's bytes; the immutable base keeps the original.
+ * two-stage model and the layer trust boundary — an apply rewrites this
+ * layer's bytes; the immutable base keeps the original.
  */
 export class CloudDocumentRedactionService implements DocumentRedactionService {
   constructor(
@@ -28,31 +31,42 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
-  apply(scope: RedactionApplyScope): AbortablePromise<RedactionApplyResult> {
+  apply(
+    scope: RedactionApplyScope,
+    options?: WriteOptions,
+  ): AbortablePromise<RedactionApplyResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<RedactionApplyResult>(async (signal) => {
-      const result = await this.http.postJson(
-        wirePaths.layerRedactionsApply(this.docId, this.layerName),
-        { scope },
-        (raw) => RedactionApplyResultSchema.parse(raw),
-        signal,
-      );
-      // Nothing applied means no artifact and therefore no coherence bump.
-      if (result.meta === null) return result;
-      // Redaction-apply rewrites content and consumes the marks, so both
-      // planes flip.
-      this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishLocal({
-        type: 'redaction.applied',
-        ...result,
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerRedactionsApply(this.docId, this.layerName),
+            scope,
+            (raw) => RedactionApplyResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Nothing applied comes back without a cache delta: no artifact, no
+        // coherence bump, no event.
+        if (result.meta.cacheDelta === null) return result;
+        // Redaction-apply rewrites content and consumes the marks, so both
+        // planes flip.
+        this.manifest.apply(result.meta, ['content', 'annotations', 'forms']);
+        this.publisher.publishWrite(opId, {
+          type: 'redaction.applied',
+          ...result,
+        });
+        return result;
       });
-      return result;
     });
   }
 }

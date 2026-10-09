@@ -110,8 +110,8 @@ export function guardHandle(
     let proxy = cache.get(target);
     if (!proxy) {
       proxy = new Proxy(target, {
-        get(t, property) {
-          return wrapValue(Reflect.get(t, property, t), t);
+        get(proxyTarget, property) {
+          return wrapValue(Reflect.get(proxyTarget, property, proxyTarget), proxyTarget);
         },
       });
       cache.set(target, proxy);

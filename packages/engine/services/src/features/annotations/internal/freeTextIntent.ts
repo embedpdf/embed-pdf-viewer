@@ -5,19 +5,21 @@ import type { FreeTextIntent } from '@embedpdf/engine-core/runtime';
  * wire-stable `FreeTextIntent` strings. Kept in engine-services so
  * engine-core stays PDFium-free.
  *
- *   FreeText           -> 'free-text'         (plain text box)
- *   FreeTextCallout    -> 'free-text-callout' (with /CL leader line)
- *
- * `FreeTextTypeWriter` (a typewriter variant) round-trips as the plain
- * `'free-text'` intent — we don't author it.
+ *   FreeText           -> 'free-text'            (plain text box)
+ *   FreeTextCallout    -> 'free-text-callout'    (with /CL leader line)
+ *   FreeTextTypeWriter -> 'free-text-typewriter' (another app's typewriter)
  */
-const IT_FREE_TEXT = 'FreeText';
-const IT_FREE_TEXT_CALLOUT = 'FreeTextCallout';
+const NAME_BY_INTENT: Record<FreeTextIntent, string> = {
+  'free-text': 'FreeText',
+  'free-text-callout': 'FreeTextCallout',
+  'free-text-typewriter': 'FreeTextTypeWriter',
+};
 
 export function freeTextIntentToName(intent: FreeTextIntent): string {
-  return intent === 'free-text-callout' ? IT_FREE_TEXT_CALLOUT : IT_FREE_TEXT;
+  return NAME_BY_INTENT[intent];
 }
 
 export function freeTextIntentFromName(name: string | null): FreeTextIntent {
-  return name === IT_FREE_TEXT_CALLOUT ? 'free-text-callout' : 'free-text';
+  const found = Object.entries(NAME_BY_INTENT).find(([, candidate]) => candidate === name);
+  return (found?.[0] as FreeTextIntent | undefined) ?? 'free-text';
 }

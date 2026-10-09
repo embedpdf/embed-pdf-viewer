@@ -2,29 +2,38 @@ import { definePlugin } from '@embedpdf/core';
 import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 import { ShellToken } from '@embedpdf/plugin-shell/contract';
 
-import type { CommandsConfig } from './contract';
+import { COMMANDS_DEFAULTS, type CommandsConfig } from './contract';
 import { createCommandsController } from './controller';
 import { CommandsToken } from './host-contract';
-import type { CommandsHostCapability } from './host-contract';
-import { commandsReducer, initialCommandsState } from './model';
-import type { CommandsAction, CommandsState } from './model';
 
 /**
- * The commands plugin: workspace-scoped (one vocabulary for the whole
- * workspace; resolution/execution bind to a target document per call).
- * Definitions live in the INSTANCE's registry — never in the store (they hold
- * functions) and never in the definition (a definition is an immutable recipe
- * that two kernels may share); the store slice holds only `disabledCategories`.
+ * The commands: one set for the whole workspace, each resolved and run for a
+ * document (the one named, else the document in scope, else the active one).
+ * Definitions are settings and app content, never state, since they hold
+ * functions. `config` is the settings the app registers, over
+ * {@link COMMANDS_DEFAULTS}.
  */
-export const commandsPlugin = (config: CommandsConfig = {}) =>
-  definePlugin<CommandsState, CommandsAction, CommandsHostCapability>({
+export const commandsPlugin = (config?: CommandsConfig) =>
+  definePlugin({
     id: 'commands',
     scope: 'workspace',
     token: CommandsToken,
-    // Labels come from i18n and declarative menu/panel targets route through
-    // shell; both are optional — the plugin degrades to raw keys / no routing.
+    // Labels come from i18n, and commands that open a panel, menu or dialog
+    // go through shell; without them a label is the command's own, and those
+    // commands open nothing.
     optional: [I18nToken, ShellToken],
-    initialState: () => initialCommandsState(config.disabledCategories),
-    reduce: commandsReducer,
-    create: (ctx) => ({ api: createCommandsController(ctx, config) }),
+    // Command definitions come from the app and may use any capability.
+    resolvesAnyCapability: true,
+    settings: { defaults: COMMANDS_DEFAULTS, registered: config },
+    create: createCommandsController,
+    // Inside a document's scope, a call that leaves out the document is for that one.
+    inScope: (commands, documentId) => ({
+      ...commands,
+      resolveCommand: (id, target = documentId) => commands.resolveCommand(id, target),
+      listCommands: (target = documentId) => commands.listCommands(target),
+      searchCommands: (query, target = documentId) => commands.searchCommands(query, target),
+      execute: (id, options) =>
+        commands.execute(id, { ...options, documentId: options?.documentId ?? documentId }),
+      canExecute: (id, target = documentId) => commands.canExecute(id, target),
+    }),
   });

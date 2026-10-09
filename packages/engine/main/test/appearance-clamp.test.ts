@@ -1,6 +1,6 @@
 /**
  * Appearance pixel-clamp red line: rendering a page's annotation
- * appearances at an absurd deep-zoom scale must stay BOUNDED — every
+ * appearances at an absurd deep-zoom scale must stay bounded — every
  * raster within the per-appearance ceiling, the whole batch resolving —
  * instead of a page-sized annotation asking the wasm heap for gigabytes
  * (the observed failure: ~600pt stamp × scale ~47 → 3.3 GB malloc → OOM).
@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
+import type { LocalDocumentHandle } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
@@ -29,14 +29,14 @@ const pdfPath = resolve(
 );
 
 let engine: LocalEngine;
-let doc: DocumentHandle;
-let pon: number;
+let doc: LocalDocumentHandle;
+let pageObjectNumber: number;
 
 beforeAll(async () => {
   const bytes = new Uint8Array(await readFile(pdfPath));
   engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   doc = await engine.open({ kind: 'bytes', id: 'clamp-doc', bytes });
-  pon = (await doc.pages.list()).pages[0]!.ref.pageObjectNumber;
+  pageObjectNumber = (await doc.pages.list()).pages[0]!.ref.objectNumber;
 }, 60_000);
 
 afterAll(async () => {
@@ -48,7 +48,9 @@ describe('appearance pixel clamp (wasm engine, real document)', () => {
   test('a deep-zoom appearance batch stays bounded and complete', async () => {
     // Scale ~50 is the territory that OOM'd before the clamp. Raw rasters —
     // node has no canvas encoder, and pixels are what the clamp bounds.
-    const result = await doc.page(toPageRef(pon)).annotations.renderAppearances({ scale: 50 });
+    const result = await doc
+      .page(toPageRef(pageObjectNumber))
+      .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 50 } });
     expect(result.appearances.length).toBeGreaterThan(0);
     for (const ap of result.appearances) {
       expect(ap.raster.width).toBeGreaterThan(0);
@@ -56,11 +58,11 @@ describe('appearance pixel clamp (wasm engine, real document)', () => {
       // The red line: no raster past the per-appearance ceiling (+ rounding slack).
       expect(ap.raster.width * ap.raster.height).toBeLessThanOrEqual(16_000_000 * 1.02);
     }
-    // Small annotations must NOT be over-clamped: at scale 50 at least one
+    // Small annotations must not be over-clamped: at scale 50 at least one
     // appearance should render meaningfully sharper than the page-sized
     // stamp's capped scale (~5.7) would allow relative to its rect.
     const sharp = result.appearances.some((ap) => {
-      const rectW = ap.rect.right - ap.rect.left;
+      const rectW = ap.rect.width;
       return rectW > 0 && ap.raster.width / rectW > 20;
     });
     expect(sharp).toBe(true);

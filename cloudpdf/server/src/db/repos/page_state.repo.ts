@@ -5,9 +5,10 @@ import type { Database as Schema } from '../schema';
 export interface DurablePageRow {
   pageObjectNumber: number;
   contentVersion: number;
+  /** The page's annotations except widgets. */
   annotationVersion: number;
-  annotationGeneration: number;
-  hasWeakAnnotations: boolean;
+  /** The page's widgets. */
+  widgetVersion: number;
   updatedAt: number;
 }
 
@@ -15,8 +16,7 @@ export interface UpsertDurablePageInput {
   pageObjectNumber: number;
   contentVersion?: number;
   annotationVersion?: number;
-  annotationGeneration?: number;
-  hasWeakAnnotations: boolean;
+  widgetVersion?: number;
   updatedAt?: number;
 }
 
@@ -56,8 +56,7 @@ export class DocumentPagesRepo {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion ?? 1,
             annotation_version: page.annotationVersion ?? 1,
-            annotation_generation: page.annotationGeneration ?? 0,
-            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+            widget_version: page.widgetVersion ?? 1,
             updated_at: page.updatedAt ?? now,
           })),
         )
@@ -76,8 +75,7 @@ export class DocumentPagesRepo {
           page_object_number: page.pageObjectNumber,
           content_version: page.contentVersion ?? 1,
           annotation_version: page.annotationVersion ?? 1,
-          annotation_generation: page.annotationGeneration ?? 0,
-          has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+          widget_version: page.widgetVersion ?? 1,
           updated_at: page.updatedAt ?? now,
         })),
       )
@@ -85,42 +83,10 @@ export class DocumentPagesRepo {
         oc.columns(['doc_id', 'page_object_number']).doUpdateSet((eb) => ({
           content_version: eb.ref('excluded.content_version'),
           annotation_version: eb.ref('excluded.annotation_version'),
-          annotation_generation: eb.ref('excluded.annotation_generation'),
-          has_weak_annotations: eb.ref('excluded.has_weak_annotations'),
+          widget_version: eb.ref('excluded.widget_version'),
           updated_at: eb.ref('excluded.updated_at'),
         })),
       )
-      .execute();
-  }
-
-  async bumpAnnotationState(
-    docId: string,
-    pageObjectNumber: number,
-    input: {
-      bumpVersion: boolean;
-      bumpGeneration: boolean;
-      hasWeakAnnotations?: boolean;
-    },
-  ): Promise<void> {
-    const row = await this.db
-      .selectFrom('document_pages')
-      .select(['annotation_version', 'annotation_generation'])
-      .where('doc_id', '=', docId)
-      .where('page_object_number', '=', pageObjectNumber)
-      .executeTakeFirst();
-    if (!row) return;
-    await this.db
-      .updateTable('document_pages')
-      .set({
-        annotation_version: Number(row.annotation_version) + (input.bumpVersion ? 1 : 0),
-        annotation_generation: Number(row.annotation_generation) + (input.bumpGeneration ? 1 : 0),
-        ...(typeof input.hasWeakAnnotations === 'boolean'
-          ? { has_weak_annotations: input.hasWeakAnnotations ? 1 : 0 }
-          : {}),
-        updated_at: Date.now(),
-      })
-      .where('doc_id', '=', docId)
-      .where('page_object_number', '=', pageObjectNumber)
       .execute();
   }
 }
@@ -138,6 +104,8 @@ export interface LayerRow {
   attachmentsVersion: number;
   /** Bulk-annotations pointer — see `LayersTable.annotations_version`. */
   annotationsVersion: number;
+  /** Form pointer — see `LayersTable.forms_version`. */
+  formsVersion: number;
   /** Audit-log head at this layer's state — the manifest's `auditHead`. */
   lastAuditId: number;
   currentVersion: number;
@@ -167,6 +135,7 @@ export interface CreateLayerInput {
   metadataVersion?: number;
   attachmentsVersion?: number;
   annotationsVersion?: number;
+  formsVersion?: number;
 }
 
 export class LayersRepo {
@@ -195,6 +164,7 @@ export class LayersRepo {
         doc_version: input.docVersion ?? 1,
         attachments_version: input.attachmentsVersion ?? 1,
         annotations_version: input.annotationsVersion ?? 1,
+        forms_version: input.formsVersion ?? 1,
         layout_version: input.layoutVersion ?? 1,
         metadata_version: input.metadataVersion ?? 1,
         last_audit_id: 0,
@@ -250,8 +220,7 @@ export class LayerPagesRepo {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion ?? 1,
             annotation_version: page.annotationVersion ?? 1,
-            annotation_generation: page.annotationGeneration ?? 0,
-            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+            widget_version: page.widgetVersion ?? 1,
             updated_at: page.updatedAt ?? now,
           })),
         )
@@ -261,7 +230,7 @@ export class LayerPagesRepo {
 
   /**
    * First materialization of a layer's page rows from the immutable base.
-   * MUST be concurrency-safe across replicas: two replicas whose first-ever
+   * Must be concurrency-safe across replicas: two replicas whose first-ever
    * writes race both observe "no rows yet" and both snapshot — the values
    * are identical (derived from `document_pages`), so the loser's inserts
    * are simply ignored. A delete-then-insert here turns that benign race
@@ -277,12 +246,11 @@ export class LayerPagesRepo {
           layer_id: layerId,
           page_object_number: page.pageObjectNumber,
           // `document_pages` describes the immutable base view, so these
-          // counters are the initial CDN/revision epoch. After snapshotting,
-          // only `layer_pages` advance.
+          // counters are the initial CDN epoch. After snapshotting, only
+          // `layer_pages` advance.
           content_version: page.contentVersion,
           annotation_version: page.annotationVersion,
-          annotation_generation: page.annotationGeneration,
-          has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+          widget_version: page.widgetVersion,
           updated_at: page.updatedAt ?? now,
         })),
       )
@@ -295,16 +263,14 @@ function mapDocumentPageRow(row: {
   page_object_number: number;
   content_version: number;
   annotation_version: number;
-  annotation_generation: number;
-  has_weak_annotations: boolean | number;
+  widget_version: number;
   updated_at: number;
 }): DurablePageRow {
   return {
     pageObjectNumber: Number(row.page_object_number),
     contentVersion: Number(row.content_version),
     annotationVersion: Number(row.annotation_version),
-    annotationGeneration: Number(row.annotation_generation),
-    hasWeakAnnotations: Boolean(row.has_weak_annotations),
+    widgetVersion: Number(row.widget_version),
     updatedAt: Number(row.updated_at),
   };
 }
@@ -313,8 +279,7 @@ function mapLayerPageRow(row: {
   page_object_number: number;
   content_version: number;
   annotation_version: number;
-  annotation_generation: number;
-  has_weak_annotations: boolean | number;
+  widget_version: number;
   updated_at: number;
 }): DurablePageRow {
   return mapDocumentPageRow(row);
@@ -331,6 +296,7 @@ function mapLayerRow(row: {
   metadata_version: number;
   attachments_version: number;
   annotations_version?: number | bigint;
+  forms_version?: number | bigint;
   current_version: number;
   current_artifact_key: string | null;
   current_artifact_sha: string | null;
@@ -350,6 +316,7 @@ function mapLayerRow(row: {
     metadataVersion: Number(row.metadata_version),
     attachmentsVersion: Number(row.attachments_version),
     annotationsVersion: Number(row.annotations_version ?? 1),
+    formsVersion: Number(row.forms_version ?? 1),
     lastAuditId: Number(row.last_audit_id ?? 0),
     currentVersion: Number(row.current_version),
     currentArtifactKey: row.current_artifact_key,

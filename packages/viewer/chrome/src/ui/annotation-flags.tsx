@@ -1,9 +1,9 @@
 /**
- * The annotation FLAGS section — a live test surface for `/F` (ISO 32000
- * Table 167). Select any annotation(s) and toggle flags; the writes go through
- * the plugin's `updateSelectionFlags` (optimistic, flags-only engine patch),
- * and the reads come from `useSelectionFlags` (per-flag value, `null` when the
- * selection disagrees → indeterminate checkbox).
+ * The annotation flags section: a live test surface for `/F` (ISO 32000
+ * Table 167). Select any annotation(s) and toggle flags. Flags are
+ * properties like any other: the reads come from `useAnnotationProperties()`
+ * (a flag the selection disagrees on is `mixed`, an indeterminate checkbox),
+ * and the writes go through `selection.update({ locked: true })`.
  *
  * Things to try:
  *   - `locked`: the selection keeps its outline but loses handles/knob; move,
@@ -16,7 +16,11 @@
  *   - `print`: flip it off and print/flatten elsewhere — the annotation is
  *     excluded (viewer rendering is unaffected).
  */
-import { useAnnotation, useSelectionFlags, type AnnotationFlags } from '@embedpdf/react/annotation';
+import {
+  useAnnotation,
+  useAnnotationProperties,
+  type AnnotationFlags,
+} from '@embedpdf/react/annotation';
 import { useEffect, useRef } from 'react';
 
 const FLAG_ROWS: { key: keyof AnnotationFlags; label: string; hint: string }[] = [
@@ -73,8 +77,10 @@ function FlagRow({
  *  when nothing is selected (the style panel shows its tool defaults then). */
 export function AnnotationFlagsSection() {
   const annotation = useAnnotation();
-  const flags = useSelectionFlags();
-  if (!flags) return null;
+  const { properties, values, mixed } = useAnnotationProperties();
+  if (!properties.length) return null;
+  const valueOf = (key: keyof AnnotationFlags): boolean | null =>
+    mixed.includes(key) ? null : values[key] === true;
   return (
     <section className="border-border mt-2 border-t pt-4">
       <p className="text-fg-muted mb-2 text-[11px] font-semibold uppercase tracking-wide">
@@ -86,8 +92,8 @@ export function AnnotationFlagsSection() {
             key={row.key}
             label={row.label}
             hint={row.hint}
-            value={flags[row.key]}
-            onToggle={(next) => annotation.updateSelectionFlags({ [row.key]: next })}
+            value={valueOf(row.key)}
+            onToggle={(next) => void annotation.selection.update({ [row.key]: next })}
           />
         ))}
       </div>

@@ -5,11 +5,11 @@
  *     GET  /v1/docs/:docId/layers/:layerName/signatures[@docVersion]
  *     GET  /v1/docs/:docId/layers/:layerName/signatures/analysis[@token]
  *   Mutations (current only; never cached):
- *     POST   …/signatures/prepare                 multipart envelope (JSON body + resource:appearance)
+ *     POST   …/signatures/prepare                 multipart (`body`, naming its artwork's `resource:<key>` part)
  *     POST   …/signatures/:signingId/complete     JSON { cms: base64, expectedVersion }
  *     DELETE …/signatures/:signingId
  *   Version-scoped reads (content-addressed by base sha; immutable; the
- *   RESOURCE comes before the sha so each family keeps its own CDN prefix):
+ *   resource comes before the sha so each family keeps its own CDN prefix):
  *     GET  /v1/docs/:docId/versions                                   the catalog (no-store)
  *     GET  /v1/docs/:docId/versions/signatures/:sha
  *     GET  /v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents
@@ -50,17 +50,18 @@ import {
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import {
-  abortSignalFromRequest,
+  abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   setImmutableCache,
   setNoStore,
   type SchemaLike,
 } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
   requireDocAccessOnly,
   requireLayerCapability,
+  requireLayerFieldWrite,
   requireLayerDocAccessOnly,
   requireLayerResource,
   requireResource,
@@ -98,7 +99,7 @@ export async function registerSignatureRoutes(
   ) => service.readLayerSignatures(ctx, docId, layerName, signal);
   // The layer session was opened on base + artifact and has applied every
   // later write in memory (each one persisted as a new artifact): the
-  // layer's state IS the session's working copy, so the analysis
+  // layer's state is the session's working copy, so the analysis
   // snapshots it as one more revision over the loaded bytes.
   const analyzeLayer = (
     ctx: OpenContext,
@@ -130,7 +131,7 @@ export async function registerSignatureRoutes(
       );
     }
     setImmutableCache(reply);
-    return readSignatures(ctx, docId, layerName, abortSignalFromRequest(req));
+    return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures', async (req, reply) => {
@@ -139,7 +140,7 @@ export async function registerSignatureRoutes(
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', pdfBits);
     setNoStore(reply);
-    return readSignatures(ctx, docId, layerName, abortSignalFromRequest(req));
+    return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures/analysis@:token', async (req, reply) => {
@@ -172,7 +173,7 @@ export async function registerSignatureRoutes(
     };
     // No cache header until the worker has answered: an error response must
     // never carry the immutable header the success path earns.
-    const analysis = await analyzeLayer(ctx, docId, layerName, input, abortSignalFromRequest(req));
+    const analysis = await analyzeLayer(ctx, docId, layerName, input, abortSignalOf(reply));
     return finishAnalysisReply(reply, analysis);
   });
 
@@ -194,7 +195,7 @@ export async function registerSignatureRoutes(
       docId,
       layerName,
       analyzeInputFromQuery(query, 'working-copy'),
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -204,43 +205,34 @@ export async function registerSignatureRoutes(
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+    // Whether this field is the token's to sign (its group) is checked in the worker.
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
     // Appearance artwork is a page of a PDF: the stamp rule (sniffed, never declared).
-    const { body, resources } = await readMutationEnvelope(req, () => 'image-or-pdf');
+    const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
     const parsed = parseOrInvalidArg(
       SignaturePrepareBodySchema as unknown as SchemaLike<
         ReturnType<typeof SignaturePrepareBodySchema.parse>
       >,
-      body,
+      envelope.body,
       'request body',
     );
     if (parsed.certify) {
       requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
     }
-    const { appearance, signer, ...rest } = parsed;
+    const { resources: named, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
-    if (!input.attribution && signer) input.attribution = signer;
-    if (appearance) {
-      const resource = resources?.[appearance.resource];
-      if (!resource) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `body references resource '${appearance.resource}' but no such multipart part arrived`,
-        );
-      }
+    const resource = resourcesByRole(envelope, named).appearance;
+    if (resource) {
       if (resource.mimeType !== 'application/pdf') {
         throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
       }
-      input.appearance = {
-        pdf: new Uint8Array(resource.bytes),
-        ...(appearance.pageIndex !== undefined ? { pageIndex: appearance.pageIndex } : {}),
-      };
+      input.appearance = { pdf: new Uint8Array(resource.bytes) };
     }
     setNoStore(reply);
     const prepared = await layerService.prepareSignature(
       ctx,
-      { docId, layerName, input },
-      abortSignalFromRequest(req),
+      { docId, layerName, input, authority: ctx.authority },
+      abortSignalOf(reply),
     );
     return encodePrepared(prepared);
   });
@@ -255,7 +247,9 @@ export async function registerSignatureRoutes(
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+      // Its field was checked when the signing was prepared; the signing id
+      // goes only to whoever prepared it.
+      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
       const body = parseOrInvalidArg(
         SignatureCompleteBodySchema as unknown as SchemaLike<
           ReturnType<typeof SignatureCompleteBodySchema.parse>
@@ -273,7 +267,7 @@ export async function registerSignatureRoutes(
       return layerService.completeSignature(
         ctx,
         { docId, layerName, signingId, cms, expectedVersion: body.expectedVersion },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -286,9 +280,9 @@ export async function registerSignatureRoutes(
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
     setNoStore(reply);
-    return layerService.abortSignature(ctx, { docId, layerName, signingId });
+    return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });
 
   // ---- version-scoped reads -----------------------------------------------
@@ -324,7 +318,13 @@ export async function registerSignatureRoutes(
       ctx,
       docId,
       sha,
-      (sessionId, jobId) => wirePack({ kind: 'signatures.list' as const, jobId, docId: sessionId }),
+      (sessionId, jobId) =>
+        wirePack({
+          kind: 'signatures.list' as const,
+          effect: 'read' as const,
+          jobId,
+          docId: sessionId,
+        }),
       signal,
     );
     if (payload.tag !== 'signatures.list') {
@@ -338,7 +338,7 @@ export async function registerSignatureRoutes(
     const accessCtx = requireDocAccessOnly(req, docId);
     const pdfBits = await bitsForDoc(accessCtx, docId);
     const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
-    const snapshot = await versionSignatures(ctx, docId, requireSha(sha), abortSignalFromRequest(req));
+    const snapshot = await versionSignatures(ctx, docId, requireSha(sha), abortSignalOf(reply));
     setImmutableCache(reply);
     return snapshot;
   });
@@ -358,8 +358,14 @@ export async function registerSignatureRoutes(
       docId,
       requireSha(sha),
       (sessionId, jobId) =>
-        wirePack({ kind: 'signatures.contents' as const, jobId, docId: sessionId, ref }),
-      abortSignalFromRequest(req),
+        wirePack({
+          kind: 'signatures.contents' as const,
+          effect: 'read' as const,
+          jobId,
+          docId: sessionId,
+          ref,
+        }),
+      abortSignalOf(reply),
     );
     if (payload.tag !== 'signatures.contents') {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
@@ -395,12 +401,13 @@ export async function registerSignatureRoutes(
         (sessionId, jobId) =>
           wirePack({
             kind: 'signatures.digest' as const,
+            effect: 'read' as const,
             jobId,
             docId: sessionId,
             ref,
             algorithm: algorithm as DigestAlgorithm,
           }),
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
       if (payload.tag !== 'signatures.digest') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
@@ -433,8 +440,14 @@ export async function registerSignatureRoutes(
       docId,
       requireSha(sha),
       (sessionId, jobId) =>
-        wirePack({ kind: 'signatures.analyze' as const, jobId, docId: sessionId, input }),
-      abortSignalFromRequest(req),
+        wirePack({
+          kind: 'signatures.analyze' as const,
+          effect: 'read' as const,
+          jobId,
+          docId: sessionId,
+          input,
+        }),
+      abortSignalOf(reply),
     );
     if (payload.tag !== 'signatures.analyze') {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
@@ -464,12 +477,7 @@ export async function registerSignatureRoutes(
       );
     }
     const version = await service.requireVersion(ctx, docId, requireSha(sha));
-    const snapshot = await versionSignatures(
-      ctx,
-      docId,
-      version.sha256,
-      abortSignalFromRequest(req),
-    );
+    const snapshot = await versionSignatures(ctx, docId, version.sha256, abortSignalOf(reply));
     const revision = snapshot.revisions[Number(index)];
     if (!revision) {
       throw new EngineError(

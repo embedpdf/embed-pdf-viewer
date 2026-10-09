@@ -1,0 +1,25 @@
+{
+  "fixtureCount": 10,
+  "localTests": {
+    "passed": 20,
+    "failed": 0,
+    "runtimes": [
+      "wasm",
+      "native"
+    ]
+  },
+  "explicitDocMdpP": 3,
+  "allCatalogReferencesVerified": true,
+  "allCmsVerifiedWithOpenSSL": true,
+  "runtimeVerdictParity": true,
+  "acrobatObserved": 3,
+  "note": "Local tests pin current engine behavior and fixture facts. They do not establish Acrobat acceptance.",
+  "acrobatStatus": {
+    "directBaseline": "INVALID certification despite trusted signer",
+    "next": "p3-indirect-control",
+    "interpretation": "Direct baseline and rewrite are invalid; indirect rewrite is valid with permitted changes. Do not attribute direct failure to a later edit. Indirect baseline remains the next comparison.",
+    "directRewrite": "INVALID certification, baseline already invalid",
+    "indirectRewrite": "VALID certification with permitted changes",
+    "indirectBaseline": "unobserved"
+  }
+}

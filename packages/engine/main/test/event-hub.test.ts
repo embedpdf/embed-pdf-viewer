@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest';
 import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
-function metadataEvent(serverId: number | null = null): DocumentEvent {
+function metadataEvent(
+  serverId: number | null = null,
+): Extract<DocumentEvent, { type: 'metadata.updated' }> {
   return {
     type: 'metadata.updated',
     metadata: {
@@ -12,12 +14,11 @@ function metadataEvent(serverId: number | null = null): DocumentEvent {
       keywords: null,
       producer: null,
       creator: null,
-      created: null,
-      modified: null,
+      createdAt: null,
+      modifiedAt: null,
       trapped: 'unknown',
-      custom: {},
     },
-    cache: null,
+    meta: { affectedPages: [], cacheDelta: null },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId },
   };
 }
@@ -49,21 +50,25 @@ describe('EventHub: delivery contract', () => {
     expect(hub.lastServerId()).toBe(7);
   });
 
-  test('publisher stamps a local origin with the session identity', () => {
+  test('publisher stamps a local origin with the session identity and the write', () => {
     const hub = new EventHub(() => {});
     const publisher = new SessionEventPublisher(hub, 'session-x', 'alice');
     const events: DocumentEvent[] = [];
     hub.subscribe((event) => events.push(event));
 
     const { origin: _origin, ...init } = metadataEvent();
-    publisher.publishLocal(init);
+    publisher.publishWrite('op-1', init, init);
 
-    expect(events).toHaveLength(1);
-    expect(events[0].origin).toMatchObject({
-      kind: 'local',
-      sessionId: 'session-x',
-      sub: 'alice',
-      serverId: null,
-    });
+    expect(events).toHaveLength(2);
+    expect(events.map((event) => event.origin)).toMatchObject([
+      {
+        kind: 'local',
+        sessionId: 'session-x',
+        sub: 'alice',
+        serverId: null,
+        tx: { id: 'op-1', index: 0, count: 2 },
+      },
+      { tx: { id: 'op-1', index: 1, count: 2 } },
+    ]);
   });
 });

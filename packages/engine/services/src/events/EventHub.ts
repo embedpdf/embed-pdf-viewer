@@ -1,14 +1,17 @@
+import { subscribeToType } from '@embedpdf/engine-core/runtime';
 import type {
   DocumentEvent,
   DocumentEventInit,
+  DocumentEventOf,
   DocumentEventStream,
+  DocumentEventType,
 } from '@embedpdf/engine-core/runtime';
 
 /**
  * The in-process implementation of `DocumentEventStream`, shared by both
  * engine shells (one hub per open `DocumentHandle`). The engine that
  * performs a mutation publishes here at confirmation time; the cloud
- * engine's remote channel will also publish here for OTHER sessions'
+ * engine's remote channel will also publish here for other sessions'
  * mutations — listeners never learn which transport delivered an event.
  *
  * Delivery contract:
@@ -38,6 +41,13 @@ export class EventHub implements DocumentEventStream {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  on<T extends DocumentEventType>(
+    type: T,
+    listener: (event: DocumentEventOf<T>) => void,
+  ): () => void {
+    return subscribeToType((all) => this.subscribe(all), type, listener);
   }
 
   publish(event: DocumentEvent): void {
@@ -83,17 +93,34 @@ export class SessionEventPublisher {
     private readonly sub: string | null = null,
   ) {}
 
-  /** Publish a mutation THIS engine instance just confirmed. */
-  publishLocal(event: DocumentEventInit): void {
-    this.hub.publish({
-      ...event,
-      origin: {
-        kind: 'local',
-        sessionId: this.sessionId,
-        sub: this.sub,
-        ts: Date.now(),
-        serverId: null,
-      },
-    } as DocumentEvent);
+  /**
+   * Publish what one write of this session just committed: one
+   * event per fact, in order, all carrying the write's `opId` as
+   * `origin.tx`.
+   */
+  publishWrite(opId: string, ...events: DocumentEventInit[]): void {
+    this.publishChange(opId, events);
+  }
+
+  /**
+   * Publish what one change committed: its events as {@link publishWrite}
+   * does, and for an undo, the `opId` of the change it undid.
+   */
+  publishChange(opId: string, events: readonly DocumentEventInit[], undoOf?: string): void {
+    const ts = Date.now();
+    events.forEach((event, index) => {
+      this.hub.publish({
+        ...event,
+        origin: {
+          kind: 'local',
+          sessionId: this.sessionId,
+          sub: this.sub,
+          ts,
+          serverId: null,
+          tx: { id: opId, index, count: events.length },
+          ...(undoOf !== undefined ? { undoOf } : {}),
+        },
+      } as DocumentEvent);
+    });
   }
 }

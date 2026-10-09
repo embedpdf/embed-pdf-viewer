@@ -8,7 +8,6 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
-  serializeError,
   subtypeFromCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -18,24 +17,24 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { I32_BYTES, readI32 } from '../../runtime/memory/structs';
 import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
-import { AnnotationReader } from '../annotations';
 import { resolveAnnotPtr } from '../annotations/internal/identity/resolveAnnotationPointer';
+import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
 
 /**
  * The destructive half of redaction (see `DocumentRedactionService` for the
  * model and the layer trust boundary). Content and annotation liveness
- * change together, exactly like {@link PagesFlattener} — this class mirrors
- * its validate-then-apply boundary and ordered-batch semantics.
+ * change together, exactly like {@link PagesFlattener}: all or nothing, so a
+ * page that fails, or a cancel, aborts the whole apply.
  *
  * Scope semantics:
- *   - `pages`: every REDACT annotation on each listed page is applied; a
+ *   - `pages`: every redact annotation on each listed page is applied; a
  *     page with none is `unchanged`.
- *   - `annotations`: exactly the referenced REDACT annotations are applied.
- *     Every ref is resolved and subtype-checked BEFORE the first native
- *     write; a non-REDACT ref rejects the whole call with `InvalidArg`.
+ *   - `annotations`: exactly the referenced redact annotations are applied.
+ *     Every ref is resolved and subtype-checked before the first native
+ *     write; a non-redact ref rejects the whole call with `InvalidArg`.
  *
  * The per-page `removedAnnotationCount` is the native collateral count:
- * annotations other than REDACT ones removed alongside the apply (popup
+ * annotations other than redact ones removed alongside the apply (popup
  * cascades and detached widgets included).
  */
 export class RedactionApplier {
@@ -57,20 +56,14 @@ export class RedactionApplier {
     const results: RedactionApplyResult['results'] = [];
     const affected = new Set<PageObjectNumber>();
     let totalRemoved = 0;
-    let stop = false;
 
     for (const [pageObjectNumber, refs] of plan) {
-      if (stop || (signal.aborted && affected.size > 0)) {
-        stop = true;
-        results.push({
-          page: toPageRef(pageObjectNumber),
-          status: 'skipped',
-          removedAnnotationCount: 0,
-        });
-        continue;
+      throwIfAborted(signal);
+      // A redaction removes entries from /Annots; promotion keeps every
+      // position.
+      if (promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber)) {
+        affected.add(pageObjectNumber);
       }
-      if (signal.aborted) throwIfAborted(signal);
-
       const pool = this.session.pagePool();
       const pagePtr = pool.acquire(pageObjectNumber);
       try {
@@ -86,51 +79,32 @@ export class RedactionApplier {
           status: outcome.status,
           removedAnnotationCount: outcome.removed,
         });
-      } catch (error) {
-        affected.add(pageObjectNumber);
-        results.push({
-          page: toPageRef(pageObjectNumber),
-          status: 'failed',
-          removedAnnotationCount: 0,
-          error: serializeError(error),
-        });
-        stop = true;
       } finally {
         pool.release(pageObjectNumber);
       }
     }
 
     if (affected.size === 0) {
-      return { scope, results, removedAnnotationCount: totalRemoved, meta: null };
+      const meta: MutationMeta = { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() };
+      return { scope, results, removedAnnotationCount: totalRemoved, meta };
     }
 
-    this.session.noteMutation();
-    for (const pageObjectNumber of affected) {
-      this.session.bumpRevision(pageObjectNumber);
-      try {
-        // Recompute the weak-annotation flag from the annotations that remain.
-        new AnnotationReader(this.runtime, this.session).list(pageObjectNumber, signal);
-      } catch {
-        // The page state remains conservatively unknown. Never lose the layer
-        // artifact because a post-apply diagnostic read failed.
-      }
-    }
+    this.session.invalidateDerived();
     const meta: MutationMeta = {
-      affectedPages: [...affected].map((pageObjectNumber) =>
-        this.session.pageState(pageObjectNumber),
-      ),
+      affectedPages: [...affected].map((pageObjectNumber) => toPageRef(pageObjectNumber)),
       cacheDelta: null,
+      ...this.session.writeStamp(),
     };
     return { scope, results, removedAnnotationCount: totalRemoved, meta };
   }
 
   /**
    * Normalize the scope into an ordered per-page plan. `null` refs means
-   * "every REDACT annotation on the page" (the `pages` scope).
+   * "every redact annotation on the page" (the `pages` scope).
    */
   private buildPlan(scope: RedactionApplyScope): Map<PageObjectNumber, AnnotationRef[] | null> {
     const plan = new Map<PageObjectNumber, AnnotationRef[] | null>();
-    if (scope.kind === 'pages') {
+    if ('pages' in scope) {
       if (this.session.resolvePageRefs(scope.pages).length === 0) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
@@ -149,37 +123,26 @@ export class RedactionApplier {
       return plan;
     }
 
-    if (scope.refs.length === 0) {
+    if (scope.annotations.length === 0) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         'redaction.apply requires at least one annotation ref',
       );
     }
-    for (const ref of scope.refs) {
-      const existing = plan.get(ref.page.pageObjectNumber);
+    for (const ref of scope.annotations) {
+      const existing = plan.get(ref.page.objectNumber);
       if (existing === null) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'mixed redaction scopes on one page');
       }
       if (existing) existing.push(ref);
-      else plan.set(ref.page.pageObjectNumber, [ref]);
-    }
-    // Applying removes annotations, which shifts positional indices — a
-    // batch of multiple refs on one page can only address the survivors
-    // stably through durable ref kinds.
-    for (const [pageObjectNumber, refs] of plan) {
-      if (refs !== null && refs.length > 1 && refs.some((r) => r.kind === 'index')) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `multiple redactions on page ${pageObjectNumber} cannot be addressed by positional 'index' refs — use objectNumber/nm refs, or one apply call per index ref`,
-        );
-      }
+      else plan.set(ref.page.objectNumber, [ref]);
     }
     return plan;
   }
 
   /**
-   * Validate every ref BEFORE the first native write: it must resolve and
-   * it must be a REDACT annotation. After this returns, the apply loop's
+   * Validate every ref before the first native write: it must resolve and
+   * it must be a redact annotation. After this returns, the apply loop's
    * writes begin and per-page failures are recorded, not thrown.
    */
   private preflight(
@@ -219,7 +182,7 @@ export class RedactionApplier {
     return withScratch(mem, I32_BYTES, (countPtr) => {
       const ok = fn.EPDFPage_ApplyRedactions(pagePtr, countPtr);
       if (!ok) {
-        // Native FALSE is overloaded: it means either "no REDACT annotations"
+        // Native false is overloaded: it means either "no redact annotations"
         // or that applying one failed. Distinguish those cases before the
         // destructive call so a sanitizer failure is never reported as an
         // unchanged page.
@@ -255,8 +218,8 @@ export class RedactionApplier {
     let removed = 0;
     for (const ref of refs) {
       // Re-resolve at apply time: an earlier apply on this page may have
-      // removed collateral annotations, and durable refs stay valid across
-      // that (preflight rejected fragile batched index refs).
+      // removed collateral annotations, and names stay valid across that
+      // (the page was promoted first).
       const annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
       try {
         const ok = withScratch(mem, I32_BYTES, (countPtr) => {

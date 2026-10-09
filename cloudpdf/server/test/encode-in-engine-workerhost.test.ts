@@ -17,11 +17,11 @@ import { SharpImageEncoder } from '../src/render/SharpImageEncoder';
  *
  * The route-level suite (`encode-in-engine.test.ts`) runs against the stub
  * worker, which reimplements the encoded kinds; this file dispatches them
- * through the REAL `WorkerHost` with the REAL native PDFium runtime and
- * the REAL sharp injection worker-entry uses — the exact production code
+ * through the real `WorkerHost` with the real native PDFium runtime and
+ * the real sharp injection worker-entry uses — the exact production code
  * path minus the worker_threads transport (whose transferable plumbing is
  * generic across kinds and covered by the stub suites). Notably it pins
- * the TRANSFER MANIFEST: the resolve envelope must transfer exactly the
+ * the transfer manifest: the resolve envelope must transfer exactly the
  * encoded image's own buffer.
  *
  * Requires the native engine binary for this platform (a hard server
@@ -118,6 +118,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     const docId = 'real-doc';
     await resolved({
       kind: 'open.layerFileBase',
+      effect: 'open',
       jobId: nextJob++,
       docId,
       baseKey: 'sha-min',
@@ -125,18 +126,20 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
       layer: { kind: 'fresh' },
       password: null,
     });
-    const list = (await resolved({ kind: 'pages.list', jobId: nextJob++, docId })).result as {
+    const list = (await resolved({ kind: 'pages.list', effect: 'read', jobId: nextJob++, docId }))
+      .result as {
       tag: string;
-      snapshot: { pages: Array<{ ref: { pageObjectNumber: number } }> };
+      snapshot: { pages: Array<{ ref: { objectNumber: number } }> };
     };
     expect(list.tag).toBe('pages.list');
-    const pon = list.snapshot.pages[0]!.ref.pageObjectNumber;
+    const pageObjectNumber = list.snapshot.pages[0]!.ref.objectNumber;
 
     const { result, transfer } = await resolved({
       kind: 'pages.renderEncoded',
+      effect: 'read',
       jobId: nextJob++,
       docId,
-      page: toPageRef(pon),
+      page: toPageRef(pageObjectNumber),
       options: { viewport: { kind: 'width', width: 120 } },
       encode: { format: 'webp' },
     });
@@ -149,7 +152,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     expect(payload.image.width).toBe(120);
     expect(payload.image.height).toBe(60); // 200×100 page at width 120
     expect(isWebp(payload.image.bytes)).toBe(true);
-    // The transfer manifest must transfer the image's OWN buffer — the
+    // The transfer manifest must transfer the image's own buffer — the
     // zero-copy contract the whole payload win rests on.
     expect(transfer).toHaveLength(1);
     expect(transfer[0]).toBe(payload.image.bytes.buffer);
@@ -159,9 +162,10 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     const png = (
       await resolved({
         kind: 'pages.renderEncoded',
+        effect: 'read',
         jobId: nextJob++,
         docId,
-        page: toPageRef(pon),
+        page: toPageRef(pageObjectNumber),
         options: { viewport: { kind: 'width', width: 120 } },
         encode: { format: 'png' },
       })
@@ -173,6 +177,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
   test('document.renderPageFileEncoded: ad-hoc file render encodes in-worker', async () => {
     const { result, transfer } = await resolved({
       kind: 'document.renderPageFileEncoded',
+      effect: 'read',
       jobId: nextJob++,
       path: pdfPath,
       password: null,
@@ -182,13 +187,13 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     });
     const payload = result as {
       tag: string;
-      page: { pageObjectNumber: number };
+      page: { objectNumber: number };
       pageCount: number;
       image: { bytes: Uint8Array };
     };
     expect(payload.tag).toBe('document.renderPageFileEncoded');
     expect(payload.pageCount).toBe(1);
-    expect(payload.page.pageObjectNumber).toBeGreaterThan(0);
+    expect(payload.page.objectNumber).toBeGreaterThan(0);
     expect(isWebp(payload.image.bytes)).toBe(true);
     expect(transfer[0]).toBe(payload.image.bytes.buffer);
   }, 30_000);
@@ -196,6 +201,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
   test('annotations.renderAppearancesEncoded: async path resolves an empty batch on a blank page', async () => {
     const { result, transfer } = await resolved({
       kind: 'annotations.renderAppearancesEncoded',
+      effect: 'read',
       jobId: nextJob++,
       docId: 'real-doc',
       page: toPageRef(3), // the page object of the minimal PDF

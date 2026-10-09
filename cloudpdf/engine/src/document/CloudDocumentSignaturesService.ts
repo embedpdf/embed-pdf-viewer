@@ -1,4 +1,5 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
@@ -7,16 +8,17 @@ import {
   type DigestAlgorithm,
   type DocumentSignaturesService,
   type FormFieldRef,
-  type SignatureAbortResult,
+  type SignatureCancelResult,
   type SignatureCompleteInput,
   type SignatureCompleteResult,
   type SignaturePrepareInput,
   type SignaturePrepared,
   type SignatureSnapshot,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   ChangeAnalysisSchema,
-  SignatureAbortResultSchema,
+  SignatureCancelResultSchema,
   SignatureCompleteResultSchema,
   SignaturePreparedWireSchema,
   SignatureSnapshotSchema,
@@ -26,18 +28,19 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
-import { buildMutationForm } from './buildMutationForm';
+import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
  * Cloud-side digital signatures. Two kinds of read, two kinds of URL:
  *
- *   - The LAYER view (`list`, and `analyze` of the working copy) is pinned
+ *   - The layer view (`list`, and `analyze` of the working copy) is pinned
  *     by the manifest's `docVersion`, like every other layer read: a
  *     signature is a layer state change, the immutable URL moves with it.
- *   - Signed BYTES (`contents`, `digest`, `revisionBytes`, and `analyze`
- *     of history) belong to a base VERSION and are content-addressed by
+ *   - Signed bytes (`contents`, `digest`, `revisionBytes`, and `analyze`
+ *     of history) belong to a base version and are content-addressed by
  *     the manifest's `baseSha`: immutable forever, shared by every layer
  *     and every caller.
  *
@@ -54,6 +57,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
   list(): AbortablePromise<SignatureSnapshot> {
@@ -74,7 +78,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     );
   }
 
-  contents(field: FormFieldRef): AbortablePromise<Uint8Array> {
+  getContents(field: FormFieldRef): AbortablePromise<Uint8Array> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<Uint8Array>(async (signal) => {
@@ -87,7 +91,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  digest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
+  getDigest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<Uint8Array>(async (signal) => {
@@ -100,7 +104,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  revisionBytes(revisionIndex: number): AbortablePromise<Uint8Array> {
+  downloadRevision(revisionIndex: number): AbortablePromise<Uint8Array> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<Uint8Array>(async (signal) => {
@@ -113,18 +117,17 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
   }
 
   /**
-   * `until: 'working-copy'` (or unset while the layer holds edits) judges
-   * the layer's pending edits against the base at the layer URL; anything
-   * else is history of the base version and resolves at the version URL.
+   * `until: 'working-copy'` judges the layer's pending edits against the
+   * base at the layer URL; anything else, the default `'persisted'`
+   * included, is history of the base version and resolves at the version
+   * URL (the saved file, as the local engine judges by default).
    */
   analyze(input: AnalyzeInput): AbortablePromise<ChangeAnalysis> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<ChangeAnalysis>(async (signal) => {
       const manifest = await this.manifest.get(signal);
-      const workingCopy =
-        input.until === 'working-copy' || (input.until === undefined && manifest.working);
-      if (workingCopy) {
+      if (input.until === 'working-copy') {
         return this.http.getJsonWithRefresh(
           async (s) => {
             const current = await this.manifest.get(s);
@@ -159,92 +162,99 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  prepare(input: SignaturePrepareInput): AbortablePromise<SignaturePrepared> {
+  prepare(
+    input: SignaturePrepareInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignaturePrepared> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<SignaturePrepared>(async (signal) => {
-      const { appearance, ...rest } = input;
-      const body = {
-        ...rest,
-        ...(appearance
-          ? {
-              appearance: {
-                resource: 'appearance',
-                ...(appearance.pageIndex !== undefined ? { pageIndex: appearance.pageIndex } : {}),
-              },
-            }
-          : {}),
-      };
-      const form = buildMutationForm(
-        body,
-        appearance
-          ? {
-              appearance: {
-                bytes: appearance.pdf.slice().buffer as ArrayBuffer,
-                mimeType: 'application/pdf',
-                name: 'appearance.pdf',
-              },
-            }
-          : {},
-      );
-      const prepared = await this.http.postMultipartJson(
-        wirePaths.layerSignaturesPrepare(this.docId, this.layerName),
-        form,
-        (raw) => decodePrepared(SignaturePreparedWireSchema.parse(raw)),
-        signal,
-      );
-      // Prepare is a layer write (layerVersion, working, docVersion moved)
-      // that returns no mutation envelope: refresh, don't guess.
-      await this.manifest.refresh(signal);
-      this.publisher.publishLocal({
-        type: 'signature.prepared',
-        signingId: prepared.signingId,
-        field: input.field,
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const { appearance, ...rest } = input;
+        const form = buildRoleMutationForm(rest, {
+          appearance: appearance && {
+            bytes: appearance.pdf.slice().buffer as ArrayBuffer,
+            mimeType: 'application/pdf',
+            name: 'appearance.pdf',
+          },
+        });
+        const prepared = await write.send((sent) =>
+          this.http.postMultipartJson(
+            wirePaths.layerSignaturesPrepare(this.docId, this.layerName),
+            form,
+            (raw) => decodePrepared(SignaturePreparedWireSchema.parse(raw)),
+            signal,
+            sent,
+          ),
+        );
+        // Prepare is a layer write (layerVersion, working, docVersion moved)
+        // that returns no mutation envelope: refresh, don't guess.
+        await this.manifest.refresh(signal);
+        this.publisher.publishWrite(opId, {
+          type: 'signatures.prepared',
+          field: input.field,
+          ...prepared,
+        });
+        return prepared;
       });
-      return prepared;
     });
   }
 
-  complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult> {
+  complete(
+    input: SignatureCompleteInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignatureCompleteResult> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<SignatureCompleteResult>(async (signal) => {
-      const result = await this.http.postJson(
-        wirePaths.layerSignatureComplete(this.docId, this.layerName, input.signingId),
-        { cms: toBase64(input.cms), expectedVersion: input.expectedVersion },
-        (raw) => SignatureCompleteResultSchema.parse(raw),
-        signal,
-      );
-      // A publish changes the whole manifest in substance (baseSha,
-      // baseByteLength, layerVersion, working, every promoted page pin, the
-      // plane pointers, the scopes): refresh on `completed` and on a
-      // replay alike, then announce the new version.
-      await this.manifest.refresh(signal);
-      if (result.status === 'completed') {
-        this.publisher.publishLocal({
-          type: 'signature.completed',
-          signingId: input.signingId,
-          ...result,
-        });
-        this.publisher.publishLocal({ type: 'document.versioned', version: result.version });
-      }
-      return result;
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerSignatureComplete(this.docId, this.layerName, input.signingId),
+            { cms: toBase64(input.cms), expectedVersion: input.expectedVersion },
+            (raw) => SignatureCompleteResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // A publish changes the whole manifest in substance (baseSha,
+        // baseByteLength, layerVersion, working, every promoted page pin, the
+        // plane pointers, the scopes): refresh on `completed` and on a
+        // replay alike, then announce the new version.
+        await this.manifest.refresh(signal);
+        if (result.status === 'completed') {
+          this.publisher.publishWrite(
+            opId,
+            { type: 'signatures.completed', signingId: input.signingId, ...result },
+            { type: 'document.versioned', version: result.version },
+          );
+        }
+        return result;
+      });
     });
   }
 
-  abort(signingId: string): AbortablePromise<SignatureAbortResult> {
+  cancel(signingId: string, options?: WriteOptions): AbortablePromise<SignatureCancelResult> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
-    return AbortablePromise.run<SignatureAbortResult>(async (signal) => {
-      const result = await this.http.deleteJson(
-        wirePaths.layerSignatureAbort(this.docId, this.layerName, signingId),
-        (raw) => SignatureAbortResultSchema.parse(raw),
-        signal,
-      );
-      if (result.status === 'aborted') {
-        this.publisher.publishLocal({ type: 'signature.aborted', signingId });
-      }
-      return result;
+    return AbortablePromise.run<SignatureCancelResult>(async (signal) => {
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.deleteJson(
+            wirePaths.layerSignatureCancel(this.docId, this.layerName, signingId),
+            (raw) => SignatureCancelResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        if (result.status === 'cancelled') {
+          this.publisher.publishWrite(opId, { type: 'signatures.cancelled', signingId });
+        }
+        return result;
+      });
     });
   }
 
@@ -263,14 +273,10 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       signal,
     );
     const match = snapshot.signatures.find(
-      (s) =>
-        s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === field.fieldObjectNumber,
+      (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === field.objectNumber,
     );
     if (!match) {
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `no signature field #${field.fieldObjectNumber}`,
-      );
+      throw new EngineError(EngineErrorCode.NotFound, `no signature field #${field.objectNumber}`);
     }
     return match.fieldName;
   }

@@ -1,5 +1,5 @@
 /**
- * Node-ONLY target detection. `detect-libc` (musl vs glibc for the native
+ * Node-only target detection. `detect-libc` (musl vs glibc for the native
  * addons) requires Node builtins at module load, so this file may only appear
  * in the `node` export condition's graph — never in the browser entry.
  */

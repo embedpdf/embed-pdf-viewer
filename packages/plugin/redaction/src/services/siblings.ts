@@ -1,4 +1,4 @@
-/** The sibling planes: the annotation plugin (required, host lens), the selection and search plugins (optional). */
+/** The sibling plugins: annotation (required, host lens), selection and search (optional). */
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
 import { SearchToken } from '@embedpdf/plugin-search/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';

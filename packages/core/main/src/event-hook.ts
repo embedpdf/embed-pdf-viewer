@@ -1,7 +1,7 @@
 import type { Unsubscribe } from './types';
 
 /**
- * Subscribe-only face of a plugin event — the ONE event shape a capability
+ * Subscribe-only face of a plugin event — the one event shape a capability
  * exposes (`onX: EventHook<XEvent>`). Events carry occurrences, never state:
  * a late subscriber that needs the current value uses a query + selector
  * instead. Payloads are plain serializable objects.

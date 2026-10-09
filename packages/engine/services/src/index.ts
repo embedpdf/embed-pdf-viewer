@@ -1,7 +1,7 @@
 /**
  * @embedpdf/engine-services - synchronous, runtime-agnostic PDF runtime service
- * implementations shared by every Engine v3 host (browser worker, server
- * worker_thread, future direct-thread embedding).
+ * implementations shared by every engine host (browser worker, server
+ * worker_thread).
  *
  * Layout (strict downward dependency):
  *   runtime/           — low-level @embedpdf/engine-runtime helpers
@@ -23,7 +23,7 @@ export {
 } from './shared/securityPermissions';
 
 // Engine-shell shared: the in-process DocumentEventStream implementation.
-// Lives on the MAIN thread next to the DocumentHandle (not in the worker
+// Lives on the main thread next to the DocumentHandle (not in the worker
 // tiers): the engine that performs a mutation publishes at confirmation time.
 export { EventHub, SessionEventPublisher } from './events/EventHub';
 
@@ -39,10 +39,6 @@ export {
   type OpenedPdfDocument,
   type OpenedPdfDocumentKind,
 } from './document-session/lifecycle/PdfDocumentOpener';
-export {
-  LocalRevisionAuthority,
-  type RevisionAuthority,
-} from './document-session/revisions/RevisionAuthority';
 export { PagePtrPool } from './document-session/pages/PagePtrPool';
 export type { PageRecord } from './document-session/pages/PageRecord';
 
@@ -55,6 +51,7 @@ export * from './features/geometry';
 export { EPDF_CHAR_GEOMETRY_LAYOUT } from './runtime/memory/structs';
 export * from './features/render';
 export * from './features/annotations';
+export * from './features/changes';
 export * from './features/attachments';
 export * from './features/security';
 export * from './features/save';

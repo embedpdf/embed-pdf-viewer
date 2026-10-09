@@ -26,9 +26,12 @@ export interface FinalizeCandidateInput {
 }
 
 export interface FinalizedCandidate {
+  /** In page space: no session outlives the finalize to measure it later. */
   signature: SignatureDTO;
   protection: DocumentProtection;
   version: BaseVersionInfo;
+  /** The sealed file's last object number: every object it has is at or below it. */
+  lastObjectNumber: number;
 }
 
 /**
@@ -99,10 +102,14 @@ export class CandidateFinalizer {
       const reader = new SignatureReader(this.runtime, session);
       const snapshot = reader.readSnapshot();
       const signature = snapshot.signatures.find(
-        (s) =>
-          s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === input.fieldObjectNumber,
+        (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === input.fieldObjectNumber,
       )!;
-      return { signature, protection: snapshot.protection, version: reader.version() };
+      return {
+        signature,
+        protection: snapshot.protection,
+        version: reader.version(),
+        lastObjectNumber: session.lastObjectNumber(),
+      };
     } finally {
       // Releases the base acquisition through the handle's close stack.
       session.close();

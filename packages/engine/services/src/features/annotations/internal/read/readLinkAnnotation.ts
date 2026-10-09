@@ -1,20 +1,22 @@
 import type {
   AnnotationBase,
-  LinkAnnotationDTO,
+  LinkAnnotation,
   PdfActionTree,
+  PdfDestination,
   PdfLinkTarget,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readDestination } from '../../../destinations/readDestination';
 import type { AnnotationReadContext } from './annotationReadContext';
+import { readDestination } from '../../../destinations/readDestination';
 
 /**
  * Link reader: rect/flags/relationship ride the base (a link grouped to an
  * annotation is plain `inReplyTo` + `replyType: 'group'`); this module only
  * materialises the normalized target.
  *
- * ONE truth, one projection: the target is a pure function of the SAME
+ * One truth, one projection: the target is a pure function of the same
  * payload-carrying action tree the scripting plane reads
  * (`base.actions.activate`) — no second native read exists any more, so the
  * two action-shaped surfaces cannot drift by construction.
@@ -23,16 +25,16 @@ import type { AnnotationReadContext } from './annotationReadContext';
  * executed (an `incomplete` tree, a degraded/unreadable root) projects
  * `unsupported` — a broken action is a dead link, never an invitation to
  * guess. The direct `/Dest` (which is data, not an action) is consulted
- * ONLY when no `/A` exists at all.
+ * only when no `/A` exists at all.
  */
 export function readLink(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
+  base: AnnotationBase<PdfCoordinates>,
   _rawSubtypeCode: number,
   ctx: AnnotationReadContext,
-): LinkAnnotationDTO {
+): LinkAnnotation<PdfCoordinates> {
   return { ...base, subtype: 'link', target: readLinkTarget(fn, mem, annotPtr, base, ctx) };
 }
 
@@ -41,7 +43,9 @@ export function readLink(
  * shared with any consumer that wants the root-level navigation reading of a
  * tree (the link plugin's no-actions-plugin fallback uses the same law).
  */
-export function linkTargetFromActionTree(tree: PdfActionTree): PdfLinkTarget | null {
+export function linkTargetFromActionTree(
+  tree: PdfActionTree<PdfDestination>,
+): PdfLinkTarget<PdfDestination> | null {
   // The law, enforced at the projection too: never execute — not even
   // navigate the root of — a tree marked incomplete.
   if (tree.incomplete) return { kind: 'unsupported' };
@@ -72,9 +76,9 @@ function readLinkTarget(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
+  base: AnnotationBase<PdfCoordinates>,
   ctx: AnnotationReadContext,
-): PdfLinkTarget | null {
+): PdfLinkTarget<PdfDestination> | null {
   const activate = base.actions?.activate;
   if (activate) return linkTargetFromActionTree(activate);
 

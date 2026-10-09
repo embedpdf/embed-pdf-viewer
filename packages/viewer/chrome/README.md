@@ -262,7 +262,7 @@ el.addEventListener('epdf:ready', () => {
 
   viewer.watch(
     // the one primitive
-    () => annotation.getSelectionProps(),
+    () => annotation.getSelectionFields(),
     (props) => myPanel.render(props),
   );
   viewer.documents.list(); // the tab model
@@ -270,8 +270,8 @@ el.addEventListener('epdf:ready', () => {
 ```
 
 Rule of thumb: **buttons speak commands; code speaks capabilities.** The
-token re-export list in `index.ts` is the public-API act — internal lenses
-(`/internal` entries) are structurally absent from delivery bundles. Coarse
+token re-export list in `index.ts` is the public-API act — host lenses
+(`/contract/host` entries) are structurally absent from delivery bundles. Coarse
 DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 
 ### Theme — match your brand
@@ -279,16 +279,21 @@ DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 ```tsx
 theme={{
   preference: 'system',
-  tokens: { accent: '#7c3aed', 'accent-hover': '#6d28d9' },  // both modes
-  dark: { accent: '#a78bfa' },                               // dark overrides
+  tokens: { accent: '#7c3aed', surface: '#fdfcff' }, // both modes
+  dark: { accent: '#a78bfa' },                       // dark overrides
 }}
 ```
 
-Token names are the `--ep-*` variables in `styles.css` without the prefix —
-the prefix exists because custom properties inherit through shadow boundaries,
-so unprefixed names could collide with the host page. The custom element
-adopts the overrides into its shadow root; direct consumers of this package
-just set the `--ep-*` variables in their own CSS.
+Token names are the variables in `styles.css` without their prefix. The
+light and dark themes set EmbedPDF's own theming variables (`--epdf-accent`,
+`--epdf-scrollbar-thumb`, `--epdf-toolbar-*`, the headless docs' "Colors &
+theming" list), so `accent` themes the pages and the chrome together: the
+chrome's hover, pressed and tinted shades are mixed from it. Every other name
+is one of the chrome's own `--ep-*` tokens. The prefixes exist because custom
+properties inherit through shadow boundaries, so unprefixed names could
+collide with the host page. The custom element adopts the overrides into its
+shadow root; direct consumers of this package just set the variables in their
+own CSS.
 
 ### Restyle — reshape built-ins with page CSS
 
@@ -319,23 +324,37 @@ picked goes in. The Form tab authors signature fields.
 What placing a mark on a field does is the `signatures` config:
 
 ```tsx
-import { FullViewer, personalSigner, indexedDbKeyStore } from '@embedpdf/viewer-chrome';
+import {
+  FullViewer,
+  personalSigner,
+  indexedDbKeyStore,
+} from '@embedpdf/viewer-chrome';
 
 <FullViewer
   engine={engine}
   signatures={{
-    // The key holder: your own key (`webCryptoSigner`), a signing service
+    // The key: your own (`webCryptoSigner`), a signing service
     // (`remoteSigner`), or one self-signed identity per person kept in the
-    // browser (`personalSigner`). Without a signer the mark is only DRAWN
+    // browser (`personalSigner`). Without a key the mark is only DRAWN
     // into the field — nothing is sealed.
-    signer: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('acme-keys') }),
+    key: () =>
+      personalSigner({
+        subject: 'Ada Lovelace',
+        store: indexedDbKeyStore('acme-keys'),
+      }),
     // Anchors a reader trusts; none → "valid, signer not trusted" at best.
     trust: { anchors: async () => [rootCertificateDer] },
-    // 'sign' (default with a signer) | 'visual' (default without) | 'ask' (a dialog first)
+    // 'sign' (default with a key) | 'visual' (default without) | 'ask' (a dialog first)
     mode: 'ask',
     allowCertify: true, // offer a certification (first signature) in the dialog
     kinds: ['signature'], // no initials
-    fonts: [{ key: 'great-vibes', url: '/fonts/GreatVibes.ttf', label: 'Great Vibes' }], // typed marks
+    fonts: [
+      {
+        key: 'great-vibes',
+        url: '/fonts/GreatVibes.ttf',
+        label: 'Great Vibes',
+      },
+    ], // typed marks
   }}
   stamps={{
     sidebar: ['stamps'], // library kinds the stamps sidebar lists

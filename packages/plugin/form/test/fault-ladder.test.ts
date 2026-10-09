@@ -11,18 +11,23 @@ import {
 } from '@embedpdf/core-acrojs';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import {
+  formWidget,
   toPageRef,
   type DocumentHandle,
   type FormEffect,
   type FormFieldDTO,
   type FormSnapshot,
+  type PageLayout,
   type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
 import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
-const ref = (fieldObjectNumber: number) => ({ kind: 'objectNumber' as const, fieldObjectNumber });
+const ref = (fieldObjectNumber: number) => ({
+  kind: 'objectNumber' as const,
+  objectNumber: fieldObjectNumber,
+});
 
 const action = (script: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
@@ -38,13 +43,21 @@ const text = (
   actions?: FormFieldDTO['actions'],
 ): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
-  fieldObjectNumber,
   name,
   family: 'text',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'scalar', value },
   defaultValueEntry: { kind: 'scalar', value: '' },
   value,
@@ -53,7 +66,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [{ annotObjectNumber: fieldObjectNumber, page: toPageRef(10) }],
+  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
   ...(actions ? { actions } : {}),
 });
 
@@ -96,6 +109,7 @@ class BudgetFaultSandbox extends NodeSandbox {
         selEnd: 0,
       },
       formEffects: [],
+      annotEffects: [],
       uiEffects: [],
       diagnostics: [],
       error: { kind: 'budget', message: 'synthetic budget fault' },
@@ -103,14 +117,17 @@ class BudgetFaultSandbox extends NodeSandbox {
   }
 }
 
-const documentMeta = (): DocumentMeta =>
-  ({
-    id: 'form-doc',
-    name: 'proposal.pdf',
-    pageCount: 1,
-    pages: [{ ref: toPageRef(10) }],
-    revision: 0,
-  }) as DocumentMeta;
+const documentMeta = (): DocumentMeta => ({
+  id: 'form-doc',
+  instanceId: 'form-doc',
+  name: 'proposal.pdf',
+  pageCount: 1,
+  // Only the page's identity matters to the scripting controller.
+  pages: [{ ref: toPageRef(10) } as PageLayout],
+  revision: 0,
+  hasUnsavedChanges: false,
+  renderPolicy: { kind: 'continuous' },
+});
 
 function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbox()) {
   const batches: FormEffect[][] = [];
@@ -123,15 +140,16 @@ function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbo
         fields: [],
         changedWidgets: [],
       })),
-      changedWidgets: [],
       meta: {} as never,
     };
   });
   const doc = {
     id: 'form-doc',
     forms: { list: async () => snapshot, applyEffects },
-    actions: { read: async () => ({ nameTreeScripts: [], openAction: null }) },
-    security: { identity: { user_id: 'alex', display_name: 'Alex Morgan', group_id: 'EmbedPDF' } },
+    actions: { get: async () => ({ nameTreeScripts: [], openAction: null }) },
+    security: {
+      identity: { userId: 'alex', displayName: 'Alex Morgan', organization: 'EmbedPDF' },
+    },
   } as unknown as DocumentHandle;
   const realm = standaloneRealm(doc, documentMeta, {
     now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
@@ -153,17 +171,16 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'amount', '', { keystroke: action(`definitelyNotInstalled();`) })],
       calculationOrder: [],
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '42' });
+    const result = await fx.controller.commit(ref(2), { value: '42' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '42' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '42' } }]);
     expect(
       result.diagnostics.filter(
         ({ code, message }) => code === 'script-error' && message.includes('Keystroke'),
@@ -175,6 +192,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [
         text(2, 'price', '', { keystroke: action(`AFNumber_Keystroke(2, 0, 0, 0, "", true);`) }),
       ],
@@ -182,7 +200,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const rejected = await fx.controller.commit(ref(2), { type: 'text', value: 'abc' });
+    const rejected = await fx.controller.commit(ref(2), { value: 'abc' });
     expect(rejected.status).toBe('rejected');
     expect(rejected.uiEffects).toContainEqual(
       expect.objectContaining({
@@ -194,12 +212,11 @@ describe('script fault ladder', () => {
     expect(fx.batches).toEqual([]);
 
     const accepted = await fx.controller.commit(ref(2), {
-      type: 'text',
       value: '1,234.56',
     });
     expect(accepted.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '1,234.56' } },
+      { kind: 'setValue', ref: ref(2), value: { value: '1,234.56' } },
     ]);
   });
 
@@ -207,17 +224,16 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'qty', '', { validate: action(`explode();`) })],
       calculationOrder: [],
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '7' });
+    const result = await fx.controller.commit(ref(2), { value: '7' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '7' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '7' } }]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
 
@@ -225,6 +241,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [
         text(2, 'amount', '3'),
         text(3, 'broken', 'stale', { calculate: action(`explode();`) }),
@@ -236,12 +253,12 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '5' });
+    const result = await fx.controller.commit(ref(2), { value: '5' });
 
     expect(result.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '5' } },
-      { kind: 'setValue', ref: ref(4), value: { type: 'text', value: '10' } },
+      { kind: 'setValue', ref: ref(2), value: { value: '5' } },
+      { kind: 'setValue', ref: ref(4), value: { value: '10' } },
     ]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
@@ -250,17 +267,16 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'amount', '', { format: action(`kaboom();`) })],
       calculationOrder: [],
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '7' });
+    const result = await fx.controller.commit(ref(2), { value: '7' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '7' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '7' } }]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
 
@@ -268,12 +284,13 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'amount', '', { keystroke: action(`AFNumber_Keystroke(2, 0);`) })],
       calculationOrder: [],
     };
     const fx = harness(snapshot, new BudgetFaultSandbox());
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '5' });
+    const result = await fx.controller.commit(ref(2), { value: '5' });
 
     expect(result.status).toBe('failed');
     expect(result.error).toMatchObject({ kind: 'budget' });

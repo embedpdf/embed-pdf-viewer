@@ -1,44 +1,45 @@
 import {
   CONTINUOUS_RENDER_POLICY,
+  LOCAL_ENGINE_BRAND,
   type EngineRenderPolicy,
-  type PageHandle,
+  type LocalPageHandle as LocalPageHandleContract,
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { LocalPageAnnotationsService } from './LocalPageAnnotationsService';
-import { LocalPageGeometryService } from './LocalPageGeometryService';
+import { LocalPageFormsService } from './LocalPageFormsService';
 import { LocalPageRenderService } from './LocalPageRenderService';
 import { LocalPageTextService } from './LocalPageTextService';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
 import { LocalPageMeasureService } from './LocalPageMeasureService';
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
 import type { ScopeGuard } from '../scope';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
 }
 
 /**
- * Local page handle. `pageIndex` is supplied as advisory metadata when
- * the document handle creates the page handle. The per-page services
- * each own their queue interaction; the handle is otherwise stateless.
+ * Local page handle: the page's address and its services. The per-page
+ * services each own their queue interaction; the handle is otherwise
+ * stateless.
  */
-export class LocalPageHandle implements PageHandle {
+export class LocalPageHandle implements LocalPageHandleContract {
+  readonly [LOCAL_ENGINE_BRAND] = true;
   readonly annotations: LocalPageAnnotationsService;
+  readonly forms: LocalPageFormsService;
   readonly text: LocalPageTextService;
-  readonly geometry: LocalPageGeometryService;
   readonly render: LocalPageRenderService;
   readonly pieceInfo: LocalPieceInfoService;
   readonly measure: LocalPageMeasureService;
 
   constructor(
     readonly ref: PageRef,
-    readonly pageIndex: number,
     docId: string,
-    queue: WorkerQueue,
+    queue: JobQueue,
     view: DocClosedView,
     imageEncoder: LocalImageEncoder,
     guard: ScopeGuard,
@@ -55,8 +56,16 @@ export class LocalPageHandle implements PageHandle {
       publisher,
       renderPolicy,
     );
+    this.forms = new LocalPageFormsService(
+      docId,
+      ref,
+      queue,
+      view,
+      imageEncoder,
+      guard,
+      renderPolicy,
+    );
     this.text = new LocalPageTextService(docId, ref, queue, view, guard);
-    this.geometry = new LocalPageGeometryService(docId, ref, queue, view, guard);
     this.render = new LocalPageRenderService(
       docId,
       ref,

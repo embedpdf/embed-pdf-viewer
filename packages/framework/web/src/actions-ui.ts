@@ -1,17 +1,17 @@
 /**
- * The DEFAULT actions UI adapter — the origin×phase visibility matrix plus
- * the browser fallbacks, written ONCE here so every framework binding
- * (react, angular, …) ships the SAME policy instead of forking it per
+ * The default actions UI adapter — the origin×phase visibility matrix plus
+ * the browser fallbacks, written once here so every framework binding
+ * (react, angular, …) ships the same policy instead of forking it per
  * framework. Types are structural twins of `@embedpdf/plugin-actions`'
  * adapter contract (declared here so this package stays plugin-free, per
  * the layering law); assignability is checked where a binding installs it.
  *
- * The matrix (defaults only — an embedder override receives EVERY effect
+ * The matrix (defaults only — an embedder override receives every effect
  * with its context attached and decides for itself):
  * - URIs open through `sanitizeExternalUri` in a new tab (the dispatcher
  *   already policy-gated the node; blocked schemes are dropped here).
  * - Print: hover/lifecycle-origin requests never open the dialog; user
- *   requests fall back to `globalThis.print`. The `doc.print` AUTHORITY
+ *   requests fall back to `globalThis.print`. The `doc.print` authority
  *   gate is upstream in the plugin and not overridable.
  * - Alert: document-open nags (lifecycle origin, boot phase) never reach
  *   `window.alert` — the boot-nag gap, closed.
@@ -30,15 +30,15 @@ export interface ActionsUiEffectContext {
 
 /** Structural twin of plugin-actions' `ActionUiAdapter`. */
 export interface ActionsUiAdapterShape {
-  openUri(uri: string, opts: { isMap: boolean; origin: ActionsUiOrigin }): void;
-  print(opts?: ActionsUiEffectContext): void;
-  alert?(message: string, opts: ActionsUiEffectContext & { icon: number; title?: string }): void;
-  gotoPage?(page: number, opts: ActionsUiEffectContext): void;
+  openUri(uri: string, options: { isMap: boolean; origin: ActionsUiOrigin }): void;
+  print(options?: ActionsUiEffectContext): void;
+  alert?(message: string, options: ActionsUiEffectContext & { icon: number; title?: string }): void;
+  gotoPage?(page: number, options: ActionsUiEffectContext): void;
 }
 
 export interface DefaultActionsUiAdapterOptions {
   /**
-   * Per-handler overrides. Pass a FUNCTION for late binding (a binding's
+   * Per-handler overrides. Pass a function for late binding (a binding's
    * mutable handlers ref) — it is consulted on every effect, so a fresh
    * closure never needs a reinstall.
    */
@@ -53,10 +53,10 @@ export const createDefaultActionsUiAdapter = (
   const overridesOf = (): Partial<ActionsUiAdapterShape> | undefined =>
     typeof options.overrides === 'function' ? options.overrides() : options.overrides;
   return {
-    openUri: (uri, opts) => {
+    openUri: (uri, options) => {
       const current = overridesOf();
       if (current?.openUri) {
-        current.openUri(uri, opts);
+        current.openUri(uri, options);
         return;
       }
       const href = sanitizeExternalUri(uri);
@@ -64,24 +64,24 @@ export const createDefaultActionsUiAdapter = (
         window.open(href, '_blank', 'noopener,noreferrer');
       }
     },
-    print: (opts) => {
+    print: (options) => {
       const current = overridesOf();
-      if (current?.print) current.print(opts);
-      else if (opts && opts.origin !== 'user') {
+      if (current?.print) current.print(options);
+      else if (options && options.origin !== 'user') {
         // Hover/lifecycle scripts never open the print dialog by default.
       } else if (typeof globalThis.print === 'function') globalThis.print();
     },
-    alert: (message, opts) => {
+    alert: (message, options) => {
       const current = overridesOf();
-      if (current?.alert) current.alert(message, opts);
-      else if (opts.origin === 'lifecycle' || opts.phase === 'boot') {
+      if (current?.alert) current.alert(message, options);
+      else if (options.origin === 'lifecycle' || options.phase === 'boot') {
         // Document-open nags (Adobe version checks, lifecycle scripts)
         // never alert by default — the boot-nag gap, closed.
       } else if (typeof globalThis.alert === 'function') globalThis.alert(message);
     },
-    gotoPage: (page, opts) => {
+    gotoPage: (page, effectContext) => {
       const current = overridesOf();
-      if (current?.gotoPage) current.gotoPage(page, opts);
+      if (current?.gotoPage) current.gotoPage(page, effectContext);
       else options.goToPage?.(page);
     },
   };

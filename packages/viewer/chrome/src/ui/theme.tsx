@@ -15,7 +15,7 @@ export type ThemePreference = ThemeMode | 'system';
 const ThemeCtx = createContext<{
   mode: ThemeMode;
   toggle: () => void;
-  set: (m: ThemeMode) => void;
+  set: (mode: ThemeMode) => void;
 } | null>(null);
 
 const systemMode = (): ThemeMode =>
@@ -41,7 +41,11 @@ export function ThemeProvider({
     (target ?? document.documentElement).classList.toggle('dark', mode === 'dark');
   }, [mode, target]);
   const value = useMemo(
-    () => ({ mode, toggle: () => setMode((m) => (m === 'dark' ? 'light' : 'dark')), set: setMode }),
+    () => ({
+      mode,
+      toggle: () => setMode((previous) => (previous === 'dark' ? 'light' : 'dark')),
+      set: setMode,
+    }),
     [mode],
   );
   return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;

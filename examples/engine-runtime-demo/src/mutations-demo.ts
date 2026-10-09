@@ -1,26 +1,26 @@
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationListPageSnapshot,
-  AnnotationMoveResult,
+  AnnotationList,
+  AnnotationReorderResult,
   AnnotationRef,
   AnnotationUpdateResult,
   HighlightDraft,
 } from '@embedpdf/engine-core';
-import type { Engine } from '@embedpdf/engine-core/runtime';
+import { deletedAnnotationsOf, toPageRef, type Engine } from '@embedpdf/engine-core/runtime';
 
 /**
- * Engine-agnostic mutation walkthrough. Drives `update` (weak →
- * /NM-stamped), `create`, two `move` operations (single-as-batch and
- * multi-block contiguous reorder), and finally `delete` to leave the
- * fixture as we found it. Returns the observable side-effects so the
+ * Engine-agnostic mutation walkthrough. Drives `update` (of an annotation
+ * born inline, which keeps its `baseIndex` name), `create`, two `move`
+ * operations (single-as-batch and multi-block contiguous reorder), and
+ * finally `delete` to leave the fixture as we found it. Returns the observable side-effects so the
  * node + browser entries can render exactly the same payload.
  */
 export interface MutationsDemoResult {
   label: string;
   docId: string;
   elapsedMs: number;
-  before: AnnotationListPageSnapshot;
+  before: AnnotationList;
   createdA: AnnotationCreateResult;
   createdB: AnnotationCreateResult;
   createdCircle: AnnotationCreateResult;
@@ -29,19 +29,19 @@ export interface MutationsDemoResult {
   createdPolyline: AnnotationCreateResult;
   createdLine: AnnotationCreateResult;
   updated: AnnotationUpdateResult | null;
-  movedSingle: AnnotationMoveResult;
-  movedBatch: AnnotationMoveResult;
+  movedSingle: AnnotationReorderResult;
+  movedBatch: AnnotationReorderResult;
   deletedA: AnnotationDeleteResult;
   deletedB: AnnotationDeleteResult;
-  after: AnnotationListPageSnapshot;
+  after: AnnotationList;
 }
 
 const QUAD: HighlightDraft['quadPoints'] = [
   {
-    p1: { x: 50, y: 100 },
-    p2: { x: 150, y: 100 },
-    p3: { x: 50, y: 80 },
-    p4: { x: 150, y: 80 },
+    upperLeft: { x: 50, y: 692 },
+    upperRight: { x: 150, y: 692 },
+    lowerLeft: { x: 50, y: 712 },
+    lowerRight: { x: 150, y: 712 },
   },
 ];
 
@@ -55,33 +55,24 @@ export async function runMutationsDemo(
   const started = Date.now();
   const doc = await engine.open({ kind: 'bytes', id: docId, bytes: pdfBytes });
   try {
-    const page = doc.page(pageObjectNumber);
+    const page = doc.page(toPageRef(pageObjectNumber));
     const before = await page.annotations.list();
 
-    // 1) Update a weak annotation FIRST. Update is non-invalidating
-    //    (no revision bump, no index shift), so any index refs we
-    //    captured stay valid for the rest of the demo. We exercise
-    //    update first specifically to demonstrate the opportunistic
-    //    UUID v4 /NM stamp on a weak annotation; the resulting ref
-    //    will be upgraded to `kind: 'nm'`.
-    //
-    //    (Note: `create` is also non-invalidating now — append-only,
-    //    no revision bump — so the historical concern about "create
-    //    invalidates `weak.ref`" no longer applies. We still keep the
-    //    update-first ordering for narrative clarity in the demo
-    //    output.)
-    const weak = before.annotations.find((a) => a.identityQuality === 'weak');
+    // 1) Update an annotation the file stores inline (without an object
+    //    number of its own). It is named by the position it was born at
+    //    (`baseIndex`), and keeps that name through every write.
+    const inline = before.annotations.find((a) => a.ref.kind === 'baseIndex');
     let updated: AnnotationUpdateResult | null = null;
     if (
-      weak &&
-      (weak.subtype === 'highlight' ||
-        weak.subtype === 'underline' ||
-        weak.subtype === 'squiggly' ||
-        weak.subtype === 'strikeout')
+      inline &&
+      (inline.subtype === 'highlight' ||
+        inline.subtype === 'underline' ||
+        inline.subtype === 'squiggly' ||
+        inline.subtype === 'strikeout')
     ) {
-      updated = await page.annotations.update(weak.ref, {
-        subtype: weak.subtype,
-        contents: 'mutation demo: updated weak annot',
+      updated = await page.annotations.update(inline.ref, {
+        subtype: inline.subtype,
+        contents: 'mutation demo: updated inline annot',
       });
     }
 
@@ -90,28 +81,28 @@ export async function runMutationsDemo(
     const createdA = await page.annotations.create({
       subtype: 'highlight',
       contents: 'mutation demo: A',
-      color: { r: 30, g: 144, b: 255 },
+      color: '#1e90ff',
       opacity: 0.4,
       quadPoints: QUAD,
     });
     const createdB = await page.annotations.create({
       subtype: 'highlight',
       contents: 'mutation demo: B',
-      color: { r: 255, g: 99, b: 71 },
+      color: '#ff6347',
       opacity: 0.4,
       quadPoints: QUAD,
     });
 
-    // 2b) Create a circle and a square. Shapes are /Rect-based (not quad
+    // 2b) Create a circle and a square. Shapes are box-based (not quad
     //     based) and carry interior/stroke colour + border style. The
     //     mutator bakes an /AP appearance stream for them on create, so
     //     they render in any compliant viewer without a separate overlay.
     const createdCircle = await page.annotations.create({
       subtype: 'circle',
       contents: 'mutation demo: circle',
-      rect: { left: 60, bottom: 300, right: 180, top: 400 },
-      interiorColor: { r: 30, g: 144, b: 255 },
-      color: { r: 0, g: 0, b: 139 },
+      box: { x: 60, y: 392, width: 120, height: 100 },
+      interiorColor: '#1e90ff',
+      color: '#00008b',
       strokeWidth: 2,
       borderStyle: 'solid',
       opacity: 0.5,
@@ -119,30 +110,28 @@ export async function runMutationsDemo(
     const createdSquare = await page.annotations.create({
       subtype: 'square',
       contents: 'mutation demo: square',
-      rect: { left: 220, bottom: 300, right: 360, top: 400 },
+      box: { x: 220, y: 392, width: 140, height: 100 },
       interiorColor: null,
-      color: { r: 220, g: 20, b: 60 },
+      color: '#dc143c',
       strokeWidth: 3,
       borderStyle: 'dashed',
       dashArray: [4, 2],
       opacity: 1,
     });
 
-    // 2c) Create a polygon, polyline, and line. These carry explicit
-    //     geometry (/Vertices or /L) plus the bounding /Rect the plugin
-    //     owns; the engine writes them verbatim and bakes the /AP. The
-    //     polyline/line also carry /LE line endings.
+    // 2c) Create a polygon, polyline, and line. These carry their points
+    //     (/Vertices or /L); the engine draws the /AP and works out /Rect
+    //     from what it draws. The polyline/line also carry /LE line endings.
     const createdPolygon = await page.annotations.create({
       subtype: 'polygon',
       contents: 'mutation demo: polygon',
-      rect: { left: 60, bottom: 450, right: 180, top: 550 },
       vertices: [
-        { x: 70, y: 460 },
-        { x: 170, y: 460 },
-        { x: 120, y: 540 },
+        { x: 70, y: 332 },
+        { x: 170, y: 332 },
+        { x: 120, y: 252 },
       ],
-      interiorColor: { r: 255, g: 215, b: 0 },
-      color: { r: 0, g: 0, b: 139 },
+      interiorColor: '#ffd700',
+      color: '#00008b',
       strokeWidth: 2,
       borderStyle: 'solid',
       opacity: 0.7,
@@ -150,14 +139,13 @@ export async function runMutationsDemo(
     const createdPolyline = await page.annotations.create({
       subtype: 'polyline',
       contents: 'mutation demo: polyline',
-      rect: { left: 220, bottom: 450, right: 360, top: 550 },
       vertices: [
-        { x: 230, y: 460 },
-        { x: 290, y: 540 },
-        { x: 350, y: 460 },
+        { x: 230, y: 332 },
+        { x: 290, y: 252 },
+        { x: 350, y: 332 },
       ],
       interiorColor: null,
-      color: { r: 220, g: 20, b: 60 },
+      color: '#dc143c',
       strokeWidth: 2,
       borderStyle: 'solid',
       opacity: 1,
@@ -166,37 +154,35 @@ export async function runMutationsDemo(
     const createdLine = await page.annotations.create({
       subtype: 'line',
       contents: 'mutation demo: line',
-      rect: { left: 400, bottom: 450, right: 520, top: 550 },
-      linePoints: { start: { x: 410, y: 460 }, end: { x: 510, y: 540 } },
+      linePoints: { start: { x: 410, y: 332 }, end: { x: 510, y: 252 } },
       interiorColor: null,
-      color: { r: 0, g: 128, b: 128 },
+      color: '#008080',
       strokeWidth: 2,
       borderStyle: 'solid',
       opacity: 1,
       lineEndings: { start: 'none', end: 'open-arrow' },
     });
 
-    // 3) Single-annotation move: move B to position 0. This exercises
-    //    `move([ref], toIndex)` as the single-as-batch case. Move is
-    //    index-shifting, so this DOES bump the per-page revision.
-    const movedSingle = await page.annotations.move([createdB.created.ref], 0);
+    // 3) Single-annotation reorder: B to the bottom of the stack.
+    const movedSingle = await page.annotations.reorder([createdB.annotation.ref], 'start');
 
-    // 4) Multi-block move: move [A, B] to position 0 in caller order.
-    //    Verifies that caller-supplied order is preserved at the
-    //    destination, ONE revision bump per batch.
-    const movedBatch = await page.annotations.move([createdA.created.ref, createdB.created.ref], 0);
+    // 4) Multi-annotation reorder: [A, B] to the bottom, in caller order.
+    const movedBatch = await page.annotations.reorder(
+      [createdA.annotation.ref, createdB.annotation.ref],
+      'start',
+    );
 
     // 5) Delete both annotations we created so the fixture is unchanged.
-    //    Use the still-stable durable refs (objectNumber survives
-    //    arbitrary moves; that's the whole point of stable identity).
-    const deletedA = await page.annotations.delete(createdA.created.ref);
-    const deletedB = await page.annotations.delete(createdB.created.ref);
+    //    Their refs survive the reorders: a ref is an annotation's name for
+    //    life.
+    const deletedA = await page.annotations.delete(createdA.annotation.ref);
+    const deletedB = await page.annotations.delete(createdB.annotation.ref);
     // Clean up the shapes too so the fixture is left as we found it.
-    await page.annotations.delete(createdCircle.created.ref);
-    await page.annotations.delete(createdSquare.created.ref);
-    await page.annotations.delete(createdPolygon.created.ref);
-    await page.annotations.delete(createdPolyline.created.ref);
-    await page.annotations.delete(createdLine.created.ref);
+    await page.annotations.delete(createdCircle.annotation.ref);
+    await page.annotations.delete(createdSquare.annotation.ref);
+    await page.annotations.delete(createdPolygon.annotation.ref);
+    await page.annotations.delete(createdPolyline.annotation.ref);
+    await page.annotations.delete(createdLine.annotation.ref);
 
     const after = await page.annotations.list();
 
@@ -226,101 +212,81 @@ export async function runMutationsDemo(
 
 /**
  * Compact human-readable view of a `MutationsDemoResult`. Includes the
- * meta envelopes (revision generations, weakRefsInvalidated,
- * shouldRefetch reason) so the demo doubles as a visual contract for
- * the locked impact rules.
+ * meta envelopes (the refs each write changed, the cache delta) so the demo
+ * doubles as a visual contract for them.
  */
 export function summarizeMutations(result: MutationsDemoResult) {
   return {
     label: result.label,
     docId: result.docId,
     elapsedMs: result.elapsedMs,
-    before: {
-      generation: result.before.pageState.revision.generation,
-      hasWeak: knownWeakFlag(result.before.pageState),
-      count: result.before.annotations.length,
-    },
+    before: { count: result.before.annotations.length },
     update: result.updated
       ? {
-          inputRefKind: 'index',
-          outputRef: refSummary(result.updated.updated.ref),
-          outputNm: result.updated.updated.nm,
-          identityQuality: result.updated.updated.identityQuality,
+          ref: refSummary(result.updated.annotation.ref),
+          nm: result.updated.annotation.nm,
           meta: metaSummary(result.updated.meta),
         }
-      : { skipped: 'no weak annotation on the page' },
+      : { skipped: 'no inline annotation on the page' },
     createA: {
-      ref: refSummary(result.createdA.created.ref),
-      identityQuality: result.createdA.created.identityQuality,
+      ref: refSummary(result.createdA.annotation.ref),
       meta: metaSummary(result.createdA.meta),
     },
     createB: {
-      ref: refSummary(result.createdB.created.ref),
-      identityQuality: result.createdB.created.identityQuality,
+      ref: refSummary(result.createdB.annotation.ref),
       meta: metaSummary(result.createdB.meta),
     },
     createCircle: {
-      ref: refSummary(result.createdCircle.created.ref),
-      subtype: result.createdCircle.created.subtype,
-      identityQuality: result.createdCircle.created.identityQuality,
+      ref: refSummary(result.createdCircle.annotation.ref),
+      subtype: result.createdCircle.annotation.subtype,
       meta: metaSummary(result.createdCircle.meta),
     },
     createSquare: {
-      ref: refSummary(result.createdSquare.created.ref),
-      subtype: result.createdSquare.created.subtype,
-      identityQuality: result.createdSquare.created.identityQuality,
+      ref: refSummary(result.createdSquare.annotation.ref),
+      subtype: result.createdSquare.annotation.subtype,
       meta: metaSummary(result.createdSquare.meta),
     },
     createPolygon: {
-      ref: refSummary(result.createdPolygon.created.ref),
-      subtype: result.createdPolygon.created.subtype,
-      identityQuality: result.createdPolygon.created.identityQuality,
+      ref: refSummary(result.createdPolygon.annotation.ref),
+      subtype: result.createdPolygon.annotation.subtype,
       meta: metaSummary(result.createdPolygon.meta),
     },
     createPolyline: {
-      ref: refSummary(result.createdPolyline.created.ref),
-      subtype: result.createdPolyline.created.subtype,
-      identityQuality: result.createdPolyline.created.identityQuality,
+      ref: refSummary(result.createdPolyline.annotation.ref),
+      subtype: result.createdPolyline.annotation.subtype,
       meta: metaSummary(result.createdPolyline.meta),
     },
     createLine: {
-      ref: refSummary(result.createdLine.created.ref),
-      subtype: result.createdLine.created.subtype,
-      identityQuality: result.createdLine.created.identityQuality,
+      ref: refSummary(result.createdLine.annotation.ref),
+      subtype: result.createdLine.annotation.subtype,
       meta: metaSummary(result.createdLine.meta),
     },
     moveSingle: {
-      moved: result.movedSingle.moved.map((d) => refSummary(d.ref)),
+      moved: result.movedSingle.meta.changed.map(refSummary),
       meta: metaSummary(result.movedSingle.meta),
     },
     moveBatch: {
-      moved: result.movedBatch.moved.map((d) => refSummary(d.ref)),
+      moved: result.movedBatch.meta.changed.map(refSummary),
       meta: metaSummary(result.movedBatch.meta),
     },
     deleteA: {
-      deleted: result.deletedA.deleted,
+      deleted: deletedAnnotationsOf(result.deletedA).map(refSummary),
       meta: metaSummary(result.deletedA.meta),
     },
     deleteB: {
-      deleted: result.deletedB.deleted,
+      deleted: deletedAnnotationsOf(result.deletedB).map(refSummary),
       meta: metaSummary(result.deletedB.meta),
     },
-    after: {
-      generation: result.after.pageState.revision.generation,
-      hasWeak: knownWeakFlag(result.after.pageState),
-      count: result.after.annotations.length,
-    },
+    after: { count: result.after.annotations.length },
   };
 }
 
 function refSummary(ref: AnnotationRef): string {
   switch (ref.kind) {
     case 'objectNumber':
-      return `objectNumber=${ref.annotObjectNumber}`;
-    case 'nm':
-      return `nm=${ref.nm}`;
-    case 'index':
-      return `index=${ref.index}`;
+      return `objectNumber=${ref.objectNumber}`;
+    case 'baseIndex':
+      return `baseIndex=${ref.baseIndex}`;
     default:
       return exhaustiveRef(ref);
   }
@@ -331,12 +297,8 @@ function exhaustiveRef(ref: never): string {
 }
 
 function metaSummary(meta: AnnotationCreateResult['meta']) {
-  const pageState = meta.affectedPages[0];
   return {
-    generation: pageState?.revision.generation ?? null,
-    weakRefsInvalidated: meta.weakRefsInvalidated,
-    shouldRefetch: meta.shouldRefetch?.reason ?? null,
-    changed: meta.changed.map((c) => `${c.kind}=${String(c.value)}`),
+    changed: meta.changed.map(refSummary),
     cacheDelta: meta.cacheDelta
       ? {
           previousDocVersion: meta.cacheDelta.previousDocVersion,
@@ -345,10 +307,4 @@ function metaSummary(meta: AnnotationCreateResult['meta']) {
         }
       : null,
   };
-}
-
-function knownWeakFlag(pageState: AnnotationListPageSnapshot['pageState']): boolean | null {
-  return pageState.weakAnnotationState.kind === 'known'
-    ? pageState.weakAnnotationState.hasAnyWeakAnnotations
-    : null;
 }

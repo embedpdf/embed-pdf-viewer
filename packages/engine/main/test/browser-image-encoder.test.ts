@@ -1,5 +1,5 @@
 /**
- * The encoder-worker pool contract — above all, the REGRESSION that made the
+ * The encoder-worker pool contract — above all, the regression that made the
  * pool dead code for every default consumer: the literal source `'inline'`
  * is a string, and a branch-order slip resolved it as the URL "/inline"
  * (HTML → SyntaxError → permanent main-thread fallback). These tests pin

@@ -3,7 +3,7 @@
  * not a wildcard, virtual, or collab scope) is rejected at parse time.
  *
  * Bit references in comments are documentation of how `pdf.permissions`
- * expands these capabilities. PDF bits are NEVER consulted unless
+ * expands these capabilities. PDF bits are never consulted unless
  * `pdf.permissions` is in scope.
  */
 export type DocCapability =
@@ -14,7 +14,7 @@ export type DocCapability =
   // Text/content extraction (PDF bit 5)
   | 'doc.text.select' // /pages/*/geometry
   | 'doc.text.copy' // /pages/*/text
-  | 'doc.text.search' // reserved for future /pages/*/search@*
+  | 'doc.text.search' // doc.search.query (match positions; snippets also need doc.text.copy)
   | 'doc.content.copy' // graphics/image extraction (reserved)
 
   // Output (cloud-only download capabilities)
@@ -31,13 +31,16 @@ export type DocCapability =
 
   // Forms
   | 'doc.forms.read' // structured read of form field definitions/values (cloud-only; no PDF-bit gate — reading is unconditional)
-  | 'doc.forms.fill' // set form field values (PDF bit 9, also implied by bit 6)
+  | 'doc.forms.fill' // set form field values (PDF bit 4, 6 or 9)
   | 'doc.forms.modify' // create/restructure/delete fields (PDF bit 6 + bit 4)
-  | 'doc.forms.submit' // deliver a form submission to the document's HOME (grant-minted ONLY — ISO defines no submit permission bit, so `pdf.permissions` never expands it; gates the engine `forms.submit` capability, NOT viewer-side handlers)
+  | 'doc.forms.import' // restore form fields and values with who created and filled them (grant-minted only — `pdf.permissions` never expands it; removed wherever a signature removes `doc.forms.fill`)
+  | 'doc.forms.script' // write JavaScript, submit-form and URI actions into the form: code and ways out that every later filler gets (grant-minted only — `pdf.permissions` never expands it; guards writing them, never running them; removed wherever a signature removes `doc.forms.modify`)
+  | 'doc.forms.submit' // deliver a form submission to the document's home (grant-minted only — ISO defines no submit permission bit, so `pdf.permissions` never expands it; gates the engine `forms.submit` capability, not viewer-side handlers)
 
   // Annotations
   | 'doc.annotate.read' // structured read of annotation lists (cloud-only; no PDF-bit gate — reading is unconditional)
   | 'doc.annotate.modify' // broad write default for create/update/delete (PDF bit 6); narrowed per-action by collab scopes when present
+  | 'doc.annotate.import' // restore annotations with their original authors and dates (grant-minted only — `pdf.permissions` never expands it; a restored userId or groupId grants that owner access)
 
   // Metadata (Info-dict writes, PDF bit 4)
   | 'doc.metadata.modify' // rewrite document metadata / Info dict (PDF bit 4)
@@ -49,14 +52,15 @@ export type DocCapability =
   | 'doc.redact'
 
   // Digital signatures
-  | 'doc.sign' // prepare/complete/abort an approval signature or document timestamp (PDF bit 6 or bit 9: filling in a signature field IS form fill)
+  | 'doc.sign' // prepare/complete/abort an approval signature or document timestamp (PDF bit 4, 6 or 9: signing a signature field is filling it in)
   | 'doc.sign.certify'; // additionally make it the certification signature (/Perms /DocMDP) — grant-minted only, never expanded from PDF bits
 
 /**
- * Single-entity collaboration vocabulary. Only annotations are
- * collab-scoped today; future entities slot into the same grammar.
+ * What a collab scope is about: annotations, or form fields. Both follow one
+ * grammar, `entity:action:filter`, and a filter compares one fact on the
+ * record (its creator, its group) with the value the scope names.
  */
-export type CollabEntity = 'annotations';
+export type CollabEntity = 'annotations' | 'fields';
 
 /**
  * Collab actions for annotations. Each can be qualified by a filter that
@@ -80,17 +84,34 @@ export type CollabFilter =
   | { kind: 'createdBy'; userId: string }
   | { kind: 'group'; groupId: string };
 
+/**
+ * Collab actions for form fields: filling one in (its value, its displayed
+ * text), signing a signature field, and putting a field in a group. A
+ * field's group is who fills it (the buyer's fields), not who made it.
+ */
+export type FieldAction = 'fill' | 'sign' | 'set-group';
+
+/** A field filter: every field, or the fields of one group. Fields record no owner to match. */
+export type FieldFilter = { kind: 'all' } | { kind: 'group'; groupId: string };
+
 export interface ParsedCapability {
   kind: 'capability';
   name: DocCapability;
 }
 
-export interface ParsedCollab {
-  kind: 'collab';
-  entity: CollabEntity;
-  action: CollabAction | '*';
-  filter: CollabFilter;
-}
+export type ParsedCollab =
+  | {
+      kind: 'collab';
+      entity: 'annotations';
+      action: CollabAction | '*';
+      filter: CollabFilter;
+    }
+  | {
+      kind: 'collab';
+      entity: 'fields';
+      action: FieldAction | '*';
+      filter: FieldFilter;
+    };
 
 export interface ParsedVirtual {
   kind: 'virtual';
@@ -122,23 +143,32 @@ export interface PdfBits {
 }
 
 /**
- * Identity claims associated with a JWT (cloud) or supplied at engine
- * open time (local). Used by collab filter resolution and by annotation
- * authoring (populating /T and /EMBD_Metadata fields).
+ * Who a session acts for: supplied at open time to the local engine, and
+ * carried in the `identity` claim of a document token for the cloud engine.
+ * It drives collab filters and fills in the attribution of what the session
+ * writes. Only `displayName`, `userId` and `groupId` are written into
+ * annotations; the rest is for the viewer (stamp templates, signature
+ * appearances), so personal data doesn't travel in every shared PDF.
  */
-export interface IdentityClaims {
-  user_id?: string;
-  group_id?: string;
-  groups?: ReadonlyArray<string>;
-  display_name?: string;
+export interface Identity {
+  /** The person's stable id in your system: `/EMBD_Metadata/UserID`, `CreatedBy` and `UpdatedBy`. */
+  readonly userId?: string;
+  /** The name shown as the author: `/T`. */
+  readonly displayName?: string;
+  readonly email?: string;
+  readonly title?: string;
+  readonly organization?: string;
+  readonly organizationalUnit?: string;
+  /**
+   * The group what they create goes into: a new annotation's or form
+   * field's `/EMBD_Metadata/GroupID`, unless the write names another.
+   */
+  readonly groupId?: string;
 }
 
 /**
- * Subset of identity claims that flows into worker requests so the
+ * The part of an {@link Identity} that flows into worker requests, so the
  * annotation pipeline can stamp /T, /M, and /EMBD_Metadata on writes.
- *
- * Field names follow PDF/EMBD conventions (UserID, GroupID) rather than
- * the JWT-style snake_case used by IdentityClaims.
  */
 export interface AnnotationActor {
   userId?: string;

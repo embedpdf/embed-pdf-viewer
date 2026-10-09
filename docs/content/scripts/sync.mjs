@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Mount the shared docs corpus into a site (DOCS-PLATFORM-ARCHITECTURE.md).
+ * Mount the shared docs corpus into a site (docs/conventions/docs-architecture.md).
  *
  *   node scripts/sync.mjs --target <site dir> --engine local|cloud [--frameworks react,...] [--check]
  *
@@ -19,6 +19,12 @@
  *
  * The generator OWNS the target directories: anything there it did not emit
  * is deleted (or fails `--check`). Site-local pages don't belong in them.
+ *
+ * `--check` also runs the headless reference check (`reference.mjs`): the pages
+ * list every public member of every plugin, and nothing the code doesn't have.
+ * Then it compiles the snippets and writes which pages are live
+ * (`publish-gate.mjs`), which the site's build reads. That part only reports: a
+ * snippet that doesn't compile holds its page back, never the build.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,6 +32,8 @@ import { fileURLToPath } from 'node:url';
 
 import { DEMO_DOCUMENTS } from '../documents.mjs';
 import { ENGINES } from '../engines.mjs';
+import { writePublishStatus } from './publish-gate.mjs';
+import { checkReference } from './reference.mjs';
 
 const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -38,21 +46,22 @@ const ALL_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'];
 const MOUNTS = {
   mdx: [
     { from: 'headless', to: 'src/content/docs/headless' },
-    // Deliberately the core-concepts SUBTREE: each site owns its own
-    // engine/getting-started (genuinely different onboarding) and _meta.
-    { from: 'engine/core-concepts', to: 'src/content/docs/engine/core-concepts' },
+    // The whole engine corpus. Onboarding that differs per engine is a
+    // flavored page (`setup.local.mdx` / `setup.cloud.mdx`) or a page with
+    // `engines: [cloud]`, not a site-owned file.
+    // Its code imports from the local package; each flavor's copy imports
+    // from its own (`swapEngineImports`).
+    { from: 'engine', to: 'src/content/docs/engine', swapsEngineImports: true },
     { from: 'viewer', to: 'src/content/docs/viewer' },
   ],
+  // Every folder of live examples (samples/<area>/), so a new area needs no entry here.
   samples: [
-    { from: 'samples/stage', to: 'src/samples/stage' },
-    { from: 'samples/render', to: 'src/samples/render' },
-    { from: 'samples/selection', to: 'src/samples/selection' },
-    { from: 'samples/page-edit', to: 'src/samples/page-edit' },
-    { from: 'samples/stamp', to: 'src/samples/stamp' },
-    { from: 'samples/annotation', to: 'src/samples/annotation' },
-    { from: 'samples/signature', to: 'src/samples/signature' },
-    { from: 'samples/getting-started', to: 'src/samples/getting-started' },
-    { from: 'samples/viewer', to: 'src/samples/viewer' },
+    ...fs
+      .readdirSync(path.join(contentRoot, 'samples'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({ from: `samples/${entry.name}`, to: `src/samples/${entry.name}` })),
+    // Code-only snippets, one file per framework (<Snippet name>); demos never build them.
+    { from: 'snippets', to: 'src/samples/snippets' },
   ],
 };
 
@@ -100,6 +109,20 @@ function resolveMdxOverride(files, relative, engine) {
   }
   // A shared page: emit unless this flavor has an override sibling.
   return files.includes(`${base}.${engine}.mdx`) ? null : relative;
+}
+
+/**
+ * The engine pages' code blocks import from the local package, as the shared
+ * types and helpers are exported by both; a flavor's copy imports from its
+ * own package. Only `import … from '@embedpdf/engine';` lines change, never
+ * prose that names the package.
+ */
+function swapEngineImports(source, engine) {
+  if (engine === 'local') return source;
+  return source.replace(
+    /^(\s*import (?:type )?\{[^}]*\} from )'@embedpdf\/engine';$/gm,
+    `$1'${ENGINES[engine].package}';`,
+  );
 }
 
 function transformSample(source, engine, relative) {
@@ -205,7 +228,8 @@ function buildExpected(engine, frameworks) {
           skippedKeysByDir.set(directory, skipped);
           continue;
         }
-        const marked = source.replace(/^(---\n[\s\S]*?\n---\n)/, `$1\n${MDX_MARKER}\n`);
+        const flavored = mount.swapsEngineImports ? swapEngineImports(source, engine) : source;
+        const marked = flavored.replace(/^(---\n[\s\S]*?\n---\n)/, `$1\n${MDX_MARKER}\n`);
         expected.set(path.join(mount.to, emitAs), marked);
       } else if (relative.endsWith('_meta.ts')) {
         metas.push({ relative, source });
@@ -231,7 +255,7 @@ function buildExpected(engine, frameworks) {
       const framework = frameworkOf(relative);
       if (framework && !frameworks.includes(framework)) continue;
       const source = fs.readFileSync(absolute, 'utf8');
-      const emitted = framework ? transformSample(source, engine, relative) : source; // _shared chrome, css — engine-neutral lesson scaffolding
+      const emitted = framework ? transformSample(source, engine, relative) : source; // an example's stylesheet: engine-neutral
       expected.set(path.join(mount.to, relative), emitted);
     }
   }
@@ -249,7 +273,7 @@ function ownedRoots() {
   return [...MOUNTS.mdx, ...MOUNTS.samples].map((mount) => mount.to);
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv);
   const expected = buildExpected(args.engine, args.frameworks);
 
@@ -285,6 +309,8 @@ function main() {
       process.exit(1);
     }
     console.log(`Docs content is current (${expected.size} files, engine=${args.engine}).`);
+    await checkReference();
+    await writePublishStatus();
     return;
   }
 
@@ -303,4 +329,4 @@ function main() {
   );
 }
 
-main();
+await main();

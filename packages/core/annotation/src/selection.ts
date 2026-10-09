@@ -1,22 +1,34 @@
 /** The complete annotation frame shared by selection and transform gestures. */
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
-import { geomRotation, isRotatableGeom, selectionQuad } from './geometry';
+import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geometry';
+import { measurementOf, type MeasurementAppearance } from './measurement';
 import { measurementSelectionQuad } from './measurement-shape';
-import type { Annot, Quad, Vec, ViewEnv } from './types';
+import { shapeOf, styleOf } from './record';
+import type { ModelAnnotation, Shape, QuadRing, Point, Style, ViewEnv } from './types';
 
 export interface SelectionFrame {
-  corners: Quad;
-  center: Vec;
+  corners: QuadRing;
+  center: Point;
   angle: number;
 }
 
-export function annotationSelectionFrame(annotation: Annot, view?: ViewEnv): SelectionFrame {
-  const mode = anchorModeOf(annotation);
-  const geometry = anchoredGeom(annotation.geom, mode, view);
-  const strokeWidth = anchoredStrokeWidth(annotation.style.strokeWidth, mode, view);
-  const corners = annotation.measure
-    ? measurementSelectionQuad(geometry, annotation.measure, { ...annotation.style, strokeWidth })
-    : selectionQuad(geometry, strokeWidth, annotation.style.border);
+/**
+ * The frame of `record` as it is drawn, or with `live` fields laid over its
+ * own (a gesture's geometry, a screen-anchored stroke).
+ */
+export function annotationSelectionFrame(
+  record: ModelAnnotation,
+  view?: ViewEnv,
+  live?: { geometry?: Shape; style?: Style; measure?: MeasurementAppearance },
+): SelectionFrame {
+  const style = live?.style ?? styleOf(record.annotation);
+  const measure = live?.measure ?? measurementOf(record.annotation);
+  const mode = anchorModeOf(record);
+  const geometry = anchoredGeom(live?.geometry ?? shapeOf(record.annotation), mode, view);
+  const strokeWidth = anchoredStrokeWidth(style.strokeWidth, mode, view);
+  const corners = measure
+    ? measurementSelectionQuad(geometry, measure, { ...style, strokeWidth })
+    : selectionQuad(geometry, { ...style, strokeWidth: strokeWidth });
 
   // PDF /Rect is a page-aligned rendering envelope. Its conservative padding
   // must not change the editor's frame or rotation center after an engine echo.
@@ -28,4 +40,9 @@ export function annotationSelectionFrame(annotation: Annot, view?: ViewEnv): Sel
     },
     angle: isRotatableGeom(geometry) ? geomRotation(geometry) : 0,
   };
+}
+
+/** Where a turn of `record` pivots (`turnPivotOf`), in its frame's space. */
+export function annotationTurnPivot(record: ModelAnnotation, view?: ViewEnv): Point {
+  return turnPivotOf(anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view));
 }

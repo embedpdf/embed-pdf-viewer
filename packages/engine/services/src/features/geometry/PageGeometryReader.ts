@@ -3,6 +3,7 @@ import type {
   PageGeometryRun,
   PageGeometrySnapshot,
   PageObjectNumber,
+  PdfCoordinates,
   PdfQuad,
   PdfRect,
   RotatedGeometryGlyph,
@@ -23,13 +24,18 @@ import {
   readRectF,
 } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
+import { SliceTimer, type Slices } from '../../shared/slices';
 
 /**
  * Mid-object orientation drift that forces a run split (~0.5°). Real content
  * keeps one char matrix per text object; this guards the exotic cases so a
- * run's `rotation` is always representative of every glyph in it.
+ * run's `baselineAngle` is always representative of every glyph in it.
  */
 const ROTATION_SPLIT_TOLERANCE = 0.0087;
+
+/** A record's flags; the wire carries them as `space` and `empty`. */
+const FLAG_SPACE = 1;
+const FLAG_EMPTY = 2;
 
 /**
  * One glyph as read from `EPDFText_GetCharGeometry`, plus the run-grouping
@@ -42,9 +48,9 @@ export interface RawGeometryGlyphRecord {
   /** Sampled at each text object's first glyph (run splits inherit it). */
   fontSize?: number;
   /**
-   * Wire flags (bit 1 = space, bit 2 = empty). Synthesized-but-visible
-   * glyphs (/ActualText pieces) stay 0, exactly like the legacy reader —
-   * they represent real, selectable text.
+   * `FLAG_SPACE` and `FLAG_EMPTY`. Synthesized-but-visible glyphs
+   * (/ActualText pieces) stay 0, exactly like the legacy reader — they
+   * represent real, selectable text.
    */
   flags: number;
   /** Page-space AABB (zeroed when empty). */
@@ -56,20 +62,20 @@ export interface RawGeometryGlyphRecord {
   /** Native uprightness of the char matrix (empty glyphs: true, inert). */
   upright: boolean;
   /** Baseline angle (radians CCW, PDF y-up); 0 when upright. */
-  rotation: number;
+  baselineAngle: number;
   /** True when the ascent vector maps opposite the rotated +y (det < 0). */
   ascentFlip: boolean;
 }
 
 /** The orientation class a run commits to at its first classifiable glyph. */
-type RunClass = { upright: true } | { upright: false; rotation: number; ascentFlip: boolean };
+type RunClass = { upright: true } | { upright: false; baselineAngle: number; ascentFlip: boolean };
 
 /**
  * Geometry-only text layout reader.
  *
  * Emits geometry in PDF user space (y-up edges) — the canonical engine
  * geometry. The viewer converts to content/view space via the page geometry
- * matrix; this reader applies NO Y-flip or device transform.
+ * matrix; this reader applies no Y-flip or device transform.
  *
  * One `EPDFText_GetCharGeometry` call per glyph supplies boxes, oriented
  * cells, and flags together; `buildRunsFromRawGlyphs` then groups glyphs
@@ -83,11 +89,20 @@ export class PageGeometryReader {
     private readonly session: DocumentSession,
   ) {}
 
-  read(pageObjectNumber: PageObjectNumber, signal: AbortSignal): PageGeometrySnapshot {
+  /**
+   * A page's text geometry. The page loads in slices when it isn't parsed, and
+   * the glyph loop pauses once a slice's budget is spent, so an abort stops the
+   * read at either.
+   */
+  async read(
+    pageObjectNumber: PageObjectNumber,
+    signal: AbortSignal,
+    slices: Slices,
+  ): Promise<PageGeometrySnapshot<PdfCoordinates>> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
+    const pagePtr = await pool.acquireInSlices(pageObjectNumber, signal, slices);
 
     try {
       throwIfAborted(signal);
@@ -105,9 +120,10 @@ export class PageGeometryReader {
         const geometryPtr = mem.alloc(EPDF_CHAR_GEOMETRY_LAYOUT.bytes);
 
         try {
+          const timer = new SliceTimer(slices, signal);
           let prevObjectKey: number | bigint | null = null;
           for (let i = 0; i < glyphCount; i++) {
-            throwIfAborted(signal);
+            if (timer.due) await timer.pause();
             const objectKey = fn.FPDFText_GetTextObject(textPagePtr, i);
             const record: RawGeometryGlyphRecord = {
               objectKey,
@@ -152,10 +168,10 @@ export class PageGeometryReader {
 
     const upright = Boolean(native & bits.upright);
     const raw: Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'> = {
-      flags: native & bits.space ? 1 : 0,
+      flags: native & bits.space ? FLAG_SPACE : 0,
       looseBox: normalizePdfRect(readRectF(mem, geometryPtr, offsets.looseBox)),
       upright,
-      rotation: 0,
+      baselineAngle: 0,
       ascentFlip: false,
     };
     if (native & bits.hasTightBox) {
@@ -171,7 +187,7 @@ export class PageGeometryReader {
         const b = readF32(mem, geometryPtr, offsets.matrix + 4);
         const c = readF32(mem, geometryPtr, offsets.matrix + 8);
         const d = readF32(mem, geometryPtr, offsets.matrix + 12);
-        raw.rotation = Math.atan2(b, a);
+        raw.baselineAngle = Math.atan2(b, a);
         raw.ascentFlip = a * d - b * c < 0;
       }
     }
@@ -184,17 +200,19 @@ export class PageGeometryReader {
  *
  * Runs split on text-object change (the legacy rule) and on orientation
  * change between classifiable glyphs (θ drift / mixed orientation). A run's
- * variant is decided by its FIRST classifiable glyph:
+ * variant is decided by its first classifiable glyph:
  *   - empty glyphs never classify (they adopt the run's variant);
- *   - real glyphs WITHOUT an oriented cell (singular matrix, synthesized
+ *   - real glyphs without an oriented cell (singular matrix, synthesized
  *     /ActualText pieces) classify as upright — box-only data degrades to
  *     exactly the legacy behavior;
  *   - real glyphs with a non-upright matrix classify as rotated.
  * Runs that never see a classifiable glyph emit as upright (degenerate,
  * legacy behavior).
  */
-export function buildRunsFromRawGlyphs(records: RawGeometryGlyphRecord[]): PageGeometryRun[] {
-  const runs: PageGeometryRun[] = [];
+export function buildRunsFromRawGlyphs(
+  records: RawGeometryGlyphRecord[],
+): PageGeometryRun<PdfCoordinates>[] {
+  const runs: PageGeometryRun<PdfCoordinates>[] = [];
   let buffer: RawGeometryGlyphRecord[] = [];
   let charStart = 0;
   let fontSize: number | undefined;
@@ -229,17 +247,23 @@ export function buildRunsFromRawGlyphs(records: RawGeometryGlyphRecord[]): PageG
 }
 
 function classOf(record: RawGeometryGlyphRecord): RunClass | undefined {
-  if (record.flags & 2) return undefined; // empty glyphs never classify
+  if (record.flags & FLAG_EMPTY) return undefined; // empty glyphs never classify
   if (record.looseQuad && !record.upright) {
-    return { upright: false, rotation: record.rotation, ascentFlip: record.ascentFlip };
+    return { upright: false, baselineAngle: record.baselineAngle, ascentFlip: record.ascentFlip };
   }
   return { upright: true };
+}
+
+/** A baseline's angle (radians, counter-clockwise) as the API's turn: degrees clockwise, 0 up to 360. */
+function rotationOfBaseline(radians: number): number {
+  const degrees = (-radians * 180) / Math.PI;
+  return ((degrees % 360) + 360) % 360;
 }
 
 function sameClass(a: RunClass, b: RunClass): boolean {
   if (a.upright || b.upright) return a.upright === b.upright;
   if (a.ascentFlip !== b.ascentFlip) return false;
-  const delta = a.rotation - b.rotation;
+  const delta = a.baselineAngle - b.baselineAngle;
   return Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) <= ROTATION_SPLIT_TOLERANCE;
 }
 
@@ -248,76 +272,94 @@ function materializeRun(
   charStart: number,
   fontSize: number | undefined,
   cls: RunClass | undefined,
-): PageGeometryRun {
+): PageGeometryRun<PdfCoordinates> {
   if (cls && !cls.upright) {
-    const glyphs: RotatedGeometryGlyph[] = buffer.map((g) =>
+    const glyphs: RotatedGeometryGlyph<PdfCoordinates>[] = buffer.map((g) =>
       g.looseQuad
         ? {
-            looseQuad: g.looseQuad,
-            flags: g.flags,
-            ...(g.tightQuad ? { tightQuad: g.tightQuad } : {}),
+            loose: g.looseQuad,
+            ...(g.tightQuad ? { tight: g.tightQuad } : {}),
+            ...statesOf(g.flags),
           }
-        : // Empty glyphs inside a rotated run: zeroed quad + the empty flag,
+        : // Empty glyphs inside a rotated run: zeroed quad + empty,
           // mirroring the upright variant's zeroed-box convention.
-          { looseQuad: zeroQuad(), flags: g.flags },
+          { loose: zeroQuad(), ...statesOf(g.flags) },
     );
     return {
       rect: runBounds(buffer, (g) => (g.looseQuad ? pdfQuadBounds(g.looseQuad) : ZERO_RECT)),
-      charStart,
+      start: charStart,
       glyphs,
-      rotation: cls.rotation,
+      rotation: rotationOfBaseline(cls.baselineAngle),
       ascentFlip: cls.ascentFlip,
       ...(fontSize !== undefined ? { fontSize } : {}),
     };
   }
 
-  // Upright (and degenerate-only) runs: the legacy materialization verbatim —
-  // native-offered quads are dropped, the rect seeds from the FIRST glyph's
-  // box (zeroed for empty glyphs, quirk included) and expands over non-empty
-  // glyphs only.
-  const glyphs: PageGeometryGlyph[] = buffer.map((g) => ({
-    looseBox: g.looseBox,
-    flags: g.flags,
-    ...(g.tightBox ? { tightBox: g.tightBox } : {}),
+  // Upright (and degenerate-only) runs: native-offered quads are dropped, and
+  // the rect is the union of the real glyphs' boxes.
+  const glyphs: PageGeometryGlyph<PdfCoordinates>[] = buffer.map((g) => ({
+    loose: g.looseBox,
+    ...(g.tightBox ? { tight: g.tightBox } : {}),
+    ...statesOf(g.flags),
   }));
   return {
     rect: runBounds(buffer, (g) => g.looseBox),
-    charStart,
+    start: charStart,
     glyphs,
     ...(fontSize !== undefined ? { fontSize } : {}),
   };
 }
 
-/** Legacy run-rect algorithm: seed from the first glyph, expand on non-empty. */
+/** A glyph's space and empty states, present only when true. */
+function statesOf(flags: number): { space?: true; empty?: true } {
+  return {
+    ...(flags & FLAG_SPACE ? { space: true } : {}),
+    ...(flags & FLAG_EMPTY ? { empty: true } : {}),
+  };
+}
+
+/**
+ * A run's box: the union of its glyphs' boxes. A glyph with no box
+ * (`FLAG_EMPTY`) has only a zeroed stand-in, so it takes no part; a run of
+ * nothing but such glyphs gets the zeroed box itself.
+ */
 function runBounds(
   buffer: RawGeometryGlyphRecord[],
   boundsOf: (g: RawGeometryGlyphRecord) => PdfRect,
 ): PdfRect {
-  const seed = boundsOf(buffer[0]);
-  const rect = { left: seed.left, bottom: seed.bottom, right: seed.right, top: seed.top };
+  let rect: PdfRect | null = null;
   for (const g of buffer) {
-    if (g.flags & 2) continue;
+    if (g.flags & FLAG_EMPTY) continue;
     const b = boundsOf(g);
+    if (!rect) {
+      rect = { left: b.left, bottom: b.bottom, right: b.right, top: b.top };
+      continue;
+    }
     rect.left = Math.min(rect.left, b.left);
     rect.bottom = Math.min(rect.bottom, b.bottom);
     rect.right = Math.max(rect.right, b.right);
     rect.top = Math.max(rect.top, b.top);
   }
-  return rect;
+  return rect ?? { ...ZERO_RECT };
 }
 
 const ZERO_RECT: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };
 
 function zeroQuad(): PdfQuad {
-  return { p1: { x: 0, y: 0 }, p2: { x: 0, y: 0 }, p3: { x: 0, y: 0 }, p4: { x: 0, y: 0 } };
+  return {
+    upperLeft: { x: 0, y: 0 },
+    upperRight: { x: 0, y: 0 },
+    lowerLeft: { x: 0, y: 0 },
+    lowerRight: { x: 0, y: 0 },
+  };
 }
 
 function emptyRawGlyph(): Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'> {
   return {
-    flags: 2,
+    flags: FLAG_EMPTY,
     looseBox: { left: 0, bottom: 0, right: 0, top: 0 },
     upright: true,
-    rotation: 0,
+    baselineAngle: 0,
     ascentFlip: false,
   };
 }
@@ -325,9 +367,9 @@ function emptyRawGlyph(): Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'>
 function readQuad(mem: PdfRuntimeMemory, ptr: Ptr, byteOffset: number): PdfQuad {
   const f = (offset: number) => readF32(mem, ptr, byteOffset + offset);
   return {
-    p1: { x: f(0), y: f(4) },
-    p2: { x: f(8), y: f(12) },
-    p3: { x: f(16), y: f(20) },
-    p4: { x: f(24), y: f(28) },
+    upperLeft: { x: f(0), y: f(4) },
+    upperRight: { x: f(8), y: f(12) },
+    lowerLeft: { x: f(16), y: f(20) },
+    lowerRight: { x: f(24), y: f(28) },
   };
 }

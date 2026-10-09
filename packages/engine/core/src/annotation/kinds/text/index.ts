@@ -1,19 +1,35 @@
-import type { TextDraft } from './draft';
-import type { TextAnnotationDTO } from './dto';
-import type { TextPatch } from './patch';
-import { TextDTOSchema, TextDraftSchema, TextPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { TextDeclaration } from './declaration';
 
-export type { TextAnnotationDTO } from './dto';
-export type { TextDraft, NoteIcon } from './draft';
-export type { TextPatch } from './patch';
-export { TextDTOSchema, TextDraftSchema, TextPatchSchema, NoteIconSchema } from './schema';
+export { TextDeclaration } from './declaration';
+export type { NoteIcon } from './values';
+export { NoteIconSchema } from './values';
 
-export const TextKind: AnnotationKindModule<'text', TextAnnotationDTO, TextDraft, TextPatch> = {
+export type TextAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof TextDeclaration,
+  C
+>;
+export type TextDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof TextDeclaration,
+  C
+>;
+export type TextPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof TextDeclaration,
+  C
+>;
+
+export const TextDTOSchema = TextDeclaration.readSchema;
+export const TextDraftSchema = TextDeclaration.createSchema;
+export const TextPatchSchema = TextDeclaration.updateSchema;
+
+export const TextKind: AnnotationKindModule<'text', TextAnnotation, TextDraft, TextPatch> = {
   subtype: 'text',
   pdfSubtypeCode: PdfAnnotationSubtypeCode.TEXT,
   dtoSchema: TextDTOSchema,
   draftSchema: TextDraftSchema,
   patchSchema: TextPatchSchema,
+  readBackWrites: TextDeclaration.readBackWrites,
 };

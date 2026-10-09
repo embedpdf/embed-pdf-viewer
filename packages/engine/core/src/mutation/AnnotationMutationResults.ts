@@ -1,44 +1,30 @@
 import type { AnnotationListMutationMeta } from './AnnotationListMutationMeta';
 import type { AppearanceOutcome } from '../annotation/appearance';
-import type { AnnotationDTO } from '../annotation/kinds';
-import type { AnnotationStableId } from '../identity/AnnotationStableId';
+import type { Annotation } from '../annotation/kinds';
+import type { AnnotationRef } from '../identity/AnnotationRef';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
- * Created annotation, fully materialised. The new annotation always has
- * `identityQuality === 'durable'` because the engine uses the
- * `EPDFPage_CreateAnnot` fork helper (which creates an indirect PDF
- * object) and reads it back via `EPDFPage_GetAnnotByObjectNumber`.
+ * Created annotation, fully materialised. It is born as a PDF object, so
+ * it is named by its object number.
  */
-export interface AnnotationCreateResult {
-  created: AnnotationDTO;
+export interface AnnotationCreateResult<C extends Coordinates = PageCoordinates> {
+  annotation: Annotation<C>;
   meta: AnnotationListMutationMeta;
 }
 
-export interface AnnotationUpdateResult {
+export interface AnnotationUpdateResult<C extends Coordinates = PageCoordinates> {
   /**
-   * The updated annotation, fully materialised after the patch.
+   * The updated annotation, fully materialised after the patch, under the
+   * name it had: an update never renames an annotation, and never writes
+   * its /NM.
    *
-   * Note: `updated.ref` may be **stronger** than the input ref. If the
-   * caller updated by `kind: 'index'` against a weak annotation (no /NM,
-   * no indirect object number), the engine stamps a fresh
-   * engine-generated UUID v4 as /NM during the update. The returned ref
-   * will then be `kind: 'nm'`. This is non-structural (no revision bump,
-   * no `shouldRefetch`); use `meta.changed[0]` (or `updated.ref`) to
-   * update cache keys.
-   *
-   * /NM is monotonic per annotation:
-   *   - if the annotation is already durable (has /NM or has objectNumber),
-   *     the engine NEVER touches /NM during update;
-   *   - if the annotation is weak, the engine always stamps a UUID v4.
-   *
-   * The /NM value is opaque to the engine. Callers that need a specific
-   * id for tenant-side bookkeeping should set `draft.nm` at creation
-   * time (the only place caller-supplied identity is accepted), or
-   * maintain a Map<engine-id, tenant-id> on their side. There is
-   * intentionally no `patch.nm` — a stable id that callers can rename
-   * mid-session is not stable.
+   * The /NM value is data to the engine. Callers that keep their own id
+   * in it set `draft.nm` at creation (a create refuses a name its page
+   * already has) and find the annotation by it in a read. There is no
+   * `patch.nm`.
    */
-  updated: AnnotationDTO;
+  annotation: Annotation<C>;
   /**
    * The engine's appearance verdict for this update (see
    * {@link AppearanceOutcome}). Clients drive raster invalidation off
@@ -50,42 +36,34 @@ export interface AnnotationUpdateResult {
   meta: AnnotationListMutationMeta;
 }
 
+/**
+ * A delete: nothing exists after it, so only `meta`. Deleting an annotation
+ * deletes its replies, grouped parts, review states and popups with it;
+ * `meta.changed` names them all, the annotation first.
+ */
 export interface AnnotationDeleteResult {
-  /**
-   * Stable id of the annotation that was deleted. `null` for a weak
-   * annotation (no objectNumber, no /NM): the engine refuses to fabricate
-   * a stable id at delete time, so callers that targeted by index
-   * receive `null` and must fall back to refetching the page list.
-   */
-  deleted: AnnotationStableId | null;
   meta: AnnotationListMutationMeta;
 }
 
 /**
- * Batch annotation move (contiguous-block semantics; symmetric with
- * `pages.move`). The single-annotation case is `move([ref], toIndex)`.
- *
- * Note on identity: any weak ref in the batch is opportunistically
- * upgraded to `kind: 'nm'` with an engine-stamped UUID v4 BEFORE the
- * move happens, mirroring `update()`. So `moved[i].ref` may be stronger
- * than the corresponding input ref. Each `moved[i].index` reflects the
- * post-move index, which is exactly `toIndex + i`.
- *
- * Move is structural for the per-page index space — bumps the page
- * revision once per batch, and `meta.shouldRefetch` is set iff the prior
- * `weakAnnotationState` was known to contain weak annotations.
+ * What a delete removed, as its `annotations.deleted` event names it for
+ * listeners that didn't make the call: the refs in `meta.changed`, the
+ * annotation first.
  */
-export interface AnnotationMoveResult {
-  /**
-   * The moved annotations in their **new order**. `length === refs.length`.
-   * `moved[i]` is the post-move DTO of `refs[i]`, and lives at index
-   * `toIndex + i` in the page's /Annots array.
-   */
-  moved: AnnotationDTO[];
-  /**
-   * One structural envelope per batch. ONE revision bump, one impact
-   * computation, regardless of `refs.length`. `meta.changed` lists the
-   * stable IDs of every moved annotation, in caller order.
-   */
+export function deletedAnnotationsOf(result: AnnotationDeleteResult): AnnotationRef[] {
+  return result.meta.changed;
+}
+
+/**
+ * Result of a stacking-order change (`page.annotations.reorder()`): the
+ * page's annotations in their new paint order, whole, as refs (widgets
+ * excepted: they paint above every annotation, in their own order). The
+ * moved annotations keep their names and their data, so nothing else is
+ * read back.
+ */
+export interface AnnotationReorderResult {
+  /** Every annotation of the page, widgets excepted, bottom to top. */
+  order: AnnotationRef[];
+  /** `meta.changed` names the annotations that moved, in the order given. */
   meta: AnnotationListMutationMeta;
 }

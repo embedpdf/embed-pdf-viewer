@@ -1,10 +1,9 @@
 /**
  * Magic-byte format detection for inline binary payloads.
  *
- * Ported from v2 (`@embedpdf/models` image-metadata). Declared mime types
- * are never trusted — the sniffed format is canonical on every engine and
- * on the server. Raster formats include intrinsic pixel dimensions (used
- * for aspect-ratio fitting); PDF only identifies the format.
+ * Declared mime types are never trusted — the sniffed format is canonical
+ * on every engine and on the server. Raster formats include intrinsic pixel
+ * dimensions (used for aspect-ratio fitting); PDF only identifies the format.
  */
 
 export type BinaryMimeType = 'image/png' | 'image/jpeg' | 'application/pdf';

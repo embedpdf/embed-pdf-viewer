@@ -7,8 +7,11 @@ export type AuditMutationKind =
   | 'annot.create'
   | 'annot.update'
   | 'annot.delete'
-  | 'annot.move'
-  | 'pages.move'
+  /** A page's annotations restacked (`page.annotations.reorder`). */
+  | 'annot.reorder'
+  /** A bundle's annotations, created as one change (`doc.annotations.import`). */
+  | 'annot.import'
+  | 'pages.reorder'
   | 'pages.rotate'
   | 'pages.delete'
   | 'pages.insert'
@@ -16,21 +19,39 @@ export type AuditMutationKind =
   | 'pages.flatten'
   | 'redaction.apply'
   | 'metadata.update'
+  | 'metadata.updateCustom'
   | 'attachment.create'
   | 'attachment.delete'
   | 'form.setValue'
   | 'form.reset'
+  /** A bundle's fields, copied in as one change (`doc.forms.import`). */
   | 'form.import'
+  /** A bundle's values, filled in as one change (`doc.forms.importValues`). */
+  | 'form.importValues'
   | 'form.repair'
   | 'form.createField'
   | 'form.updateField'
   | 'form.deleteField'
-  | 'form.attachWidget'
+  | 'form.addWidget'
   | 'form.detachWidget'
+  /** A widget's place and look (`doc.forms.updateWidget`). */
+  | 'form.updateWidget'
+  /** A page's widgets restacked (`doc.forms.reorderWidgets`). */
+  | 'form.reorderWidgets'
+  /** The form's calculation order changed (`doc.forms.reorderCalculations`). */
+  | 'form.reorderCalculations'
+  /** A widget deleted from its page and its field (`doc.forms.deleteWidget`). */
+  | 'form.deleteWidget'
   | 'form.applyEffects'
   | 'form.setSignatureAppearance'
+  /** A signing was prepared on this layer: the layer is locked until it ends. */
+  | 'signature.prepare'
+  /** A prepared signing was cancelled. */
+  | 'signature.cancel'
   /** A signature published a new base version through this layer. */
-  | 'signature.completed';
+  | 'signature.complete'
+  /** One change of `POST …/changes`: its ops, or an undo (`undoOf`). */
+  | 'change';
 
 export interface AppendAuditLogInput {
   tenantId: string;
@@ -48,10 +69,12 @@ export interface AppendAuditLogInput {
   artifactSize: number;
   idempotencyKey?: string | null;
   payload: unknown;
-  /** Engine-instance session id of the mutating client (X-Engine-Session-Id).
+  /** Session id of the mutating open document (X-Engine-Session-Id).
    *  SSE subscribers drop rows whose origin matches their own session — their
    *  local publish already covered them (exactly-once). */
   originSessionId?: string | null;
+  /** An undo's row: the opId of the change it undid. */
+  undoOf?: string | null;
 }
 
 export interface AuditLogRow extends AppendAuditLogInput {
@@ -91,10 +114,25 @@ export class AuditLogRepo {
         idempotency_key: input.idempotencyKey ?? null,
         payload_json: JSON.stringify(input.payload),
         origin_session_id: input.originSessionId ?? null,
+        undo_of: input.undoOf ?? null,
       })
       .returning('id')
       .executeTakeFirstOrThrow();
     return Number(row.id);
+  }
+
+  /**
+   * The row a layer committed under `idempotencyKey`, if any: a retried
+   * request finds the change it already made (unique per layer).
+   */
+  async findByIdempotencyKey(layerId: string, idempotencyKey: string): Promise<AuditLogRow | null> {
+    const row = await this.db
+      .selectFrom('audit_log')
+      .selectAll()
+      .where('layer_id', '=', layerId)
+      .where('idempotency_key', '=', idempotencyKey)
+      .executeTakeFirst();
+    return row ? mapAuditRow(row) : null;
   }
 
   async findForDocTimeRange(input: {
@@ -181,6 +219,7 @@ interface AuditLogDbRow {
   idempotency_key: string | null;
   payload_json: string;
   origin_session_id: string | null;
+  undo_of?: string | null;
 }
 
 function mapAuditRow(row: AuditLogDbRow): AuditLogRow {
@@ -201,6 +240,7 @@ function mapAuditRow(row: AuditLogDbRow): AuditLogRow {
     artifactSize: Number(row.artifact_size),
     idempotencyKey: row.idempotency_key,
     originSessionId: row.origin_session_id ?? null,
+    undoOf: row.undo_of ?? null,
     payload: JSON.parse(row.payload_json) as unknown,
   };
 }

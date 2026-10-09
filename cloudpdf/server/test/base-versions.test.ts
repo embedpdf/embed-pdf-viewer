@@ -45,13 +45,30 @@ async function migrateAll(): Promise<void> {
 async function seedReadyDocument(): Promise<void> {
   await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
   const documents = new DocumentsRepo(db);
-  await documents.createPending({ id: DOC, tenantId: TENANT, metadata: null, idempotencyKey: null, createdBy: null });
-  const committed = await documents.commit({ id: DOC, tenantId: TENANT, baseSha: SHA1, storageSizeBytes: 1234 });
+  await documents.createPending({
+    id: DOC,
+    tenantId: TENANT,
+    metadata: null,
+    idempotencyKey: null,
+    createdBy: null,
+  });
+  const committed = await documents.commit({
+    id: DOC,
+    tenantId: TENANT,
+    baseSha: SHA1,
+    storageSizeBytes: 1234,
+  });
   expect(committed?.state).toBe('ready');
-  await new BaseVersionsRepo(db).insertInitial({ tenantId: TENANT, docId: DOC, sha256: SHA1, byteLength: 1234, createdAt: 1 });
+  await new BaseVersionsRepo(db).insertInitial({
+    tenantId: TENANT,
+    docId: DOC,
+    sha256: SHA1,
+    byteLength: 1234,
+    createdAt: 1,
+  });
   await new DocumentPagesRepo(db).upsertForDocument(DOC, [
-    { pageObjectNumber: 11, hasWeakAnnotations: false },
-    { pageObjectNumber: 22, hasWeakAnnotations: false },
+    { pageObjectNumber: 11 },
+    { pageObjectNumber: 22 },
   ]);
 }
 
@@ -84,7 +101,11 @@ async function publishVersion2(): Promise<void> {
       metadataVersion: 2,
       createdAt: 2,
     });
-    await trx.updateTable('documents').set({ base_sha: SHA2, doc_version: 5 }).where('id', '=', DOC).execute();
+    await trx
+      .updateTable('documents')
+      .set({ base_sha: SHA2, doc_version: 5 })
+      .where('id', '=', DOC)
+      .execute();
   });
 }
 
@@ -104,17 +125,36 @@ describe('storage keys', () => {
 describe('migration 030', () => {
   test('backfills version 1 for every document with a base and stamps layers with the head', async () => {
     const upTo029 = sqliteMigrations.filter((m) => m.version < '030');
-    expect(upTo029).toHaveLength(sqliteMigrations.length - 1);
+    expect(upTo029.at(-1)?.version).toBe('029');
     await migrate(db, { source: { kind: 'inline', migrations: upTo029 } });
     const now = 1000;
     await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
     const documents = new DocumentsRepo(db);
-    await documents.createPending({ id: DOC, tenantId: TENANT, metadata: null, idempotencyKey: null, createdBy: null });
+    await documents.createPending({
+      id: DOC,
+      tenantId: TENANT,
+      metadata: null,
+      idempotencyKey: null,
+      createdBy: null,
+    });
     await documents.commit({ id: DOC, tenantId: TENANT, baseSha: SHA1, storageSizeBytes: 777 });
-    await documents.createPending({ id: 'doc-pending', tenantId: TENANT, metadata: null, idempotencyKey: null, createdBy: null });
+    await documents.createPending({
+      id: 'doc-pending',
+      tenantId: TENANT,
+      metadata: null,
+      idempotencyKey: null,
+      createdBy: null,
+    });
     await db
       .insertInto('layers')
-      .values({ id: 'layer-old', doc_id: DOC, tenant_id: TENANT, name: 'alice', created_at: now, updated_at: now } as never)
+      .values({
+        id: 'layer-old',
+        doc_id: DOC,
+        tenant_id: TENANT,
+        name: 'alice',
+        created_at: now,
+        updated_at: now,
+      } as never)
       .execute();
 
     await migrateAll();
@@ -145,12 +185,20 @@ describe('BaseVersionsRepo', () => {
 
   test('version 1 is idempotent; a published version numbers after its parent and never twice', async () => {
     const repo = new BaseVersionsRepo(db);
-    await repo.insertInitial({ tenantId: TENANT, docId: DOC, sha256: SHA1, byteLength: 1234, createdAt: 9 });
+    await repo.insertInitial({
+      tenantId: TENANT,
+      docId: DOC,
+      sha256: SHA1,
+      byteLength: 1234,
+      createdAt: 9,
+    });
     expect(await repo.listForDocument(DOC)).toHaveLength(1);
 
     await publishVersion2();
     const versions = await repo.listForDocument(DOC);
-    expect(versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producerKind, v.producerRef])).toEqual([
+    expect(
+      versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producerKind, v.producerRef]),
+    ).toEqual([
       [1, SHA1, null, 'upload', null],
       [2, SHA2, SHA1, 'signature', 'signing-1'],
     ]);
@@ -207,24 +255,49 @@ describe('DocumentSigningsRepo', () => {
     const { layer } = await layerService.materializeLayerForWrite(ctx, DOC, 'alice');
     const repo = new DocumentSigningsRepo(db);
 
-    const row = await db.transaction().execute((trx) => repo.insertPrepared(trx, prepared('sig-1', layer.id, 10_000)));
+    const row = await db
+      .transaction()
+      .execute((trx) => repo.insertPrepared(trx, prepared('sig-1', layer.id, 10_000)));
     expect(row.state).toBe('prepared');
     expect(await repo.findPending(layer.id)).toMatchObject({ id: 'sig-1' });
     // The partial unique index: a second prepare on the layer fails.
     await expect(
-      db.transaction().execute((trx) => repo.insertPrepared(trx, prepared('sig-2', layer.id, 10_000))),
+      db
+        .transaction()
+        .execute((trx) => repo.insertPrepared(trx, prepared('sig-2', layer.id, 10_000))),
     ).rejects.toThrow(/UNIQUE|unique/);
 
     // Claim: exactly one caller wins; a second claim sees the row gone from `prepared`.
-    expect(await repo.transition(db, 'sig-1', 'prepared', 'completed', { cmsSha256: 'e'.repeat(64), finishedAt: 500 }, { notExpiredAt: 500 })).toBe(true);
-    expect(await repo.transition(db, 'sig-1', 'prepared', 'completed', {}, { notExpiredAt: 500 })).toBe(false);
-    expect(await repo.find('sig-1')).toMatchObject({ state: 'completed', cmsSha256: 'e'.repeat(64), finishedAt: 500 });
+    expect(
+      await repo.transition(
+        db,
+        'sig-1',
+        'prepared',
+        'completed',
+        { cmsSha256: 'e'.repeat(64), finishedAt: 500 },
+        { notExpiredAt: 500 },
+      ),
+    ).toBe(true);
+    expect(
+      await repo.transition(db, 'sig-1', 'prepared', 'completed', {}, { notExpiredAt: 500 }),
+    ).toBe(false);
+    expect(await repo.find('sig-1')).toMatchObject({
+      state: 'completed',
+      cmsSha256: 'e'.repeat(64),
+      finishedAt: 500,
+    });
     expect(await repo.findPending(layer.id)).toBeNull();
 
     // After completion the layer can prepare again; an expired row cannot be claimed and is swept.
-    await db.transaction().execute((trx) => repo.insertPrepared(trx, prepared('sig-3', layer.id, 600)));
-    expect(await repo.transition(db, 'sig-3', 'prepared', 'completed', {}, { notExpiredAt: 700 })).toBe(false);
-    expect(await repo.expireDue(700)).toEqual([{ id: 'sig-3', tailKey: StorageKeys.signingTail(TENANT, DOC, 'sig-3') }]);
+    await db
+      .transaction()
+      .execute((trx) => repo.insertPrepared(trx, prepared('sig-3', layer.id, 600)));
+    expect(
+      await repo.transition(db, 'sig-3', 'prepared', 'completed', {}, { notExpiredAt: 700 }),
+    ).toBe(false);
+    expect(await repo.expireDue(700)).toEqual([
+      { id: 'sig-3', tailKey: StorageKeys.signingTail(TENANT, DOC, 'sig-3') },
+    ]);
     expect(await repo.expireDue(700)).toEqual([]);
     expect((await repo.find('sig-3'))?.state).toBe('expired');
     expect((await repo.listForDocument(DOC)).map((s) => s.id)).toEqual(['sig-3', 'sig-1']);
@@ -240,17 +313,28 @@ describe('layers over base versions', () => {
   test('a new layer is seeded from the head: its sha, its docVersion, its version pointers', async () => {
     const { layerService, layerState } = services();
     const alice = await layerService.materializeLayerForWrite(ctx, DOC, 'alice');
-    expect(alice.layer).toMatchObject({ baseSha: SHA1, docVersion: 1, ...INITIAL_BASE_POINTERS, currentVersion: 0 });
+    expect(alice.layer).toMatchObject({
+      baseSha: SHA1,
+      docVersion: 1,
+      ...INITIAL_BASE_POINTERS,
+      currentVersion: 0,
+    });
 
     await publishVersion2();
     const bob = await layerService.materializeLayerForWrite(ctx, DOC, 'bob');
-    expect(bob.layer).toMatchObject({ baseSha: SHA2, docVersion: 5, metadataVersion: 2, layoutVersion: 1 });
+    expect(bob.layer).toMatchObject({
+      baseSha: SHA2,
+      docVersion: 5,
+      metadataVersion: 2,
+      layoutVersion: 1,
+    });
 
     // Bob inherits every plane at the head's epochs (metadata 2 = 2 is
     // inherited, not owned); Alice is behind the head: diverged everywhere.
     expect(await layerState.computeLayerScopesFromDb(DOC, 'bob')).toEqual({
       content: 'base',
       annotations: 'base',
+      forms: 'base',
       layout: 'base',
       attachments: 'base',
       metadata: 'base',
@@ -259,13 +343,17 @@ describe('layers over base versions', () => {
     expect(await layerState.computeLayerScopesFromDb(DOC, 'alice')).toEqual({
       content: 'layer',
       annotations: 'layer',
+      forms: 'layer',
       layout: 'layer',
       attachments: 'layer',
       metadata: 'layer',
       actions: 'base',
     });
     // A never-written layer name is trivially inherited.
-    expect(await layerState.computeLayerScopesFromDb(DOC, 'carol')).toMatchObject({ content: 'base', metadata: 'base' });
+    expect(await layerState.computeLayerScopesFromDb(DOC, 'carol')).toMatchObject({
+      content: 'base',
+      metadata: 'base',
+    });
   });
 
   test('manifests carry the signing fences and the version facts', async () => {
@@ -276,19 +364,37 @@ describe('layers over base versions', () => {
     const manifest = layerState.buildLayerManifest(
       DOC,
       head!,
+      null,
       'alice',
       alice.layer,
       alice.pages,
       layerState.computeLayerScopes(alice.layer, alice.pages, alice.pages, head),
     );
-    expect(manifest).toMatchObject({ baseSha: SHA1, baseByteLength: 1234, layerVersion: 0, working: false, docVersion: 1 });
+    expect(manifest).toMatchObject({
+      baseSha: SHA1,
+      baseByteLength: 1234,
+      layerVersion: 0,
+      working: false,
+      docVersion: 1,
+      protection: null,
+    });
     const base = layerState.buildBaseManifest(
       { id: DOC, baseSha: SHA1, docVersion: 1 } as never,
       alice.pages,
       { ...head!, metadataVersion: 3 },
+      null,
     );
-    expect(base).toMatchObject({ metadataVersion: 3, layerVersion: 0, working: false, baseByteLength: 1234 });
+    expect(base).toMatchObject({
+      metadataVersion: 3,
+      layerVersion: 0,
+      working: false,
+      baseByteLength: 1234,
+    });
     // A published version's facts fall back to the initial epochs only when uncatalogued.
-    expect(await layerState.baseVersionFacts(DOC, 'f'.repeat(64), 55)).toEqual({ sha256: 'f'.repeat(64), byteLength: 55, ...INITIAL_BASE_POINTERS });
+    expect(await layerState.baseVersionFacts(DOC, 'f'.repeat(64), 55)).toEqual({
+      sha256: 'f'.repeat(64),
+      byteLength: 55,
+      ...INITIAL_BASE_POINTERS,
+    });
   });
 });

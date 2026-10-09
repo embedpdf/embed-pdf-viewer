@@ -2,51 +2,55 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
-  createPageImageHandle,
-  encodeStableIdKey,
-  normalizeAnnotationDraft,
-  normalizeAnnotationPatch,
-  type WireResourceMap,
-  type AnnotationAppearanceImage,
+  deletedAnnotationsOf,
+  encodeAnnotKey,
+  hasAnnotationResources,
+  opIdOf,
+  resolveAnnotationResources,
+  withFileFromResource,
+  type AnnotationResourceRole,
+  type AnnotationCreateOptions,
+  type AnnotationUpdateOptions,
+  type WireAnnotationResources,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
-  type AnnotationAppearanceRenderOptions,
-  type AnnotationAppearancesResult,
   type AnnotationDraft,
-  type AnnotationListPageSnapshot,
+  type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
-  type AnnotationMoveResult,
-  type PageFlattenUsage,
+  type AnnotationPosition,
+  type AnnotationReorderResult,
+  type FlattenWriteOptions,
   type AnnotationUpdateResult,
-  type AttachmentContent,
   type DocumentEventInit,
   type MutationMeta,
   type PageAnnotationsService,
-  type PageImageResult,
   type PageNetworkRenderFormat,
   type PageRef,
+  type WriteOptions,
+  checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
-  AnnotationListPageSnapshotSchema,
-  AnnotationAppearanceManifestSchema,
+  AnnotationListSchema,
   AnnotationFlattenResultSchema,
-  AnnotationMoveResultSchema,
+  AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
   annotationAppearancesImageOptionsToWire,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
-import { buildMutationForm, hasResources } from './buildMutationForm';
+import { parseAppearanceForm } from './appearanceForm';
+import { buildAnnotationMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrite, CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
-import { parseAttachmentContent } from './parseAttachmentContent';
+import { withObjectNumbers } from '../shared/withObjectNumbers';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -67,29 +71,30 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
-  list(): AbortablePromise<AnnotationListPageSnapshot> {
+  list(): AbortablePromise<AnnotationList> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
+    return AbortablePromise.run<AnnotationList>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.objectNumber;
+        const page = manifest.pages.find((p) => p.page.objectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: the list depends on the `annotations` plane. A
-        // base's own annotations (weak-identity ones included) are simply
-        // VISIBLE through an inheriting layer, so every visitor reads ONE
-        // doc-level URL served from the base session.
+        // base's own annotations are simply visible through an inheriting
+        // layer, so every visitor reads one doc-level URL served from the
+        // base session.
         return planesInherited(manifest, ['annotations'])
           ? wirePaths.docPageAnnotations(this.docId, this.pageRef, page.cache.annotationVersion)
           : wirePaths.layerPageAnnotations(
@@ -101,7 +106,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       };
       return this.http.getJsonWithRefresh(
         buildPath,
-        (raw) => AnnotationListPageSnapshotSchema.parse(raw),
+        (raw) => AnnotationListSchema.parse(raw),
         async (s) => {
           await this.manifest.refresh(s);
         },
@@ -111,17 +116,6 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   }
 
   renderAppearances(
-    _options?: AnnotationAppearanceRenderOptions,
-  ): AbortablePromise<AnnotationAppearancesResult> {
-    return AbortablePromise.rejectReason(
-      new EngineError(
-        EngineErrorCode.NotImplemented,
-        'annotations.renderAppearances() raw rasters are not available in the cloud engine; use renderAppearanceImages()',
-      ),
-    );
-  }
-
-  renderAppearanceImages(
     options: AnnotationAppearanceImageOptions = {},
   ): AbortablePromise<AnnotationAppearanceImagesResult> {
     if (this.isClosed()) {
@@ -130,18 +124,19 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
     }
     return AbortablePromise.run<AnnotationAppearanceImagesResult>(async (signal) => {
+      checkImageQuality(options.quality);
       // The cloud appearance endpoint is always content-addressed, so the URL
       // must carry an explicit network format (PNG/WebP). Default to WebP when
       // the caller omits it, matching render.image().
       const format: PageNetworkRenderFormat = options.format ?? 'webp';
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.objectNumber;
+        const page = manifest.pages.find((p) => p.page.objectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         const wireToken = annotationAppearancesImageOptionsToWire(
@@ -171,41 +166,45 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   }
 
   /**
-   * Decode and return the file embedded in a FileAttachment annotation.
-   * A read over the immutable `attachment-files` leaf, pinned by the
-   * manifest's `attachmentsVersion` (annotation-level files re-key on the
-   * same pin as document-level ones), with the same stale-404 refresh
-   * retry as {@link list}. Weak `index` refs cannot be spliced into a GET
-   * URL (no body to carry the revision), so bytes reads require a stable
-   * id — the same `:annotKey` routing update()/delete() use.
+   * One of the annotation's resources. `file` is a read over the immutable
+   * `attachment-files` leaf, pinned by the manifest's `attachmentsVersion`
+   * (annotation-level files re-key on the same pin as document-level ones),
+   * with the same stale-404 refresh retry as {@link list}. `appearance` is a
+   * derived read (no-store), like {@link exportAppearance}. Both address the
+   * annotation by the same `:annotKey` update()/delete() use.
    */
-  downloadFile(ref: AnnotationRef): AbortablePromise<AttachmentContent> {
+  downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+    if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
+          `ref.page ${ref.page.objectNumber} != page ${this.pageRef.objectNumber}`,
         ),
       );
     }
-    if (ref.kind === 'index') {
-      return AbortablePromise.rejectReason(
-        new EngineError(
-          EngineErrorCode.InvalidArg,
-          'downloadFile requires a stable ref (objectNumber or nm); index refs cannot address the content-addressed file leaf',
+    const annotKey = encodeAnnotKey(ref);
+    if (role === 'appearance') {
+      return AbortablePromise.run<Uint8Array>(async (signal) =>
+        this.http.getBytes(
+          wirePaths.layerAnnotationAppearanceResource(
+            this.docId,
+            this.layerName,
+            this.pageRef,
+            annotKey,
+          ),
+          signal,
         ),
       );
     }
-    const annotKey = encodeStableIdKey(refToStableId(ref));
-    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+    return AbortablePromise.run<Uint8Array>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // A FileAttachment annotation's bytes depend on BOTH planes —
+        // A FileAttachment annotation's bytes depend on both planes —
         // the annotation must exist in this view (`annotations`) and the
         // byte pin is `attachmentsVersion` (`attachments`).
         return planesInherited(manifest, ['annotations', 'attachments'])
@@ -230,205 +229,261 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         },
         signal,
       );
-      return parseAttachmentContent(file);
+      return file.bytes;
     });
   }
 
-  create(draft: AnnotationDraft): AbortablePromise<AnnotationCreateResult> {
+  create(
+    draft: AnnotationDraft,
+    options: AnnotationCreateOptions = {},
+  ): AbortablePromise<AnnotationCreateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
-      // Split inline BinarySource fields (stamp images, …) into the wire
-      // draft + binary resources. Without resources the request is the
-      // plain JSON POST it has always been; with resources it becomes
-      // multipart: a `body` JSON part + one `resource:{key}` part each —
-      // the mirror image of the appearance-render response.
-      const { wire, resources } = await normalizeAnnotationDraft(draft);
-      const path = wirePaths.layerPageAnnotationsCreate(this.docId, this.layerName, this.pageRef);
-      const parse = (raw: unknown) => AnnotationCreateResultSchema.parse(raw);
-      const result = hasResources(resources)
-        ? await this.http.postMultipartJson(path, buildMutationForm(wire, resources), parse, signal)
-        : await this.http.postJson(path, wire, parse, signal);
-      return this.absorbMutation(result, 'annotation.created');
-    });
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const { resources, objectNumber } = options;
+    // A `File` brings its name and type; the bytes travel without them.
+    const data = withFileFromResource(draft, resources);
+    const path = withObjectNumbers(
+      wirePaths.layerPageAnnotationsCreate(this.docId, this.layerName, this.pageRef),
+      { objectNumber },
+    );
+    return AbortablePromise.run<AnnotationCreateResult>((signal) =>
+      this.writes.run(
+        opId,
+        signal,
+        async (write) => {
+          // Without resources the request is the plain JSON POST of the data;
+          // with them it is multipart (see `buildAnnotationMutationForm`).
+          const wireResources = await resolveAnnotationResources(resources);
+          const parse = (raw: unknown) => AnnotationCreateResultSchema.parse(raw);
+          const result = await write.send((sent) =>
+            hasAnnotationResources(wireResources)
+              ? this.http.postMultipartJson(
+                  path,
+                  buildAnnotationMutationForm(data, wireResources),
+                  parse,
+                  signal,
+                  sent,
+                )
+              : this.http.postJson(path, data, parse, signal, sent),
+          );
+          return this.absorbMutation(opId, result, 'annotations.created');
+        },
+        [objectNumber],
+      ),
+    );
   }
 
-  update(ref: AnnotationRef, patch: AnnotationPatch): AbortablePromise<AnnotationUpdateResult> {
+  update(
+    ref: AnnotationRef,
+    patch: AnnotationPatch,
+    options: AnnotationUpdateOptions = {},
+  ): AbortablePromise<AnnotationUpdateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const { resources } = options;
+    if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
+          `ref.page ${ref.page.objectNumber} != page ${this.pageRef.objectNumber}`,
         ),
       );
     }
-    if (ref.kind === 'index') {
-      // Index refs cannot be addressed by stable id. Send the full ref
-      // in the body so the server can validate the revision and resolve
-      // it the same way the local mutator does.
-      const path = wirePaths.layerAnnotationByKey(
-        this.docId,
-        this.layerName,
-        this.pageRef,
-        'index',
-      );
-      return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-        const { wire, resources } = await normalizeAnnotationPatch(patch);
-        const result = await this.patchMutation(path, { ref, patch: wire }, resources, signal);
-        return this.absorbMutation(result, 'annotation.updated');
-      });
-    }
-    const stableKey = encodeStableIdKey(refToStableId(ref));
     const path = wirePaths.layerAnnotationByKey(
       this.docId,
       this.layerName,
       this.pageRef,
-      stableKey,
+      encodeAnnotKey(ref),
     );
-    return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-      const { wire, resources } = await normalizeAnnotationPatch(patch);
-      const result = await this.patchMutation(path, { patch: wire }, resources, signal);
-      return this.absorbMutation(result, 'annotation.updated');
-    });
+    return AbortablePromise.run<AnnotationUpdateResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const wireResources = await resolveAnnotationResources(resources);
+        const result = await this.patchMutation(write, path, { patch }, wireResources, signal);
+        return this.absorbMutation(opId, result, 'annotations.updated');
+      }),
+    );
   }
 
-  /** PATCH as plain JSON, or as multipart when the patch carried binaries. */
+  /** PATCH as plain JSON, or as multipart when resources came with the patch. */
   private patchMutation(
+    write: CloudWrite,
     path: string,
-    body: unknown,
-    resources: WireResourceMap,
+    body: object,
+    resources: WireAnnotationResources,
     signal: AbortSignal,
   ): Promise<AnnotationUpdateResult> {
     const parse = (raw: unknown) => AnnotationUpdateResultSchema.parse(raw);
-    if (hasResources(resources)) {
-      return this.http.patchMultipartJson(path, buildMutationForm(body, resources), parse, signal);
-    }
-    return this.http.patchJson(path, body, parse, signal);
+    return write.send((sent) =>
+      hasAnnotationResources(resources)
+        ? this.http.patchMultipartJson(
+            path,
+            buildAnnotationMutationForm(body, resources),
+            parse,
+            signal,
+            sent,
+          )
+        : this.http.patchJson(path, body, parse, signal, sent),
+    );
   }
 
-  delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult> {
+  delete(ref: AnnotationRef, options?: WriteOptions): AbortablePromise<AnnotationDeleteResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    if (ref.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.InvalidArg,
-          `ref.page ${ref.page.pageObjectNumber} != page ${this.pageRef.pageObjectNumber}`,
+          `ref.page ${ref.page.objectNumber} != page ${this.pageRef.objectNumber}`,
         ),
       );
     }
-    if (ref.kind === 'index') {
-      // DELETE has no body in plain HTTP, so we PATCH the same
-      // 'index' key with `{ ref, op: 'delete' }`. This keeps the
-      // semantics atomic on the server (single round-trip).
-      const path = wirePaths.layerAnnotationByKey(
-        this.docId,
-        this.layerName,
-        this.pageRef,
-        'index',
-      );
-      return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
-        const result = await this.http.patchJson(
-          path,
-          { ref, op: 'delete' },
-          (raw) => AnnotationDeleteResultSchema.parse(raw),
-          signal,
-        );
-        return this.absorbMutation(result, 'annotation.deleted');
-      });
-    }
-    const stableKey = encodeStableIdKey(refToStableId(ref));
     const path = wirePaths.layerAnnotationByKey(
       this.docId,
       this.layerName,
       this.pageRef,
-      stableKey,
+      encodeAnnotKey(ref),
     );
-    return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
-      const result = await this.http.deleteJson(
-        path,
-        (raw) => AnnotationDeleteResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(result, 'annotation.deleted');
-    });
+    return AbortablePromise.run<AnnotationDeleteResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.deleteJson(
+            path,
+            (raw) => AnnotationDeleteResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbDelete(opId, result);
+      }),
+    );
   }
 
-  move(refs: AnnotationRef[], toIndex: number): AbortablePromise<AnnotationMoveResult> {
+  reorder(
+    refs: AnnotationRef[],
+    position: AnnotationPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<AnnotationReorderResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
+    }
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
     }
     // The page is part of the URL; the worker validates per-ref consistency
     // again, but rejecting up front gives a cleaner error from the client side.
     for (const r of refs) {
-      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+      if (r.page.objectNumber !== this.pageRef.objectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `move ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
+            `reorder ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
           ),
         );
       }
     }
-    const path = wirePaths.layerPageAnnotationsMove(this.docId, this.layerName, this.pageRef);
-    return AbortablePromise.run<AnnotationMoveResult>(async (signal) => {
-      const result = await this.http.postJson(
-        path,
-        { refs, toIndex },
-        (raw) => AnnotationMoveResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(result, 'annotation.moved');
-    });
+    const path = wirePaths.layerPageAnnotationsReorder(this.docId, this.layerName, this.pageRef);
+    return AbortablePromise.run<AnnotationReorderResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            path,
+            { refs, position },
+            (raw) => AnnotationReorderResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // A reorder moves only the annotations: widgets have their own order.
+        this.manifest.apply(result.meta, ['annotations']);
+        this.publisher.publishWrite(opId, {
+          type: 'annotations.reordered',
+          page: this.pageRef,
+          ...result,
+        });
+        return result;
+      }),
+    );
   }
 
   flatten(
     refs: AnnotationRef[],
-    usage: PageFlattenUsage = 'display',
+    options?: FlattenWriteOptions,
   ): AbortablePromise<AnnotationFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
     for (const r of refs) {
-      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+      if (r.page.objectNumber !== this.pageRef.objectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `flatten ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
+            `flatten ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
           ),
         );
       }
     }
     const path = wirePaths.layerPageAnnotationsFlatten(this.docId, this.layerName, this.pageRef);
-    return AbortablePromise.run<AnnotationFlattenResult>(async (signal) => {
-      const result = await this.http.postJson(
-        path,
-        { refs, usage },
-        (raw) => AnnotationFlattenResultSchema.parse(raw),
-        signal,
-      );
-      // Nothing applied means no artifact and no coherence bump.
-      if (result.meta === null) return result;
-      // Flatten bakes annotations into page content, so both planes flip.
-      this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishLocal({ type: 'annotations.flattened', ...result });
-      return result;
-    });
+    return AbortablePromise.run<AnnotationFlattenResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            path,
+            { refs, usage },
+            (raw) => AnnotationFlattenResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Nothing applied comes back without a cache delta: no artifact, no
+        // coherence bump, no event.
+        if (result.meta.cacheDelta === null) return result;
+        // Flatten bakes annotations and form fields into page content.
+        this.manifest.apply(result.meta, ['content', 'annotations', 'forms']);
+        this.publisher.publishWrite(opId, { type: 'annotations.flattened', ...result });
+        return result;
+      }),
+    );
   }
 
   exportAppearance(refs: AnnotationRef[]): AbortablePromise<Uint8Array> {
@@ -438,11 +493,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
     }
     for (const r of refs) {
-      if (r.page.pageObjectNumber !== this.pageRef.pageObjectNumber) {
+      if (r.page.objectNumber !== this.pageRef.objectNumber) {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `exportAppearance ref points at page ${r.page.pageObjectNumber}; service is bound to page ${this.pageRef.pageObjectNumber}`,
+            `exportAppearance ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
           ),
         );
       }
@@ -464,91 +519,29 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
    * `type` with the matching result by construction; the cast localizes that
    * pairing here instead of widening every site.
    */
+  /** A delete's event names what went, for listeners that didn't delete it. */
+  private absorbDelete(opId: string, result: AnnotationDeleteResult): AnnotationDeleteResult {
+    this.manifest.apply(result.meta, ['annotations']);
+    this.publisher.publishWrite(opId, {
+      type: 'annotations.deleted',
+      page: this.pageRef,
+      deleted: deletedAnnotationsOf(result),
+      ...result,
+    });
+    return result;
+  }
+
   private absorbMutation<T extends { meta: MutationMeta }>(
+    opId: string,
     result: T,
-    type: 'annotation.created' | 'annotation.updated' | 'annotation.deleted' | 'annotation.moved',
+    type: 'annotations.created' | 'annotations.updated',
   ): T {
     this.manifest.apply(result.meta, ['annotations']);
-    this.publisher.publishLocal({
+    this.publisher.publishWrite(opId, {
       type,
       page: this.pageRef,
       ...result,
     } as unknown as DocumentEventInit);
     return result;
   }
-}
-
-/**
- * Parse the appearance `multipart/form-data` response into the same
- * `AnnotationAppearanceImagesResult` shape the local engine produces. The
- * `manifest` part is validated against the wire schema; each image part is
- * wrapped in a `PageImageHandle` backed by the in-memory blob we already
- * downloaded.
- */
-async function parseAppearanceForm(form: FormData): Promise<AnnotationAppearanceImagesResult> {
-  const manifestRaw = form.get('manifest');
-  if (typeof manifestRaw !== 'string') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      'appearance response missing JSON manifest part',
-    );
-  }
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(manifestRaw);
-  } catch (err) {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `appearance manifest is not valid JSON: ${(err as Error)?.message ?? err}`,
-    );
-  }
-  const manifest = AnnotationAppearanceManifestSchema.parse(parsedJson);
-
-  const appearances: AnnotationAppearanceImage[] = await Promise.all(
-    manifest.appearances.map(async (entry) => {
-      const partValue = form.get(entry.part);
-      if (partValue === null || typeof partValue === 'string') {
-        throw new EngineError(
-          EngineErrorCode.WireFormat,
-          `appearance response missing image part "${entry.part}"`,
-        );
-      }
-      const blob = partValue as Blob;
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const result: PageImageResult = {
-        width: entry.width,
-        height: entry.height,
-        format: entry.format,
-        contentType: entry.contentType,
-        source: { kind: 'bytes', bytes },
-      };
-      const image = createPageImageHandle(result, {
-        async blob() {
-          return blob;
-        },
-      });
-      return {
-        ref: entry.ref,
-        mode: entry.mode,
-        rect: entry.rect,
-        image,
-      };
-    }),
-  );
-
-  return { pageState: manifest.pageState, appearances };
-}
-
-/**
- * Local helper: project a non-index `AnnotationRef` into the matching
- * `AnnotationStableId` shape so we can route by stable key. The compiler
- * narrows on `ref.kind` here so we can't accidentally pass an index ref.
- */
-function refToStableId(
-  ref: Extract<AnnotationRef, { kind: 'objectNumber' | 'nm' }>,
-): { kind: 'objectNumber'; value: number } | { kind: 'nm'; value: string } {
-  if (ref.kind === 'objectNumber') {
-    return { kind: 'objectNumber', value: ref.annotObjectNumber };
-  }
-  return { kind: 'nm', value: ref.nm };
 }

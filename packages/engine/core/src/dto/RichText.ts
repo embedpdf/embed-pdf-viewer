@@ -67,6 +67,24 @@ export interface RichTextParagraph extends Partial<RichTextParagraphProps> {
 
 export type RichTextBody = RichTextRunStyle & RichTextParagraphProps;
 
+/**
+ * The body a partial input body completes itself from: Helvetica 12 pt
+ * black, left-aligned, ltr, nothing else set.
+ */
+export const DEFAULT_RICH_TEXT_BODY: Readonly<RichTextBody> = {
+  family: 'Helvetica',
+  weight: 400,
+  italic: false,
+  size: 12,
+  color: '#000000',
+  decoration: [],
+  script: 'normal',
+  letterSpacing: 0,
+  horizontalScale: 1,
+  align: 'left',
+  dir: 'ltr',
+};
+
 /** What an annotation reads back: a complete body, every paragraph resolved. */
 export interface RichTextDocument {
   body: RichTextBody;

@@ -1,0 +1,308 @@
+---
+title: Permissions
+description: What a user may do with a document, how to check it before you show a button, and what happens when a call is refused.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Permissions
+
+A document can be opened with less than full power: a reviewer who may comment but not download,
+a signer who may only fill in the form, a public link that only shows the pages. Each thing a user
+may do is a permission, a string like `doc.download`.
+
+Check a permission before you show the control for it:
+
+```ts
+if (doc.security.allows('doc.download')) {
+  showDownloadButton();
+}
+```
+
+The engine checks every call too. A call the user may not make fails with `Forbidden`, so hiding
+a button is about honest UI, not safety.
+
+## Where permissions come from
+
+<Engine local>
+
+You give them when you open the document:
+
+```ts
+const doc = await engine.open(
+  { kind: 'bytes', bytes },
+  { scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.annotate.read'] },
+);
+```
+
+Without `scope`, the user gets every permission, and the engine logs a reminder once. That's
+handy while you build; pass the permissions your users will really have, so you see the interface
+they'll see.
+
+A scope without `doc.open` can't open the document: `open()` fails with `Forbidden`, as it does
+on a cloud server.
+
+</Engine>
+
+<Engine cloud>
+
+They're in the user's token, which your backend creates. The server checks them on every request.
+See [Authentication](/docs/engine/authentication#what-a-token-carries).
+
+</Engine>
+
+To list what the user was given (for a "you can…" panel), read `doc.security.scope`.
+
+## Every permission
+
+| Permission               | What it allows                                                                                             |
+| :----------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `doc.open`               | Open the document and list its pages.                                                                      |
+| `doc.render`             | Render pages as images.                                                                                    |
+| `doc.text.select`        | Where text is: selecting it and the text layout.                                                           |
+| `doc.text.search`        | Search, with where each match is.                                                                          |
+| `doc.text.copy`          | The text itself: reading it, copying it, search snippets.                                                  |
+| `doc.download`           | Download the file, attached files and stamp drawings, signed revisions; export annotations; extract pages. |
+| `doc.print`              | Print, in the viewer.                                                                                      |
+| `doc.pages.assemble`     | Rotate, move, delete, insert and name pages.                                                               |
+| `doc.pages.modify`       | Change page content: flatten, redact (with the permissions below).                                         |
+| `doc.annotate.read`      | See annotations.                                                                                           |
+| `doc.annotate.modify`    | Create, change and delete any annotation.                                                                  |
+| `doc.annotate.import`    | Import annotations with their original authors and dates.                                                  |
+| `doc.forms.read`         | See form fields and their values.                                                                          |
+| `doc.forms.fill`         | Fill in form fields.                                                                                       |
+| `doc.forms.modify`       | Create, change and delete form fields.                                                                     |
+| `doc.forms.import`       | Import form fields and values with who created and filled them in, and when.                               |
+| `doc.forms.script`       | Write scripts, submit buttons and links into form fields.                                                  |
+| `doc.sign`               | Sign the document.                                                                                         |
+| `doc.sign.certify`       | Sign as the certifying signature.                                                                          |
+| `doc.metadata.modify`    | Change the title, author and other metadata.                                                               |
+| `doc.attachments.modify` | Add and remove attached files.                                                                             |
+| `doc.redact`             | Apply redactions.                                                                                          |
+| `pdf.permissions`        | What the PDF file itself allows (its permission flags); see [below](#the-pdfs-own-restrictions).           |
+| `*`                      | Everything.                                                                                                |
+
+Some permissions include others: `doc.annotate.modify` includes `doc.annotate.read`,
+`doc.forms.fill` includes `doc.forms.read`, and `doc.forms.modify` includes `doc.forms.fill` and
+`doc.forms.read`. Each page of these docs says which permission its calls
+need.
+
+`doc.annotate.import`, `doc.forms.import` and `doc.forms.script` come only from a scope that names
+them (or `*`): no other permission, and not `pdf.permissions`, includes them. `doc.forms.script`
+is about writing code into the form, never running it. Scripts run in each viewer, for everyone
+who fills the form in, so putting one in is a separate decision from designing fields.
+
+## Annotations
+
+In a document many people work on, "may edit annotations" usually means "may edit _my_
+annotations". Permissions for annotations can say exactly that, with the action and whose
+annotations it covers:
+
+```ts
+const scope = [
+  'doc.open',
+  'doc.render',
+  'doc.annotate.read',
+  'annotations:create:self',
+  'annotations:update:self',
+  'annotations:delete:self',
+];
+```
+
+| Part   | Values                                                                          |
+| :----- | :------------------------------------------------------------------------------ |
+| action | `create`, `update`, `delete`, `set-group`, or `*` for all four                  |
+| whose  | `self` (the user's own), `all`, `group=<id>` (a group's), `createdBy=<user id>` |
+
+A user's own annotations are the ones with their user id (`userId`). An `annotations:<action>:…`
+permission replaces `doc.annotate.modify` for that action.
+`['doc.annotate.modify', 'annotations:update:self']` lets a user create and delete any
+annotation, but update only their own.
+
+To check a single annotation before showing its edit controls:
+
+```ts
+doc.security.allowsAnnotation('create'); // may the user add annotations?
+doc.security.allowsAnnotation('update', annotation); // may they change this one?
+doc.security.allowsAnnotation('delete', annotation); // …delete this one?
+```
+
+A form field's widget is an annotation in the PDF, but changing it is designing the form: moving,
+resizing, restyling or deleting a widget takes `doc.forms.modify`, and the `annotations:…`
+permissions never apply to it. `allowsAnnotation('update', widget)` answers the same way.
+
+## Form fields
+
+When several people fill in one form, each fills in and signs their own fields: the buyer the
+buyer's, the seller the seller's. A field belongs to a group (`groupId`, see
+[Signers and groups](/docs/engine/forms/groups)), and permissions for fields name the action and
+the group:
+
+```ts
+// The buyer: fills in and signs the buyer's fields, and nothing else.
+const scope = ['doc.open', 'doc.render', 'fields:fill:group=buyer', 'fields:sign:group=buyer'];
+```
+
+| Part   | Values                                            |
+| :----- | :------------------------------------------------ |
+| action | `fill`, `sign`, `set-group`, or `*` for all three |
+| which  | `all`, or `group=<id>` (the fields of one group)  |
+
+A `fields:fill:…` permission replaces `doc.forms.fill` for filling in, and `fields:sign:…`
+replaces `doc.sign` for signing, so `['doc.forms.fill', 'fields:fill:group=buyer']` fills in the
+buyer's fields only. A field in no group is then left to users without a `fields:fill` permission.
+Any `fields:` permission lets the user read the form: groups limit what they change, never what
+they see.
+
+A field a script calculates, such as a total, is filled in together with the field it's
+calculated from. Writing it is allowed when the same change also fills in one of the user's own
+fields, so the result travels with its input.
+
+Designing the form (`doc.forms.modify`) isn't narrowed by any `fields:` permission. A signer's
+token lists the permissions it needs and leaves out `doc.forms.modify` and `pdf.permissions`.
+
+```ts
+doc.security.allowsField('fill', field); // may the user fill this field in?
+doc.security.allowsField('sign', field); // …sign it?
+doc.security.allowsField('set-group', { groupId: 'buyer' }); // …put fields in this group?
+```
+
+## The PDF's own restrictions
+
+A PDF can restrict itself: a file protected with an owner password may forbid printing or
+copying. Add `pdf.permissions` to the scope to follow those restrictions. Without it, the engine
+ignores them and only your permissions count.
+
+<Engine local>
+
+```ts
+await engine.open(input, { scope: ['pdf.permissions'] });
+```
+
+`pdf.permissions` also lets you open and render the document, so this scope works on its own.
+
+</Engine>
+
+<Engine cloud>
+
+Put `pdf.permissions` in the token's scope, next to the other permissions.
+
+</Engine>
+
+`pdf.permissions` gives what Acrobat allows on the same file. The names are the ones in Acrobat's
+security summary for the file:
+
+| The file allows                      | `pdf.permissions` gives                                                                                                                  |
+| :----------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| Printing                             | `doc.print`, and `doc.print.high` when it allows printing at full quality                                                                |
+| Content copying                      | `doc.text.select`, `doc.text.search` and `doc.text.copy`                                                                                 |
+| Changing the document                | `doc.pages.modify`, `doc.pages.assemble`, `doc.redact`, `doc.metadata.modify`, `doc.attachments.modify`, `doc.forms.fill` and `doc.sign` |
+| Commenting                           | `doc.annotate.modify`, `doc.forms.fill` and `doc.sign`                                                                                   |
+| Changing the document and commenting | all of those, and `doc.forms.modify`                                                                                                     |
+| Filling in form fields               | `doc.forms.fill` and `doc.sign`                                                                                                          |
+| Document assembly                    | `doc.pages.assemble`                                                                                                                     |
+
+It always gives `doc.open`, `doc.render`, `doc.annotate.read` and `doc.forms.read` too: the file's
+restrictions are about changing it, never about seeing its annotations and fields. Signing a
+signature field counts as filling it in, so whatever allows filling in allows signing. Designing
+the form takes both changing the document and commenting, as in Acrobat, where a file that only
+allows commenting and filling in offers no form tools.
+
+When the user unlocks the file with its owner password, the file's restrictions no longer apply.
+See [Opening documents](/docs/engine/documents/opening#password-protected-files).
+
+## What signatures forbid
+
+A signed document can forbid changes itself: a certification says which changes may follow. That
+binds every user, whatever their permissions. `allows()` answers no, and the call fails with
+`ProtectedDocument` rather than `Forbidden`:
+
+```ts
+// On a document certified at level 2: filling in the form, but no new comments.
+doc.security.allows('doc.forms.fill'); // true
+doc.security.allows('doc.annotate.modify'); // false
+```
+
+See [Certify a document](/docs/engine/forms/signatures#certify-a-document) for what each level
+allows.
+
+## When a call is refused
+
+A refused call fails with an `EngineError` whose code is `Forbidden`. It names the permission that
+was missing:
+
+```ts
+import { EngineError, EngineErrorCode } from '@embedpdf/engine';
+
+try {
+  await doc.download();
+} catch (error) {
+  if (EngineError.is(error, EngineErrorCode.Forbidden)) {
+    console.log(`missing ${error.details.required}`); // "doc.download"
+  }
+}
+```
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Permissions that protect the file"
+  href="https://www.cloudpdf.com/docs/engine/concepts/permissions"
+  cta="How CloudPDF enforces permissions"
+>
+
+The local engine checks permissions in the user's browser, and the browser already has the whole
+file. That keeps your interface and your code honest, but a user who takes the file out of the
+page gets all of it.
+
+With CloudPDF the file stays on your server and every call is checked there. A user without
+`doc.download` never receives the file; a user without `doc.text.copy` never receives
+the text; a reviewer with `annotations:update:self` can't change anyone else's comments, whatever
+they send. Your code doesn't change.
+
+</CloudPdfCallout>
+
+</Engine>
+
+## Good to know
+
+### Building interface from permissions
+
+The headless components turn permissions into one question per button, such as
+`annotation.canEdit(ref)` and `selection.canCopy()`, so your interface never offers something that
+will fail. See [Permissions](/docs/headless/concepts/permissions) in the headless docs.
+
+### Groups
+
+An annotation or a form field can belong to a group (`groupId`): a team or a department for
+annotations, whoever fills them in for fields. What a user creates goes in their own group
+(`identity.groupId`). `annotations:set-group:group=<id>` and `fields:set-group:group=<id>` let a
+user put annotations or fields in that group; `annotations:update:group=<id>` lets them edit that
+group's annotations, and `fields:fill:group=<id>` fill in that group's fields.
+
+A `group=<id>` permission names the group it covers: the user doesn't need to be in it. To give
+someone several groups, give them one permission per group.
+
+### Importing with original authors
+
+`doc.annotate.import` lets an [import](/docs/engine/annotations/import-export) write annotations
+with the authors, dates and owners they had in the source document. Only give it to trusted jobs,
+such as syncing from your own database: it lets the caller create annotations in someone else's
+name.
+
+`doc.forms.import` does the same for [form fields](/docs/engine/forms/import-export): an import
+keeps who created each field and who filled it in, instead of naming the importing user. On a
+signed form, who filled a field in is evidence, so give it as carefully.
+
+### Scripts in forms
+
+`doc.forms.script` decides who may put code into a form: scripts that check or calculate a field,
+and buttons that submit the form or open a link. A script runs for everyone who fills the form in
+afterwards. In your viewer it can change what they type or hide fields; opened in another PDF app,
+a script or a submit button can send their answers anywhere. So a user who may design fields
+(`doc.forms.modify`) doesn't get it with that. Buttons that only go to a page, reset the form, or
+show and hide fields need `doc.forms.modify` alone. An import without it leaves the scripts, submits
+and links out and copies the rest.
+
+It doesn't make a script's result trustworthy: a client can skip scripts and send any value. A
+server that must trust a calculated value calculates it itself.

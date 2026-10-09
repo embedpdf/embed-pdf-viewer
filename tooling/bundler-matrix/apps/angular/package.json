@@ -20,6 +20,7 @@
     "@angular/build": "~20.2.0",
     "@angular/cli": "~20.2.0",
     "typescript": "~5.8.3",
-    "@embedpdf/engine-runtime-wasm32": "workspace:*"
+    "@embedpdf/engine-runtime-wasm32": "workspace:*",
+    "@angular/compiler-cli": "~20.2.0"
   }
 }

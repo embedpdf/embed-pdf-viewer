@@ -62,7 +62,13 @@ export function readDocsCodeFile(codePath: string, githubBaseUrl?: string): Docs
   }
 }
 
-/** Resolves every framework/integration variant of an `<Example name="topic/base" />`. */
+/**
+ * Resolves every framework/integration variant of an `<Example name="topic/base" />`.
+ *
+ * An example's stylesheet, `<topic>/<base>.css`, has no framework infix: every
+ * framework's version imports the same file, so it rides along as a tab after
+ * the entry of every variant that exists.
+ */
 export function collectSampleFiles(name: string, githubBaseUrl?: string) {
   const byVariant: Partial<Record<DocsExampleVariant, DocsCodeFile[]>> = {};
   const sampleDirectory = path.resolve(process.cwd(), 'src', 'samples', path.dirname(name));
@@ -75,6 +81,12 @@ export function collectSampleFiles(name: string, githubBaseUrl?: string) {
     console.warn(`[docs-samples] No sample directory for: ${name}`);
     return byVariant;
   }
+
+  const stylesheet = entries.includes(`${base}.css`)
+    ? readDocsCodeFile(`samples/${path.dirname(name)}/${base}.css`, githubBaseUrl)
+    : null;
+  const withStylesheet = (files: DocsCodeFile[]) =>
+    stylesheet ? [files[0], stylesheet, ...files.slice(1)] : files;
 
   for (const variant of DOCS_EXAMPLE_VARIANTS) {
     // Multi-file shape: a `<base>.<variant>/` directory of real files. Tabs
@@ -93,7 +105,7 @@ export function collectSampleFiles(name: string, githubBaseUrl?: string) {
         )
         .filter((file): file is DocsCodeFile => file !== null);
 
-      if (files.length > 0) byVariant[variant] = files;
+      if (files.length > 0) byVariant[variant] = withStylesheet(files);
       continue;
     }
 
@@ -108,7 +120,7 @@ export function collectSampleFiles(name: string, githubBaseUrl?: string) {
         filename: file.filename.replace(`.${variant}.`, '.'),
       }));
 
-    if (files.length > 0) byVariant[variant] = files;
+    if (files.length > 0) byVariant[variant] = withStylesheet(files);
   }
 
   return byVariant;

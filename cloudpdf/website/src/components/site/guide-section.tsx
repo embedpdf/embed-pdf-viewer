@@ -52,7 +52,7 @@ const PATHS = [
     labelClass: 'bg-cp-blue/10 text-cp-blue',
     title: 'Managed SaaS + ready-made viewer',
     desc: 'No infrastructure to run, no UI to build. A working viewer in your app in under 10 minutes.',
-    href: '/docs/engine/getting-started/quick-start',
+    href: '/docs/engine/quick-start',
     cta: 'Start here',
   },
   {
@@ -159,7 +159,7 @@ function StepDeploy() {
         iconWrap="bg-cp-blue/10"
         title="Managed SaaS"
         desc="Fully managed by CloudPDF. Scale instantly. Always up to date."
-        href="/docs/engine/getting-started"
+        href="/docs/engine"
       />
       <DeployCard
         icon={<HugeiconsIcon icon={ServerStack01Icon} size={28} strokeWidth={1.9} />}

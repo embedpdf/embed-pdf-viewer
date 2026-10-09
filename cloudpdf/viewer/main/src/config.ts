@@ -1,15 +1,17 @@
 /**
- * `@cloudpdf/viewer/config` — the CLOUD vocabulary, in one place.
+ * `@cloudpdf/viewer/config` — the cloud vocabulary, in one place.
  *
  * Every cloud door (the CDN snippet here, and each `@cloudpdf/viewer-<framework>`
  * wrapper) faces the same job: turn CloudPDF connection options plus a document
- * reference into what the open-source viewer's ENGINE-AGNOSTIC door already
+ * reference into what the open-source viewer's engine-agnostic door already
  * takes — an engine factory and a `documents` list — while passing every other
  * option through untouched. That mapping lives here, so the brand vocabulary
  * has exactly one definition and each door stays a genuine shim.
  *
- * Deliberately tiny and framework-free: `cloudEngine` is the only runtime
- * import, so a wrapper that uses this does not drag the CDN artifact along.
+ * Deliberately tiny and framework-free: `cloudEngine` is the only static
+ * runtime import, so a wrapper that uses this does not drag the CDN artifact
+ * along. The local engine stamps need is imported on first use (see
+ * `localAssetEngine`).
  */
 import {
   cloudEngine,
@@ -17,7 +19,7 @@ import {
   type OpenInputShare,
   type TokenSource,
 } from '@cloudpdf/engine';
-import type { EngineFactory, InitialDocument } from '@embedpdf/viewer/core';
+import type { EngineFactory, InitialDocument, StampsCustomization } from '@embedpdf/viewer/core';
 
 /**
  * @deprecated `{ kind: 'share' }` is a standard `OpenInput` kind now
@@ -58,7 +60,19 @@ export interface CloudSource extends CloudEngineOptions {
    *  (a standard OpenInput kind the cloud engine resolves itself). Wins over
    *  the `docToken`/`docId`/`shareToken` shorthands. */
   documents?: InitialDocument[];
+  /** Stamps, exactly as the open-source viewer takes them, except that
+   *  `assetEngine` defaults to a local engine loaded on first use. */
+  stamps?: StampsCustomization;
 }
+
+/**
+ * The engine stamp libraries and signature marks open in. The cloud engine
+ * renders the pages, but a stamp library is a PDF that is cut into stamps and
+ * previewed in the browser, which takes a local engine. It is imported the
+ * first time someone opens Stamps or Signatures, so a viewer that never does
+ * never downloads the wasm.
+ */
+const localAssetEngine = () => import('@embedpdf/engine').then((engine) => engine.localEngine());
 
 /**
  * Split cloud options into the engine seam, the initial documents, and
@@ -69,15 +83,16 @@ export interface CloudSource extends CloudEngineOptions {
  * <PDFViewer {...resolveCloudConfig(props)} />        // react
  * ```
  *
- * The engine comes back as a THUNK, which is what gives the viewer ownership of
- * its lifetime: created on mount, destroyed on unmount.
+ * The engine comes back as a thunk, which is what gives the viewer ownership of
+ * its lifetime: created on mount, destroyed on unmount. `stamps` comes back
+ * with a local `assetEngine` unless you named one.
  *
  * Document sources need no lowering here: `{ kind: 'share' }` is part of the
  * standard `OpenInput` union and the cloud engine resolves it itself
  * (exchange, renewal, revocation-at-renewal). This module only expands the
  * one-document shorthands.
  *
- * The return type is deliberately INFERRED. The destructuring below is the only
+ * The return type is deliberately inferred. The destructuring below is the only
  * statement of what this module consumes, so what passes through in `rest` and
  * what the type says passes through are the same fact and cannot drift. Writing
  * the type by hand needs a second list of the same keys, and a second list is
@@ -87,17 +102,17 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
   const {
     baseUrl,
     token,
-    sessionId,
     fetch: fetchFn,
     docToken,
     docId,
     shareToken,
     sharePassword,
     documents,
+    stamps,
     ...rest
   } = options;
 
-  const engine: EngineFactory = () => cloudEngine({ baseUrl, token, sessionId, fetch: fetchFn });
+  const engine: EngineFactory = () => cloudEngine({ baseUrl, token, fetch: fetchFn });
 
   const initialDocuments: InitialDocument[] = documents ?? [
     ...(docToken !== undefined ? [{ source: { kind: 'token' as const, token: docToken } }] : []),
@@ -115,5 +130,10 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     ...(docId !== undefined ? [{ source: { kind: 'id' as const, id: docId } }] : []),
   ];
 
-  return { ...rest, engine, documents: initialDocuments };
+  return {
+    ...rest,
+    engine,
+    documents: initialDocuments,
+    stamps: { assetEngine: localAssetEngine, ...stamps },
+  };
 }

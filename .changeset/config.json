@@ -40,6 +40,7 @@
       "@embedpdf/plugin-annotation",
       "@embedpdf/plugin-commands",
       "@embedpdf/plugin-form",
+      "@embedpdf/plugin-history",
       "@embedpdf/plugin-i18n",
       "@embedpdf/plugin-interaction",
       "@embedpdf/plugin-link",
@@ -55,9 +56,11 @@
       "@embedpdf/plugin-stamp",
       "@embedpdf/plugin-view-manager",
       "@embedpdf/react",
+      "@embedpdf/svelte",
       "@embedpdf/viewer",
       "@embedpdf/viewer-chrome",
       "@embedpdf/viewer-react",
+      "@embedpdf/vue",
       "@embedpdf/web",
       "@embedpdf/plugin-measurement"
     ]

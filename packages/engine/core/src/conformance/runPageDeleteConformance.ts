@@ -1,36 +1,26 @@
 import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataConformance';
-import type { AnnotationPatch, HighlightDraft } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { AnnotationRef } from '../identity/AnnotationRef';
+import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageDeleteResultSchema } from '../wire/schemas';
 
-const QUAD: HighlightDraft['quadPoints'] = [
-  {
-    p1: { x: 50, y: 100 },
-    p2: { x: 150, y: 100 },
-    p3: { x: 50, y: 80 },
-    p4: { x: 150, y: 80 },
-  },
-];
-
 /**
  * Page delete conformance suite. Verifies the architectural invariants —
- * do NOT loosen these without re-reading `PageDeleteResult`:
+ * do not loosen these without re-reading `PageDeleteResult`:
  *
  *   1. `pages.delete()` removes exactly the listed pages and returns the
  *      full surviving layout; a subsequent `list()` agrees.
- *   2. Deleted PONs are RETIRED: addressing a deleted page afterwards is a
+ *   2. Deleted page object numbers are retired: addressing a deleted page afterwards is a
  *      clean `NotFound` (an API-level error, never native-memory danger).
- *   3. SURVIVING pages keep identity and `RevisionToken`s — an index-based
- *      annotation ref on an unrelated page survives a neighbour's deletion.
+ *   3. Surviving pages keep identity, and their annotations keep their
+ *      names — a `baseIndex` ref survives a neighbour's deletion.
  *   4. Deleting every page is rejected (`InvalidArg`) — a document keeps at
  *      least one page.
- *   5. Duplicate / unknown PONs reject with `InvalidArg` / `NotFound`;
+ *   5. Duplicate / unknown page object numbers reject with `InvalidArg` / `NotFound`;
  *      abort propagates as `AbortError`.
  *
  * Both local (worker host + WASM) and cloud (HTTP + @cloudpdf/server)
@@ -58,7 +48,7 @@ export function runPageDeleteConformance(
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const victim = before.pages[1].ref.pageObjectNumber;
+        const victim = before.pages[1].ref.objectNumber;
 
         const result = await doc.pages.delete([toPageRef(victim)]);
         expect(PageDeleteResultSchema.safeParse(result).success).toBe(true);
@@ -66,20 +56,20 @@ export function runPageDeleteConformance(
         const after = result.layout;
         expect(after.pages.length).toBe(before.pages.length - 1);
         expect(after.pageCount).toBe(before.pageCount - 1);
-        expect(after.pages.some((p) => p.ref.pageObjectNumber === victim)).toBe(false);
+        expect(after.pages.some((p) => p.ref.objectNumber === victim)).toBe(false);
 
         // Survivors keep their relative order, contiguous 0..N-1 indices.
         const expectedOrder = before.pages
-          .map((p) => p.ref.pageObjectNumber)
-          .filter((pon) => pon !== victim);
-        expect(after.pages.map((p) => p.ref.pageObjectNumber)).toEqual(expectedOrder);
+          .map((p) => p.ref.objectNumber)
+          .filter((pageObjectNumber) => pageObjectNumber !== victim);
+        expect(after.pages.map((p) => p.ref.objectNumber)).toEqual(expectedOrder);
         for (let i = 0; i < after.pages.length; i++) {
           expect(after.pages[i].index).toBe(i);
         }
 
         // A subsequent list() agrees (the result is not a one-off view).
         const relisted = await doc.pages.list();
-        expect(relisted.pages.map((p) => p.ref.pageObjectNumber)).toEqual(expectedOrder);
+        expect(relisted.pages.map((p) => p.ref.objectNumber)).toEqual(expectedOrder);
       } finally {
         await doc.close();
       }
@@ -90,7 +80,7 @@ export function runPageDeleteConformance(
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const victim = before.pages[1].ref.pageObjectNumber;
+        const victim = before.pages[1].ref.objectNumber;
         await doc.pages.delete([toPageRef(victim)]);
 
         let caught: unknown;
@@ -105,43 +95,23 @@ export function runPageDeleteConformance(
       }
     });
 
-    test('surviving pages keep their weak index-based annotation refs', async () => {
+    test('an annotation born inline keeps its baseIndex name when another page is deleted', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        if (list.pages.length < 2) return;
-
-        const hostPon = list.pages[0].ref.pageObjectNumber;
-        const victimPon = list.pages[1].ref.pageObjectNumber;
-        const hostPage = doc.page(toPageRef(hostPon));
-
-        const draft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'neighbour deletion survives this',
-          quadPoints: QUAD,
-        };
-        const created = await hostPage.annotations.create(draft);
-        const afterCreate = await hostPage.annotations.list();
-        const targetIndex = afterCreate.annotations.findIndex(
-          (a) =>
-            a.ref.kind === 'objectNumber' &&
-            created.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+        const inline = (await doc.annotations.list()).annotations.find(
+          (a) => a.ref.kind === 'baseIndex',
         );
-        expect(targetIndex >= 0).toBe(true);
+        const victim = list.pages.find((p) => p.ref.objectNumber !== inline?.page.objectNumber);
+        if (!inline || !victim) return;
 
-        const indexRef: AnnotationRef = {
-          kind: 'index',
-          page: toPageRef(hostPon),
-          index: targetIndex,
-          revision: afterCreate.pageState.revision,
-        };
+        await doc.pages.delete([victim.ref]);
 
-        await doc.pages.delete([toPageRef(victimPon)]);
-
-        const patch: AnnotationPatch = { subtype: 'highlight', contents: 'still alive' };
-        const update = await hostPage.annotations.update(indexRef, patch);
-        expect(update.updated.contents).toBe('still alive');
+        const update = await doc.page(inline.page).annotations.update(inline.ref, {
+          contents: 'still alive',
+        });
+        expect(update.annotation.contents).toBe('still alive');
+        expect(annotationKey(update.annotation.ref)).toBe(annotationKey(inline.ref));
       } finally {
         await doc.close();
       }
@@ -167,10 +137,10 @@ export function runPageDeleteConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.objectNumber;
         let caught: unknown;
         try {
-          await doc.pages.delete([toPageRef(pon), toPageRef(pon)]);
+          await doc.pages.delete([toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)]);
         } catch (err) {
           caught = err;
         }
@@ -185,7 +155,7 @@ export function runPageDeleteConformance(
       try {
         const list = await doc.pages.list();
         let bogus = 0;
-        for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
+        for (const p of list.pages) bogus = Math.max(bogus, p.ref.objectNumber);
         bogus += 9999;
 
         let caught: unknown;
@@ -208,8 +178,8 @@ export function runPageDeleteConformance(
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;
-        const pon = list.pages[1].ref.pageObjectNumber;
-        const p = doc.pages.delete([toPageRef(pon)]);
+        const pageObjectNumber = list.pages[1].ref.objectNumber;
+        const p = doc.pages.delete([toPageRef(pageObjectNumber)]);
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {

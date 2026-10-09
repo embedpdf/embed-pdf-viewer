@@ -1,0 +1,164 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --focus: #7db6ff;
+  --danger: #b42318;
+  --danger-tint: #fef3f2;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The tabs: one per document, with its status */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--ink);
+  background: var(--tint);
+  border-color: var(--focus);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The dot before a tab's name: its status */
+.status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.status[data-status='ready'] {
+  background: #12b76a;
+}
+
+.status[data-status='loading'] {
+  background: var(--focus);
+}
+
+.status[data-status='locked'] {
+  background: #f79009;
+}
+
+.status[data-status='error'] {
+  background: var(--danger);
+}
+
+/* What the gate shows instead of the pages */
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 420px;
+  box-sizing: border-box;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+}
+
+.panel h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.panel p {
+  margin: 0;
+  max-width: 360px;
+}
+
+.panel[data-tone='error'] {
+  background: var(--danger-tint);
+}
+
+.panel[data-tone='error'] p {
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.field {
+  appearance: none;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:focus-visible,
+.field:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}

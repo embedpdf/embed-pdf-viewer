@@ -8,8 +8,8 @@
  * conformance suite (test/_helpers/object-store-conformance.ts) pins
  * all four to identical observable behaviour.
  *
- * Phase 3 adds `materializeLocal`: copy a remote object to a local
- * path so PDFium can `pread()` it (or load it into memory). The
+ * `materializeLocal` copies a remote object to a local path so PDFium
+ * can `pread()` it (or load it into memory). The
  * `BaseFileCache` calls this once per (sha, worker host) tuple, then
  * relies on the OS page cache for hot data.
  */
@@ -41,7 +41,7 @@ export interface PresignedUpload {
   /** The URL the client PUTs to. */
   url: string;
   /**
-   * Headers the client MUST include verbatim on the PUT, in the order
+   * Headers the client must include verbatim on the PUT, in the order
    * given. S3 includes `Host` and any signed metadata headers.
    */
   headers: Record<string, string>;
@@ -62,7 +62,7 @@ export interface ObjectStat {
   /**
    * Strong identifier set by the backend on PUT. For S3 this is the
    * ETag (sans quotes); for FS it's the SHA-256 we compute as we
-   * write. Used as a coarse change detector, NOT as a cryptographic
+   * write. Used as a coarse change detector, not as a cryptographic
    * hash for our base PDF dedup; that comes from
    * `getSha256`/server-side verification on commit.
    */
@@ -77,14 +77,15 @@ export interface ObjectStat {
  *     responsible for using `StorageKeys` to enforce isolation.
  *   - `put` and `delete` are idempotent: putting the same key twice
  *     overwrites; deleting a missing key is a no-op (returns false).
- *   - `deletePrefix` MUST recurse, return only after every child is
+ *   - `deletePrefix` must recurse, return only after every child is
  *     gone, and tolerate concurrent deletes. Backends that can't
  *     deliver atomicity (S3) should at least be eventually consistent
  *     once they return.
  *
  * The `info` field follows the unified adapter pattern (see
- * ADAPTERS.md) — `kind` is the discriminator, other fields are
- * public identifiers safe to expose via `/v1/deployment/status`.
+ * `docs/conventions/server-adapters.md`) — `kind` is the discriminator,
+ * other fields are public identifiers safe to expose via
+ * `/v1/deployment/status`.
  */
 export interface ObjectStore {
   /**
@@ -108,10 +109,10 @@ export interface ObjectStore {
    * Returns the SHA-256 hex digest of the bytes that were written.
    *
    * Streaming contract (all adapters, pinned by the conformance
-   * suite): a `Readable` body is hashed and counted AS IT FLOWS —
+   * suite): a `Readable` body is hashed and counted AS IT flows —
    * constant memory, never buffered whole. `contentLength` is
    * enforced exactly; under- or over-delivery aborts the transfer
-   * BEFORE a visible object can appear, and any prior object at the
+   * before a visible object can appear, and any prior object at the
    * key survives the failed attempt. The recorded SHA-256 lands in
    * backend metadata so `getSha256`/`materializeLocal` skip re-hashes.
    */
@@ -122,9 +123,9 @@ export interface ObjectStore {
   ): Promise<{ sha256: string }>;
 
   /**
-   * One-shot full download. Returns `null` for missing keys. Phase 1
-   * only uses this for the admin /download verification endpoint;
-   * Phase 3 will add `materializeLocal` for engine reads.
+   * One-shot full download into memory (admin downloads, thumbnails,
+   * derived renders). Returns `null` for missing keys. Engine reads use
+   * {@link ObjectStore.materializeLocal} instead.
    */
   get(key: string): Promise<Uint8Array | null>;
 
@@ -151,7 +152,7 @@ export interface ObjectStore {
   deletePrefix(prefix: string): Promise<{ deleted: number }>;
 
   /**
-   * Phase 3 — copy a remote object to a local file path so the
+   * Copy a remote object to a local file path so the
    * worker can pread it. The implementation is allowed to use
    * whichever fan-out strategy gives best throughput (parallel range
    * GET for S3, hard-link or stream-copy for FS).

@@ -40,5 +40,22 @@ export type { FitMetrics, FitResult, GroupAssignment, UnitAssignment } from './s
 export { projectOverflow, projectShed, projectStrip } from './projection';
 export type { OverflowRow, OverflowSection, ResolveMenuTarget, StripGroup } from './projection';
 
+export { groupMenuView, layoutToolbar, sameStripGroups, stripGroupsOf } from './toolbar-layout';
+export type {
+  CollapsedGroupView,
+  CustomSlotCtx,
+  GroupDisclosureView,
+  LiveGroup,
+  LiveSection,
+  OverflowMenuView,
+  StripView,
+  StripViewGroup,
+  ToolbarCommand,
+  ToolbarLayout,
+  ToolbarLayoutInput,
+  ToolbarMeasureKeys,
+  ToolbarPart,
+} from './toolbar-layout';
+
 export { formatShortcut, matchShortcut, parseShortcut } from './shortcuts';
 export type { KeyStroke, ParsedShortcut } from './shortcuts';

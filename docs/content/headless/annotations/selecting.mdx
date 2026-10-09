@@ -1,0 +1,337 @@
+---
+title: Selecting & editing
+description: How people select and change annotations, and how to add a menu, a style panel and your own handles.
+---
+
+# Selecting & editing
+
+With the `pointer` tool active, people click an annotation to select it. A box with handles appears
+around it: drag the annotation to move it, a handle to resize it, and the round handle above it to
+turn it. Your code reads and changes the same selection, and you build the menu and the style
+panel around it.
+
+## How people select
+
+- **Click** an annotation to select it. **Shift-click** adds it to the selection, or takes it out.
+- **Drag on empty space** to draw a box: everything it touches is selected. It has to touch what an annotation paints: its lines, or the inside of a filled shape. A box drawn inside an empty rectangle doesn't select the rectangle.
+- **Click empty space** to clear the selection.
+- **Double-click** a text box to type in it.
+
+While moving, the selection snaps to the edges and centers of other annotations and of the page,
+and a turn snaps to 0°, 90°, 180° and 270°. Hold Shift to move or turn freely. See
+[Snapping](#snapping) to change it.
+
+## Select with code
+
+```ts
+annotation.selection.set([ref]); // select these
+annotation.selection.add([otherRef]); // add to the selection
+annotation.selection.selectAll(page.ref); // everything on a page (or leave out the page)
+annotation.selection.selectInRect(page.ref, { x: 50, y: 50, width: 200, height: 100 });
+annotation.selection.clear();
+```
+
+To show the selection in a component, use `useAnnotationState()`. Your component
+<Word of="rerenders" /> when the selection changes:
+
+<Snippet name="annotations/selecting/selected" />
+
+<Example name="annotation/select-code" />
+
+> **Try it:** **The top half** selects the two shapes the box touches. Shift-click a shape to add
+> it, or take it out.
+
+Every field is listed under [State](#state).
+
+## Add a menu
+
+`<AnnotationMenu>` places your own UI next to the selection. <Fw only="react">Mount it in the Stage's
+`overlay`</Fw><Fw only="vue">Mount it in the Stage's `#overlay` slot</Fw><Fw only="svelte">Mount it in the
+Stage's `overlay` snippet</Fw><Fw only="angular">Put it inside `<epdf-stage>`, next to the page template</Fw>,
+and it stays attached while the user scrolls and zooms:
+
+<Snippet name="annotations/selecting/menu" />
+
+<Example name="annotation/menu" />
+
+> **Try it:** select the rectangle: the menu loses **Bold** and **Edit text**. Drag it, and the
+> menu hides until you let go.
+
+- **The menu only places things.** What's in it is yours: build it from the selection, as above,
+  to show buttons that fit what's selected.
+- **It moves out of the way.** It hides while the user drags, and it never covers the rotation
+  handle.
+- **`placement`** is `'top'` (the default), `'bottom'`, `'left'` or `'right'`, and `gap` is the
+  space between the selection and the menu, in pixels.
+
+## A style panel
+
+A style panel shows the properties of what's selected, such as color, width, opacity and font, with
+their current values. `useAnnotationProperties()` gives you everything to draw it:
+
+- **`properties`** are what the selection can change, in display order. Each one says which control
+  fits: a color, a number with its range, a choice from a list, or an on/off flag.
+- **`values`** are their current values.
+- **`mixed`** lists the properties where the selected annotations differ. Show those as "mixed".
+
+When different kinds are selected, you get only the properties they all have.
+
+Each property's `key` is the annotation's own field name, so most read and write with no mapping.
+Two group several fields: `borderStyle` is the style, the dashes and the cloudy edge together, and
+`lineEndings` reads as a `{ start, end }` pair while its options are single endings. The panel below
+shows both:
+
+<Snippet name="annotations/selecting/style-panel" />
+
+<Example name="annotation/style-panel" />
+
+> **Try it:** change the rectangle's colors and width, then select the arrow or the text box: the
+> panel shows what each one has. Shift-click two to see what they share.
+
+| `property.control` | What to show                                                                                                | Also on the property |
+| :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
+| `'color'`       | A color picker. `null` means no color.                                                                         |                      |
+| `'number'`      | A slider or a number input.                                                                                    | `min`, `max`, `step` |
+| `'choice'`      | A list, such as fonts or line endings.                                                                         | `options`            |
+| `'flag'`        | An on/off switch, such as `locked` or `print`.                                                                 |                      |
+| `'text'`        | A text input, such as a redaction's label.                                                                     |                      |
+| `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
+| `'link'`        | Where the annotation links to. Write it with `annotation.selection.updateLink(target)`, or `null` to remove it. |                      |
+
+`selection.update()` gives each selected annotation the properties its kind has, and skips the rest.
+To change each annotation relative to itself, pass a function. For example, to set only the end
+arrow of lines that keep their own start:
+
+```ts
+await annotation.selection.update((member) =>
+  member.subtype === 'line' ? { lineEndings: { ...member.lineEndings, end: 'open-arrow' } } : {},
+);
+```
+
+The same properties drive a panel for a tool's defaults; see
+[Let people change the defaults](tools#let-people-change-the-defaults).
+
+## Change the handles
+
+By default the selection has an outline in the accent color, square handles on its corners and sides
+(or on each point of a line or a polygon), and a round rotation handle above it, on a short line
+called its stalk. Everything about them can change.
+
+**Set them when you register the plugin.** One color changes every part; the rest is optional:
+
+```ts
+annotationPlugin({
+  chrome: {
+    accent: '#e91e63',
+    outline: { style: 'dashed', width: 1 },
+    handles: { shape: 'circle', size: 10 },
+    rotationHandle: { offset: 30, stalk: false },
+  },
+});
+```
+
+| Setting          | What it changes                                                                                                                          | From CSS                                                                                   |
+| :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------- |
+| `accent`         | The color of every part below, unless you set one of its own. Defaults to the viewer's accent.                                           | `--epdf-annotation-accent`                                                                 |
+| `outline`        | The box around the selection: `style` (`'solid'`, `'dashed'`), `width`, `color`.                                                         | `--epdf-annotation-outline`, `--epdf-annotation-outline-width`, `--epdf-annotation-outline-dash` |
+| `handles`        | The resize and point handles: `shape` (`'square'`, `'circle'`), `size`, `hitSize`, `fill`, `stroke`.                                     | `--epdf-annotation-handle-fill`, `--epdf-annotation-handle-stroke`                         |
+| `rotationHandle` | The turn handle: `enabled`, `size`, `hitSize`, `offset` (distance from the box), `stalk` (`false` hides the line to it), `fill`, `stroke`. | `--epdf-annotation-rotation-handle-fill`, `--epdf-annotation-rotation-handle-stroke`       |
+| `guides`         | The lines shown while snapping and turning: `enabled`, `color`, `rotationColor`, `style`, `width`.                                        | `--epdf-annotation-guide`, `--epdf-annotation-rotation-guide`, `--epdf-annotation-guide-width`, `--epdf-annotation-guide-dash` |
+| `marquee`        | The box you drag to select several annotations: `fill`, `stroke`.                                                                        | `--epdf-annotation-marquee-fill`, `--epdf-annotation-marquee-stroke`                       |
+| `textOutline`    | The outline of a text box while you type in it.                                                                                          | `--epdf-annotation-text-outline`                                                           |
+| `readout`        | The angle while you turn: `enabled`, `background`, `color`.                                                                               | `--epdf-readout-background`, `--epdf-readout-color`                                        |
+
+Every size is in screen pixels, so handles stay the same size at every zoom. `hitSize` is the area
+you can grab; keep it at 24 or more for touch.
+
+**Override the colors from CSS**, for example for dark mode. A CSS variable wins over the setting:
+
+```css
+@media (prefers-color-scheme: dark) {
+  .pdf-viewer {
+    --epdf-annotation-accent: #ff80ab;
+  }
+}
+```
+
+Colors, widths and dashes can come from CSS. Sizes and the offset can't, because they decide where
+you can grab. Every variable is on [Colors & theming](../ui/theming#every-color).
+
+**Change them while the app runs**, for example when the user picks another accent:
+
+```ts
+annotation.updateSettings({ chrome: { accent: '#0f6e56' } });
+annotation.resetSettings(); // back to what the plugin was registered with
+```
+
+**Draw them yourself.** <Fw only="react">Pass your own components, and the layer draws them in place
+of its handles:</Fw><Fw only="vue">Fill the layer's `#handle` and `#rotation-handle` slots, and it draws
+them in place of its handles:</Fw><Fw only="svelte">Give the layer `handle` and `rotationHandle`
+snippets, and it draws them in place of its handles:</Fw><Fw only="angular">Put an
+`<ng-template epdfHandle>` and an `<ng-template epdfRotationHandle>` in the layer, and it draws them in
+place of its handles:</Fw>
+
+<Snippet name="annotations/selecting/handles" />
+
+| Prop       | What it is                                                          |
+| :--------- | :------------------------------------------------------------------ |
+| `at`       | The handle's center, in pixels on the page.                         |
+| `size`     | The `size` from the settings.                                       |
+| `rotation` | The selection's rotation, so a square handle can turn with it.      |
+| `kind`     | `'corner'`, `'side'` or `'point'` (a point of a line or a polygon). |
+| `active`   | True while it's being dragged.                                      |
+
+The rotation handle gets the same props except `kind`, plus `from`, where its stalk starts on the box. You only draw:
+the viewer still decides where a handle can be grabbed, so what you draw can't break dragging.
+
+<Example name="annotation/handles" />
+
+> **Try it:** pick an accent and round handles, then **Draw them myself**. **Reset** goes back to
+> what the plugin was registered with.
+
+## Snapping
+
+```ts
+annotationPlugin({
+  snap: {
+    alignment: true, // snap to other annotations and the page while moving
+    alignmentThreshold: 6, // how close, in screen pixels, before it snaps
+    rotation: true,
+    rotationAngles: [0, 45, 90, 135, 180, 225, 270, 315],
+    rotationThreshold: 4, // degrees
+  },
+});
+
+annotation.updateSettings({ snap: { alignment: false } }); // while the app runs
+```
+
+The threshold is in screen pixels, so snapping feels the same at every zoom. The lines that show
+what an annotation snaps to are `--epdf-annotation-guide`.
+
+<Example name="annotation/snapping" />
+
+> **Try it:** drag the red rectangle until its edge lines up with the blue one, then turn it with
+> the round handle.
+
+## Turn and group
+
+```ts
+annotation.selection.rotateBy(90); // a quarter turn clockwise; -90 the other way
+annotation.selection.resetRotation(); // upright again
+```
+
+Grouping makes several annotations select and move as one. The group is saved in the PDF the way
+Acrobat saves it, so it stays a group there too:
+
+```ts
+if (annotation.selection.canGroup()) await annotation.selection.group();
+if (annotation.selection.canUngroup()) await annotation.selection.ungroup();
+```
+
+<Example name="annotation/turn-group" />
+
+> **Try it:** **Group** the two shapes, click empty space, then click one: both are selected.
+
+To bring an annotation to the front or send it to the back, see
+[Change the drawing order](with-code#change-the-drawing-order).
+
+## Edit text
+
+A double-click on a text box starts typing in it; a click outside ends it. From code:
+
+```ts
+annotation.text.begin(ref);
+await annotation.text.toggleFormat('bold'); // the selected words, or the whole box
+await annotation.text.end();
+```
+
+`annotation.text.getEditing()` is the box being typed in, or `null`. How fonts and formatting work
+is on [Rich text](../concepts/rich-text).
+
+## Shapes with many points
+
+A polygon or a polyline takes a click per point, and a double-click ends it. While it's being drawn,
+`<AnnotationDraftMenu>` can show buttons to finish or cancel it, which helps on touch screens:
+
+<Snippet name="annotations/selecting/draft-menu" />
+
+## Keyboard
+
+The headless plugin doesn't take over any keys, since your app may already use them. Delete and
+Escape are a few lines:
+
+<Snippet name="annotations/selecting/keyboard" />
+
+<Example name="annotation/polygon" />
+
+> **Try it:** click a few points on the page, then **Done**, or double-click. Select a shape and
+> press Delete; Escape stops a shape you're drawing.
+
+## Methods
+
+What `useAnnotation()` gives you for selecting, drawing and editing text: its `selection`, `draft` and `text` parts. The rest is on
+[Annotations in code](with-code#methods).
+
+| Method                                                     | What it does                                                                                                                     |
+| :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| `selection.set(refs)`, `selection.add(refs)`               | Selects these annotations, or adds them to the selection. An annotation in a group brings its group. [Select with code](#select-with-code) |
+| `selection.selectAll(page?)`                               | Selects everything that can be selected, on one page or in the whole document                                                    |
+| `selection.selectInRect(page, rect)`                       | Selects everything a box on a page touches of what it paints, with the rest of each one's group, as dragging on empty space does |
+| `selection.clear()`                                        | Clears the selection                                                                                                             |
+| `selection.update(changes)`                                | Changes the selected annotations: each takes the fields its kind has. Pass a function to change each one relative to itself. [A style panel](#a-style-panel) |
+| `selection.updateLink(target)`                             | Links the selected annotations to a page or a website, or removes their links with `null`. [A style panel](#a-style-panel) |
+| `selection.getProperties()`                                | What a style panel shows for the selection: `{ properties, values, mixed }`. In a component, use `useAnnotationProperties()`.  |
+| `selection.delete()`                                       | Deletes every selected annotation                                                                                                |
+| `selection.rotateBy(degrees)`, `selection.resetRotation()` | Turns the selection a quarter turn (`90` clockwise, `-90` the other way), or back upright. [Turn and group](#turn-and-group)     |
+| `selection.group()`, `selection.ungroup()`                 | Makes the selected annotations one group, saved the way Acrobat saves it, or splits the selected group up again                  |
+| `selection.canGroup()`, `selection.canUngroup()`           | Whether the selection can be grouped, or is a group that can be split                                                            |
+| `selection.getAnchor()`                                    | Where a menu attaches: `{ page, bounds }` around the selection, or `null`. `<AnnotationMenu>` uses it. [Add a menu](#add-a-menu) |
+| `selection.getRotationAnchor()`                            | While a selection is being turned: `{ page, at, angle }`, the pointer's point and the angle so far in degrees clockwise, or `null`. `<AnnotationRotationBadge>` uses it to show the angle next to the pointer. |
+| `draft.get()`                                              | The polygon or polyline being drawn (`{ page, bounds, pointCount, canFinish }`), or `null`. `<AnnotationDraftMenu>` uses it. [Shapes with many points](#shapes-with-many-points) |
+| `draft.finish()`, `draft.cancel()`                         | Ends the shape and creates it, as a double-click does, or drops it                                                               |
+| `text.begin(ref)`, `text.end()`                            | Starts typing in a text box, as a double-click does, or stops and saves what was typed. [Edit text](#edit-text)                  |
+| `text.toggleFormat(format)`                                | Turns `'bold'`, `'italic'` or `'underline'` on or off, for the selected words or the whole box                                   |
+| `cancel()`                                                 | Stops a drag, or a polygon in progress. [Keyboard](#keyboard)                                                                    |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useAnnotationState()" />
+
+| Field      | What it is                                                                                                | Read once           |
+| :--------- | :-------------------------------------------------------------------------------------------------------- | :------------------ |
+| `status`   | `'loading'` until every annotation is in, then `'ready'`; `'forbidden'` or `'error'` when they can't load | `getStatus()`       |
+| `selected` | The selected annotations                                                                                  | `selection.list()`  |
+| `hovered`  | The annotation under the pointer, or `null`                                                               | `getHovered()`      |
+| `editing`  | The text box being typed in, or `null`                                                                    | `text.getEditing()` |
+
+The annotations themselves come from `useAnnotationList(filter)`, a tool's defaults from
+`useAnnotationDefaults(id)`, and a style panel's properties from `useAnnotationProperties()`<Fw only="react">, so a
+component re-renders only for what it shows</Fw>.
+
+## Events
+
+<Snippet name="annotations/selecting/events" />
+
+| Event                | Fires when                                        | Carries                  |
+| :------------------- | :------------------------------------------------ | :----------------------- |
+| `onSelectionChanged` | The selection changed                             | `refs`, `previousRefs`   |
+| `onDraftChanged`     | A polygon or polyline is being drawn, or ended    | `draft`                  |
+| `onEditingChanged`   | Typing in a text box started or ended             | `ref`                    |
+| `onHoverChanged`     | The pointer moved onto an annotation, or off it   | `ref`                    |
+
+Changes to the annotations themselves are on [Events, saving & sharing](saving#events).
+
+## Good to know
+
+### Locked annotations
+
+People can select a `locked` annotation, but not move, resize, turn or delete it, and
+`lockedContents` stops them from changing its text. A `hidden` annotation can't be selected at all.
+
+### Touch
+
+A tap selects. The handles of a selected annotation are easier to grab with a finger: their grab
+area is twice as large on touch. One finger on the selected annotation moves it; anywhere else, it
+scrolls the page.

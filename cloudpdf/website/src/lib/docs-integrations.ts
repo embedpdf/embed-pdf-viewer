@@ -1,6 +1,6 @@
 /**
  * The shared integration preference across the Viewer and Headless docs —
- * the same fan-out model as embedpdf.com (DOCS-PLATFORM-ARCHITECTURE.md):
+ * the same fan-out model as embedpdf.com (docs/conventions/docs-architecture.md):
  * the URL remains the source of truth for the current page; the cookie only
  * chooses an integration when a visitor enters through a variant-less route.
  *
@@ -82,15 +82,19 @@ export function integrationForProduct(
 }
 
 /**
+ * Where each fanned-out product starts, below its integration segment: the
+ * Viewer at its getting-started page, Headless at its overview (like Engine).
+ */
+export const DOCS_ENTRY_TOPIC = { viewer: 'getting-started', headless: '' } as const;
+
+/**
  * The canonical entry point into a fanned-out product for one integration —
  * the concrete URL, so marketing and docs links land on the reader's framework
  * without a middleware redirect hop.
  */
-export function docsGettingStartedHref(
-  product: FanoutDocsProduct,
-  integration: DocsIntegration,
-): string {
-  return `/docs/${product}/${integration}/getting-started`;
+export function docsEntryHref(product: FanoutDocsProduct, integration: DocsIntegration): string {
+  const topic = DOCS_ENTRY_TOPIC[product];
+  return `/docs/${product}/${integration}${topic ? `/${topic}` : ''}`;
 }
 
 /** Rewrites a canonical or concrete product route to one integration sibling. */

@@ -1,9 +1,15 @@
 import { createContext, runInContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
-import { PRELUDE_SOURCE as builtPreludeSource } from '../dist/index.js';
 import { PRELUDE_SOURCE as sourcePreludeSource } from '../src';
 import type { AcroJsVmGlobal, ScriptInput, ScriptOutput } from '../src';
+
+// The built bundle runs next to the source; it has the source's types, and the
+// path stays a runtime import so typechecking does not need a build first.
+const builtEntry: string = '../dist/index.js';
+const { PRELUDE_SOURCE: builtPreludeSource } = (await import(
+  builtEntry
+)) as typeof import('../src');
 
 const scriptInput: ScriptInput = {
   document: { id: 'doc-parity', fileName: 'parity.pdf', pageCount: 1, pageNumber: 0 },

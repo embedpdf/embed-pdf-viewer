@@ -1,0 +1,4 @@
+# @embedpdf/svelte — ./page-view
+
+PageView [SvelteComponent] (from packages/framework/svelte/src/page-view/PageView.svelte): props PageViewProps; defaults { width: 240}
+PageViewProps [InterfaceDeclaration] (from packages/framework/svelte/src/page-view/props.ts): export interface PageViewProps{ page: PageRef | number; documentId?: string; fallback?: Snippet; width?: number; pageFrame?: Partial<PageFrame>; children: Snippet<[page: PageContextValue]>; pageChrome?: Snippet<[page: PageContextValue]>; class?: string; style?: string; }

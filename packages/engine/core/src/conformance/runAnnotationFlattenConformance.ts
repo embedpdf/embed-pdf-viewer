@@ -9,10 +9,10 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef } from '../identity/PageRef';
 import { AnnotationFlattenResultSchema } from '../wire/schemas';
 
-const square = (left: number, bottom: number): SquareDraft => ({
+const square = (x: number, y: number): SquareDraft => ({
   subtype: 'square',
-  rect: { left, bottom, right: left + 40, top: bottom + 40 },
-  color: { r: 20, g: 40, b: 220 },
+  box: { x, y, width: 40, height: 40 },
+  color: '#1428dc',
   strokeWidth: 2,
 });
 
@@ -48,29 +48,29 @@ export function runAnnotationFlattenConformance(
       const doc = await openFixture(engine, opts);
       try {
         const layoutBefore = await doc.pages.list();
-        const pon = layoutBefore.pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = layoutBefore.pages[0].ref.objectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.flatten) return;
 
-        const a = (await page.annotations.create(square(20, 20))).created.ref;
-        const b = (await page.annotations.create(square(80, 20))).created.ref;
-        const c = (await page.annotations.create(square(140, 20))).created.ref;
+        const a = (await page.annotations.create(square(20, 20))).annotation.ref;
+        const b = (await page.annotations.create(square(80, 20))).annotation.ref;
+        const c = (await page.annotations.create(square(140, 20))).annotation.ref;
         // Hide `c` — ineligible for display flatten, so it must be skipped.
-        await page.annotations.update(c, { subtype: 'square', flags: { hidden: true } });
+        await page.annotations.update(c, { subtype: 'square', hidden: true });
         const before = await page.annotations.list();
 
         const events: DocumentEvent[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
           if (event.type === 'annotations.flattened') events.push(event);
         });
-        const result = await page.annotations.flatten([a, c], 'display');
+        const result = await page.annotations.flatten([a, c], { usage: 'display' });
         unsubscribe();
 
         expect(AnnotationFlattenResultSchema.safeParse(result).success).toBe(true);
-        expect(result.page.pageObjectNumber).toBe(pon);
+        expect(result.page.objectNumber).toBe(pageObjectNumber);
         expect(result.usage).toBe('display');
-        expect(result.results.map((item) => item.status)).toEqual(['applied', 'skipped']);
-        expect(result.meta === null).toBe(false);
+        expect(result.results.map((item) => item.status)).toEqual(['applied', 'unchanged']);
+        expect(result.meta.affectedPages).toEqual([page.ref]);
         expect(events).toHaveLength(1);
 
         // Layout untouched; `a` gone, `b` and `c` still there.
@@ -80,9 +80,6 @@ export function runAnnotationFlattenConformance(
         expect(after.annotations.some((dto) => sameRef(dto.ref, b))).toBe(true);
         expect(after.annotations.some((dto) => sameRef(dto.ref, c))).toBe(true);
         expect(after.annotations.some((dto) => sameRef(dto.ref, a))).toBe(false);
-        expect(after.pageState.revision.generation > before.pageState.revision.generation).toBe(
-          true,
-        );
       } finally {
         await doc.close();
       }
@@ -96,8 +93,8 @@ export function runAnnotationFlattenConformance(
         const page0 = doc.page(layout.pages[0].ref);
         const page1 = doc.page(layout.pages[1].ref);
         if (!page0.annotations.flatten) return;
-        const own = (await page0.annotations.create(square(20, 100))).created.ref;
-        const foreign = (await page1.annotations.create(square(20, 100))).created.ref;
+        const own = (await page0.annotations.create(square(20, 100))).annotation.ref;
+        const foreign = (await page1.annotations.create(square(20, 100))).annotation.ref;
         const countBefore = (await page0.annotations.list()).annotations.length;
 
         await expect(page0.annotations.flatten([own, foreign])).rejects.toMatchObject({
@@ -109,11 +106,11 @@ export function runAnnotationFlattenConformance(
       }
     });
 
-    test('an empty ref list rejects InvalidArg; an unknown ref rejects', async () => {
+    test('an empty ref list rejects InvalidArg; an unknown ref rejects NotFound', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.flatten) return;
         await expect(page.annotations.flatten([])).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
@@ -121,16 +118,16 @@ export function runAnnotationFlattenConformance(
         let unknown: unknown = null;
         try {
           await page.annotations.flatten([
-            { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 987654321 },
+            {
+              kind: 'objectNumber',
+              page: toPageRef(pageObjectNumber),
+              objectNumber: 987654321,
+            },
           ]);
         } catch (error) {
           unknown = error;
         }
-        expect(
-          EngineError.is(unknown, EngineErrorCode.NotFound) ||
-            EngineError.is(unknown, EngineErrorCode.InvalidArg) ||
-            EngineError.is(unknown, EngineErrorCode.InvalidReference),
-        ).toBe(true);
+        expect(EngineError.is(unknown, EngineErrorCode.NotFound)).toBe(true);
       } finally {
         await doc.close();
       }
@@ -140,7 +137,7 @@ export function runAnnotationFlattenConformance(
 
 function sameRef(left: AnnotationRef, right: AnnotationRef): boolean {
   if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
-    return left.annotObjectNumber === right.annotObjectNumber;
+    return left.objectNumber === right.objectNumber;
   }
   return JSON.stringify(left) === JSON.stringify(right);
 }

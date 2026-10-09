@@ -1,18 +1,31 @@
-import type { StrikeoutDraft } from './draft';
-import type { StrikeoutAnnotationDTO } from './dto';
-import type { StrikeoutPatch } from './patch';
-import { StrikeoutDTOSchema, StrikeoutDraftSchema, StrikeoutPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { StrikeoutDeclaration } from './declaration';
 
-export type { StrikeoutAnnotationDTO } from './dto';
-export type { StrikeoutDraft } from './draft';
-export type { StrikeoutPatch } from './patch';
-export { StrikeoutDTOSchema, StrikeoutDraftSchema, StrikeoutPatchSchema } from './schema';
+export { StrikeoutDeclaration } from './declaration';
+
+export type StrikeoutAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof StrikeoutDeclaration,
+  C
+>;
+export type StrikeoutDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof StrikeoutDeclaration,
+  C
+>;
+export type StrikeoutPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof StrikeoutDeclaration,
+  C
+>;
+
+export const StrikeoutDTOSchema = StrikeoutDeclaration.readSchema;
+export const StrikeoutDraftSchema = StrikeoutDeclaration.createSchema;
+export const StrikeoutPatchSchema = StrikeoutDeclaration.updateSchema;
 
 export const StrikeoutKind: AnnotationKindModule<
   'strikeout',
-  StrikeoutAnnotationDTO,
+  StrikeoutAnnotation,
   StrikeoutDraft,
   StrikeoutPatch
 > = {
@@ -21,4 +34,5 @@ export const StrikeoutKind: AnnotationKindModule<
   dtoSchema: StrikeoutDTOSchema,
   draftSchema: StrikeoutDraftSchema,
   patchSchema: StrikeoutPatchSchema,
+  readBackWrites: StrikeoutDeclaration.readBackWrites,
 };

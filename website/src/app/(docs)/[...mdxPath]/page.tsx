@@ -1,10 +1,15 @@
+import { PreviewBanner, UnreleasedNotice } from '@embedpdf/docs-kit';
 import { notFound } from 'next/navigation';
 import { generateStaticParamsFor, importPage } from 'nextra/pages';
-import { Fragment } from 'react';
+import { Fragment, type HTMLAttributes } from 'react';
 
 import { useMDXComponents as getMDXComponents } from '../../../../mdx-components';
 
+import { PageTitle } from '@/components/docs/mdx';
+import { RouteExample, type CompiledExampleProps } from '@/components/docs/route-example';
+import { isHeadlessIntegration, type HeadlessIntegration } from '@/lib/docs-integrations';
 import { buildDocsPageMetadata, getDocsPagePresentation } from '@/lib/docs-page';
+import { docsRelease, reactVersionHref } from '@/lib/docs-release';
 import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
 
 const nextraParams = generateStaticParamsFor('mdxPath');
@@ -27,7 +32,11 @@ export async function generateMetadata(props: PageProps) {
   const { mdxPath } = await props.params;
   const page = await getDocsPagePresentation(mdxPath);
   if (!page) return {};
-  return buildDocsPageMetadata(page);
+  const metadata = buildDocsPageMetadata(page);
+  // A page held back for this framework stays out of search engines until it's live.
+  const resolved = resolveDocsPath(mdxPath);
+  const live = !resolved || docsRelease(resolved.contentPath, resolved.integration).live;
+  return live ? metadata : { ...metadata, robots: { index: false } };
 }
 
 const Wrapper = getMDXComponents().wrapper ?? Fragment;
@@ -38,10 +47,48 @@ export default async function Page(props: PageProps) {
   if (!resolved) notFound();
   const result = await importPage(resolved.contentPath);
   const { default: MDXContent, ...rest } = result;
+  const release = docsRelease(resolved.contentPath, resolved.integration);
 
+  // The publish gate holds this page back for its framework: the title, and why.
+  if (!release.live && isHeadlessIntegration(resolved.integration)) {
+    return (
+      <Wrapper {...rest} toc={[]}>
+        <PageTitle>{rest.metadata?.title}</PageTitle>
+        <UnreleasedNotice
+          framework={resolved.integration}
+          reactHref={reactVersionHref(`/${params.mdxPath.join('/')}`, release)}
+        />
+      </Wrapper>
+    );
+  }
+
+  // The preview site shows a page production holds back with a banner under its title. Examples
+  // and snippets read and send only this route's framework's code (RouteExample).
+  const framework = resolved.integration ?? null;
+  const components = {
+    ...(release.preview && isHeadlessIntegration(resolved.integration)
+      ? { h1: withPreviewBanner(resolved.integration) }
+      : {}),
+    Example: (props: CompiledExampleProps) => <RouteExample {...props} framework={framework} />,
+    Snippet: (props: CompiledExampleProps) => (
+      <RouteExample {...props} mode="code" kind="snippet" framework={framework} />
+    ),
+  };
   return (
     <Wrapper {...rest}>
-      <MDXContent {...props} params={params} />
+      <MDXContent {...props} params={params} components={components} />
     </Wrapper>
   );
+}
+
+/** The page's title with the preview banner under it. */
+function withPreviewBanner(framework: HeadlessIntegration) {
+  return function TitleWithPreviewBanner(props: HTMLAttributes<HTMLHeadingElement>) {
+    return (
+      <>
+        <PageTitle {...props} />
+        <PreviewBanner framework={framework} />
+      </>
+    );
+  };
 }

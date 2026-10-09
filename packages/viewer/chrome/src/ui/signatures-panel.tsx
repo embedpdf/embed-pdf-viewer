@@ -1,33 +1,28 @@
 /**
- * The signatures sidebar (right panel) — Preview's signature sheet on v3
- * parts. One row per PERSON: a stamp library of kind `signatures` holding a
+ * The signatures sidebar (right panel), a signature sheet like Preview's.
+ * One row per person: a stamp library of kind `signatures` holding a
  * full signature and, optionally, initials. Nothing is stored beyond the
  * file; rename/export/delete are the library verbs.
  *
- *   pick a mark → with a TARGET field ("sign here" was clicked, or a
+ *   pick a mark → with a target field ("sign here" was clicked, or a
  *   signature widget selected) the mark goes into that field by the
- *   plugin's mode; otherwise it ARMS — hover a page for the ghost, click a
+ *   plugin's mode; otherwise it arms — hover a page for the ghost, click a
  *   signature field to sign it, click anywhere else to drop it as a stamp.
  *
- * Below the people: the signature fields of THIS document, signed or not,
+ * Below the people: the signature fields of this document, signed or not,
  * with their verdicts — click an unsigned one to target it, a signed one to
  * inspect it.
  */
 import { useEffect, useState } from 'react';
-import { useTool } from '@embedpdf/react/interaction';
+import { useInteractionState } from '@embedpdf/react/interaction';
+import { useSelector } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
 import { useSurface } from '@embedpdf/react/shell';
+import { useStamp, useStampAssetPreviewUrl, type StampAsset } from '@embedpdf/react/stamp';
 import {
-  useArmStampAsset,
-  useStamp,
-  useStampAssetPreviewUrl,
-  type StampAsset,
-} from '@embedpdf/react/stamp';
-import {
+  SignatureToken,
   useSignature,
-  useSignatureSnapshot,
-  useSignatureTarget,
-  useSignatureVerdicts,
+  useSignatureState,
   useSignatureEvent,
   useSignerRows,
   type SignatureDTO,
@@ -39,8 +34,8 @@ import { Icon } from './icons';
 import { restoreStampLibrariesOnce } from './stamp-store';
 
 const fieldLabel = (
-  field: { kind: 'fqn'; name: string } | { kind: 'objectNumber'; fieldObjectNumber: number },
-): string => (field.kind === 'fqn' ? field.name : `#${field.fieldObjectNumber}`);
+  field: { kind: 'fqn'; name: string } | { kind: 'objectNumber'; objectNumber: number },
+): string => (field.kind === 'fqn' ? field.name : `#${field.objectNumber}`);
 
 export function SignaturesPanel() {
   const t = useT();
@@ -48,9 +43,9 @@ export function SignaturesPanel() {
   const signature = useSignature();
   const config = useSignaturesConfig();
   const rows = useSignerRows();
-  const { target, busy } = useSignatureTarget();
-  const { armAsset } = useArmStampAsset();
-  const { activeToolId } = useTool();
+  const target = useSignatureState((state) => state.target);
+  const busy = useSignatureState((state) => state.busy);
+  const { activeToolId } = useInteractionState();
   const maker = useSurface('signature-maker');
   const [armedId, setArmedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,16 +53,17 @@ export function SignaturesPanel() {
   // one a save would invalidate. Shown until the next verdicts land.
   const [invalidating, setInvalidating] = useState<string | null>(null);
   useSignatureEvent(
-    (c) => c.onInvalidating,
+    (signature) => signature.onInvalidationPredicted,
     (event) =>
       setInvalidating(signature.getSignature(event.field)?.fieldName ?? fieldLabel(event.field)),
   );
   useSignatureEvent(
-    (c) => c.onValidated,
+    (signature) => signature.onValidated,
     (event) => {
       if (
         !event.verdicts.some(
-          (v) => v.summary === 'invalid' && v.modifications.basis === 'working-copy',
+          (verdict) =>
+            verdict.summary === 'invalid' && verdict.modifications.basis === 'working-copy',
         )
       )
         setInvalidating(null);
@@ -86,15 +82,15 @@ export function SignaturesPanel() {
   const pick = (asset: StampAsset) => {
     setError(null);
     if (target) {
-      void signature.placeMark({ assetId: asset.id }, { field: target }).catch((err) => {
-        console.error('[embedpdf] placing the mark failed:', err);
+      void signature.placeMark({ assetId: asset.id }, { field: target }).catch((error) => {
+        console.error('[embedpdf] placing the mark failed:', error);
         setError(t('demo.signError'));
       });
       return;
     }
     setArmedId(asset.id);
-    void armAsset(asset.id).catch((err) => {
-      console.error('[embedpdf] arm mark failed:', err);
+    void stamp.armAsset(asset.id).catch((error) => {
+      console.error('[embedpdf] arm mark failed:', error);
       setArmedId(null);
       setError(t('demo.stampsArmError'));
     });
@@ -188,10 +184,10 @@ function SignerRowView({
     if (!bytes) return;
     const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${row.name || 'signature'}.pdf`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${row.name || 'signature'}.pdf`;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
   const commitRename = () => {
@@ -208,11 +204,11 @@ function SignerRowView({
           <input
             autoFocus
             value={renaming}
-            onChange={(e) => setRenaming(e.target.value)}
+            onChange={(event) => setRenaming(event.target.value)}
             onBlur={commitRename}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitRename();
-              if (e.key === 'Escape') setRenaming(null);
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') commitRename();
+              if (event.key === 'Escape') setRenaming(null);
             }}
             className="border-border bg-surface text-fg min-w-0 flex-1 rounded border px-1.5 py-0.5 text-sm"
           />
@@ -315,43 +311,43 @@ function MarkThumb({
 function DocumentSignatures() {
   const t = useT();
   const signature = useSignature();
-  const snapshot = useSignatureSnapshot();
-  const verdicts = useSignatureVerdicts();
-  const { target } = useSignatureTarget();
+  // Every signature field, signed or not; the signed ones carry their verdict in the state.
+  const snapshot = useSelector(SignatureToken, (capability) => capability.getSnapshot());
+  const signed = useSignatureState((state) => state.signatures);
+  const target = useSignatureState((state) => state.target);
   const [validating, setValidating] = useState(false);
   const fields = snapshot?.signatures ?? [];
   const verdictOf = (dto: SignatureDTO) =>
-    verdicts?.find((v) => v.signature.index === dto.index) ?? null;
+    signed.find((entry) => entry.index === dto.index)?.verdict ?? null;
   // Three honest states: valid; valid on disk but unsaved edits would
   // invalidate it (the verdict judged the working copy); invalid on disk.
-  const verdictLabel = (v: SignatureVerdict | null): string =>
-    !v
+  const verdictLabel = (verdict: SignatureVerdict | null): string =>
+    !verdict
       ? t('demo.signaturesSigned')
-      : v.summary === 'valid'
+      : verdict.summary === 'valid'
         ? t('demo.verdictValid')
-        : v.summary === 'valid-untrusted'
+        : verdict.summary === 'valid-untrusted'
           ? t('demo.verdictValidUntrusted')
-          : v.summary === 'indeterminate'
+          : verdict.summary === 'indeterminate'
             ? t('demo.verdictIndeterminate')
-            : v.modifications.basis === 'working-copy'
+            : verdict.modifications.basis === 'working-copy'
               ? t('demo.verdictWillInvalidate')
               : t('demo.verdictInvalid');
-  const verdictTone = (v: SignatureVerdict | null): string =>
-    !v || v.summary === 'indeterminate'
+  const verdictTone = (verdict: SignatureVerdict | null): string =>
+    !verdict || verdict.summary === 'indeterminate'
       ? 'text-fg-muted'
-      : v.summary === 'invalid'
-        ? v.modifications.basis === 'working-copy'
+      : verdict.summary === 'invalid'
+        ? verdict.modifications.basis === 'working-copy'
           ? 'text-amber-600'
           : 'text-red-600'
-        : v.summary === 'valid-untrusted'
+        : verdict.summary === 'valid-untrusted'
           ? 'text-amber-600'
           : 'text-green-600';
   const isTarget = (dto: SignatureDTO) =>
     !!target &&
     (target.kind === 'fqn'
       ? target.name === dto.fieldName
-      : target.fieldObjectNumber ===
-        (dto.field.kind === 'objectNumber' ? dto.field.fieldObjectNumber : -1));
+      : target.objectNumber === (dto.field.kind === 'objectNumber' ? dto.field.objectNumber : -1));
   const validate = () => {
     setValidating(true);
     void signature.validate().finally(() => setValidating(false));
@@ -363,7 +359,7 @@ function DocumentSignatures() {
         <span className="text-fg-muted text-xs font-semibold uppercase tracking-wide">
           {t('demo.signaturesInDocument')}
         </span>
-        {fields.some((f) => f.signed) ? (
+        {fields.some((signature) => signature.signed) ? (
           <button
             type="button"
             disabled={validating}

@@ -1,117 +1,159 @@
 /**
- * The annotation slice: the core-annotation Model plus the selection-chrome
- * settings, the tool ghost, the stamp arm epoch and the editor's text
- * selection. The pure `update` runs in the store service (which also runs
- * effects); the reducer only stores new state — keeping the kernel store a
- * dumb, serializable container.
+ * The annotation plugin's state and its transitions.
+ *
+ * Three kinds of data make up what the user sees, and each has one owner:
+ *
+ *   confirmed  the engine's records             the records mirror (sync/records.ts)
+ *   pending    this session's changes the       the kernel's change queue (`ctx.changes`);
+ *              engine hasn't answered           the records mirror predicts them
+ *   session    selection, gestures, settings    `session` below, produced by the core's `update`
+ *
+ * The view (read/view.ts) composes the session with the records as the
+ * mirror shows them (`records.view()`) into the core's `Model`.
  */
-import { initialModel } from '@embedpdf/core-annotation';
-import type { Model } from '@embedpdf/core-annotation';
+import { initialSession, sameSession } from '@embedpdf/core-annotation';
+import type { Id, Point, Session, SnapSettings } from '@embedpdf/core-annotation';
+import type { PageRotation } from '@embedpdf/core-geometry';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 
-import type {
-  AnnotationConfig,
-  AnnotationHydration,
-  ChromeSettings,
-  ChromeSettingsPatch,
-  ToolGhost,
-} from './contract';
 import type { TextSelection } from './rich-text';
 
-export interface AnnotationState {
-  model: Model;
-  hydration: AnnotationHydration;
-  chrome: ChromeSettings;
-  /**
-   * The armed tool's FOOTPRINT ghost: where (and what) the NEXT click would
-   * place — the stamp's fitted image box, or a click-create tool's default
-   * geometry — computed by the same rules the placement uses (WYSIWYG). In the
-   * store (not the capability closure) because it is RENDERED — vector ghosts
-   * ride `pageItems`, image ghosts (stamp) render via the framework's
-   * `ToolGhost`. The armed bytes stay out of the store.
-   */
-  toolGhost: ToolGhost | null;
-  /** Bumps on every arm/disarm — the render layer's cue to rebuild (or drop)
-   *  the ghost preview object URL. Never rendered itself. */
-  stampArmEpoch: number;
-  /**
-   * The text editor's selection inside the annotation being edited (flat
-   * offsets over its plain projection), or null. In the store because it is
-   * READ by the property surface: while a range is held, the range keys
-   * (`getSelectionProps`) report and take the RUNS, not the body.
-   */
-  textSelection: TextSelection | null;
+/** Where the active tool's ghost is: the pointer on a page, and how that page shows there. */
+export interface GhostPointer {
+  readonly toolId: string;
+  readonly page: PageRef;
+  readonly point: Point;
+  /** The page's display rotation at the pointer (an upright tool lays its click out as seen). */
+  readonly displayRotation?: PageRotation;
+  /** The page's zoom at the pointer (a screen-sized icon's size depends on it). */
+  readonly zoom?: number;
 }
 
-export type AnnotationAction =
-  | { type: 'SET_MODEL'; model: Model }
-  | { type: 'SET_HYDRATION'; hydration: AnnotationHydration }
-  | { type: 'SET_CHROME'; patch: ChromeSettingsPatch }
-  | { type: 'SET_TOOL_GHOST'; ghost: ToolGhost | null }
-  | { type: 'SET_TEXT_SELECTION'; selection: TextSelection | null }
-  | { type: 'STAMP_ARM_CHANGED' };
+/** A sibling plugin's placement gesture with one of this plugin's tools: its press, and the pointer now. */
+export interface ForeignPlacement {
+  readonly toolId: string;
+  readonly page: PageRef;
+  readonly from: Point;
+  readonly to: Point;
+}
 
-/**
- * Out-of-the-box selection chrome — a sensible document-annotation feel. Every
- * length is CSS px (screen-constant across zoom); every color falls back to
- * `accent`. Just defaults: override any field at registration
- * (`annotationPlugin({ chrome })`) or at runtime (`setChrome`).
- */
-export const DEFAULT_CHROME: ChromeSettings = {
-  accent: '#3858e9',
-  // Solid, like the shape's own resting look — one style at rest AND rotated.
-  outline: { style: 'solid', width: 1 },
-  // 8px squares to look at, 24px to grab (touch-friendly without visual bulk).
-  handles: { size: 8, hitSize: 24, fill: '#ffffff' },
-  knob: { size: 10, hitSize: 24, offset: 32, stalk: true, fill: '#ffffff' },
-  // Faint reference cross, prominent live indicator (v2 feel).
-  guides: { enabled: true, style: 'solid', width: 1, axisOpacity: 0.35, indicatorOpacity: 0.8 },
-};
+export interface AnnotationState {
+  /** The core's session: selection, hover, the gesture in progress, tool settings. */
+  readonly session: Session;
+  /**
+   * Records this session renders from their description instead of the
+   * engine's raster: the ones it edited or created. Another session's edit
+   * hands a record back to the raster (see sync/confirmed.ts).
+   */
+  readonly vector: Readonly<Record<Id, true>>;
+  /**
+   * Where the active tool's ghost is: the pointer, while a click there would
+   * make something. Only the pointer is state; what the ghost paints is
+   * derived from it and the tool's live defaults (tools/ghost.ts).
+   */
+  readonly ghostAt: GhostPointer | null;
+  /**
+   * A placement a sibling plugin's gesture is making with one of this
+   * plugin's tools (the form palette's drag-to-place). Once it is a drag it
+   * paints as a drawing in progress (tools/ghost.ts).
+   */
+  readonly placing: ForeignPlacement | null;
+  /**
+   * The text editor's selection inside the annotation being edited (flat
+   * offsets over its plain text), or null. It is state because the property
+   * surface reads it: while a range is held, the text style keys report and
+   * change the runs, not the whole body.
+   */
+  readonly textSelection: TextSelection | null;
+}
 
-/** Deep-partial merge of a chrome patch — one level per piece, like the
- *  stage-settings convention (align pairs / pageFrame). */
-export const mergeChrome = (base: ChromeSettings, patch: ChromeSettingsPatch): ChromeSettings => ({
-  accent: patch.accent ?? base.accent,
-  outline: { ...base.outline, ...patch.outline },
-  handles: { ...base.handles, ...patch.handles },
-  knob: { ...base.knob, ...patch.knob },
-  guides: { ...base.guides, ...patch.guides },
-});
-
-/**
- * The slice holds the annotation-core Model + the selection-chrome settings.
- * The pure `update` runs in the capability (the shell, which also performs
- * effects); the reducer only stores new state — keeping the kernel store a
- * dumb, serializable container. The registration config seeds the model's
- * snap settings and the chrome.
- */
-export const initialAnnotationState = (config: AnnotationConfig = {}): AnnotationState => ({
-  model: { ...initialModel, snap: { ...initialModel.snap, ...config.snap } },
-  hydration: { status: 'loading' },
-  chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),
-  toolGhost: null,
-  stampArmEpoch: 0,
+/** The initial state. The session's snapping comes from the settings (`withSnap`). */
+export const initialAnnotationState = (): AnnotationState => ({
+  session: initialSession,
+  vector: {},
+  ghostAt: null,
+  placing: null,
   textSelection: null,
 });
 
-export const annotationReducer = (
+/** The session snaps as the settings say. */
+export const withSnap = (state: AnnotationState, snap: SnapSettings): AnnotationState =>
+  state.session.snap === snap ? state : { ...state, session: { ...state.session, snap } };
+
+/* ── the session and render preferences ──────────────────────────────── */
+
+/**
+ * Record one message's session. The records it changed and drew live
+ * (`vector`) render live from now on: this session's appearance is the one
+ * its own painter draws.
+ */
+export function withSession(
   state: AnnotationState,
-  action: AnnotationAction,
-): AnnotationState => {
-  switch (action.type) {
-    case 'SET_MODEL':
-      return { ...state, model: action.model };
-    case 'SET_HYDRATION':
-      return { ...state, hydration: action.hydration };
-    case 'SET_CHROME':
-      return { ...state, chrome: mergeChrome(state.chrome, action.patch) };
-    case 'SET_TOOL_GHOST':
-      return { ...state, toolGhost: action.ghost };
-    case 'SET_TEXT_SELECTION':
-      return { ...state, textSelection: action.selection };
-    case 'STAMP_ARM_CHANGED':
-      // A new (or dropped) payload invalidates any ghost drawn for the old one.
-      return { ...state, stampArmEpoch: state.stampArmEpoch + 1, toolGhost: null };
-    default:
-      return state;
-  }
-};
+  session: Session,
+  vector: readonly Id[] = [],
+): AnnotationState {
+  const next = sameSession(state.session, session) ? state : { ...state, session };
+  return preferVector(next, vector);
+}
+
+/** The session holds these object numbers too, for the records it creates next. */
+export const withObjectNumbers = (
+  state: AnnotationState,
+  numbers: readonly number[],
+): AnnotationState =>
+  numbers.length
+    ? {
+        ...state,
+        session: {
+          ...state.session,
+          objectNumbers: [...state.session.objectNumbers, ...numbers],
+        },
+      }
+    : state;
+
+/** The session lost these object numbers: the engine refuses a create that names one. */
+export function withoutObjectNumbers(
+  state: AnnotationState,
+  lost: readonly number[],
+): AnnotationState {
+  const gone = new Set(lost);
+  const objectNumbers = state.session.objectNumbers.filter((number) => !gone.has(number));
+  return objectNumbers.length === state.session.objectNumbers.length
+    ? state
+    : { ...state, session: { ...state.session, objectNumbers } };
+}
+
+/** Render these records live from their description. */
+export function preferVector(state: AnnotationState, ids: readonly Id[]): AnnotationState {
+  const added = ids.filter((id) => !state.vector[id]);
+  if (!added.length) return state;
+  const vector = { ...state.vector };
+  for (const id of added) vector[id] = true;
+  return { ...state, vector };
+}
+
+/** Render these records from the engine's raster again. */
+export function preferBaked(state: AnnotationState, ids: readonly Id[]): AnnotationState {
+  const removed = ids.filter((id) => state.vector[id]);
+  if (!removed.length) return state;
+  const vector = { ...state.vector };
+  for (const id of removed) delete vector[id];
+  return { ...state, vector };
+}
+
+/* ── ghost and text selection ─────────────────────────────────────────────── */
+
+export const setGhostAt = (
+  state: AnnotationState,
+  ghostAt: GhostPointer | null,
+): AnnotationState => (state.ghostAt === ghostAt ? state : { ...state, ghostAt });
+
+export const setPlacing = (
+  state: AnnotationState,
+  placing: ForeignPlacement | null,
+): AnnotationState => (state.placing === placing ? state : { ...state, placing });
+
+export const setTextSelection = (
+  state: AnnotationState,
+  textSelection: TextSelection | null,
+): AnnotationState => (state.textSelection === textSelection ? state : { ...state, textSelection });

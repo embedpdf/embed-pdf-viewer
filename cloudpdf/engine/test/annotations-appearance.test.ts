@@ -5,7 +5,7 @@ import {
   runAnnotationAppearanceConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -56,11 +56,11 @@ runAnnotationAppearanceConformance(runner, {
     expected: { trapped: 'unknown' },
     pageObjectNumber: 2,
     minAppearanceCount: 4,
-    expectsWeakAppearance: false,
+    expectsInlineAppearance: false,
   },
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({
+    return cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });

@@ -1,51 +1,43 @@
-import type { CaretDraft, CaretPatch, Color } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_DEFAULTS,
+  type CaretDraft,
+  type CaretPatch,
+  type PdfCoordinates,
+  type PlacedDraft,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
-  clearRectangleDifferences,
   setAnnotColor,
   setAnnotOpacity,
-  setAnnotRect,
   setIntent,
-  setRectangleDifferences,
+  setIntentOrClear,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
-import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { caretIntentToName } from '../textEditIntent';
 
-/** Default `/C` colour when a caret draft omits it (engine-wide default mark). */
-const DEFAULT_CARET_COLOR: Color = { r: 255, g: 0, b: 0 };
-
-/** Default opacity, set explicitly so reads always round-trip the same value. */
-const DEFAULT_OPACITY = 1;
+/** A caret's defaults (`annotation/defaults.ts`), written explicitly so reads round-trip. */
+const DEFAULTS = ANNOTATION_DEFAULTS.caret;
 
 /**
- * Apply a caret draft to a freshly-created annotation. Caret carries no
- * geometry of its own beyond `/Rect`. Order:
+ * Apply a caret draft to a freshly-created annotation. The caret symbol
+ * fills its box. Order:
  *   1. base author-metadata (contents/nm/flags)
- *   2. `/Rect` (required — supplied by the caller; never derived)
+ *   2. the box and its turn, before the appearance is drawn
  *   3. `/C` color + `/CA` opacity
- *   4. `/RD` rectangle differences (optional)
  */
 export function applyCaretDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: CaretDraft,
+  draft: PlacedDraft<CaretDraft<PdfCoordinates>>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
-  // Box-family rotation pair — MUST land before the AP bake sees the caret.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: draft.rotation,
-    unrotatedRect: draft.unrotatedRect,
-  });
-  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_CARET_COLOR);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
-  if (draft.intent !== undefined) setIntent(fn, annotPtr, caretIntentToName(draft.intent));
-  if (draft.rectDifferences != null) {
-    setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
-  }
+  writeAnnotationBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null });
+  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULTS.color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
+  if (draft.intent != null) setIntent(fn, annotPtr, caretIntentToName(draft.intent));
 }
 
 /**
@@ -56,18 +48,10 @@ export function applyCaretPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: CaretPatch,
+  patch: CaretPatch<PdfCoordinates>,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
-  if (patch.rect !== undefined) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
-  if (patch.rotation !== undefined || patch.unrotatedRect !== undefined) {
-    writeBoxTransformMetadata(fn, mem, annotPtr, {
-      rotation: patch.rotation,
-      unrotatedRect: patch.unrotatedRect,
-    });
-  }
+  applyAnnotationBoxPatch(fn, mem, annotPtr, patch);
   if (patch.color !== undefined) {
     setAnnotColor(fn, annotPtr, patch.color);
   }
@@ -75,12 +59,7 @@ export function applyCaretPatch(
     setAnnotOpacity(fn, annotPtr, patch.opacity);
   }
   if (patch.intent !== undefined) {
-    setIntent(fn, annotPtr, caretIntentToName(patch.intent));
-  }
-  if (patch.rectDifferences === null) {
-    clearRectangleDifferences(fn, annotPtr);
-  } else if (patch.rectDifferences !== undefined) {
-    setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
+    setIntentOrClear(fn, annotPtr, patch.intent === null ? null : caretIntentToName(patch.intent));
   }
 }
 

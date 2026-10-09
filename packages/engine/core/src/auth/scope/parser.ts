@@ -1,10 +1,10 @@
 import { InvalidScope } from './errors';
-import type { CollabAction, CollabFilter, DocCapability, ParsedScope } from './types';
+import type { CollabAction, CollabFilter, DocCapability, FieldAction, ParsedScope } from './types';
 
 /**
  * Closed set of recognized capability strings. Membership is the
  * authoritative source of truth — adding a new capability requires
- * extending the `DocCapability` union AND adding it here. The parser
+ * extending the `DocCapability` union and adding it here. The parser
  * rejects anything outside this set.
  *
  * Removed legacy names (e.g., `doc.read`, `doc.edit-pages`, `doc.save`)
@@ -27,9 +27,12 @@ const KNOWN_CAPABILITIES: ReadonlySet<DocCapability> = new Set([
   'doc.forms.read',
   'doc.forms.fill',
   'doc.forms.modify',
+  'doc.forms.import',
+  'doc.forms.script',
   'doc.forms.submit',
   'doc.annotate.read',
   'doc.annotate.modify',
+  'doc.annotate.import',
   'doc.metadata.modify',
   'doc.attachments.modify',
   'doc.redact',
@@ -68,7 +71,7 @@ export function validateScopeArray(raw: ReadonlyArray<string>): void {
 }
 
 function parseCollab(raw: string): ParsedScope {
-  // Split on the FIRST two colons only. Filter values may contain
+  // Split on the first two colons only. Filter values may contain
   // colons (UUIDs with `urn:uuid:...`, subject ids like `auth0|user:1`).
   const idx1 = raw.indexOf(':');
   const idx2 = raw.indexOf(':', idx1 + 1);
@@ -79,6 +82,7 @@ function parseCollab(raw: string): ParsedScope {
   const action = raw.slice(idx1 + 1, idx2);
   const filterStr = raw.slice(idx2 + 1);
 
+  if (entity === 'fields') return parseFieldScope(raw, action, filterStr);
   if (entity !== 'annotations') {
     throw new InvalidScope(raw, `unknown collab entity: ${entity}`);
   }
@@ -111,6 +115,25 @@ function parseCollab(raw: string): ParsedScope {
     action: action as CollabAction | '*',
     filter,
   };
+}
+
+/**
+ * `fields:<fill|sign|set-group|*>:<all|group=NAME>`. A field's group is who
+ * fills it, and a field records no creator, so `self` and `createdBy=` are
+ * refused.
+ */
+function parseFieldScope(raw: string, action: string, filterStr: string): ParsedScope {
+  if (action !== 'fill' && action !== 'sign' && action !== 'set-group' && action !== '*') {
+    throw new InvalidScope(raw, `unknown fields action: ${action}`);
+  }
+  const filter = parseFilter(filterStr, raw);
+  if (filter.kind !== 'all' && filter.kind !== 'group') {
+    throw new InvalidScope(
+      raw,
+      `fields only support :all or :group=<id> filters (got :${filter.kind})`,
+    );
+  }
+  return { kind: 'collab', entity: 'fields', action: action as FieldAction | '*', filter };
 }
 
 function parseFilter(s: string, raw: string): CollabFilter {

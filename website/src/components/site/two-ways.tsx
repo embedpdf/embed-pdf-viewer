@@ -237,25 +237,25 @@ export function TwoWays() {
                   accent="purple"
                   icon={<ReactIcon />}
                   label="React"
-                  href="/docs/headless/react/getting-started"
+                  href="/docs/headless/react"
                 />
                 <StackChip
                   accent="purple"
                   icon={<VueIcon />}
                   label="Vue"
-                  href="/docs/headless/vue/getting-started"
+                  href="/docs/headless/vue"
                 />
                 <StackChip
                   accent="purple"
                   icon={<SvelteIcon />}
                   label="Svelte"
-                  href="/docs/headless/svelte/getting-started"
+                  href="/docs/headless/svelte"
                 />
                 <StackChip
                   accent="purple"
                   icon={<AngularIcon />}
                   label="Angular"
-                  href="/docs/headless/angular/getting-started"
+                  href="/docs/headless/angular"
                 />
               </>
             }

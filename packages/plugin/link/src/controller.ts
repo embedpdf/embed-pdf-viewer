@@ -1,19 +1,18 @@
 import {
-  createEventHook,
-  pageRefsEqual,
-  type ChangeOrigin,
-  type DocumentEvent,
-  type PageRef,
+  PluginError,
   type PluginContext,
+  type DocumentEvent,
+  type OperationOptions,
+  type PageRef,
 } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-import { destinationToReveal } from '@embedpdf/plugin-stage/destination';
-import { loadLinksPage } from './source';
+
+import { connectLink } from './connect';
 import type {
   Link,
   LinkActivateContext,
@@ -22,72 +21,106 @@ import type {
   LinkLoadedEvent,
   LinkResolution,
 } from './contract';
-import type { LinkHostCapability } from './host-contract';
-import type { LinkAction, LinkState } from './model';
+import type { LinkHostCapability, UriOpener } from './host-contract';
+import { linksOf } from './source';
 
 const EMPTY: readonly Link[] = Object.freeze([]);
-const USER_ORIGIN: ChangeOrigin = {
-  locality: 'local',
-  trigger: 'user',
-  sessionId: null,
-  actorId: null,
-};
 
 const isLink = (value: PdfLinkTarget | Link): value is Link =>
   'target' in value && 'bounds' in value;
-const contains = (b: { x: number; y: number; width: number; height: number }, p: Point): boolean =>
-  p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
+const contains = (
+  bounds: { x: number; y: number; width: number; height: number },
+  point: Point,
+): boolean =>
+  point.x >= bounds.x &&
+  point.x <= bounds.x + bounds.width &&
+  point.y >= bounds.y &&
+  point.y <= bounds.y + bounds.height;
+
+/** The pages whose annotation lists an event changed, each once. */
+function pagesChangedBy(event: DocumentEvent): readonly PageRef[] | null {
+  switch (event.type) {
+    case 'annotations.created':
+      return [event.annotation.page];
+    case 'annotations.updated':
+      return [event.annotation.page];
+    case 'annotations.deleted':
+    case 'annotations.reordered':
+      return [event.page];
+    // These can remove annotations, links included, from the pages they applied to.
+    case 'redaction.applied':
+    case 'pages.flattened':
+      return event.results
+        .filter((result) => result.status === 'applied')
+        .map((result) => result.page);
+    case 'annotations.flattened':
+      return event.results.some((result) => result.status === 'applied') ? [event.page] : null;
+    default:
+      return null;
+  }
+}
 
 /**
  * The link controller. Two sources for the clickable areas: the annotation
- * plugin's folded model when it is installed (always current), else this
- * plugin's own per-page reads. Activation is pure resolution (`resolve`)
- * plus the one side effect this plugin owns — a stage reveal; everything
- * else is reported to the host, which keeps the user gesture.
+ * plugin's folded model when it is installed (always current), else a page
+ * mirror of this plugin's own per-page reads, re-read when a confirmed
+ * change (an annotation write, a redaction, a flatten) touches a loaded page. Activation is pure resolution
+ * (`resolve`) plus the one side effect this plugin owns, a stage reveal;
+ * everything else is reported to the host, which keeps the user gesture.
  */
-export function createLinkController(ctx: PluginContext<LinkState, LinkAction>) {
-  const anno = () => ctx.tryGet(AnnotationHostToken);
-  const reportListener = (error: unknown) => console.error('[link] event listener failed:', error);
-  const activated = createEventHook<LinkActivatedEvent>(reportListener);
-  const loaded = createEventHook<LinkLoadedEvent>(reportListener);
-  ctx.cleanup(() => {
-    activated.dispose();
-    loaded.dispose();
+export function createLinkController(ctx: PluginContext<void>) {
+  const annotationHost = () => ctx.tryGet(AnnotationHostToken);
+  const activated = ctx.events.source<LinkActivatedEvent>();
+  const loaded = ctx.events.source<LinkLoadedEvent>();
+
+  const pages = ctx.pageMirror<readonly Link[]>({
+    name: 'links',
+    load: async (doc, page) => {
+      if (!ctx.getPage(page)) {
+        throw new PluginError(
+          'not-found',
+          'link',
+          `page ${page.objectNumber} is not in this document`,
+        );
+      }
+      const snapshot = await doc.page(page).annotations.list();
+      return linksOf(snapshot.annotations);
+    },
+    affected: pagesChangedBy,
+    changed: ({ page, cause }) => {
+      if (cause === 'load') loaded.emit({ page });
+    },
   });
 
-  const listLinks = (page: PageRef): readonly Link[] => {
-    const host = anno();
+  // Reads take a page's ref or its index; a page that isn't there has no links.
+  const listLinks = (pageArgument: PageRef | number): readonly Link[] => {
+    const page = ctx.getPage(pageArgument)?.ref;
+    if (!page) return EMPTY;
+    const host = annotationHost();
     if (host) return host.listLinkItems(page);
-    return ctx.getState().pages[page.pageObjectNumber] ?? EMPTY;
+    return pages.get(page) ?? EMPTY;
   };
-  const isLoaded = (page: PageRef): boolean =>
-    anno() !== null || page.pageObjectNumber in ctx.getState().pages;
 
-  const loads = new Map<number, Promise<void>>();
-  const ensureLoaded = (page: PageRef): Promise<void> => {
-    if (anno()) return Promise.resolve(); // the annotation model owns the data
-    const pon = page.pageObjectNumber;
-    if (pon in ctx.getState().pages) return Promise.resolve();
-    const inFlight = loads.get(pon);
-    if (inFlight) return inFlight;
-    const load = loadLinksPage(ctx, page).then(() => {
-      loads.delete(pon);
-      if (pon in ctx.getState().pages) loaded.emit({ page });
-    });
-    loads.set(pon, load);
-    return load;
+  const ensureLoaded = async (
+    pageArgument: PageRef | number,
+    options?: OperationOptions,
+  ): Promise<void> => {
+    const { ref } = ctx.pageOf(pageArgument);
+    // With the annotation plugin installed, its model owns the data.
+    if (annotationHost()) return;
+    await ctx.cancellable(options?.signal, pages.ensureLoaded(ref));
   };
+
+  // The framework's website openers, the latest first: the plugin never opens one itself.
+  const uriOpeners: UriOpener[] = [];
 
   const resolve = (target: PdfLinkTarget): LinkResolution => {
     switch (target.kind) {
-      case 'goto': {
-        const layout = ctx
-          .document()
-          ?.pages.find((p) => pageRefsEqual(p.ref, target.destination.page));
-        if (!layout) return { kind: 'destination', destination: target.destination };
-        const { pageIndex, options } = destinationToReveal(target.destination, layout);
-        return { kind: 'reveal', page: target.destination.page, pageIndex, options };
-      }
+      case 'goto':
+        // A page the document doesn't have can't be shown.
+        return ctx.getPage(target.destination.page)
+          ? { kind: 'destination', destination: target.destination }
+          : { kind: 'reported', target };
       case 'uri':
         return { kind: 'uri', uri: target.uri };
       case 'named':
@@ -97,48 +130,48 @@ export function createLinkController(ctx: PluginContext<LinkState, LinkAction>) 
     }
   };
 
+  const perform = (target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation => {
+    const actions = ctx.tryGet(ActionsToken);
+    if (actions && context?.activate) {
+      const dispatch = actions.execute(context.activate, {
+        origin: 'user',
+        source: { kind: 'link', annotation: context.ref, page: context.page },
+        event: { scope: 'activate' },
+      });
+      return { outcome: 'dispatched', dispatch };
+    }
+    const resolution = resolve(target);
+    switch (resolution.kind) {
+      case 'destination': {
+        // The view the link was followed in, by its own scroll behavior.
+        const stage = context?.stage ?? ctx.tryGet(StageToken);
+        if (!stage) return { outcome: 'destination', destination: resolution.destination };
+        stage.goToDestination(resolution.destination);
+        return { outcome: 'revealed' };
+      }
+      case 'uri': {
+        const open = uriOpeners[0];
+        if (!open || open(resolution.uri)) return { outcome: 'uri', uri: resolution.uri };
+        return { outcome: 'reported', target };
+      }
+      case 'named':
+        return { outcome: 'named', name: resolution.name };
+      default:
+        return { outcome: 'reported', target };
+    }
+  };
+
   const activate = (input: PdfLinkTarget | Link, context?: LinkActivateContext): LinkActivation => {
     const target = isLink(input) ? input.target : input;
-    const ctxOf: LinkActivateContext | undefined = isLink(input)
+    const linkContext: LinkActivateContext | undefined = isLink(input)
       ? { activate: input.activate, ref: input.ref, ...context }
       : context;
-    const activation = ((): LinkActivation => {
-      const actions = ctx.tryGet(ActionsToken);
-      if (actions && ctxOf?.activate) {
-        const dispatch = actions.execute(ctxOf.activate, {
-          origin: 'user',
-          source: { kind: 'link', annotation: ctxOf.ref, page: ctxOf.page },
-          event: { scope: 'activate' },
-        });
-        return { outcome: 'dispatched', dispatch };
-      }
-      const resolution = resolve(target);
-      switch (resolution.kind) {
-        case 'reveal': {
-          const stage = ctx.tryGet(StageToken);
-          if (!stage || target.kind !== 'goto') {
-            return target.kind === 'goto'
-              ? { outcome: 'destination', destination: target.destination }
-              : { outcome: 'reported', target };
-          }
-          stage.revealIndex(resolution.pageIndex, { ...resolution.options, behavior: 'smooth' });
-          return { outcome: 'revealed' };
-        }
-        case 'destination':
-          return { outcome: 'destination', destination: resolution.destination };
-        case 'uri':
-          return { outcome: 'uri', uri: resolution.uri };
-        case 'named':
-          return { outcome: 'named', name: resolution.name };
-        default:
-          return { outcome: 'reported', target };
-      }
-    })();
-    activated.emit({ target, activation, origin: USER_ORIGIN });
+    const activation = perform(target, linkContext);
+    activated.emit({ target, activation });
     return activation;
   };
 
-  const getLinkAt = (page: PageRef, point: Point): Link | null => {
+  const getLinkAt = (page: PageRef | number, point: Point): Link | null => {
     let best: Link | null = null;
     for (const link of listLinks(page)) {
       if (!contains(link.bounds, point)) continue;
@@ -168,58 +201,50 @@ export function createLinkController(ctx: PluginContext<LinkState, LinkAction>) 
 
   const api: LinkHostCapability = {
     listLinks,
-    getLink: (page, linkId) => listLinks(page).find((l) => l.id === linkId) ?? null,
+    getLink: (page, linkId) => listLinks(page).find((link) => link.id === linkId) ?? null,
     getLinkAt,
-    listAllLinks: async () => {
-      const pages = ctx.document()?.pages ?? [];
-      await Promise.all(pages.map((p) => ensureLoaded(p.ref)));
-      return pages.flatMap((p) => listLinks(p.ref));
+    listAllLinks: async (options) => {
+      const layouts = ctx.document()?.pages ?? [];
+      await ctx.cancellable(
+        options?.signal,
+        Promise.all(layouts.map((layout) => ensureLoaded(layout.ref, options))),
+      );
+      return layouts.flatMap((layout) => listLinks(layout.ref));
     },
     ensureLoaded,
-    isLoaded,
+    isLoaded: (page) => {
+      const ref = ctx.getPage(page)?.ref;
+      return !!ref && (annotationHost() !== null || pages.getStatus(ref) === 'ready');
+    },
+    getStatus: (page) => {
+      const ref = ctx.getPage(page)?.ref;
+      if (!ref) return 'idle';
+      return annotationHost() ? 'ready' : pages.getStatus(ref);
+    },
     resolve,
     activate,
-    activateAt: (page, point, context) => {
+    activateAt: (pageArgument, point, context) => {
+      const page = ctx.pageOf(pageArgument).ref;
       const link = getLinkAt(page, point);
       return link ? activate(link, { page, ...context }) : null;
     },
     getLabel,
     onActivated: activated.on,
     onLoaded: loaded.on,
-    isNavigationEngaged: () =>
-      ctx.tryGet(InteractionToken)?.getActiveTool()?.enables.has('link-nav') ?? false,
+    registerUriOpener: (opener) => {
+      uriOpeners.unshift(opener);
+      return () => {
+        const index = uriOpeners.indexOf(opener);
+        if (index >= 0) uriOpeners.splice(index, 1);
+      };
+    },
+    isNavigationEngaged: () => ctx.tryGet(InteractionToken)?.activeToolEnables('link-nav') ?? false,
   };
 
   return {
     api,
     connect() {
-      // Stand-alone source only: a confirmed annotation change re-reads the
-      // page it touched (the annotation model owns the data otherwise).
-      const refetch = (page: PageRef): void => {
-        if (anno()) return;
-        if (page.pageObjectNumber in ctx.getState().pages) {
-          void loadLinksPage(ctx, page).then(() => loaded.emit({ page }));
-        }
-      };
-      const off = ctx.doc?.events.subscribe((event: DocumentEvent) => {
-        switch (event.type) {
-          case 'annotation.created':
-            refetch(event.created.page);
-            break;
-          case 'annotation.updated':
-            refetch(event.updated.page);
-            break;
-          case 'annotation.moved':
-            if (event.moved.length) refetch(event.moved[0]!.page);
-            break;
-          case 'annotation.deleted':
-            refetch(event.page);
-            break;
-          default:
-            break;
-        }
-      });
-      if (off) ctx.cleanup(off);
+      connectLink(ctx);
     },
   };
 }

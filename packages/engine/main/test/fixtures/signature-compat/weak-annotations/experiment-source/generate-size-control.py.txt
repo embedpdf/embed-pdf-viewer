@@ -1,0 +1,33 @@
+import sys,json,re,subprocess,tempfile
+from pathlib import Path
+sys.dont_write_bytecode=True
+sys.path.insert(0,'/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/test/fixtures/signature-compat')
+from generate import reader,raw_body,describe_bytes
+from asn1crypto import cms
+root=Path('/tmp/epdf-weak-nm-probes')
+base=(root/'pdfs/approval-inline-control.pdf').read_bytes()
+previous=(root/'supplemental/approval-inline-rewrite-unchanged.pdf').read_bytes()
+size=int(reader(base).trailer['/Size'])
+append=previous[len(base):]
+old_size=int(reader(previous).trailer['/Size'])
+old_token=f'/Size {old_size}'.encode();new_token=f'/Size {size}'.encode()
+assert len(old_token)==len(new_token) and append.count(old_token)==1
+changed=append.replace(old_token,new_token)
+data=base+changed
+assert len(data)==len(previous)
+assert [(i,a,b) for i,(a,b) in enumerate(zip(previous,data)) if a!=b] == [(previous.rfind(old_token)+len(old_token)-1,ord('5'),ord('4'))]
+r=reader(data);p=r.root['/Pages']['/Kids'].raw_get(0)
+assert raw_body(base,p.idnum)==raw_body(data,p.idnum)
+assert r.total_revisions==2
+facts=describe_bytes(data);assert all(s['digestMatches'] for s in facts['signatures'])
+sig=r.embedded_signatures[0].sig_object;ranges=sig['/ByteRange']
+signed=b''.join(data[int(ranges[i]):int(ranges[i])+int(ranges[i+1])] for i in range(0,len(ranges),2))
+with tempfile.TemporaryDirectory(prefix='epdf-size-cms-') as temporary:
+ t=Path(temporary);(t/'sig.der').write_bytes(cms.ContentInfo.load(sig['/Contents'].original_bytes).dump());(t/'signed.bin').write_bytes(signed)
+ result=subprocess.run(['openssl','cms','-verify','-inform','DER','-in',str(t/'sig.der'),'-content',str(t/'signed.bin'),'-binary','-noverify','-out','/dev/null'],capture_output=True)
+ assert result.returncode==0,result.stderr
+file=root/'supplemental/approval-inline-rewrite-size-preserved.pdf';assert not file.exists();file.write_bytes(data)
+manifest_path=root/'supplemental/manifest.json';manifest=json.loads(manifest_path.read_text())
+manifest['cases'].append({'id':'approval-inline-rewrite-size-preserved','file':file.name,'profile':'approval','layout':'inline','action':'rewrite-size-preserved','facts':facts,'pageObjectNumber':p.idnum,'pageBodyByteIdentical':True,'cmsVerified':True,'acrobat':'unobserved','differenceFrom':'approval-inline-rewrite-unchanged','difference':'Exactly one unsigned byte changed: incremental trailer /Size 25 -> /Size 24, matching baseline. Offsets and all other bytes unchanged.'})
+manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
+print('Prepared size-preserved control: one unsigned byte differs, CMS valid, page bytes identical.')

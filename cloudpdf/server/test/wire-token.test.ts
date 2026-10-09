@@ -1,17 +1,20 @@
 import { describe, expect, test } from 'vitest';
 
-// SKIPPED: stale since the engine-core -> engine/core restructure broke the
+// Skipped: stale since the engine-core -> engine/core restructure broke the
 // import path and these stopped collecting; the render wire schema has since
 // drifted (9 assertions fail against current shapes). Revive against the
 // current wire contract in a dedicated pass.
 import {
   decodeRenderToken,
   encodeRenderToken,
-  PageRenderQuerySchema,
+  PageRenderQuerySchemas,
   renderImageOptionsToToken,
   renderImageOptionsToWire,
   unflatten,
 } from '@embedpdf/engine-core/wire';
+
+// The picture family these stale cases were written against.
+const PageRenderQuerySchema = PageRenderQuerySchemas.annotations;
 
 describe.skip('wire token codec', () => {
   test('render tokens use dotted SDK paths in canonical alphabetical order', () => {
@@ -24,15 +27,15 @@ describe.skip('wire token codec', () => {
       'viewport.width': 720,
       background: 'white',
       rotation: 90,
-      quality: 80,
+      quality: 0.8,
       'target.kind': 'rect',
-      'target.rect.left': 10,
-      'target.rect.bottom': 20,
-      'target.rect.right': 40.5,
-      'target.rect.top': 60.25,
+      'target.rect.x': 10,
+      'target.rect.y': 20,
+      'target.rect.width': 30.5,
+      'target.rect.height': 40.25,
     });
     expect(token).toBe(
-      'annotationVersion=7,background=white,contentVersion=1,format=webp,includeAnnotations=true,quality=80,rotation=90,target.kind=rect,target.rect.bottom=20,target.rect.left=10,target.rect.right=40.5,target.rect.top=60.25,viewport.kind=width,viewport.width=720',
+      'annotationVersion=7,background=white,contentVersion=1,format=webp,includeAnnotations=true,quality=0.8,rotation=90,target.kind=rect,target.rect.height=40.25,target.rect.width=30.5,target.rect.x=10,target.rect.y=20,viewport.kind=width,viewport.width=720',
     );
     expect(decodeRenderToken(token)).toEqual({
       contentVersion: '1',
@@ -43,12 +46,12 @@ describe.skip('wire token codec', () => {
       'viewport.width': '720',
       background: 'white',
       rotation: '90',
-      quality: '80',
+      quality: '0.8',
       'target.kind': 'rect',
-      'target.rect.left': '10',
-      'target.rect.bottom': '20',
-      'target.rect.right': '40.5',
-      'target.rect.top': '60.25',
+      'target.rect.x': '10',
+      'target.rect.y': '20',
+      'target.rect.width': '30.5',
+      'target.rect.height': '40.25',
     });
   });
 
@@ -121,11 +124,11 @@ describe.skip('wire token codec', () => {
       viewport: { kind: 'width' as const, width: 720 },
       target: {
         kind: 'rect' as const,
-        rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+        rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
       },
       rotation: 90 as const,
       background: 'white' as const,
-      quality: 80,
+      quality: 0.8,
       includeAnnotations: true,
     };
     expect(renderImageOptionsToWire(options, { contentVersion: 3, annotationVersion: 9 })).toEqual({
@@ -136,13 +139,13 @@ describe.skip('wire token codec', () => {
       'viewport.kind': 'width',
       'viewport.width': 720,
       'target.kind': 'rect',
-      'target.rect.left': 10,
-      'target.rect.bottom': 20,
-      'target.rect.right': 40.5,
-      'target.rect.top': 60.25,
+      'target.rect.x': 10,
+      'target.rect.y': 20,
+      'target.rect.width': 30.5,
+      'target.rect.height': 40.25,
       rotation: 90,
       background: 'white',
-      quality: 80,
+      quality: 0.8,
     });
   });
 
@@ -152,11 +155,11 @@ describe.skip('wire token codec', () => {
       viewport: { kind: 'width' as const, width: 720 },
       target: {
         kind: 'rect' as const,
-        rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+        rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
       },
       rotation: 90 as const,
       background: 'white' as const,
-      quality: 80,
+      quality: 0.8,
       includeAnnotations: true,
     };
     const tokenString = renderImageOptionsToToken(options, {
@@ -169,11 +172,11 @@ describe.skip('wire token codec', () => {
       viewport: { kind: 'width', width: 720 },
       target: {
         kind: 'rect',
-        rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+        rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
       },
       rotation: 90,
       background: 'white',
-      quality: 80,
+      quality: 0.8,
     });
   });
 });

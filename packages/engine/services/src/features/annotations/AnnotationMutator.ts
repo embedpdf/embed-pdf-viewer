@@ -1,72 +1,65 @@
-import { isDimension } from '@embedpdf/engine-core/runtime';
+import { isDimension, type PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import {
-  prepareMeasurementDraft,
-  prepareMeasurementPatch,
-} from './internal/mutations/prepareMeasurementMutation';
-import {
+  annotationKey,
+  assertAnnotationResources,
   appearanceImpactOf,
+  authorizeAnnotationDelete,
+  authorizeAnnotationUpdate,
+  pdfResolveAnnotationPatch,
+  deletedWith,
   EngineError,
   EngineErrorCode,
-  PDF_SUBTYPE_TO_CODE,
   type AnnotationActor,
+  type AnnotationAuthority,
   type AppearanceOutcome,
-  type BlendMode,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
-  type AnnotationDTO,
-  type WireAnnotationDraft,
-  type AnnotationListMutationMeta,
-  type AnnotationMoveResult,
-  type WireAnnotationPatch,
-  type WireResourceMap,
+  type AnnotationDraft,
+  type AnnotationPatch,
+  type WireAnnotationResources,
   type AnnotationRef,
-  type AnnotationStableId,
+  type AnnotationReplyType,
   type AnnotationUpdateResult,
   type PageObjectNumber,
   PdfAnnotationSubtypeCode,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
-import { blendModeFromCode, blendModeToCode } from './internal/blendMode';
+import { pdfPageCountOf } from './internal/write/stampDrawing';
+import { AnnotationBatchApplier } from './AnnotationBatchApplier';
+import { blendModeFromCode } from './internal/blendMode';
+import { assertCaptionMetadataWritable } from './internal/mutations/captionMetadata';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts';
-import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
-import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
-import { computeMutationImpact } from './internal/mutations/computeMutationImpact';
-import { assertRichTextAgreement } from './internal/richTextWire';
+import { annotationRefOf } from './internal/identity/annotationName';
+import { openAnnotAtRaw, resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
+import { annotationMutationMeta } from './internal/mutations/annotationMutationMeta';
 import { readContextFor } from './internal/read/annotationReadContext';
-import { readAnnotString } from './internal/read/annotationReadPrimitives';
 import {
   joinWidgetFieldNumbers,
   resolveWidgetFieldObjectNumber,
 } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
+import { applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
+import { settleAnnotationTurn } from './internal/write/writeAnnotationTransformMetadata';
+import { RawAnnotationReader } from './RawAnnotationReader';
+import { generateAppearance } from './internal/write/generateAppearance';
+import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
+import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
 import {
-  applyDraft,
-  applyPatch,
-  preflightDraft,
-  preflightPatch,
-} from './internal/write/annotationWriterRegistry';
-import {
-  writeAnnotationAuthor,
-  writeAnnotationModified,
-} from './internal/write/writeAnnotationBase';
-import { writeAnnotationRelationship } from './internal/write/writeAnnotationRelationship';
-import {
-  applyEmbedMetadataOnCreate,
-  applyEmbedMetadataOnUpdate,
-} from './internal/write/writeEmbedMetadata';
-
-/** `FPDF_ANNOT_APPEARANCEMODE_NORMAL` — the `/AP /N` stream. */
-const APPEARANCE_MODE_NORMAL = 0;
+  writeAnnotationRelationship,
+  writeLinkedOpen,
+  writePopupParent,
+} from './internal/write/writeAnnotationRelationship';
+import { applyEmbedMetadataOnUpdate } from './internal/write/writeEmbedMetadata';
 
 /**
  * Synchronous orchestrator for `create` / `update` / `delete` annotation
- * mutations. Owns the dance between PDFium calls, identity bookkeeping,
- * revision bumping (only for structural ops), and the
- * `AnnotationListMutationMeta` envelope every result type carries.
+ * mutations. Owns the dance between PDFium calls, identity bookkeeping, and
+ * the `AnnotationListMutationMeta` envelope every result type carries.
  *
  * Lives in `engine-services` (not the worker hosts) so the local Web
  * Worker, the Node `worker_thread` server, and any future direct-thread
@@ -74,21 +67,19 @@ const APPEARANCE_MODE_NORMAL = 0;
  * them is the underlying `PdfRuntimeModule` (WASM vs native).
  *
  * Identity rules enforced here, locked with the user:
- *   - `create` always uses `EPDFPage_CreateAnnot` (the fork helper that
- *     creates an INDIRECT object) so new annotations are born durable.
- *     If the fork helper ever returns a direct object, we throw — never
- *     silently produce a weak annotation.
- *   - `update` is non-structural. /NM is monotonic per annotation:
- *       * already durable (objectNumber > 0 OR /NM present) -> NEVER touched.
- *       * weak (no objectNumber, no /NM) -> stamp engine-generated UUID v4.
- *     The patch type has no `nm` field, so the writer surface enforces
- *     "callers cannot rename a stable id" at the type level. Updates do
- *     not bump the revision.
- *   - `delete` is subtype-agnostic. Three native fork helpers handle the
- *     three ref kinds without round-tripping through index. For weak
- *     deletes (`AnnotationStableId | null`-shaped result), we set
- *     `deleted: null` so callers can detect that no durable id was
- *     reportable.
+ *   - `create` is a one-item change set on `AnnotationBatchApplier`, which
+ *     makes the annotation with `EPDFPage_CreateAnnotRaw` (an indirect
+ *     object, on a page that isn't loaded), so a new annotation is named by
+ *     its object number. If the fork helper ever returns a direct object, it
+ *     throws.
+ *   - Every annotation keeps its name through every write (see
+ *     `annotationRefOf`). No write stamps an /NM to name one, and the patch
+ *     type has no `nm` field, so callers cannot rename one either.
+ *   - `delete` is subtype-agnostic and names everything it removed.
+ *
+ * Every write finds its annotations from the page's dictionaries (raw
+ * handles), so none parses the page's content. Each runs inside its job's
+ * layer transaction: a failure after the first write aborts all of it.
  */
 export class AnnotationMutator {
   constructor(
@@ -104,8 +95,8 @@ export class AnnotationMutator {
   ) {}
 
   /** Build the per-write context handed to subtype writers: font resolver
-   *  (FreeText `/DA`), doc/page pointers and binary resources (stamp). */
-  private writeContext(pagePtr: Ptr, resources?: WireResourceMap): AnnotationWriteContext {
+   *  (FreeText `/DA`), the document pointer and binary resources (stamp). */
+  private writeContext(resources?: WireAnnotationResources): AnnotationWriteContext {
     const fonts = this.fonts;
     return {
       ...(fonts
@@ -114,155 +105,83 @@ export class AnnotationMutator {
             describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
           }
         : {}),
+      runtime: this.runtime,
       docPtr: this.session.requireDocPtr(),
-      pagePtr,
+      drawings: this.session.drawingIndex(),
+      pdfPageCount: (bytes) => pdfPageCountOf(this.runtime.fn, this.runtime.mem, bytes),
       ...(resources ? { resources } : {}),
     };
   }
 
+  /**
+   * A one-item change set on {@link AnnotationBatchApplier}: checked before
+   * the first write, made without loading its page, all or nothing. A
+   * `reply` or a popup's `parent` names an annotation the document has.
+   */
   create(
     pageObjectNumber: PageObjectNumber,
-    draft: WireAnnotationDraft,
+    draft: AnnotationDraft<PdfCoordinates>,
     signal: AbortSignal,
-    actor?: AnnotationActor,
-    resources?: WireResourceMap,
-  ): AnnotationCreateResult {
-    throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
-    const subtypeCode = PDF_SUBTYPE_TO_CODE[draft.subtype];
-
-    const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
-    try {
-      this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
-      const writeCtx = this.writeContext(pagePtr, resources);
-      preflightDraft(draft, writeCtx);
-      assertRichTextAgreement(draft);
-      draft = prepareMeasurementDraft(draft);
-      // `create` is append-only: PDFium drops the new annotation at
-      // `index = previousCount`, so no existing index ever shifts. Per
-      // the locked rule in `computeMutationImpact`, that means create is
-      // non-invalidating — no per-page revision bump, no weak-ref
-      // staleness signal. The DTO is read against the page's current
-      // revision (which both pre-existing and freshly-created
-      // annotations share, since nothing bumped it).
-      const pageStateBefore = this.session.pageState(pageObjectNumber);
-      throwIfAborted(signal);
-
-      const annotPtr = fn.EPDFPage_CreateAnnot(pagePtr, subtypeCode);
-      if (!annotPtr) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `EPDFPage_CreateAnnot returned NULL for subtype '${draft.subtype}'`,
-        );
-      }
-
-      let dto;
-      let newObjNum: number;
-      let newIndex: number;
-      let linkedParentId: AnnotationStableId | null = null;
-      try {
-        applyDraft(fn, mem, annotPtr, draft, writeCtx);
-        // Link to an /IRT parent when the draft asks for one. This may
-        // promote a weak/direct parent to an indirect object (non-structural,
-        // no index shift); the strengthened parent id is folded into
-        // `meta.changed` below so the client can reconcile its cached ref.
-        if (draft.inReplyTo !== undefined || draft.replyType !== undefined) {
-          linkedParentId = writeAnnotationRelationship(
-            this.runtime,
-            this.session,
-            pagePtr,
-            annotPtr,
-            pageObjectNumber,
-            { inReplyTo: draft.inReplyTo, replyType: draft.replyType },
-          );
-        }
-        // Stamp identity + modification metadata AFTER the per-subtype
-        // writer so a buggy subtype writer can't clobber them:
-        //   /T             ← actor.displayName  (when present)
-        //   /M             ← now                 (always)
-        //   /EMBD_Metadata ← actor.userId/groupId (when present)
-        if (actor?.displayName) {
-          writeAnnotationAuthor(fn, mem, annotPtr, actor.displayName);
-        }
-        writeAnnotationModified(fn, mem, annotPtr);
-        applyEmbedMetadataOnCreate(fn, mem, annotPtr, actor);
-        // Bake the /AP appearance stream now that every visual field is
-        // written, so the new annotation ships with a standard-compliant
-        // appearance (matches the v2 engine).
-        this.regenerateAppearance(annotPtr, pagePtr, draft.blendMode);
-
-        newObjNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-        if (newObjNum <= 0) {
-          // Defensive: the fork helper guarantees an indirect object.
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `EPDFPage_CreateAnnot produced a direct object (no objectNumber); fork helper invariant broken`,
-          );
-        }
-        newIndex = fn.FPDFPage_GetAnnotIndex(pagePtr, annotPtr);
-        if (newIndex < 0) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `FPDFPage_GetAnnotIndex returned ${newIndex} for freshly created annotation`,
-          );
-        }
-
-        dto = readAnnotationFromPtr(
-          fn,
-          mem,
-          annotPtr,
-          pageObjectNumber,
-          newIndex,
-          pageStateBefore.revision,
-          readContextFor(this.session, this.fonts),
-        );
-        joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
-      } finally {
-        fn.FPDFPage_CloseAnnot(annotPtr);
-      }
-
-      const createdId: AnnotationStableId = { kind: 'objectNumber', value: newObjNum };
-      // Linking promoted the parent in place, so the page may now have one
-      // fewer weak annotation — refresh the flag that future delete/move
-      // refetch decisions read. (A plain create touches no existing annot.)
-      if (linkedParentId) this.recordWeakStateFromPage(pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(pageObjectNumber);
-      const meta: AnnotationListMutationMeta = computeMutationImpact({
-        mutation: 'create',
-        pageStateBefore,
-        pageStateAfter,
-        changed: linkedParentId ? [createdId, linkedParentId] : [createdId],
-      });
-
-      return { created: dto, meta };
-    } finally {
-      pool.release(pageObjectNumber);
-    }
+    options: {
+      /** Who creates it: stamped as its author. */
+      readonly actor?: AnnotationActor;
+      /** The bytes beside the draft, by role. */
+      readonly resources?: WireAnnotationResources;
+      /** The object number it gets; the next free one when absent. */
+      readonly objectNumber?: number;
+    } = {},
+  ): AnnotationCreateResult<PdfCoordinates> {
+    const { actor, resources, objectNumber } = options;
+    const { reply, ...data } = draft as AnnotationDraft<PdfCoordinates> & {
+      parent?: AnnotationRef | null;
+    };
+    const parent = draft.subtype === 'popup' ? draft.parent : null;
+    if (draft.subtype === 'popup') delete (data as { parent?: unknown }).parent;
+    const { created, meta } = new AnnotationBatchApplier(
+      this.runtime,
+      this.session,
+      this.fonts,
+    ).create(
+      [
+        {
+          page: toPageRef(pageObjectNumber),
+          draft: data as AnnotationDraft<PdfCoordinates>,
+          ...(reply
+            ? { replyTo: { to: { existing: reply.to }, type: reply.type ?? 'reply' } }
+            : {}),
+          ...(parent ? { parent: { existing: parent } } : {}),
+          ...(resources ? { resources } : {}),
+          ...(objectNumber !== undefined ? { objectNumber } : {}),
+          attribution: { kind: 'stamp', ...(actor ? { actor } : {}) },
+        },
+      ],
+      signal,
+    );
+    return { annotation: created[0]!, meta };
   }
 
+  /**
+   * Edit an annotation in place. `authority` is checked against the
+   * annotation as it reads before the first write, and gives the actor the
+   * write stamps.
+   */
   update(
     ref: AnnotationRef,
-    patch: WireAnnotationPatch,
+    patch: AnnotationPatch<PdfCoordinates>,
+    authority: AnnotationAuthority,
     signal: AbortSignal,
-    actor?: AnnotationActor,
-    resources?: WireResourceMap,
-  ): AnnotationUpdateResult {
+    resources?: WireAnnotationResources,
+  ): AnnotationUpdateResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
-    const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
-    let annotPtr: Ptr | null = null;
+    // An update edits in place, so the annotation keeps its position
+    // throughout: opened again there after its appearance is baked.
+    const { pageIndex, index } = resolveAnnotIndexRaw(this.runtime, this.session, ref);
+    let annotPtr: Ptr | null = openAnnotAtRaw(this.runtime, this.session, pageIndex, index);
     try {
-      annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
       throwIfAborted(signal);
 
-      const writeCtx = this.writeContext(pagePtr, resources);
-      preflightPatch(patch, writeCtx);
-      assertRichTextAgreement(patch);
-
-      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
+      const writeCtx = this.writeContext(resources);
 
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
@@ -272,34 +191,39 @@ export class AnnotationMutator {
       // Pre-patch DTO for the appearance classifier: it value-diffs the patch
       // against this, so no-op keys (full-projection clients) drop away and a
       // pure move is recognized no matter how verbose the patch is.
-      const preIndex = fn.FPDFPage_GetAnnotIndex(pagePtr, annotPtr);
-      if (preIndex < 0) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `FPDFPage_GetAnnotIndex returned ${preIndex} before update`,
-        );
-      }
       const currentDto = readAnnotationFromPtr(
         fn,
         mem,
         annotPtr,
-        ref.page.pageObjectNumber,
-        preIndex,
-        pageStateBefore.revision,
+        ref.page.objectNumber,
+        index,
         readContextFor(this.session, this.fonts),
       );
+      const actor = authorizeAnnotationUpdate(
+        authority,
+        currentDto,
+        (patch as { groupId?: string | null }).groupId,
+      );
 
-      patch = prepareMeasurementPatch(fn, annotPtr, currentDto, patch);
+      // What the patch means, stated whole: the one resolution a viewer's
+      // pending view shares (`applyAnnotationPatch`). The writers below write
+      // exactly this.
+      assertCaptionMetadataWritable(fn, annotPtr, currentDto, patch);
+      patch = pdfResolveAnnotationPatch(currentDto, patch, {
+        describeFont: writeCtx.describeRegisteredFont,
+      });
+      assertAnnotationResources(currentDto.subtype, resources, 'update');
+      preflightPatch(patch, writeCtx);
 
       // Apply boundary: validation and cancellation are complete before the
-      // first possible document write (weak-id strengthening below).
+      // first document write.
       throwIfAborted(signal);
 
-      // Opportunistic /NM stamp for weak annotations + capture the
-      // resulting stable id for `meta.changed`. Same monotonic /NM
-      // rule that `move()` uses; sharing the helper guarantees the
-      // two paths cannot drift in their identity bookkeeping.
-      const stableId = this.captureOrStampStableId(annotPtr);
+      // The appearance decision (see below) depends only on the read and the
+      // patch. A write that redraws or re-places the drawing starts from the
+      // turn the annotation reads: our keys record it first.
+      const impact = resources?.appearance ? 'regenerate' : appearanceImpactOf(currentDto, patch);
+      if (impact !== 'inert') settleAnnotationTurn(fn, mem, annotPtr);
 
       // Apply caller-supplied subtype-specific writes.
       applyPatch(fn, mem, annotPtr, patch, writeCtx);
@@ -312,19 +236,58 @@ export class AnnotationMutator {
       ) {
         fn.EPDFAnnot_RemoveKey(annotPtr, 'RC');
       }
-      // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Setting a
-      // link may promote a weak parent to indirect (non-structural); the
-      // strengthened parent id is folded into `meta.changed` below.
-      let linkedParentId: AnnotationStableId | null = null;
-      if (patch.inReplyTo !== undefined || patch.replyType !== undefined) {
-        linkedParentId = writeAnnotationRelationship(
+      // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Only this
+      // annotation is written; a popup relink and a shared `/Open` also write
+      // the other annotation, which `meta.changed` names after this one.
+      let linkedParent: AnnotationRef | null = null;
+      if (patch.reply !== undefined && !sameReply(patch.reply, currentDto.reply)) {
+        writeAnnotationRelationship(
           this.runtime,
           this.session,
-          pagePtr,
           annotPtr,
-          ref.page.pageObjectNumber,
-          { inReplyTo: patch.inReplyTo, replyType: patch.replyType },
+          ref.page.objectNumber,
+          patch.reply === null
+            ? { inReplyTo: null }
+            : { inReplyTo: patch.reply.to, replyType: patch.reply.type ?? 'reply' },
         );
+      }
+      let relinked = false;
+      if (
+        patch.subtype === 'popup' &&
+        currentDto.subtype === 'popup' &&
+        patch.parent !== undefined &&
+        !sameRef(patch.parent, currentDto.parent)
+      ) {
+        relinked = true;
+        linkedParent = writePopupParent(
+          this.runtime,
+          this.session,
+          annotPtr,
+          ref.page.objectNumber,
+          patch.parent,
+          currentDto.parent,
+        );
+      }
+      // A note and its popup hold one `/Open`: writing it on one writes the
+      // other (a relink has made them equal already).
+      let linkedOpen: AnnotationRef | null = null;
+      const open = (patch as { open?: boolean }).open;
+      if (open !== undefined && !relinked) {
+        const other =
+          currentDto.subtype === 'text'
+            ? currentDto.popup
+            : currentDto.subtype === 'popup'
+              ? currentDto.parent
+              : null;
+        if (other) {
+          linkedOpen = writeLinkedOpen(
+            this.runtime,
+            this.session,
+            other,
+            open,
+            currentDto.subtype === 'popup',
+          );
+        }
       }
       // Refresh standard /M (modified date) on every update — independent
       // of whether the patch touched any subtype-specific field. Then
@@ -337,30 +300,26 @@ export class AnnotationMutator {
       // image stamp) is destroyed only as the explicit consequence of a
       // semantic edit, never as a side effect of writing back values nobody
       // changed. `inert` patches (metadata-only, or all values no-ops) never
-      // touch /AP; a VERIFIED rigid translation preserves an existing /AP
-      // byte-for-byte (ISO 32000: BBox→/Rect fitting translates the pixels);
-      // everything else re-bakes. With no existing normal /AP there is
-      // nothing to preserve, so any appearance-relevant write bakes one (v2
-      // parity — otherwise the annotation renders as nothing). The verdict is
-      // echoed on the result: clients drive raster invalidation off
+      // touch /AP. A verified rigid translation keeps the appearance as it is:
+      // an existing /AP byte-for-byte (ISO 32000: BBox→/Rect fitting
+      // translates the pixels), and a missing one stays missing (the renderer
+      // draws it in memory where the annotation now is; a move gives the file
+      // no drawing of ours). Everything else bakes one. The verdict is echoed
+      // on the result: clients drive raster invalidation off
       // `appearance.changed` instead of guessing from the patch they sent.
-      const impact = appearanceImpactOf(currentDto, patch);
+      // New appearance bytes are a new drawing, whatever the patch says.
       let appearance: AppearanceOutcome;
-      if (
-        impact === 'inert' ||
-        (impact === 'translation' &&
-          fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL))
-      ) {
+      if (impact === 'inert' || impact === 'translation') {
         appearance = { action: 'preserved', changed: false };
       } else {
-        const ok = this.regenerateAppearance(
-          annotPtr,
-          pagePtr,
-          patch.blendMode ?? previousBlendMode,
-        );
+        const ok =
+          currentDto.subtype === 'widget'
+            ? // Drawn as its field's family draws it; a widget in no field has none.
+              fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
+            : generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
         appearance = ok
           ? { action: 'regenerated', changed: true }
-          : // No generic generator for this subtype (e.g. widgets). The
+          : // No generator for this annotation (a widget in no field). The
             // dictionary still changed when the patch was appearance-relevant,
             // so `changed` stays true in that case — form-layer renderers may
             // paint differently even though no /AP was written.
@@ -373,437 +332,194 @@ export class AnnotationMutator {
       // target before read-back so the returned DTO reflects the new stream.
       fn.FPDFPage_CloseAnnot(annotPtr);
       annotPtr = null;
-      annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
+      annotPtr = openAnnotAtRaw(this.runtime, this.session, pageIndex, index);
 
-      // Read back. Update is non-structural, so the index does NOT move
-      // and the revision does NOT bump.
-      const newIndex = fn.FPDFPage_GetAnnotIndex(pagePtr, annotPtr);
-      if (newIndex < 0) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `FPDFPage_GetAnnotIndex returned ${newIndex} after update`,
-        );
-      }
+      // Read back. Update is non-structural, so the index does not move.
       const dto = readAnnotationFromPtr(
         fn,
         mem,
         annotPtr,
-        ref.page.pageObjectNumber,
-        newIndex,
-        pageStateBefore.revision,
+        ref.page.objectNumber,
+        index,
         readContextFor(this.session, this.fonts),
       );
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
-      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
-      const meta = computeMutationImpact({
-        mutation: 'update',
-        pageStateBefore,
-        pageStateAfter,
-        changed: linkedParentId ? [stableId, linkedParentId] : [stableId],
-      });
-      return { updated: dto, appearance, meta };
+      const meta = annotationMutationMeta(
+        this.session.writeStamp(),
+        ref.page.objectNumber,
+        uniqueRefs([dto.ref, linkedParent, linkedOpen]),
+      );
+      return { annotation: dto, appearance, meta };
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
-      pool.release(ref.page.pageObjectNumber);
     }
   }
 
   /**
    * Attached widgets are views of a form field: deleting one here would
    * orphan the field's /Kids (the corruption class doc.forms.repair
-   * exists to fix). Detach first, or use the forms-plane cascade.
+   * exists to fix). Remove it from its field first, or delete the field. A
+   * merged field/widget is the field's own dictionary and has nothing to be
+   * removed from, so only the field's delete removes it; that cascade passes
+   * the field it has unlinked as `releasedFieldObjectNumber`.
    */
-  private assertNotAttachedWidget(annotPtr: Ptr): void {
+  private assertNotAttachedWidget(annotPtr: Ptr, releasedFieldObjectNumber: number): void {
     const { fn } = this.runtime;
     if (fn.FPDFAnnot_GetSubtype(annotPtr) !== PdfAnnotationSubtypeCode.WIDGET) return;
     const annotObjectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-    if (resolveWidgetFieldObjectNumber(this.runtime, this.session, annotObjectNumber) === 0) {
+    if (releasedFieldObjectNumber > 0 && annotObjectNumber === releasedFieldObjectNumber) {
+      return; // the unlinked field's own dictionary, leaving its page
+    }
+    const fieldObjectNumber = resolveWidgetFieldObjectNumber(
+      this.runtime,
+      this.session,
+      annotObjectNumber,
+    );
+    if (fieldObjectNumber === 0) {
       return; // inert widget: an ordinary annotation, ordinary delete
     }
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      'widget is attached to a form field - use doc.forms.detachWidget or doc.forms.deleteField',
+      fieldObjectNumber === annotObjectNumber
+        ? "widget is its form field's own dictionary (a merged field/widget) - delete the field with doc.forms.delete"
+        : 'widget is attached to a form field - use doc.forms.removeWidget or doc.forms.delete',
     );
   }
 
-  delete(ref: AnnotationRef, signal: AbortSignal): AnnotationDeleteResult {
-    throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
-    const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
-    let bumpRequested = false;
-    try {
-      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
-      throwIfAborted(signal);
-
-      let deleted: AnnotationStableId | null;
-      let ok = false;
-      switch (ref.kind) {
-        case 'objectNumber': {
-          // Probe so we 404 honestly before mutating. The fork helper
-          // does its own existence check too, but we want a clean
-          // InvalidReference up front rather than a "false" return code
-          // we'd have to translate.
-          const probe = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
-          if (!probe) {
-            throw new EngineError(
-              EngineErrorCode.InvalidReference,
-              `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
-            );
-          }
-          try {
-            this.assertNotAttachedWidget(probe);
-          } finally {
-            fn.FPDFPage_CloseAnnot(probe);
-          }
-          bumpRequested = true;
-          ok = fn.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
-          deleted = { kind: 'objectNumber', value: ref.annotObjectNumber };
-          break;
-        }
-        case 'nm': {
-          const namePtr = mem.writeU16String(ref.nm);
-          try {
-            const probe = fn.EPDFPage_GetAnnotByName(pagePtr, namePtr);
-            if (!probe) {
-              throw new EngineError(
-                EngineErrorCode.InvalidReference,
-                `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
-              );
-            }
-            try {
-              this.assertNotAttachedWidget(probe);
-            } finally {
-              fn.FPDFPage_CloseAnnot(probe);
-            }
-            bumpRequested = true;
-            ok = fn.EPDFPage_RemoveAnnotByName(pagePtr, namePtr);
-          } finally {
-            mem.free(namePtr);
-          }
-          deleted = { kind: 'nm', value: ref.nm };
-          break;
-        }
-        case 'index': {
-          this.session.validateRevision(ref.revision);
-          const annotPtr = fn.FPDFPage_GetAnnot(pagePtr, ref.index);
-          if (!annotPtr) {
-            throw new EngineError(
-              EngineErrorCode.InvalidReference,
-              `index ${ref.index} out of range on page ${ref.page.pageObjectNumber}`,
-            );
-          }
-          let probedObjNum: number;
-          let probedNm: string | null;
-          try {
-            probedObjNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-            probedNm = readAnnotString(fn, mem, annotPtr, 'NM');
-          } finally {
-            fn.FPDFPage_CloseAnnot(annotPtr);
-          }
-          deleted =
-            probedObjNum > 0
-              ? { kind: 'objectNumber', value: probedObjNum }
-              : probedNm !== null && probedNm.length > 0
-                ? { kind: 'nm', value: probedNm }
-                : null;
-          bumpRequested = true;
-          // EPDFPage_RemoveAnnot is the fork helper that ALSO cleans up
-          // the indirect object if the annotation has one. The vanilla
-          // FPDFPage_RemoveAnnot would leak the indirect object.
-          ok = fn.EPDFPage_RemoveAnnot(pagePtr, ref.index);
-          break;
-        }
-      }
-      if (!ok) {
-        throw new EngineError(EngineErrorCode.Unknown, `failed to remove annotation: ${ref.kind}`);
-      }
-
-      // Structural change; bump the local index-space epoch now and stop
-      // the finally-bump. Do not gate this on the page's current weak state:
-      // old snapshots can still hold index refs from before annotations were
-      // strengthened, and delete/move can make those refs point elsewhere.
-      this.session.bumpRevision(ref.page.pageObjectNumber);
-      bumpRequested = false;
-      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
-
-      const meta = computeMutationImpact({
-        mutation: 'delete',
-        pageStateBefore,
-        pageStateAfter,
-        changed: deleted ? [deleted] : [],
-      });
-      return { deleted, meta };
-    } finally {
-      if (bumpRequested) this.session.bumpRevision(ref.page.pageObjectNumber);
-      pool.release(ref.page.pageObjectNumber);
-    }
-  }
-
   /**
-   * Batch reorder of a contiguous block of annotations within a single
-   * page's /Annots array. Symmetric with `pages.move()` for pages.
-   *
-   * Semantics (locked with the user, mirrors `EPDFPage_MoveAnnots`):
-   *   - Each ref in `refs` is resolved to its current /Annots index.
-   *     The block is detached, then re-inserted at `toIndex` in the
-   *     post-removal index space, preserving caller-supplied order.
-   *   - Single-annotation case is `move([ref], toIndex)`. There is no
-   *     separate single-move path; one batch primitive serves both.
-   *   - Atomic from the caller's perspective:
-   *       * one revision bump per batch, regardless of `refs.length`.
-   *       * one `AnnotationListMutationMeta` envelope.
-   *       * if `EPDFPage_MoveAnnots` rejects (returns false) the page is
-   *         untouched and we throw `InvalidArg` without bumping.
-   *   - Identity strengthening: each weak ref in the batch (no
-   *     `objectNumber`, no `/NM`) is opportunistically stamped with a
-   *     fresh engine-generated UUID v4 BEFORE the move. So
-   *     `meta.changed` always lists durable stable ids, and the moved
-   *     DTOs come out durable. Same monotonic `/NM` rule as `update()`.
-   *
-   * Validation rules applied here BEFORE calling the helper, so callers
-   * get clean errors instead of an opaque `false` return code:
-   *   - `refs.length >= 1`.
-   *   - All refs target the page identified by `pageObjectNumber`.
-   *   - `toIndex >= 0` and `toIndex <= count - refs.length` (count is
-   *     captured AFTER ref resolution, so the helper sees the same view).
-   *   - Resolved indices have no duplicates.
-   *
-   * The `EPDFPage_MoveAnnots` helper itself enforces the same rules; the
-   * up-front validation is purely for a usable error surface.
+   * Delete an annotation with everything that goes with it
+   * ({@link deletedWith}): its replies and theirs, grouped parts, review
+   * states and every popup, in one change. `authority` is checked against
+   * each of them, and every check runs before the first write.
    */
-  move(
-    pageObjectNumber: PageObjectNumber,
-    refs: AnnotationRef[],
-    toIndex: number,
+  delete(
+    ref: AnnotationRef,
+    authority: AnnotationAuthority,
     signal: AbortSignal,
-  ): AnnotationMoveResult {
+  ): AnnotationDeleteResult {
     throwIfAborted(signal);
-    if (refs.length === 0) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'move requires at least one ref');
+    const { fn } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
+    const pageObjectNumber = ref.page.objectNumber;
+    const { pageIndex } = this.session.resolvePageRef(ref.page);
+    // Raw handles off the document, never a loaded page: a page loaded
+    // before this change's writes (a layer's copy-on-write) could miss them.
+    const { annotations } = new RawAnnotationReader(this.runtime, this.session, this.fonts).listOne(
+      pageObjectNumber,
+      signal,
+    );
+
+    const members = deletedWith(annotations, ref);
+    if (members.length === 0) throw missingAnnotation(ref);
+    authorizeAnnotationDelete(authority, members);
+    const indexOf = (member: AnnotationRef) =>
+      resolveAnnotIndexRaw(this.runtime, this.session, member).index;
+    const positions = members.map((member) => indexOf(member.ref));
+    for (const index of positions) {
+      this.withAnnotAt(pageIndex, index, (annotPtr) => this.assertNotAttachedWidget(annotPtr, 0));
     }
-    if (toIndex < 0 || !Number.isInteger(toIndex)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `move toIndex must be a non-negative integer (got ${toIndex})`,
+    // A popup deleted without the annotation it shows leaves that
+    // annotation, which stops naming it.
+    const going = new Set(members.map((member) => annotationKey(member.ref)));
+    const keptParents = members.flatMap((member) => {
+      if (member.subtype !== 'popup' || !member.parent) return [];
+      const key = annotationKey(member.parent);
+      const parent = annotations.find((annotation) => annotationKey(annotation.ref) === key);
+      return parent && !going.has(key) ? [indexOf(parent.ref)] : [];
+    });
+
+    // Apply boundary. Promotion keeps every position; then the highest
+    // position first, so the positions still to go hold. The raw remove also
+    // deletes the indirect object.
+    throwIfAborted(signal);
+    promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
+    for (const index of [...positions].sort((a, b) => b - a)) {
+      if (!fn.EPDFPage_RemoveAnnotRaw(docPtr, pageIndex, index)) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `failed to remove annotation ${index} on page ${pageObjectNumber}`,
+        );
+      }
+    }
+    // After the removals, at the position each kept parent now has.
+    for (const parent of keptParents) {
+      const before = positions.filter((index) => index < parent).length;
+      this.withAnnotAt(pageIndex, parent - before, (annotPtr) =>
+        fn.EPDFAnnot_RemoveKey(annotPtr, 'Popup'),
       );
     }
-    for (const r of refs) {
-      if (r.page.pageObjectNumber !== pageObjectNumber) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.page.pageObjectNumber}`,
-        );
-      }
-    }
-
-    const { fn, mem } = this.runtime;
-    const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
-    let bumpRequested = false;
-
-    try {
-      this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(pageObjectNumber);
-      throwIfAborted(signal);
-
-      // 1. Resolve every ref in caller order. For each: capture its
-      //    current /Annots index and its (possibly newly-stamped)
-      //    stable id. We close each annotPtr right after probing — the
-      //    move helper takes the page-level pointer, and we'll re-open
-      //    annotPtrs later by *new* index for the readback.
-      const fromIndices: number[] = new Array(refs.length);
-      const stableIds: AnnotationStableId[] = new Array(refs.length);
-      for (let i = 0; i < refs.length; i++) {
-        throwIfAborted(signal);
-        const annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, refs[i]);
-        try {
-          const idx = fn.FPDFPage_GetAnnotIndex(pagePtr, annotPtr);
-          if (idx < 0) {
-            throw new EngineError(
-              EngineErrorCode.Unknown,
-              `FPDFPage_GetAnnotIndex returned ${idx} during move resolution`,
-            );
-          }
-          fromIndices[i] = idx;
-          stableIds[i] = this.captureOrStampStableId(annotPtr);
-        } finally {
-          fn.FPDFPage_CloseAnnot(annotPtr);
-        }
-      }
-
-      // 2. Reject duplicate source indices up front. Two refs that
-      //    resolve to the same index would violate the helper's
-      //    invariant (and would also be a confused caller).
-      const seen = new Set<number>();
-      for (const idx of fromIndices) {
-        if (seen.has(idx)) {
-          throw new EngineError(
-            EngineErrorCode.InvalidArg,
-            `move refs resolve to duplicate /Annots index ${idx}`,
-          );
-        }
-        seen.add(idx);
-      }
-
-      // 3. Range-check toIndex against the post-removal count, matching
-      //    the helper's contract.
-      const count = fn.FPDFPage_GetAnnotCount(pagePtr);
-      const postRemovalCount = count - fromIndices.length;
-      if (toIndex > postRemovalCount) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `move toIndex ${toIndex} out of range; post-removal count is ${postRemovalCount}`,
-        );
-      }
-
-      // 4. Marshal fromIndices into an i32 array in runtime memory and
-      //    invoke the helper. From this call onward a structural change
-      //    may have happened; finally-bump on any failure.
-      const arrBytes = 4 * fromIndices.length;
-      const arrPtr = mem.alloc(arrBytes);
-      let ok: boolean;
-      try {
-        for (let i = 0; i < fromIndices.length; i++) {
-          mem.poke(arrPtr, 'i32', fromIndices[i], 4 * i);
-        }
-        bumpRequested = true;
-        ok = fn.EPDFPage_MoveAnnots(pagePtr, arrPtr, fromIndices.length, toIndex);
-      } finally {
-        mem.free(arrPtr);
-      }
-
-      if (!ok) {
-        // The helper validates atomically: a `false` return means it
-        // rejected the request and made no changes. Cancel the pending
-        // bump and surface a clean error.
-        bumpRequested = false;
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `EPDFPage_MoveAnnots rejected the request (toIndex=${toIndex}, fromIndices=[${fromIndices.join(
-            ',',
-          )}])`,
-        );
-      }
-
-      // 5. Single revision bump for the whole batch. This is the local
-      //    index-space epoch, so it advances for every successful move even
-      //    if the page is currently strong. Read back DTOs against the
-      //    bumped revision so they are internally consistent.
-      const bumpedRev = this.session.bumpRevision(pageObjectNumber);
-      bumpRequested = false;
-
-      const moved: AnnotationDTO[] = new Array(fromIndices.length);
-      for (let i = 0; i < fromIndices.length; i++) {
-        throwIfAborted(signal);
-        const newIdx = toIndex + i;
-        const annotPtr = fn.FPDFPage_GetAnnot(pagePtr, newIdx);
-        if (!annotPtr) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `failed to re-read moved annotation at index ${newIdx}`,
-          );
-        }
-        try {
-          moved[i] = readAnnotationFromPtr(
-            fn,
-            mem,
-            annotPtr,
-            pageObjectNumber,
-            newIdx,
-            bumpedRev,
-            readContextFor(this.session, this.fonts),
-          );
-        } finally {
-          fn.FPDFPage_CloseAnnot(annotPtr);
-        }
-      }
-
-      this.recordWeakStateFromPage(pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(pageObjectNumber);
-      const meta: AnnotationListMutationMeta = computeMutationImpact({
-        mutation: 'move',
-        pageStateBefore,
-        pageStateAfter,
-        changed: stableIds,
-      });
-      return { moved, meta };
-    } finally {
-      if (bumpRequested) this.session.bumpRevision(pageObjectNumber);
-      pool.release(pageObjectNumber);
-    }
+    // The annotation first, then what went with it.
+    const changed = [...members].reverse().map((member) => member.ref);
+    return { meta: annotationMutationMeta(this.session.writeStamp(), pageObjectNumber, changed) };
   }
 
   /**
-   * Bake (or re-bake) an annotation's `/AP` normal appearance stream from
-   * its current dictionary properties using PDFium's native AP generator,
-   * then flush the page content so the result is persisted into the
-   * page/object tree. Same path the v2 engine used after every
-   * create/update; runs for every writable subtype (shapes + text-markup).
-   *
-   * Best-effort: `EPDFAnnot_GenerateAppearance` returns false for subtypes
-   * PDFium has no generator for (e.g. widgets), in which case the
-   * annotation simply ships without a baked `/AP` and viewers synthesize
-   * one — so a false return is not a hard error; it is surfaced to `update`
-   * callers as the `generation-unavailable` appearance outcome. This step is
-   * non-structural: it never shifts annotation indices or bumps revisions.
+   * Remove a widget of the field `doc.forms.delete` has just unlinked from
+   * the field tree, including the field's own dictionary when it is a
+   * merged field/widget. The cascade runs past that mutation's apply
+   * boundary, so it takes no abort signal.
    */
-  private regenerateAppearance(annotPtr: Ptr, pagePtr: Ptr, blendMode?: BlendMode): boolean {
-    const { fn } = this.runtime;
-    const ok =
-      blendMode === undefined
-        ? fn.EPDFAnnot_GenerateAppearance(annotPtr)
-        : fn.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, blendModeToCode(blendMode));
-    fn.FPDFPage_GenerateContent(pagePtr);
-    return ok;
-  }
-
-  private captureOrStampStableId(annotPtr: Ptr): AnnotationStableId {
-    return captureOrStampStableId(this.runtime, annotPtr);
-  }
-
-  private ensureKnownWeakStateFromPage(pageObjectNumber: PageObjectNumber, pagePtr: Ptr): void {
-    if (this.session.weakAnnotationState(pageObjectNumber).kind === 'known') {
-      return;
-    }
-    this.recordWeakStateFromPage(pageObjectNumber, pagePtr);
-  }
-
-  private recordWeakStateFromPage(pageObjectNumber: PageObjectNumber, pagePtr: Ptr): void {
-    this.session.recordWeakFlag(pageObjectNumber, this.computeHasWeakAnnotations(pagePtr));
-  }
-
-  private computeHasWeakAnnotations(pagePtr: Ptr): boolean {
+  deleteReleasedWidget(
+    ref: AnnotationRef,
+    releasedFieldObjectNumber: number,
+  ): AnnotationDeleteResult {
     const { fn, mem } = this.runtime;
-    const count = fn.FPDFPage_GetAnnotCount(pagePtr);
-    if (count < 0) {
-      throw new EngineError(
-        EngineErrorCode.Unknown,
-        `FPDFPage_GetAnnotCount returned ${count} while computing weak annotations`,
-      );
+    const docPtr = this.session.requireDocPtr();
+    const pageObjectNumber = ref.page.objectNumber;
+    const { pageIndex, index } = resolveAnnotIndexRaw(this.runtime, this.session, ref);
+
+    const deleted = this.withAnnotAt(pageIndex, index, (annotPtr) => {
+      this.assertNotAttachedWidget(annotPtr, releasedFieldObjectNumber);
+      return annotationRefOf(fn, mem, docPtr, ref.page, annotPtr, index);
+    });
+
+    // Promotion keeps every position; the raw remove also deletes the
+    // indirect object.
+    promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
+    if (!fn.EPDFPage_RemoveAnnotRaw(docPtr, pageIndex, index)) {
+      throw new EngineError(EngineErrorCode.Unknown, `failed to remove annotation: ${ref.kind}`);
     }
-    for (let i = 0; i < count; i++) {
-      const annotPtr = fn.FPDFPage_GetAnnot(pagePtr, i);
-      if (!annotPtr) {
-        continue;
-      }
-      try {
-        const objNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-        if (objNum > 0) {
-          continue;
-        }
-        const nm = readAnnotString(fn, mem, annotPtr, 'NM');
-        if (nm === null || nm.length === 0) {
-          return true;
-        }
-      } finally {
-        fn.FPDFPage_CloseAnnot(annotPtr);
-      }
-    }
-    return false;
+    return { meta: annotationMutationMeta(this.session.writeStamp(), pageObjectNumber, [deleted]) };
   }
+
+  /** An annotation of the page opened raw at `index`, closed after `body`. */
+  private withAnnotAt<T>(pageIndex: number, index: number, body: (annotPtr: Ptr) => T): T {
+    const annotPtr = openAnnotAtRaw(this.runtime, this.session, pageIndex, index);
+    try {
+      return body(annotPtr);
+    } finally {
+      this.runtime.fn.FPDFPage_CloseAnnot(annotPtr);
+    }
+  }
+}
+
+/** `NotFound` for a ref that names no annotation on its page. */
+function missingAnnotation(ref: AnnotationRef): EngineError {
+  return new EngineError(
+    EngineErrorCode.NotFound,
+    `no annotation ${annotationKey(ref)} on page ${ref.page.objectNumber}`,
+  );
+}
+
+/** What a write reports touching, once each, in order. */
+function uniqueRefs(refs: ReadonlyArray<AnnotationRef | null>): AnnotationRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref): ref is AnnotationRef => {
+    if (ref === null || seen.has(annotationKey(ref))) return false;
+    seen.add(annotationKey(ref));
+    return true;
+  });
+}
+
+const sameRef = (left: AnnotationRef | null, right: AnnotationRef | null): boolean =>
+  left === null || right === null ? left === right : annotationKey(left) === annotationKey(right);
+
+/** Whether a patch's `reply` names the link the annotation already has. */
+function sameReply(
+  next: { to: AnnotationRef; type?: AnnotationReplyType } | null,
+  current: { to: AnnotationRef; type: AnnotationReplyType } | null,
+): boolean {
+  if (next === null || current === null) return next === current;
+  return sameRef(next.to, current.to) && (next.type ?? 'reply') === current.type;
 }

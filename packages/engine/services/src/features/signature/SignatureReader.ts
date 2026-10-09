@@ -111,7 +111,7 @@ export class SignatureReader {
       throw new EngineError(
         EngineErrorCode.NotFound,
         ref.kind === 'objectNumber'
-          ? `signature field not found: object ${ref.fieldObjectNumber}`
+          ? `signature field not found: object ${ref.objectNumber}`
           : `signature field not found: "${ref.name}"`,
       );
     }
@@ -131,7 +131,7 @@ export class SignatureReader {
   readSignatureByObjectNumber(fieldObjectNumber: number): SignatureDTO {
     const snapshot = this.readSnapshot();
     const found = snapshot.signatures.find(
-      (s) => s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === fieldObjectNumber,
+      (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === fieldObjectNumber,
     );
     if (!found) {
       throw new EngineError(
@@ -230,7 +230,7 @@ export class SignatureReader {
   private indexOf(model: Ptr, ref: FormFieldRef): number {
     const { fn } = this.runtime;
     if (ref.kind === 'objectNumber') {
-      return fn.EPDFSig_GetIndexByFieldObjNum(model, ref.fieldObjectNumber);
+      return fn.EPDFSig_GetIndexByFieldObjNum(model, ref.objectNumber);
     }
     const count = fn.EPDFSig_Count(model);
     for (let i = 0; i < count; i++) {
@@ -247,7 +247,7 @@ export class SignatureReader {
       throw new EngineError(
         EngineErrorCode.NotFound,
         ref.kind === 'objectNumber'
-          ? `signature field not found: object ${ref.fieldObjectNumber}`
+          ? `signature field not found: object ${ref.objectNumber}`
           : `signature field not found: "${ref.name}"`,
       );
     }

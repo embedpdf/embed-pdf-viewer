@@ -1,22 +1,40 @@
+import type { FormFieldDTO } from './field';
+import type { Coordinates } from '../pageSpace/coordinates';
+
 /**
- * A typed value write for one field. The `type` must match the target
- * field's family — the engine rejects mismatches with `InvalidArg` rather
- * than guessing:
+ * A value to write to one field, in the fields a read of it returns:
  *
- * - `text` → text-family fields. Values longer than /MaxLen are truncated.
- * - `toggle` → checkbox/radio. `state` is a widget's `onState` token and
- *   selects WHICH widget of the group is checked; `null` clears the group
- *   (rejected for radios with `noToggleToOff`). Sibling widgets update
- *   together (checkboxes and in-unison radios check all widgets sharing
- *   the target's export value).
- * - `choice` → combo/list boxes, by option export value. Multiple values
- *   need a multi-select list box; an empty array clears the selection.
- *   Combo boxes with the `edit` flag accept one free-text value.
+ * - `{ value }`: a text field's text; a radio group's or a checkbox's
+ *   choice, by the export value of the widget to check (`'Off'` or `null`
+ *   clears it); a dropdown's option value (or free text when it allows
+ *   editing; `null` clears it). `null` empties a text field.
+ * - `{ checked }`: a checkbox. `true` checks its first widget.
+ * - `{ selectedValues }`: a list's option values; `[]` clears it.
+ *
+ * A shape the field's family doesn't take fails with `InvalidArg`.
  */
 export type FormFieldValue =
-  | { type: 'text'; value: string }
-  | { type: 'toggle'; state: string | null }
-  | { type: 'choice'; values: string[] };
+  | { value: string | null }
+  | { checked: boolean }
+  | { selectedValues: string[] };
 
-/** Serialized form-data interchange formats. */
-export type FormDataFormat = 'fdf' | 'xfdf';
+/**
+ * The value `field` holds, as a value write takes it: writing it to the
+ * same field changes nothing. `null` for a field whose value a write can't
+ * set (a push button, a signature, a family the engine doesn't know).
+ */
+export function fieldValueOf(field: FormFieldDTO<Coordinates>): FormFieldValue | null {
+  switch (field.family) {
+    case 'checkbox':
+      return { checked: field.checked };
+    case 'listbox':
+      return { selectedValues: field.selectedValues };
+    case 'radio':
+      return { value: field.value === 'Off' ? null : field.value };
+    case 'text':
+    case 'combobox':
+      return { value: field.value };
+    default:
+      return null;
+  }
+}

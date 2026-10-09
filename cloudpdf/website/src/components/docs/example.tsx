@@ -14,10 +14,10 @@ import {
   isDocsIntegration,
 } from '@/lib/docs-integrations';
 
-/** Mounts a built demo module (public/demos/…) via a NATIVE dynamic import —
+/** Mounts a built demo module (public/demos/…) via a native dynamic import —
  * the module carries its own framework runtime, so Vue/Svelte/Angular demos
  * run inside the Next site with no bundler integration at all. Import cost is
- * deferred until the preview is open AND near the viewport; once mounted, a
+ * deferred until the preview is open and near the viewport; once mounted, a
  * collapse keeps the instance alive (state survives toggling). */
 function DemoMount({ url, active }: { url: string; active: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -82,7 +82,7 @@ function DemoMount({ url, active }: { url: string; active: boolean }) {
 }
 
 /**
- * The route-variant-resolved sample display. This site's job is RESOLUTION —
+ * The route-variant-resolved sample display. This site's job is resolution —
  * which framework's files, which built demo — and the honest not-yet-ported
  * fallback; the kit's CodeExampleCard owns every pixel of the shell, so the
  * "View code" chrome is identical on both docs sites.
@@ -91,10 +91,19 @@ export function Example({
   filesByFramework,
   demosByFramework,
   mode = 'default',
+  kind = 'example',
+  available,
 }: {
   filesByFramework?: string;
   demosByFramework?: string;
   mode?: ExampleMode;
+  /** A `<Snippet>` is code only; its gap note says so. */
+  kind?: 'example' | 'snippet';
+  /**
+   * The frameworks that have a version, when the server only sent the route's framework's files
+   * (`RouteExample`); the "not available yet" note picks its link from it.
+   */
+  available?: readonly string[];
 }) {
   const pathname = usePathname();
   const product = fanoutProductFromPath(pathname);
@@ -115,9 +124,8 @@ export function Example({
   const demoUrl = demos[variant];
 
   if (!files || files.length === 0) {
-    const fallback = byFramework[defaultIntegration]?.length
-      ? defaultIntegration
-      : Object.keys(byFramework)[0];
+    const versions = available ?? Object.keys(byFramework).filter((fw) => byFramework[fw]?.length);
+    const fallback = versions.includes(defaultIntegration) ? defaultIntegration : versions[0];
     const fallbackIntegration = isDocsIntegration(fallback) ? fallback : null;
     const fallbackLabel = fallbackIntegration ? DOCS_INTEGRATION_LABELS[fallbackIntegration] : null;
     const fallbackHref = fallbackIntegration
@@ -125,7 +133,8 @@ export function Example({
       : null;
     return (
       <div className="mt-6 max-w-[72ch] rounded-[14px] border border-[#C9DEFF] bg-[#F2F7FF] px-[18px] py-4 font-sans text-[15px] leading-[1.6] text-[#2A4574]">
-        This example isn&rsquo;t available for <b>{label}</b> yet.
+        {kind === 'snippet' ? 'This code isn’t written for ' : 'This example isn’t available for '}
+        <b>{label}</b> yet.
         {fallback && fallbackHref && fallbackLabel ? (
           <>
             {' '}

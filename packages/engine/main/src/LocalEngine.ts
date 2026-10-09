@@ -1,25 +1,28 @@
 import {
-  type SessionKind,
   type SignedDocumentPolicy,
   AbortablePromise,
+  checkCapability,
   CONTINUOUS_RENDER_POLICY,
+  decodePdfBits,
   EngineError,
   EngineErrorCode,
+  LOCAL_ENGINE_BRAND,
+  PermissionDenied,
   wirePack,
-  type DocumentHandle,
-  type Engine,
   type EngineRenderPolicy,
+  type LocalEngine as LocalEngineContract,
   type OpenInput,
   type OpenOptions,
 } from '@embedpdf/engine-core/runtime';
 import { generateUuid } from '@embedpdf/engine-services';
 
 import { LocalDocumentHandle } from './document/LocalDocumentHandle';
+import { OBJECT_NUMBER_POOL_SIZE } from './document/LocalObjectNumberPool';
 import { LocalFontService } from './fonts/LocalFontService';
 import { BrowserImageEncoder, type LocalImageEncoder } from './render/BrowserImageEncoder';
+import { PortableImageEncoder } from './render/PortableImageEncoder';
 import { buildHandleScopeContext, ScopeGuard } from './scope';
 import type { Transport } from './transport/Transport';
-import { Priority } from './worker/Priority';
 import type { JobId, WorkerResultPayload } from './worker/protocol';
 import { WorkerQueue } from './worker/WorkerQueue';
 
@@ -28,14 +31,14 @@ export interface LocalEngineOptions {
   concurrency?: number;
   imageEncoder?: LocalImageEncoder;
   /**
-   * Deployment render policy for THIS engine instance — the local
+   * Deployment render policy for this engine instance — the local
    * counterpart of the lattice a cloud deployment advertises over
    * `/v1/access`, configured the same way permissions are overridden:
    * by the embedder, at construction. Advertised verbatim via
-   * `doc.render.policy()`; a lattice's `maxRenderPixels` budget rides
+   * `doc.render.getPolicy()`; a lattice's `maxRenderPixels` budget rides
    * into every worker render, and `enforced: true` rejects off-lattice
    * requests exactly like the enforcing server does. Default:
-   * `continuous` (render anything — v2 parity).
+   * `continuous` (render anything).
    */
   renderPolicy?: EngineRenderPolicy;
   /**
@@ -46,14 +49,6 @@ export interface LocalEngineOptions {
    * invalid files). Signature analysis never depends on it.
    */
   signedDocumentPolicy?: SignedDocumentPolicy;
-  /**
-   * The shape every `open({ kind: 'bytes' })` session takes. Default
-   * `layer`: an immutable base with a layer of edits on top, so saves append
-   * only what changed and signatures survive later edits. `plain` keeps the
-   * classic single in-memory document (a signed file still opens as a
-   * layer). See {@link SessionKind}.
-   */
-  sessionKind?: SessionKind;
 }
 
 /**
@@ -61,7 +56,8 @@ export interface LocalEngineOptions {
  * but routes everything through a WorkerQueue + Transport (Web Worker or
  * inline) backed by a WASM PDFium runtime.
  */
-export class LocalEngine implements Engine {
+export class LocalEngine implements LocalEngineContract {
+  readonly [LOCAL_ENGINE_BRAND] = true;
   static fromTransport(opts: LocalEngineOptions): LocalEngine {
     return new LocalEngine(
       opts.transport,
@@ -69,15 +65,12 @@ export class LocalEngine implements Engine {
       opts.imageEncoder,
       opts.renderPolicy,
       opts.signedDocumentPolicy ?? 'protect',
-      opts.sessionKind ?? 'layer',
     );
   }
 
   private readonly queue: WorkerQueue;
   private readonly imageEncoder: LocalImageEncoder;
   private readonly renderPolicy: EngineRenderPolicy;
-  /** This engine instance's identity on every event's `origin.sessionId`. */
-  private readonly sessionId = `local:${generateUuid()}`;
   private destroyed = false;
 
   /**
@@ -96,10 +89,15 @@ export class LocalEngine implements Engine {
     imageEncoder: LocalImageEncoder | undefined,
     renderPolicy: EngineRenderPolicy | undefined,
     private readonly signedDocumentPolicy: SignedDocumentPolicy,
-    private readonly sessionKind: SessionKind,
   ) {
     this.queue = new WorkerQueue(transport, { concurrency });
-    this.imageEncoder = imageEncoder ?? new BrowserImageEncoder();
+    // A canvas where there is one; the portable PNG/BMP encoder elsewhere
+    // (Node), so an image render works in every environment.
+    this.imageEncoder =
+      imageEncoder ??
+      (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined'
+        ? new PortableImageEncoder()
+        : new BrowserImageEncoder());
     this.renderPolicy = renderPolicy ?? CONTINUOUS_RENDER_POLICY;
     this.fonts = new LocalFontService(this.queue);
   }
@@ -115,11 +113,22 @@ export class LocalEngine implements Engine {
     void this.transport.start?.();
   }
 
-  open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle> {
+  open(input: OpenInput, options?: OpenOptions): AbortablePromise<LocalDocumentHandle> {
     if (this.destroyed) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'),
       );
+    }
+
+    // A session without `doc.open` could do nothing: refuse it here, before
+    // the file is loaded, as the cloud refuses the token at `/head`.
+    // (`pdf.permissions` grants it, and an omitted scope means every one.)
+    try {
+      if (options?.scope && !checkCapability('doc.open', options.scope, decodePdfBits(null))) {
+        return AbortablePromise.rejectReason(new PermissionDenied('doc.open', 'engine-local'));
+      }
+    } catch (error) {
+      return AbortablePromise.rejectReason(error); // an invalid scope string
     }
 
     if (input.kind === 'bytes') {
@@ -142,14 +151,14 @@ export class LocalEngine implements Engine {
     );
   }
 
-  /** A layer over a base FILE: PDFium range-reads the base from disk (Node runtimes only). */
+  /** A layer over a base file: PDFium range-reads the base from disk (Node runtimes only). */
   private openLayerFile(
     input: Extract<OpenInput, { kind: 'layerFile' }>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
-    const password = options?.password ?? input.password ?? null;
-    const docId = input.id;
+    const password = options?.password ?? null;
+    const docId = input.id ?? generateUuid();
     const baseKey = input.baseKey ?? input.basePath;
     const artifactBytes =
       input.layer?.kind === 'artifact' ? toArrayBuffer(input.layer.bytes) : undefined;
@@ -163,26 +172,25 @@ export class LocalEngine implements Engine {
     const signedDocumentPolicy = this.signedDocumentPolicy;
     const baseSha256 = input.baseSha256;
 
-    const submission = queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'open.layerFileBase',
-              jobId,
-              docId,
-              baseKey,
-              basePath: input.basePath,
-              layer,
-              password,
-              signedDocumentPolicy,
-              ...(baseSha256 ? { baseSha256 } : {}),
-            },
-            transfer,
-          ),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'open.layerFileBase',
+            effect: 'open',
+            jobId,
+            docId,
+            baseKey,
+            basePath: input.basePath,
+            layer,
+            password,
+            signedDocumentPolicy,
+            ...(baseSha256 ? { baseSha256 } : {}),
+            reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
+          },
+          transfer,
+        ),
+    });
 
     return this.openResult(submission, options);
   }
@@ -190,37 +198,34 @@ export class LocalEngine implements Engine {
   private openBytes(
     input: Extract<OpenInput, { kind: 'bytes' }>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
-    const password = options?.password ?? input.password ?? null;
+    const password = options?.password ?? null;
     const buffer = toArrayBuffer(input.bytes);
-    const docId = input.id;
+    const docId = input.id ?? generateUuid();
     const signedDocumentPolicy = this.signedDocumentPolicy;
-    const sessionKind = this.sessionKind;
 
-    const submission = queue.enqueue<WorkerResultPayload>(
-      {
-        // open() is the one current producer that actually carries a buffer.
-        // The buffer reference appears once in the payload and once in the
-        // transfer manifest — same object, marked for zero-copy move so the
-        // sender's `buffer.byteLength` becomes 0 after the transport hands
-        // it off to the worker.
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'open.fatMem',
-              jobId,
-              docId,
-              bytes: buffer,
-              password,
-              signedDocumentPolicy,
-              sessionKind,
-            },
-            [buffer],
-          ),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = queue.enqueue<WorkerResultPayload>({
+      // open() is the one current producer that actually carries a buffer.
+      // The buffer reference appears once in the payload and once in the
+      // transfer manifest — same object, marked for zero-copy move so the
+      // sender's `buffer.byteLength` becomes 0 after the transport hands
+      // it off to the worker.
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'open.fatMem',
+            effect: 'open',
+            jobId,
+            docId,
+            bytes: buffer,
+            password,
+            signedDocumentPolicy,
+            reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
+          },
+          [buffer],
+        ),
+    });
 
     return this.openResult(submission, options);
   }
@@ -228,11 +233,11 @@ export class LocalEngine implements Engine {
   private openLayerBytes(
     input: Extract<OpenInput, { kind: 'layerBytes' }>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
-    const password = options?.password ?? input.password ?? null;
-    const docId = input.id;
-    const baseKey = input.baseKey ?? input.id;
+    const password = options?.password ?? null;
+    const docId = input.id ?? generateUuid();
+    const baseKey = input.baseKey ?? docId;
     const baseBytes = toArrayBuffer(input.baseBytes);
     const artifactBytes =
       input.layer?.kind === 'artifact' ? toArrayBuffer(input.layer.bytes) : undefined;
@@ -243,25 +248,24 @@ export class LocalEngine implements Engine {
     const transfer = artifactBytes ? [baseBytes, artifactBytes] : [baseBytes];
     const signedDocumentPolicy = this.signedDocumentPolicy;
 
-    const submission = queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'open.layerMemBase',
-              jobId,
-              docId,
-              baseKey,
-              baseBytes,
-              layer,
-              password,
-              signedDocumentPolicy,
-            },
-            transfer,
-          ),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'open.layerMemBase',
+            effect: 'open',
+            jobId,
+            docId,
+            baseKey,
+            baseBytes,
+            layer,
+            password,
+            signedDocumentPolicy,
+            reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
+          },
+          transfer,
+        ),
+    });
 
     return this.openResult(submission, options);
   }
@@ -269,10 +273,10 @@ export class LocalEngine implements Engine {
   private openResult(
     submission: AbortablePromise<WorkerResultPayload>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
     const imageEncoder = this.imageEncoder;
-    return AbortablePromise.run<DocumentHandle>(async (signal) => {
+    return AbortablePromise.run<LocalDocumentHandle>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -294,15 +298,19 @@ export class LocalEngine implements Engine {
           signedDocumentPolicy: this.signedDocumentPolicy,
         }),
       );
-      return new LocalDocumentHandle(
+      const handle = LocalDocumentHandle.open(
         payload.docId,
         queue,
         imageEncoder,
         payload.security,
         guard,
-        this.sessionId,
+        // Every open is its own session, as on the cloud engine.
+        `local:${generateUuid()}`,
         this.renderPolicy,
+        payload.objectNumbers,
       );
+      if (payload.passwordRejected) handle.security.markPasswordRejected();
+      return handle;
     });
   }
 

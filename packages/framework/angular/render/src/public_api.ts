@@ -1,7 +1,12 @@
 /**
- * @embedpdf/angular/render — `<epdf-render-layer>`.
+ * @embedpdf/angular/render: the page pictures.
+ *
+ *   withRender(options)      the plugin, for provideEmbedPdf()
+ *   inject(EpdfRender)       pictures on demand, redraws, the settings
+ *   <epdf-render-layer>      the picture of each page on a Stage
  */
 
-// One-line-per-feature: registration travels with the UI.
+// The plugin's types and helpers, so app code has one import for the feature.
 export * from '@embedpdf/plugin-render';
-export * from './render-layer';
+export * from './render';
+export { EpdfRenderLayer } from './render-layer';

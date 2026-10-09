@@ -29,7 +29,7 @@ describe('operation registry', () => {
         op.path,
       ).toBe(true);
       if (op.credentials.length === 0) {
-        // The PUBLIC surface is exactly the share-session exchange: the
+        // The public surface is exactly the share-session exchange: the
         // grant row is the authorization, so no bearer credential
         // exists. Any new unauthenticated operation must be added here
         // deliberately — an empty credential list anywhere else is a
@@ -240,17 +240,31 @@ describe('openapi document', () => {
       allOf: [{ $ref: '#/components/schemas/PdfActionNode' }],
       nullable: true,
     });
-    expect(
-      schemas.DocAnnotationsList200Response.properties.annotations.items.anyOf[0].properties
-        .actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
-    expect(
-      schemas.DocAnnotationsListAll200Response.properties.pages.items.properties.annotations.items
-        .anyOf[0].properties.actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
-    expect(
-      schemas.DocFormsGet200Response.properties.fields.items.anyOf[0].properties.actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfFieldActions' });
+    // An annotation read carries `actions: null` when it has none.
+    const nullableAnnotationActions = {
+      allOf: [{ $ref: '#/components/schemas/PdfAnnotationActions' }],
+      nullable: true,
+    };
+    expect(schemas.Annotation.anyOf[0].properties.actions).toEqual(nullableAnnotationActions);
+    // Both annotation lists, and every write that returns annotations, name
+    // the one `Annotation` component.
+    const annotationRef = { $ref: '#/components/schemas/Annotation' };
+    expect(schemas.AnnotationList.properties.annotations.items).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsList200Response).toEqual({
+      $ref: '#/components/schemas/AnnotationList',
+    });
+    expect(schemas.DocAnnotationsListAll200Response).toEqual({
+      $ref: '#/components/schemas/AnnotationList',
+    });
+    expect(schemas.DocAnnotationsCreate200Response.properties.annotation).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsUpdate200Response.properties.annotation).toEqual(annotationRef);
+    // Every form read and write names the one `FormField` component.
+    expect(schemas.DocFormsList200Response.properties.fields.items).toEqual({
+      $ref: '#/components/schemas/FormField',
+    });
+    expect(schemas.FormField.anyOf[0].properties.actions).toEqual({
+      $ref: '#/components/schemas/PdfFieldActions',
+    });
 
     const refs: string[] = [];
     const visit = (value: unknown): void => {
@@ -267,6 +281,30 @@ describe('openapi document', () => {
     visit(doc);
     expect(refs.filter((ref) => ref.includes('/properties/actions'))).toEqual([]);
   });
+
+  test('a change names the models it carries instead of inlining them', () => {
+    const doc = buildAdminOpenApiDocument({ version: pkg.version }) as {
+      components: { schemas: Record<string, any> };
+    };
+    const schemas = doc.components.schemas;
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+    const op = (type: string) =>
+      schemas.ChangeOp.anyOf.find((arm: any) => arm.properties.type.enum[0] === type);
+
+    expect(op('annotations.create').properties.data).toEqual(ref('AnnotationDraft'));
+    expect(op('annotations.create').properties.page).toEqual(ref('PageRef'));
+    expect(op('annotations.update').properties.patch).toEqual(ref('AnnotationPatch'));
+    expect(op('annotations.update').properties.ref).toEqual(ref('AnnotationRef'));
+    expect(op('forms.create').properties.draft).toEqual(ref('FormFieldDraft'));
+    expect(op('forms.update').properties.patch).toEqual(ref('FormFieldPatch'));
+    expect(op('metadata.update').properties.patch).toEqual(ref('MetadataPatch'));
+    const [applied, refused] = schemas.DocChanges200Response.properties.changes.items.anyOf;
+    expect(applied.properties.result).toEqual(ref('ChangeResult'));
+    expect(refused.properties.error).toEqual(ref('EngineErrorPayload'));
+    // Every error response names the plane's one error envelope.
+    expect(schemas.DocChanges404Response).toEqual(ref('EngineErrorPayload'));
+    expect(schemas.TokensIssue400Response).toEqual(ref('AdminErrorPayload'));
+  });
 });
 
 describe('sdkOperationName', () => {
@@ -275,9 +313,9 @@ describe('sdkOperationName', () => {
       groups: ['documents'],
       method: 'importFrom',
     });
-    expect(sdkOperationName('doc.forms.importData')).toEqual({
+    expect(sdkOperationName('doc.forms.setValue')).toEqual({
       groups: ['doc', 'forms'],
-      method: 'importData',
+      method: 'setValue',
     });
   });
 

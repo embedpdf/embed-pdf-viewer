@@ -1,0 +1,370 @@
+{
+  "id": null,
+  "corpusVersion": "signed-inline-pages-v1",
+  "observedAt": null,
+  "observer": {
+    "application": null,
+    "build": null,
+    "osVersion": null
+  },
+  "settings": {
+    "certificateTrust": null,
+    "validationTime": null
+  },
+  "cases": [
+    {
+      "id": "S01",
+      "file": "pdfs/S01-approval-control.pdf",
+      "sha256": "92fa0251eb879a09790d78ef5734ca711d5afdc17f8a9976cb0d2a38df44f14f",
+      "question": "Baseline: approval signature; page 1 holds inline and object annotations.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S02",
+      "file": "pdfs/S02-approval-recolour-object-annotation-p1.pdf",
+      "sha256": "60fadb769a277c2984a2da7c2dbaf10c6b6021f3bb6af391c9c2a57091d4a083",
+      "question": "E4: recolour object-0 in place (new appearance stream); page 1 is not rewritten.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S03",
+      "file": "pdfs/S03-approval-retext-object-annotation-p1.pdf",
+      "sha256": "8af85e116a95b338e83e2d1204151e5d2433f1841b0ff69c8d2a90bd06f42e74",
+      "question": "E4: change the comment text of object-0 in place; no appearance change.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S04",
+      "file": "pdfs/S04-approval-retext-inline-annotation-p1.pdf",
+      "sha256": "fa86b59645a840830d691f6576b5c4450b7d721dae1c55c6ba392e7b338de558",
+      "question": "Control: change the text of inline-0, which rewrites page 1.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S05",
+      "file": "pdfs/S05-approval-fill-field-p1.pdf",
+      "sha256": "5c59de729925505e78e78026bf49968a6bc00a9758a8d100e0c20f8f6ed0f2fa",
+      "question": "E1: fill ValueOne on page 1 (value and appearance).",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S06",
+      "file": "pdfs/S06-approval-fill-field-p2.pdf",
+      "sha256": "a4cfcdfcd68b3b17f1c0bcd80051fda3cea96a7ec9b145eb93797d6157e11b05",
+      "question": "E1: fill ValueTwo on page 2.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S07",
+      "file": "pdfs/S07-approval-sign-empty-field-p1.pdf",
+      "sha256": "2df465bda0e281f7626dca8b46d24d1ada29f1d8bd4fcd95b98644ec27a3e292",
+      "question": "E2: second signature in the existing empty field SignatureTwo on page 1. Record both signatures.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S08",
+      "file": "pdfs/S08-approval-sign-empty-field-p2.pdf",
+      "sha256": "37503ddf1f30a272c3cb04cf839f5dfa88cbeff9999abfa4ebb5304d91c616c5",
+      "question": "E2: second signature in the existing empty field SignatureThree on page 2. Record both signatures.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureThree",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S09",
+      "file": "pdfs/S09-approval-comment-p2.pdf",
+      "sha256": "11243d97aee01b02091898281e271f0286699c192175ff7766380815a4ca9619",
+      "question": "E3: add a Square on page 2, which holds no inline annotations.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S10",
+      "file": "pdfs/S10-approval-comment-p1.pdf",
+      "sha256": "f57a26396d7ff61f49f2ccb919a2a9b955f2601e4a92ca03c8feca5ef8ea5e5e",
+      "question": "Control: add a Square on page 1 (rewrites page 1).",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S11",
+      "file": "pdfs/S11-approval-delete-object-annotation-p1.pdf",
+      "sha256": "54ead1f34ac4d1d8f9566a0f2a0b4336e90b31d0ecb6adaa7381a49371ddb24c",
+      "question": "Frozen list: delete object-0 from page 1 (rewrites page 1).",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S12",
+      "file": "pdfs/S12-promoted-control.pdf",
+      "sha256": "f5403e76e02916a6fc0dfae4e249507c907b3faf9763233c89209baf05ba037c",
+      "question": "E5 baseline: inline annotations promoted to objects (own revision), then signed.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S13",
+      "file": "pdfs/S13-promoted-comment-p1.pdf",
+      "sha256": "bf2d74fd2edb7bed64e7834284acea8f10f0a848f5b4fcc11157d94721c727d3",
+      "question": "E5: add a Square on page 1 after signing.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S14",
+      "file": "pdfs/S14-promoted-recolour-annotation-p1.pdf",
+      "sha256": "085bd2effa495eb9b6f46f31428cc552a2c4659d7a45b226dadce4b92f291f00",
+      "question": "E5: recolour the promoted inline-0 in place.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S15",
+      "file": "pdfs/S15-promoted-delete-annotation-p1.pdf",
+      "sha256": "533187171701b05183ffb7134d3a4a43c269d02ea1775c8fc9838ddb063aec5d",
+      "question": "E5: delete the promoted inline-1.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S16",
+      "file": "pdfs/S16-promoted-reply-p1.pdf",
+      "sha256": "622c350180a7547d9d0b729f81307821f0b8d30c8a95dd0f050bf348ca621c9d",
+      "question": "E5: add a reply (/IRT) to the promoted inline-0.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S17",
+      "file": "pdfs/S17-p3-control.pdf",
+      "sha256": "9a7f630b2912c16c38cd52bd6960e0b2b2ff92865c4e7811b0036e9b72a6e276",
+      "question": "Baseline: certification P=3; page 1 holds inline and object annotations.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S18",
+      "file": "pdfs/S18-p3-recolour-object-annotation-p1.pdf",
+      "sha256": "c098f11a4f110be73008e05b62bb8ee10c337cba809507538b416b1b9f38e620",
+      "question": "E4 under P=3: recolour object-0 in place.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S19",
+      "file": "pdfs/S19-p3-promoted-control.pdf",
+      "sha256": "50768aaa3066b4ce238d3313d81daf72b37576d49aae9e5fb0589a079b99a593",
+      "question": "E5 baseline under P=3: promoted before certifying.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "S20",
+      "file": "pdfs/S20-p3-promoted-comment-p1.pdf",
+      "sha256": "86f5e775175ea66a13184b09d1b3c579ce3f85c18c78f86c19a30bb4b1d0fe86",
+      "question": "E5 under P=3: add a Square on page 1 after certifying.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "modificationMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    }
+  ]
+}

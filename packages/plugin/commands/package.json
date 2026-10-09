@@ -2,7 +2,7 @@
   "name": "@embedpdf/plugin-commands",
   "version": "3.0.0-next.14",
   "private": false,
-  "description": "The command registry: the single vocabulary of verbs. Definitions are app content (mechanism/content split); state (label · icon · enabled · active · visible) derives purely from other capabilities, so every consumer is reactive through the kernel's one change stream — no events, no diffing.",
+  "description": "The commands: one name per action of the viewer, with its label, icon, state and shortcut, which toolbars, menus, a command palette and the keyboard all show and run. A command's state is read from live state, so every reader follows the kernel's one change stream. `/standard` has the commands every viewer has.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -11,7 +11,7 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./contract/host": "./src/host-contract.ts",
-    "./internal": "./src/internal.ts",
+    "./standard": "./src/standard.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -31,9 +31,9 @@
         "import": "./dist/contract/host.js",
         "require": "./dist/contract/host.cjs"
       },
-      "./internal": {
-        "import": "./dist/internal.js",
-        "require": "./dist/internal.cjs"
+      "./standard": {
+        "import": "./dist/standard.js",
+        "require": "./dist/standard.cjs"
       },
       "./package.json": "./package.json"
     }
@@ -49,9 +49,14 @@
   },
   "dependencies": {
     "@embedpdf/core": "workspace:*",
+    "@embedpdf/core-ui": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-shell": "workspace:*",
-    "@embedpdf/core-ui": "workspace:*"
+    "@embedpdf/plugin-stage": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

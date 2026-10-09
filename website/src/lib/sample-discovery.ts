@@ -29,7 +29,7 @@ export const SAMPLE_ENTRY_FILENAMES: Record<string, string> = {
 /** Topics whose samples must not be demo-built yet (their packages don't
  *  exist in the v3 tree — e.g. the ready-made viewer). Docs still show the
  *  code; only the live-preview build skips them. */
-export const DEMO_EXCLUDED_TOPICS = ['viewer'];
+export const DEMO_EXCLUDED_TOPICS = ['viewer', 'snippets'];
 
 export type SampleVariant = {
   /** Manifest/entry key: `<topic path>/<base>.<fw>` */
@@ -38,6 +38,18 @@ export type SampleVariant = {
   /** Absolute path of the module the mount wrapper imports. */
   entry: string;
 };
+
+/**
+ * The class that scopes one example's stylesheet on a docs page. A demo mounts
+ * into the page itself, not an iframe, and its `<base>.css` uses plain class
+ * names (`.toolbar`, `.button`), as a reader copies it. So the demo build
+ * prefixes every rule with this class and the demo's mount element carries it:
+ * examples on one page never restyle each other or the site. `key` is the
+ * framework-neutral `topic/base`.
+ */
+export function sampleScopeClass(key: string): string {
+  return `epdf-example--${key.replace(/[^a-zA-Z0-9]+/g, '-')}`;
+}
 
 function isExcluded(relativeTopic: string): boolean {
   return DEMO_EXCLUDED_TOPICS.some((t) => relativeTopic === t || relativeTopic.startsWith(`${t}/`));

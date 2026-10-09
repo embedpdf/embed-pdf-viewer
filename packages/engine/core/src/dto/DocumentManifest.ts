@@ -1,15 +1,14 @@
 import type { CachePins } from './CachePins';
 import type { LayerScopes } from './LayerScopes';
-import type { PageState } from '../revision/PageState';
+import type { PageRef } from '../identity/PageRef';
+import type { DocumentProtection } from '../signature/types';
 
 /**
- * Per-page envelope inside `DocumentManifest`.
- *
- * `state` is universal document/page state; `cache` is the cloud/CDN read
- * coordinate for immutable leaf URLs.
+ * Per-page envelope inside `DocumentManifest`: the page, and `cache`, the
+ * cloud/CDN read coordinate for its immutable leaf URLs.
  */
 export interface ManifestPage {
-  state: PageState;
+  page: PageRef;
   cache: CachePins;
 }
 
@@ -19,14 +18,14 @@ export interface ManifestPage {
  *
  * `layoutVersion` is the doc-level version pointer for the page-geometry
  * resource (`/layout@layoutVersion`). It bumps only on structural page ops
- * (move/insert/delete/rotate), NOT on annotation or content edits — a
- * different cadence than `docVersion`. The layout bytes themselves are NOT
+ * (move/insert/delete/rotate), not on annotation or content edits — a
+ * different cadence than `docVersion`. The layout bytes themselves are not
  * in the manifest; only this pointer is, mirroring how per-page
  * `cache.contentVersion` points at the immutable text/render leaves.
  *
  * `metadataVersion` is the doc-level version pointer for the document
  * metadata resource (`/metadata@metadataVersion`). It bumps only on
- * metadata writes (Info-dict edits), NOT on page or annotation edits —
+ * metadata writes (Info-dict edits), not on page or annotation edits —
  * the same independent-cadence design as `layoutVersion`, so each CDN
  * leaf only invalidates when its own bytes change.
  */
@@ -46,16 +45,22 @@ export interface DocumentManifest {
   /**
    * Doc-level pin for the immutable whole-document annotation listing
    * (`/annotations/items@annotationsVersion=N`) — the cloud's one-request
-   * hydration read. Bumps ONLY when annotation list BODIES change —
+   * hydration read. Bumps only when annotation list bodies change —
    * annotation create/update/delete/move, page insert/delete,
-   * redaction-apply, flatten, and form field/widget structure — and
-   * deliberately NOT on form value writes (widget DTOs carry no value;
-   * only `/AP` rasters change, which the per-page `annotationVersion`
-   * covers), metadata, attachments, or page move/rotate (bulk page order
-   * is unspecified by contract). The same independent-cadence design as
-   * `layoutVersion` / `metadataVersion`.
+   * redaction-apply and flatten — and never on form writes: widgets are the
+   * form's (`formsVersion`). Not on metadata, attachments, or page
+   * move/rotate either (bulk page order is unspecified by contract). The
+   * same independent-cadence design as `layoutVersion` / `metadataVersion`.
    */
   annotationsVersion: number;
+  /**
+   * Doc-level pin for the immutable form (`/form@formsVersion=N`): the
+   * fields, every widget row, the calculation order. Bumps on every form
+   * write (fills included, since a fill changes a widget's state or look),
+   * on a stacking-order move, page insert/delete, flatten and redaction —
+   * never on an annotation write.
+   */
+  formsVersion: number;
   /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts
@@ -81,9 +86,16 @@ export interface DocumentManifest {
   /**
    * Plane scopes (layer manifests only; absent on base manifests and
    * on pre-plane servers = all-`'layer'`). Whole-layer by design — edge
-   * grants are prefix-level — and DERIVED from the version counters at
+   * grants are prefix-level — and derived from the version counters at
    * every emission point, never stored. See {@link LayerScopes}.
    */
   scopes?: LayerScopes;
+  /**
+   * What the signatures in `baseSha` forbid from now on (`null` when the
+   * version has none): the protection every capability check subtracts,
+   * as the local engine's does. It belongs to the version's bytes, so it
+   * changes only when a signature publishes a new version.
+   */
+  protection: DocumentProtection | null;
   pages: ManifestPage[];
 }

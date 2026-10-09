@@ -1,0 +1,236 @@
+---
+title: Selecting & copying
+description: Let people select text with the pointer or a finger, select text from code, copy it, and show a menu next to the selection.
+---
+
+# Selecting & copying
+
+The selection plugin lets people select text with the mouse or a finger, and lets your code select the
+same text. Register `interactionPlugin()` and `selectionPlugin()`, and put `<SelectionLayer>`
+above the page:
+
+<Example name="selection/basic" mode="open" />
+
+> **Try it:** the cover's title starts out selected from code. Drag over text, double-click a word,
+> or triple-click a line. A selection can run from one page onto the next. On a touch screen,
+> long-press a word and drag the handles.
+
+`interactionPlugin()` is the input system every tool shares: the Stage passes the pointer to it,
+the selection plugin handles it, and `<SelectionLayer>` draws the result. So you can restyle or
+replace the highlight without touching how selecting works.
+
+Selecting uses where the characters are on the page, not the text itself. Nothing reads the page's
+text until your code asks for it, and a document can allow selecting while it forbids copying (see
+[Permissions](#permissions)).
+
+## Select text from code
+
+`useSelection()` does from code what the pointer does, and the highlight follows:
+
+<Example name="selection/programmatic" />
+
+```ts
+selection.select({ page: page.ref, start: 20, count: 40 }); // 40 characters on one page
+selection.selectWordAt(page.ref, { x: 120, y: 80 }); // the word at a point
+selection.selectLineAt(page.ref, { x: 120, y: 80 }); // the line at a point
+selection.selectPage(page.ref);
+selection.selectAll();
+selection.clear();
+```
+
+A search result is already a range, so selecting it takes no conversion:
+
+```ts
+selection.select(hit); // { page, start, count }
+```
+
+For a selection across pages, give where it starts and where it ends:
+
+```ts
+selection.select({
+  start: { page: firstPage.ref, index: 120 },
+  end: { page: lastPage.ref, index: 35 },
+});
+```
+
+Ranges include `start` and stop before `end`, and they count characters as the page stores them,
+not JavaScript string positions. `selection.extendTo(page.ref, point)` grows the current selection
+to a point on a page, as dragging a handle does. Every method that takes a page takes its ref or its
+index: `selection.selectPage(0)` selects the first page.
+
+## Show the selection in your UI
+
+`useSelectionState()` gives you what to show, and your component <Word of="rerenders" /> when it
+changes:
+
+<Snippet name="text/highlight-button" />
+
+<Example name="selection/state" />
+
+> **Try it:** drag over text. `isSelecting` is `true` until you let go, and `pages` counts the pages
+> the selection reaches.
+
+Every field is listed under [State](#state). For drawing your own highlight, `selection.listSegments(page.ref)` gives you each selected line as
+four corners, turned with the text, and `selection.listRects(page.ref)` a plain box per line.
+
+## Copy the selected text
+
+Reading the text and using the clipboard are two steps:
+
+```ts
+const text = await selection.readText();
+```
+
+`readText()` reads only the selected characters and gives them to you; it doesn't touch the
+clipboard. Lines on different pages are joined with a new line, and with nothing selected it's an
+empty string. `readTextInRange(range)` reads any range without selecting it.
+
+For the clipboard, the <Framework /> package has two helpers. `copySelection()` copies from your own
+button:
+
+<Snippet name="text/copy-button" />
+
+`<SelectionClipboard>` makes Ctrl+C and the browser's Copy menu work. Mount it once per document view:
+
+<Snippet name="text/clipboard" />
+
+It reads the text as soon as a selection settles, so the browser's copy can answer at once. Set
+`prefetch` to `false` to read text only when someone copies.
+
+<Example name="selection/copy" />
+
+> **Try it:** select other text: the line above the pages shows what `readText()` reads once the
+> selection settles. Then press **Copy**, or Ctrl+C.
+
+## Add a selection menu
+
+`<SelectionMenu>` places your own UI next to the selection. It hides while the user drags and
+appears when the selection settles:
+
+<Example name="selection/menu" />
+
+> **Try it:** select other text, and the menu follows it. Pick where it goes above the pages.
+
+Mount it <Fw only="react">in the Stage's `overlay`</Fw><Fw only="vue">in the Stage's `#overlay`
+slot</Fw><Fw only="svelte">in the Stage's `overlay` snippet</Fw><Fw only="angular">inside
+`<epdf-stage>`, next to the page template</Fw>, and it stays attached to the text while the user
+scrolls and zooms. The menu only places things; what's in it is yours: copy, comment, highlight, redact. `placement`
+is `'top'`, `'bottom'`, `'left'` or `'right'`, and `gap` the space in pixels.
+
+## On touch screens
+
+A finger has no text cursor, so selection works as it does elsewhere on a phone: **long-press a word,
+then drag the handles.** Add `<SelectionHandles>` next to your menu:
+
+<Snippet name="text/selection-handles" />
+
+<Example name="selection/handles" />
+
+> **Try it:** drag a handle's round grip, with a finger or the mouse: the selection grows or shrinks
+> from the other end.
+
+Each handle is the selection's own edge, with a round grip. Dragging one grows the selection from the
+other end, across pages too. Grabbing a handle never scrolls the page, and everywhere else a finger
+still scrolls and pinch-zooms. For the small tick a native app gives on long-press, see
+[haptic feedback](../ui/tools#haptic-feedback).
+
+## Methods
+
+Everything `useSelection()` gives you.
+
+| Method                          | What it does                                                                                                                              |
+| :------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| `select(range)`                 | Selects `{ page, start, count }` on one page, or `{ start, end }` across pages. An empty range clears. [Select text from code](#select-text-from-code) |
+| `selectWordAt(page, point)`     | Selects the word at a point, like a double-click. Returns `false` when there's no text there.                                             |
+| `selectLineAt(page, point)`     | Selects the line at a point, like a triple-click. Returns `false` when there's no text there.                                             |
+| `selectPage(page)`              | Selects every character on a page                                                                                                         |
+| `selectAll()`                   | Selects the whole document                                                                                                                |
+| `extendTo(page, point)`         | Grows the selection to a point, as dragging a handle does                                                                                 |
+| `clear()`                       | Clears the selection. Always allowed.                                                                                                     |
+| `readText()`                    | The selected text, or `''` with nothing selected. Needs permission to copy. [Copy the selected text](#copy-the-selected-text)              |
+| `readTextInRange(range)`        | The text of any range, without selecting it                                                                                               |
+| `listSegments(page)`            | Each selected line on a page, as four corners turned with the text                                                                        |
+| `listRects(page)`               | A plain box around each selected line on a page                                                                                           |
+| `getAnchor()`                   | Where a menu attaches: `{ page, bounds }` on the page where the selection ends, or `null`. `<SelectionMenu>` uses it.                      |
+| `getSnapshot()`                 | Everything at once: each page's lines, both ends with their direction, and the range. For drawing your own highlight and handles.         |
+| `canSelect()`, `canCopy()`      | Whether selecting, and reading the selected text, are allowed. [Permissions](#permissions)                                                 |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useSelectionSettings()`. [Settings](#settings) |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useSelectionState()" />
+
+| Field          | What it is                                                                  | Read once             |
+| :------------- | :-------------------------------------------------------------------------- | :-------------------- |
+| `hasSelection` | Whether anything is selected                                                | `hasSelection()`      |
+| `isSelecting`  | Whether the user is still dragging                                          | `isSelecting()`       |
+| `range`        | The selection as `{ start, end }`, to store and pass back to `select()`, or `null` | `getRange()`   |
+| `pages`        | The pages the selection is on, in document order                            | `listSelectedPages()` |
+
+## Settings
+
+Set them when you register the plugin, and change them while the app runs with
+`selection.updateSettings({ … })`; `selection.resetSettings()` goes back to what you registered, and
+`useSelectionSettings()` gives you the current settings.
+
+| Setting           | What it does                                                | Default                       | From CSS                              |
+| :---------------- | :---------------------------------------------------------- | :---------------------------- | :------------------------------------ |
+| `dragThreshold`   | How far, in pixels, the pointer moves before a drag selects | `4`                           | —                                     |
+| `color`           | The color of selected text                                  | the viewer's accent at 35%    | `--epdf-text-selection`               |
+| `handles.color`   | The grips at its ends, on touch screens                     | the viewer's accent           | `--epdf-text-selection-handle`        |
+| `handles.shadow`  | Their shadow                                                | `'0 1px 4px rgb(0 0 0 / 0.35)'` | `--epdf-text-selection-handle-shadow` |
+
+A CSS variable wins over the setting, for dark mode or a different look per viewer: see
+[Colors & theming](../ui/theming).
+
+<Example name="selection/colors" />
+
+> **Try it:** pick a color, and `selection.updateSettings({ color, handles })` changes the selection
+> and its handles at once. Then turn on **Override with CSS**: the CSS variables win over the color
+> you picked.
+
+## Events
+
+<Snippet name="text/selection-committed" />
+
+| Event         | Fires when                                                  | Carries          |
+| :------------ | :---------------------------------------------------------- | :--------------- |
+| `onChanged`   | The selection changed, while dragging too                   | `range`, `pages` |
+| `onCommitted` | A drag or a tap finished selecting                          | `range`          |
+| `onCleared`   | The selection was cleared                                   | —                |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+
+Use the change event for things that follow the selection as it grows, and the commit event for
+things that should happen once, such as creating a highlight.
+
+## Permissions
+
+Selecting and copying are two permissions:
+
+| Permission        | What it allows                                | Check                  |
+| :---------------- | :-------------------------------------------- | :--------------------- |
+| `doc.text.select` | Selecting text, and highlighting it            | `selection.canSelect()` |
+| `doc.text.copy`   | Reading the selected text with `readText()`   | `selection.canCopy()`   |
+
+Without `doc.text.select`, pointer selection does nothing and `select()` is refused; `clear()` always
+works. Without `doc.text.copy`, people can still select and highlight, but `readText()` is refused
+and no page text is sent. So a document can allow markup without copy.
+
+## Good to know
+
+### Characters, not string positions
+
+A range counts characters as the page stores them. Search results, annotations and selections all use
+the same counting, so a range from one goes straight into another.
+
+### No HTML text layer
+
+The selection works from where each character is, so there's no hidden HTML text over the page. That
+keeps large documents fast, and it's why a document can allow selecting without giving away its text.
+
+### Outside the browser
+
+The selection plugin itself has no clipboard or HTML in it, so `readText()` also works in tests and in
+Node. The clipboard is the <Framework /> package's job.

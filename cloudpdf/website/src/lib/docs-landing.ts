@@ -1,9 +1,9 @@
 /**
  * The landing manifest: every reader-facing string of the docs landing, the
- * homepage plan section, and the backend band lives HERE, once. The page
+ * homepage plan section, and the backend band lives here, once. The page
  * components render it; the Markdown projection (docs-landing-markdown.ts)
  * renders it; neither may carry copy of its own — so the surfaces cannot
- * drift (DOCS-PLATFORM-ARCHITECTURE.md: one content source, N renderings).
+ * drift (docs/conventions/docs-architecture.md: one content source, N renderings).
  *
  * Where two surfaces deliberately pitch the same card differently, both
  * variants live side by side under `landing:`/`plan:` — divergence is a
@@ -66,7 +66,7 @@ export const LANDING_DEPLOYMENTS: readonly LandingDeployment[] = [
   {
     id: 'saas',
     title: 'Managed SaaS',
-    href: '/docs/engine/getting-started',
+    href: '/docs/engine/quick-start',
     landing: {
       lead: 'We host and manage everything.',
       sub: 'Get secure, scalable infrastructure so you can focus on your product.',
@@ -113,7 +113,7 @@ export const BACKEND_BAND = {
       method: null as string | null,
       title: 'Open in your viewer',
       description: 'The token is all the browser ever holds.',
-      href: '/docs/engine/getting-started',
+      href: '/docs/engine/quick-start',
     },
   ],
 } as const;

@@ -6,8 +6,8 @@ describe('createEventHook', () => {
   it('fans out synchronously in subscription order', () => {
     const hook = createEventHook<number>();
     const seen: string[] = [];
-    hook.on((n) => seen.push(`a${n}`));
-    hook.on((n) => seen.push(`b${n}`));
+    hook.on((value) => seen.push(`a${value}`));
+    hook.on((value) => seen.push(`b${value}`));
     hook.emit(1);
     expect(seen).toEqual(['a1', 'b1']);
   });
@@ -68,7 +68,7 @@ describe('createEventHook', () => {
 
 describe('createSerialQueue', () => {
   it('runs operations one at a time in submission order', async () => {
-    const enqueue = createSerialQueue();
+    const enqueue = createSerialQueue('test');
     const order: string[] = [];
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
@@ -86,9 +86,51 @@ describe('createSerialQueue', () => {
   });
 
   it('a failed operation never poisons later ones', async () => {
-    const enqueue = createSerialQueue();
+    const enqueue = createSerialQueue('test');
     await expect(enqueue(async () => Promise.reject(new Error('nope')))).rejects.toThrow('nope');
     await expect(enqueue(async () => 'ok')).resolves.toBe('ok');
+  });
+
+  it('skips an operation whose signal fired while it waited, and runs the next one', async () => {
+    const enqueue = createSerialQueue('test');
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const ran: string[] = [];
+    const first = enqueue(async () => {
+      await gate;
+      ran.push('first');
+    });
+    const controller = new AbortController();
+    const skipped = vi.fn(async () => {
+      ran.push('skipped');
+    });
+    const second = enqueue(skipped, { signal: controller.signal });
+    const third = enqueue(async () => {
+      ran.push('third');
+    });
+    controller.abort();
+    release();
+    await first;
+    await expect(second).rejects.toMatchObject({
+      code: 'operation-cancelled',
+      capability: 'test',
+    });
+    await third;
+    expect(skipped).not.toHaveBeenCalled();
+    expect(ran).toEqual(['first', 'third']);
+  });
+
+  it('an operation that started runs on when its signal fires', async () => {
+    const enqueue = createSerialQueue('test');
+    const controller = new AbortController();
+    const running = enqueue(
+      async () => {
+        controller.abort();
+        return 'done';
+      },
+      { signal: controller.signal },
+    );
+    await expect(running).resolves.toBe('done');
   });
 });
 

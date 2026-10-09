@@ -1,0 +1,111 @@
+---
+title: Authentication
+description: Open a document with a token from your backend, by id, or with a public share link, and what a token carries.
+engines: [cloud]
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Authentication
+
+Every request the engine makes carries a token. Your backend creates the token and signs it with
+your secret key; the engine only passes it along, and the server checks it. The token says which
+document the user may open, what they may do with it, and who they are.
+
+## Three ways to open a document
+
+Pick the one that matches where the credential comes from.
+
+### With a document token
+
+Your backend creates a token for one user and one document. This is the most common way:
+
+```ts
+const doc = await engine.open({
+  kind: 'token',
+  token: () => fetchDocumentToken(documentId),
+});
+```
+
+The token names the document, so you don't pass an id. Pass a function rather than a string: the
+engine calls it for every request, so a short-lived token never runs out mid-session.
+
+One engine can hold many documents opened this way, each with its own token.
+
+### By id
+
+When your app already has a token for your whole account (an admin tool, a backend job), open any
+of its documents by id:
+
+```ts
+const engine = cloudEngine({
+  baseUrl: 'https://pdf.example.com',
+  token: () => fetchAccountToken(),
+});
+
+const doc = await engine.open({ kind: 'id', id: 'doc_proposal_2026' });
+```
+
+The engine's `token` is used for every document opened by id. To use a different one for a
+single document, pass `token` in the input as well.
+
+### With a share link
+
+A share link (`shr_…`) comes from the CloudPDF dashboard. It needs no backend at all, which makes
+it right for public embeds:
+
+```ts
+const doc = await engine.open({ kind: 'share', shareToken: 'shr_9f2k…' });
+```
+
+A share link isn't a credential itself: the engine exchanges it for a short-lived token, and
+renews that token before it expires. Editing or revoking the share in the dashboard changes every
+embed at the next renewal. The server only accepts the exchange from the websites the share
+allows.
+
+If the share has a passphrase, pass it as `sharePassword`. Without it, `open()` fails with
+`SharePasswordRequired`, so you can ask the user and try again:
+
+```ts
+const doc = await engine.open({ kind: 'share', shareToken, sharePassword: 'open-sesame' });
+```
+
+## Password-protected PDFs
+
+A PDF can have its own password, separate from any token or share passphrase. Pass it in the
+options, whichever way you open:
+
+```ts
+const doc = await engine.open({ kind: 'token', token }, { password: 'pdf-password' });
+```
+
+[Opening documents](/docs/engine/documents/opening#password-protected-files) shows how to ask
+for it only when a file needs one.
+
+## What a token carries
+
+A token carries the user's **permissions** (for example `doc.render`, `doc.text.copy`,
+`annotations:update:self`) and their **identity** (a user id, a display name, a group). The
+server enforces the permissions on every request; the identity becomes the author of the
+annotations the user creates.
+
+Both come from the token, so the engine has no options for them. Read what the user was given
+from `doc.security`:
+
+```ts
+doc.security.allows('doc.download'); // may this user download the file?
+doc.security.identity?.displayName; // who they are
+```
+
+[Permissions](/docs/engine/concepts/permissions) lists every permission and how to build UI that
+matches them.
+
+<Callout type="warn">
+  Create tokens on your server, never in the browser, and keep them short-lived. A document token
+  opens one document only, so a leaked token can't be used for any other.
+</Callout>
+
+## When something is wrong
+
+A missing or expired token fails with `Unauthenticated`; a token without the permission a call
+needs fails with `Forbidden`. See [Errors & cancelling](/docs/engine/concepts/errors-and-cancelling).

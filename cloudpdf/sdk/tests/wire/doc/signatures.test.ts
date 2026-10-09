@@ -15,9 +15,9 @@ describe("SignaturesClient", () => {
             signatures: [
                 {
                     index: 1,
-                    field: { kind: "objectNumber", fieldObjectNumber: 1 },
+                    field: { kind: "objectNumber", objectNumber: 1 },
                     fieldName: "fieldName",
-                    widget: { ref: null, annotObjectNumber: 1, page: null },
+                    widget: { ref: null, objectNumber: 1, page: null },
                     signed: true,
                     kind: "signature",
                     filter: "filter",
@@ -26,7 +26,7 @@ describe("SignaturesClient", () => {
                     contentsSize: 1,
                     coverage: "whole-revision",
                     revisionIndex: 1,
-                    signer: { name: null, reason: null, location: null, contactInfo: null, claimedTime: null },
+                    signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
                     docMdp: 1.1,
                     catalogCertification: true,
                     fieldMdp: { action: "all", fields: ["fields"] },
@@ -90,11 +90,11 @@ describe("SignaturesClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
-    test("abort (1)", async () => {
+    test("cancel (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { status: "aborted" };
+        const rawResponseBody = { status: "cancelled" };
 
         server
             .mockEndpoint()
@@ -104,7 +104,7 @@ describe("SignaturesClient", () => {
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.doc.signatures.abort({
+        const response = await client.doc.signatures.cancel({
             docId: "docId",
             layerName: "layerName",
             signingId: "signingId",
@@ -112,7 +112,7 @@ describe("SignaturesClient", () => {
         expect(response).toEqual(rawResponseBody);
     });
 
-    test("abort (2)", async () => {
+    test("cancel (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
@@ -127,7 +127,7 @@ describe("SignaturesClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.signatures.abort({
+            return await client.doc.signatures.cancel({
                 docId: "docId",
                 layerName: "layerName",
                 signingId: "signingId",
@@ -143,16 +143,12 @@ describe("SignaturesClient", () => {
             status: "completed",
             signature: {
                 index: 1,
-                field: { kind: "objectNumber", fieldObjectNumber: 1 },
+                field: { kind: "objectNumber", objectNumber: 1 },
                 fieldName: "fieldName",
                 widget: {
-                    ref: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
-                    annotObjectNumber: 1,
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    objectNumber: 1,
+                    page: { kind: "objectNumber", objectNumber: 1 },
                 },
                 signed: true,
                 kind: "signature",
@@ -167,7 +163,7 @@ describe("SignaturesClient", () => {
                     reason: "reason",
                     location: "location",
                     contactInfo: "contactInfo",
-                    claimedTime: "claimedTime",
+                    signedAt: "2024-01-15T09:30:00Z",
                 },
                 docMdp: 1.1,
                 catalogCertification: true,
@@ -195,30 +191,26 @@ describe("SignaturesClient", () => {
                 policyVersion: 1,
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 

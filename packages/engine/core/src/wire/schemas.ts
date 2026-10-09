@@ -1,26 +1,40 @@
+import type { Identity } from '../auth/scope/types';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import type { PageRef } from '../identity/PageRef';
 import { z } from 'zod';
 
-import type {
-  AnnotationListPageSnapshot,
-  AnnotationListSnapshotAllPages,
-} from '../annotation/AnnotationListSnapshot';
+import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
+
+import type { AnnotationList } from '../annotation/AnnotationList';
+import { AnnotationRefSchema } from '../annotation/base.schema';
 import {
-  AnnotationRefSchema,
-  AnnotationStableIdSchema,
-  RevisionTokenSchema,
-} from '../annotation/base.schema';
-import { AnnotationDTOSchema } from '../annotation/kinds';
-import type {
-  AnnotationAppearanceImageOptions,
-  AnnotationAppearanceManifest,
-  AnnotationAppearancesQuery,
+  AnnotationDraftSchema,
+  AnnotationPatchSchema,
+  AnnotationSchema,
+  PdfLinkTargetSchema,
+  PdfLinkTargetWritableSchema,
+} from '../annotation/kinds';
+import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
+import {
+  ANNOTATION_APPEARANCE_MODES,
+  type AnnotationAppearanceImageOptions,
+  type AnnotationAppearanceBatch,
+  type AnnotationAppearanceMode,
+  type AnnotationAppearancesQuery,
+  type WidgetAppearancesQuery,
 } from '../dto/AnnotationRender';
-import { EmbeddedFileItemSchema, EmbeddedFileRefSchema } from '../dto/Attachment.schema';
+import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema';
+import {
+  AppearanceResourceKeysSchema,
+  ImageResourceKeysSchema,
+  SourceResourceKeysSchema,
+} from './resourceKeys';
+import { PAGE_RENDER_FAMILIES, type PageRenderFamily, type PageRenderPin } from './renderFamilies';
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
+import type { CustomMetadata } from '../dto/CustomMetadata';
+import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
@@ -30,7 +44,7 @@ import type {
   DocumentVersionRef,
   FieldLockSpec,
   PdfRevision,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteResult,
   SignatureDTO,
   SignaturePrepared,
@@ -50,9 +64,18 @@ import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/Documen
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
-import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../forms/schema';
+import {
+  FormFieldDraftSchema,
+  FormFieldDTOSchema,
+  FormFieldPatchSchema,
+  FormFieldWidgetSchema,
+  FormWidgetSchema,
+  WidgetPlacementSchema,
+} from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
+  PageBoxSchema,
+  PageQuadSchema,
   PdfQuadSchema,
   PdfRectSchema,
   PdfRotationSchema,
@@ -63,23 +86,31 @@ import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutat
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationMoveResult,
+  AnnotationReorderResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
 import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
-  AttachmentsCache,
+  AttachmentMutationMeta,
 } from '../mutation/AttachmentMutationResults';
+import type { AttachmentList } from '../dto/Attachment';
 import type {
   FormFieldCreateResult,
+  FormCalculationsReorderResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
-  FormImportResult,
   FormRepairResult,
+  FormMutationMeta,
+  FormResetResult,
   FormSetValueResult,
+  FormWidgetDeleteResult,
   FormWidgetLinkResult,
+  FormWidgetRestoreResult,
+  FormWidgetsReorderResult,
+  FormWidgetUpdateResult,
 } from '../mutation/FormMutationResults';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 import type { PageDeleteInput } from '../mutation/PageDeleteInput';
@@ -88,8 +119,9 @@ import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
-import type { PageMoveInput } from '../mutation/PageMoveInput';
-import type { PageMoveResult } from '../mutation/PageMoveResult';
+import type { ListPosition } from '../mutation/ListPosition';
+import type { PageReorderInput } from '../mutation/PageReorderInput';
+import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type {
   AnnotationAppearanceExportInput,
   AnnotationFlattenInput,
@@ -99,10 +131,22 @@ import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInp
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateInput } from '../mutation/PageRotateInput';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
-import type { PageStructureCache } from '../mutation/PageStructureCache';
-import type { RefetchReason } from '../mutation/RefetchReason';
-import type { PageState } from '../revision/PageState';
-import type { WeakAnnotationState } from '../revision/WeakAnnotationState';
+import type {
+  AnnotationImportBody,
+  AnnotationImportOptions,
+  AnnotationImportResult,
+} from '../transfer/annotationImport';
+import type { FormExportSelection } from '../transfer/formExport';
+import type {
+  FormImportBody,
+  FormImportOptions,
+  FormImportResult,
+  FormValuesImportBody,
+  FormValuesImportOptions,
+  FormValuesImportResult,
+} from '../transfer/formImport';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
+import { fromBase64, toBase64 } from '../resource/base64';
 import type {
   SearchMatch,
   SearchQuery,
@@ -113,6 +157,19 @@ import type {
 import type { PdfTextSegment } from '../text/layout';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
+/** Who a session acts for; see `Identity` in `auth/scope/types.ts`. */
+export const IdentitySchema: z.ZodType<Identity> = z
+  .object({
+    userId: z.string().min(1).max(256).optional(),
+    displayName: z.string().min(1).max(256).optional(),
+    email: z.string().min(1).max(256).optional(),
+    title: z.string().min(1).max(256).optional(),
+    organization: z.string().min(1).max(256).optional(),
+    organizationalUnit: z.string().min(1).max(256).optional(),
+    groupId: z.string().min(1).max(256).optional(),
+  })
+  .strict();
+
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   title: z.string().nullable(),
   author: z.string().nullable(),
@@ -120,16 +177,14 @@ export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   keywords: z.string().nullable(),
   producer: z.string().nullable(),
   creator: z.string().nullable(),
-  created: z.string().datetime().nullable(),
-  modified: z.string().datetime().nullable(),
+  createdAt: IsoDateTimeSchema.nullable(),
+  modifiedAt: IsoDateTimeSchema.nullable(),
   trapped: z.enum(['true', 'false', 'unknown']),
-  custom: z.record(z.string(), z.string()),
 });
 
 /**
  * Three-state metadata patch. Mirrors annotation patch semantics:
- * `undefined` leaves a field, `null` clears it, a value sets it. `custom`
- * is a per-key three-state map (string set / null clear / absent leave).
+ * `undefined` leaves a field, `null` clears it, a value sets it.
  */
 export const MetadataPatchSchema: z.ZodType<MetadataPatch> = z
   .object({
@@ -139,12 +194,24 @@ export const MetadataPatchSchema: z.ZodType<MetadataPatch> = z
     keywords: z.string().nullable().optional(),
     producer: z.string().nullable().optional(),
     creator: z.string().nullable().optional(),
-    created: z.string().datetime().nullable().optional(),
-    modified: z.string().datetime().nullable().optional(),
+    createdAt: DateInputSchema.nullable().optional(),
+    modifiedAt: DateInputSchema.nullable().optional(),
     trapped: z.enum(['true', 'false', 'unknown']).optional(),
-    custom: z.record(z.string(), z.string().nullable()).optional(),
   })
   .strict();
+
+/** The Info dict's other keys, `{ key: value }`. */
+export const CustomMetadataSchema: z.ZodType<CustomMetadata> = z.record(z.string(), z.string());
+
+/**
+ * A custom-key patch: every key is a field (string sets, `null` removes, left
+ * out stays). Which keys a PDF can hold is the engine's check, so a refusal
+ * names the key the same way on both engines.
+ */
+export const CustomMetadataPatchSchema: z.ZodType<CustomMetadataPatch> = z.record(
+  z.string(),
+  z.string().nullable(),
+);
 
 export const OpenDocumentResponseSchema = z.object({
   id: z.string(),
@@ -158,11 +225,10 @@ export type OpenDocumentResponse = z.infer<typeof OpenDocumentResponseSchema>;
  * fields are accepted and ignored).
  *
  * `docVersion` is the single monotonic integer per doc; it bumps on
- * ANY mutation that could change the manifest's content (page list,
- * per-page content, per-page annotations, per-page weak-flag), which
+ * any mutation that could change the manifest's content (page list,
+ * per-page content, per-page annotations), which
  * makes `/manifest@docVersion=N` fully content-addressed and cache-friendly.
- * Phase 4 hard-codes it to `1`; Phase 5's mutation handler is what
- * actually bumps it.
+ * The server's layer mutations bump it.
  */
 export const DocumentHeadSchema = z.object({
   id: z.string(),
@@ -191,7 +257,7 @@ export const DocumentHeadSchema = z.object({
 export type DocumentHead = z.infer<typeof DocumentHeadSchema>;
 
 export const AccessRequestSchema = z.object({
-  /** Deprecated: identity now rides the PATH
+  /** Deprecated: identity now rides the path
    *  (`/v1/docs/:docId/layers/:layerName/access`). Kept optional for the
    *  legacy `/v1/access` alias, which requires `docId` in the body. */
   docId: z.string().min(1).optional(),
@@ -199,8 +265,43 @@ export const AccessRequestSchema = z.object({
   password: z.string().optional(),
   passwordGrant: z.string().optional(),
   mode: z.enum(['any', 'owner']).optional(),
+  /**
+   * How many object numbers the caller's editing session wants now, at
+   * most 32: 8 for a new session when absent, 0 for a client that holds
+   * enough.
+   */
+  objectNumbers: z.number().int().nonnegative().optional(),
 });
 export type AccessRequest = z.infer<typeof AccessRequestSchema>;
+
+/** `first`, `first + 1`, …, `first + count - 1`. */
+export const ObjectNumberRangeSchema = z.object({
+  first: z.number().int().positive(),
+  count: z.number().int().positive(),
+});
+
+/** See `EditSessionAccess`. */
+export const EditSessionAccessSchema = z.object({
+  session: z.enum(['new', 'revived', 'live']),
+  expiresIn: z.number().int().nonnegative(),
+  objectNumbers: z.array(ObjectNumberRangeSchema),
+});
+
+/** See `EditSessionStatus`: the event stream's `session` event. */
+export const EditSessionStatusSchema = z.object({
+  held: z.array(ObjectNumberRangeSchema),
+  expiresIn: z.number().int().nonnegative(),
+});
+
+/** `POST …/object-numbers`: a bulk reservation. */
+export const ObjectNumberReservationRequestSchema = z.object({
+  count: z.number().int().positive(),
+});
+
+export const ObjectNumberReservationResponseSchema = z.object({
+  objectNumbers: z.array(ObjectNumberRangeSchema),
+  expiresIn: z.number().int().nonnegative(),
+});
 
 /**
  * Typed boolean view of the PDF user-access permission word. Names
@@ -268,6 +369,21 @@ export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.o
   }),
 });
 
+const positiveCount = z.number().int().positive();
+
+/** See `BundleLimits`. */
+export const BundleLimitsSchema = z
+  .object({
+    bundleBytes: positiveCount,
+    manifestBytes: positiveCount,
+    items: positiveCount,
+    pages: positiveCount,
+    resources: positiveCount,
+    resourceBytes: positiveCount,
+    imagePixels: positiveCount,
+  })
+  .strict();
+
 export const AccessResponseSchema = z.object({
   security: DocumentSecurityStateSchema,
   cdn: z.object({
@@ -313,22 +429,19 @@ export const AccessResponseSchema = z.object({
    * detection.
    */
   effectiveScope: z.array(z.string()),
-  identity: z.object({
-    user_id: z.string().optional(),
-    group_id: z.string().optional(),
-    groups: z.array(z.string()).optional(),
-    display_name: z.string().optional(),
-  }),
+  /** What the document's signatures forbid; `effectiveScope` already leaves it out. */
+  protection: z.lazy(() => DocumentProtectionSchema).nullable(),
+  identity: IdentitySchema,
   originPasswordPolicy: z.object({
     mode: z.enum(['not-needed', 'client-retry', 'server-session']),
   }),
   expiresAt: z.number().int().positive(),
   /**
    * The deployment's render lattice — the canonical parameter points the
-   * server treats as durable, CDN-shared artifacts. Lives HERE and never in
+   * server treats as durable, CDN-shared artifacts. Lives here and never in
    * the manifest: manifests are version-pinned immutable objects; the
    * lattice is mutable deployment policy. The SDK exposes it (and a pure
-   * `snap` helper) but NEVER conforms requests implicitly — the same render
+   * `snap` helper) but never conforms requests implicitly — the same render
    * call must not return different pixels on local vs cloud. When
    * `enforced` is true the server rejects off-lattice render tokens with
    * 400; when false, off-lattice renders are computed but not persisted.
@@ -338,7 +451,7 @@ export const AccessResponseSchema = z.object({
     .object({
       /**
        * Full-page renders quantize on `viewport.width` — the bounded
-       * quantity is OUTPUT PIXELS, never zoom (PDF page space is
+       * quantity is output pixels, never zoom (PDF page space is
        * effectively unbounded, so a scale lattice bounds artifact count
        * but not size).
        */
@@ -346,7 +459,7 @@ export const AccessResponseSchema = z.object({
         widths: z.array(z.number().int().positive()),
       }),
       /**
-       * RESERVED for deep-zoom tile support: scale-based pyramid ×
+       * Reserved for deep-zoom tile support: scale-based pyramid ×
        * fixed tile size, constant per-job cost. Absent until the tiling
        * plugin ships.
        */
@@ -357,7 +470,7 @@ export const AccessResponseSchema = z.object({
         })
         .optional(),
       /**
-       * Annotation-appearance lattice — SCALE-based (appearances are sized
+       * Annotation-appearance lattice — scale-based (appearances are sized
        * by `rect × scale` and must track the page's effective render scale
        * for crisp composites).
        */
@@ -373,6 +486,10 @@ export const AccessResponseSchema = z.object({
       enforced: z.boolean(),
     })
     .optional(),
+  /** The deployment's limits for an annotation import (see `BundleLimits`). */
+  bundleLimits: BundleLimitsSchema,
+  /** The caller's editing session (see `DocumentAccessInfo.edit`). */
+  edit: EditSessionAccessSchema.optional(),
 });
 export type AccessResponse = z.infer<typeof AccessResponseSchema>;
 export type RenderPolicy = NonNullable<AccessResponse['renderPolicy']>;
@@ -391,38 +508,22 @@ export const EngineErrorPayloadSchema: z.ZodType<SerializedEngineError> = z.obje
   details: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const WeakAnnotationStateSchema: z.ZodType<WeakAnnotationState> = z.discriminatedUnion(
-  'kind',
-  [
-    z.object({ kind: z.literal('unknown') }),
-    z.object({
-      kind: z.literal('known'),
-      hasAnyWeakAnnotations: z.boolean(),
-    }),
-  ],
-);
-
-export const PageStateSchema: z.ZodType<PageState> = z.object({
-  page: PageRefSchema,
-  revision: RevisionTokenSchema,
-  weakAnnotationState: WeakAnnotationStateSchema,
-});
-
 export const CachePinsSchema: z.ZodType<CachePins> = z.object({
   contentVersion: z.number().int().positive(),
   annotationVersion: z.number().int().positive(),
+  widgetVersion: z.number().int().positive(),
 });
 
 /**
- * Plane scopes are DERIVED from the version counters at every emission
- * point (layer manifests, mutation cache envelopes, SSE rows), never stored.
- * Additive/optional both ways: old clients ignore it, old servers omit it
- * (consumers treat absence as all-'layer' — never wrong, only unshared).
+ * Plane scopes are derived from the version counters when a layer manifest
+ * is built, never stored. Absent on base manifests: consumers treat absence
+ * as all-'layer' (never wrong, only unshared).
  */
 const LayerScopeValueSchema = z.enum(['base', 'layer']);
 export const LayerScopesSchema: z.ZodType<LayerScopes> = z.object({
   content: LayerScopeValueSchema,
   annotations: LayerScopeValueSchema,
+  forms: LayerScopeValueSchema,
   layout: LayerScopeValueSchema,
   attachments: LayerScopeValueSchema,
   metadata: LayerScopeValueSchema,
@@ -431,34 +532,19 @@ export const LayerScopesSchema: z.ZodType<LayerScopes> = z.object({
 export type { LayerScopes, LayerScopePlane } from '../dto/LayerScopes';
 
 /**
- * Per-page envelope inside `DocumentManifest`. Carries the full
- * `PageState` plus the cache-busting integers the SDK embeds in
- * leaf URLs (`/pages/:pon/text@contentVersion=N`, `/pages/:pon/annotations@annotationVersion=N`).
+ * Per-page envelope inside `DocumentManifest`: the page, plus the
+ * cache-busting integers the SDK embeds in leaf URLs
+ * (`/pages/:pon/text@contentVersion=N`, `/pages/:pon/annotations@annotationVersion=N`).
  *
  * `contentVersion` bumps when the page's content stream changes
  * (text, page reorder doesn't, the pon is durable). `annotationVersion`
  * bumps when /Annots gains/loses entries or when a tracked annotation
- * mutates. `hasWeakAnnotations` is hoisted from `PageState` so the
- * SDK can decide whether to display a "stale-on-reorder" badge
- * without re-fetching the page.
- *
- * Phase 4 hard-codes all three to (1, 1, false); Phase 5's
- * `layer_pages` table drives the real values.
+ * mutates. The server derives both from its per-layer page state.
  */
-export const ManifestPageSchema: z.ZodType<ManifestPage> = z
-  .object({
-    state: PageStateSchema,
-    cache: CachePinsSchema,
-  })
-  .superRefine((page, ctx) => {
-    if (page.state.weakAnnotationState.kind !== 'known') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['state', 'weakAnnotationState'],
-        message: 'manifest pages must have a known weak annotation state',
-      });
-    }
-  }) as z.ZodType<ManifestPage>;
+export const ManifestPageSchema: z.ZodType<ManifestPage> = z.object({
+  page: PageRefSchema,
+  cache: CachePinsSchema,
+});
 export type { ManifestPage } from '../dto/DocumentManifest';
 
 /**
@@ -473,6 +559,7 @@ export const DocumentManifestSchema = z.object({
   actionsVersion: z.number().int().positive().default(1),
   attachmentsVersion: z.number().int().positive().default(1),
   annotationsVersion: z.number().int().positive().default(1),
+  formsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   // Signing fences (absent on pre-signature servers: unwritten, unknown length).
@@ -481,29 +568,26 @@ export const DocumentManifestSchema = z.object({
   baseByteLength: z.number().int().nonnegative().default(0),
   // Plane scopes: layer manifests only; absent = all-'layer'.
   scopes: LayerScopesSchema.optional(),
+  // Defined further down; lazy so this schema can come first.
+  protection: z.lazy(() => DocumentProtectionSchema).nullable(),
   pages: z.array(ManifestPageSchema),
 }) as unknown as z.ZodType<DocumentManifest>;
 export type { DocumentManifest } from '../dto/DocumentManifest';
 
-export const AnnotationListPageSnapshotSchema: z.ZodType<AnnotationListPageSnapshot> = z.object({
-  pageState: PageStateSchema,
-  annotations: z.array(AnnotationDTOSchema),
+/** What both engines' `annotations.list()` return, and the server's list endpoints send. */
+export const AnnotationListSchema: z.ZodType<AnnotationList> = z.object({
+  annotations: z.array(AnnotationSchema),
+  pages: z.array(PageRefSchema),
+  auditHead: z.number().int().nonnegative().optional(),
 });
-
-export const AnnotationListSnapshotAllPagesSchema: z.ZodType<AnnotationListSnapshotAllPages> =
-  z.object({
-    pages: z.array(AnnotationListPageSnapshotSchema),
-    // Cloud stamps the manifest's transactional audit cursor; local omits it.
-    auditHead: z.number().int().nonnegative().optional(),
-  });
 
 /**
  * Wire shape of `GET …/text/pages/:pon/data@<contentVersion>` and the
- * `pages.text` worker result: the UTF-16-faithful extraction, the CHARACTER
- * space size (`charCount` — the space geometry runs tile; NOT `text.length`),
+ * `pages.text` worker result: the UTF-16-faithful extraction, the character
+ * space size (`charCount` — the space geometry runs tile; not `text.length`),
  * and the optional character→text anchor map. Malformed maps are rejected
  * here with the shared `charMapViolation` invariants — absent/empty map
- * REQUIRES `charCount === text.length` (identity).
+ * requires `charCount === text.length` (identity).
  */
 export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
   .object({
@@ -521,27 +605,29 @@ export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
   });
 
 export const PageGeometryGlyphSchema = z.object({
-  looseBox: PdfRectSchema,
-  flags: z.number().int().nonnegative(),
-  tightBox: PdfRectSchema.optional(),
+  loose: PageBoxSchema,
+  tight: PageBoxSchema.optional(),
+  space: z.literal(true).optional(),
+  empty: z.literal(true).optional(),
 });
 
 export const RotatedGeometryGlyphSchema = z.object({
-  looseQuad: PdfQuadSchema,
-  flags: z.number().int().nonnegative(),
-  tightQuad: PdfQuadSchema.optional(),
+  loose: PageQuadSchema,
+  tight: PageQuadSchema.optional(),
+  space: z.literal(true).optional(),
+  empty: z.literal(true).optional(),
 });
 
 export const UprightGeometryRunSchema = z.object({
-  rect: PdfRectSchema,
-  charStart: z.number().int().nonnegative(),
+  rect: PageBoxSchema,
+  start: z.number().int().nonnegative(),
   glyphs: z.array(PageGeometryGlyphSchema),
   fontSize: z.number().optional(),
 });
 
 export const RotatedGeometryRunSchema = z.object({
-  rect: PdfRectSchema,
-  charStart: z.number().int().nonnegative(),
+  rect: PageBoxSchema,
+  start: z.number().int().nonnegative(),
   glyphs: z.array(RotatedGeometryGlyphSchema),
   rotation: z.number(),
   ascentFlip: z.boolean(),
@@ -549,7 +635,7 @@ export const RotatedGeometryRunSchema = z.object({
 });
 
 // Rotated first: in zod's default strip mode the upright shape would accept a
-// zero-glyph rotated run and silently drop its rotation; the rotated shape can
+// zero-glyph rotated run and silently drop its angle; the rotated shape can
 // never swallow an upright run (it requires `rotation`/`ascentFlip`).
 export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = z.union([
   RotatedGeometryRunSchema,
@@ -566,7 +652,7 @@ export const PageGeometrySnapshotSchema: z.ZodType<PageGeometrySnapshot> = z.obj
  * semantics (`validateSearchQuery`: regex dialect + flag combos) after
  * parse — the schema only checks structure.
  */
-export const SearchQuerySchema: z.ZodType<SearchQuery> = z.object({
+const searchQueryObject = z.object({
   text: z.string(),
   regex: z.boolean().optional(),
   matchCase: z.boolean().optional(),
@@ -574,39 +660,36 @@ export const SearchQuerySchema: z.ZodType<SearchQuery> = z.object({
   matchDiacritics: z.boolean().optional(),
   ignoreWhitespace: z.boolean().optional(),
 });
+export const SearchQuerySchema: z.ZodType<SearchQuery> = searchQueryObject;
 
-export const SearchModeSchema = z.enum(['rects', 'full']);
-
-export const SearchRequestSchema: z.ZodType<SearchRequest> = z.object({
-  query: SearchQuerySchema,
-  mode: SearchModeSchema.optional(),
+export const SearchRequestSchema: z.ZodType<SearchRequest> = searchQueryObject.extend({
+  snippets: z.boolean().optional(),
+  from: PageRefSchema.optional(),
   cursor: z.string().optional(),
-  startPage: PageRefSchema.optional(),
-  skip: z.number().int().nonnegative().optional(),
-  budget: z
+  limit: z
     .object({
-      maxMatches: z.number().int().positive().optional(),
-      maxPages: z.number().int().positive().optional(),
+      matches: z.number().int().positive().optional(),
+      pages: z.number().int().positive().optional(),
     })
     .optional(),
 });
 
 export const SearchSnippetSchema: z.ZodType<SearchSnippet> = z.object({
-  text: z.string(),
-  matchStart: z.number().int().nonnegative(),
-  matchLength: z.number().int().positive(),
+  before: z.string(),
+  match: z.string(),
+  after: z.string(),
 });
 
 export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
-  quad: PdfQuadSchema,
-  rect: PdfRectSchema,
+  quad: PageQuadSchema,
+  rect: PageBoxSchema,
   advance: z.union([z.literal(1), z.literal(-1)]),
 });
 
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
   page: PageRefSchema,
-  charStart: z.number().int().nonnegative(),
-  charCount: z.number().int().positive(),
+  start: z.number().int().nonnegative(),
+  count: z.number().int().positive(),
   segments: z.array(PdfTextSegmentSchema),
   snippet: SearchSnippetSchema.optional(),
 });
@@ -614,8 +697,8 @@ export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
 export const SearchSliceSchema: z.ZodType<SearchSlice> = z.object({
   matches: z.array(SearchMatchSchema),
   nextCursor: z.string().nullable(),
-  scannedPages: z.number().int().nonnegative(),
-  totalPages: z.number().int().nonnegative(),
+  pagesSearched: z.number().int().nonnegative(),
+  pageCount: z.number().int().nonnegative(),
 });
 
 export const PageNetworkRenderFormatSchema: z.ZodType<PageNetworkRenderFormat> = z.enum([
@@ -661,10 +744,10 @@ const RenderTargetSchema = z.discriminatedUnion('kind', [
       kind: z.literal('rect'),
       rect: z
         .object({
-          left: z.coerce.number().finite(),
-          bottom: z.coerce.number().finite(),
-          right: z.coerce.number().finite(),
-          top: z.coerce.number().finite(),
+          x: z.coerce.number().finite(),
+          y: z.coerce.number().finite(),
+          width: z.coerce.number().positive().finite(),
+          height: z.coerce.number().positive().finite(),
         })
         .strict(),
     })
@@ -680,30 +763,56 @@ const RenderRotationSchema = z.preprocess(
 
 const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 
-const RenderQualitySchema = z.coerce.number().int().min(1).max(100);
+/** WebP quality, 0 (smallest) to 1 (best) — the `canvas.toBlob` scale. */
+const RenderQualitySchema = z.coerce.number().min(0).max(1);
+
+const AppearanceModeSchema = z.enum(['normal', 'rollover', 'down']);
 
 /**
- * Token/path rule: annotatedness is PATH-expressed —
- * the render FAMILY the route belongs to — never token/query-expressed.
- * Each family therefore gets its own query schema, built from one shared
- * base:
- *
- *   - the annotation-free family (`…/render/pages/`) has NO
- *     `annotationVersion` field at all — `.strict()` rejects it as an
- *     unrecognized key, so the illegal combination is unrepresentable;
- *   - the annotated family (`…/render/annotated/pages/`) REQUIRES
- *     `annotationVersion` on versioned requests — its artifact depends on
- *     the `annotations` plane, so the pin must be in the cache key.
- *
- * Both transforms stamp `includeAnnotations` onto the parsed SDK options
- * from the family, so downstream consumers (worker options, classify) are
- * family-blind.
+ * A token's `modes`: the modes it asks for, in the engine's mode order,
+ * joined by `-` (`normal-down`). Anything else is refused, so one set of
+ * modes has one spelling and one URL.
  */
-function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQuery> {
+const AppearanceModesSchema = z.string().transform((value, ctx) => {
+  const modes = value.split('-') as AnnotationAppearanceMode[];
+  const canonical = ANNOTATION_APPEARANCE_MODES.filter((mode) => modes.includes(mode));
+  if (
+    canonical.length === 0 ||
+    canonical.length === ANNOTATION_APPEARANCE_MODES.length ||
+    canonical.join('-') !== value
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        'modes must name some but not all of normal, rollover, down, in that order, joined by -',
+    });
+    return z.NEVER;
+  }
+  return canonical;
+});
+
+/**
+ * The query/token schema of one picture family (`PAGE_RENDER_FAMILIES`).
+ * What a picture draws is in its path, never its token, so each family has
+ * its own schema, built from one shared base:
+ *
+ *   - its pins are the family's own (`contentVersion`, plus
+ *     `annotationVersion` and `widgetVersion` for the planes it draws), and
+ *     `.strict()` refuses any other, so a pin the family doesn't depend on
+ *     is unrepresentable;
+ *   - a versioned request (one with `contentVersion`) carries every one of
+ *     them, since the picture changes with each.
+ *
+ * The transform stamps what the family draws onto the parsed options, so
+ * the worker options downstream need no family.
+ */
+function buildPageRenderQuerySchema(family: PageRenderFamily): z.ZodType<PageRenderQuery> {
+  const { draws, pins } = PAGE_RENDER_FAMILIES[family];
+  const pinFields: Record<string, z.ZodTypeAny> = {};
+  for (const pin of pins) pinFields[pin] = z.coerce.number().int().positive().optional();
   return z
     .object({
-      contentVersion: z.coerce.number().int().positive().optional(),
-      ...(annotated ? { annotationVersion: z.coerce.number().int().positive().optional() } : {}),
+      ...pinFields,
       format: PageNetworkRenderFormatSchema.optional(),
       viewport: RenderViewportSchema.optional(),
       target: RenderTargetSchema.optional(),
@@ -713,35 +822,36 @@ function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQue
     })
     .strict()
     .superRefine((v, ctx) => {
-      // The object shape is family-dependent (the free family has no
-      // `annotationVersion` key at all), so read the pins through one
-      // explicit view instead of letting the conditional spread's union
-      // type leak into the refinement.
-      const pins = v as { contentVersion?: number; annotationVersion?: number };
-      if (pins.contentVersion !== undefined && v.format === undefined) {
+      const pinned = v as Partial<Record<PageRenderPin, number>>;
+      if (pinned.contentVersion === undefined) {
+        for (const pin of pins) {
+          if (pinned[pin] === undefined) continue;
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [pin],
+            message: `${pin} requires contentVersion`,
+          });
+        }
+        return;
+      }
+      if (v.format === undefined) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['format'],
           message: 'versioned render requires format',
         });
       }
-      if (annotated && pins.annotationVersion !== undefined && pins.contentVersion === undefined) {
+      for (const pin of pins) {
+        if (pinned[pin] !== undefined) continue;
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['annotationVersion'],
-          message: 'annotationVersion requires contentVersion',
-        });
-      }
-      if (annotated && pins.contentVersion !== undefined && pins.annotationVersion === undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['annotationVersion'],
-          message: 'versioned annotated render requires annotationVersion',
+          path: [pin],
+          message: `a versioned ${family} picture requires ${pin}`,
         });
       }
     })
     .transform((v) => {
-      const pins = v as { contentVersion?: number; annotationVersion?: number };
+      const pinned = v as Partial<Record<PageRenderPin, number>>;
       const options: PageImageOptions = {
         ...(v.target ? { target: v.target } : {}),
         ...(v.viewport ? { viewport: v.viewport } : {}),
@@ -749,101 +859,109 @@ function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQue
         ...(v.background !== undefined ? { background: v.background } : {}),
         ...(v.quality !== undefined ? { quality: v.quality } : {}),
         ...(v.format !== undefined ? { format: v.format } : {}),
-        includeAnnotations: annotated,
+        ...draws,
       };
-      return {
-        options,
-        ...(pins.contentVersion !== undefined ? { contentVersion: pins.contentVersion } : {}),
-        ...(pins.annotationVersion !== undefined
-          ? { annotationVersion: pins.annotationVersion }
-          : {}),
-      };
+      const query: PageRenderQuery = { options };
+      for (const pin of pins) {
+        if (pinned[pin] !== undefined) query[pin] = pinned[pin];
+      }
+      return query;
     }) as unknown as z.ZodType<PageRenderQuery>;
 }
 
-/** Query/token schema for the annotation-free render family (`page-render`). */
-export const PageRenderQuerySchema = buildPageRenderQuerySchema(false);
-/** Query/token schema for the annotated render family (`page-render-annotated`). */
-export const PageRenderAnnotatedQuerySchema = buildPageRenderQuerySchema(true);
+/** Query/token schemas of the four picture families, by family. */
+export const PageRenderQuerySchemas: Readonly<
+  Record<PageRenderFamily, z.ZodType<PageRenderQuery>>
+> = {
+  pages: buildPageRenderQuerySchema('pages'),
+  annotations: buildPageRenderQuerySchema('annotations'),
+  fields: buildPageRenderQuerySchema('fields'),
+  all: buildPageRenderQuerySchema('all'),
+};
 
 /**
- * Query/token schema for the batch annotation-appearance render endpoint.
- * Mirrors `PageRenderQuerySchema` but without page target/viewport/background
- * or `includeAnnotations` (appearances are always annotation-derived), and
- * keyed by `annotationVersion` only — appearance bitmaps do not depend on
+ * Query/token schema of an appearance batch, keyed by `pin`. Mirrors
+ * `PageRenderQuerySchema` but without page target/background or
+ * `includeAnnotations` (appearances are always annotation-derived), and keyed
+ * by the page's pin for its family only — appearance bitmaps do not depend on
  * page base content, so `contentVersion` is not part of the cache key. The
- * endpoint renders the Normal appearance only.
+ * endpoint renders every mode and state an annotation stores, or the `modes`
+ * asked for.
  */
-export const AnnotationAppearancesQuerySchema = z
-  .object({
-    annotationVersion: z.coerce.number().int().positive().optional(),
-    format: PageNetworkRenderFormatSchema.optional(),
-    rotation: RenderRotationSchema.optional(),
-    scale: z.coerce.number().positive().finite().optional(),
-    quality: RenderQualitySchema.optional(),
-  })
-  .strict()
-  .superRefine((v, ctx) => {
-    // A versioned (cacheable) request pins the annotation version and must
-    // declare the encoded format so the cached URL is unambiguous.
-    if (v.annotationVersion !== undefined && v.format === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['format'],
-        message: 'versioned appearance render requires format',
-      });
-    }
-  })
-  .transform((v) => {
-    const options: AnnotationAppearanceImageOptions = {
-      ...(v.rotation !== undefined ? { rotation: v.rotation } : {}),
-      ...(v.scale !== undefined ? { scale: v.scale } : {}),
-      ...(v.quality !== undefined ? { quality: v.quality } : {}),
-      ...(v.format !== undefined ? { format: v.format } : {}),
-    };
-    return {
-      options,
-      ...(v.annotationVersion !== undefined ? { annotationVersion: v.annotationVersion } : {}),
-    };
-  }) as unknown as z.ZodType<AnnotationAppearancesQuery>;
+function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVersion'>(pin: Pin) {
+  return z
+    .object({
+      [pin]: z.coerce.number().int().positive().optional(),
+      format: PageNetworkRenderFormatSchema.optional(),
+      modes: AppearanceModesSchema.optional(),
+      rotation: RenderRotationSchema.optional(),
+      viewport: RenderViewportSchema.optional(),
+      quality: RenderQualitySchema.optional(),
+    } as Record<string, z.ZodTypeAny>)
+    .strict()
+    .superRefine((v, ctx) => {
+      // A versioned (cacheable) request pins its version and must declare
+      // the encoded format so the cached URL is unambiguous.
+      if (v[pin] !== undefined && v.format === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['format'],
+          message: 'versioned appearance render requires format',
+        });
+      }
+    })
+    .transform((v) => {
+      const options: AnnotationAppearanceImageOptions = {
+        ...(v.rotation !== undefined ? { rotation: v.rotation } : {}),
+        ...(v.viewport ? { viewport: v.viewport } : {}),
+        ...(v.quality !== undefined ? { quality: v.quality } : {}),
+        ...(v.format !== undefined ? { format: v.format } : {}),
+        ...(v.modes !== undefined ? { modes: v.modes } : {}),
+      };
+      return { options, ...(v[pin] !== undefined ? { [pin]: v[pin] } : {}) };
+    });
+}
+
+/** Query/token schema of a page's annotation images (`annotations/pages/{p}/appearances@`). */
+export const AnnotationAppearancesQuerySchema = buildAppearancesQuerySchema(
+  'annotationVersion',
+) as unknown as z.ZodType<AnnotationAppearancesQuery>;
+
+/** Query/token schema of a page's widget images (`form/pages/{p}/appearances@`). */
+export const WidgetAppearancesQuerySchema = buildAppearancesQuerySchema(
+  'widgetVersion',
+) as unknown as z.ZodType<WidgetAppearancesQuery>;
 
 /**
- * The JSON manifest part of the appearance `multipart/form-data` response.
- * Wire-stable; the cloud client validates the parsed `manifest` part against
+ * The `body` part of the appearance `multipart/form-data` response.
+ * Wire-stable; the cloud client validates the parsed `body` part against
  * this before reconstructing image handles from the binary parts.
  */
-export const AnnotationAppearanceManifestSchema: z.ZodType<AnnotationAppearanceManifest> = z.object(
-  {
-    pageState: PageStateSchema,
-    appearances: z.array(
-      z.object({
-        part: z.string().min(1),
-        ref: AnnotationRefSchema,
-        mode: z.enum(['normal', 'rollover', 'down']),
-        rect: PdfRectSchema,
-        width: z.number().int().positive(),
-        height: z.number().int().positive(),
-        format: PageNetworkRenderFormatSchema,
-        contentType: z.string().min(1),
-      }),
-    ),
-  },
-);
-
-/**
- * Reasons a mutation tells the client its old snapshot is stale. Wire-stable;
- * extend with care (forward-compat clients accept only known values).
- */
-export const RefetchReasonSchema: z.ZodType<RefetchReason> = z.enum([
-  'weakRefsInvalidated',
-  'externalChange',
-  'pageRebuilt',
-]);
+export const AnnotationAppearanceBatchSchema: z.ZodType<AnnotationAppearanceBatch> = z.object({
+  page: PageRefSchema,
+  appearances: z.array(
+    z.object({
+      resources: ImageResourceKeysSchema,
+      ref: AnnotationRefSchema,
+      mode: AppearanceModeSchema,
+      state: z.string().nullable(),
+      rect: PageBoxSchema,
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+      format: PageNetworkRenderFormatSchema,
+      contentType: z.string().min(1),
+    }),
+  ),
+});
 
 export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
-  previousDocVersion: z.number().int().positive(),
+  previousDocVersion: z.number().int().nonnegative(),
   docVersion: z.number().int().positive(),
   annotationsVersion: z.number().int().positive().optional(),
+  formsVersion: z.number().int().positive().optional(),
+  layoutVersion: z.number().int().positive().optional(),
+  metadataVersion: z.number().int().positive().optional(),
+  attachmentsVersion: z.number().int().positive().optional(),
   layerVersion: z.number().int().nonnegative().optional(),
   working: z.boolean().optional(),
   pages: z.array(
@@ -855,68 +973,182 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
 });
 
 export const MutationMetaSchema: z.ZodType<MutationMeta> = z.object({
-  affectedPages: z.array(PageStateSchema),
+  affectedPages: z.array(PageRefSchema),
   cacheDelta: CacheDeltaSchema.nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
 });
 
 /**
- * Per-page side-effect envelope every annotation mutation returns. Mirrors
- * `AnnotationListMutationMeta`. The `shouldRefetch` field is `null` when the
- * client's existing index-based references remain valid; non-null only when
- * the engine knows for sure the snapshot is stale.
+ * Where rows go in their list, on the wire: `'start'`, `'end'`, or one
+ * object naming exactly one neighbour (`before` or `after`).
  */
+function listPositionSchema<Ref>(ref: z.ZodType<Ref>): z.ZodType<ListPosition<Ref>> {
+  return z.union([
+    z.enum(['start', 'end']),
+    z
+      .object({ before: ref.optional(), after: ref.optional() })
+      .strict()
+      .refine((position) => (position.before === undefined) !== (position.after === undefined), {
+        message: 'exactly one of before or after',
+      }),
+  ]) as unknown as z.ZodType<ListPosition<Ref>>;
+}
+
+/** Where pages go among the document's pages. */
+export const PagePositionSchema = listPositionSchema(PageRefSchema);
+
+/** Where annotations go among their page's annotations, or widgets among its widgets. */
+export const AnnotationPositionSchema = listPositionSchema(AnnotationRefSchema);
+
+/** Where fields go in the form's calculation order. */
+export const FieldPositionSchema = listPositionSchema(FormFieldRefSchema);
+
+/**
+ * Stable public component names for the models every part of the document
+ * wire shares (page refs, a write's meta, the metadata), like
+ * `AnnotationWireComponents`.
+ */
+export const DocumentWireComponents = {
+  PageRef: PageRefSchema,
+  PagePosition: PagePositionSchema,
+  CacheDelta: CacheDeltaSchema,
+  MutationMeta: MutationMetaSchema,
+  DocumentMetadata: DocumentMetadataSchema,
+  MetadataPatch: MetadataPatchSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
+
+/** Per-page side-effect envelope every annotation mutation returns. Mirrors `AnnotationListMutationMeta`. */
 export const AnnotationListMutationMetaSchema: z.ZodType<AnnotationListMutationMeta> = z.object({
-  affectedPages: z.array(PageStateSchema),
+  affectedPages: z.array(PageRefSchema),
   cacheDelta: CacheDeltaSchema.nullable(),
-  changed: z.array(AnnotationStableIdSchema),
-  weakRefsInvalidated: z.boolean(),
-  shouldRefetch: z.object({ reason: RefetchReasonSchema }).nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
+  changed: z.array(AnnotationRefSchema),
 });
 
 export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z.object({
-  created: AnnotationDTOSchema,
+  annotation: AnnotationSchema,
   meta: AnnotationListMutationMetaSchema,
 });
+
+export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object({
+  annotations: z.array(AnnotationSchema),
+  refMap: z.array(z.object({ from: AnnotationRefSchema, to: AnnotationRefSchema })),
+  dropped: z.array(
+    z.object({
+      ref: AnnotationRefSchema,
+      field: z.string().optional(),
+      reason: z.enum([
+        'unsupported-kind',
+        'widget',
+        'geospatial',
+        'unknown-measure',
+        'unsupported-action',
+        'unsupported-value',
+        'name-conflict',
+        'parent-dropped',
+        'parent-missing',
+        'popup-taken',
+      ]),
+    }),
+  ),
+  meta: AnnotationListMutationMetaSchema,
+}) as z.ZodType<AnnotationImportResult>;
 
 /** The engine's `/AP` verdict riding every update result (see engine-core
  *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */
 export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
-  action: z.enum(['preserved', 'regenerated', 'generation-unavailable']),
+  action: z.enum(['preserved', 'regenerated', 'generation-unavailable', 'restored']),
   changed: z.boolean(),
 });
 
 export const AnnotationUpdateResultSchema: z.ZodType<AnnotationUpdateResult> = z.object({
-  updated: AnnotationDTOSchema,
+  annotation: AnnotationSchema,
   appearance: AppearanceOutcomeSchema,
   meta: AnnotationListMutationMetaSchema,
 });
 
-/**
- * `deleted` is nullable: a weak annotation (no /NM, no indirect object
- * number) has no durable id to report after removal. Cloud server and local
- * worker both emit `null` in that case so callers don't have to special-case
- * a sentinel.
- */
 export const AnnotationDeleteResultSchema: z.ZodType<AnnotationDeleteResult> = z.object({
-  deleted: AnnotationStableIdSchema.nullable(),
   meta: AnnotationListMutationMetaSchema,
 });
 
 /**
- * Batch annotation move (contiguous-block, symmetric with `pages.move`).
- * `moved` is in caller order; each `moved[i]` lives at index `toIndex + i`
- * after the move. ONE structural envelope per batch.
+ * Stable public component names for the annotation wire model, so an OpenAPI
+ * projection names each once (`Annotation`, not one type per response that
+ * carries one), like `PdfActionWireComponents`.
  */
-export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.object({
-  moved: z.array(AnnotationDTOSchema),
+export const AnnotationWireComponents = {
+  Annotation: AnnotationSchema,
+  AnnotationRef: AnnotationRefSchema,
+  AnnotationDraft: AnnotationDraftSchema,
+  AnnotationPatch: AnnotationPatchSchema,
+  PdfLinkTarget: PdfLinkTargetSchema,
+  PdfLinkTargetWritable: PdfLinkTargetWritableSchema,
+  AnnotationList: AnnotationListSchema,
+  AnnotationMutationMeta: AnnotationListMutationMetaSchema,
+  AnnotationPosition: AnnotationPositionSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
+
+/** What `page.annotations.reorder` takes on the wire. */
+export const AnnotationReorderBodySchema = z
+  .object({ refs: z.array(AnnotationRefSchema).min(1), position: AnnotationPositionSchema })
+  .strict();
+
+/** A stacking-order change: the page's annotations in their new order, as refs. */
+export const AnnotationReorderResultSchema: z.ZodType<AnnotationReorderResult> = z.object({
+  order: z.array(AnnotationRefSchema),
   meta: AnnotationListMutationMetaSchema,
 });
+
+/** A single-field write's meta: the envelope plus the fields and widgets it changed. */
+export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
+  affectedPages: z.array(PageRefSchema),
+  cacheDelta: CacheDeltaSchema.nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
+  changedFields: z.array(FormFieldRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
+});
+
+/**
+ * Stable public component names for the form wire model, so an OpenAPI
+ * projection names each once (`FormField`, not one type per response that
+ * carries one), like `AnnotationWireComponents`.
+ */
+export const FormWireComponents = {
+  FormFieldRef: FormFieldRefSchema,
+  FormField: FormFieldDTOSchema,
+  FormFieldValue: FormFieldValueSchema,
+  FormWidget: FormWidgetSchema,
+  FormFieldDraft: FormFieldDraftSchema,
+  FormFieldPatch: FormFieldPatchSchema,
+  FieldPosition: FieldPositionSchema,
+  WidgetPlacement: WidgetPlacementSchema,
+  WidgetAnnotation: WidgetDTOSchema,
+  WidgetPatch: WidgetPatchSchema,
+  FormMutationMeta: FormMutationMetaSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object({
   field: FormFieldDTOSchema,
-  changedWidgets: z.array(FormWidgetSchema),
-  meta: MutationMetaSchema,
-});
+  widgets: z.array(WidgetDTOSchema),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormSetValueResult>;
+
+export const FormResetResultSchema: z.ZodType<FormResetResult> = z.object({
+  fields: z.array(FormFieldDTOSchema),
+  widgets: z.array(WidgetDTOSchema),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormResetResult>;
+
+/** What `reset` takes on the wire: the fields to reset, or none for the whole form. */
+export const FormResetBodySchema = z
+  .object({ refs: z.array(FormFieldRefSchema).optional() })
+  .strict();
+
+/** What `updateWidget` takes on the wire: the widget patch (`PATCH …/form/widgets/{p}/{key}`). */
+export const FormWidgetUpdateBodySchema = z.object({ patch: WidgetPatchSchema }).strict();
 
 export const FormEffectSchema: z.ZodType<FormEffect> = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('setValue'), ref: FormFieldRefSchema, value: FormFieldValueSchema }),
@@ -939,39 +1171,117 @@ export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
       error: EngineErrorPayloadSchema.optional(),
     }),
   ),
-  changedWidgets: z.array(FormWidgetSchema),
-  meta: MutationMetaSchema.nullable(),
-});
+  widgets: z.array(WidgetDTOSchema),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormEffectsResult>;
 
 export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
-  fieldsTotal: z.number().int().nonnegative(),
-  fieldsApplied: z.number().int().nonnegative(),
-  fieldsSkipped: z.number().int().nonnegative(),
-  widgetsChanged: z.number().int().nonnegative(),
-  snapshot: FormSnapshotSchema,
-  meta: MutationMetaSchema,
-});
+  fields: z.array(FormFieldDTOSchema),
+  widgets: z.array(WidgetDTOSchema),
+  refMap: z.array(z.object({ from: FormFieldRefSchema, to: FormFieldRefSchema })),
+  dropped: z.array(
+    z.object({
+      ref: FormFieldRefSchema.nullable(),
+      widget: AnnotationRefSchema.optional(),
+      field: z.string().optional(),
+      reason: z.enum([
+        'name-conflict',
+        'no-field',
+        'unsupported-family',
+        'script-not-allowed',
+        'unsupported-action',
+      ]),
+    }),
+  ),
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormImportResult>;
+
+export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z.object({
+  fields: z.array(FormFieldDTOSchema),
+  widgets: z.array(WidgetDTOSchema),
+  dropped: z.array(
+    z.object({
+      ref: FormFieldRefSchema,
+      reason: z.enum([
+        'no-field',
+        'wrong-family',
+        'value-not-allowed',
+        'locked',
+        'fill-not-allowed',
+      ]),
+    }),
+  ),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormValuesImportResult>;
 
 export const FormFieldCreateResultSchema: z.ZodType<FormFieldCreateResult> = z.object({
   field: FormFieldDTOSchema,
-  meta: MutationMetaSchema,
-});
+  widgets: z.array(WidgetDTOSchema),
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormFieldCreateResult>;
 
 export const FormFieldUpdateResultSchema: z.ZodType<FormFieldUpdateResult> = z.object({
   field: FormFieldDTOSchema,
-  meta: MutationMetaSchema,
+  widgets: z.array(WidgetDTOSchema),
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormFieldUpdateResult>;
+
+export const FormWidgetUpdateResultSchema: z.ZodType<FormWidgetUpdateResult> = z.object({
+  widget: WidgetDTOSchema,
+  appearance: AppearanceOutcomeSchema,
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormWidgetUpdateResult>;
+
+/** What `forms.reorderWidgets` takes on the wire: the widgets of one page and where they go. */
+export const FormWidgetsReorderBodySchema = z
+  .object({ widgets: z.array(AnnotationRefSchema).min(1), position: AnnotationPositionSchema })
+  .strict();
+
+/** A widget stacking-order change: the page's widgets in their new order, as refs. */
+export const FormWidgetsReorderResultSchema: z.ZodType<FormWidgetsReorderResult> = z.object({
+  page: PageRefSchema,
+  order: z.array(AnnotationRefSchema),
+  meta: FormMutationMetaSchema,
 });
 
 export const FormFieldDeleteResultSchema: z.ZodType<FormFieldDeleteResult> = z.object({
-  deletedFieldObjectNumber: z.number().int().positive(),
-  removedWidgets: z.array(FormWidgetSchema),
-  meta: MutationMetaSchema,
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
+  meta: FormMutationMetaSchema,
 });
+
+/** What `forms.reorderCalculations` takes on the wire: the fields and where they go. */
+export const FormCalculationsReorderBodySchema = z
+  .object({ fields: z.array(FormFieldRefSchema).min(1), position: FieldPositionSchema })
+  .strict();
+
+/** A calculation-order change: the form's whole new order. */
+export const FormCalculationsReorderResultSchema: z.ZodType<FormCalculationsReorderResult> =
+  z.object({
+    calculationOrder: z.array(FormFieldRefSchema),
+    meta: FormMutationMetaSchema,
+  });
 
 export const FormWidgetLinkResultSchema: z.ZodType<FormWidgetLinkResult> = z.object({
   field: FormFieldDTOSchema,
-  meta: MutationMetaSchema,
-});
+  widgets: z.array(WidgetDTOSchema),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormWidgetLinkResult>;
+
+export const FormWidgetDeleteResultSchema: z.ZodType<FormWidgetDeleteResult> = z.object({
+  widget: AnnotationRefSchema,
+  page: PageRefSchema,
+  field: FormFieldDTOSchema.nullable(),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormWidgetDeleteResult>;
+
+export const FormWidgetRestoreResultSchema: z.ZodType<FormWidgetRestoreResult> = z.object({
+  field: FormFieldDTOSchema.nullable(),
+  widgets: z.array(WidgetDTOSchema),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormWidgetRestoreResult>;
 
 export const FormRepairResultSchema: z.ZodType<FormRepairResult> = z.object({
   acroformCreated: z.boolean(),
@@ -979,7 +1289,7 @@ export const FormRepairResultSchema: z.ZodType<FormRepairResult> = z.object({
   widgetsLinked: z.number().int().nonnegative(),
   fieldsUnrepairable: z.number().int().nonnegative(),
   appearancesBaked: z.number().int().nonnegative(),
-  needAppearancesCleared: z.boolean(),
+  needsAppearancesCleared: z.boolean(),
   meta: MutationMetaSchema,
 });
 
@@ -990,12 +1300,13 @@ export const FormRepairResultSchema: z.ZodType<FormRepairResult> = z.object({
  */
 export { PdfRectSchema };
 
+/** A page's five boxes in page space: measured from the top-left of the crop box. */
 export const PageBoxesSchema: z.ZodType<PageBoxes> = z.object({
-  media: PdfRectSchema,
-  crop: PdfRectSchema,
-  bleed: PdfRectSchema.optional(),
-  trim: PdfRectSchema.optional(),
-  art: PdfRectSchema.optional(),
+  media: PageBoxSchema,
+  crop: PageBoxSchema,
+  bleed: PageBoxSchema,
+  trim: PageBoxSchema,
+  art: PageBoxSchema,
 });
 
 /**
@@ -1010,6 +1321,7 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   rotation: PdfRotationSchema,
   userUnit: z.number().positive(),
   boxes: PageBoxesSchema,
+  pdfCropBox: PdfRectSchema,
   actions: PdfPageActionsSchema.optional(),
 });
 
@@ -1019,11 +1331,10 @@ export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
   results: z.array(
     z.object({
       page: PageRefSchema,
-      status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
-      error: EngineErrorPayloadSchema.optional(),
+      status: z.enum(['applied', 'unchanged']),
     }),
   ),
-  meta: MutationMetaSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
 /** See `AnnotationFlattenResult`. */
@@ -1033,10 +1344,10 @@ export const AnnotationFlattenResultSchema: z.ZodType<AnnotationFlattenResult> =
   results: z.array(
     z.object({
       ref: AnnotationRefSchema,
-      status: z.enum(['applied', 'skipped']),
+      status: z.enum(['applied', 'unchanged']),
     }),
   ),
-  meta: MutationMetaSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
 /** `annotations.flatten` input — see `AnnotationFlattenInput`. */
@@ -1051,37 +1362,148 @@ export const AnnotationAppearanceExportInputSchema: z.ZodType<AnnotationAppearan
     refs: z.array(AnnotationRefSchema).min(1),
   });
 
+/** `doc.annotations.export` selection — see `AnnotationExportSelection`. */
+export const AnnotationExportSelectionSchema: z.ZodType<AnnotationExportSelection> = z
+  .object({
+    refs: z.array(AnnotationRefSchema).optional(),
+    pages: z.array(PageRefSchema).optional(),
+    include: z.enum(['references', 'threads']).optional(),
+  })
+  .strict();
+
+/**
+ * The body of a POST annotation export: the pins a GET's token carries and
+ * the selection, for one a URL can't carry.
+ */
+export const AnnotationsExportRequestSchema = z
+  .object({
+    annotationsVersion: z.number().int().positive(),
+    layoutVersion: z.number().int().positive(),
+    selection: AnnotationExportSelectionSchema,
+  })
+  .strict();
+
+/** Where an import puts each page of a bundle — see `BundleImportPages`. */
+const BundleImportPagesSchema = z.union([
+  z.literal('same'),
+  z.literal('by-position'),
+  z.array(z.object({ from: PageRefSchema, to: PageRefSchema }).strict()),
+]);
+
+/** `doc.forms.export` selection — see `FormExportSelection`. */
+export const FormExportSelectionSchema: z.ZodType<FormExportSelection> = z
+  .object({
+    fields: z.array(FormFieldRefSchema).optional(),
+    pages: z.array(PageRefSchema).optional(),
+  })
+  .strict();
+
+/**
+ * The body of a POST form export: the pins a GET's token carries and the
+ * selection, for one a URL can't carry.
+ */
+export const FormExportRequestSchema = z
+  .object({
+    formsVersion: z.number().int().positive(),
+    layoutVersion: z.number().int().positive(),
+    selection: FormExportSelectionSchema,
+  })
+  .strict();
+
+/** `doc.forms.import` options on the wire; the `opId` is the `Idempotency-Key` header. */
+export const FormImportOptionsSchema: z.ZodType<Omit<FormImportOptions, 'opId'>> = z
+  .object({
+    pages: BundleImportPagesSchema.optional(),
+    attribution: z.enum(['restore', 'stamp']).optional(),
+    values: z.boolean().optional(),
+  })
+  .strict();
+
+/** `doc.forms.importValues` options on the wire. */
+export const FormValuesImportOptionsSchema: z.ZodType<Omit<FormValuesImportOptions, 'opId'>> = z
+  .object({ attribution: z.enum(['restore', 'stamp']).optional() })
+  .strict();
+
+/** A form bundle's envelope: its rows are the worker's to check, as an annotation bundle's. */
+const FormBundleEnvelopeSchema = z
+  .object({
+    format: z.literal('embedpdf/form'),
+    version: z.literal(1),
+    pages: z.array(z.unknown()),
+    fields: z.array(z.unknown()),
+    widgets: z.array(z.unknown()),
+    calculationOrder: z.array(z.unknown()),
+  })
+  .strict();
+
+/** The `body` part of a form import request. */
+export const FormImportBodySchema: z.ZodType<FormImportBody> = z
+  .object({ bundle: FormBundleEnvelopeSchema, options: FormImportOptionsSchema })
+  .strict() as unknown as z.ZodType<FormImportBody>;
+
+/** The `body` part of a form values import request. */
+export const FormValuesImportBodySchema: z.ZodType<FormValuesImportBody> = z
+  .object({ bundle: FormBundleEnvelopeSchema, options: FormValuesImportOptionsSchema })
+  .strict() as unknown as z.ZodType<FormValuesImportBody>;
+
+/** `doc.annotations.import` options on the wire; the `opId` is the `Idempotency-Key` header. */
+export const AnnotationImportOptionsSchema: z.ZodType<Omit<AnnotationImportOptions, 'opId'>> = z
+  .object({
+    pages: BundleImportPagesSchema.optional(),
+    attribution: z.enum(['restore', 'stamp']).optional(),
+  })
+  .strict();
+
+/**
+ * The `body` part of an import request. Only its envelope is checked
+ * here: the bundle's pages and items are the worker's to check, against the
+ * limits and each kind's create schema.
+ */
+export const AnnotationImportBodySchema: z.ZodType<AnnotationImportBody> = z
+  .object({
+    bundle: z
+      .object({
+        format: z.literal('embedpdf/annotations'),
+        version: z.literal(1),
+        pages: z.array(z.unknown()),
+        items: z.array(z.unknown()),
+      })
+      .strict(),
+    options: AnnotationImportOptionsSchema,
+  })
+  .strict() as unknown as z.ZodType<AnnotationImportBody>;
+
 export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
   pages: z.array(PageRefSchema),
   usage: z.enum(['display', 'print']),
 });
 
-export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> = z.discriminatedUnion(
-  'kind',
-  [
-    z.object({
-      kind: z.literal('pages'),
-      pages: z.array(PageRefSchema),
-    }),
-    z.object({
-      kind: z.literal('annotations'),
-      refs: z.array(AnnotationRefSchema),
-    }),
-  ],
-) as unknown as z.ZodType<RedactionApplyScope>;
+/**
+ * `{ pages }` or `{ annotations }`: one object with exactly one of the two,
+ * so the wire has no untagged union (the API reference labels variants by a
+ * discriminating literal, and a scope has none to add).
+ */
+export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> = z
+  .object({
+    pages: z.array(PageRefSchema).optional(),
+    annotations: z.array(AnnotationRefSchema).optional(),
+  })
+  .strict()
+  .refine((scope) => (scope.pages === undefined) !== (scope.annotations === undefined), {
+    message: 'exactly one of pages or annotations',
+  }) as unknown as z.ZodType<RedactionApplyScope>;
 
 export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.object({
   scope: RedactionApplyScopeSchema,
   results: z.array(
     z.object({
       page: PageRefSchema,
-      status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
+      status: z.enum(['applied', 'unchanged']),
       removedAnnotationCount: z.number().int().nonnegative(),
-      error: EngineErrorPayloadSchema.optional(),
     }),
   ),
   removedAnnotationCount: z.number().int().nonnegative(),
-  meta: MutationMetaSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
 /**
@@ -1102,7 +1524,7 @@ export const NamedPageEntrySchema: z.ZodType<NamedPageEntry> = z.object({
 export const PageListSnapshotSchema: z.ZodType<PageListSnapshot> = z.object({
   pageCount: z.number().int().nonnegative(),
   pages: z.array(PageLayoutSchema),
-  namedPages: z.array(NamedPageEntrySchema).optional(),
+  namedPages: z.array(NamedPageEntrySchema),
 });
 
 /** `pages.setName` input — see `PageNameInput`. */
@@ -1117,43 +1539,32 @@ export const PageRemoveNameInputSchema: z.ZodType<PageRemoveNameInput> = z.objec
   name: z.string().min(1),
 });
 
+/** Page reorder input: the pages, in their new order, and where they go. */
+export const PageReorderInputSchema: z.ZodType<PageReorderInput> = z
+  .object({
+    pages: z.array(PageRefSchema).min(1),
+    position: PagePositionSchema,
+  })
+  .strict();
+
 /**
- * Page reorder input. Pages are addressed by `PageRef`; `destIndex` is the
- * insertion point in the post-removal index space.
+ * Page reorder result. No per-page revision is bumped (they survive a page
+ * reorder). The whole new order is returned so callers swap their snapshot.
  */
-export const PageMoveInputSchema: z.ZodType<PageMoveInput> = z.object({
+export const PageReorderResultSchema: z.ZodType<PageReorderResult> = z.object({
   pages: z.array(PageRefSchema),
-  destIndex: z.number().int().nonnegative(),
-});
-
-/**
- * Coherence pins shared by every page-STRUCTURE result (move/rotate/delete) —
- * see `PageStructureCache`. Nullable at each use site (local engines).
- */
-export const PageStructureCacheSchema: z.ZodType<PageStructureCache> = z.object({
-  previousDocVersion: z.number().int().nonnegative(),
-  docVersion: z.number().int().positive(),
-  layoutVersion: z.number().int().positive(),
-});
-
-/**
- * Page reorder result. No revision is bumped (no doc-level revision exists,
- * and per-page revisions intentionally survive a page reorder). The full
- * post-move order is returned so callers can swap their snapshot directly.
- */
-export const PageMoveResultSchema: z.ZodType<PageMoveResult> = z.object({
   layout: PageListSnapshotSchema,
-  cache: PageStructureCacheSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
 /** Named-page mutation result — layout-shaped, see `PageNameResult`. */
 export const PageNameResultSchema: z.ZodType<PageNameResult> = z.object({
   layout: PageListSnapshotSchema,
-  cache: PageStructureCacheSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
 /**
- * Page rotate input. ABSOLUTE rotation (idempotent — see `PageRotateInput`),
+ * Page rotate input. Absolute rotation (idempotent — see `PageRotateInput`),
  * one value applied to every listed page.
  */
 export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
@@ -1168,7 +1579,7 @@ export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
  */
 export const PageRotateResultSchema: z.ZodType<PageRotateResult> = z.object({
   layout: PageListSnapshotSchema,
-  cache: PageStructureCacheSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
 /** Page delete input. Deleting every page is rejected server/worker-side. */
@@ -1177,22 +1588,25 @@ export const PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({
 });
 
 /**
- * Page delete result. Deleted PONs are retired (never recycled); surviving
+ * Page delete result. Deleted page object numbers are retired (never recycled); surviving
  * pages keep identity + revisions (see `PageDeleteResult`).
  */
 export const PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({
   layout: PageListSnapshotSchema,
-  cache: PageStructureCacheSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
 /**
- * Page insert (bytes) input — the JSON `body` part of the multipart
- * mutation envelope; the PDF itself rides the `resource:source` part.
- * `destIndex` omitted → append.
+ * Page insert (bytes) input — the `body` part of the multipart envelope;
+ * the PDF rides the part `resources.source` names. `position` omitted →
+ * `'end'`.
  */
-export const PageInsertInputSchema: z.ZodType<{ destIndex?: number }> = z.object({
-  destIndex: z.number().int().nonnegative().optional(),
-});
+export const PageInsertInputSchema: z.ZodType<{
+  position?: ListPosition<PageRef>;
+  resources: { source: string };
+}> = z
+  .object({ position: PagePositionSchema.optional(), resources: SourceResourceKeysSchema })
+  .strict();
 
 /**
  * Blank-page insert input — plain JSON, pages.insert minus the bytes.
@@ -1203,14 +1617,14 @@ export const PageInsertInputSchema: z.ZodType<{ destIndex?: number }> = z.object
 export const PageInsertBlankInputSchema: z.ZodType<{
   size: { width: number; height: number };
   count?: number;
-  destIndex?: number;
+  position?: ListPosition<PageRef>;
 }> = z.object({
   size: z.object({
     width: z.number().positive().finite(),
     height: z.number().positive().finite(),
   }),
   count: z.number().int().min(1).max(PAGE_INSERT_BLANK_MAX_COUNT).optional(),
-  destIndex: z.number().int().nonnegative().optional(),
+  position: PagePositionSchema.optional(),
 });
 
 /** Page extract input: the pages to export, in the order they should appear. */
@@ -1220,111 +1634,61 @@ export const PageExtractInputSchema: z.ZodType<{ pages: PageRef[] }> = z.object(
 
 /**
  * Page insert result — shared by bytes-insert and blank-insert: the fresh
- * PONs in insertion order plus the full new layout (see `PageInsertResult`).
+ * page object numbers in insertion order plus the full new layout (see `PageInsertResult`).
  */
 export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
   insertedPages: z.array(PageRefSchema),
   layout: PageListSnapshotSchema,
-  cache: PageStructureCacheSchema.nullable(),
+  meta: MutationMetaSchema,
 });
 
-/**
- * Metadata write result. The Info dict is rewritten in place, so the
- * result returns the re-read `metadata` plus cloud coherence pins. No
- * `layoutVersion` is touched — a metadata edit bumps only `docVersion`
- * and `metadataVersion`. `cache` is `null` for local engines.
- */
-export const AttachmentsCacheSchema: z.ZodType<AttachmentsCache> = z.object({
-  previousDocVersion: z.number().int().nonnegative(),
-  docVersion: z.number().int().positive(),
-  attachmentsVersion: z.number().int().positive(),
+/** See `AttachmentMutationMeta`. */
+export const AttachmentMutationMetaSchema: z.ZodType<AttachmentMutationMeta> = z.object({
+  affectedPages: z.array(PageRefSchema),
+  cacheDelta: CacheDeltaSchema.nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
+  changed: z.array(AttachmentRefSchema),
 });
 
 export const AttachmentCreateResultSchema: z.ZodType<AttachmentCreateResult> = z.object({
-  created: EmbeddedFileItemSchema,
-  cache: AttachmentsCacheSchema.nullable(),
+  attachment: AttachmentSchema,
+  meta: AttachmentMutationMetaSchema,
 });
 
 export const AttachmentDeleteResultSchema: z.ZodType<AttachmentDeleteResult> = z.object({
-  deleted: EmbeddedFileRefSchema,
-  cache: AttachmentsCacheSchema.nullable(),
+  meta: AttachmentMutationMetaSchema,
 });
 
+/** See `AttachmentList`. */
+export const AttachmentListSchema: z.ZodType<AttachmentList> = z.object({
+  attachments: z.array(AttachmentSchema),
+});
+
+/**
+ * Metadata write result: the re-read `metadata`. On the cloud,
+ * `meta.cacheDelta` advances only `docVersion` and `metadataVersion`.
+ */
 export const MetadataUpdateResultSchema: z.ZodType<MetadataUpdateResult> = z.object({
   metadata: DocumentMetadataSchema,
-  cache: z
-    .object({
-      previousDocVersion: z.number().int().nonnegative(),
-      docVersion: z.number().int().positive(),
-      metadataVersion: z.number().int().positive(),
-    })
-    .nullable(),
+  meta: MutationMetaSchema,
 });
 
-export const WeakAnnotationSessionResponseSchema = z.object({
-  sessionId: z.string().min(1),
-  expiresAt: z.number().int().positive(),
-  heartbeatIntervalMs: z.number().int().positive(),
-  pages: z.array(PageRefSchema),
+export const CustomMetadataUpdateResultSchema: z.ZodType<CustomMetadataUpdateResult> = z.object({
+  custom: CustomMetadataSchema,
+  meta: MutationMetaSchema,
 });
-export type WeakAnnotationSessionResponse = z.infer<typeof WeakAnnotationSessionResponseSchema>;
-
-export const WeakAnnotationSessionPagesRequestSchema = z.object({
-  pages: z.array(PageRefSchema),
-});
-export type WeakAnnotationSessionPagesRequest = z.infer<
-  typeof WeakAnnotationSessionPagesRequestSchema
->;
 
 // ---------------------------------------------------------------------------
 // Digital signatures: the JSON forms of the two-phase signing DTOs.
 //
 // `SignaturePrepared.digest` and `SignatureCompleteInput.cms` are bytes;
 // `JSON.stringify` turns a typed array into an index-keyed object, which
-// the completion gate then rejects. These codecs are the ONE definition
+// the completion gate then rejects. These codecs are the one definition
 // the HTTP bodies and the server's durable `prepared_json` share.
 // ---------------------------------------------------------------------------
 
-const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-/** Standard base64 (padded). Dependency-free: no Buffer, runs in browsers too. */
-export function toBase64(bytes: Uint8Array): string {
-  let out = '';
-  for (let i = 0; i < bytes.length; i += 3) {
-    const b0 = bytes[i];
-    const b1 = bytes[i + 1];
-    const b2 = bytes[i + 2];
-    out += BASE64_ALPHABET[b0 >> 2];
-    out += BASE64_ALPHABET[((b0 & 0x03) << 4) | ((b1 ?? 0) >> 4)];
-    out += b1 === undefined ? '=' : BASE64_ALPHABET[((b1 & 0x0f) << 2) | ((b2 ?? 0) >> 6)];
-    out += b2 === undefined ? '=' : BASE64_ALPHABET[b2 & 0x3f];
-  }
-  return out;
-}
-
-export function fromBase64(encoded: string): Uint8Array {
-  // Scan backward to avoid regex backtracking on long runs of interior padding.
-  let end = encoded.length;
-  while (end > 0 && encoded[end - 1] === '=') {
-    end -= 1;
-  }
-  const clean = encoded.slice(0, end);
-  if (clean.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(clean)) {
-    throw new Error('malformed base64');
-  }
-  const bytes: number[] = [];
-  let buffer = 0;
-  let bits = 0;
-  for (const ch of clean) {
-    buffer = (buffer << 6) | BASE64_ALPHABET.indexOf(ch);
-    bits += 6;
-    if (bits >= 8) {
-      bits -= 8;
-      bytes.push((buffer >> bits) & 0xff);
-    }
-  }
-  return Uint8Array.from(bytes);
-}
+export { fromBase64, toBase64 };
 
 const Base64Schema = z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/, 'base64');
 
@@ -1403,7 +1767,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   index: z.number().int().nonnegative(),
   field: FormFieldRefSchema,
   fieldName: z.string(),
-  widget: FormWidgetSchema.nullable(),
+  widget: FormFieldWidgetSchema.nullable(),
   signed: z.boolean(),
   kind: z.enum(['signature', 'timestamp']),
   filter: z.string().nullable(),
@@ -1417,7 +1781,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
     reason: z.string().nullable(),
     location: z.string().nullable(),
     contactInfo: z.string().nullable(),
-    claimedTime: z.string().nullable(),
+    signedAt: IsoDateTimeSchema.nullable(),
   }),
   docMdp: DocMdpPermissionSchema.nullable(),
   catalogCertification: z.boolean(),
@@ -1470,8 +1834,8 @@ export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> =
   meta: MutationMetaSchema,
 });
 
-export const SignatureAbortResultSchema: z.ZodType<SignatureAbortResult> = z.object({
-  status: z.enum(['aborted', 'already-completed', 'unknown']),
+export const SignatureCancelResultSchema: z.ZodType<SignatureCancelResult> = z.object({
+  status: z.enum(['cancelled', 'already-completed', 'unknown']),
 });
 
 const ChangeFindingSchema = z.object({
@@ -1525,24 +1889,23 @@ export const ChangeAnalysisSchema = z.object({
   steps: z.array(z.unknown()),
 }) as unknown as z.ZodType<ChangeAnalysis>;
 
-const SignatureAttributionSchema = z.object({
+const SignatureSignerInputSchema = z.object({
   name: z.string().optional(),
   reason: z.string().optional(),
   location: z.string().optional(),
   contactInfo: z.string().optional(),
+  signedAt: IsoDateTimeSchema.optional(),
 });
 
-/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the PDF, and its page. */
+/** The `body` part of a visual signature fill: which part holds the one-page PDF. */
 export const SignatureAppearanceBodySchema = z.object({
-  resource: z.string().min(1),
-  pageIndex: z.number().int().nonnegative().optional(),
+  resources: AppearanceResourceKeysSchema,
 });
 export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
 
 /**
- * The JSON part of a prepare (multipart envelope): `SignaturePrepareInput`
- * with the appearance artwork referenced by its resource part instead of
- * inline bytes.
+ * The `body` part of a prepare: `SignaturePrepareInput` with the
+ * appearance artwork named by the key of its part instead of inline bytes.
  */
 export const SignaturePrepareBodySchema = z.object({
   field: FormFieldRefSchema,
@@ -1550,15 +1913,10 @@ export const SignaturePrepareBodySchema = z.object({
   subFilter: z.enum(['adbe.pkcs7.detached', 'ETSI.CAdES.detached']).optional(),
   digest: z.enum(['sha256', 'sha384', 'sha512']).optional(),
   contentsSize: z.number().int().positive().optional(),
-  attribution: SignatureAttributionSchema.optional(),
-  /** @deprecated the pre-rename spelling of `attribution`; servers read either. */
-  signer: SignatureAttributionSchema.optional(),
-  signingTime: z.string().optional(),
+  signer: SignatureSignerInputSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
-  appearance: z
-    .object({ resource: z.string().min(1), pageIndex: z.number().int().nonnegative().optional() })
-    .optional(),
+  resources: AppearanceResourceKeysSchema.optional(),
 });
 export type SignaturePrepareBody = z.infer<typeof SignaturePrepareBodySchema>;
 

@@ -1,0 +1,82 @@
+---
+title: Menus over the page
+description: Attach your own UI to a spot on a page, such as a selection, an annotation or a search match, and keep it there while people scroll and zoom.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Menus over the page
+
+A menu next to selected text, a card next to an annotation, a button over a search match: UI that
+belongs to a spot on the page, but floats above it. `<Anchored>` places your UI at a spot, and keeps it
+there while people scroll, zoom and rotate. <Fw only="react">Put it in the Stage's `overlay`:</Fw><Fw only="vue">Put it in the Stage's `#overlay` slot:</Fw><Fw only="svelte">Put it in the Stage's `overlay` snippet:</Fw><Fw only="angular">Put it inside `<epdf-stage>`, next to the page template:</Fw>
+
+<Snippet name="ui/stage-overlay" />
+
+The anchor is a box on a page, in page coordinates: the same `page` and `bounds` every plugin gives
+you. The overlay moves with the view in the same frame as the pages, so your menu never lags behind.
+
+<Example name="anchored/overlay" />
+
+## Ready-made menus
+
+Most menus follow something that's already on the page. These place themselves:
+
+| Component                | Attaches to                                  | Page                                                         |
+| :----------------------- | :------------------------------------------- | :----------------------------------------------------------- |
+| `<SelectionMenu>`        | The selected text                            | [Selecting & copying](../text/selection#add-a-selection-menu) |
+| `<AnnotationMenu>`       | The selected annotations                     | [Selecting & editing](../annotations/selecting#add-a-menu)   |
+| `<AnnotationDraftMenu>`  | A polygon or polyline being drawn            | [Selecting & editing](../annotations/selecting#shapes-with-many-points) |
+
+They hide while people drag, and show when the selection settles. What's inside is yours.
+
+## Attach to an annotation
+
+`useAnnotationAnchor(ref)` gives you an annotation's anchor, and follows it while it's moved. A count
+of replies next to a note stays put, so it's `pinned`:
+
+<Snippet name="ui/reply-count" />
+
+<Fw only={['vue', 'svelte']}>
+
+Pass the ref as a function, and the anchor and the thread follow `note` when it changes.
+
+</Fw>
+
+<Fw only="angular">
+
+Pass the ref as a function, and the anchor and the thread follow the `note` input when it changes.
+
+</Fw>
+
+## Where it goes
+
+| Prop        | What it is                                                           | Default  |
+| :---------- | :------------------------------------------------------------------- | :------- |
+| `anchor`    | `{ page, bounds }`, or `null` to hide. `avoid` adds points to keep clear of, such as a rotation handle | required |
+| `placement` | `'top'`, `'bottom'`, `'left'` or `'right'` of the box, centred on that side, or lined up with its start or end: `'top-start'`, `'top-end'`, `'right-start'` and so on | `'top'`  |
+| `gap`       | The space between the box and your UI, in pixels. Negative overlaps the box, for a badge on a corner | `8`      |
+| `pinned`    | Stays exactly where `placement` puts it: no flipping, no moving to stay in view | `false`  |
+
+When there's no room on the side you chose, it flips to the other side, and it stays inside the view.
+That's right for a menu. A badge or a status belongs on its spot, so pin it: it stays there and
+scrolls away with its box. Scroll the match close to an edge, then turn on **Pinned**:
+
+<Example name="anchored/placement" />
+
+## Good to know
+
+### Only what's on screen costs anything
+
+Anchored UI on a page that isn't on screen isn't drawn, and doesn't follow the scroll or the zoom.
+Mount one for every annotation that needs it; a document with hundreds costs only the ones in view.
+
+### Clicks stay in your menu
+
+A click in an anchored menu never reaches the page underneath, so it doesn't clear the selection or
+start a drag.
+
+### In a PageView
+
+Inside a [PageView](../viewing/page-view), anchored UI is placed above everything else on your page,
+so a scrolling list or a card can't cut it off.

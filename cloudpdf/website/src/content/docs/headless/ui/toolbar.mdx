@@ -1,0 +1,163 @@
+---
+title: Toolbar
+description: A toolbar that fits itself to the space it has, shrinking buttons and moving them into a menu instead of wrapping, with every pixel yours.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Toolbar
+
+A viewer's toolbar has to fit a phone and a wide screen. `<Toolbar>` takes a list of what should be in
+it, measures what fits, and makes room when it has to: labels become icons, a group folds into one
+button, and what's left over goes into a "More" menu. You draw every button.
+
+The items are [commands](commands), so each one already knows its label, icon, whether it's enabled,
+and what it does. These are from the [standard commands](commands#the-standard-commands):
+
+<Snippet name="ui/toolbar" />
+
+<Example name="toolbar/basic" />
+
+Resize the window, and the toolbar adjusts on its own. It measures real rendered widths, so a longer
+translation or a bigger font just works.
+
+## How it makes room
+
+When the items don't fit, the toolbar takes these steps, in order, until they do:
+
+1. **An item gets smaller**: from its first `variant` to the next, such as `'icon+label'` to `'icon'`.
+2. **A group folds** into one button with a menu, when it has `collapse: 'menu'`, or into a dropdown
+   with `collapse: 'select'`.
+3. **An item moves into the "More" menu**, the least important first.
+
+`importance` decides the order, from `1` (goes first) to `5` (never leaves the bar):
+
+```ts
+item('document:download', { importance: 5 }); // always visible
+group('annotate', ['tool:note', 'tool:ink'], { importance: 2 });
+```
+
+## Sections
+
+`start`, `center` and `end` are the toolbar's left, middle and right. The center stays centered in the
+space the other two leave. In a right-to-left language, `start` and `end` swap sides.
+
+## Your own items
+
+Not everything is a command: a page number input, a search box. Put a custom item in the bar and draw
+it:
+
+<Snippet name="ui/toolbar-custom" />
+
+<Example name="toolbar/custom-item" />
+
+The second argument, `'page:go-to'` (a command of your own that opens a "Go to page" dialog), is what
+the item becomes in the "More" menu when there's no room for it. `variants` lets it get smaller first, like a command's variants.
+
+<Fw only="react">
+
+`renderCustom` has one renderer per item name. A renderer that returns `undefined` draws the item's
+command as a button instead. An item with no renderer is a native `<slot name>` element with that
+button inside: in a web component, the host's children for that slot show there.
+
+</Fw>
+
+<Fw only="vue">
+
+The `#custom` slot draws every custom item, by `name`. Where it draws nothing for one (a `v-if` that
+doesn't match), the item's command shows as a button instead. Without the slot, each item is a native
+`<slot name>` element with that button inside: in a web component, the host's children for that slot
+show there.
+
+</Fw>
+
+<Fw only="svelte">
+
+The `custom` snippet draws every custom item, by `name`, so draw something for each one: a snippet
+can't fall back, and an item it skips shows nothing. Without the snippet, each item is a native
+`<slot name>` element with the item's command as a button inside: in a web component, the host's
+children for that slot show there.
+
+</Fw>
+
+<Fw only="angular">
+
+Each `epdfToolbarCustom="name"` template draws the item of that name. An item with no template is a
+native `<slot name>` element with its command as a button inside: in a web component, the host's
+children for that slot show there.
+
+</Fw>
+
+## Draw every part
+
+| Prop                    | Draws                                                                  |
+| :---------------------- | :--------------------------------------------------------------------- |
+| `renderCommand`         | A button, for a command and its variant                                |
+| `renderCustom`          | Your own items, by name                                                |
+| `renderCollapsed`       | A folded group: its button and its menu                                |
+| `renderSeparator`       | The line between groups                                                |
+| `renderOverflowTrigger` | The "More" button                                                      |
+| `renderOverflowMenu`    | The "More" menu, with its sections, items and the call to run each one |
+
+<Fw only="react">
+
+Every prop you leave out has a plain default, so you can start with `renderCommand` and add the rest as
+you style them. `renderCollapsed` and `renderGroupTrigger` can return `undefined` for a group to leave
+it to the default. `gap` and `separatorWidth` set the spacing, and `className` and `style` go on the
+toolbar itself.
+
+</Fw>
+
+<Fw only="vue">
+
+Every slot you leave out has a plain default, so you can start with `#command` and add the rest as
+you style them. A slot that draws nothing for a part leaves that part to the default. `gap` and
+`separator-width` set the spacing, and `class` and `style` go on the toolbar itself.
+
+</Fw>
+
+<Fw only="svelte">
+
+Every snippet you leave out has a plain default, so you can start with `command` and add the rest as
+you style them. A snippet you pass draws every part of its kind. `gap` and `separatorWidth` set the
+spacing, and `class` and `style` go on the toolbar itself.
+
+</Fw>
+
+<Fw only="angular">
+
+Every template you leave out has a plain default, so you can start with `epdfToolbarCommand` and add
+the rest as you style them. A template you give draws every part of its kind. `gap` and
+`separatorWidth` set the spacing, and a `class` or `style` on `<epdf-toolbar>` styles the toolbar
+itself.
+
+</Fw>
+
+## A toolbar per mode
+
+Most viewers change the toolbar with what people do: annotation tools while annotating, field tools
+while building a form. Keep a bar per mode and pick one from your state:
+
+<Snippet name="ui/toolbar-mode" />
+
+<Example name="toolbar/modes" />
+
+## Good to know
+
+### Commands keep the buttons right
+
+Because the items are commands, a button disables itself when its command can't run, shows as pressed
+when it's active, and hides when the command isn't visible, with no code in the toolbar. Change a
+permission or open a document, and the toolbar follows.
+
+### Labels in the user's language
+
+A command's label comes through [translations](translations), so the toolbar is in the user's language
+and re-measures when it changes.
+
+### The default look
+
+When you don't draw a part yourself, the toolbar draws a plain one. Its colors come from CSS only,
+because you're meant to replace them: `--epdf-toolbar-surface` (the "More" menu and folded groups,
+`#ffffff`), `--epdf-toolbar-border` (`rgb(0 0 0 / 0.15)`) and `--epdf-toolbar-active` (a pressed or
+open button, `rgb(0 0 0 / 0.12)`).

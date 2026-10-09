@@ -1,30 +1,37 @@
 /**
- * The workspace/document split, Angular-style:
- *   - workspace chrome (tabs, open button) renders unconditionally — alive
- *     while WASM still compiles;
- *   - document UI (toolbar, stage) sits behind @if (documentId()) — the app's
- *     own template, so creation genuinely defers (eager content projection
- *     can't bite here).
+ * The document UI: the toolbar and the Stage, behind `*epdfDocumentGate`, which creates them
+ * only once a document is ready and shows the fallback until then.
  */
-import { afterNextRender, ChangeDetectionStrategy, Component } from '@angular/core';
-import { injectDocumentId, injectDocuments, injectKernelHost } from '@embedpdf/angular/runtime';
-import { EpdfPageChrome, EpdfPageTemplate, EpdfStage } from '@embedpdf/angular/stage';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { EpdfDocumentGate, EpdfViewer } from '@embedpdf/angular/runtime';
 import { EpdfRenderLayer } from '@embedpdf/angular/render';
-import { sampleSource } from './engine';
+import { EpdfPageChrome, EpdfPageTemplate, EpdfStage } from '@embedpdf/angular/stage';
 import { Toolbar } from './toolbar';
-import { DocTabs } from './doc-tabs';
 
 @Component({
   selector: 'app-workspace',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EpdfStage, EpdfPageTemplate, EpdfPageChrome, EpdfRenderLayer, Toolbar, DocTabs],
+  imports: [
+    EpdfDocumentGate,
+    EpdfStage,
+    EpdfPageTemplate,
+    EpdfPageChrome,
+    EpdfRenderLayer,
+    Toolbar,
+  ],
   styles: `
     :host {
       display: flex;
       flex-direction: column;
-      height: 100%;
+      flex: 1;
+      min-height: 0;
       background: #e8e8ec;
+    }
+    .document {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
     }
     .stage {
       flex: 1;
@@ -48,12 +55,9 @@ import { DocTabs } from './doc-tabs';
     }
   `,
   template: `
-    <!-- workspace chrome: outside the gate, alive from t≈0 -->
-    <app-doc-tabs />
-    @if (documentId()) {
-      <!-- document UI: defined over a document, so gated on having one -->
-      <app-toolbar />
-      <epdf-stage class="stage">
+    <div *epdfDocumentGate="let document; fallback: empty" class="document">
+      <app-toolbar [stage]="stage" />
+      <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
         </ng-template>
@@ -61,25 +65,15 @@ import { DocTabs } from './doc-tabs';
           <div class="page-label">{{ page.pageIndex() + 1 }}</div>
         </ng-template>
       </epdf-stage>
-    } @else {
+    </div>
+
+    <ng-template #empty>
       <div class="empty">
-        {{ ready() ? 'Opening document…' : 'Starting engine…' }}
+        {{ viewer.status() === 'ready' ? 'Opening document…' : 'Starting engine…' }}
       </div>
-    }
+    </ng-template>
   `,
 })
 export class Workspace {
-  protected readonly documentId = injectDocumentId();
-  protected readonly ready = injectKernelHost().ready;
-  private readonly documents = injectDocuments();
-
-  constructor() {
-    // First document: after first render — inputs are set, we're in the
-    // browser, and the open() awaits the deferred engine internally.
-    afterNextRender(() => {
-      void (async () => {
-        await this.documents.open(await sampleSource('ebook', '/ebook.pdf'), { name: 'Ebook' });
-      })().catch((err) => console.error('[example] open failed', err));
-    });
-  }
+  protected readonly viewer = inject(EpdfViewer);
 }

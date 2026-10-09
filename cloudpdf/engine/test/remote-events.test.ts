@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { toPageRef, type DocumentEvent, type HighlightDraft } from '@embedpdf/engine-core/runtime';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -29,10 +29,10 @@ const DOC_ID = 'sample-pdf-remote-events-cloud';
 
 const QUAD: HighlightDraft['quadPoints'] = [
   {
-    p1: { x: 50, y: 100 },
-    p2: { x: 150, y: 100 },
-    p3: { x: 50, y: 80 },
-    p4: { x: 150, y: 80 },
+    upperLeft: { x: 50, y: 100 },
+    upperRight: { x: 150, y: 100 },
+    lowerLeft: { x: 50, y: 80 },
+    lowerRight: { x: 150, y: 80 },
   },
 ];
 
@@ -56,11 +56,11 @@ afterAll(async () => {
 describe('remote events: two engines, one document (the collaboration loop)', () => {
   test("A mutates → B receives kind:'remote' with A's payload; A gets NO echo", async () => {
     if (!fx) throw new Error('fixture not initialised');
-    const engineA = createCloudEngine({
+    const engineA = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });
-    const engineB = createCloudEngine({
+    const engineB = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });
@@ -75,8 +75,8 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docA.pages.list();
-      const pon = list.pages[0].ref.pageObjectNumber;
-      const rotated = await docA.pages.rotate([toPageRef(pon)], 90);
+      const pageObjectNumber = list.pages[0].ref.objectNumber;
+      const rotated = await docA.pages.rotate([toPageRef(pageObjectNumber)], 90);
 
       // A: exactly one event, its own, local.
       await waitFor(() => eventsA.length >= 1, "A's local event");
@@ -92,9 +92,9 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       expect(typeof remote.origin.serverId).toBe('number');
       if (remote.type === 'pages.rotated') {
         expect(remote.rotation).toBe(90);
-        expect(remote.pages).toEqual([toPageRef(pon)]);
+        expect(remote.pages).toEqual([toPageRef(pageObjectNumber)]);
         expect(remote.layout).toEqual(rotated.layout);
-        expect(remote.cache).toEqual(rotated.cache);
+        expect(remote.meta).toEqual(rotated.meta);
       }
       // Provenance: the remote event names A's engine instance.
       expect(remote.origin.sessionId).toBe(eventsA[0].origin.sessionId);
@@ -106,7 +106,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       // And B's manifest absorbed the pins: a follow-up read on B sees the
       // rotation without a manual refresh.
       const listB = await docB.pages.list();
-      expect(listB.pages.find((p) => p.ref.pageObjectNumber === pon)?.rotation).toBe(90);
+      expect(listB.pages.find((p) => p.ref.objectNumber === pageObjectNumber)?.rotation).toBe(90);
     } finally {
       await docA.close();
       await docB.close();
@@ -117,11 +117,11 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
 
   test('B mutates back: the channel is symmetric', async () => {
     if (!fx) throw new Error('fixture not initialised');
-    const engineA = createCloudEngine({
+    const engineA = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });
-    const engineB = createCloudEngine({
+    const engineB = cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });
@@ -133,21 +133,61 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await new Promise((r) => setTimeout(r, 300));
 
       const list = await docB.pages.list();
-      const pon = list.pages[0].ref.pageObjectNumber;
+      const pageObjectNumber = list.pages[0].ref.objectNumber;
       const created = await docB
-        .page(toPageRef(pon))
+        .page(toPageRef(pageObjectNumber))
         .annotations.create({ subtype: 'highlight', contents: 'from B', quadPoints: QUAD });
 
       await waitFor(() => eventsA.length >= 1, "A's remote annotation event");
       const remote = eventsA[0];
       expect(remote.origin.kind).toBe('remote');
-      expect(remote.type).toBe('annotation.created');
-      if (remote.type === 'annotation.created') {
-        expect(remote.created).toEqual(created.created);
-        // The remote meta carries the SAME cloud-stable revision tokens A
-        // would get from its own reads — the finalize-in-txn work, visible.
+      expect(remote.type).toBe('annotations.created');
+      if (remote.type === 'annotations.created') {
+        expect(remote.annotation).toEqual(created.annotation);
+        // The remote meta is the finalized result B received — the
+        // finalize-in-txn work, visible.
         expect(remote.meta).toEqual(created.meta);
       }
+    } finally {
+      await docA.close();
+      await docB.close();
+      await engineA.destroy();
+      await engineB.destroy();
+    }
+  });
+
+  test("custom keys: B hears A's write as metadata.customUpdated and its next read sees it", async () => {
+    if (!fx) throw new Error('fixture not initialised');
+    const engineA = cloudEngine({
+      baseUrl: fx.baseUrl,
+      token: docScopedToken(fx, TENANT_ID, DOC_ID),
+    });
+    const engineB = cloudEngine({
+      baseUrl: fx.baseUrl,
+      token: docScopedToken(fx, TENANT_ID, DOC_ID),
+    });
+    const docA = await engineA.open({ kind: 'id', id: DOC_ID });
+    const docB = await engineB.open({ kind: 'id', id: DOC_ID });
+    try {
+      // B reads first, so its cached manifest points at the old leaf.
+      const before = await docB.metadata.custom.get();
+      expect(before['RemoteKey']).toBeUndefined();
+      const eventsB: DocumentEvent[] = [];
+      docB.events.subscribe((event) => eventsB.push(event));
+      await new Promise((r) => setTimeout(r, 300));
+
+      const written = await docA.metadata.custom.update({ RemoteKey: 'from A' });
+
+      await waitFor(() => eventsB.length >= 1, "B's remote custom-metadata event");
+      const remote = eventsB[0];
+      expect(remote.origin.kind).toBe('remote');
+      expect(remote.type).toBe('metadata.customUpdated');
+      if (remote.type === 'metadata.customUpdated') {
+        expect(remote.custom).toEqual(written.custom);
+        expect(remote.meta).toEqual(written.meta);
+      }
+      // The event's pins moved B to the new leaf: no manual refresh.
+      expect((await docB.metadata.custom.get())['RemoteKey']).toBe('from A');
     } finally {
       await docA.close();
       await docB.close();

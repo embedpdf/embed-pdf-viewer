@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLocalEngine } from '@embedpdf/engine';
-import { createCloudEngine } from '@cloudpdf/engine';
+import { cloudEngine } from '@cloudpdf/engine';
 import { signDevToken, defaultWorkerEntryUrl, type AppBundle } from '@cloudpdf/server';
 import { buildAppForTesting } from '../../../cloudpdf/server/src/app/buildApp.ts';
 import { createValidTestLicenseGate } from '../../../cloudpdf/server/src/licensing/testing.ts';
@@ -28,7 +28,7 @@ try {
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   const local = await createLocalEngine({ runtime: { prefer: 'auto' } });
-  const cloud = createCloudEngineSync(baseUrl);
+  const cloud = cloudEngineSync(baseUrl);
 
   const localResult = await runEngineDemo('local (node, native)', local, bytes, 'sample-pdf-local');
   const cloudResult = await runEngineDemo(
@@ -55,8 +55,8 @@ try {
   if (bundle) await bundle.shutdown();
 }
 
-function createCloudEngineSync(baseUrl: string) {
-  return createCloudEngine({
+function cloudEngineSync(baseUrl: string) {
+  return cloudEngine({
     baseUrl,
     token: signDevToken(SECRET, { sub: 'demo', tenant_id: 'demo-tenant' }),
   });

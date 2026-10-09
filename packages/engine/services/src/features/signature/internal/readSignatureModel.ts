@@ -1,6 +1,7 @@
 import type {
   DocMdpPermission,
   FieldLockSpec,
+  IsoDateTime,
   PdfRevision,
   RevisionField,
   RevisionStructure,
@@ -14,8 +15,10 @@ import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runt
 
 import { withScratch, withScratchN } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
+import { pdfDateToIso } from '../../../shared/pdf-date';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
-import { readFormSnapshot, widgetPageRef } from '../../forms/internal/readFormSnapshot';
+import { readFormFields, widgetPageRef } from '../../forms/internal/readFormSnapshot';
+import { fieldObjectNumberOf } from '../../forms/internal/resolveFieldRef';
 
 // Mirrors public/epdf_signature.h.
 const KIND_DOC_TIMESTAMP = 1;
@@ -163,7 +166,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
     const docMdp = fn.EPDFSig_GetDocMDPPermission(model, i);
     out.push({
       index: i,
-      field: { kind: 'objectNumber', fieldObjectNumber: fn.EPDFSig_GetFieldObjNum(model, i) },
+      field: { kind: 'objectNumber', objectNumber: fn.EPDFSig_GetFieldObjNum(model, i) },
       fieldName: readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldName(model, i, buf, cap)) ?? '',
       widget:
         widgetObjNum > 0
@@ -182,7 +185,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
         reason: str(i, STRING_REASON),
         location: str(i, STRING_LOCATION),
         contactInfo: str(i, STRING_CONTACT_INFO),
-        claimedTime: str(i, STRING_M),
+        signedAt: signedAtOf(str(i, STRING_M)),
       },
       docMdp: isPermission(docMdp) ? docMdp : null,
       catalogCertification: fn.EPDFSig_IsCatalogCertification(model, i),
@@ -298,16 +301,17 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
   const formModel = fn.EPDFForm_LoadModel(docPtr);
   if (formModel !== NULL_PTR) {
     try {
-      const snapshot = readFormSnapshot(runtime, formModel, docPtr);
-      for (const f of snapshot.fields) {
+      const snapshot = readFormFields(runtime, formModel, docPtr);
+      // The snapshot lists the model's fields in model order.
+      snapshot.fields.forEach((f, index) => {
         fields.push({
-          objectNumber: f.fieldObjectNumber,
+          objectNumber: fieldObjectNumberOf(f),
           name: f.name,
           family: f.family,
-          widgets: f.widgets.map((w) => w.annotObjectNumber),
-          flags: f.flags.raw,
+          widgets: f.widgets.map((w) => w.objectNumber),
+          flags: fn.EPDFForm_GetFieldFlags(formModel, index),
         });
-      }
+      });
     } finally {
       fn.EPDFForm_CloseModel(formModel);
     }
@@ -316,4 +320,9 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
     readSignaturesFromModel(runtime, model),
   );
   return { root, acroForm, pagesRoot, pages, fields, signatures };
+}
+
+/** `/M` as `IsoDateTime`; `null` when absent or not a date. */
+function signedAtOf(raw: string | null): IsoDateTime | null {
+  return raw ? pdfDateToIso(raw) : null;
 }

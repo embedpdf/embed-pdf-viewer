@@ -1,4 +1,5 @@
 import {
+  releasedMarkdownSource,
   renderDocsMarkdownWith,
   resolveDocsTreeWith,
   stringifyDocsTree,
@@ -17,6 +18,7 @@ import {
 } from './docs-integrations';
 import { projectEmbedPdfComponent } from './site-markdown';
 import { docsProductFromPath, type DocsProduct } from './docs-products';
+import { reactVersionHref, type DocsRelease } from './docs-release';
 import { collectSampleFiles, readDocsCodeFile } from './docs-samples';
 import { SITE_ORIGIN } from './site';
 
@@ -27,6 +29,8 @@ export type RenderDocsMarkdownOptions = {
   canonicalPath: string;
   integration?: DocsIntegration;
   metadata?: { title?: unknown; description?: unknown };
+  /** What the route shows (`./docs-release`). Without it, the page in full. */
+  release?: DocsRelease;
 };
 
 /** This site's binding of the kit's Markdown projection. */
@@ -56,7 +60,7 @@ export function resolveDocsTree({
   sourceCode,
   canonicalPath,
   integration,
-}: Omit<RenderDocsMarkdownOptions, 'metadata'>): {
+}: Pick<RenderDocsMarkdownOptions, 'sourceCode' | 'canonicalPath' | 'integration'>): {
   tree: AstNode;
   product: DocsProduct | null;
 } {
@@ -67,16 +71,29 @@ export function resolveDocsTree({
 
 export { stringifyDocsTree };
 
-/** Produces plain, route-specific Markdown from Nextra's raw MDX source. */
+/**
+ * Produces plain, route-specific Markdown from Nextra's raw MDX source: what the route's page
+ * shows, in full or held back by the publish gate.
+ */
 export function renderDocsMarkdown({
   sourceCode,
   canonicalPath,
   integration,
   metadata,
+  release,
 }: RenderDocsMarkdownOptions) {
   const product = docsProductFromPath(canonicalPath);
+  const react = release && reactVersionHref(canonicalPath, release);
   return renderDocsMarkdownWith(site, {
-    sourceCode,
+    sourceCode: release
+      ? releasedMarkdownSource({
+          sourceCode,
+          title: typeof metadata?.title === 'string' ? metadata.title : undefined,
+          framework: isHeadlessIntegration(integration) ? integration : undefined,
+          release,
+          reactUrl: react ? `${SITE_ORIGIN}${react}` : null,
+        })
+      : sourceCode,
     canonicalPath,
     integration,
     metadata,

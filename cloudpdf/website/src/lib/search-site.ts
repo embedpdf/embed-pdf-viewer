@@ -8,10 +8,11 @@ import {
   type FanoutDocsProduct,
 } from './docs-integrations';
 import { resolveDocsTree } from './docs-markdown';
+import { docsRelease } from './docs-release';
 
 /**
  * CloudPDF's binding of the kit search extractor. Sections resolve through
- * the SAME markdown pass that renders the `.md` export — which is how the
+ * the same markdown pass that renders the `.md` export — which is how the
  * API reference gets indexed for free: `<ApiOperation>` pages project their
  * real summaries, parameters, and responses through the same
  * `projectCloudPdfComponent` hook the `.md` route uses.
@@ -25,6 +26,9 @@ export const searchExtractSite: SearchExtractSite = {
     }
     return [undefined];
   },
+  // A page the publish gate holds back for a framework isn't indexed for it.
+  publishedIntegrations: (contentPath, integrations) =>
+    integrations.filter((integration) => docsRelease(contentPath.split('/'), integration).live),
 };
 
 /**

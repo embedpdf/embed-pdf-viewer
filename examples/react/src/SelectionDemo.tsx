@@ -12,12 +12,12 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import {
   PageView,
-  PagePointerSource,
   RenderLayer,
   SelectionLayer,
   Viewer,
+  useInteraction,
+  useInteractionState,
   useSelection,
-  useTool,
   interactionPlugin,
   selectionPlugin,
   renderPlugin,
@@ -32,11 +32,12 @@ const PAGES = [0, 1, 2];
 const WIDTH = 760;
 
 function Toolbar() {
-  const { activeToolId, activate } = useTool();
+  const interaction = useInteraction();
+  const { activeToolId } = useInteractionState();
   const selection = useSelection();
   const btn = (id: string, label: string) => (
     <button
-      onClick={() => activate(id)}
+      onClick={() => interaction.activateTool(id)}
       style={{
         padding: '6px 12px',
         borderRadius: 6,
@@ -86,10 +87,9 @@ function Shell() {
       <div style={{ flex: 1, overflow: 'auto', background: '#f3f4f6', padding: 24 }}>
         {PAGES.map((i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-            <PageView pageIndex={i} width={WIDTH}>
+            <PageView page={i} width={WIDTH}>
               <RenderLayer />
               <SelectionLayer />
-              <PagePointerSource />
             </PageView>
           </div>
         ))}

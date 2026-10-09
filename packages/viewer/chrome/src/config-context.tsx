@@ -1,6 +1,6 @@
 /**
  * The resolved customization, as React context. The chrome schema and the
- * user's extra icons are RESOLVED ONCE in <FullViewer> and read here by the
+ * user's extra icons are resolved once in <FullViewer> and read here by the
  * shell, menus, and strips — no component imports the default schema value
  * directly, so "the host replaced the chrome" is invisible below this line.
  *
@@ -12,6 +12,7 @@ import type { BarSchema, ChromeSchema, MenuSchema } from '@embedpdf/react/toolba
 import { defaultChrome, getMenu, getModeBar, getStrip } from './config/chrome';
 import type { IconDef } from './ui/icons';
 import type { SignatureMode, SignerPort, TrustPort } from '@embedpdf/react/signature';
+import type { StampAssetEngine } from '@embedpdf/react/stamp';
 
 export interface StampsCustomization {
   /** `false`: no built-in library. A string: URL template with `{locale}`. */
@@ -21,6 +22,10 @@ export interface StampsCustomization {
   /** Quick marks in the Insert toolbar: asset ids (`library:name`) from any
    *  library, or one library's whole set. Default none. */
   readonly toolbar?: ReadonlyArray<string> | { readonly library: string };
+  /** The local engine stamp libraries and signature marks open in, or a
+   *  function that makes one on first use. Default: the viewer's own engine,
+   *  which is right when it is local. A cloud viewer needs one of its own. */
+  readonly assetEngine?: StampAssetEngine;
 }
 
 export interface SignaturesCustomization {
@@ -28,10 +33,10 @@ export interface SignaturesCustomization {
   readonly kinds?: ReadonlyArray<'signature' | 'initials'>;
   /** `'one'`: a single person per browser (no "new signature" once one exists). Default `'many'`. */
   readonly libraries?: 'one' | 'many';
-  /** What placing a mark on a field does; default `sign` with a signer, else `visual`. */
+  /** What placing a mark on a field does; default `sign` with a key, else `visual`. */
   readonly mode?: SignatureMode;
-  /** The key holder — `webCryptoSigner`, `remoteSigner`, `personalSigner`, or a thunk resolving one per signing. */
-  readonly signer?: SignerPort | (() => Promise<SignerPort>);
+  /** The key — `webCryptoSigner`, `remoteSigner`, `personalSigner`, or a thunk resolving one per signing. */
+  readonly key?: SignerPort | (() => Promise<SignerPort>);
   /** Trust anchors for validation; none → verdicts top out at "valid, signer unknown". */
   readonly trust?: TrustPort;
   /** Offer a certification (first signature, DocMDP) in the sign dialog. Default false. */
@@ -46,7 +51,7 @@ export interface SignaturesCustomization {
 
 /** A font for free-text annotations beyond the standard 14. */
 export interface AnnotationFontSpec {
-  /** The stable id a free-text `fontFamily` carries — the engine key AND the
+  /** The stable id a free-text `fontFamily` carries — the engine key and the
    *  CSS family the live editor renders with. Not one of the 14 standard names. */
   readonly key: string;
   /** Where the TTF/OTF bytes come from (same-origin or CORS-enabled). */

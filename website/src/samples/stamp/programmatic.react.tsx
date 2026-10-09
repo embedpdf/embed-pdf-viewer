@@ -1,23 +1,20 @@
-import { useEffect, useState } from 'react';
-import { Viewer, DocumentGate, useDocumentId } from '@embedpdf/react/runtime';
+import { useEffect, useRef } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, usePageList, usePages } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
+import {
+  AnnotationLayer,
+  annotationPlugin,
+  useAnnotationList,
+  useAnnotationState,
+} from '@embedpdf/react/annotation';
 import { stampPlugin, useStamp, useStampAssets } from '@embedpdf/react/stamp';
 import { loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './programmatic.css';
 
 const engine = localEngine();
 const assetEngine = engine; // stamp libraries are PDFs; they open here too
@@ -34,80 +31,93 @@ const ebook = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-function PlaceByCode() {
+// The middle of a Letter page, and the cover's empty corner, in page coordinates.
+const MIDDLE = { x: 306, y: 396 };
+const CORNER = { x: 60, y: 590, width: 220, height: 180 };
+
+function PlaceStamps() {
   const stamp = useStamp();
+  const stage = useStage();
   const assets = useStampAssets();
-  const documentId = useDocumentId();
-  const { currentPage } = usePages();
-  const { pages } = usePageList();
-  const page = pages[currentPage];
-  const [status, setStatus] = useState('');
+  const ready = useAnnotationState((state) => state.status === 'ready');
+  const currentPage = useStageState((state) => state.currentPageIndex);
+  const stamps = useAnnotationList({ subtype: 'stamp' });
+  const placed = useRef(false);
 
+  const approved = assets.find((asset) => asset.name === 'Approved');
+  const draft = assets.find((asset) => asset.name === 'Draft');
+
+  // On load: the standard stamps, and "Approved" in the cover's empty corner, scrolled into view.
   useEffect(() => {
-    if (assets.length > 0) return;
-    loadDefaultLibrary('en')
+    if (!ready || placed.current) return;
+    placed.current = true;
+    void loadDefaultLibrary('en')
       .then((bytes) => stamp.importLibrary(bytes))
-      .catch((err) => setStatus(err instanceof Error ? err.message : String(err)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stamp]);
-
-  // The same box a click would produce: centred on `at` (page points, origin
-  // top-left), fitted and clamped to the page, /Name and /Subj written.
-  const place = async (identifier: string, at: { x: number; y: number }, rotation = 0) => {
-    const asset = assets.find((a) => a.name === identifier);
-    if (!asset || !documentId || !page) return;
-    const ref = await stamp.placeAsset(documentId, asset.id, {
-      page: page.ref,
-      at,
-      targetWidth: 160,
-      rotation,
-    });
-    setStatus(
-      `placed ${asset.label} on page ${ref.page.pageObjectNumber === page.ref.pageObjectNumber ? currentPage + 1 : '?'}`,
-    );
-  };
+      .then(({ library }) => {
+        const asset = stamp
+          .listAssets({ libraryId: library.id })
+          .find((candidate) => candidate.name === 'Approved');
+        if (!asset) return;
+        return stamp.placeAsset(asset.id, {
+          page: 0,
+          center: { x: 170, y: 680 },
+          targetWidth: 180,
+          rotation: -8,
+        });
+      })
+      .then(() => stage.reveal(0, { rect: CORNER }));
+  }, [stamp, stage, ready]);
 
   return (
-    <Toolbar>
-      <Readout>page {currentPage + 1}</Readout>
-      <Button
-        title="Place the Approved stamp near the top-left corner of this page"
-        disabled={assets.length === 0}
-        onClick={() => void place('Approved', { x: 120, y: 90 })}
+    <div className="toolbar">
+      <button
+        type="button"
+        className="button"
+        disabled={!approved}
+        onClick={() =>
+          approved &&
+          void stamp.placeAsset(approved.id, { page: currentPage, center: MIDDLE, select: true })
+        }
       >
-        Approve
-      </Button>
-      <Button
-        title="Place the Draft stamp, rotated"
-        disabled={assets.length === 0}
-        onClick={() => void place('Draft', { x: 300, y: 200 }, 15)}
+        Approve this page
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={!draft}
+        onClick={() =>
+          draft &&
+          void stamp.placeAssetOnPages(draft.id, 'all', {
+            center: MIDDLE,
+            targetWidth: 320,
+            rotation: -30,
+          })
+        }
       >
-        Mark as draft
-      </Button>
-      <Spacer />
-      <Readout>{status}</Readout>
-    </Toolbar>
+        “Draft” on every page
+      </button>
+      <span className="spacer" />
+      <output className="readout">
+        {stamps.length} {stamps.length === 1 ? 'stamp' : 'stamps'} in the document
+      </output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <PlaceByCode />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <PlaceStamps />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

@@ -1,7 +1,8 @@
 import type {
   AnnotationBase,
-  AnnotationDTO,
+  Annotation,
   AnnotationSubtype,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { subtypeFromCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -13,6 +14,7 @@ import { readFreeText } from './readFreeTextAnnotation';
 import { readInk } from './readInkAnnotation';
 import { readLine } from './readLineAnnotation';
 import { readLink } from './readLinkAnnotation';
+import { readPopup } from './readPopupAnnotation';
 import { readRedact } from './readRedactAnnotation';
 import { readCircle, readSquare } from './readShapeAnnotation';
 import { readStamp } from './readStampAnnotation';
@@ -43,10 +45,10 @@ export type AnnotationSubtypeReader = (
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
+  base: AnnotationBase<PdfCoordinates>,
   rawSubtypeCode: number,
   ctx: AnnotationReadContext,
-) => AnnotationDTO;
+) => Annotation<PdfCoordinates>;
 
 const READER_BY_SUBTYPE: Partial<Record<AnnotationSubtype, AnnotationSubtypeReader>> = {
   highlight: readHighlight,
@@ -67,6 +69,7 @@ const READER_BY_SUBTYPE: Partial<Record<AnnotationSubtype, AnnotationSubtypeRead
   'file-attachment': readFileAttachment,
   widget: readWidget,
   redact: readRedact,
+  popup: readPopup,
   unsupported: readUnsupported,
 };
 

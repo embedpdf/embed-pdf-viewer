@@ -11,7 +11,7 @@ import type { DocCapability, PdfBits } from './types';
  *
  * Each leaf is a function returning the literal string (as `const`) so
  * TypeScript catches typos at the call site. Wrappers like `download`
- * and `print` are `Object.assign`'d to be callable AND carry child
+ * and `print` are `Object.assign`'d to be callable and carry child
  * properties for the refinement capabilities.
  */
 export const caps = {
@@ -40,10 +40,14 @@ export const caps = {
       read: () => 'doc.forms.read' as const,
       fill: () => 'doc.forms.fill' as const,
       modify: () => 'doc.forms.modify' as const,
+      import: () => 'doc.forms.import' as const,
+      script: () => 'doc.forms.script' as const,
+      submit: () => 'doc.forms.submit' as const,
     },
     annotate: {
       read: () => 'doc.annotate.read' as const,
       modify: () => 'doc.annotate.modify' as const,
+      import: () => 'doc.annotate.import' as const,
     },
     metadata: {
       modify: () => 'doc.metadata.modify' as const,
@@ -52,6 +56,9 @@ export const caps = {
       modify: () => 'doc.attachments.modify' as const,
     },
     redact: () => 'doc.redact' as const,
+    sign: Object.assign(() => 'doc.sign' as const, {
+      certify: () => 'doc.sign.certify' as const,
+    }),
   },
 } as const;
 
@@ -65,6 +72,9 @@ export const caps = {
  *   collab.annotations.delete.createdBy("u-7") → "annotations:delete:createdBy=u-7"
  *   collab.annotations.setGroup.group("legal") → "annotations:set-group:group=legal"
  *   collab.annotations.all.all()               → "annotations:*:all"  (action wildcard)
+ *   collab.fields.fill.group("buyer")          → "fields:fill:group=buyer"
+ *   collab.fields.sign.group("buyer")          → "fields:sign:group=buyer"
+ *   collab.fields.all.group("seller")          → "fields:*:group=seller"
  *
  * On create, the filter is evaluated against the caller's own identity
  * (no impersonation), so `:self` and `:all` trivially pass; `:group=X`
@@ -76,9 +86,17 @@ export const collab = {
     create: makeFilterBuilder('annotations', 'create'),
     update: makeFilterBuilder('annotations', 'update'),
     delete: makeFilterBuilder('annotations', 'delete'),
-    setGroup: makeSetGroupBuilder(),
-    /** Action wildcard — matches create, update, delete, AND set-group with the given filter. */
+    setGroup: makeGroupFilterBuilder('annotations', 'set-group'),
+    /** Action wildcard — matches create, update, delete, and set-group with the given filter. */
     all: makeFilterBuilder('annotations', '*'),
+  },
+  /** Form fields, by group: a field records no creator, so only `:all` and `:group=X`. */
+  fields: {
+    fill: makeGroupFilterBuilder('fields', 'fill'),
+    sign: makeGroupFilterBuilder('fields', 'sign'),
+    setGroup: makeGroupFilterBuilder('fields', 'set-group'),
+    /** Action wildcard — matches fill, sign, and set-group with the given filter. */
+    all: makeGroupFilterBuilder('fields', '*'),
   },
 } as const;
 
@@ -99,21 +117,21 @@ function makeFilterBuilder(entity: string, action: string): FilterBuilder {
 }
 
 /**
- * `set-group` is an authority filter, not a per-record collab filter:
- * only `:all` and `:group=X` are meaningful (assign-to-any vs
- * assign-to-X). The builder exposes exactly those two — a typo at JWT
- * mint time is caught by the compiler instead of producing a JWT that
- * fails at verify.
+ * The scopes that take only `:all` and `:group=X`: `set-group`, an
+ * assignment authority rather than a per-record filter (assign-to-any vs
+ * assign-to-X), and every field scope, since a field records no creator.
+ * The builder exposes exactly those two — a typo at JWT mint time is caught
+ * by the compiler instead of producing a JWT that fails at verify.
  */
-interface SetGroupBuilder {
+interface GroupFilterBuilder {
   all(): string;
   group(groupId: string): string;
 }
 
-function makeSetGroupBuilder(): SetGroupBuilder {
+function makeGroupFilterBuilder(entity: string, action: string): GroupFilterBuilder {
   return {
-    all: () => 'annotations:set-group:all',
-    group: (groupId: string) => `annotations:set-group:group=${groupId}`,
+    all: () => `${entity}:${action}:all`,
+    group: (groupId: string) => `${entity}:${action}:group=${groupId}`,
   };
 }
 
@@ -138,8 +156,10 @@ export const pdfPermissions = (): 'pdf.permissions' => 'pdf.permissions';
  *     'doc.download',
  *   ];
  *
- * IMPORTANT: this MUST stay in sync with `addPdfPermissions` inside
- * resolver.ts. A test pins them together.
+ * This is the one reading of the bits: the scope resolver and the
+ * permission advisory both use it. It follows what Acrobat allows on a
+ * file with these bits, which is broader than ISO 32000 in one place:
+ * bit 4 ("changing the document") also allows filling in and signing.
  */
 export function materializePdfPermissions(b: PdfBits): DocCapability[] {
   const out = new Set<DocCapability>();
@@ -166,12 +186,17 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
     out.add('doc.metadata.modify');
     out.add('doc.attachments.modify');
   }
-  if (b.bit11) out.add('doc.pages.assemble');
+  // Bit 11 assembles pages even when bit 4 is clear; bit 4 includes it.
+  if (b.bit4 || b.bit11) out.add('doc.pages.assemble');
   if (b.bit6) out.add('doc.annotate.modify');
-  if (b.bit6 || b.bit9) {
+  // Signing a signature field is filling it in. Acrobat (and PDFium's form
+  // filler) let any of the three bits fill in.
+  if (b.bit4 || b.bit6 || b.bit9) {
     out.add('doc.forms.fill');
     out.add('doc.sign');
   }
+  // Changing existing fields takes both: Acrobat keeps them in fill mode
+  // under bit 4 alone, and offers no form tools under bit 6 or 9 alone.
   if (b.bit6 && b.bit4) out.add('doc.forms.modify');
 
   return [...out];

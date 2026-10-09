@@ -1,0 +1,107 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The sheet beside the pages, and above them on a phone */
+.layout {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+/* The keys work while focus is inside the viewer: show where that is, for the keyboard */
+.layout:focus-visible,
+.layout:has(:focus-visible) {
+  outline: 2px solid var(--focus, #7db6ff);
+  outline-offset: 4px;
+  border-radius: 14px;
+}
+
+@container (min-width: 620px) {
+  .layout {
+    grid-template-columns: 220px 1fr;
+  }
+}
+
+.sheet {
+  box-sizing: border-box;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.status {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--accent);
+  background: var(--tint);
+  border-radius: 8px;
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 2px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.row[data-disabled] {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.key {
+  min-width: 52px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--canvas);
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

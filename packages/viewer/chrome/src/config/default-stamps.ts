@@ -1,8 +1,8 @@
 /**
- * The viewer's BUILT-IN stamp library: `@embedpdf/default-stamps`, the
+ * The viewer's built-in stamp library: `@embedpdf/default-stamps`, the
  * standard rubber stamps as one Acrobat-compatible PDF per locale.
  *
- * Delivery: the library ships INSIDE whatever ships this viewer. The package
+ * Delivery: the library ships inside whatever ships this viewer. The package
  * exposes each locale as a lazy ES module (`@embedpdf/default-stamps/library`),
  * so it travels through the module graph like any other code — every bundler
  * splits it into a chunk served from the app's own origin, the CDN snippet
@@ -11,7 +11,7 @@
  *   - `false`          → no built-in library, no request (air-gapped);
  *   - a URL template   → exactly that (`{locale}` slot), for self-hosted copies.
  *
- * Loading is LAZY (first open of the stamps panel, never at boot) and
+ * Loading is lazy (first open of the stamps panel, never at boot) and
  * locale-aware: the chrome locale leads, the browser languages break ties
  * for the locales the chrome does not translate itself, and a locale change
  * while a default library is loaded swaps it for the new one. The file names

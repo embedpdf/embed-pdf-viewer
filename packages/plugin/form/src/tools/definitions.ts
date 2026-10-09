@@ -1,41 +1,44 @@
 /**
- * THE form-tool table — the single source of truth for the palette. Every
+ * The form-tool table — the single source of truth for the palette. Every
  * derivation reads this one list: interaction registration (annotation-less),
  * annotation tool/style registration (full viewer), active-tool → field
- * family lookup, click placement, and default appearance.
+ * family lookup, click placement, and default appearance. With the
+ * annotation plugin each tool shows a ghost: the field a click places, drawn
+ * with the tool's defaults where it will land.
  *
- * "One tool system, two commit planes": the tools live in the ANNOTATION
+ * "One tool system, two commit planes": the tools live in the annotation
  * registry when that plugin is present (defaults, style panel, click-create —
- * the shared authoring infrastructure), but the COMMIT always goes
- * through `doc.forms.createField` via the form place handler. The tags make
+ * the shared authoring infrastructure), but the commit always goes
+ * through `form.create()` from the form place handler. The tags make
  * that structural: these tools enable `form-place`, never `annotation-draw`,
  * so the annotation draw handler can't wake up for them.
  */
-import type { FormFieldFamily } from '@embedpdf/engine-core/runtime';
-import type { AnnotationPropsPatch, ClickCreate } from '@embedpdf/plugin-annotation/contract';
+import type { FormFieldFamily, WidgetAppearance } from '@embedpdf/engine-core/runtime';
+import type { ClickCreate } from '@embedpdf/plugin-annotation/contract';
 
-/** The families the palette can author (push buttons are not authorable). */
+/** The families the palette places; a push button is made through `create()`. */
 export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unknown'>;
 
 export interface FormToolDef {
   id: string;
-  /** The field family `placeField` commits (the FORM plane's vocabulary). */
+  /** The field family the tool places (the form plane's vocabulary). */
   family: AuthorableFormFamily;
-  /** The client kind the ANNOTATION registry routes on (props panel).
+  /** The client kind the annotation registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */
-  visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-box';
+  visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-radio' | 'widget-box';
   /** What a bare click places (box policies only — fields are boxes). */
   clickCreate: Extract<ClickCreate, { width: number }>;
-  /** Seed drawing defaults: a placed field is VISIBLE (white box, gray
-   *  border) and restylable per tool through the shared style panel. */
-  defaults: AnnotationPropsPatch;
+  /** Seed drawing defaults, the widget's appearance fields: a placed field is
+   *  visible (white box, gray border) and restylable per tool through the
+   *  shared style panel. */
+  defaults: WidgetAppearance;
   cursor: string;
 }
 
 /** Palette tools keep widgets editable right after placement. */
 export const PLACE_TAGS = ['form-place', 'annotation-edit'] as const;
 
-const FIELD_CHROME: AnnotationPropsPatch = {
+const FIELD_CHROME: WidgetAppearance = {
   interiorColor: '#ffffff',
   color: '#6b7280',
   strokeWidth: 1,
@@ -61,7 +64,8 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   {
     id: 'form-radio',
     family: 'radio',
-    visualKind: 'widget-toggle',
+    // Round, as the engine draws a radio button: its ghost and its placement too.
+    visualKind: 'widget-radio',
     clickCreate: { width: 18, height: 18 },
     defaults: FIELD_CHROME,
     cursor: 'crosshair',
@@ -96,5 +100,5 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
 ];
 
 export const FORM_TOOL_BY_ID: ReadonlyMap<string, FormToolDef> = new Map(
-  FORM_TOOLS.map((t) => [t.id, t]),
+  FORM_TOOLS.map((tool) => [tool.id, tool]),
 );

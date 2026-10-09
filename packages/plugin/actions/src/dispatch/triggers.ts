@@ -1,124 +1,158 @@
 /**
- * Trigger resolution helpers: the config gates, annotation identity, the
- * page-lifecycle tree cache (the fan-out's read amplifier) and ISO Table
- * 197's page-step order.
+ * Trigger resolution helpers: the `triggers` setting, the per-page cache of annotations bearing page-lifecycle trees (the fan-out's
+ * read amplifier) and ISO 32000-2 Table 197's page-step order.
  */
-import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type {
   AnnotationRef,
+  DocumentEvent,
   PageObjectNumber,
+  PageRef,
   PdfActionTree,
   PdfAnnotationActions,
   PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
 
-import type { ActionsConfig, ActionSource, ActionTrigger } from '../contract';
-import type { ActionsContext } from '../services';
+import type { ActionSource, ActionTrigger } from '../contract';
+import type { ActionsContext, ActionsServices } from '../services';
+import { readPageAnnotations } from '../services/annotation-rows';
 
-export const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
-  if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
-    return left.annotObjectNumber === right.annotObjectNumber;
+/** An annotation that carries at least one page-lifecycle tree (/PO, /PC, /PV, /PI), as read. */
+interface LifecycleAnnotation {
+  readonly ref: AnnotationRef;
+  readonly actions: PdfAnnotationActions;
+}
+
+/**
+ * The pages whose annotations an event changes: those pages, every page
+ * (`'all'`: a redaction, a skipped stretch of the stream, new document
+ * bytes), or none.
+ */
+const annotationPagesOf = (event: DocumentEvent): readonly PageRef[] | 'all' | null => {
+  switch (event.type) {
+    case 'annotations.created':
+    case 'annotations.updated':
+    case 'annotations.deleted':
+    case 'annotations.reordered':
+    case 'annotations.flattened':
+    case 'forms.widgetsReordered':
+      return [event.page];
+    // A form write can add, move or remove widgets, which carry page actions too.
+    case 'forms.created':
+    case 'forms.deleted':
+    case 'forms.widgetAdded':
+    case 'forms.widgetRemoved':
+    case 'forms.widgetDeleted':
+    case 'forms.widgetRestored':
+    case 'forms.widgetUpdated':
+    case 'forms.restored':
+    case 'forms.repaired':
+      return 'all';
+    case 'pages.flattened':
+      return event.pages;
+    case 'redaction.applied':
+    case 'stream.desynced':
+    case 'document.versioned':
+      return 'all';
+    default:
+      return null;
   }
-  if (left.kind === 'nm' && right.kind === 'nm') {
-    return left.page.pageObjectNumber === right.page.pageObjectNumber && left.nm === right.nm;
-  }
-  if (left.kind === 'index' && right.kind === 'index') {
-    return left.page.pageObjectNumber === right.page.pageObjectNumber && left.index === right.index;
-  }
-  return false;
 };
 
-export function createTriggers(ctx: ActionsContext, config: ActionsConfig) {
+export function createTriggers(
+  ctx: ActionsContext,
+  { settings }: Pick<ActionsServices, 'settings'>,
+) {
   const triggerEnabled = (trigger: ActionTrigger): boolean => {
+    const { triggers } = settings.get();
     switch (trigger.scope) {
       case 'activate':
-        return true; // the Phase-1 core door — never gated
+        return true; // the click door is never gated
       case 'annotation':
-        return config.triggers?.annotation !== false;
+        return triggers.annotation;
       case 'page':
-        return config.triggers?.page !== false;
+        return triggers.page;
       case 'document':
-        return config.triggers?.document !== false;
+        return triggers.document;
     }
   };
 
-  /**
-   * Per-pon cache of annotations bearing page-lifecycle trees (PO/PC/PV/PI)
-   * — the fan-out's read amplifier. Invalidated wholesale on any
-   * `annotation.*` document event and on `stream.desynced` (gap events never
-   * arrive, so every cached page may be stale); rebuilt lazily per pon.
-   */
-  type LifecycleAnnot = { ref: AnnotationRef; actions: PdfAnnotationActions };
-  const lifecycleCache = new Map<PageObjectNumber, LifecycleAnnot[]>();
-  const lifecycleTreesFor = async (pon: PageObjectNumber): Promise<LifecycleAnnot[]> => {
-    const hit = lifecycleCache.get(pon);
-    if (hit) return hit;
-    const doc = ctx.doc;
-    if (!doc) return [];
-    const { annotations } = await doc.page(toPageRef(pon)).annotations.list();
-    const bearing = annotations
-      .filter(
-        (a) =>
-          a.actions &&
-          (a.actions.pageOpen?.root ||
-            a.actions.pageClose?.root ||
-            a.actions.pageVisible?.root ||
-            a.actions.pageInvisible?.root),
-      )
-      .map((a) => ({ ref: a.ref, actions: a.actions! }));
-    lifecycleCache.set(pon, bearing);
-    return bearing;
-  };
-  {
-    // Optional-chained end to end: unit harnesses fake `ctx.doc` without an
-    // event stream; a real DocumentHandle always carries one.
-    const unsubscribe = ctx.doc?.events?.subscribe((event) => {
-      if (event.type.startsWith('annotation.') || event.type === 'stream.desynced') {
-        lifecycleCache.clear();
-      }
+  // Per page, the pending or settled read of its lifecycle-bearing
+  // annotations. Reads start only inside the queued operation that needs
+  // them, so a trigger sees every change made by the operations queued
+  // before it. Holding the promise lets concurrent readers share one read,
+  // and dropping it on invalidation means a read that was in flight when its
+  // page changed is never reused afterwards.
+  const lifecycleReads = new Map<PageObjectNumber, Promise<readonly LifecycleAnnotation[]>>();
+
+  const lifecycleAnnotationsOf = (page: PageRef): Promise<readonly LifecycleAnnotation[]> => {
+    const key = page.objectNumber;
+    const cached = lifecycleReads.get(key);
+    if (cached) return cached;
+    const read = readPageAnnotations(ctx, page).then((annotations) =>
+      annotations
+        .filter(
+          (annotation) =>
+            annotation.actions &&
+            (annotation.actions.pageOpen?.root ||
+              annotation.actions.pageClose?.root ||
+              annotation.actions.pageVisible?.root ||
+              annotation.actions.pageInvisible?.root),
+        )
+        .map((annotation) => ({ ref: annotation.ref, actions: annotation.actions! })),
+    );
+    lifecycleReads.set(key, read);
+    // A failed read is not kept: the next trigger for the page reads again.
+    read.catch(() => {
+      if (lifecycleReads.get(key) === read) lifecycleReads.delete(key);
     });
-    if (unsubscribe) ctx.cleanup(unsubscribe);
-  }
+    return read;
+  };
+
+  /** Forget the pages a confirmed document event changed. */
+  const invalidate = (event: DocumentEvent): void => {
+    const pages = annotationPagesOf(event);
+    if (pages === 'all') lifecycleReads.clear();
+    else if (pages) for (const page of pages) lifecycleReads.delete(page.objectNumber);
+  };
 
   /**
-   * ISO order, verified against 32000-2 Table 197 (2026-09-02): PO "shall be
-   * executed after the O action … and the OpenAction entry"; PC "shall be
-   * executed before the C action". Rootless trees are skipped (a
-   * budget-degraded tree with no root has nothing to walk).
+   * ISO 32000-2 Table 197 order: /PO "shall be executed after the O action …
+   * and the OpenAction entry"; /PC "shall be executed before the C action".
+   * Rootless trees are skipped (a budget-degraded tree with no root has
+   * nothing to walk).
    */
   const planPageSteps = (
     event: 'open' | 'close' | 'visible' | 'invisible',
-    pon: PageObjectNumber,
+    page: PageRef,
     pageActions: PdfPageActions | undefined,
-    lifecycle: LifecycleAnnot[],
+    lifecycle: readonly LifecycleAnnotation[],
   ): Array<{ source: ActionSource; tree: PdfActionTree }> => {
-    const page = toPageRef(pon);
     const pageSource: ActionSource = { kind: 'page', page };
-    const annotSteps = (key: 'pageOpen' | 'pageClose' | 'pageVisible' | 'pageInvisible') =>
+    const annotationSteps = (key: 'pageOpen' | 'pageClose' | 'pageVisible' | 'pageInvisible') =>
       lifecycle
-        .filter((a) => a.actions[key]?.root)
-        .map((a) => ({
-          source: { kind: 'annotation', annotation: a.ref, page } as ActionSource,
-          tree: a.actions[key]!,
+        .filter((annotation) => annotation.actions[key]?.root)
+        .map((annotation) => ({
+          source: { kind: 'annotation', annotation: annotation.ref, page } as ActionSource,
+          tree: annotation.actions[key]!,
         }));
     switch (event) {
       case 'open':
         return [
           ...(pageActions?.open?.root ? [{ source: pageSource, tree: pageActions.open }] : []),
-          ...annotSteps('pageOpen'),
+          ...annotationSteps('pageOpen'),
         ];
       case 'close':
         return [
-          ...annotSteps('pageClose'),
+          ...annotationSteps('pageClose'),
           ...(pageActions?.close?.root ? [{ source: pageSource, tree: pageActions.close }] : []),
         ];
       case 'visible':
-        return annotSteps('pageVisible');
+        return annotationSteps('pageVisible');
       case 'invisible':
-        return annotSteps('pageInvisible');
+        return annotationSteps('pageInvisible');
     }
   };
 
-  return { triggerEnabled, lifecycleTreesFor, planPageSteps };
+  return { triggerEnabled, lifecycleAnnotationsOf, invalidate, planPageSteps };
 }
 export type ActionsTriggers = ReturnType<typeof createTriggers>;

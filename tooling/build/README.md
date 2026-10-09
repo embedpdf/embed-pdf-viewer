@@ -1,7 +1,7 @@
 # @embedpdf/tooling-build — the one build preset
 
 `epdf-build` turns a publishable TS package into dual ESM+CJS with
-declarations, and proves the result on every build. [`plugins.md`](../../.agents/skills/embedpdf-conventions/references/plugins.md) is the law for
+declarations, and proves the result on every build. [`plugins.md`](../../docs/conventions/plugins.md) is the law for
 plugin authors; this file is the law for how packages BUILD.
 
 ## The laws
@@ -73,6 +73,24 @@ plugin authors; this file is the law for how packages BUILD.
 ## Outside this preset, on purpose
 
 - `framework/angular` — ng-packagr (the platform's own library builder).
-- future `framework/svelte` — svelte-package.
+- `framework/vue` — Vite library build + vue-tsc declarations; `framework/svelte` —
+  svelte-package. Both finish and prove their `dist` with two scripts here (below).
 - `engine/runtime` (pdf-runtime) — bespoke emscripten/wasm build.
 - Apps, examples, viewers — Vite app builds; they are consumers, not libraries.
+
+### Vue and Svelte: finishing and proving `dist`
+
+Their builders keep each import as the source writes it, and their workspace
+`exports` point at the source, so nothing in the workspace ever reads their
+`dist`. Each package's `build` script therefore ends with:
+
+- `src/fully-specify-imports.mjs` — every relative import in `dist` names its
+  file (`./stage/scope.js`), as Node, webpack and TypeScript's `node16` need;
+  `--cjs-types` (Vue) also writes the `.d.cts` declarations a `require` reads.
+- `src/check-framework-package.mjs` — the publish check: packs the package,
+  checks the manifest (every export names a shipped file with its types, no
+  `workspace:` range, every imported package declared), runs publint and attw
+  (law 3's profile; `.svelte` component imports are left to Svelte's tooling),
+  and type-checks the package's `consumer/` app against the tarball with
+  `vue-tsc` or `svelte-check` and `skipLibCheck: false`. Lines marked
+  `// error expected` must fail, so types that went `any` fail the build.

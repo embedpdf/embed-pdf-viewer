@@ -43,20 +43,26 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
 
   return (tree: any) => {
     visit(tree, 'mdxJsxFlowElement', (node: any) => {
-      if (node.name === 'Example') {
+      // <Snippet name="search/search-box">: code only, one file per framework under
+      // samples/snippets/ (docs/content/snippets/), resolved exactly like an example.
+      if (node.name === 'Example' || node.name === 'Snippet') {
         const nameAttr = node.attributes?.find(
           (attr: any) => attr.type === 'mdxJsxAttribute' && attr.name === 'name',
         );
         if (typeof nameAttr?.value !== 'string') return;
-        const byFramework = collectSampleFiles(nameAttr.value, githubBaseUrl);
-        node.attributes.push({
-          type: 'mdxJsxAttribute',
-          name: '__fwFiles',
-          value: JSON.stringify(byFramework),
-        });
+        const sampleName =
+          node.name === 'Snippet' ? `snippets/${nameAttr.value}` : nameAttr.value;
+        const byFramework = collectSampleFiles(sampleName, githubBaseUrl);
+        // For rehype-code-example, which highlights the files, stores them under the sample's
+        // name and leaves the page only a reference to them (docs-kit `mdx/code-panels`).
+        node.attributes.push(
+          { type: 'mdxJsxAttribute', name: '__sample', value: sampleName },
+          { type: 'mdxJsxAttribute', name: '__fwFiles', value: JSON.stringify(byFramework) },
+        );
         // Live demos: built by vite.demos.config.ts before the docs build;
-        // presence in the manifest = a mounted preview exists.
-        const demos = readDemoManifest()[nameAttr.value];
+        // presence in the manifest = a mounted preview exists. A snippet is code only, even
+        // when an example has the same name.
+        const demos = node.name === 'Example' ? readDemoManifest()[nameAttr.value] : undefined;
         if (demos) {
           node.attributes.push({
             type: 'mdxJsxAttribute',

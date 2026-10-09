@@ -66,33 +66,33 @@ describe('validateSearchRegex', () => {
 describe('matchRegex', () => {
   test('finds all matches with original offsets', () => {
     expect(matchRegex('a 12 b 345', q('\\d+'))).toEqual([
-      { start: 2, length: 2 },
-      { start: 7, length: 3 },
+      { start: 2, count: 2 },
+      { start: 7, count: 3 },
     ]);
   });
 
   test('is case-insensitive by default; matchCase turns that off', () => {
     expect(matchRegex('FOO foo', q('foo'))).toEqual([
-      { start: 0, length: 3 },
-      { start: 4, length: 3 },
+      { start: 0, count: 3 },
+      { start: 4, count: 3 },
     ]);
-    expect(matchRegex('FOO foo', q('foo', true))).toEqual([{ start: 4, length: 3 }]);
+    expect(matchRegex('FOO foo', q('foo', true))).toEqual([{ start: 4, count: 3 }]);
   });
 
   test('skips zero-length matches without looping forever', () => {
-    expect(matchRegex('bbab', q('a*'))).toEqual([{ start: 2, length: 1 }]);
+    expect(matchRegex('bbab', q('a*'))).toEqual([{ start: 2, count: 1 }]);
   });
 
   test('advances a full code point past empty matches on astral chars', () => {
-    expect(matchRegex('\u{1F600}a', q('a*'))).toEqual([{ start: 2, length: 1 }]);
+    expect(matchRegex('\u{1F600}a', q('a*'))).toEqual([{ start: 2, count: 1 }]);
   });
 
   test('^ and $ match line boundaries (multiline page text)', () => {
-    expect(matchRegex('ax\nbx', q('^b'))).toEqual([{ start: 3, length: 1 }]);
+    expect(matchRegex('ax\nbx', q('^b'))).toEqual([{ start: 3, count: 1 }]);
   });
 
   test('unicode property classes work (u-mode)', () => {
-    expect(matchRegex('abc 123', q('\\p{L}+'))).toEqual([{ start: 0, length: 3 }]);
+    expect(matchRegex('abc 123', q('\\p{L}+'))).toEqual([{ start: 0, count: 3 }]);
   });
 
   test('throws on dialect violations', () => {
@@ -102,8 +102,8 @@ describe('matchRegex', () => {
   test('wholeWord post-filters at word boundaries', () => {
     // 'cat' standalone matches; inside 'concatenate' it does not.
     expect(matchRegex('cat concatenate cat', { ...q('cat'), wholeWord: true })).toEqual([
-      { start: 0, length: 3 },
-      { start: 16, length: 3 },
+      { start: 0, count: 3 },
+      { start: 16, count: 3 },
     ]);
   });
 
@@ -112,14 +112,14 @@ describe('matchRegex', () => {
     // inside it; the shared word test must not — same semantics as the
     // literal path's wholeWord.
     expect(matchRegex('café caf', { ...q('caf'), wholeWord: true })).toEqual([
-      { start: 5, length: 3 },
+      { start: 5, count: 3 },
     ]);
   });
 
   test('wholeWord composes with alternation (the "why not hand-write \\b" case)', () => {
     expect(matchRegex('color colour colorful', { ...q('col(o|ou)r'), wholeWord: true })).toEqual([
-      { start: 0, length: 5 },
-      { start: 6, length: 6 },
+      { start: 0, count: 5 },
+      { start: 6, count: 6 },
     ]);
   });
 

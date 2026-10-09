@@ -1,0 +1,206 @@
+---
+title: Quick start
+description: Build a PDF viewer step by step, with text selection, zoom buttons, a highlighter and a save button.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Quick start
+
+This guide builds a small PDF viewer: the pages, text people can select, zoom buttons, a
+highlighter and a save button. Each step adds one plugin or one control, so you can stop at any
+step and have a working viewer.
+
+## 1. Install
+
+You need two packages: the one for your framework, and an engine.
+
+<Fw only="react">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/react @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/react @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="vue">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/vue @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/vue @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="svelte">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/svelte @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/svelte @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="angular">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/angular @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/angular @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+Every feature is a separate import from the framework package, such as `@embedpdf/react/stage`,
+so what you don't use never reaches your bundle.
+
+## 2. Show a PDF
+
+Create the engine once, then give it to `<Viewer>` with the plugins you want and the document to
+open. `<Stage>` shows the pages, and `<RenderLayer>` draws each one:
+
+<Example name="getting-started/basic" mode="open" />
+
+<Engine local>
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+`localEngine()` costs nothing until it's used, so creating it at the top of a module is safe, even
+with server-side rendering. The viewer starts it when it mounts: PDFium boots in a Web Worker in
+the background, and the first page shows as soon as the document is open. The engine's
+WebAssembly is part of your build and loads from your own site; see [Setup](setup).
+
+</Fw>
+
+<Fw only="angular">
+
+`localEngine()` costs nothing until it's used, so it's safe in your component, even with
+server-side rendering. The viewer starts it in the browser: PDFium boots in a Web Worker in the
+background, and the first page shows as soon as the document is open. The engine's WebAssembly is
+part of your build and loads from your own site; see [Setup](setup).
+
+</Fw>
+
+</Engine>
+
+<Engine cloud>
+
+`cloudEngine({ baseUrl })` holds an HTTP client and nothing else, so creating it at the top of a
+module is safe, even with server-side rendering. Every page, text and annotation call goes to your
+CloudPDF server; see [Setup](setup).
+
+</Engine>
+
+`<DocumentGate>` shows its `fallback` until the document is open, so the Stage never renders
+without one.
+
+## 3. Let people select text
+
+Add the interaction plugin, which handles the pointer for every feature, and the selection plugin.
+Then put `<SelectionLayer>` above the page:
+
+<Snippet name="start/select-text" />
+
+Drag over text to select it, double-click a word, or triple-click a line. On a phone, long-press a
+word. See [Selecting & copying](text/selection) for copying and a selection menu.
+
+## 4. Add zoom buttons
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+Every plugin has a <Word of="hook" /> for its API and one for its state. `useStage()` does things,
+and `useStageState()` gives you what to show:
+
+</Fw>
+
+<Fw only="angular">
+
+Every plugin has a service with its methods and its state as signals. The Stage is a component, so
+it hands both to your template through a template reference, `#stage="epdfStage"`:
+
+</Fw>
+
+<Snippet name="start/zoom-controls" />
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+Put `<ZoomControls />` anywhere inside `<DocumentGate>`. It <Word of="rerenders" /> when the zoom
+changes, whether a button, a pinch or code changed it.
+
+</Fw>
+
+<Fw only="angular">
+
+The buttons go inside `*epdfDocumentGate`, next to the stage they name. The percentage updates when
+the zoom changes, whether a button, a pinch or code changed it.
+
+</Fw>
+
+## 5. Add a highlighter
+
+The annotation plugin shows the annotations a PDF already has, and lets people add their own. Add
+it with its layer, and a button that turns on the highlight tool:
+
+<Snippet name="start/highlighter" />
+
+With the tool on, select text and it's highlighted. Click a highlight with the `pointer` tool to
+select it. The page picture leaves the annotations out by itself, because the annotation layer
+draws them now. <Fw only="angular">The component that provides the viewer can inject its services
+too, so the button needs no component of its own. </Fw>See [Annotations](annotations) for every
+tool.
+
+## 6. Save
+
+`documents.download()` gives you the PDF with every change, as bytes. `saveFile` hands them to the
+browser as a download:
+
+<Snippet name="start/save-button" />
+
+<Fw only={['react', 'vue', 'svelte']}>Put `<SaveButton />` anywhere inside `<Viewer>`.</Fw>
+<Fw only="angular">Put `<app-save-button />` anywhere in the template of the component that provides
+the viewer: it injects the service from there.</Fw>
+
+<Engine cloud>
+
+You don't need to save to keep the highlights: the server stored each one as it was made.
+`download()` is for when you want the file itself.
+
+</Engine>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Setup"
+    description="Server-side rendering, bundlers, fonts, and hosting the engine yourself."
+    href="setup"
+  />
+  <Card
+    title="How it works"
+    description="Plugins, how your UI talks to them, layers, and which document a component talks to."
+    href="concepts/how-it-works"
+  />
+  <Card
+    title="Scroll, zoom & layout"
+    description="Layouts, zoom modes, page navigation and touch."
+    href="viewing/stage"
+  />
+</Cards>

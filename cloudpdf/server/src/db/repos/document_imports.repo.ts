@@ -1,10 +1,10 @@
 /**
- * Import provenance (and, in phase 3b, the async job queue).
+ * Import provenance and the async import job queue.
  *
  * One row per document, upserted on doc_id: the row is "the latest
  * import status for this document", not an append-only log. Sync
  * imports write running -> succeeded | failed; a retryable sync
- * failure records `failed` + last_error here while the DOCUMENT stays
+ * failure records `failed` + last_error here while the document stays
  * pending (doc state is the lifecycle truth; this row is the attempt
  * outcome). Rows die with their document via the delete cascade.
  */
@@ -56,7 +56,7 @@ export interface DocumentImportRow {
   updatedAt: number;
 }
 
-/** Enqueue input for an ASYNC import job (connection sources only). */
+/** Enqueue input for an async import job (connection sources only). */
 export interface ImportJobEnqueue extends ImportAttemptStart {
   /** JSON of the (sanitized) wire descriptor the worker re-drives from. */
   sourceJson: string;
@@ -188,8 +188,8 @@ export class DocumentImportsRepo {
    * the atomic create path, and standalone for resume-onto-existing:
    *   - no row            -> insert queued
    *   - running, live lease -> leave untouched ('already-running')
-   *   - anything else     -> re-arm to queued NOW with fresh source
-   * Attempts are cumulative across re-arms; the CLAIM increments them.
+   *   - anything else     -> re-arm to queued now with fresh source
+   * Attempts are cumulative across re-arms; the claim increments them.
    */
   async enqueue(input: ImportJobEnqueue): Promise<'queued' | 'already-running'> {
     const now = Date.now();
@@ -259,10 +259,10 @@ export class DocumentImportsRepo {
 
   /**
    * Atomically claim the next runnable job: queued-and-due, or
-   * running with an EXPIRED lease (crashed worker). The UPDATE's
+   * running with an expired lease (crashed worker). The UPDATE's
    * outer guard re-checks the claim conditions so two replicas racing
    * the same subquery id cannot both win — the loser matches zero
-   * rows. Dialect-portable (no SKIP LOCKED needed at this contention
+   * rows. Dialect-portable (no skip locked needed at this contention
    * level); the claim mints the fencing token and increments the
    * attempt counter.
    */

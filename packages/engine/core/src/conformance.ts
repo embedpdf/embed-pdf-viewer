@@ -17,6 +17,29 @@ export type {
   AnnotationConformanceOptions,
 } from './conformance/runAnnotationReadConformance';
 export { runAnnotationMutationConformance } from './conformance/runAnnotationMutationConformance';
+export { runAnnotationAttributionConformance } from './conformance/runAnnotationAttributionConformance';
+export type {
+  AnnotationAttributionConformanceOptions,
+  AttributionSession,
+} from './conformance/runAnnotationAttributionConformance';
+export { runAnnotationResourceConformance } from './conformance/runAnnotationResourceConformance';
+export { runAnnotationExportConformance } from './conformance/runAnnotationExportConformance';
+export { runAnnotationImportConformance } from './conformance/runAnnotationImportConformance';
+export { runAnnotationTransferConformance } from './conformance/runAnnotationTransferConformance';
+export type { AnnotationTransferConformanceOptions } from './conformance/runAnnotationTransferConformance';
+export { creatables, iconRect, type Creatable } from './conformance/creatables';
+export type {
+  AnnotationResourceConformanceOptions,
+  AnnotationResourceFixture,
+} from './conformance/runAnnotationResourceConformance';
+export { runDateConformance } from './conformance/runDateConformance';
+export type { DateConformanceOptions } from './conformance/runDateConformance';
+export { runAnnotationDeclarationConformance } from './conformance/runAnnotationDeclarationConformance';
+export type {
+  AnnotationDeclarationConformanceOptions,
+  AnnotationDeclarationFixture,
+} from './conformance/runAnnotationDeclarationConformance';
+export { annotationReadDriftOf } from './conformance/annotationReadDrift';
 export { runFormConformance } from './conformance/runFormConformance';
 export type {
   FormConformanceFixtures,
@@ -37,17 +60,101 @@ export type {
   PageReorderConformanceOptions,
 } from './conformance/runPageReorderConformance';
 export { runPageRotateConformance } from './conformance/runPageRotateConformance';
+export {
+  runAnnotationRotationConformance,
+  type AnnotationRotationConformanceOptions,
+  type AnnotationRotationFixture,
+} from './conformance/runAnnotationRotationConformance';
+export {
+  CROP_OFFSET_PDF,
+  runPageRenderConformance,
+  type PageRenderConformanceOptions,
+} from './conformance/runPageRenderConformance';
+export {
+  runPageSpaceConformance,
+  type PageSpaceConformanceOptions,
+} from './conformance/runPageSpaceConformance';
+export {
+  COLOR_FIXTURE_PDF,
+  runColorConformance,
+  type ColorConformanceOptions,
+} from './conformance/runColorConformance';
+export {
+  APPEARANCE_STATES_FIXTURE_PDF,
+  runAppearanceStatesConformance,
+  type AppearanceStatesConformanceOptions,
+} from './conformance/runAppearanceStatesConformance';
+export {
+  DRAWING_FIXTURE_PDF,
+  runDrawingDetailsConformance,
+  type DrawingDetailsConformanceOptions,
+  type DrawingDetailsFixture,
+} from './conformance/runDrawingDetailsConformance';
+export {
+  PAGE_SPACE_FIXTURES,
+  type PageSpaceFixture,
+  type PageSpaceFixturePage,
+} from './conformance/pageSpaceFixtures';
 export { runPageDeleteConformance } from './conformance/runPageDeleteConformance';
 export { runNamedPagesConformance } from './conformance/runNamedPagesConformance';
 export { runAnnotationFlattenConformance } from './conformance/runAnnotationFlattenConformance';
 export { runAnnotationAppearanceExportConformance } from './conformance/runAnnotationAppearanceExportConformance';
 export { runPageFlattenConformance } from './conformance/runPageFlattenConformance';
-export { runRedactionApplyConformance } from './conformance/runRedactionApplyConformance';
+export {
+  BARE_PAGE_FIXTURE_PDF,
+  runRedactionApplyConformance,
+  type RedactionApplyConformanceOptions,
+} from './conformance/runRedactionApplyConformance';
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
 export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
 export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
-export { runPieceInfoConformance } from './conformance/runPieceInfoConformance';
+export {
+  OBJECT_NUMBER_FIXTURE_PDF,
+  runObjectNumberConformance,
+  type ObjectNumberConformanceOptions,
+} from './conformance/runObjectNumberConformance';
+export {
+  CHANGE_FIXTURE_PDF,
+  runChangeConformance,
+  type ChangeConformanceOptions,
+} from './conformance/runChangeConformance';
+export { pdfOf } from './conformance/pdfOf';
+export {
+  PERMISSION_TOKENS,
+  runPermissionConformance,
+  type PermissionConformanceOptions,
+  type PermissionToken,
+} from './conformance/runPermissionConformance';
+export {
+  runFormScriptConformance,
+  type FormScriptConformanceOptions,
+} from './conformance/runFormScriptConformance';
+export {
+  runFormAttributionConformance,
+  type FormAttributionConformanceOptions,
+} from './conformance/runFormAttributionConformance';
+export {
+  runFormTransferConformance,
+  TWO_PAGES_PDF,
+  type FormTransferConformanceOptions,
+} from './conformance/runFormTransferConformance';
+export {
+  runWidgetRotationConformance,
+  TURNED_FIELDS_PDF,
+  type WidgetRotationConformanceOptions,
+} from './conformance/runWidgetRotationConformance';
+export {
+  WIDGET_FINDING_CASES,
+  runWidgetFindingConformance,
+  type WidgetFindingCase,
+  type WidgetFindingCaseName,
+  type WidgetFindingConformanceOptions,
+} from './conformance/runWidgetFindingConformance';
+export {
+  runPieceInfoConformance,
+  type PieceInfoConformanceOptions,
+} from './conformance/runPieceInfoConformance';
 export { runDocumentEventsConformance } from './conformance/runDocumentEventsConformance';
 export { runPageTextConformance } from './conformance/runPageTextConformance';
 export type {
@@ -73,12 +180,21 @@ export type {
   SearchConformanceFixture,
   SearchConformanceOptions,
 } from './conformance/runSearchConformance';
-export {
-  diffAnnotationListSnapshot,
-  diffAnnotationListSnapshotAll,
-} from './conformance/diffAnnotationListSnapshot';
+export { diffAnnotationList } from './conformance/diffAnnotationList';
 export { runSignatureConformance } from './conformance/runSignatureConformance';
 export type {
   SignatureConformanceFixtures,
   SignatureConformanceOptions,
 } from './conformance/runSignatureConformance';
+export {
+  PREDICTION_FIXTURE_PDF,
+  runAnnotationPredictionConformance,
+  type AnnotationPredictionConformanceOptions,
+} from './conformance/runAnnotationPredictionConformance';
+export {
+  FIELD_GROUP_TOKENS,
+  FIELD_GROUPS_PDF,
+  runFieldGroupsConformance,
+  type FieldGroupToken,
+  type FieldGroupsConformanceOptions,
+} from './conformance/runFieldGroupsConformance';

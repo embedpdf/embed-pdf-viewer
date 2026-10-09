@@ -11,7 +11,7 @@ import {
 
 /**
  * The pathname is the single source of truth for the active framework
- * (DOCS-PLATFORM-ARCHITECTURE.md): /docs/headless/<fw>/… — no provider
+ * (docs/conventions/docs-architecture.md): /docs/headless/<fw>/… — no provider
  * threading, correct during SSR, and every component derives it the same
  * way. Same contract as the EmbedPDF site.
  */

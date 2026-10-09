@@ -1,19 +1,23 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
   type PageMeasureService,
   type PageRef,
   type PdfMeasure,
-  type PageMeasurementViewport,
+  type PageMeasurementViewportList,
+  type PageScaleResult,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
-  PageMeasurementViewportSchema,
+  PageMeasurementViewportListSchema,
   PageScaleResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudPageMeasureService implements PageMeasureService {
@@ -25,31 +29,37 @@ export class CloudPageMeasureService implements PageMeasureService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
-  viewports(): AbortablePromise<PageMeasurementViewport[]> {
+  listViewports(): AbortablePromise<PageMeasurementViewportList> {
     return AbortablePromise.run(async (signal) => {
       this.check();
       // Viewports have no independent cache pin. Always read the current layer.
       return this.http.getJson(
         wirePaths.layerPageViewports(this.docId, this.layerName, this.pageRef),
-        (raw) => PageMeasurementViewportSchema.array().parse(raw),
+        (raw) => PageMeasurementViewportListSchema.parse(raw),
         signal,
       );
     });
   }
-  setScale(measure: PdfMeasure | null): AbortablePromise<void> {
+  setScale(measure: PdfMeasure | null, options?: WriteOptions): AbortablePromise<PageScaleResult> {
     return AbortablePromise.run(async (signal) => {
-      await Promise.resolve();
-      signal.throwIfAborted();
+      const opId = opIdOf(options);
       this.check();
-      const result = await this.http.putJson(
-        wirePaths.layerPageScale(this.docId, this.layerName, this.pageRef),
-        { measure },
-        (raw) => PageScaleResultSchema.parse(raw),
-        signal,
-      );
-      this.manifest.apply(result.meta, []);
-      this.publisher.publishLocal({ type: 'page.viewportsChanged', ...result });
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.putJson(
+            wirePaths.layerPageScale(this.docId, this.layerName, this.pageRef),
+            { measure },
+            (raw) => PageScaleResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        this.manifest.apply(result.meta, []);
+        this.publisher.publishWrite(opId, { type: 'pages.scaleSet', ...result });
+        return result;
+      });
     });
   }
   private check(): void {

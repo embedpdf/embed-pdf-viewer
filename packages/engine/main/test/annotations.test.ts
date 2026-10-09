@@ -48,7 +48,7 @@ runAnnotationReadConformance(runner, {
     minInkCount: 1,
     minFreeTextCount: 2,
     minCaretCount: 1,
-    expectsWeakAnnotation: true,
+    expectsInlineAnnotation: true,
   },
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
 });

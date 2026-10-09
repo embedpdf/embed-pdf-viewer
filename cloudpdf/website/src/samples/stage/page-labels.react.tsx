@@ -4,38 +4,31 @@ import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-import { Demo, StageFrame, stageFill } from './_shared/chrome';
+import './page-labels.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 
-// Reserve a 26px band below every page — the label lives there, so it never
-// overlaps the page and never scales away when you zoom.
-const plugins = [
-  stagePlugin({ pageFrame: { top: 0, right: 0, bottom: 26, left: 0 } }),
-  renderPlugin(),
-];
+// Reserve a 26px band below every page: the label lives there, so it never
+// covers the page and keeps its size when you zoom.
+const plugins = [stagePlugin({ pageFrame: { bottom: 26 } }), renderPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <StageFrame height={460}>
-            <Stage
-              style={stageFill}
-              pageChrome={(page) => (
-                <div className="epdf-page-label" style={{ height: page.frame.bottom }}>
-                  Page {page.pageIndex + 1}
-                </div>
-              )}
-            >
-              {() => <RenderLayer />}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <Stage
+          className="stage"
+          pageChrome={(page) => (
+            <div className="page-label" style={{ height: page.frame.bottom }}>
+              Page {page.pageIndex + 1}
+            </div>
+          )}
+        >
+          {() => <RenderLayer />}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

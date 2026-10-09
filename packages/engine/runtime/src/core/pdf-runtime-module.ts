@@ -3,7 +3,7 @@ import type { PdfFunctions } from './pdf-functions.generated';
 export type Ptr = bigint & { readonly __brand: 'PdfRuntimePtr' };
 export type Callback = bigint & { readonly __brand: 'PdfRuntimeCallback' };
 
-/** The null pointer; useful when the underlying API accepts a NULL value. */
+/** The null pointer; useful when the underlying API accepts a null value. */
 export const NULL_PTR = 0n as Ptr;
 
 export type MemoryValueKind = 'i8' | 'i16' | 'i32' | 'i64' | 'f32' | 'f64' | 'ptr';

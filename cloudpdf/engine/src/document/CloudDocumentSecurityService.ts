@@ -4,19 +4,25 @@ import {
   EngineErrorCode,
   checkCapability,
   checkCollab,
+  checkFieldAction,
   checkSetGroup,
+  collabTargetOf,
   decodePdfBits,
   expandRawScope,
   passwordPromptFromState,
+  protectedCapabilities,
   securityStateFromHead,
-  type CollabTarget,
+  type AnnotationOwner,
   type DocCapability,
   type DocumentAccessInfo,
-  type DocumentIdentity,
+  type DocumentProtection,
   type DocumentSecurityService,
   type DocumentSecurityState,
   type DocumentUnlockInput,
   type DocumentUnlockResult,
+  type EditSessionAccess,
+  type Identity,
+  type PageLayerRights,
   type PasswordPrompt,
 } from '@embedpdf/engine-core/runtime';
 import { AccessResponseSchema, wirePaths, type DocumentHead } from '@embedpdf/engine-core/wire';
@@ -24,18 +30,33 @@ import { AccessResponseSchema, wirePaths, type DocumentHead } from '@embedpdf/en
 import { decodeUnverifiedClaims } from '../transport/decodeUnverifiedClaims';
 import type { HttpClient } from '../transport/HttpClient';
 
+/** The editing session's side of `/access`: how many numbers to ask for, and what came. */
+export interface AccessEditing {
+  wanted(): number;
+  opened(edit: EditSessionAccess): void;
+}
+
 export class CloudDocumentSecurityService implements DocumentSecurityService {
-  private state: DocumentSecurityState;
+  private securityState: DocumentSecurityState;
   private access: DocumentAccessInfo | null = null;
 
   /**
    * Parsed JWT identity + scope, decoded once at construction. Used by
-   * the local-fallback path for `effectiveScope` and `identity` when
+   * the local-fallback path for `scope` and `identity` when
    * /access hasn't run yet (public-share with no CDN, password not
    * yet supplied, etc.).
    */
   private readonly tokenScope: ReadonlyArray<string>;
-  private readonly tokenIdentity: DocumentIdentity | null;
+  private readonly tokenIdentity: Identity | null;
+  /** Whether the token is a document token with a scope: rights the client can know. */
+  private readonly tokenHasDocScope: boolean;
+
+  /**
+   * What the document's signatures forbid, as the server reports it with
+   * each manifest and each `/access`: taken away from every capability
+   * check, exactly as the server's route guards take it away.
+   */
+  private protection: DocumentProtection | null = null;
 
   constructor(
     private readonly http: HttpClient,
@@ -44,15 +65,30 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     initialHead: DocumentHead,
     private readonly view: { isClosed(): boolean },
     initialToken: string | null = null,
+    private readonly editing: AccessEditing | null = null,
   ) {
-    this.state = securityStateFromHead(initialHead);
+    this.securityState = securityStateFromHead(initialHead);
     const claims = initialToken ? safeDecodeClaims(initialToken) : null;
     this.tokenScope = Array.isArray(claims?.scope) ? (claims!.scope as ReadonlyArray<string>) : [];
     this.tokenIdentity = claims ? identityFromClaims(claims) : null;
+    this.tokenHasDocScope = typeof claims?.doc_id === 'string' && Array.isArray(claims?.scope);
   }
 
-  get current(): DocumentSecurityState {
-    return this.state;
+  /**
+   * What the caller may read of a page picture, when the client can know it:
+   * once `/access` answered, or from a document token's scope. Null without
+   * either (no token, a tenant or API token): the server decides.
+   */
+  pageLayerRights(): PageLayerRights | null {
+    if (!this.access && !this.tokenHasDocScope) return null;
+    return {
+      annotations: this.allows('doc.annotate.read'),
+      formFields: this.allows('doc.forms.read'),
+    };
+  }
+
+  get state(): DocumentSecurityState {
+    return this.securityState;
   }
 
   get currentAccess(): DocumentAccessInfo | null {
@@ -62,26 +98,31 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   /**
    * Expanded capability set. Cloud-canonical post-/access; otherwise
    * computed locally from the JWT scope + /head's pdf bits using the
-   * SAME `expandRawScope` helper engine-local calls — so the value
+   * same `expandRawScope` helper engine-local calls — so the value
    * matches across engines bit-for-bit on the same inputs.
    */
-  get effectiveScope(): ReadonlyArray<string> {
+  get scope(): ReadonlyArray<string> {
     if (this.access) return this.access.effectiveScope;
-    const bits = decodePdfBits(this.state.permissions.bits);
-    return Array.from(expandRawScope(this.tokenScope, bits)).sort();
+    return Array.from(expandRawScope(this.tokenScope, this.pdfBits(), this.protection)).sort();
   }
 
   /**
-   * Wildcard-aware authorization check — mirrors what the server route layer
-   * enforces with. `effectiveScope` alone can't gate UI: it enumerates concrete
-   * grants and drops the `*` admin wildcard. So we honor a server-canonical
-   * concrete grant when present, then fall back to the same `checkCapability`
-   * predicate (which short-circuits `*`) against the JWT scope + /head bits.
+   * The server route guards' own predicate over the same inputs: what the
+   * document's signatures forbid first, then the scope (the server's copy
+   * once `/access` answered, else the JWT's), wildcard included, against the
+   * PDF bits. `scope` alone can't gate UI: it enumerates concrete grants and
+   * drops the `*` admin wildcard.
    */
   allows(cap: DocCapability): boolean {
-    if (this.access?.effectiveScope.includes(cap)) return true;
-    const bits = decodePdfBits(this.state.permissions.bits);
-    return checkCapability(cap, this.tokenScope, bits);
+    return checkCapability(cap, this.rawScope(), this.pdfBits(), this.protection);
+  }
+
+  /**
+   * Cloud-internal: what the document's signatures forbid, from the latest
+   * manifest (it changes only when a signature publishes a new version).
+   */
+  setProtection(protection: DocumentProtection | null): void {
+    this.protection = protection;
   }
 
   /**
@@ -94,17 +135,53 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * before any token/access context exists — fail closed, same rule
    * as `allows`.
    */
-  allowsAnnotationCreate(): boolean {
+  allowsAnnotation(action: 'create'): boolean;
+  allowsAnnotation(action: 'update' | 'delete', annotation: AnnotationOwner): boolean;
+  allowsAnnotation(action: 'set-group', target: { groupId: string }): boolean;
+  allowsAnnotation(
+    action: 'create' | 'update' | 'delete' | 'set-group',
+    target?: AnnotationOwner | { groupId: string },
+  ): boolean {
     const id = this.identity ?? {};
-    return checkCollab('create', selfTarget(id), this.rawScope(), id, this.pdfBits());
+    // A signature that forbids annotation writes outranks the caller's collab
+    // authority, as on the server and in the local engine.
+    const annotationsProtected = protectedCapabilities(this.protection).has('doc.annotate.modify');
+    switch (action) {
+      case 'create':
+        if (annotationsProtected) return false;
+        return checkCollab('create', selfTarget(id), this.rawScope(), id, this.pdfBits());
+      case 'set-group':
+        return checkSetGroup(
+          'annotations',
+          (target as { groupId: string }).groupId,
+          id.groupId,
+          this.rawScope(),
+        );
+      default: {
+        const annotation = (target ?? {}) as AnnotationOwner;
+        if (annotation.subtype === 'widget') return this.allows('doc.forms.modify');
+        if (annotationsProtected) return false;
+        const owner = collabTargetOf(annotation);
+        return checkCollab(action, owner, this.rawScope(), id, this.pdfBits());
+      }
+    }
   }
 
-  allowsAnnotationMutation(action: 'update' | 'delete', target: CollabTarget): boolean {
-    return checkCollab(action, target, this.rawScope(), this.identity ?? {}, this.pdfBits());
-  }
-
-  allowsAnnotationGroupAssignment(groupId: string): boolean {
-    return checkSetGroup(groupId, this.identity?.group_id, this.rawScope(), this.pdfBits());
+  /** Per-field form authorization mirrors: the checks the server's writes run, over the same inputs. */
+  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'set-group', target: { groupId: string }): boolean;
+  allowsField(action: 'fill' | 'sign' | 'set-group', target: { groupId: string | null }): boolean {
+    if (action === 'set-group') {
+      const groupId = target.groupId ?? '';
+      return checkSetGroup('fields', groupId, this.identity?.groupId, this.rawScope());
+    }
+    return checkFieldAction(
+      action,
+      target.groupId,
+      this.rawScope(),
+      this.pdfBits(),
+      this.protection,
+    );
   }
 
   /** Raw scope for the collab resolver: server-canonical post-/access, else the JWT claim. */
@@ -113,7 +190,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   }
 
   private pdfBits() {
-    return decodePdfBits(this.state.permissions.bits);
+    return decodePdfBits(this.securityState.permissions.bits);
   }
 
   /**
@@ -124,7 +201,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * version is just refreshed to reflect any server-side identity
    * augmentation (rare; reserved for future tenant hooks).
    */
-  get identity(): DocumentIdentity | null {
+  get identity(): Identity | null {
     return this.access?.identity ?? this.tokenIdentity;
   }
 
@@ -135,8 +212,11 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * security state. See `passwordPromptFromState` for the rules.
    */
   get passwordPrompt(): PasswordPrompt {
-    return passwordPromptFromState(this.state);
+    return passwordPromptFromState(this.securityState, this.passwordRejected);
   }
+
+  /** Whether the last password tried was wrong (the prompt's `incorrect`). */
+  private passwordRejected = false;
 
   unlock(input: DocumentUnlockInput): AbortablePromise<DocumentUnlockResult> {
     if (this.view.isClosed()) {
@@ -145,17 +225,26 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       );
     }
     return AbortablePromise.run<DocumentUnlockResult>(async (signal) => {
-      return await this.postAccess(signal, {
-        password: input.password,
-        mode: input.mode ?? 'any',
-      });
+      try {
+        const result = await this.postAccess(signal, {
+          password: input.password,
+          mode: input.mode ?? 'any',
+        });
+        this.passwordRejected = false;
+        return result;
+      } catch (error) {
+        if (EngineError.is(error, EngineErrorCode.DocPasswordIncorrect)) {
+          this.passwordRejected = true;
+        }
+        throw error;
+      }
     });
   }
 
   /**
    * Cloud-internal: call /v1/access with no password to establish
    * a CDN-credentialed session. Used by `CloudEngine.open` when
-   * /head's `access.reasons` includes 'cdn' but NOT 'password' —
+   * /head's `access.reasons` includes 'cdn' but not 'password' —
    * the server accepts an authenticated /access POST without a
    * password and returns the signed-URL block.
    *
@@ -179,7 +268,9 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * password) and `establishAccess()` (no password). Updates cached
    * security state, caches the access block, and pushes the CDN
    * binding into the HttpClient so subsequent fetches apply CDN
-   * tokens via `applyCdnAccess`.
+   * tokens via `applyCdnAccess`. It goes as the editing session, and a
+   * caller that may create gets the session's object numbers with it
+   * (`edit`).
    *
    * `none` CDN adapter → the access block has null overrides/policies
    * and `applyCdnAccess` short-circuits to origin; safe to call always.
@@ -189,30 +280,37 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     body: { password?: string; mode: 'any' | 'owner' },
   ): Promise<DocumentUnlockResult> {
     const response = await this.http.postJson(
-      // Identity rides the PATH — doc and layer, like every layer route;
+      // Identity rides the path — doc and layer, like every layer route;
       // the affinity tier pins the session bootstrap to the document's
       // pod from the very first request.
       wirePaths.access(this.docId, this.layerName),
       {
         ...(body.password ? { password: body.password } : {}),
         mode: body.mode,
+        ...(this.editing ? { objectNumbers: this.editing.wanted() } : {}),
       },
       (raw) => AccessResponseSchema.parse(raw),
       signal,
+      { session: true },
     );
-    this.state = response.security;
+    this.securityState = response.security;
+    this.protection = response.protection;
     this.access = {
       cdn: response.cdn,
       passwordGrant: response.passwordGrant,
       pdfPermissions: response.pdfPermissions,
       scope: response.scope,
       effectiveScope: response.effectiveScope,
+      protection: response.protection,
       identity: response.identity,
       originPasswordPolicy: response.originPasswordPolicy,
       expiresAt: response.expiresAt,
       // Deployment render lattice. Absent on older servers without render policy support.
       ...(response.renderPolicy ? { renderPolicy: response.renderPolicy } : {}),
+      bundleLimits: response.bundleLimits,
+      ...(response.edit ? { edit: response.edit } : {}),
     };
+    if (response.edit) this.editing?.opened(response.edit);
     this.http.setCdnAccess({
       cdn: response.cdn,
       docId: this.docId,
@@ -221,7 +319,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     // DocumentUnlockResult.access is `DocumentAccessInfo | undefined`,
     // not `| null`. We carry the local cache as `| null` (clearer
     // "not yet unlocked" semantic); coerce at the boundary.
-    return { security: this.state, access: this.access ?? undefined };
+    return { security: this.securityState, access: this.access ?? undefined };
   }
 }
 
@@ -241,28 +339,41 @@ function safeDecodeClaims(token: string): Record<string, unknown> | null {
 }
 
 /**
- * CREATE's CollabTarget is the caller's own identity — the same
+ * Create's CollabTarget is the caller's own identity — the same
  * derivation as engine-local's `ScopeGuard.targetForSelfCreate`, so
  * `:self` trivially passes and `:group=X` matches the caller's
  * default group.
  */
-function selfTarget(id: DocumentIdentity): CollabTarget {
+function selfTarget(id: Identity): { userId?: string; groupId?: string } {
   return {
-    ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-    ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
+    ...(id.userId !== undefined ? { userId: id.userId } : {}),
+    ...(id.groupId !== undefined ? { groupId: id.groupId } : {}),
   };
 }
 
-function identityFromClaims(claims: Record<string, unknown>): DocumentIdentity | null {
-  const out: DocumentIdentity = {};
-  if (typeof claims['user_id'] === 'string') out.user_id = claims['user_id'];
-  if (typeof claims['group_id'] === 'string') out.group_id = claims['group_id'];
-  if (typeof claims['display_name'] === 'string') out.display_name = claims['display_name'];
-  if (Array.isArray(claims['groups'])) {
-    const groups = (claims['groups'] as unknown[]).filter(
-      (g): g is string => typeof g === 'string',
-    );
-    if (groups.length > 0) out.groups = groups;
+const IDENTITY_STRING_FIELDS = [
+  'userId',
+  'displayName',
+  'email',
+  'title',
+  'organization',
+  'organizationalUnit',
+  'groupId',
+] as const;
+
+/**
+ * The token's `identity` claim, read the way the server reads it: string
+ * fields, empty values absent. The server rejects a
+ * malformed claim; unverified here, anything else is skipped.
+ */
+function identityFromClaims(claims: Record<string, unknown>): Identity | null {
+  const claim = claims['identity'];
+  if (!claim || typeof claim !== 'object' || Array.isArray(claim)) return null;
+  const record = claim as Record<string, unknown>;
+  const out: { -readonly [K in keyof Identity]: Identity[K] } = {};
+  for (const key of IDENTITY_STRING_FIELDS) {
+    const value = record[key];
+    if (typeof value === 'string' && value.length > 0) out[key] = value;
   }
   return Object.keys(out).length > 0 ? out : null;
 }

@@ -1,4 +1,4 @@
-import type { SignatureDTO } from '@embedpdf/engine-core/runtime';
+import type { PdfCoordinates, SignatureDTO } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -18,7 +18,7 @@ export interface SealExpectation {
  * version — the in-session complete and the server's session-less
  * finalize. Reading the result back through the ordinary signature model
  * proves the bytes, not the writer: the field is signed, its signature
- * covers the whole LAST revision (the candidate's own, never an earlier
+ * covers the whole last revision (the candidate's own, never an earlier
  * one), its /ByteRange is the one the digest was computed over, and the
  * /Contents decode to exactly the CMS installed. Anything else is refused
  * and the bytes are never installed.
@@ -33,8 +33,7 @@ export function assertSealedSignature(
     new EngineError(EngineErrorCode.SignatureRefused, `the sealed bytes ${why}`);
   const signatures = readSignaturesFromModel(runtime, model);
   const signature = signatures.find(
-    (s) =>
-      s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === expected.fieldObjectNumber,
+    (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === expected.fieldObjectNumber,
   );
   if (!signature) throw refuse('lost the signature field');
   if (!signature.signed || signature.coverage !== 'whole-revision' || !signature.byteRange) {

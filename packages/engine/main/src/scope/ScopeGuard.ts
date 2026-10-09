@@ -8,11 +8,18 @@ import {
   checkCapability,
   checkCollab,
   checkSetGroup,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
+  decodePdfBits,
+  describeProtection,
   expandRawScope,
   type AnnotationActor,
+  type AnnotationAuthority,
+  type ChangeAuthority,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
+  type FieldWriteAction,
 } from '@embedpdf/engine-core/runtime';
 
 import type { HandleScopeContext } from './HandleScopeContext';
@@ -34,8 +41,18 @@ import type { HandleScopeContext } from './HandleScopeContext';
 export class ScopeGuard {
   private protection: DocumentProtection | null;
 
-  constructor(private readonly ctx: HandleScopeContext) {
+  constructor(private ctx: HandleScopeContext) {
     this.protection = ctx.signedDocumentPolicy === 'protect' ? ctx.protection : null;
+  }
+
+  /**
+   * Replace the file's own permission bits after an unlock loaded it with
+   * another password: the owner password lifts the file's restrictions,
+   * and a file opened locked only now has bits at all. What `pdf.permissions`
+   * grants follows.
+   */
+  setPdfPermissions(pdfPermissionsBits: number | null): void {
+    this.ctx = { ...this.ctx, pdfBits: decodePdfBits(pdfPermissionsBits) };
   }
 
   /** The signature-derived restrictions this guard subtracts (`null` when none apply). */
@@ -52,7 +69,7 @@ export class ScopeGuard {
     this.protection = this.ctx.signedDocumentPolicy === 'protect' ? protection : null;
   }
 
-  /** Identity claims (user_id, group_id, groups, display_name). */
+  /** Who the handle acts for, as supplied to `open()`. */
   identity(): HandleScopeContext['identity'] {
     return this.ctx.identity;
   }
@@ -102,14 +119,14 @@ export class ScopeGuard {
   }
 
   /**
-   * Throws `PermissionDenied` if the scope grants NONE of `caps`. Used
+   * Throws `PermissionDenied` if the scope grants none of `caps`. Used
    * by routes whose underlying endpoint is satisfied by more than one
    * capability (currently unused locally; reserved for future shapes
    * like `/text` which the cloud gates on `doc.text.copy OR doc.text.search`).
    */
   assertAnyCapability(caps: ReadonlyArray<DocCapability>): void {
     if (!checkAnyCapability(caps, this.ctx.scope, this.ctx.pdfBits, this.protection)) {
-      throw new PermissionDenied(`one of: ${caps.join(', ')}`, 'engine-local');
+      throw new PermissionDenied(caps[0] ?? 'doc.open', 'engine-local', caps);
     }
   }
 
@@ -134,18 +151,74 @@ export class ScopeGuard {
 
   /** Non-throwing destination-group check — see `assertSetGroup`. */
   canSetGroup(newGroupId: string): boolean {
-    return checkSetGroup(newGroupId, this.ctx.identity.group_id, this.ctx.scope, this.ctx.pdfBits);
+    return checkSetGroup('annotations', newGroupId, this.ctx.identity.groupId, this.ctx.scope);
+  }
+
+  /** Whether the handle may put a form field in `groupId`. */
+  canSetFieldGroup(groupId: string): boolean {
+    return checkSetGroup('fields', groupId, this.ctx.identity.groupId, this.ctx.scope);
+  }
+
+  /** Whether the handle may `action` (fill in, or sign) the field in `groupId`. */
+  canFieldWrite(groupId: string | null, action: FieldWriteAction): boolean {
+    return allowsFieldWrite(this.changeAuthority(), groupId, action);
+  }
+
+  /**
+   * Throws unless the handle may `action` some field: what a form write
+   * checks before the job, which checks each field it writes.
+   */
+  assertSomeFieldWrite(action: FieldWriteAction): void {
+    if (allowsSomeFieldWrite(this.changeAuthority(), action)) return;
+    this.assertCapability(action === 'fill' ? 'doc.forms.fill' : 'doc.sign');
+  }
+
+  /**
+   * Throws unless the handle may fill in every field: a write that checks
+   * no field (script effects) takes a filler no `fields:fill` scope narrows.
+   */
+  assertEveryFieldFill(): void {
+    this.assertCapability('doc.forms.fill');
+    if (!this.canFieldWrite(null, 'fill'))
+      throw new PermissionDenied('doc.forms.fill', 'engine-local');
   }
 
   assertCollab(action: CollabAction, target: CollabTarget): void {
+    this.assertAnnotationsUnprotected();
+    if (!this.canCollab(action, target)) {
+      throw new PermissionDenied(`annotations:${action}`, 'engine-local');
+    }
+  }
+
+  /**
+   * What an annotation write carries for the worker to check against the
+   * annotations it changes, inside the write: who the handle acts for and
+   * its grants. The document's signature protection is not in it; check
+   * {@link assertAnnotationsUnprotected} before the write.
+   */
+  annotationAuthority(): AnnotationAuthority {
+    return {
+      identity: this.ctx.identity,
+      grants: { scope: this.ctx.scope, pdfBits: this.ctx.pdfBits },
+    };
+  }
+
+  /**
+   * What a change carries for the worker to check each of its ops against,
+   * inside the write: who the handle acts for, its grants, and what the
+   * document's signatures forbid.
+   */
+  changeAuthority(): ChangeAuthority {
+    return { ...this.annotationAuthority(), protection: this.protection };
+  }
+
+  /** Throws `ProtectedDocument` when a signature forbids annotation writes. */
+  assertAnnotationsUnprotected(): void {
     if (protectedCapabilities(this.protection).has('doc.annotate.modify')) {
       throw new EngineError(
         EngineErrorCode.ProtectedDocument,
         describeProtection('doc.annotate.modify', this.protection!),
       );
-    }
-    if (!this.canCollab(action, target)) {
-      throw new PermissionDenied(`annotations:${action}`, 'engine-local');
     }
   }
 
@@ -171,62 +244,36 @@ export class ScopeGuard {
    *   groupId     → /EMBD_Metadata/GroupID
    *   displayName → /T (the standard PDF "author" display field)
    *
+   * `groupId` is the group the caller chose for the annotation, checked
+   * with {@link assertSetGroup} beforehand; it defaults to the identity's.
+   *
    * Returns `undefined` when the handle has no identity fields at all
    * (anonymous local handle) — the worker still writes /M but skips
    * both /T and /EMBD_Metadata.
    */
-  actorForCreate(): AnnotationActor | undefined {
-    const id = this.ctx.identity;
-    const actor: AnnotationActor = {
-      ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-      ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
-      ...(id.display_name !== undefined ? { displayName: id.display_name } : {}),
-    };
-    return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
-  }
-
-  /**
-   * Build the CollabTarget for CREATE — the handle's own identity.
-   * Fed to `assertCollab('create', target)` so `:self`/`:all` trivially
-   * pass and `:group=X` is meaningful (matches when the handle's
-   * default group is X).
-   */
-  targetForSelfCreate(): CollabTarget {
-    const id = this.ctx.identity;
-    return {
-      ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-      ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
-    };
-  }
-
-  /**
-   * Build the actor for an annotation UPDATE.
-   *   - userId      → caller's identity (UpdatedBy stamp)
-   *   - groupId     → ONLY when the patch reassigns it (differs from current)
-   *   - displayName → caller's display_name (for the modification trail;
-   *                   the worker does not touch /T on update)
-   *
-   * No set-group check here — call `assertSetGroup` separately first,
-   * before producing the actor.
-   */
-  actorForUpdate(
-    currentGroupId: string | undefined,
-    patchGroupId: string | undefined,
+  actorForCreate(
+    groupId: string | undefined = this.ctx.identity.groupId,
   ): AnnotationActor | undefined {
     const id = this.ctx.identity;
-    const isReassigning = patchGroupId !== undefined && patchGroupId !== currentGroupId;
     const actor: AnnotationActor = {
-      ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
-      ...(id.display_name !== undefined ? { displayName: id.display_name } : {}),
-      ...(isReassigning ? { groupId: patchGroupId } : {}),
+      ...(id.userId !== undefined ? { userId: id.userId } : {}),
+      ...(groupId !== undefined ? { groupId } : {}),
+      ...(id.displayName !== undefined ? { displayName: id.displayName } : {}),
     };
     return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
   }
-}
 
-function describeProtection(cap: DocCapability, protection: DocumentProtection): string {
-  const cause = protection.certification
-    ? `certification signature ${protection.certification.signatureIndex} (permission ${protection.certification.permission})`
-    : `an existing signature (declared level '${protection.enforced ?? 'none declared'}')`;
-  return `the document is signed: ${cause} forbids '${cap}'`;
+  /**
+   * Build the CollabTarget for create — the handle's own identity, in
+   * the group the annotation is created in (the identity's unless the
+   * caller chose one). Fed to `assertCollab('create', target)` so
+   * `:self`/`:all` trivially pass and `:group=X` is meaningful.
+   */
+  targetForSelfCreate(groupId: string | undefined = this.ctx.identity.groupId): CollabTarget {
+    const id = this.ctx.identity;
+    return {
+      ...(id.userId !== undefined ? { userId: id.userId } : {}),
+      ...(groupId !== undefined ? { groupId } : {}),
+    };
+  }
 }

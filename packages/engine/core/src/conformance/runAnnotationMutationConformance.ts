@@ -1,8 +1,11 @@
+import { appearanceRaster } from './appearanceRasters';
+import { iconRect } from './creatables';
 import type {
   ConformanceTestRunner,
   ConformanceFixture,
   ConformanceOptions,
 } from './runMetadataConformance';
+import { drawnPointsOf } from '../pageSpace/helpers';
 import type {
   AnnotationDraft,
   AnnotationPatch,
@@ -21,19 +24,19 @@ import type {
   TextDraft,
   TextPatch,
 } from '../annotation/kinds';
-import type { WeakAnnotationEditSession } from '../engine/DocumentAnnotationsService';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { InkList, LinePoints, PdfPoint, PdfRect } from '../geometry/primitives';
+import type { PageBox, PagePoint } from '../geometry/pageSpace';
+import { pagePointsBounds, pagePointTurned, pageTurnOfUpright } from '../pageSpace/helpers';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import {
   AnnotationCreateResultSchema,
-  AnnotationDeleteResultSchema,
-  AnnotationMoveResultSchema,
+  AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
 } from '../wire/schemas';
 
@@ -47,90 +50,85 @@ import {
 export interface AnnotationMutationConformanceFixture extends ConformanceFixture {
   /** PDF object number of the page used by the mutation tests. */
   pageObjectNumber: number;
-  /** Page already has at least one weak annotation (no /NM, direct object). */
-  expectsWeakAnnotation: boolean;
+  /** The page has at least one annotation born inline (a dictionary in `/Annots`, no object number). */
+  expectsInlineAnnotation: boolean;
   /**
-   * QuadPoints to use for the create() smoke test. Coordinates are in
-   * PDF user space; pick a small rectangle that fits anywhere on the
-   * fixture page so we don't flake on different page sizes.
+   * QuadPoints to use for the create() smoke test, in page space; pick a
+   * small rectangle that fits anywhere on the fixture page so we don't
+   * flake on different page sizes.
    */
   createQuad?: HighlightDraft['quadPoints'];
   /**
-   * `/Rect` to use for the shape (circle/square) create tests. PDF user
+   * The box to use for the shape (circle/square) create tests, in page
    * space; pick a small box that fits anywhere on the fixture page.
    */
-  createShapeRect?: PdfRect;
+  createShapeRect?: PageBox;
   /**
-   * `/Vertices` to use for the polygon/polyline create tests. PDF user
-   * space; must fit inside `createShapeRect` (the rect the engine bakes
-   * the appearance into). Defaults to a small triangle.
+   * `/Vertices` to use for the polygon/polyline create tests, in page
+   * space; must fit inside `createShapeRect`. Defaults to a small triangle.
    */
-  createVertices?: PdfPoint[];
+  createVertices?: PagePoint[];
   /**
-   * `/L` endpoints to use for the line create test. PDF user space; must
-   * fit inside `createShapeRect`. Defaults to the rect's diagonal.
+   * `/L` endpoints to use for the line create test, in page space; must fit
+   * inside `createShapeRect`. Defaults to the rect's diagonal.
    */
-  createLinePoints?: LinePoints;
+  createLinePoints?: LineDraft['linePoints'];
   /**
-   * `/InkList` strokes to use for the ink create test. PDF user space; must
+   * `/InkList` strokes to use for the ink create test, in page space; must
    * fit inside `createShapeRect`. Defaults to a single short stroke.
    */
-  createInkList?: InkList;
+  createInkList?: InkDraft['inkList'];
 }
 
 export interface AnnotationMutationConformanceOptions extends Omit<ConformanceOptions, 'fixture'> {
   fixture: AnnotationMutationConformanceFixture;
-  /**
-   * `true` for engines that expose the raw RGBA appearance rasters
-   * (`renderAppearances`). When set, the shape-create test additionally
-   * asserts that creating a shape produces a baked `/AP` the appearance
-   * reader can rasterize. The cloud engine ships encoded images instead
-   * and leaves this `false`.
-   */
-  supportsAppearanceRasters?: boolean;
 }
 
+/** Its top corners first, as a text selection's quads are. */
 const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
   {
-    p1: { x: 50, y: 100 },
-    p2: { x: 150, y: 100 },
-    p3: { x: 50, y: 80 },
-    p4: { x: 150, y: 80 },
+    upperLeft: { x: 50, y: 100 },
+    upperRight: { x: 150, y: 100 },
+    lowerLeft: { x: 50, y: 120 },
+    lowerRight: { x: 150, y: 120 },
   },
 ];
 
-const DEFAULT_SHAPE_RECT: PdfRect = { left: 60, bottom: 60, right: 160, top: 140 };
+const DEFAULT_SHAPE_RECT: PageBox = { x: 60, y: 60, width: 100, height: 80 };
 
 /** A small triangle inside DEFAULT_SHAPE_RECT (valid for polygon: >=3). */
-const DEFAULT_VERTICES: PdfPoint[] = [
-  { x: 70, y: 70 },
-  { x: 150, y: 70 },
-  { x: 110, y: 130 },
+const DEFAULT_VERTICES: PagePoint[] = [
+  { x: 70, y: 130 },
+  { x: 150, y: 130 },
+  { x: 110, y: 70 },
 ];
 
 /** A line along the diagonal of DEFAULT_SHAPE_RECT. */
-const DEFAULT_LINE_POINTS: LinePoints = {
-  start: { x: 70, y: 70 },
-  end: { x: 150, y: 130 },
+const DEFAULT_LINE_POINTS: LineDraft['linePoints'] = {
+  start: { x: 70, y: 130 },
+  end: { x: 150, y: 70 },
 };
 
 /**
  * A knee-jointed callout leader inside DEFAULT_SHAPE_RECT: the called-out
  * point, a knee, then the point touching the text box.
  */
-const DEFAULT_CALLOUT_LINE: [PdfPoint, PdfPoint, PdfPoint] = [
-  { x: 65, y: 65 },
-  { x: 90, y: 90 },
+const DEFAULT_CALLOUT_LINE: [PagePoint, PagePoint, PagePoint] = [
+  { x: 65, y: 135 },
+  { x: 90, y: 110 },
   { x: 110, y: 100 },
 ];
 
 /** A single freehand stroke inside DEFAULT_SHAPE_RECT (valid for ink). */
-const DEFAULT_INK_STROKES: InkList = [
+/** Equal to 3 decimals: points and rects are stored as f32. */
+const near = (a: number, b: number): boolean => Math.abs(a - b) < 5e-4;
+
+const DEFAULT_INK_STROKES: InkDraft['inkList'] = [
   [
-    { x: 70, y: 70 },
-    { x: 100, y: 120 },
-    { x: 130, y: 80 },
-    { x: 150, y: 130 },
+    { x: 70, y: 130 },
+    { x: 100, y: 80 },
+    { x: 130, y: 120 },
+    { x: 150, y: 70 },
   ],
 ];
 
@@ -141,17 +139,11 @@ const DEFAULT_INK_STROKES: InkList = [
  * @cloudpdf/server) implementations must pass identically.
  *
  * The locked rules being verified here:
- *   - `create` is append-only: PDFium drops the new annotation at
- *     `index = previousCount`, so no existing index shifts. Treated
- *     as non-invalidating — revisions do NOT bump and weak refs
- *     captured before the create remain valid.
- *   - `update` is non-structural; revisions do NOT bump.
- *   - Opportunistic /NM stamp upgrades a weak annotation's ref to
- *     `kind: 'nm'` on update; an already-durable annotation's /NM is
- *     NEVER touched.
- *   - `delete` and `move` are the only index-shifting ops. They bump
- *     the per-page revision and, on a page that had weak refs before
- *     the mutation, surface `shouldRefetch: 'weakRefsInvalidated'`.
+ *   - `create` is append-only: the new annotation paints on top of the
+ *     page's others, and none of them moves.
+ *   - Every annotation keeps its name through every write: an object
+ *     number, or the `baseIndex` of one born inline in the file. No write
+ *     stamps an /NM to name one.
  *   - Abort propagates as `AbortError` even before the worker
  *     responds.
  */
@@ -178,7 +170,7 @@ export function runAnnotationMutationConformance(
       if (engine) await engine.destroy();
     });
 
-    test('create appends without shifting indices and leaves weak refs valid', async () => {
+    test('create appends on top without moving the others', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -188,43 +180,34 @@ export function runAnnotationMutationConformance(
         const draft: HighlightDraft = {
           subtype: 'highlight',
           contents: 'mutation conformance: created',
-          color: { r: 200, g: 100, b: 50 },
+          color: '#c86432',
           opacity: 0.5,
           quadPoints: quad,
         };
         const result = await page.annotations.create(draft);
         expect(AnnotationCreateResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+        expect(result.meta.affectedPages[0].objectNumber).toBe(fix.pageObjectNumber);
         expect('cacheDelta' in result.meta).toBe(true);
 
-        // Always durable (engine uses the EPDFPage_CreateAnnot fork helper).
-        expect(result.created.identityQuality).toBe('durable');
-        expect(result.created.subtype).toBe('highlight');
-        expect(result.created.ref.kind).toBe('objectNumber');
+        // Born as an object (the engine creates it with EPDFPage_CreateAnnotRaw).
+        expect(result.annotation.subtype).toBe('highlight');
+        expect(result.annotation.ref.kind).toBe('objectNumber');
 
-        // Locked rule: create is append-only, so the page revision does
-        // NOT bump and no weak refs become stale — regardless of whether
-        // the page had pre-existing weak annotations.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(result.meta.shouldRefetch).toBe(null);
-        expect(result.meta.weakRefsInvalidated).toBe(false);
         expect(result.meta.changed.length).toBe(1);
 
-        // The annotation is actually on the page now, at the END of the
-        // /Annots array. This is the invariant that justifies the
-        // non-invalidating impact: every prior index is preserved.
+        // The annotation is actually on the page now, on top of the others.
         const after = await page.annotations.list();
         expect(after.annotations.length).toBe(beforeCount + 1);
-        expect(result.created.index).toBe(beforeCount);
+        expect(annotationKey(after.annotations.at(-1)!.ref)).toBe(
+          annotationKey(result.annotation.ref),
+        );
       } finally {
         await doc.close();
       }
     });
 
-    test('create + update honor annotation flags (set on create, merge on patch)', async () => {
+    test('create and update write each annotation flag as its own field', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -233,30 +216,24 @@ export function runAnnotationMutationConformance(
         const draft: HighlightDraft = {
           subtype: 'highlight',
           contents: 'mutation conformance: flags',
-          color: { r: 10, g: 20, b: 30 },
+          color: '#0a141e',
           opacity: 1,
           quadPoints: quad,
-          flags: { print: true },
+          print: true,
         };
         const created = await page.annotations.create(draft);
-        expect(created.created.flags.print).toBe(true);
-        expect(created.created.flags.hidden).toBe(false);
+        expect(created.annotation.print).toBe(true);
+        expect(created.annotation.hidden).toBe(false);
 
-        // Patch a different flag: it must merge, leaving `print` intact.
-        const hidden = await page.annotations.update(created.created.ref, {
-          subtype: 'highlight',
-          flags: { hidden: true },
-        });
-        expect(hidden.updated.flags.hidden).toBe(true);
-        expect(hidden.updated.flags.print).toBe(true);
+        // Setting another flag leaves `print` as it is.
+        const hidden = await page.annotations.update(created.annotation.ref, { hidden: true });
+        expect(hidden.annotation.hidden).toBe(true);
+        expect(hidden.annotation.print).toBe(true);
 
         // Clearing one flag leaves the rest untouched.
-        const cleared = await page.annotations.update(created.created.ref, {
-          subtype: 'highlight',
-          flags: { print: false },
-        });
-        expect(cleared.updated.flags.print).toBe(false);
-        expect(cleared.updated.flags.hidden).toBe(true);
+        const cleared = await page.annotations.update(created.annotation.ref, { print: false });
+        expect(cleared.annotation.print).toBe(false);
+        expect(cleared.annotation.hidden).toBe(true);
       } finally {
         await doc.close();
       }
@@ -270,39 +247,37 @@ export function runAnnotationMutationConformance(
         const circleDraft: CircleDraft = {
           subtype: 'circle',
           contents: 'mutation conformance: circle',
-          rect: shapeRect,
-          interiorColor: { r: 255, g: 0, b: 0 },
-          color: { r: 0, g: 0, b: 255 },
+          box: shapeRect,
+          interiorColor: '#ff0000',
+          color: '#0000ff',
           strokeWidth: 3,
           borderStyle: 'solid',
           opacity: 0.6,
         };
         const circle = await page.annotations.create(circleDraft);
         expect(AnnotationCreateResultSchema.safeParse(circle).success).toBe(true);
-        expect(circle.created.subtype).toBe('circle');
-        expect(circle.created.identityQuality).toBe('durable');
-        expect(circle.created.ref.kind).toBe('objectNumber');
-        if (circle.created.subtype === 'circle') {
-          expect(circle.created.interiorColor).toMatchObject({ r: 255, g: 0, b: 0 });
-          expect(circle.created.color).toMatchObject({ r: 0, g: 0, b: 255 });
-          expect(circle.created.strokeWidth).toBe(3);
-          expect(circle.created.borderStyle).toBe('solid');
+        expect(circle.annotation.subtype).toBe('circle');
+        expect(circle.annotation.ref.kind).toBe('objectNumber');
+        if (circle.annotation.subtype === 'circle') {
+          expect(circle.annotation.interiorColor).toBe('#ff0000');
+          expect(circle.annotation.color).toBe('#0000ff');
+          expect(circle.annotation.strokeWidth).toBe(3);
+          expect(circle.annotation.borderStyle).toBe('solid');
           // /CA stored as f32 — compare at 2dp to absorb float drift.
-          expect(Math.round(circle.created.opacity * 100) / 100).toBe(0.6);
-          // /Rect round-trips. The chosen bounds are small integers that
-          // are exactly representable in f32, so an exact compare is safe.
-          expect(circle.created.rect.left).toBe(shapeRect.left);
-          expect(circle.created.rect.right).toBe(shapeRect.right);
-          expect(circle.created.rect.bottom).toBe(shapeRect.bottom);
-          expect(circle.created.rect.top).toBe(shapeRect.top);
+          expect(Math.round(circle.annotation.opacity * 100) / 100).toBe(0.6);
+          // The border is drawn inside the box, so `rect` is the box. The
+          // chosen bounds are small integers that are exactly representable
+          // in f32, so an exact compare is safe.
+          expect(circle.annotation.box).toEqual(shapeRect);
+          expect(circle.annotation.rect).toEqual(shapeRect);
         }
 
         const squareDraft: SquareDraft = {
           subtype: 'square',
           contents: 'mutation conformance: square',
-          rect: shapeRect,
+          box: shapeRect,
           interiorColor: null,
-          color: { r: 0, g: 128, b: 0 },
+          color: '#008000',
           strokeWidth: 2,
           borderStyle: 'dashed',
           dashArray: [3, 2],
@@ -310,13 +285,13 @@ export function runAnnotationMutationConformance(
         };
         const square = await page.annotations.create(squareDraft);
         expect(AnnotationCreateResultSchema.safeParse(square).success).toBe(true);
-        expect(square.created.subtype).toBe('square');
-        if (square.created.subtype === 'square') {
+        expect(square.annotation.subtype).toBe('square');
+        if (square.annotation.subtype === 'square') {
           // interiorColor omitted/null => no fill.
-          expect(square.created.interiorColor).toBe(null);
-          expect(square.created.color).toMatchObject({ r: 0, g: 128, b: 0 });
-          expect(square.created.borderStyle).toBe('dashed');
-          expect(square.created.dashArray).toEqual([3, 2]);
+          expect(square.annotation.interiorColor).toBe(null);
+          expect(square.annotation.color).toBe('#008000');
+          expect(square.annotation.borderStyle).toBe('dashed');
+          expect(square.annotation.dashArray).toEqual([3, 2]);
         }
 
         const after = await page.annotations.list();
@@ -328,59 +303,62 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('cloudy border (/BE) + rect differences (/RD) are tri-state', async () => {
+    test('a cloudy border reaches past the box, and rect takes it in', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
-        // A plain shape reads BOTH optional entries as explicit null — absence
-        // is stated, so a read DTO compares structurally against a clearing
-        // patch. The draft ALSO states them as null (exactly what the plugin's
+        // A plain shape reads `cloudyIntensity` as explicit null — absence is
+        // stated, so a read DTO compares structurally against a clearing
+        // patch. The draft also states it as null (exactly what the plugin's
         // total projection emits for a fresh solid shape): a draft writer must
         // skip null, never dereference it — the stale-worker regression where
         // solid creates vanished while cloudy ones survived.
         const plainDraft: SquareDraft = {
           subtype: 'square',
-          contents: 'mutation conformance: cloudy tri-state',
-          rect: shapeRect,
-          color: { r: 0, g: 128, b: 0 },
+          contents: 'mutation conformance: cloudy border',
+          box: shapeRect,
+          color: '#008000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
           cloudyIntensity: null,
-          rectDifferences: null,
         };
         const plain = await page.annotations.create(plainDraft);
-        expect(plain.created.subtype).toBe('square');
-        if (plain.created.subtype === 'square') {
-          expect(plain.created.cloudyIntensity).toBe(null);
-          expect(plain.created.rectDifferences).toBe(null);
+        expect(plain.annotation.subtype).toBe('square');
+        if (plain.annotation.subtype === 'square') {
+          expect(plain.annotation.cloudyIntensity).toBe(null);
+          expect(plain.annotation.rect).toEqual(shapeRect);
         }
 
-        // A value sets /BE + /RD…
-        const rd = { left: 5, top: 5, right: 5, bottom: 5 };
-        const cloudy = await page.annotations.update(plain.created.ref, {
+        // The bumps reach out past the box on every side: the box stays, and
+        // `rect` takes them in.
+        const cloudy = await page.annotations.update(plain.annotation.ref, {
           subtype: 'square',
           cloudyIntensity: 2,
-          rectDifferences: rd,
         });
-        expect(cloudy.updated.subtype).toBe('square');
-        if (cloudy.updated.subtype === 'square') {
-          expect(cloudy.updated.cloudyIntensity).toBe(2);
-          expect(cloudy.updated.rectDifferences).toMatchObject(rd);
+        expect(cloudy.annotation.subtype).toBe('square');
+        if (cloudy.annotation.subtype === 'square') {
+          expect(cloudy.annotation.cloudyIntensity).toBe(2);
+          const { box, rect } = cloudy.annotation;
+          for (const edge of ['x', 'y', 'width', 'height'] as const) {
+            expect(Math.abs(box[edge] - shapeRect[edge]) < 1e-3).toBe(true);
+          }
+          expect(rect.x < box.x - 1 && rect.y < box.y - 1).toBe(true);
+          expect(rect.x + rect.width > box.x + box.width + 1).toBe(true);
+          expect(rect.y + rect.height > box.y + box.height + 1).toBe(true);
         }
 
-        // …and null removes them: the cloudy -> solid transition leaves no
-        // stale /RD behind (the Adobe "phantom padding" regression).
-        const solid = await page.annotations.update(plain.created.ref, {
+        // A solid border gives the room back: no stale bump room is left
+        // behind (the Adobe "phantom padding" regression).
+        const solid = await page.annotations.update(plain.annotation.ref, {
           subtype: 'square',
           cloudyIntensity: null,
-          rectDifferences: null,
         });
-        expect(solid.updated.subtype).toBe('square');
-        if (solid.updated.subtype === 'square') {
-          expect(solid.updated.cloudyIntensity).toBe(null);
-          expect(solid.updated.rectDifferences).toBe(null);
+        expect(solid.annotation.subtype).toBe('square');
+        if (solid.annotation.subtype === 'square') {
+          expect(solid.annotation.cloudyIntensity).toBe(null);
+          expect(solid.annotation.rect).toEqual(shapeRect);
         }
 
         // Polygon carries /BE too (but never /RD, per ISO 32000) — same tri-state,
@@ -388,26 +366,25 @@ export function runAnnotationMutationConformance(
         const polyDraft: PolygonDraft = {
           subtype: 'polygon',
           contents: 'mutation conformance: polygon cloudy tri-state',
-          rect: shapeRect,
           vertices,
-          color: { r: 0, g: 0, b: 255 },
+          color: '#0000ff',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
           cloudyIntensity: 1,
         };
         const poly = await page.annotations.create(polyDraft);
-        expect(poly.created.subtype).toBe('polygon');
-        if (poly.created.subtype === 'polygon') {
-          expect(poly.created.cloudyIntensity).toBe(1);
+        expect(poly.annotation.subtype).toBe('polygon');
+        if (poly.annotation.subtype === 'polygon') {
+          expect(poly.annotation.cloudyIntensity).toBe(1);
         }
-        const polySolid = await page.annotations.update(poly.created.ref, {
+        const polySolid = await page.annotations.update(poly.annotation.ref, {
           subtype: 'polygon',
           cloudyIntensity: null,
         });
-        expect(polySolid.updated.subtype).toBe('polygon');
-        if (polySolid.updated.subtype === 'polygon') {
-          expect(polySolid.updated.cloudyIntensity).toBe(null);
+        expect(polySolid.annotation.subtype).toBe('polygon');
+        if (polySolid.annotation.subtype === 'polygon') {
+          expect(polySolid.annotation.cloudyIntensity).toBe(null);
         }
       } finally {
         await doc.close();
@@ -421,8 +398,8 @@ export function runAnnotationMutationConformance(
         const draft: SquareDraft = {
           subtype: 'square',
           contents: 'mutation conformance: appearance echo',
-          rect: shapeRect,
-          color: { r: 200, g: 0, b: 0 },
+          box: shapeRect,
+          color: '#c80000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -433,43 +410,33 @@ export function runAnnotationMutationConformance(
         // move: the engine value-diffs away the unchanged style keys, verifies
         // the rigid translation, and preserves the baked /AP — the raster
         // invalidation signal stays off.
-        const moved = await page.annotations.update(created.created.ref, {
+        const moved = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: {
-            left: shapeRect.left + 12,
-            bottom: shapeRect.bottom - 8,
-            right: shapeRect.right + 12,
-            top: shapeRect.top - 8,
-          },
-          color: { r: 200, g: 0, b: 0 },
+          box: { ...shapeRect, x: shapeRect.x + 12, y: shapeRect.y + 8 },
+          color: '#c80000',
           strokeWidth: 2,
           opacity: 1,
         });
         expect(moved.appearance).toEqual({ action: 'preserved', changed: false });
 
         // Metadata-only patches never touch /AP.
-        const flagged = await page.annotations.update(created.created.ref, {
+        const flagged = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          flags: { print: true },
+          print: true,
         });
         expect(flagged.appearance).toEqual({ action: 'preserved', changed: false });
 
         // A real style edit re-bakes and says so.
-        const restyled = await page.annotations.update(created.created.ref, {
+        const restyled = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          interiorColor: { r: 255, g: 214, b: 0 },
+          interiorColor: '#ffd600',
         });
         expect(restyled.appearance).toEqual({ action: 'regenerated', changed: true });
 
         // A resize is not a translation — it re-bakes too.
-        const resized = await page.annotations.update(created.created.ref, {
+        const resized = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: {
-            left: shapeRect.left,
-            bottom: shapeRect.bottom,
-            right: shapeRect.right + 40,
-            top: shapeRect.top,
-          },
+          box: { ...shapeRect, width: shapeRect.width + 40 },
         });
         expect(resized.appearance).toEqual({ action: 'regenerated', changed: true });
       } finally {
@@ -485,106 +452,405 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'DA read-modify-write',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'times-roman',
           fontSize: 14,
           textAlign: 'left',
-          color: { r: 200, g: 0, b: 0 },
+          color: '#c80000',
         };
         const created = await page.annotations.create(draft);
         // `/DA` packs font+size+colour into one string; the writer must
         // read-modify-write, so a partial patch cannot reset the others (the
         // old constant fallbacks turned a size-only patch into 12pt black).
-        expect(created.created.subtype).toBe('free-text');
-        if (created.created.subtype === 'free-text') {
-          expect(created.created.fontFamily).toBe('times-roman');
+        expect(created.annotation.subtype).toBe('free-text');
+        if (created.annotation.subtype === 'free-text') {
+          expect(created.annotation.fontFamily).toBe('times-roman');
         }
-        const sized = await page.annotations.update(created.created.ref, {
+        const sized = await page.annotations.update(created.annotation.ref, {
           subtype: 'free-text',
           fontSize: 18,
         });
-        expect(sized.updated.subtype).toBe('free-text');
-        if (sized.updated.subtype === 'free-text') {
-          expect(sized.updated.fontFamily).toBe('times-roman');
-          expect(sized.updated.fontSize).toBe(18);
-          expect(sized.updated.color).toMatchObject({ r: 200, g: 0, b: 0 });
+        expect(sized.annotation.subtype).toBe('free-text');
+        if (sized.annotation.subtype === 'free-text') {
+          expect(sized.annotation.fontFamily).toBe('times-roman');
+          expect(sized.annotation.fontSize).toBe(18);
+          expect(sized.annotation.color).toBe('#c80000');
         }
-        const recolored = await page.annotations.update(created.created.ref, {
+        const recolored = await page.annotations.update(created.annotation.ref, {
           subtype: 'free-text',
-          color: { r: 0, g: 0, b: 200 },
+          color: '#0000c8',
         });
-        if (recolored.updated.subtype === 'free-text') {
-          expect(recolored.updated.fontFamily).toBe('times-roman');
-          expect(recolored.updated.fontSize).toBe(18);
-          expect(recolored.updated.color).toMatchObject({ r: 0, g: 0, b: 200 });
+        if (recolored.annotation.subtype === 'free-text') {
+          expect(recolored.annotation.fontFamily).toBe('times-roman');
+          expect(recolored.annotation.fontSize).toBe(18);
+          expect(recolored.annotation.color).toBe('#0000c8');
         }
       } finally {
         await doc.close();
       }
     });
 
-    test('box transform is tri-state: rect-only moves keep rotation, null flattens', async () => {
+    test('a turn stays until changed: a box move keeps it, null straightens', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const draft: SquareDraft = {
           subtype: 'square',
           contents: 'transform tri-state',
-          rect: shapeRect,
-          color: { r: 0, g: 0, b: 255 },
+          box: shapeRect,
+          color: '#0000ff',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
-          // A 90° rotation whose AABB equals the box (square) — valid pair.
           rotation: 90,
-          unrotatedRect: shapeRect,
         };
         const created = await page.annotations.create(draft);
-        expect(created.created.subtype).toBe('square');
-        if (created.created.subtype === 'square') {
-          expect(created.created.rotation).toBe(90);
+        expect(created.annotation.subtype).toBe('square');
+        if (created.annotation.subtype === 'square') {
+          expect(created.annotation.rotation).toBe(90);
         }
+        // The engine sets `rect` to the upright box around the turned box: a
+        // quarter turn swaps its sides about the same middle.
+        const turnedRect = created.annotation.rect;
+        expect(turnedRect.width).toBe(shapeRect.height);
+        expect(turnedRect.height).toBe(shapeRect.width);
 
-        // The whole group riding one delta is a verified translation: the
-        // rotation survives AND the baked /AP is preserved.
+        // The box and its turn riding one delta is a verified translation: the
+        // rotation survives and the baked /AP is preserved.
         const d = { x: 15, y: -10 };
-        const shift = (r: typeof shapeRect) => ({
-          left: r.left + d.x,
-          bottom: r.bottom + d.y,
-          right: r.right + d.x,
-          top: r.top + d.y,
-        });
-        const trioMoved = await page.annotations.update(created.created.ref, {
+        const shift = (r: PageBox): PageBox => ({ ...r, x: r.x + d.x, y: r.y + d.y });
+        const moved = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: shift(shapeRect),
+          box: shift(shapeRect),
           rotation: 90,
-          unrotatedRect: shift(shapeRect),
         });
-        expect(trioMoved.appearance).toEqual({ action: 'preserved', changed: false });
-        if (trioMoved.updated.subtype === 'square') {
-          expect(trioMoved.updated.rotation).toBe(90);
+        expect(moved.appearance).toEqual({ action: 'preserved', changed: false });
+        expect(moved.annotation.rect).toEqual(shift(turnedRect));
+        if (moved.annotation.subtype === 'square') {
+          expect(moved.annotation.rotation).toBe(90);
         }
 
-        // A rect-only move PRESERVES the omitted rotation (tri-state law: a
-        // patch touches what it states) — the old writer cleared it.
-        const rectOnly = await page.annotations.update(created.created.ref, {
+        // A box-only move keeps the omitted rotation (tri-state law: a patch
+        // touches what it states).
+        const boxOnly = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          rect: shapeRect,
+          box: shapeRect,
         });
-        if (rectOnly.updated.subtype === 'square') {
-          expect(rectOnly.updated.rotation).toBe(90);
+        if (boxOnly.annotation.subtype === 'square') {
+          expect(boxOnly.annotation.rotation).toBe(90);
         }
 
-        // Explicit null flattens — the ONLY way to remove the rotation.
-        const flattened = await page.annotations.update(created.created.ref, {
+        // Explicit null straightens the box where it is.
+        const straightened = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
           rotation: null,
-          unrotatedRect: null,
         });
-        if (flattened.updated.subtype === 'square') {
-          expect(flattened.updated.rotation).toBe(undefined);
-          expect(flattened.updated.unrotatedRect).toBe(undefined);
+        if (straightened.annotation.subtype === 'square') {
+          expect(straightened.annotation.rotation).toBe(null);
+          expect(straightened.annotation.box).toEqual(shapeRect);
+          expect(straightened.annotation.rect).toEqual(shapeRect);
         }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a line, polyline, polygon or ink: rect is what the engine draws', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const contains = (outer: PageBox, inner: PageBox) =>
+          outer.x <= inner.x + 1e-3 &&
+          outer.y <= inner.y + 1e-3 &&
+          outer.x + outer.width >= inner.x + inner.width - 1e-3 &&
+          outer.y + outer.height >= inner.y + inner.height - 1e-3;
+        const area = (r: PageBox) => r.width * r.height;
+        const grown = (r: PageBox, by: number): PageBox => ({
+          x: r.x - by,
+          y: r.y - by,
+          width: r.width + 2 * by,
+          height: r.height + 2 * by,
+        });
+
+        // No rect is sent: the engine measures the stroke and the arrowheads.
+        const line = (lineEndings: LineDraft['lineEndings']) =>
+          page.annotations.create({
+            subtype: 'line',
+            linePoints,
+            color: '#000000',
+            strokeWidth: 2,
+            lineEndings,
+          } satisfies LineDraft);
+        const plain = (await line({ start: 'none', end: 'none' })).annotation;
+        const arrowed = (await line({ start: 'closed-arrow', end: 'closed-arrow' })).annotation;
+        const ends = pagePointsBounds([linePoints.start, linePoints.end]);
+        expect(contains(plain.rect, grown(ends, 0.5))).toBe(true);
+        expect(contains(arrowed.rect, plain.rect)).toBe(true);
+        expect(area(arrowed.rect) > area(plain.rect)).toBe(true);
+
+        // A wider pen widens the rect, a narrower one narrows it again.
+        const ink = (strokeWidth: number) =>
+          page.annotations.create({
+            subtype: 'ink',
+            inkList: inkStrokes,
+            color: '#1d4ed8',
+            strokeWidth,
+          } satisfies InkDraft);
+        const thin = (await ink(1)).annotation;
+        const wide = (await ink(6)).annotation;
+        const drawn = pagePointsBounds(inkStrokes.flat());
+        expect(contains(thin.rect, grown(drawn, 0.5))).toBe(true);
+        expect(contains(wide.rect, grown(drawn, 3))).toBe(true);
+        expect(wide.rect.width > thin.rect.width + 4.9).toBe(true);
+        const narrowed = await page.annotations.update(wide.ref, {
+          subtype: 'ink',
+          strokeWidth: 1,
+        });
+        expect(near(narrowed.annotation.rect.x, thin.rect.x)).toBe(true);
+        expect(near(narrowed.annotation.rect.width, thin.rect.width)).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('points are upright: rotation turns them about the middle of their box', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const expectPoints = (actual: readonly PagePoint[], expected: readonly PagePoint[]) => {
+          expect(actual.length).toBe(expected.length);
+          actual.forEach((point, i) => {
+            expect(near(point.x, expected[i]!.x)).toBe(true);
+            expect(near(point.y, expected[i]!.y)).toBe(true);
+          });
+        };
+        const created = await page.annotations.create({
+          subtype: 'polygon',
+          vertices,
+          color: '#0000ff',
+          strokeWidth: 2,
+          rotation: 90,
+        } satisfies PolygonDraft);
+        const polygon = created.annotation;
+        if (polygon.subtype !== 'polygon') throw new Error('expected a polygon');
+        // A read gives the points as sent, and the turn.
+        expect(polygon.rotation).toBe(90);
+        expectPoints(polygon.vertices, vertices);
+        // The page shows them turned about the middle of their box, and rect is
+        // around what it shows.
+        const turn = pageTurnOfUpright(vertices, 90);
+        const drawn = vertices.map((point) => pagePointTurned(point, turn));
+        expectPoints(drawnPointsOf(polygon)![0]!, drawn);
+        const drawnBounds = pagePointsBounds(drawn);
+        expect(polygon.rect.x <= drawnBounds.x).toBe(true);
+        expect(polygon.rect.y <= drawnBounds.y).toBe(true);
+        expect(polygon.rect.x + polygon.rect.width >= drawnBounds.x + drawnBounds.width).toBe(true);
+        expect(polygon.rect.y + polygon.rect.height >= drawnBounds.y + drawnBounds.height).toBe(
+          true,
+        );
+
+        // Moving the points keeps the turn and the drawing: rect moves with them.
+        const d = { x: 15, y: -10 };
+        const moved = await page.annotations.update(polygon.ref, {
+          subtype: 'polygon',
+          vertices: vertices.map((point) => ({ x: point.x + d.x, y: point.y + d.y })),
+        });
+        expect(moved.appearance).toEqual({ action: 'preserved', changed: false });
+        if (moved.annotation.subtype !== 'polygon') throw new Error('expected a polygon');
+        expect(moved.annotation.rotation).toBe(90);
+        expect(near(moved.annotation.rect.x, polygon.rect.x + d.x)).toBe(true);
+        expect(near(moved.annotation.rect.y, polygon.rect.y + d.y)).toBe(true);
+
+        // A new turn keeps the points upright and draws them again.
+        const turned = await page.annotations.update(polygon.ref, {
+          subtype: 'polygon',
+          vertices,
+          rotation: 45,
+        });
+        expect(turned.appearance.action === 'preserved').toBe(false);
+        if (turned.annotation.subtype !== 'polygon') throw new Error('expected a polygon');
+        expect(turned.annotation.rotation).toBe(45);
+        expectPoints(turned.annotation.vertices, vertices);
+
+        // Null straightens the points where they are.
+        const straightened = await page.annotations.update(polygon.ref, {
+          subtype: 'polygon',
+          rotation: null,
+        });
+        if (straightened.annotation.subtype !== 'polygon') throw new Error('expected a polygon');
+        expect(straightened.annotation.rotation).toBe(null);
+        expectPoints(straightened.annotation.vertices, vertices);
+        expectPoints(drawnPointsOf(straightened.annotation)![0]!, vertices);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("a note's icon fills its rect, and moves and grows with it", async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const rect = iconRect(shapeRect.x, shapeRect.y);
+        const created = await page.annotations.create({
+          subtype: 'text',
+          rect,
+          icon: 'comment',
+        } satisfies TextDraft);
+        const note = created.annotation;
+        if (note.subtype !== 'text') throw new Error('expected a note');
+        expect(note.rect).toEqual(rect);
+
+        // A move keeps the drawing: the icon only moves.
+        const to = iconRect(rect.x + 30, rect.y + 15);
+        const moved = await page.annotations.update(note.ref, { subtype: 'text', rect: to });
+        expect(moved.annotation.rect).toEqual(to);
+        expect(moved.appearance.changed).toBe(false);
+
+        // A bigger rect is a bigger icon, drawn again.
+        const bigger = { ...to, width: 50, height: 50 };
+        const grown = await page.annotations.update(note.ref, { subtype: 'text', rect: bigger });
+        expect(grown.annotation.rect).toEqual(bigger);
+        expect(grown.appearance.changed).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("a new rect puts a drawing there, as a script's annot.rect does in Acrobat", async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const offset = (r: PageBox, dx: number, dy: number): PageBox => ({
+          ...r,
+          x: r.x + dx,
+          y: r.y + dy,
+        });
+        const expectPoint = (actual: PagePoint, expected: PagePoint) => {
+          expect(near(actual.x, expected.x) && near(actual.y, expected.y)).toBe(true);
+        };
+        const expectRect = (actual: PageBox, expected: PageBox) => {
+          expectPoint(actual, expected);
+          expectPoint(
+            { x: actual.width, y: actual.height },
+            { x: expected.width, y: expected.height },
+          );
+        };
+        const refused = { code: EngineErrorCode.InvalidArg, details: { field: 'rect' } };
+
+        const created = (
+          await page.annotations.create({
+            subtype: 'line',
+            linePoints,
+            color: '#000000',
+          } satisfies LineDraft)
+        ).annotation;
+        if (created.subtype !== 'line') throw new Error('expected a line');
+
+        // Moved 40 right and 20 down: the points move by the offset, and the rect with them.
+        const movedTo = offset(created.rect, 40, 20);
+        const moved = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          rect: movedTo,
+        });
+        if (moved.annotation.subtype !== 'line') throw new Error('expected a line');
+        expectRect(moved.annotation.rect, movedTo);
+        expectPoint(moved.annotation.linePoints.start, {
+          x: linePoints.start.x + 40,
+          y: linePoints.start.y + 20,
+        });
+        expectPoint(moved.annotation.linePoints.end, {
+          x: linePoints.end.x + 40,
+          y: linePoints.end.y + 20,
+        });
+        expect(moved.appearance.changed).toBe(false);
+
+        // Stretched 60 wider and 30 taller, right and down: each axis on its
+        // own, from the rect it had onto the new one.
+        const from = moved.annotation.rect;
+        const to = { ...from, width: from.width + 60, height: from.height + 30 };
+        const onto = (point: PagePoint): PagePoint => ({
+          x: to.x + ((point.x - from.x) * to.width) / from.width,
+          y: to.y + ((point.y - from.y) * to.height) / from.height,
+        });
+        const stretched = await page.annotations.update(created.ref, { subtype: 'line', rect: to });
+        if (stretched.annotation.subtype !== 'line') throw new Error('expected a line');
+        expectPoint(stretched.annotation.linePoints.start, onto(moved.annotation.linePoints.start));
+        expectPoint(stretched.annotation.linePoints.end, onto(moved.annotation.linePoints.end));
+        expect(stretched.appearance.changed).toBe(true);
+
+        // The rect it read, sent back, changes nothing.
+        const back = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          rect: stretched.annotation.rect,
+          contents: 'sent back',
+        });
+        if (back.annotation.subtype !== 'line') throw new Error('expected a line');
+        expect(back.annotation.rect).toEqual(stretched.annotation.rect);
+        expect(back.annotation.linePoints).toEqual(stretched.annotation.linePoints);
+        expect(back.annotation.contents).toBe('sent back');
+
+        // A new rect with new points: which of the two to follow would be a guess.
+        const rect = back.annotation.rect;
+        await expect(
+          page.annotations.update(created.ref, {
+            subtype: 'line',
+            rect: offset(rect, 5, 5),
+            linePoints: { start: linePoints.start, end: { x: 90, y: 90 } },
+          }),
+        ).rejects.toMatchObject(refused);
+        // A rect with no width.
+        await expect(
+          page.annotations.update(created.ref, {
+            subtype: 'line',
+            rect: { ...rect, width: 0 },
+          }),
+        ).rejects.toMatchObject(refused);
+
+        // Text markup: the quads move, and the rect with them.
+        const highlight = (
+          await page.annotations.create({
+            subtype: 'highlight',
+            quadPoints: quad,
+            color: '#ffff00',
+          } satisfies HighlightDraft)
+        ).annotation;
+        const highlightTo = offset(highlight.rect, 10, 15);
+        const movedHighlight = await page.annotations.update(highlight.ref, {
+          subtype: 'highlight',
+          rect: highlightTo,
+        });
+        if (movedHighlight.annotation.subtype !== 'highlight')
+          throw new Error('expected a highlight');
+        expectRect(movedHighlight.annotation.rect, highlightTo);
+        expectPoint(movedHighlight.annotation.quadPoints[0]!.upperLeft, {
+          x: quad[0]!.upperLeft.x + 10,
+          y: quad[0]!.upperLeft.y + 15,
+        });
+
+        // A turned drawing only moves.
+        const turned = (
+          await page.annotations.create({
+            subtype: 'square',
+            box: shapeRect,
+            rotation: 30,
+            color: '#0000ff',
+          } satisfies SquareDraft)
+        ).annotation;
+        if (turned.subtype !== 'square') throw new Error('expected a square');
+        const turnedTo = offset(turned.rect, 25, 5);
+        const movedTurned = await page.annotations.update(turned.ref, {
+          subtype: 'square',
+          rect: turnedTo,
+        });
+        if (movedTurned.annotation.subtype !== 'square') throw new Error('expected a square');
+        expectRect(movedTurned.annotation.box, offset(shapeRect, 25, 5));
+        expect(movedTurned.annotation.rotation).toBe(30);
+        await expect(
+          page.annotations.update(turned.ref, {
+            subtype: 'square',
+            rect: { ...turnedTo, width: turnedTo.width + 20 },
+          }),
+        ).rejects.toMatchObject(refused);
       } finally {
         await doc.close();
       }
@@ -598,30 +864,28 @@ export function runAnnotationMutationConformance(
         const polygonDraft: PolygonDraft = {
           subtype: 'polygon',
           contents: 'mutation conformance: polygon',
-          rect: shapeRect,
           vertices,
-          interiorColor: { r: 255, g: 200, b: 0 },
-          color: { r: 0, g: 0, b: 255 },
+          interiorColor: '#ffc800',
+          color: '#0000ff',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 0.8,
         };
         const polygon = await page.annotations.create(polygonDraft);
         expect(AnnotationCreateResultSchema.safeParse(polygon).success).toBe(true);
-        expect(polygon.created.subtype).toBe('polygon');
-        if (polygon.created.subtype === 'polygon') {
-          expect(polygon.created.vertices.length).toBe(vertices.length);
-          expect(polygon.created.color).toMatchObject({ r: 0, g: 0, b: 255 });
-          expect(polygon.created.interiorColor).toMatchObject({ r: 255, g: 200, b: 0 });
+        expect(polygon.annotation.subtype).toBe('polygon');
+        if (polygon.annotation.subtype === 'polygon') {
+          expect(polygon.annotation.vertices.length).toBe(vertices.length);
+          expect(polygon.annotation.color).toBe('#0000ff');
+          expect(polygon.annotation.interiorColor).toBe('#ffc800');
         }
 
         const polylineDraft: PolylineDraft = {
           subtype: 'polyline',
           contents: 'mutation conformance: polyline',
-          rect: shapeRect,
           vertices,
           interiorColor: null,
-          color: { r: 200, g: 0, b: 0 },
+          color: '#c80000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -629,20 +893,19 @@ export function runAnnotationMutationConformance(
         };
         const polyline = await page.annotations.create(polylineDraft);
         expect(AnnotationCreateResultSchema.safeParse(polyline).success).toBe(true);
-        expect(polyline.created.subtype).toBe('polyline');
-        if (polyline.created.subtype === 'polyline') {
-          expect(polyline.created.vertices.length).toBe(vertices.length);
-          expect(polyline.created.lineEndings.start).toBe('open-arrow');
-          expect(polyline.created.lineEndings.end).toBe('closed-arrow');
+        expect(polyline.annotation.subtype).toBe('polyline');
+        if (polyline.annotation.subtype === 'polyline') {
+          expect(polyline.annotation.vertices.length).toBe(vertices.length);
+          expect(polyline.annotation.lineEndings.start).toBe('open-arrow');
+          expect(polyline.annotation.lineEndings.end).toBe('closed-arrow');
         }
 
         const lineDraft: LineDraft = {
           subtype: 'line',
           contents: 'mutation conformance: line',
-          rect: shapeRect,
           linePoints,
           interiorColor: null,
-          color: { r: 0, g: 128, b: 128 },
+          color: '#008080',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -650,35 +913,36 @@ export function runAnnotationMutationConformance(
         };
         const line = await page.annotations.create(lineDraft);
         expect(AnnotationCreateResultSchema.safeParse(line).success).toBe(true);
-        expect(line.created.subtype).toBe('line');
-        if (line.created.subtype === 'line') {
+        expect(line.annotation.subtype).toBe('line');
+        if (line.annotation.subtype === 'line') {
           // /L stored as f32 — compare rounded to absorb float drift.
-          expect(Math.round(line.created.linePoints.start.x)).toBe(Math.round(linePoints.start.x));
-          expect(Math.round(line.created.linePoints.end.y)).toBe(Math.round(linePoints.end.y));
-          expect(line.created.lineEndings.end).toBe('open-arrow');
+          expect(Math.round(line.annotation.linePoints.start.x)).toBe(
+            Math.round(linePoints.start.x),
+          );
+          expect(Math.round(line.annotation.linePoints.end.y)).toBe(Math.round(linePoints.end.y));
+          expect(line.annotation.lineEndings.end).toBe('open-arrow');
         }
 
         const inkDraft: InkDraft = {
           subtype: 'ink',
           contents: 'mutation conformance: ink',
-          rect: shapeRect,
           inkList: inkStrokes,
-          color: { r: 29, g: 78, b: 216 },
+          color: '#1d4ed8',
           strokeWidth: 3,
           borderStyle: 'solid',
           opacity: 1,
         };
         const ink = await page.annotations.create(inkDraft);
         expect(AnnotationCreateResultSchema.safeParse(ink).success).toBe(true);
-        expect(ink.created.subtype).toBe('ink');
-        if (ink.created.subtype === 'ink') {
-          expect(ink.created.inkList.length).toBe(inkStrokes.length);
-          expect(ink.created.inkList[0]!.length).toBe(inkStrokes[0]!.length);
-          expect(ink.created.color).toMatchObject({ r: 29, g: 78, b: 216 });
-          expect(ink.created.intent).toBe(null);
-          expect(ink.created.blendMode).toBe('normal');
+        expect(ink.annotation.subtype).toBe('ink');
+        if (ink.annotation.subtype === 'ink') {
+          expect(ink.annotation.inkList.length).toBe(inkStrokes.length);
+          expect(ink.annotation.inkList[0]!.length).toBe(inkStrokes[0]!.length);
+          expect(ink.annotation.color).toBe('#1d4ed8');
+          expect(ink.annotation.intent).toBe(null);
+          expect(ink.annotation.blendMode).toBe('normal');
           // Ink has a stroke but no /IC.
-          expect('interiorColor' in ink.created).toBe(false);
+          expect('interiorColor' in ink.annotation).toBe(false);
         }
 
         const after = await page.annotations.list();
@@ -697,47 +961,47 @@ export function runAnnotationMutationConformance(
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
-        // Plain free text, no fontColor override => text follows `color`.
+        // Plain free text: `color` is the border; the text is black unless
+        // `fontColor` says otherwise.
         const freeTextDraft: FreeTextDraft = {
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'mutation conformance: free text',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'center',
-          color: { r: 20, g: 40, b: 60 },
-          interiorColor: { r: 250, g: 250, b: 210 },
+          color: '#14283c',
+          interiorColor: '#fafad2',
           opacity: 1,
           strokeWidth: 1,
           borderStyle: 'solid',
         };
         const freeText = await page.annotations.create(freeTextDraft);
         expect(AnnotationCreateResultSchema.safeParse(freeText).success).toBe(true);
-        expect(freeText.created.subtype).toBe('free-text');
-        if (freeText.created.subtype === 'free-text') {
-          expect(freeText.created.intent).toBe('free-text');
-          expect(freeText.created.fontFamily).toBe('helvetica');
-          expect(freeText.created.fontSize).toBe(14);
-          expect(freeText.created.textAlign).toBe('center');
-          expect(freeText.created.color).toMatchObject({ r: 20, g: 40, b: 60 });
-          expect(freeText.created.interiorColor).toMatchObject({ r: 250, g: 250, b: 210 });
-          // No override sent => text follows `color`, so fontColor is omitted.
-          expect(freeText.created.fontColor === undefined).toBe(true);
+        expect(freeText.annotation.subtype).toBe('free-text');
+        if (freeText.annotation.subtype === 'free-text') {
+          expect(freeText.annotation.intent).toBe('free-text');
+          expect(freeText.annotation.fontFamily).toBe('helvetica');
+          expect(freeText.annotation.fontSize).toBe(14);
+          expect(freeText.annotation.textAlign).toBe('center');
+          expect(freeText.annotation.color).toBe('#14283c');
+          expect(freeText.annotation.interiorColor).toBe('#fafad2');
+          expect(freeText.annotation.fontColor).toBe('#000000');
         }
 
-        // Callout: intent + /CL leader + /LE ending, explicit fontColor
-        // override, transparent (null) background.
+        // Callout: intent + /CL leader + /LE ending, its own text color,
+        // transparent (null) background.
         const calloutDraft: FreeTextDraft = {
           subtype: 'free-text',
           intent: 'free-text-callout',
           contents: 'mutation conformance: callout',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'times-roman',
           fontSize: 12,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
-          fontColor: { r: 200, g: 0, b: 0 },
+          color: '#000000',
+          fontColor: '#c80000',
           interiorColor: null,
           opacity: 1,
           strokeWidth: 1,
@@ -747,15 +1011,21 @@ export function runAnnotationMutationConformance(
         };
         const callout = await page.annotations.create(calloutDraft);
         expect(AnnotationCreateResultSchema.safeParse(callout).success).toBe(true);
-        expect(callout.created.subtype).toBe('free-text');
-        if (callout.created.subtype === 'free-text') {
-          expect(callout.created.intent).toBe('free-text-callout');
-          expect(callout.created.interiorColor).toBe(null);
-          // fontColor differs from color => surfaced as an override.
-          expect(callout.created.fontColor).toMatchObject({ r: 200, g: 0, b: 0 });
-          expect(callout.created.color).toMatchObject({ r: 0, g: 0, b: 0 });
-          expect(callout.created.calloutLine?.length).toBe(DEFAULT_CALLOUT_LINE.length);
-          expect(callout.created.lineEnding).toBe('open-arrow');
+        expect(callout.annotation.subtype).toBe('free-text');
+        if (callout.annotation.subtype === 'free-text') {
+          expect(callout.annotation.intent).toBe('free-text-callout');
+          expect(callout.annotation.interiorColor).toBe(null);
+          expect(callout.annotation.fontColor).toBe('#c80000');
+          expect(callout.annotation.color).toBe('#000000');
+          expect(callout.annotation.calloutLine?.length).toBe(DEFAULT_CALLOUT_LINE.length);
+          expect(callout.annotation.lineEnding).toBe('open-arrow');
+          // The box is the text box; `rect` holds it, the line and its arrow.
+          expect(callout.annotation.box).toEqual(shapeRect);
+          const { rect } = callout.annotation;
+          for (const point of DEFAULT_CALLOUT_LINE) {
+            expect(point.x >= rect.x && point.x <= rect.x + rect.width).toBe(true);
+            expect(point.y >= rect.y && point.y <= rect.y + rect.height).toBe(true);
+          }
         }
 
         const after = await page.annotations.list();
@@ -774,11 +1044,11 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'free-text-update-base',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 12,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           interiorColor: null,
           opacity: 1,
           strokeWidth: 1,
@@ -786,27 +1056,22 @@ export function runAnnotationMutationConformance(
         } satisfies FreeTextDraft);
         const before = await page.annotations.list();
 
-        const result = await page.annotations.update(created.created.ref, {
+        const result = await page.annotations.update(created.annotation.ref, {
           subtype: 'free-text',
           textAlign: 'right',
           fontFamily: 'helvetica',
           fontSize: 18,
-          color: { r: 0, g: 80, b: 160 },
-          interiorColor: { r: 240, g: 240, b: 240 },
+          color: '#0050a0',
+          interiorColor: '#f0f0f0',
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-        expect(result.updated.subtype).toBe('free-text');
-        if (result.updated.subtype === 'free-text') {
-          expect(result.updated.textAlign).toBe('right');
-          expect(result.updated.fontSize).toBe(18);
-          expect(result.updated.color).toMatchObject({ r: 0, g: 80, b: 160 });
-          expect(result.updated.interiorColor).toMatchObject({ r: 240, g: 240, b: 240 });
+        expect(result.annotation.subtype).toBe('free-text');
+        if (result.annotation.subtype === 'free-text') {
+          expect(result.annotation.textAlign).toBe('right');
+          expect(result.annotation.fontSize).toBe(18);
+          expect(result.annotation.color).toBe('#0050a0');
+          expect(result.annotation.interiorColor).toBe('#f0f0f0');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -827,16 +1092,16 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'Plain\rtext',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica-bold',
           fontSize: 18,
           textAlign: 'center',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
         } satisfies FreeTextDraft);
-        expect(created.created.subtype).toBe('free-text');
-        if (created.created.subtype === 'free-text') {
-          const rich = created.created.richText;
-          expect(created.created.fontFamily).toBe('helvetica-bold');
+        expect(created.annotation.subtype).toBe('free-text');
+        if (created.annotation.subtype === 'free-text') {
+          const rich = created.annotation.richText;
+          expect(created.annotation.fontFamily).toBe('helvetica-bold');
           expect(rich.body.family).toBe('Helvetica');
           expect(rich.body.weight).toBe(700);
           expect(rich.body.italic).toBe(false);
@@ -861,11 +1126,9 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'free-text',
           intent: 'free-text',
-          rect: shapeRect,
-          fontFamily: 'helvetica',
-          fontSize: 12,
-          textAlign: 'left',
-          color: { r: 0, g: 0, b: 255 },
+          box: shapeRect,
+          color: '#0000ff',
+          // The body carries the size; a `fontSize` beside it would win.
           richText: {
             body: { family: 'Helvetica', size: 18, color: '#102030' },
             paragraphs: [
@@ -881,20 +1144,22 @@ export function runAnnotationMutationConformance(
           },
         } satisfies FreeTextDraft);
         expect(AnnotationCreateResultSchema.safeParse(created).success).toBe(true);
-        expect(created.created.subtype).toBe('free-text');
-        if (created.created.subtype === 'free-text') {
-          const dto = created.created;
+        expect(created.annotation.subtype).toBe('free-text');
+        if (created.annotation.subtype === 'free-text') {
+          const dto = created.annotation;
           // `contents` is the projection: paragraphs joined by \r, runs concatenated.
           expect(dto.contents).toBe('Hello bold red\rH2');
-          // The body became the /DA font and size; the /DA colour stayed the draft's.
+          // The body became the /DA font and size; the /DA colour, the border's,
+          // stayed the draft's, and the text is the body's color.
           expect(dto.fontFamily).toBe('helvetica');
           expect(dto.fontSize).toBe(18);
-          expect(dto.color).toMatchObject({ r: 0, g: 0, b: 255 });
+          expect(dto.color).toBe('#0000ff');
+          expect(dto.fontColor).toBe('#102030');
           expect(dto.richText.body.color).toBe('#102030');
           expect(dto.richText.paragraphs[0]!.runs).toEqual([
             { text: 'Hello ' },
             { text: 'bold', style: { weight: 700 } },
-            { text: ' red', style: { color: '#FF0000' } },
+            { text: ' red', style: { color: '#ff0000' } },
           ]);
           expect(dto.richText.paragraphs[1]!.align).toBe('center');
           expect(dto.richText.paragraphs[1]!.runs[1]).toEqual({
@@ -904,7 +1169,7 @@ export function runAnnotationMutationConformance(
         }
         // The list read agrees with the create echo.
         const listed = (await page.annotations.list()).annotations.find(
-          (a) => a.index === created.created.index,
+          (a) => annotationKey(a.ref) === annotationKey(created.annotation.ref),
         );
         expect(listed?.subtype).toBe('free-text');
         if (listed?.subtype === 'free-text') {
@@ -925,17 +1190,17 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'free-text',
           intent: 'free-text',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'center',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           richText: {
             body: { family: 'Helvetica', size: 14 },
             paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { weight: 700 } }] }],
           },
         } satisfies FreeTextDraft);
-        const ref = created.created.ref;
+        const ref = created.annotation.ref;
         // The editor's commit: paragraphs only, no body — the body (and its
         // alignment) stays what the annotation had.
         const restyled = await page.annotations.update(ref, {
@@ -945,13 +1210,13 @@ export function runAnnotationMutationConformance(
           },
         });
         expect(AnnotationUpdateResultSchema.safeParse(restyled).success).toBe(true);
-        expect(restyled.updated.subtype).toBe('free-text');
-        if (restyled.updated.subtype === 'free-text') {
-          expect(restyled.updated.contents).toBe('abc');
-          expect(restyled.updated.richText.body.size).toBe(14);
-          expect(restyled.updated.richText.body.align).toBe('center');
-          expect(restyled.updated.textAlign).toBe('center');
-          expect(restyled.updated.richText.paragraphs[0]!.runs[0]).toEqual({
+        expect(restyled.annotation.subtype).toBe('free-text');
+        if (restyled.annotation.subtype === 'free-text') {
+          expect(restyled.annotation.contents).toBe('abc');
+          expect(restyled.annotation.richText.body.size).toBe(14);
+          expect(restyled.annotation.richText.body.align).toBe('center');
+          expect(restyled.annotation.textAlign).toBe('center');
+          expect(restyled.annotation.richText.paragraphs[0]!.runs[0]).toEqual({
             text: 'ab',
             style: { italic: true },
           });
@@ -962,16 +1227,15 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           contents: 'one\rtwo',
         });
-        expect(rewritten.updated.subtype).toBe('free-text');
-        if (rewritten.updated.subtype === 'free-text') {
-          expect(rewritten.updated.contents).toBe('one\rtwo');
-          expect(rewritten.updated.richText.paragraphs).toEqual([
+        expect(rewritten.annotation.subtype).toBe('free-text');
+        if (rewritten.annotation.subtype === 'free-text') {
+          expect(rewritten.annotation.contents).toBe('one\rtwo');
+          expect(rewritten.annotation.richText.paragraphs).toEqual([
             { runs: [{ text: 'one' }] },
             { runs: [{ text: 'two' }] },
           ]);
-          expect(rewritten.updated.richText.body.size).toBe(14);
+          expect(rewritten.annotation.richText.body.size).toBe(14);
         }
-        expect(rewritten.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -984,29 +1248,29 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'free-text',
           intent: 'free-text',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           richText: {
             body: { family: 'Helvetica', size: 14 },
             paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { size: 30 } }] }],
           },
         } satisfies FreeTextDraft);
-        const updated = await page.annotations.update(created.created.ref, {
+        const updated = await page.annotations.update(created.annotation.ref, {
           subtype: 'free-text',
           fontSize: 20,
-          fontColor: { r: 255, g: 0, b: 0 },
+          fontColor: '#ff0000',
           fontFamily: 'times-bold',
         });
-        expect(updated.updated.subtype).toBe('free-text');
-        if (updated.updated.subtype === 'free-text') {
-          const dto = updated.updated;
+        expect(updated.annotation.subtype).toBe('free-text');
+        if (updated.annotation.subtype === 'free-text') {
+          const dto = updated.annotation;
           expect(dto.fontSize).toBe(20);
           expect(dto.fontFamily).toBe('times-bold');
           expect(dto.richText.body.size).toBe(20);
-          expect(dto.richText.body.color).toBe('#FF0000');
+          expect(dto.richText.body.color).toBe('#ff0000');
           expect(dto.richText.body.family).toBe('Times');
           expect(dto.richText.body.weight).toBe(700);
           // The run's own size is a delta over the body: it survives the move.
@@ -1025,13 +1289,13 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           contents: 'x',
-          rect: shapeRect,
+          box: shapeRect,
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
         } satisfies FreeTextDraft);
-        const ref = created.created.ref;
+        const ref = created.annotation.ref;
         let caught: unknown;
         try {
           await page.annotations.update(ref, {
@@ -1045,7 +1309,7 @@ export function runAnnotationMutationConformance(
         expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
         // The refused write left the annotation untouched.
         const after = (await page.annotations.list()).annotations.find(
-          (a) => a.index === created.created.index,
+          (a) => annotationKey(a.ref) === annotationKey(created.annotation.ref),
         );
         expect(after?.contents).toBe('x');
         const agreed = await page.annotations.update(ref, {
@@ -1055,10 +1319,10 @@ export function runAnnotationMutationConformance(
             paragraphs: [{ runs: [{ text: 'fr' }, { text: 'esh', style: { weight: 700 } }] }],
           },
         });
-        expect(agreed.updated.subtype).toBe('free-text');
-        if (agreed.updated.subtype === 'free-text') {
-          expect(agreed.updated.contents).toBe('fresh');
-          expect(agreed.updated.richText.paragraphs[0]!.runs[1]).toEqual({
+        expect(agreed.annotation.subtype).toBe('free-text');
+        if (agreed.annotation.subtype === 'free-text') {
+          expect(agreed.annotation.contents).toBe('fresh');
+          expect(agreed.annotation.richText.paragraphs[0]!.runs[1]).toEqual({
             text: 'esh',
             style: { weight: 700 },
           });
@@ -1079,29 +1343,29 @@ export function runAnnotationMutationConformance(
           subtype: 'redact',
           contents: 'mutation conformance: area redact',
           rect: shapeRect,
-          color: { r: 228, g: 66, b: 52 },
+          color: '#e44234',
           opacity: 1,
-          interiorColor: { r: 0, g: 0, b: 0 },
+          interiorColor: '#000000',
           overlayText: 'CONFIDENTIAL',
           repeat: true,
           fontFamily: 'helvetica',
           fontSize: 10,
-          fontColor: { r: 255, g: 255, b: 255 },
+          fontColor: '#ffffff',
           textAlign: 'center',
         };
         const area = await page.annotations.create(areaDraft);
         expect(AnnotationCreateResultSchema.safeParse(area).success).toBe(true);
-        expect(area.created.subtype).toBe('redact');
-        if (area.created.subtype === 'redact') {
-          expect(area.created.quadPoints.length).toBe(0);
-          expect(area.created.color).toMatchObject({ r: 228, g: 66, b: 52 });
-          expect(area.created.interiorColor).toMatchObject({ r: 0, g: 0, b: 0 });
-          expect(area.created.overlayText).toBe('CONFIDENTIAL');
-          expect(area.created.repeat).toBe(true);
-          expect(area.created.fontFamily).toBe('helvetica');
-          expect(area.created.fontSize).toBe(10);
-          expect(area.created.fontColor).toMatchObject({ r: 255, g: 255, b: 255 });
-          expect(area.created.textAlign).toBe('center');
+        expect(area.annotation.subtype).toBe('redact');
+        if (area.annotation.subtype === 'redact') {
+          expect(area.annotation.quadPoints.length).toBe(0);
+          expect(area.annotation.color).toBe('#e44234');
+          expect(area.annotation.interiorColor).toBe('#000000');
+          expect(area.annotation.overlayText).toBe('CONFIDENTIAL');
+          expect(area.annotation.repeat).toBe(true);
+          expect(area.annotation.fontFamily).toBe('helvetica');
+          expect(area.annotation.fontSize).toBe(10);
+          expect(area.annotation.fontColor).toBe('#ffffff');
+          expect(area.annotation.textAlign).toBe('center');
         }
 
         // Text redaction (quads) without a label: everything falls back to
@@ -1114,14 +1378,14 @@ export function runAnnotationMutationConformance(
         };
         const text = await page.annotations.create(textDraft);
         expect(AnnotationCreateResultSchema.safeParse(text).success).toBe(true);
-        expect(text.created.subtype).toBe('redact');
-        if (text.created.subtype === 'redact') {
-          expect(text.created.quadPoints.length).toBe(quad.length);
-          expect(text.created.interiorColor).toBe(null);
-          expect(text.created.overlayText).toBe(null);
-          expect(text.created.repeat).toBe(false);
+        expect(text.annotation.subtype).toBe('redact');
+        if (text.annotation.subtype === 'redact') {
+          expect(text.annotation.quadPoints.length).toBe(quad.length);
+          expect(text.annotation.interiorColor).toBe(null);
+          expect(text.annotation.overlayText).toBe(null);
+          expect(text.annotation.repeat).toBe(false);
           // Default marking outline is the red redaction convention.
-          expect(text.created.color).toMatchObject({ r: 255, g: 0, b: 0 });
+          expect(text.annotation.color).toBe('#ff0000');
         }
       } finally {
         await doc.close();
@@ -1136,62 +1400,56 @@ export function runAnnotationMutationConformance(
           subtype: 'redact',
           contents: 'redact-update-base',
           rect: shapeRect,
-          interiorColor: { r: 0, g: 0, b: 0 },
+          interiorColor: '#000000',
           overlayText: 'DRAFT',
           fontFamily: 'helvetica',
           fontSize: 8,
-          fontColor: { r: 255, g: 255, b: 255 },
+          fontColor: '#ffffff',
         } satisfies RedactDraft);
         const before = await page.annotations.list();
 
         // Restyle the label. fontSize 0 is meaningful for a redaction label
         // (auto-fit) and must round-trip verbatim, unlike free text.
-        const restyled = await page.annotations.update(created.created.ref, {
+        const restyled = await page.annotations.update(created.annotation.ref, {
           subtype: 'redact',
           overlayText: 'REDACTED',
           repeat: true,
           fontFamily: 'helvetica',
           fontSize: 0,
-          fontColor: { r: 255, g: 240, b: 240 },
+          fontColor: '#fff0f0',
           textAlign: 'right',
-          interiorColor: { r: 10, g: 10, b: 10 },
+          interiorColor: '#0a0a0a',
         });
         expect(AnnotationUpdateResultSchema.safeParse(restyled).success).toBe(true);
-        expect(restyled.updated.subtype).toBe('redact');
-        if (restyled.updated.subtype === 'redact') {
-          expect(restyled.updated.overlayText).toBe('REDACTED');
-          expect(restyled.updated.repeat).toBe(true);
-          expect(restyled.updated.fontSize).toBe(0);
-          expect(restyled.updated.fontColor).toMatchObject({ r: 255, g: 240, b: 240 });
-          expect(restyled.updated.textAlign).toBe('right');
-          expect(restyled.updated.interiorColor).toMatchObject({ r: 10, g: 10, b: 10 });
+        expect(restyled.annotation.subtype).toBe('redact');
+        if (restyled.annotation.subtype === 'redact') {
+          expect(restyled.annotation.overlayText).toBe('REDACTED');
+          expect(restyled.annotation.repeat).toBe(true);
+          expect(restyled.annotation.fontSize).toBe(0);
+          expect(restyled.annotation.fontColor).toBe('#fff0f0');
+          expect(restyled.annotation.textAlign).toBe('right');
+          expect(restyled.annotation.interiorColor).toBe('#0a0a0a');
         }
 
         // Clear the label and the fill: null wipes /OverlayText and /IC.
-        const cleared = await page.annotations.update(created.created.ref, {
+        const cleared = await page.annotations.update(created.annotation.ref, {
           subtype: 'redact',
           overlayText: null,
           repeat: false,
           interiorColor: null,
         });
-        expect(cleared.updated.subtype).toBe('redact');
-        if (cleared.updated.subtype === 'redact') {
-          expect(cleared.updated.overlayText).toBe(null);
-          expect(cleared.updated.repeat).toBe(false);
-          expect(cleared.updated.interiorColor).toBe(null);
+        expect(cleared.annotation.subtype).toBe('redact');
+        if (cleared.annotation.subtype === 'redact') {
+          expect(cleared.annotation.overlayText).toBe(null);
+          expect(cleared.annotation.repeat).toBe(false);
+          expect(cleared.annotation.interiorColor).toBe(null);
         }
-
-        // Updates never bump the revision.
-        expect(cleared.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(cleared.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
     });
 
-    test('create + update a caret round-trips color/opacity/rect differences', async () => {
+    test('create + update a caret round-trips color/opacity and its box', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -1200,56 +1458,39 @@ export function runAnnotationMutationConformance(
           subtype: 'caret',
           intent: 'replace',
           contents: 'mutation conformance: caret',
-          rect: shapeRect,
-          color: { r: 0, g: 128, b: 255 },
+          box: shapeRect,
+          color: '#0080ff',
           opacity: 0.7,
-          rectDifferences: { left: 2, top: 2, right: 2, bottom: 2 },
         };
         const caret = await page.annotations.create(caretDraft);
         expect(AnnotationCreateResultSchema.safeParse(caret).success).toBe(true);
-        expect(caret.created.subtype).toBe('caret');
-        expect(caret.created.identityQuality).toBe('durable');
-        expect(caret.created.ref.kind).toBe('objectNumber');
-        if (caret.created.subtype === 'caret') {
-          expect(caret.created.intent).toBe('replace');
-          expect(caret.created.color).toMatchObject({ r: 0, g: 128, b: 255 });
-          expect(Math.round(caret.created.opacity * 100) / 100).toBe(0.7);
+        expect(caret.annotation.subtype).toBe('caret');
+        expect(caret.annotation.ref.kind).toBe('objectNumber');
+        if (caret.annotation.subtype === 'caret') {
+          expect(caret.annotation.intent).toBe('replace');
+          expect(caret.annotation.color).toBe('#0080ff');
+          expect(Math.round(caret.annotation.opacity * 100) / 100).toBe(0.7);
           // Caret carries no border or quads.
-          expect('strokeWidth' in caret.created).toBe(false);
-          expect('quadPoints' in caret.created).toBe(false);
-          expect(caret.created.rectDifferences).toMatchObject({
-            left: 2,
-            top: 2,
-            right: 2,
-            bottom: 2,
-          });
+          expect('strokeWidth' in caret.annotation).toBe(false);
+          expect('quadPoints' in caret.annotation).toBe(false);
+          // The symbol fills its box; `rect` holds its outline too.
+          expect(caret.annotation.box).toEqual(shapeRect);
+          const { rect } = caret.annotation;
+          expect(rect.x <= shapeRect.x && rect.y <= shapeRect.y).toBe(true);
+          expect(rect.x + rect.width >= shapeRect.x + shapeRect.width).toBe(true);
+          expect(rect.y + rect.height >= shapeRect.y + shapeRect.height).toBe(true);
         }
 
         const before = await page.annotations.list();
-        const result = await page.annotations.update(caret.created.ref, {
+        const result = await page.annotations.update(caret.annotation.ref, {
           subtype: 'caret',
-          color: { r: 255, g: 0, b: 0 },
-          rectDifferences: { left: 4, top: 4, right: 4, bottom: 4 },
+          color: '#ff0000',
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-        expect(result.updated.subtype).toBe('caret');
-        if (result.updated.subtype === 'caret') {
-          expect(result.updated.color).toMatchObject({ r: 255, g: 0, b: 0 });
-        }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
-
-        // Tri-state: `null` removes /RD entirely (a read then states the absence).
-        const rdCleared = await page.annotations.update(caret.created.ref, {
-          subtype: 'caret',
-          rectDifferences: null,
-        });
-        expect(rdCleared.updated.subtype).toBe('caret');
-        if (rdCleared.updated.subtype === 'caret') {
-          expect(rdCleared.updated.rectDifferences).toBe(null);
+        expect(result.annotation.subtype).toBe('caret');
+        if (result.annotation.subtype === 'caret') {
+          expect(result.annotation.color).toBe('#ff0000');
+          expect(result.annotation.box).toEqual(shapeRect);
         }
 
         const after = await page.annotations.list();
@@ -1266,38 +1507,32 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'ink',
           contents: 'ink-update-base',
-          rect: shapeRect,
           inkList: inkStrokes,
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
         } satisfies InkDraft);
         const before = await page.annotations.list();
 
-        const newStrokes: InkList = [
+        const newStrokes: InkDraft['inkList'] = [
           ...inkStrokes,
           [
             { x: 80, y: 90 },
             { x: 120, y: 110 },
           ],
         ];
-        const result = await page.annotations.update(created.created.ref, {
+        const result = await page.annotations.update(created.annotation.ref, {
           subtype: 'ink',
           inkList: newStrokes,
-          color: { r: 220, g: 20, b: 60 },
+          color: '#dc143c',
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-        expect(result.updated.subtype).toBe('ink');
-        if (result.updated.subtype === 'ink') {
-          expect(result.updated.inkList.length).toBe(newStrokes.length);
-          expect(result.updated.color).toMatchObject({ r: 220, g: 20, b: 60 });
+        expect(result.annotation.subtype).toBe('ink');
+        if (result.annotation.subtype === 'ink') {
+          expect(result.annotation.inkList.length).toBe(newStrokes.length);
+          expect(result.annotation.color).toBe('#dc143c');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1311,31 +1546,30 @@ export function runAnnotationMutationConformance(
           subtype: 'ink',
           intent: 'ink-highlight',
           blendMode: 'multiply',
-          rect: shapeRect,
           inkList: inkStrokes,
-          color: { r: 255, g: 205, b: 69 },
+          color: '#ffcd45',
           strokeWidth: 14,
           borderStyle: 'solid',
           opacity: 1,
         } satisfies InkDraft);
-        expect(created.created.subtype).toBe('ink');
-        if (created.created.subtype !== 'ink') return;
-        expect(created.created.intent).toBe('ink-highlight');
-        expect(created.created.blendMode).toBe('multiply');
+        expect(created.annotation.subtype).toBe('ink');
+        if (created.annotation.subtype !== 'ink') return;
+        expect(created.annotation.intent).toBe('ink-highlight');
+        expect(created.annotation.blendMode).toBe('multiply');
 
-        const recolored = await page.annotations.update(created.created.ref, {
+        const recolored = await page.annotations.update(created.annotation.ref, {
           subtype: 'ink',
-          color: { r: 250, g: 190, b: 40 },
+          color: '#fabe28',
         });
-        expect(recolored.updated.subtype).toBe('ink');
-        expect(recolored.updated.blendMode).toBe('multiply');
+        expect(recolored.annotation.subtype).toBe('ink');
+        expect(recolored.annotation.blendMode).toBe('multiply');
 
-        const screened = await page.annotations.update(created.created.ref, {
+        const screened = await page.annotations.update(created.annotation.ref, {
           subtype: 'ink',
           blendMode: 'screen',
         });
-        expect(screened.updated.subtype).toBe('ink');
-        expect(screened.updated.blendMode).toBe('screen');
+        expect(screened.annotation.subtype).toBe('ink');
+        expect(screened.annotation.blendMode).toBe('screen');
       } finally {
         await doc.close();
       }
@@ -1348,10 +1582,9 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'polyline',
           contents: 'polyline-update-base',
-          rect: shapeRect,
           vertices,
           interiorColor: null,
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           strokeWidth: 1,
           borderStyle: 'solid',
           opacity: 1,
@@ -1359,27 +1592,22 @@ export function runAnnotationMutationConformance(
         } satisfies PolylineDraft);
         const before = await page.annotations.list();
 
-        const newVertices: PdfPoint[] = [
+        const newVertices: PagePoint[] = [
           ...vertices,
           { x: vertices[0]!.x + 5, y: vertices[0]!.y + 5 },
         ];
-        const result = await page.annotations.update(created.created.ref, {
+        const result = await page.annotations.update(created.annotation.ref, {
           subtype: 'polyline',
           vertices: newVertices,
           lineEndings: { start: 'circle', end: 'diamond' },
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-        expect(result.updated.subtype).toBe('polyline');
-        if (result.updated.subtype === 'polyline') {
-          expect(result.updated.vertices.length).toBe(newVertices.length);
-          expect(result.updated.lineEndings.start).toBe('circle');
-          expect(result.updated.lineEndings.end).toBe('diamond');
+        expect(result.annotation.subtype).toBe('polyline');
+        if (result.annotation.subtype === 'polyline') {
+          expect(result.annotation.vertices.length).toBe(newVertices.length);
+          expect(result.annotation.lineEndings.start).toBe('circle');
+          expect(result.annotation.lineEndings.end).toBe('diamond');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1392,158 +1620,139 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'circle',
           contents: 'shape-update-base',
-          rect: shapeRect,
-          interiorColor: { r: 10, g: 20, b: 30 },
-          color: { r: 0, g: 0, b: 0 },
+          box: shapeRect,
+          interiorColor: '#0a141e',
+          color: '#000000',
           strokeWidth: 1,
           borderStyle: 'solid',
           opacity: 1,
         } satisfies CircleDraft);
         const before = await page.annotations.list();
 
-        const result = await page.annotations.update(created.created.ref, {
+        const result = await page.annotations.update(created.annotation.ref, {
           subtype: 'circle',
-          interiorColor: { r: 200, g: 100, b: 50 },
+          interiorColor: '#c86432',
           strokeWidth: 4,
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-        expect(result.updated.subtype).toBe('circle');
-        if (result.updated.subtype === 'circle') {
-          expect(result.updated.interiorColor).toMatchObject({ r: 200, g: 100, b: 50 });
-          expect(result.updated.strokeWidth).toBe(4);
+        expect(result.annotation.subtype).toBe('circle');
+        if (result.annotation.subtype === 'circle') {
+          expect(result.annotation.interiorColor).toBe('#c86432');
+          expect(result.annotation.strokeWidth).toBe(4);
           // Unpatched fields are preserved.
-          expect(result.updated.borderStyle).toBe('solid');
+          expect(result.annotation.borderStyle).toBe('solid');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
     });
 
-    if (opts.supportsAppearanceRasters) {
-      test('creating a shape bakes an /AP appearance the reader can rasterize', async () => {
+    test('creating a shape bakes an /AP appearance the reader can rasterize', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const created = await page.annotations.create({
+          subtype: 'circle',
+          contents: 'appearance-gen',
+          box: shapeRect,
+          interiorColor: '#ff0000',
+          color: '#000000',
+          strokeWidth: 2,
+          borderStyle: 'solid',
+          opacity: 1,
+        } satisfies CircleDraft);
+
+        // The freshly created shape must carry a baked /AP (generated by
+        // the mutator), so the appearance reader draws a non-empty raster.
+        const raster = await appearanceRaster(page, created.annotation.ref);
+        expect(raster.width > 0).toBeTruthy();
+        expect(raster.height > 0).toBeTruthy();
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("update keeps the annotation's name and never touches /NM", async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const before = await page.annotations.list();
+
+        const target = before.annotations.find((a) => a.ref.kind === 'objectNumber');
+        // Skip gracefully if the fixture page has no annotation born as an
+        // object; the fixture used in our suites has some.
+        if (!target) return;
+
+        const newContents = `mutation conformance: updated@${Date.now()}`;
+        const patch = subtypeAwarePatch(target.subtype, newContents);
+        if (!patch) return;
+
+        const result = await page.annotations.update(target.ref, patch);
+        expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
+        expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
+        expect('cacheDelta' in result.meta).toBe(true);
+
+        // Same name, /NM untouched.
+        expect(annotationKey(result.annotation.ref)).toBe(annotationKey(target.ref));
+        expect(result.annotation.nm).toBe(target.nm);
+        expect(result.annotation.contents).toBe(newContents);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    if (fix.expectsInlineAnnotation) {
+      test('update of an annotation born inline keeps its baseIndex name and writes no /NM', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
-          const created = await page.annotations.create({
-            subtype: 'circle',
-            contents: 'appearance-gen',
-            rect: shapeRect,
-            interiorColor: { r: 255, g: 0, b: 0 },
-            color: { r: 0, g: 0, b: 0 },
-            strokeWidth: 2,
-            borderStyle: 'solid',
-            opacity: 1,
-          } satisfies CircleDraft);
+          const before = await page.annotations.list();
+          const inline = before.annotations.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
+          if (!inline) return;
 
-          const appearances = await page.annotations.renderAppearances({ scale: 1 });
-          const match = appearances.appearances.find(
-            (a) =>
-              a.ref.kind === 'objectNumber' &&
-              created.created.ref.kind === 'objectNumber' &&
-              a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+          const newContents = `inline-update@${Date.now()}`;
+          const patch = subtypeAwarePatch(inline.subtype, newContents);
+          if (!patch) return;
+
+          const result = await page.annotations.update(inline.ref, patch);
+          expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
+          expect(annotationKey(result.annotation.ref)).toBe(annotationKey(inline.ref));
+          expect(result.annotation.nm).toBe(inline.nm);
+          expect(result.meta.changed).toEqual([inline.ref]);
+
+          // A later read finds it under the same name, changed.
+          const after = await page.annotations.list();
+          const read = after.annotations.find(
+            (a) => annotationKey(a.ref) === annotationKey(inline.ref),
           );
-          // The freshly created shape must carry a baked /AP (generated by
-          // the mutator), so the appearance reader emits a non-empty raster.
-          expect(match !== undefined).toBe(true);
-          expect((match?.raster.width ?? 0) > 0).toBeTruthy();
-          expect((match?.raster.height ?? 0) > 0).toBeTruthy();
+          expect(read?.contents).toBe(newContents);
         } finally {
           await doc.close();
         }
       });
     }
 
-    test('update on a durable annotation is non-structural and never touches /NM', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const before = await page.annotations.list();
-
-        const target = before.annotations.find((a) => a.identityQuality === 'durable');
-        // Skip the assertion gracefully if the fixture has no durable annot
-        // up front; the test fixture used in our suites does (the existing
-        // highlights have /NM).
-        if (!target) return;
-
-        const ref: AnnotationRef = target.ref;
-        const newContents = `mutation conformance: updated@${Date.now()}`;
-        const patch = subtypeAwarePatch(target.subtype, newContents);
-        if (!patch) return;
-
-        const result = await page.annotations.update(ref, patch);
-        expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-        expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
-        expect('cacheDelta' in result.meta).toBe(true);
-
-        // Same identity, /NM untouched.
-        expect(result.updated.ref.kind).toBe(target.ref.kind);
-        expect(result.updated.nm).toBe(target.nm);
-
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pageState.revision.generation,
-        );
-        expect(result.meta.shouldRefetch).toBe(null);
-        expect(result.meta.weakRefsInvalidated).toBe(false);
-
-        // Round-trip the new contents.
-        expect(result.updated.contents).toBe(newContents);
-      } finally {
-        await doc.close();
-      }
-    });
-
-    if (fix.expectsWeakAnnotation) {
-      test('update on a weak annotation stamps a UUID v4 /NM and upgrades the ref', async () => {
+    // Runs before the inline delete below: an engine whose documents persist
+    // between tests (cloud) loses the fixture's one inline annotation to it.
+    if (fix.expectsInlineAnnotation) {
+      test('reorder of an annotation born inline keeps its baseIndex name', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
           const before = await page.annotations.list();
+          const inline = before.annotations.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
+          if (!inline) return;
 
-          const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-          expect(weak !== undefined).toBe(true);
-          if (!weak) return;
-          expect(weak.ref.kind).toBe('index');
-
-          const newContents = `weak-upgrade@${Date.now()}`;
-          const patch = subtypeAwarePatch(weak.subtype, newContents);
-          if (!patch) return;
-
-          const result = await page.annotations.update(weak.ref, patch);
-          expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-          expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
-          expect('cacheDelta' in result.meta).toBe(true);
-
-          // The ref is upgraded to durable. Either nm (engine-stamped) or
-          // objectNumber (if the annotation surprisingly had one) is fine.
-          expect(
-            result.updated.ref.kind === 'nm' || result.updated.ref.kind === 'objectNumber',
-          ).toBe(true);
-          expect(result.updated.identityQuality).toBe('durable');
-          if (result.updated.ref.kind === 'nm') {
-            expect(result.updated.nm !== null).toBe(true);
-            expect(typeof result.updated.nm).toBe('string');
-            // Engine stamps RFC 4122 v4 UUIDs: 8-4-4-4-12 hex with
-            // version 4 and variant 10xx. Match loosely.
-            expect(
-              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
-                result.updated.nm!,
-              ),
-            ).toBe(true);
-          }
-
-          // Still non-structural.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(
-            before.pageState.revision.generation,
-          );
-          expect(result.meta.shouldRefetch).toBe(null);
+          const atBottom = annotationKey(before.annotations[0]!.ref) === annotationKey(inline.ref);
+          const result = await page.annotations.reorder([inline.ref], atBottom ? 'end' : 'start');
+          const at = atBottom ? result.order.length - 1 : 0;
+          expect(annotationKey(result.order[at]!)).toBe(annotationKey(inline.ref));
+          expect(result.meta.changed).toEqual([inline.ref]);
+          const after = (await page.annotations.list()).annotations[at]!;
+          expect(annotationKey(after.ref)).toBe(annotationKey(inline.ref));
+          expect(after.nm).toBe(inline.nm);
         } finally {
           await doc.close();
         }
@@ -1563,67 +1772,58 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create(draft);
         const before = await page.annotations.list();
 
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-        const result = await page.annotations.delete(created.created.ref);
-        try {
-          expect(AnnotationDeleteResultSchema.safeParse(result).success).toBe(true);
-          expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
-          expect('cacheDelta' in result.meta).toBe(true);
+        const deletions: AnnotationRef[][] = [];
+        const stop = doc.events.subscribe((event) => {
+          if (event.type === 'annotations.deleted') deletions.push(event.deleted);
+        });
+        const result = await page.annotations.delete(created.annotation.ref);
+        stop();
+        // Nothing exists after a delete: the result is its meta only, and
+        // the event names what went, for listeners that didn't delete it.
+        expect(Object.keys(result)).toEqual(['meta']);
+        expect(deletions).toEqual([[created.annotation.ref]]);
+        expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
+        expect('cacheDelta' in result.meta).toBe(true);
+        expect(result.meta.changed).toEqual([created.annotation.ref]);
 
-          // Stable id is reported (we created it; it's durable).
-          expect(result.deleted !== null).toBe(true);
-          expect(result.deleted?.kind).toBe('objectNumber');
-
-          // Structural: revision bumped.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(
-            before.pageState.revision.generation + 1,
-          );
-
-          // The annotation is gone.
-          const after = await page.annotations.list();
-          expect(after.annotations.length).toBe(before.annotations.length - 1);
-        } finally {
-          await weakSession?.release();
-        }
+        // The annotation is gone.
+        const after = await page.annotations.list();
+        expect(after.annotations.length).toBe(before.annotations.length - 1);
       } finally {
         await doc.close();
       }
     });
 
-    if (fix.expectsWeakAnnotation) {
-      test('delete by index of a weak annotation reports deleted: null and refetch reason', async () => {
+    if (fix.expectsInlineAnnotation) {
+      test('delete of an annotation born inline reports its baseIndex name; the others keep theirs', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
           const before = await page.annotations.list();
-          const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-          if (!weak) return;
-          expect(weak.ref.kind).toBe('index');
+          const inline = before.annotations.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
+          if (!inline) return;
 
-          const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-          const result = await page.annotations.delete(weak.ref);
-          try {
-            // The weak annotation MAY have had /NM in some shapes (very
-            // legacy PDFs), but the locked semantics say a true weak
-            // delete returns null. We assert "either null or a stable id"
-            // since the fixture controls which side this lands on.
-            expect(
-              result.deleted === null ||
-                result.deleted.kind === 'objectNumber' ||
-                result.deleted.kind === 'nm',
-            ).toBe(true);
-            expect(result.meta.affectedPages.length).toBe(1);
-            expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
-            expect('cacheDelta' in result.meta).toBe(true);
+          const result = await page.annotations.delete(inline.ref);
+          expect(result.meta.changed[0]).toEqual(inline.ref);
+          expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
 
-            // The page had weak refs before, structural mutation,
-            // therefore: shouldRefetch is set.
-            expect(result.meta.shouldRefetch?.reason).toBe('weakRefsInvalidated');
-            expect(result.meta.weakRefsInvalidated).toBe(true);
-          } finally {
-            await weakSession?.release();
-          }
+          // What went with it (popups, replies) goes; everything else keeps
+          // its name.
+          const gone = new Set(result.meta.changed.map(annotationKey));
+          const after = await page.annotations.list();
+          expect(after.annotations.map((a) => annotationKey(a.ref))).toEqual(
+            before.annotations.map((a) => annotationKey(a.ref)).filter((key) => !gone.has(key)),
+          );
+
+          // The name is never reused: it now names nothing.
+          const patch = subtypeAwarePatch(inline.subtype, 'gone');
+          if (!patch) return;
+          const again = await page.annotations.update(inline.ref, patch).then(
+            () => null,
+            (error: unknown) => error,
+          );
+          expect(EngineError.is(again, EngineErrorCode.NotFound)).toBe(true);
         } finally {
           await doc.close();
         }
@@ -1647,132 +1847,56 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('update with a stale index revision throws InvalidReference', async () => {
+    // ─────────────────────────────────────────────────────────────────
+    //  reorder() — the stacking order. Locked invariants:
+    //  - The annotations go together, in the order given, next to a
+    //    neighbour or at 'start' (bottom) / 'end' (top).
+    //  - The answer is the page's whole new order; `meta.changed` lists
+    //    the moved annotations, which keep their names.
+    //  - A row named twice or a neighbour that moves is InvalidArg; a
+    //    neighbour that isn't on the page is NotFound; abort rejects.
+    // ─────────────────────────────────────────────────────────────────
+
+    test('reorder puts annotations right after or before their neighbour', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const before = await page.annotations.list();
-        const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-        if (!weak || weak.ref.kind !== 'index') return;
-
-        // Force the revision out of date by minting an *index-shifting*
-        // mutation, then trying to update against the stale ref. We
-        // deliberately use a throwaway create+delete pair (delete is
-        // the rev-bumping op now — create is append-only and does NOT
-        // bump revisions, so it can't be used here).
-        const throwaway = await page.annotations.create({
-          subtype: 'highlight',
-          contents: 'rev-bump-throwaway',
-          quadPoints: quad,
-        });
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-        await page.annotations.delete(throwaway.created.ref);
-        await weakSession?.release();
-
-        const patch = subtypeAwarePatch(weak.subtype, 'should-fail');
-        if (!patch) return;
-        let caught: unknown;
-        try {
-          await page.annotations.update(weak.ref, patch);
-        } catch (err) {
-          caught = err;
+        const seeded: AnnotationRef[] = [];
+        for (const label of ['order-a', 'order-b', 'order-c']) {
+          const created = await page.annotations.create({
+            subtype: 'highlight',
+            contents: label,
+            quadPoints: quad,
+          });
+          seeded.push(created.annotation.ref);
         }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidReference)).toBe(true);
+        const [a, b, c] = seeded as [AnnotationRef, AnnotationRef, AnnotationRef];
+        const listed = async () =>
+          (await page.annotations.list()).annotations.map((x) => annotationKey(x.ref));
+        const before = await listed();
+        const others = before.filter((key) => !seeded.map(annotationKey).includes(key));
+
+        const result = await page.annotations.reorder([a], { after: c });
+        expect(AnnotationReorderResultSchema.safeParse(result).success).toBe(true);
+        expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
+        expect('cacheDelta' in result.meta).toBe(true);
+        expect(result.meta.changed.map(annotationKey)).toEqual([annotationKey(a)]);
+        const afterC = [...others, annotationKey(b), annotationKey(c), annotationKey(a)];
+        expect(result.order.map(annotationKey)).toEqual(afterC);
+        expect(await listed()).toEqual(afterC);
+
+        const backBeforeB = await page.annotations.reorder([a], { before: b });
+        expect(backBeforeB.order.map(annotationKey)).toEqual(before);
+        expect(await listed()).toEqual(before);
       } finally {
         await doc.close();
       }
     });
 
-    // ─────────────────────────────────────────────────────────────────
-    //  move() — batch contiguous-block reorder. Locked invariants:
-    //  - `move([ref], toIndex)` is the single-annotation case; same
-    //    primitive as multi-move.
-    //  - One revision bump per batch, regardless of `refs.length`.
-    //  - Caller-supplied order is preserved at the destination.
-    //  - Weak refs in the batch are upgraded to durable /NM BEFORE the
-    //    move; the moved DTOs come out durable and `meta.changed` lists
-    //    stable ids.
-    //  - Stale revision, out-of-range, duplicate, and abort all reject.
-    // ─────────────────────────────────────────────────────────────────
-
-    test('move single durable annotation reorders within the page (single-as-batch)', async () => {
+    test('reorder keeps the order given and goes to the bottom or the top', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-
-        // Seed two durable annotations we can predict ordering for.
-        const aDraft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'move-a',
-          quadPoints: quad,
-        };
-        const bDraft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'move-b',
-          quadPoints: quad,
-        };
-        const a = await page.annotations.create(aDraft);
-        const b = await page.annotations.create(bDraft);
-        const list = await page.annotations.list();
-        const beforeRev = list.pageState.revision.generation;
-
-        // Find current indices of a and b.
-        const aIdx = list.annotations.findIndex(
-          (x) =>
-            x.ref.kind === 'objectNumber' &&
-            a.created.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === a.created.ref.annotObjectNumber,
-        );
-        const bIdx = list.annotations.findIndex(
-          (x) =>
-            x.ref.kind === 'objectNumber' &&
-            b.created.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === b.created.ref.annotObjectNumber,
-        );
-        expect(aIdx >= 0 && bIdx >= 0).toBe(true);
-        expect(aIdx < bIdx).toBe(true);
-
-        // Move A to B's slot. Post-removal index space: A was removed,
-        // so B's position becomes bIdx - 1. Targeting bIdx puts A AFTER
-        // B's original position. Use `bIdx` as toIndex => A lands right
-        // after B in the new order.
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-        const result = await page.annotations.move([a.created.ref], bIdx);
-        try {
-          expect(AnnotationMoveResultSchema.safeParse(result).success).toBe(true);
-          expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
-          expect('cacheDelta' in result.meta).toBe(true);
-          expect(result.moved.length).toBe(1);
-
-          // Single revision bump per batch.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(beforeRev + 1);
-
-          // The moved DTO sits at toIndex.
-          if (result.moved[0].ref.kind === 'objectNumber') {
-            const movedObjNum = result.moved[0].ref.annotObjectNumber;
-            if (a.created.ref.kind === 'objectNumber') {
-              expect(movedObjNum).toBe(a.created.ref.annotObjectNumber);
-            }
-          }
-
-          // Verify the page now has A at its new position.
-          const after = await page.annotations.list();
-          expect(after.annotations.length).toBe(list.annotations.length);
-        } finally {
-          await weakSession?.release();
-        }
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test('move multi-block preserves caller-supplied order at the destination', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-
-        // Seed three durable annotations.
         const ids = await Promise.all(
           ['multi-1', 'multi-2', 'multi-3'].map((label) =>
             page.annotations.create({
@@ -1783,155 +1907,62 @@ export function runAnnotationMutationConformance(
           ),
         );
 
-        const list = await page.annotations.list();
-        const beforeRev = list.pageState.revision.generation;
+        // The three go to the bottom in the order [3, 1, 2].
+        const given = [ids[2].annotation.ref, ids[0].annotation.ref, ids[1].annotation.ref];
+        const bottom = await page.annotations.reorder(given, 'start');
+        expect(bottom.meta.changed.map(annotationKey)).toEqual(given.map(annotationKey));
+        expect(bottom.order.slice(0, 3).map(annotationKey)).toEqual(given.map(annotationKey));
 
-        // Move the three to position 0 in caller order [3, 1, 2].
-        const callerOrder = [ids[2].created.ref, ids[0].created.ref, ids[1].created.ref];
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-        const result = await page.annotations.move(callerOrder, 0);
-        try {
-          // One revision bump even though three annotations moved.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(beforeRev + 1);
-          expect(result.moved.length).toBe(3);
-          expect(result.meta.changed.length).toBe(3);
-
-          // Caller-supplied order preserved at the destination. Indices
-          // 0, 1, 2 of the page now hold the moved DTOs in that order.
-          const expectedOrder = [ids[2].created.ref, ids[0].created.ref, ids[1].created.ref].map(
-            (r) => (r.kind === 'objectNumber' ? r.annotObjectNumber : null),
-          );
-
-          const movedObjNums = result.moved.map((d) =>
-            d.ref.kind === 'objectNumber' ? d.ref.annotObjectNumber : null,
-          );
-          for (let i = 0; i < expectedOrder.length; i++) {
-            expect(movedObjNums[i]).toBe(expectedOrder[i]);
-          }
-        } finally {
-          await weakSession?.release();
-        }
+        const top = await page.annotations.reorder([ids[2].annotation.ref], 'end');
+        expect(annotationKey(top.order.at(-1)!)).toBe(annotationKey(ids[2].annotation.ref));
+        expect(top.order).toHaveLength(bottom.order.length);
       } finally {
         await doc.close();
       }
     });
 
-    if (fix.expectsWeakAnnotation) {
-      test('move on a weak annotation upgrades it to durable /NM (one rev bump for batch)', async () => {
-        const doc = await openFixture(engine, opts);
-        try {
-          const page = doc.page(toPageRef(fix.pageObjectNumber));
-          const before = await page.annotations.list();
-          const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-          if (!weak || weak.ref.kind !== 'index') return;
-          const beforeRev = before.pageState.revision.generation;
-
-          // Move the weak annotation to position 0 (or somewhere
-          // non-trivial). The engine must stamp a fresh /NM BEFORE the
-          // move so the result is durable.
-          const target = weak.ref.index === 0 ? 1 : 0;
-          const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-          const result = await page.annotations.move([weak.ref], target);
+    test('reorder refuses a neighbour that moves (InvalidArg) or is not on the page (NotFound)', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const a = await page.annotations.create({
+          subtype: 'highlight',
+          contents: 'anchor-a',
+          quadPoints: quad,
+        });
+        const before = (await page.annotations.list()).annotations.map((x) => annotationKey(x.ref));
+        const refused = async (attempt: () => Promise<unknown>) => {
           try {
-            expect(result.meta.affectedPages[0].revision.generation).toBe(beforeRev + 1);
-            expect(result.moved.length).toBe(1);
-            expect(result.moved[0].identityQuality).toBe('durable');
-            expect(
-              result.moved[0].ref.kind === 'nm' || result.moved[0].ref.kind === 'objectNumber',
-            ).toBe(true);
-
-            // meta.changed is a stable id, never a weak ref.
-            expect(result.meta.changed.length).toBe(1);
-            expect(
-              result.meta.changed[0].kind === 'nm' ||
-                result.meta.changed[0].kind === 'objectNumber',
-            ).toBe(true);
-          } finally {
-            await weakSession?.release();
+            await attempt();
+          } catch (err) {
+            return err;
           }
-        } finally {
-          await doc.close();
-        }
-      });
-    }
-
-    test('move with a stale index revision rejects (locked rev-token guard)', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const a = await page.annotations.create({
-          subtype: 'highlight',
-          contents: 'stale-a',
-          quadPoints: quad,
-        });
-        const list = await page.annotations.list();
-        const aIdx = list.annotations.findIndex(
-          (x) =>
-            x.ref.kind === 'objectNumber' &&
-            a.created.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === a.created.ref.annotObjectNumber,
-        );
-        if (aIdx < 0) return;
-
-        const staleIndexRef: AnnotationRef = {
-          kind: 'index',
-          page: toPageRef(fix.pageObjectNumber),
-          index: aIdx,
-          revision: list.pageState.revision,
+          return undefined;
         };
-
-        // Bump the revision by an unrelated index-shifting mutation.
-        // create is append-only and no longer bumps revisions, so we
-        // use a throwaway create+delete pair (the delete does the bump).
-        const throwaway = await page.annotations.create({
-          subtype: 'highlight',
-          contents: 'bump-throwaway',
-          quadPoints: quad,
-        });
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-        await page.annotations.delete(throwaway.created.ref);
-
-        let caught: unknown;
-        try {
-          await page.annotations.move([staleIndexRef], 0);
-        } catch (err) {
-          caught = err;
-        } finally {
-          await weakSession?.release();
-        }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidReference)).toBe(true);
+        const self = await refused(() =>
+          page.annotations.reorder([a.annotation.ref], { after: a.annotation.ref }),
+        );
+        expect(EngineError.is(self, EngineErrorCode.InvalidArg)).toBe(true);
+        const gone: AnnotationRef = {
+          kind: 'objectNumber',
+          page: toPageRef(fix.pageObjectNumber),
+          objectNumber: 999_999,
+        };
+        const missing = await refused(() =>
+          page.annotations.reorder([a.annotation.ref], { before: gone }),
+        );
+        expect(EngineError.is(missing, EngineErrorCode.NotFound)).toBe(true);
+        const missingRow = await refused(() => page.annotations.reorder([gone], 'start'));
+        expect(EngineError.is(missingRow, EngineErrorCode.NotFound)).toBe(true);
+        expect(
+          (await page.annotations.list()).annotations.map((x) => annotationKey(x.ref)),
+        ).toEqual(before);
       } finally {
         await doc.close();
       }
     });
 
-    test('move with out-of-range toIndex rejects with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const a = await page.annotations.create({
-          subtype: 'highlight',
-          contents: 'oor-a',
-          quadPoints: quad,
-        });
-        const list = await page.annotations.list();
-        const farTooBig = list.annotations.length + 100;
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-        let caught: unknown;
-        try {
-          await page.annotations.move([a.created.ref], farTooBig);
-        } catch (err) {
-          caught = err;
-        } finally {
-          await weakSession?.release();
-        }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test('move with duplicate refs rejects with InvalidArg', async () => {
+    test('reorder with duplicate refs rejects with InvalidArg', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -1940,14 +1971,11 @@ export function runAnnotationMutationConformance(
           contents: 'dup-a',
           quadPoints: quad,
         });
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
         let caught: unknown;
         try {
-          await page.annotations.move([a.created.ref, a.created.ref], 0);
+          await page.annotations.reorder([a.annotation.ref, a.annotation.ref], 'start');
         } catch (err) {
           caught = err;
-        } finally {
-          await weakSession?.release();
         }
         expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
       } finally {
@@ -1955,7 +1983,7 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('abort on move rejects with AbortError', async () => {
+    test('abort on reorder rejects with AbortError', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -1964,44 +1992,9 @@ export function runAnnotationMutationConformance(
           contents: 'abort-a',
           quadPoints: quad,
         });
-        const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
-        const p = page.annotations.move([a.created.ref], 0);
+        const p = page.annotations.reorder([a.annotation.ref], 'start');
         p.abort('test');
-        try {
-          await expect(p).rejects.toBeInstanceOf(AbortError);
-        } finally {
-          await weakSession?.release();
-        }
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test('a page move does NOT bump per-page RevisionTokens (weak refs survive reorder)', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const list = await doc.pages.list();
-        if (list.pages.length < 1) return;
-
-        // Revision is annotation liveness, keyed by `pageObjectNumber`. A
-        // page move is structural-geometry-only: no page's /Annots array is
-        // touched, so no `RevisionToken` bumps and index-kind refs captured
-        // before the reorder stay valid. We observe the host page's
-        // revision via `annotations.list().pageState` (the move result no
-        // longer carries liveness — it returns geometry).
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const beforeGen = (await page.annotations.list()).pageState.revision.generation;
-
-        // Pull some page to the front (prefer one that is NOT the host so
-        // we exercise the cross-page case; fall back to the host itself for
-        // single-page fixtures).
-        const mover =
-          list.pages.find((pg) => pg.ref.pageObjectNumber !== fix.pageObjectNumber)?.ref ??
-          toPageRef(fix.pageObjectNumber);
-        await doc.pages.move([mover], 0);
-
-        const afterGen = (await page.annotations.list()).pageState.revision.generation;
-        expect(afterGen).toBe(beforeGen);
+        await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {
         await doc.close();
       }
@@ -2009,16 +2002,16 @@ export function runAnnotationMutationConformance(
 
     // ─────────────────────────────────────────────────────────────────
     //  /IRT + /RT relationships (reply vs group). Locked rules:
-    //  - A draft `inReplyTo` writes /IRT; /RT defaults to 'reply' when
-    //    `replyType` is omitted (ISO 32000 §12.5.6.2 default).
-    //  - The DTO surfaces `inReplyTo` (parent ref) + `replyType`; a
-    //    top-level annotation reports both as null.
-    //  - Linking reports the (possibly strengthened) parent id in
-    //    `meta.changed` and is non-structural (no rev bump / refetch).
+    //  - A draft `reply` writes /IRT; /RT defaults to 'reply' when
+    //    `reply.type` is left out (ISO 32000 §12.5.6.2 default).
+    //  - The DTO surfaces `reply` ({ to, type }); a top-level annotation
+    //    reports `reply: null`.
+    //  - Linking writes only the reply: `meta.changed` names the reply,
+    //    and the parent keeps its name.
     //  - A cross-page parent is rejected with InvalidArg.
     // ─────────────────────────────────────────────────────────────────
 
-    test('create a reply links /IRT and defaults /RT to "reply", reporting the parent', async () => {
+    test('create a reply links /IRT and defaults /RT to "reply"', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -2028,44 +2021,38 @@ export function runAnnotationMutationConformance(
           quadPoints: quad,
         } satisfies HighlightDraft);
         // A freshly created top-level annotation has no relationship.
-        expect(parent.created.inReplyTo).toBe(null);
-        expect(parent.created.replyType).toBe(null);
+        expect(parent.annotation.reply).toBe(null);
 
         const reply = await page.annotations.create({
           subtype: 'highlight',
           contents: 'a reply',
           quadPoints: quad,
-          inReplyTo: parent.created.ref,
+          reply: { to: parent.annotation.ref },
         } satisfies HighlightDraft);
         expect(AnnotationCreateResultSchema.safeParse(reply).success).toBe(true);
         // /RT absent in the draft normalizes to 'reply'.
-        expect(reply.created.replyType).toBe('reply');
-        expect(reply.created.inReplyTo === null).toBe(false);
+        expect(reply.annotation.reply?.type).toBe('reply');
+        expect(reply.annotation.reply?.to !== undefined).toBe(true);
         if (
-          reply.created.inReplyTo?.kind === 'objectNumber' &&
-          parent.created.ref.kind === 'objectNumber'
+          reply.annotation.reply?.to.kind === 'objectNumber' &&
+          parent.annotation.ref.kind === 'objectNumber'
         ) {
-          expect(reply.created.inReplyTo.annotObjectNumber).toBe(
-            parent.created.ref.annotObjectNumber,
-          );
-          expect(reply.created.inReplyTo.page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(reply.annotation.reply!.to.objectNumber).toBe(parent.annotation.ref.objectNumber);
+          expect(reply.annotation.reply!.to.page.objectNumber).toBe(fix.pageObjectNumber);
         }
-        // The parent (already durable) is reported alongside the new reply.
-        expect(reply.meta.changed.length).toBe(2);
-        // Linking is non-structural: no rev bump, no refetch.
-        expect(reply.meta.shouldRefetch).toBe(null);
-        expect(reply.meta.weakRefsInvalidated).toBe(false);
+        // Only the reply was written.
+        expect(reply.meta.changed).toEqual([reply.annotation.ref]);
 
         // The relationship survives a fresh read.
         const after = await page.annotations.list();
         const readReply = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            reply.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === reply.created.ref.annotObjectNumber,
+            reply.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === reply.annotation.ref.objectNumber,
         );
-        expect(readReply?.replyType).toBe('reply');
-        expect(readReply?.inReplyTo == null).toBe(false);
+        expect(readReply?.reply?.type).toBe('reply');
+        expect(readReply?.reply?.to !== undefined).toBe(true);
       } finally {
         await doc.close();
       }
@@ -2084,24 +2071,23 @@ export function runAnnotationMutationConformance(
         const caret = await page.annotations.create({
           subtype: 'caret',
           contents: '',
-          rect: shapeRect,
-          color: { r: 0, g: 0, b: 0 },
+          box: shapeRect,
+          color: '#000000',
           opacity: 1,
-          inReplyTo: primary.created.ref,
-          replyType: 'group',
+          reply: { to: primary.annotation.ref, type: 'group' },
         } satisfies CaretDraft);
         expect(AnnotationCreateResultSchema.safeParse(caret).success).toBe(true);
-        expect(caret.created.replyType).toBe('group');
-        expect(caret.created.inReplyTo === null).toBe(false);
+        expect(caret.annotation.reply?.type).toBe('group');
+        expect(caret.annotation.reply?.to !== undefined).toBe(true);
 
         const after = await page.annotations.list();
         const readCaret = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            caret.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === caret.created.ref.annotObjectNumber,
+            caret.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === caret.annotation.ref.objectNumber,
         );
-        expect(readCaret?.replyType).toBe('group');
+        expect(readCaret?.reply?.type).toBe('group');
       } finally {
         await doc.close();
       }
@@ -2110,12 +2096,12 @@ export function runAnnotationMutationConformance(
     // ─────────────────────────────────────────────────────────────────
     //  Link annotations. Locked rules:
     //  - `/Dest` and `/A GoTo` both read as the normalized `goto` arm;
-    //    destinations carry page OBJECT NUMBERS on the wire (never
+    //    destinations carry page object numbers on the wire (never
     //    indices) and raw PDF user-space coordinates.
     //  - `target: null` creates a dead link (create-then-edit flow).
-    //  - A patch RETARGETS by replacing `/A`; the reader gives `/A`
+    //  - A patch retargets by replacing `/A`; the reader gives `/A`
     //    precedence so a retarget wins over any stray direct `/Dest`.
-    //  - Grouped links (v2 "attached links") are plain /IRT + /RT
+    //  - Grouped links ("attached links") are plain /IRT + /RT
     //    /Group — nothing link-specific in the relationship plane.
     // ─────────────────────────────────────────────────────────────────
 
@@ -2130,9 +2116,9 @@ export function runAnnotationMutationConformance(
           target: { kind: 'uri', uri: 'https://www.embedpdf.com/' },
         } satisfies LinkDraft);
         expect(AnnotationCreateResultSchema.safeParse(uri).success).toBe(true);
-        expect(uri.created.subtype).toBe('link');
-        if (uri.created.subtype === 'link') {
-          expect(uri.created.target).toEqual({ kind: 'uri', uri: 'https://www.embedpdf.com/' });
+        expect(uri.annotation.subtype).toBe('link');
+        if (uri.annotation.subtype === 'link') {
+          expect(uri.annotation.target).toEqual({ kind: 'uri', uri: 'https://www.embedpdf.com/' });
         }
 
         // /XYZ with a null zoom axis: null means "retain current".
@@ -2144,22 +2130,22 @@ export function runAnnotationMutationConformance(
             destination: {
               kind: 'xyz',
               page: toPageRef(fix.pageObjectNumber),
-              left: 30,
-              top: 500,
+              x: 30,
+              y: 300,
               zoom: null,
             },
           },
         } satisfies LinkDraft);
-        expect(xyz.created.subtype).toBe('link');
-        if (xyz.created.subtype === 'link') {
-          expect(xyz.created.target?.kind).toBe('goto');
-          if (xyz.created.target?.kind === 'goto') {
-            const dest = xyz.created.target.destination;
+        expect(xyz.annotation.subtype).toBe('link');
+        if (xyz.annotation.subtype === 'link') {
+          expect(xyz.annotation.target?.kind).toBe('goto');
+          if (xyz.annotation.target?.kind === 'goto') {
+            const dest = xyz.annotation.target.destination;
             expect(dest.kind).toBe('xyz');
             if (dest.kind === 'xyz') {
-              expect(dest.page.pageObjectNumber).toBe(fix.pageObjectNumber);
-              expect(dest.left).toBe(30);
-              expect(dest.top).toBe(500);
+              expect(dest.page.objectNumber).toBe(fix.pageObjectNumber);
+              expect(dest.x).toBe(30);
+              expect(dest.y).toBe(300);
               expect(dest.zoom).toBe(null);
             }
           }
@@ -2170,15 +2156,15 @@ export function runAnnotationMutationConformance(
           rect: shapeRect,
           target: {
             kind: 'goto',
-            destination: { kind: 'fitH', page: toPageRef(fix.pageObjectNumber), top: 420 },
+            destination: { kind: 'fitH', page: toPageRef(fix.pageObjectNumber), y: 420 },
           },
         } satisfies LinkDraft);
-        expect(fitH.created.subtype).toBe('link');
-        if (fitH.created.subtype === 'link' && fitH.created.target?.kind === 'goto') {
-          expect(fitH.created.target.destination).toEqual({
+        expect(fitH.annotation.subtype).toBe('link');
+        if (fitH.annotation.subtype === 'link' && fitH.annotation.target?.kind === 'goto') {
+          expect(fitH.annotation.target.destination).toEqual({
             kind: 'fitH',
             page: toPageRef(fix.pageObjectNumber),
-            top: 420,
+            y: 420,
           });
         }
 
@@ -2188,8 +2174,8 @@ export function runAnnotationMutationConformance(
           rect: shapeRect,
           target: null,
         } satisfies LinkDraft);
-        expect(dead.created.subtype).toBe('link');
-        if (dead.created.subtype === 'link') expect(dead.created.target).toBe(null);
+        expect(dead.annotation.subtype).toBe('link');
+        if (dead.annotation.subtype === 'link') expect(dead.annotation.target).toBe(null);
 
         // All four survive a fresh page read as link DTOs.
         const after = await page.annotations.list();
@@ -2210,7 +2196,7 @@ export function runAnnotationMutationConformance(
           target: { kind: 'uri', uri: 'https://old.example/' },
         } satisfies LinkDraft);
 
-        const toGoto = await page.annotations.update(created.created.ref, {
+        const toGoto = await page.annotations.update(created.annotation.ref, {
           subtype: 'link',
           target: {
             kind: 'goto',
@@ -2218,27 +2204,22 @@ export function runAnnotationMutationConformance(
           },
         });
         expect(AnnotationUpdateResultSchema.safeParse(toGoto).success).toBe(true);
-        if (toGoto.updated.subtype === 'link') {
-          expect(toGoto.updated.target).toEqual({
+        if (toGoto.annotation.subtype === 'link') {
+          expect(toGoto.annotation.target).toEqual({
             kind: 'goto',
             destination: { kind: 'fit', page: toPageRef(fix.pageObjectNumber) },
           });
         }
 
-        const movedRect = {
-          left: shapeRect.left + 5,
-          bottom: shapeRect.bottom + 5,
-          right: shapeRect.right + 5,
-          top: shapeRect.top + 5,
-        };
-        const toUri = await page.annotations.update(created.created.ref, {
+        const movedRect = { ...shapeRect, x: shapeRect.x + 5, y: shapeRect.y + 5 };
+        const toUri = await page.annotations.update(created.annotation.ref, {
           subtype: 'link',
           rect: movedRect,
           target: { kind: 'uri', uri: 'https://new.example/' },
         });
-        if (toUri.updated.subtype === 'link') {
-          expect(toUri.updated.target).toEqual({ kind: 'uri', uri: 'https://new.example/' });
-          expect(Math.round(toUri.updated.rect.left)).toBe(Math.round(movedRect.left));
+        if (toUri.annotation.subtype === 'link') {
+          expect(toUri.annotation.target).toEqual({ kind: 'uri', uri: 'https://new.example/' });
+          expect(Math.round(toUri.annotation.rect.x)).toBe(Math.round(movedRect.x));
         }
       } finally {
         await doc.close();
@@ -2258,31 +2239,31 @@ export function runAnnotationMutationConformance(
           },
         } satisfies LinkDraft);
 
-        const cleared = await page.annotations.update(created.created.ref, {
+        const cleared = await page.annotations.update(created.annotation.ref, {
           subtype: 'link',
           target: null,
         });
         expect(AnnotationUpdateResultSchema.safeParse(cleared).success).toBe(true);
-        if (cleared.updated.subtype === 'link') expect(cleared.updated.target).toBe(null);
+        if (cleared.annotation.subtype === 'link') expect(cleared.annotation.target).toBe(null);
 
         // Truly dead — a fresh page read agrees (both /A and /Dest gone).
         const after = await page.annotations.list();
         const readBack = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            created.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+            created.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === created.annotation.ref.objectNumber,
         );
         expect(readBack?.subtype).toBe('link');
         if (readBack?.subtype === 'link') expect(readBack.target).toBe(null);
 
         // And a cleared link can be re-targeted afterwards.
-        const revived = await page.annotations.update(created.created.ref, {
+        const revived = await page.annotations.update(created.annotation.ref, {
           subtype: 'link',
           target: { kind: 'uri', uri: 'https://revived.example/' },
         });
-        if (revived.updated.subtype === 'link') {
-          expect(revived.updated.target).toEqual({
+        if (revived.annotation.subtype === 'link') {
+          expect(revived.annotation.target).toEqual({
             kind: 'uri',
             uri: 'https://revived.example/',
           });
@@ -2306,31 +2287,28 @@ export function runAnnotationMutationConformance(
           subtype: 'link',
           rect: shapeRect,
           target: { kind: 'uri', uri: 'https://www.embedpdf.com/docs' },
-          inReplyTo: parent.created.ref,
-          replyType: 'group',
+          reply: { to: parent.annotation.ref, type: 'group' },
         } satisfies LinkDraft);
         expect(AnnotationCreateResultSchema.safeParse(link).success).toBe(true);
-        expect(link.created.replyType).toBe('group');
-        expect(link.created.inReplyTo === null).toBe(false);
+        expect(link.annotation.reply?.type).toBe('group');
+        expect(link.annotation.reply?.to !== undefined).toBe(true);
         if (
-          link.created.inReplyTo?.kind === 'objectNumber' &&
-          parent.created.ref.kind === 'objectNumber'
+          link.annotation.reply?.to.kind === 'objectNumber' &&
+          parent.annotation.ref.kind === 'objectNumber'
         ) {
-          expect(link.created.inReplyTo.annotObjectNumber).toBe(
-            parent.created.ref.annotObjectNumber,
-          );
+          expect(link.annotation.reply!.to.objectNumber).toBe(parent.annotation.ref.objectNumber);
         }
 
-        // Both the relationship AND the target survive a fresh read.
+        // Both the relationship and the target survive a fresh read.
         const after = await page.annotations.list();
         const readLink = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            link.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === link.created.ref.annotObjectNumber,
+            link.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === link.annotation.ref.objectNumber,
         );
         expect(readLink?.subtype).toBe('link');
-        expect(readLink?.replyType).toBe('group');
+        expect(readLink?.reply?.type).toBe('group');
         if (readLink?.subtype === 'link') {
           expect(readLink.target).toEqual({ kind: 'uri', uri: 'https://www.embedpdf.com/docs' });
         }
@@ -2347,55 +2325,53 @@ export function runAnnotationMutationConformance(
           subtype: 'caret',
           intent: 'replace',
           contents: 'replacement text',
-          rect: shapeRect,
-          color: { r: 228, g: 66, b: 52 },
+          box: shapeRect,
+          color: '#e44234',
           opacity: 1,
-          rectDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
         } satisfies CaretDraft);
         const strikeout = await page.annotations.create({
           subtype: 'strikeout',
           intent: 'strikeout-text-edit',
           quadPoints: quad,
-          color: { r: 228, g: 66, b: 52 },
+          color: '#e44234',
           opacity: 1,
-          inReplyTo: caret.created.ref,
-          replyType: 'group',
+          reply: { to: caret.annotation.ref, type: 'group' },
         } satisfies StrikeoutDraft);
 
-        expect(caret.created.subtype).toBe('caret');
-        if (caret.created.subtype === 'caret') expect(caret.created.intent).toBe('replace');
-        expect(strikeout.created.subtype).toBe('strikeout');
-        if (strikeout.created.subtype === 'strikeout') {
-          expect(strikeout.created.intent).toBe('strikeout-text-edit');
+        expect(caret.annotation.subtype).toBe('caret');
+        if (caret.annotation.subtype === 'caret') expect(caret.annotation.intent).toBe('replace');
+        expect(strikeout.annotation.subtype).toBe('strikeout');
+        if (strikeout.annotation.subtype === 'strikeout') {
+          expect(strikeout.annotation.intent).toBe('strikeout-text-edit');
         }
-        expect(strikeout.created.replyType).toBe('group');
-        expect(strikeout.created.inReplyTo).toEqual(caret.created.ref);
+        expect(strikeout.annotation.reply?.type).toBe('group');
+        expect(strikeout.annotation.reply?.to).toEqual(caret.annotation.ref);
 
         const after = await page.annotations.list();
         const readCaret = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            caret.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === caret.created.ref.annotObjectNumber,
+            caret.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === caret.annotation.ref.objectNumber,
         );
         const readStrikeout = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            strikeout.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === strikeout.created.ref.annotObjectNumber,
+            strikeout.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === strikeout.annotation.ref.objectNumber,
         );
         expect(readCaret?.subtype === 'caret' && readCaret.intent).toBe('replace');
         expect(readStrikeout?.subtype === 'strikeout' && readStrikeout.intent).toBe(
           'strikeout-text-edit',
         );
-        expect(readStrikeout?.replyType).toBe('group');
-        expect(readStrikeout?.inReplyTo).toEqual(caret.created.ref);
+        expect(readStrikeout?.reply?.type).toBe('group');
+        expect(readStrikeout?.reply?.to).toEqual(caret.annotation.ref);
       } finally {
         await doc.close();
       }
     });
 
-    test('patch inReplyTo: null clears /IRT and /RT (back to top-level)', async () => {
+    test('patch reply: null clears /IRT and /RT (back to top-level)', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -2408,17 +2384,16 @@ export function runAnnotationMutationConformance(
           subtype: 'highlight',
           contents: 'clearable reply',
           quadPoints: quad,
-          inReplyTo: parent.created.ref,
+          reply: { to: parent.annotation.ref },
         } satisfies HighlightDraft);
-        expect(reply.created.replyType).toBe('reply');
+        expect(reply.annotation.reply?.type).toBe('reply');
 
-        const cleared = await page.annotations.update(reply.created.ref, {
+        const cleared = await page.annotations.update(reply.annotation.ref, {
           subtype: 'highlight',
-          inReplyTo: null,
+          reply: null,
         });
         expect(AnnotationUpdateResultSchema.safeParse(cleared).success).toBe(true);
-        expect(cleared.updated.inReplyTo).toBe(null);
-        expect(cleared.updated.replyType).toBe(null);
+        expect(cleared.annotation.reply).toBe(null);
       } finally {
         await doc.close();
       }
@@ -2433,7 +2408,7 @@ export function runAnnotationMutationConformance(
           contents: 'cross-page parent',
           quadPoints: quad,
         } satisfies HighlightDraft);
-        if (parent.created.ref.kind !== 'objectNumber') return;
+        if (parent.annotation.ref.kind !== 'objectNumber') return;
 
         // Same annotation object number, but a deliberately different page:
         // the engine must reject before resolving anything (ISO requires
@@ -2441,7 +2416,7 @@ export function runAnnotationMutationConformance(
         const crossPageRef: AnnotationRef = {
           kind: 'objectNumber',
           page: toPageRef(fix.pageObjectNumber + 2),
-          annotObjectNumber: parent.created.ref.annotObjectNumber,
+          objectNumber: parent.annotation.ref.objectNumber,
         };
         let caught: unknown;
         try {
@@ -2449,7 +2424,7 @@ export function runAnnotationMutationConformance(
             subtype: 'highlight',
             contents: 'bad cross-page reply',
             quadPoints: quad,
-            inReplyTo: crossPageRef,
+            reply: { to: crossPageRef },
           } satisfies HighlightDraft);
         } catch (err) {
           caught = err;
@@ -2460,14 +2435,35 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    test('create refuses an nm already used on the page, naming the field', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const draft = { subtype: 'highlight', quadPoints: quad, nm: 'taken' } as const;
+        await page.annotations.create(draft satisfies HighlightDraft);
+        await expect(page.annotations.create(draft)).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'nm' },
+        });
+        // A name is unique per page (ISO 32000-2 §12.5.2): another page may use it.
+        const { pages } = await doc.pages.list();
+        const other = pages.find((entry) => entry.ref.objectNumber !== fix.pageObjectNumber);
+        if (!other) return;
+        const elsewhere = await doc.page(other.ref).annotations.create(draft);
+        expect(elsewhere.annotation.nm).toBe('taken');
+      } finally {
+        await doc.close();
+      }
+    });
+
     // ─────────────────────────────────────────────────────────────────
     //  /State + /StateModel (review status, ISO 32000 §12.5.6.3) and
     //  /Subj. Locked rules:
-    //  - A status change is a NEW text annotation replying to its target
+    //  - A status change is a new text annotation replying to its target
     //    via /IRT; the target annotation itself is never modified.
     //  - Faithful reads: `state` / `stateModel` / `subject` are null iff
     //    the PDF entry is absent — a null after a null-clear patch proves
-    //    TRUE key removal (EPDFAnnot_RemoveKey), not an empty-string
+    //    true key removal (EPDFAnnot_RemoveKey), not an empty-string
     //    write.
     //  - Known review/marked values are wire-normalized to lowercase;
     //    custom Acrobat state models round-trip verbatim.
@@ -2486,30 +2482,30 @@ export function runAnnotationMutationConformance(
           subject: 'Pricing question',
           quadPoints: quad,
         } satisfies HighlightDraft);
-        expect(target.created.subject).toBe('Pricing question');
+        expect(target.annotation.subject).toBe('Pricing question');
 
         const status = await page.annotations.create({
           subtype: 'text',
-          rect: shapeRect,
-          inReplyTo: target.created.ref,
+          rect: iconRect(shapeRect.x, shapeRect.y),
+          reply: { to: target.annotation.ref },
           state: 'accepted',
           stateModel: 'review',
         } satisfies TextDraft);
         expect(AnnotationCreateResultSchema.safeParse(status).success).toBe(true);
-        expect(status.created.subtype).toBe('text');
-        if (status.created.subtype !== 'text') return;
-        expect(status.created.state).toBe('accepted');
-        expect(status.created.stateModel).toBe('review');
+        expect(status.annotation.subtype).toBe('text');
+        if (status.annotation.subtype !== 'text') return;
+        expect(status.annotation.state).toBe('accepted');
+        expect(status.annotation.stateModel).toBe('review');
         // A state annotation is a reply like any other.
-        expect(status.created.replyType).toBe('reply');
+        expect(status.annotation.reply?.type).toBe('reply');
 
         // The entries survive a fresh read.
         const after = await page.annotations.list();
         const read = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            status.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === status.created.ref.annotObjectNumber,
+            status.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === status.annotation.ref.objectNumber,
         );
         expect(read?.subtype).toBe('text');
         if (read?.subtype === 'text') {
@@ -2521,16 +2517,22 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('a draft /State without /StateModel is rejected with InvalidArg', async () => {
+    test('a draft /State without /StateModel takes its standard model, or is refused', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const { annotation } = await page.annotations.create({
+          subtype: 'text',
+          rect: iconRect(shapeRect.x, shapeRect.y),
+          state: 'accepted',
+        } satisfies TextDraft);
+        expect(annotation.subtype === 'text' && annotation.stateModel).toBe('review');
         let caught: unknown;
         try {
           await page.annotations.create({
             subtype: 'text',
-            rect: shapeRect,
-            state: 'accepted',
+            rect: iconRect(shapeRect.x, shapeRect.y),
+            state: 'escalated',
           } satisfies TextDraft);
         } catch (err) {
           caught = err;
@@ -2547,7 +2549,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const note = await page.annotations.create({
           subtype: 'text',
-          rect: shapeRect,
+          rect: iconRect(shapeRect.x, shapeRect.y),
           contents: 'work in progress',
           subject: 'Draft',
           state: 'none',
@@ -2556,18 +2558,18 @@ export function runAnnotationMutationConformance(
 
         // Cycle the state alone — the model already on the annotation
         // stays; state entries never touch the appearance.
-        const cycled = await page.annotations.update(note.created.ref, {
+        const cycled = await page.annotations.update(note.annotation.ref, {
           subtype: 'text',
           state: 'rejected',
         } satisfies TextPatch);
         expect(cycled.appearance.changed).toBe(false);
-        expect(cycled.updated.subtype).toBe('text');
-        if (cycled.updated.subtype === 'text') {
-          expect(cycled.updated.state).toBe('rejected');
-          expect(cycled.updated.stateModel).toBe('review');
+        expect(cycled.annotation.subtype).toBe('text');
+        if (cycled.annotation.subtype === 'text') {
+          expect(cycled.annotation.state).toBe('rejected');
+          expect(cycled.annotation.stateModel).toBe('review');
         }
 
-        const cleared = await page.annotations.update(note.created.ref, {
+        const cleared = await page.annotations.update(note.annotation.ref, {
           subtype: 'text',
           contents: null,
           subject: null,
@@ -2575,22 +2577,22 @@ export function runAnnotationMutationConformance(
           stateModel: null,
         } satisfies TextPatch);
         expect(cleared.appearance.changed).toBe(false);
-        expect(cleared.updated.contents).toBe(null);
-        expect(cleared.updated.subject).toBe(null);
-        if (cleared.updated.subtype === 'text') {
-          expect(cleared.updated.state).toBe(null);
-          expect(cleared.updated.stateModel).toBe(null);
+        expect(cleared.annotation.contents).toBe(null);
+        expect(cleared.annotation.subject).toBe(null);
+        if (cleared.annotation.subtype === 'text') {
+          expect(cleared.annotation.state).toBe(null);
+          expect(cleared.annotation.stateModel).toBe(null);
         }
 
         // Faithful read: null distinguishes absent from ''. Null here
-        // proves the entries were REMOVED, not overwritten with an empty
+        // proves the entries were removed, not overwritten with an empty
         // string.
         const after = await page.annotations.list();
         const read = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            note.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === note.created.ref.annotObjectNumber,
+            note.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === note.annotation.ref.objectNumber,
         );
         expect(read?.contents).toBe(null);
         expect(read?.subject).toBe(null);
@@ -2609,21 +2611,21 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const custom = await page.annotations.create({
           subtype: 'text',
-          rect: shapeRect,
+          rect: iconRect(shapeRect.x, shapeRect.y),
           state: 'in-progress',
           stateModel: 'X-ReviewWorkflow',
         } satisfies TextDraft);
-        expect(custom.created.subtype).toBe('text');
-        if (custom.created.subtype !== 'text') return;
-        expect(custom.created.state).toBe('in-progress');
-        expect(custom.created.stateModel).toBe('X-ReviewWorkflow');
+        expect(custom.annotation.subtype).toBe('text');
+        if (custom.annotation.subtype !== 'text') return;
+        expect(custom.annotation.state).toBe('in-progress');
+        expect(custom.annotation.stateModel).toBe('X-ReviewWorkflow');
 
         const after = await page.annotations.list();
         const read = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
-            custom.created.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === custom.created.ref.annotObjectNumber,
+            custom.annotation.ref.kind === 'objectNumber' &&
+            a.ref.objectNumber === custom.annotation.ref.objectNumber,
         );
         if (read?.subtype === 'text') {
           expect(read.state).toBe('in-progress');
@@ -2634,17 +2636,6 @@ export function runAnnotationMutationConformance(
       }
     });
   });
-}
-
-async function beginWeakEditIfRequired(
-  doc: DocumentHandle,
-  pageObjectNumber: number,
-  fix: AnnotationMutationConformanceFixture,
-): Promise<WeakAnnotationEditSession | null> {
-  if (doc.capabilities.weakAnnotationEditSessions !== 'required' || !fix.expectsWeakAnnotation) {
-    return null;
-  }
-  return doc.annotations.beginWeakEdit([toPageRef(pageObjectNumber)]);
 }
 
 async function openFixture(

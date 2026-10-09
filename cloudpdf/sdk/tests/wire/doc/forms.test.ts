@@ -5,7 +5,7 @@ import { CloudPDFClient } from "../../../src/Client";
 import { mockServerPool } from "../../mock-server/MockServerPool";
 
 describe("FormsClient", () => {
-    test("get (1)", async () => {
+    test("list (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
@@ -15,16 +15,24 @@ describe("FormsClient", () => {
             fields: [
                 {
                     family: "text",
-                    ref: { kind: "objectNumber", fieldObjectNumber: 1 },
-                    fieldObjectNumber: 1,
+                    ref: { kind: "objectNumber", objectNumber: 1 },
                     name: "name",
                     origin: "acroform",
-                    flags: { readOnly: true, required: true, noExport: true, raw: 1 },
+                    readOnly: true,
+                    required: true,
+                    noExport: true,
                     alternateName: "alternateName",
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                    groupId: "groupId",
+                    createdBy: "createdBy",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    filledBy: "filledBy",
+                    filledByName: "filledByName",
+                    filledAt: "2024-01-15T09:30:00Z",
+                    importedBy: "importedBy",
+                    widgets: [{ ref: null, objectNumber: 1, page: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,
@@ -33,7 +41,58 @@ describe("FormsClient", () => {
                     comb: true,
                 },
             ],
-            calculationOrder: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
+            widgets: [
+                {
+                    subtype: "widget",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
+                    nm: "nm",
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
+                    },
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    rotation: 1.1,
+                    color: "color",
+                    interiorColor: "interiorColor",
+                    strokeWidth: 1.1,
+                    borderStyle: "solid",
+                    fontFamily: "courier",
+                    fontSize: 1.1,
+                    fontColor: "fontColor",
+                    textAlign: "left",
+                    caption: "caption",
+                    field: { kind: "objectNumber", objectNumber: 1 },
+                    fieldFamily: "text",
+                },
+            ],
+            calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
         };
 
         server
@@ -44,14 +103,14 @@ describe("FormsClient", () => {
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.doc.forms.get({
+        const response = await client.doc.forms.list({
             docId: "docId",
             layerName: "layerName",
         });
         expect(response).toEqual(rawResponseBody);
     });
 
-    test("get (2)", async () => {
+    test("list (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
@@ -66,74 +125,83 @@ describe("FormsClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.forms.get({
+            return await client.doc.forms.list({
                 docId: "docId",
                 layerName: "layerName",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
-    test("importData (1)", async () => {
+    test("reorderCalculations (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { key: "value" };
+        const rawRequestBody = { fields: [{ kind: "objectNumber", objectNumber: 1 }], position: "start" };
         const rawResponseBody = {
+            calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/data")
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.doc.forms.importData({
+        const response = await client.doc.forms.reorderCalculations({
             docId: "docId",
             layerName: "layerName",
-            body: {
-                key: "value",
-            },
+            fields: [
+                {
+                    kind: "objectNumber",
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
         });
         expect(response).toEqual(rawResponseBody);
     });
 
-    test("importData (2)", async () => {
+    test("reorderCalculations (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
+        const rawRequestBody = {
+            fields: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
         const rawResponseBody = { key: "value" };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/data")
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -141,27 +209,39 @@ describe("FormsClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.forms.importData({
+            return await client.doc.forms.reorderCalculations({
                 docId: "docId",
                 layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
+                fields: [
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
                     },
-                },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
     });
 
-    test("importData (3)", async () => {
+    test("reorderCalculations (3)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
+        const rawRequestBody = {
+            fields: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
         const rawResponseBody = { key: "value" };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/data")
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -169,86 +249,20 @@ describe("FormsClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.forms.importData({
+            return await client.doc.forms.reorderCalculations({
                 docId: "docId",
                 layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
-                    },
-                },
-            });
-        }).rejects.toThrow(CloudPDF.NotFoundError);
-    });
-
-    test("reset (1)", async () => {
-        const server = mockServerPool.createServer();
-        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-
-        const rawResponseBody = {
-            meta: {
-                affectedPages: [
+                fields: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
                     },
                 ],
-                cacheDelta: {
-                    previousDocVersion: 1,
-                    docVersion: 1,
-                    annotationsVersion: 1,
-                    layerVersion: 1,
-                    working: true,
-                    pages: [
-                        {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
-                        },
-                    ],
-                },
-            },
-        };
-
-        server
-            .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/fields/fieldKey/reset")
-            .respondWith()
-            .statusCode(200)
-            .jsonBody(rawResponseBody)
-            .build();
-
-        const response = await client.doc.forms.reset({
-            docId: "docId",
-            layerName: "layerName",
-            fieldKey: "fieldKey",
-        });
-        expect(response).toEqual(rawResponseBody);
-    });
-
-    test("reset (2)", async () => {
-        const server = mockServerPool.createServer();
-        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-
-        const rawResponseBody = { key: "value" };
-
-        server
-            .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/fields/fieldKey/reset")
-            .respondWith()
-            .statusCode(404)
-            .jsonBody(rawResponseBody)
-            .build();
-
-        await expect(async () => {
-            return await client.doc.forms.reset({
-                docId: "docId",
-                layerName: "layerName",
-                fieldKey: "fieldKey",
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -258,31 +272,113 @@ describe("FormsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
-            meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
+            field: {
+                family: "text",
+                ref: { kind: "objectNumber", objectNumber: 1 },
+                name: "name",
+                origin: "acroform",
+                readOnly: true,
+                required: true,
+                noExport: true,
+                alternateName: "alternateName",
+                mappingName: "mappingName",
+                valueEntry: { kind: "none" },
+                defaultValueEntry: { kind: "none" },
+                actions: {
+                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                groupId: "groupId",
+                createdBy: "createdBy",
+                createdAt: "2024-01-15T09:30:00Z",
+                filledBy: "filledBy",
+                filledByName: "filledByName",
+                filledAt: "2024-01-15T09:30:00Z",
+                importedBy: "importedBy",
+                widgets: [{ ref: null, objectNumber: 1, page: null }],
+                value: "value",
+                defaultValue: "defaultValue",
+                maxLength: 1,
+                multiline: true,
+                password: true,
+                comb: true,
+            },
+            widgets: [
+                {
+                    subtype: "widget",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
+                    nm: "nm",
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
                     },
-                ],
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    rotation: 1.1,
+                    color: "color",
+                    interiorColor: "interiorColor",
+                    strokeWidth: 1.1,
+                    borderStyle: "solid",
+                    fontFamily: "courier",
+                    fontSize: 1.1,
+                    fontColor: "fontColor",
+                    textAlign: "left",
+                    caption: "caption",
+                    field: { kind: "objectNumber", objectNumber: 1 },
+                    fieldFamily: "text",
+                },
+            ],
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -360,6 +456,636 @@ describe("FormsClient", () => {
                         key: "value",
                     },
                 },
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("reset (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = {
+            fields: [
+                {
+                    family: "text",
+                    ref: { kind: "objectNumber", objectNumber: 1 },
+                    name: "name",
+                    origin: "acroform",
+                    readOnly: true,
+                    required: true,
+                    noExport: true,
+                    alternateName: "alternateName",
+                    mappingName: "mappingName",
+                    valueEntry: { kind: "none" },
+                    defaultValueEntry: { kind: "none" },
+                    groupId: "groupId",
+                    createdBy: "createdBy",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    filledBy: "filledBy",
+                    filledByName: "filledByName",
+                    filledAt: "2024-01-15T09:30:00Z",
+                    importedBy: "importedBy",
+                    widgets: [{ ref: null, objectNumber: 1, page: null }],
+                    value: "value",
+                    defaultValue: "defaultValue",
+                    maxLength: 1,
+                    multiline: true,
+                    password: true,
+                    comb: true,
+                },
+            ],
+            widgets: [
+                {
+                    subtype: "widget",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
+                    nm: "nm",
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
+                    },
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    rotation: 1.1,
+                    color: "color",
+                    interiorColor: "interiorColor",
+                    strokeWidth: 1.1,
+                    borderStyle: "solid",
+                    fontFamily: "courier",
+                    fontSize: 1.1,
+                    fontColor: "fontColor",
+                    textAlign: "left",
+                    caption: "caption",
+                    field: { kind: "objectNumber", objectNumber: 1 },
+                    fieldFamily: "text",
+                },
+            ],
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/reset")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.reset({
+            docId: "docId",
+            layerName: "layerName",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reset (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/reset")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reset({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reset (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/reset")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reset({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("deleteWidget (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = {
+            widget: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            page: { kind: "objectNumber", objectNumber: 1 },
+            field: {
+                family: "text",
+                ref: { kind: "objectNumber", objectNumber: 1 },
+                name: "name",
+                origin: "acroform",
+                readOnly: true,
+                required: true,
+                noExport: true,
+                alternateName: "alternateName",
+                mappingName: "mappingName",
+                valueEntry: { kind: "none" },
+                defaultValueEntry: { kind: "none" },
+                actions: {
+                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                groupId: "groupId",
+                createdBy: "createdBy",
+                createdAt: "2024-01-15T09:30:00Z",
+                filledBy: "filledBy",
+                filledByName: "filledByName",
+                filledAt: "2024-01-15T09:30:00Z",
+                importedBy: "importedBy",
+                widgets: [{ ref: null, objectNumber: 1, page: null }],
+                value: "value",
+                defaultValue: "defaultValue",
+                maxLength: 1,
+                multiline: true,
+                password: true,
+                comb: true,
+            },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.deleteWidget({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            annotKey: "annotKey",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("deleteWidget (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.deleteWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("deleteWidget (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.deleteWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("updateWidget (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { patch: {} };
+        const rawResponseBody = {
+            widget: {
+                subtype: "widget",
+                ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                page: { kind: "objectNumber", objectNumber: 1 },
+                hasAppearance: true,
+                appearanceState: "appearanceState",
+                nm: "nm",
+                rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                contents: "contents",
+                subject: "subject",
+                blendMode: "normal",
+                invisible: true,
+                hidden: true,
+                print: true,
+                noZoom: true,
+                noRotate: true,
+                noView: true,
+                readOnly: true,
+                locked: true,
+                toggleNoView: true,
+                lockedContents: true,
+                reply: {
+                    to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    type: "reply",
+                },
+                popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                groupId: "groupId",
+                author: "author",
+                createdAt: "2024-01-15T09:30:00Z",
+                modifiedAt: "2024-01-15T09:30:00Z",
+                userId: "userId",
+                createdBy: "createdBy",
+                modifiedBy: "modifiedBy",
+                importedBy: "importedBy",
+                actions: {
+                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                rotation: 1.1,
+                color: "color",
+                interiorColor: "interiorColor",
+                strokeWidth: 1.1,
+                borderStyle: "solid",
+                fontFamily: "courier",
+                fontSize: 1.1,
+                fontColor: "fontColor",
+                textAlign: "left",
+                caption: "caption",
+                field: { kind: "objectNumber", objectNumber: 1 },
+                fieldFamily: "text",
+            },
+            appearance: { action: "preserved", changed: true },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.updateWidget({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            annotKey: "annotKey",
+            patch: {},
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("updateWidget (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { patch: {} };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.updateWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+                patch: {},
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("updateWidget (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { patch: {} };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.updateWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+                patch: {},
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("reorderWidgets (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            widgets: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            position: "start",
+        };
+        const rawResponseBody = {
+            page: { kind: "objectNumber", objectNumber: 1 },
+            order: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/widgets/pageKey/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.reorderWidgets({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            widgets: [
+                {
+                    kind: "objectNumber",
+                    page: {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reorderWidgets (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            widgets: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/widgets/pageKey/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reorderWidgets({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                widgets: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reorderWidgets (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            widgets: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/widgets/pageKey/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reorderWidgets({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                widgets: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

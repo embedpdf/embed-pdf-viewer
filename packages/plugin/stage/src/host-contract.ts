@@ -1,4 +1,4 @@
-import type { CapabilityToken, PageRef, Unsubscribe } from '@embedpdf/core';
+import { createHostToken, type PageRef, type Unsubscribe } from '@embedpdf/core';
 import type { Point, Rect } from '@embedpdf/core-geometry';
 import type { Camera, ScrollMetrics, Size } from '@embedpdf/core-stage';
 
@@ -6,14 +6,17 @@ import type { StageCapability, StageViewState, ViewportPoint } from './contract'
 import { StageToken as PublicStageToken } from './token';
 
 export * from './contract';
-export type { StageAction, StageState } from './model';
+export type { StageState } from './model';
 
 /**
- * The host lens: what the surface binding, gesture controller and sibling
+ * The host lens: what the surface binding, the gesture controller and sibling
  * plugins need. The same runtime token as the public contract, typed wider.
  */
 export interface StageHostCapability extends StageCapability {
-  /** Report the container box (ResizeObserver); the first real size triggers placement. */
+  /**
+   * Report the container box (ResizeObserver); the first real size triggers placement. After
+   * that, a box with no area (hidden, or taken out of the page) keeps the last real viewport.
+   */
   setViewportSize(size: Size): void;
   /** Report the device pixel ratio so page transforms render crisp. */
   setDevicePixelRatio(ratio: number): void;
@@ -41,5 +44,5 @@ export interface StageHostCapability extends StageCapability {
   getLensId(): string;
 }
 
-export const StageToken = PublicStageToken as unknown as CapabilityToken<StageHostCapability>;
+export const StageToken = createHostToken<StageHostCapability>(PublicStageToken);
 export type { Camera, Point, Rect, ScrollMetrics, Size };

@@ -1,0 +1,205 @@
+{
+  "name": "@embedpdf/vue",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Vue adapter for EmbedPDF v3: composables, components with v-model and scoped slots, headless layers. The whole framework surface, one entry point per feature.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/framework/vue"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./actions": "./src/actions.ts",
+    "./anchored": "./src/anchored.ts",
+    "./annotation": "./src/annotation.ts",
+    "./commands": "./src/commands.ts",
+    "./form": "./src/form.ts",
+    "./i18n": "./src/i18n.ts",
+    "./interaction": "./src/interaction.ts",
+    "./link": "./src/link.ts",
+    "./measurement": "./src/measurement.ts",
+    "./metadata": "./src/metadata.ts",
+    "./history": "./src/history.ts",
+    "./page-edit": "./src/page-edit.ts",
+    "./page-view": "./src/page-view.ts",
+    "./redaction": "./src/redaction.ts",
+    "./render": "./src/render.ts",
+    "./runtime": "./src/runtime.ts",
+    "./search": "./src/search.ts",
+    "./selection": "./src/selection.ts",
+    "./shell": "./src/shell.ts",
+    "./signature": "./src/signature.ts",
+    "./stage": "./src/stage.ts",
+    "./stamp": "./src/stamp.ts",
+    "./toolbar": "./src/toolbar.ts",
+    "./view-manager": "./src/view-manager.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./actions": {
+        "import": "./dist/actions.js",
+        "require": "./dist/actions.cjs"
+      },
+      "./anchored": {
+        "import": "./dist/anchored.js",
+        "require": "./dist/anchored.cjs"
+      },
+      "./annotation": {
+        "import": "./dist/annotation.js",
+        "require": "./dist/annotation.cjs"
+      },
+      "./commands": {
+        "import": "./dist/commands.js",
+        "require": "./dist/commands.cjs"
+      },
+      "./form": {
+        "import": "./dist/form.js",
+        "require": "./dist/form.cjs"
+      },
+      "./i18n": {
+        "import": "./dist/i18n.js",
+        "require": "./dist/i18n.cjs"
+      },
+      "./interaction": {
+        "import": "./dist/interaction.js",
+        "require": "./dist/interaction.cjs"
+      },
+      "./link": {
+        "import": "./dist/link.js",
+        "require": "./dist/link.cjs"
+      },
+      "./measurement": {
+        "import": "./dist/measurement.js",
+        "require": "./dist/measurement.cjs"
+      },
+      "./metadata": {
+        "import": "./dist/metadata.js",
+        "require": "./dist/metadata.cjs"
+      },
+      "./history": {
+        "import": "./dist/history.js",
+        "require": "./dist/history.cjs"
+      },
+      "./page-edit": {
+        "import": "./dist/page-edit.js",
+        "require": "./dist/page-edit.cjs"
+      },
+      "./page-view": {
+        "import": "./dist/page-view.js",
+        "require": "./dist/page-view.cjs"
+      },
+      "./redaction": {
+        "import": "./dist/redaction.js",
+        "require": "./dist/redaction.cjs"
+      },
+      "./render": {
+        "import": "./dist/render.js",
+        "require": "./dist/render.cjs"
+      },
+      "./runtime": {
+        "import": "./dist/runtime.js",
+        "require": "./dist/runtime.cjs"
+      },
+      "./search": {
+        "import": "./dist/search.js",
+        "require": "./dist/search.cjs"
+      },
+      "./selection": {
+        "import": "./dist/selection.js",
+        "require": "./dist/selection.cjs"
+      },
+      "./shell": {
+        "import": "./dist/shell.js",
+        "require": "./dist/shell.cjs"
+      },
+      "./signature": {
+        "import": "./dist/signature.js",
+        "require": "./dist/signature.cjs"
+      },
+      "./stage": {
+        "import": "./dist/stage.js",
+        "require": "./dist/stage.cjs"
+      },
+      "./stamp": {
+        "import": "./dist/stamp.js",
+        "require": "./dist/stamp.cjs"
+      },
+      "./toolbar": {
+        "import": "./dist/toolbar.js",
+        "require": "./dist/toolbar.cjs"
+      },
+      "./view-manager": {
+        "import": "./dist/view-manager.js",
+        "require": "./dist/view-manager.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "vite build && vue-tsc -p tsconfig.build.json && node ../../../tooling/build/src/fully-specify-imports.mjs --cjs-types && node ../../../tooling/build/src/check-framework-package.mjs",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-form": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-link": "workspace:*",
+    "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-page-edit": "workspace:*",
+    "@embedpdf/plugin-redaction": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-shell": "workspace:*",
+    "@embedpdf/plugin-signature": "workspace:*",
+    "@embedpdf/plugin-stage": "workspace:*",
+    "@embedpdf/plugin-stamp": "workspace:*",
+    "@embedpdf/core-signature": "workspace:*",
+    "@embedpdf/plugin-view-manager": "workspace:*",
+    "@embedpdf/core-stage": "workspace:*",
+    "@embedpdf/core-ui": "workspace:*",
+    "@embedpdf/web": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*",
+    "@embedpdf/plugin-measurement": "workspace:*"
+  },
+  "peerDependencies": {
+    "vue": ">=3.4"
+  },
+  "devDependencies": {
+    "@embedpdf/engine": "workspace:*",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^20.11.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^2.1.9",
+    "vue": "^3.5.13",
+    "vue-tsc": "^3.2.4",
+    "@embedpdf/tooling-build": "workspace:*"
+  }
+}

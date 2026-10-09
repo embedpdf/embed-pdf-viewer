@@ -6,16 +6,15 @@ import { describe, expect, it } from 'vitest';
 import { createKernel } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { actionsPlugin, ActionsToken } from '@embedpdf/plugin-actions';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
-import { fieldKeyOf } from '../src/core/model';
 import { formPlugin } from '../src/form.plugin';
-import { FormToken } from '../src/host-contract'; // the WIDE token — package-internal view
+import { FormToken } from '../src/host-contract'; // the wide token — package-internal view
 import type { WidgetActivationResult } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +31,7 @@ const fixturePath = resolve(
 );
 
 /**
- * The synthetic HIDE/SHOW/RESET/CHAIN buttons form through the FULL plugin
+ * The synthetic hide, show, reset and chain buttons form through the full plugin
  * wiring: interaction + annotation + actions + form on one kernel. The
  * scripting-off half is the actions-≠-JavaScript proof — Hide and ResetForm
  * buttons must work with the VM disabled; the scripting-on half runs the
@@ -73,7 +72,7 @@ async function boot(scripting: boolean, scope?: string[]) {
   const snapshot = form.getSnapshot();
   if (!snapshot) throw new Error('form snapshot did not load');
   const page = snapshot.fields[0]!.widgets[0]!.page!;
-  await annotation.reloadPage(page); // hydrate the annotation plane for paint asserts
+  await annotation.whenSynced(); // the annotation plugin has loaded the document
 
   const fieldOf = (name: string) => {
     const field = form.getSnapshot()?.fields.find((candidate) => candidate.name === name);
@@ -89,13 +88,17 @@ async function boot(scripting: boolean, scope?: string[]) {
     return {
       kind: 'objectNumber',
       page: widget.page!,
-      annotObjectNumber: widget.annotObjectNumber,
+      objectNumber: widget.objectNumber,
     };
   };
   const press = (name: string): Promise<WidgetActivationResult> =>
     form.activateWidget(widgetRefOf(name));
-  const paintedIds = () => annotation.listPageItems(page).map((item) => item.id);
-  const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.annotObjectNumber}`;
+  // The page's widgets that show, as the form's rows say (`hidden` is their display).
+  const paintedIds = () =>
+    (form.getSnapshot()?.widgets ?? [])
+      .filter((widget) => widget.page.objectNumber === page.objectNumber && !widget.hidden)
+      .map((widget) => annotationKey(widget.ref));
+  const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.objectNumber}`;
   const notify = (name: string, event: PdfAnnotationEventKind) =>
     form.notifyWidgetEvent(fieldOf(name).ref, widgetRefOf(name), event);
   // notifyWidgetEvent is fire-and-forget; a bogus hover dispatch drains the
@@ -105,7 +108,7 @@ async function boot(scripting: boolean, scope?: string[]) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page, annotObjectNumber: 999_999 },
+      ref: { kind: 'objectNumber', page, objectNumber: 999_999 },
       page,
     });
 
@@ -117,7 +120,7 @@ async function boot(scripting: boolean, scope?: string[]) {
     annotation,
     page,
     fieldOf,
-    valueOf,
+    valueOf: valueOf,
     widgetRefOf,
     press,
     paintedIds,
@@ -133,168 +136,199 @@ async function boot(scripting: boolean, scope?: string[]) {
 
 describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => {
   it('HIDE session-hides the target widget; SHOW (/H false) restores it', async () => {
-    await using t = await boot(false);
-    const alphaId = `obj:${t.fieldOf('alpha').widgets[0]!.annotObjectNumber}`;
-    expect(t.paintedIds()).toContain(alphaId);
+    await using harness = await boot(false);
+    const alphaId = `obj:${harness.fieldOf('alpha').widgets[0]!.objectNumber}`;
+    expect(harness.paintedIds()).toContain(alphaId);
 
-    const hide = await t.press('btn-hide');
+    const hide = await harness.press('btn-hide');
     expect(hide.kind).toBe('dispatched');
     if (hide.kind !== 'dispatched') throw new Error('unreachable');
-    // Phase 2: a dispatch returns per-step truth; the /A tree is one step.
+    // A dispatch reports each step; the /A tree is one step.
     expect(hide.result.steps).toHaveLength(1);
     expect(hide.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'hide', status: 'executed' }),
     ]);
-    expect(t.paintedIds()).not.toContain(alphaId);
+    expect(harness.paintedIds()).not.toContain(alphaId);
 
-    const show = await t.press('btn-show');
+    const show = await harness.press('btn-show');
     expect(show.kind).toBe('dispatched');
-    expect(t.paintedIds()).toContain(alphaId);
+    expect(harness.paintedIds()).toContain(alphaId);
   });
 
   it('a READ-ONLY TEXT field with /A activates like a button (the fake-button pattern)', async () => {
     // The Test Lab's Reset/Next/Hide shape: /FT /Tx /Ff 1 styled as a
-    // button, action on the widget /A. Activation is a WIDGET behavior
+    // button, action on the widget /A. Activation is a widget behavior
     // (ISO puts /A on the annotation dictionary) — field family and the
     // ReadOnly flag are irrelevant to it.
-    await using t = await boot(false);
-    const alphaId = `obj:${t.fieldOf('alpha').widgets[0]!.annotObjectNumber}`;
-    expect(t.fieldOf('fakeButton').flags.readOnly).toBe(true);
-    expect(t.paintedIds()).toContain(alphaId);
+    await using harness = await boot(false);
+    const alphaId = `obj:${harness.fieldOf('alpha').widgets[0]!.objectNumber}`;
+    expect(harness.fieldOf('fakeButton').readOnly).toBe(true);
+    expect(harness.paintedIds()).toContain(alphaId);
 
-    const pressed = await t.press('fakeButton');
+    const pressed = await harness.press('fakeButton');
     expect(pressed.kind).toBe('dispatched');
     if (pressed.kind !== 'dispatched') throw new Error('unreachable');
     expect(pressed.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'hide', status: 'executed' }),
     ]);
-    expect(t.paintedIds()).not.toContain(alphaId);
+    expect(harness.paintedIds()).not.toContain(alphaId);
   });
 
   it('RESET with /Flags 1 resets the COMPLEMENT of the listed fields', async () => {
-    await using t = await boot(false);
-    expect(t.valueOf('alpha')).toBe('filled-a');
-    expect(t.valueOf('beta')).toBe('filled-b');
+    await using harness = await boot(false);
+    expect(harness.valueOf('alpha')).toBe('filled-a');
+    expect(harness.valueOf('beta')).toBe('filled-b');
 
-    const reset = await t.press('btn-reset'); // excludes [alpha, log] → resets beta
+    const reset = await harness.press('btn-reset'); // excludes [alpha, log] → resets beta
     expect(reset.kind).toBe('dispatched');
     if (reset.kind !== 'dispatched') throw new Error('unreachable');
     expect(reset.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'reset-form', status: 'executed' }),
     ]);
-    expect(t.valueOf('beta')).toBe('default-b');
-    expect(t.valueOf('alpha')).toBe('filled-a'); // excluded — untouched
+    expect(harness.valueOf('beta')).toBe('default-b');
+    expect(harness.valueOf('alpha')).toBe('filled-a'); // excluded — untouched
+  });
+
+  it('a button made through create() draws, and resets the form when pressed', async () => {
+    await using harness = await boot(false);
+    const { field } = await harness.form.create({
+      family: 'pushbutton',
+      name: 'clear',
+      widgets: [
+        {
+          page: harness.page,
+          rect: { x: 10, y: 10, width: 80, height: 20 },
+          caption: 'Clear form',
+          actions: { activate: { type: 'reset-form', fields: null, exclude: false } },
+        },
+      ],
+    });
+    const widget = field.widgets[0]!.ref!;
+    const row = harness.form
+      .getSnapshot()
+      ?.widgets.find((candidate) => annotationKey(candidate.ref) === annotationKey(widget));
+    expect(row).toMatchObject({ caption: 'Clear form', hasAppearance: true });
+
+    const pressed = await harness.form.activateWidget(widget);
+    expect(pressed.kind).toBe('dispatched');
+    if (pressed.kind !== 'dispatched') throw new Error('unreachable');
+    expect(pressed.result.steps[0]!.result.nodes).toEqual([
+      expect.objectContaining({ type: 'reset-form', status: 'executed' }),
+    ]);
+    expect([harness.valueOf('alpha'), harness.valueOf('beta')]).toEqual(['default-a', 'default-b']);
   });
 
   it('runs the ResetForm in a JS chain while the JS nodes stay inert', async () => {
-    await using t = await boot(false);
-    const chain = await t.press('btn-chain');
+    await using harness = await boot(false);
+    const chain = await harness.press('btn-chain');
     expect(chain.kind).toBe('dispatched');
     if (chain.kind !== 'dispatched') throw new Error('unreachable');
     // JS inert (scripting off), the reset between them still executes.
-    expect(chain.result.steps[0]!.result.nodes.map((n) => [n.type, n.status])).toEqual([
+    expect(chain.result.steps[0]!.result.nodes.map((node) => [node.type, node.status])).toEqual([
       ['javascript', 'inert'],
       ['reset-form', 'executed'],
       ['javascript', 'inert'],
     ]);
     expect(chain.result.status).toBe('executed'); // inert nodes never demote
-    expect(t.valueOf('alpha')).toBe('default-a'); // include-mode [(alpha)]
-    expect(t.valueOf('log')).toBe(''); // no script ran
+    expect(harness.valueOf('alpha')).toBe('default-a'); // include-mode [(alpha)]
+    expect(harness.valueOf('log')).toBe(''); // no script ran
   });
 });
 
 describe('action buttons e2e (scripting ON)', () => {
   it('runs JS→ResetForm→JS: each script once, in order, around the reset', async () => {
-    await using t = await boot(true);
-    const chain = await t.press('btn-chain');
+    await using harness = await boot(true);
+    const chain = await harness.press('btn-chain');
     expect(chain.kind).toBe('dispatched');
     if (chain.kind !== 'dispatched') throw new Error('unreachable');
-    expect(chain.result.steps[0]!.result.nodes.map((n) => [n.type, n.status])).toEqual([
+    expect(chain.result.steps[0]!.result.nodes.map((node) => [node.type, node.status])).toEqual([
       ['javascript', 'executed'],
       ['reset-form', 'executed'],
       ['javascript', 'executed'],
     ]);
-    // 'A' before the reset, 'B' after — order AND exactly-once in one string.
-    expect(t.valueOf('log')).toBe('AB');
-    expect(t.valueOf('alpha')).toBe('default-a');
-    expect(t.valueOf('beta')).toBe('filled-b');
+    // 'A' before the reset, 'B' after — order and exactly-once in one string.
+    expect(harness.valueOf('log')).toBe('AB');
+    expect(harness.valueOf('alpha')).toBe('default-a');
+    expect(harness.valueOf('beta')).toBe('filled-b');
   });
 
   it('never deadlocks a dispatch against a queued value commit (queue-direction law)', async () => {
-    await using t = await boot(true);
+    await using harness = await boot(true);
     // Fire the chain and a value write concurrently: the dispatch runs on
-    // the ACTIONS queue and its executors enter the form queue; the write
+    // the actions queue and its executors enter the form queue; the write
     // enters the form queue directly. form → actions → form would hang here.
-    const dispatched = t.press('btn-chain');
-    const committed = t.form.setText(t.fieldOf('beta').ref, 'raced');
+    const dispatched = harness.press('btn-chain');
+    const committed = harness.form.setValue(harness.fieldOf('beta').ref, { value: 'raced' });
     const [chain] = await Promise.all([dispatched, committed]);
     expect(chain.kind).toBe('dispatched');
-    expect(t.valueOf('log')).toBe('AB');
-    expect(t.valueOf('beta')).toBe('raced');
+    expect(harness.valueOf('log')).toBe('AB');
+    expect(harness.valueOf('beta')).toBe('raced');
   }, 20_000);
 });
 
 describe('widget /AA events (Phase 2/3 — the DOM-event feed, full ISO)', () => {
   it('runs the native tooltip via hover — a DOCUMENT mutation in an authorized session', async () => {
-    await using t = await boot(false);
-    const tipId = t.widgetId('tip');
-    expect(t.paintedIds()).not.toContain(tipId); // /F hidden at rest
+    await using harness = await boot(false);
+    const tipId = harness.widgetId('tip');
+    expect(harness.paintedIds()).not.toContain(tipId); // /F hidden at rest
 
-    t.notify('alpha', 'cursorEnter'); // alpha's /AA /E → Hide /H false (tip)
-    await t.drainActions();
-    expect(t.paintedIds()).toContain(tipId);
+    harness.notify('alpha', 'cursorEnter'); // alpha's /AA /E → Hide /H false (tip)
+    await harness.drainActions();
+    expect(harness.paintedIds()).toContain(tipId);
 
-    t.notify('alpha', 'cursorExit'); // /X → Hide (tip)
-    await t.drainActions();
-    await t.drainActions(); // the pump settles, then delivers the exit
-    expect(t.paintedIds()).not.toContain(tipId);
+    harness.notify('alpha', 'cursorExit'); // /X → Hide (tip)
+    await harness.drainActions();
+    await harness.drainActions(); // the pump settles, then delivers the exit
+    expect(harness.paintedIds()).not.toContain(tipId);
   });
 
   it('refuses the tooltip WITHOUT authority: the ISO permission model, honestly reported', async () => {
-    // Full ISO (D7): a Hide is a document mutation — a read-only session's
+    // A Hide action is a document mutation: a read-only session's
     // hover runs the trigger, the engine refuses the write, diagnostics say
-    // so, and NOTHING changes anywhere.
-    await using t = await boot(false, [
+    // so, and nothing changes anywhere.
+    await using harness = await boot(false, [
       'doc.open',
       'doc.render',
       'doc.forms.read',
       'doc.annotate.read',
     ]);
-    expect(t.form.canFill()).toBe(false); // the scope really is narrowed
-    const tipId = t.widgetId('tip');
-    expect(t.paintedIds()).not.toContain(tipId);
+    expect(harness.form.canFill({ kind: 'fqn', name: 'tip' })).toBe(false); // the scope really is narrowed
+    const tipId = harness.widgetId('tip');
+    expect(harness.paintedIds()).not.toContain(tipId);
 
     const diagnostics: string[] = [];
-    t.actions.onDiagnostic((d) => diagnostics.push(`${d.code}:${d.message}`));
-    t.notify('alpha', 'cursorEnter');
-    await t.drainActions();
-    expect(t.paintedIds()).not.toContain(tipId); // refused — byte-stable view
-    expect(diagnostics.some((d) => d.includes('executor-failed'))).toBe(true);
+    harness.actions.onDiagnosticReported((diagnostic) =>
+      diagnostics.push(`${diagnostic.code}:${diagnostic.action}`),
+    );
+    harness.notify('alpha', 'cursorEnter');
+    await harness.drainActions();
+    expect(harness.paintedIds()).not.toContain(tipId); // refused — byte-stable view
+    expect(diagnostics.some((diagnostic) => diagnostic.includes('executor-failed'))).toBe(true);
   });
 
   it('dispatches Fo/Bl and D/U; /A shadows /AA U on the buttons (ISO Table 197)', async () => {
-    await using t = await boot(false);
-    const alphaId = t.widgetId('alpha');
-    const logId = t.widgetId('log');
+    await using harness = await boot(false);
+    const alphaId = harness.widgetId('alpha');
+    const logId = harness.widgetId('log');
 
-    t.notify('beta', 'focus'); // /Fo → Hide (alpha)
-    await t.drainActions();
-    expect(t.paintedIds()).not.toContain(alphaId);
-    t.notify('beta', 'blur'); // /Bl → Hide /H false (alpha)
-    await t.drainActions();
-    expect(t.paintedIds()).toContain(alphaId);
+    harness.notify('beta', 'focus'); // /Fo → Hide (alpha)
+    await harness.drainActions();
+    expect(harness.paintedIds()).not.toContain(alphaId);
+    harness.notify('beta', 'blur'); // /Bl → Hide /H false (alpha)
+    await harness.drainActions();
+    expect(harness.paintedIds()).toContain(alphaId);
 
-    t.notify('beta', 'mouseDown'); // /D → Hide (log)
-    await t.drainActions();
-    expect(t.paintedIds()).not.toContain(logId);
-    t.notify('beta', 'mouseUp'); // /U → Hide /H false (log) — beta has NO /A
-    await t.drainActions();
-    expect(t.paintedIds()).toContain(logId);
+    harness.notify('beta', 'mouseDown'); // /D → Hide (log)
+    await harness.drainActions();
+    expect(harness.paintedIds()).not.toContain(logId);
+    harness.notify('beta', 'mouseUp'); // /U → Hide /H false (log) — beta has no /A
+    await harness.drainActions();
+    expect(harness.paintedIds()).toContain(logId);
 
-    // btn-hide HAS /A — its /AA U (none here) and any U would be shadowed;
-    // the dispatch is inert and, critically, the /A tree does NOT run.
-    t.notify('btn-hide', 'mouseUp');
-    await t.drainActions();
-    expect(t.paintedIds()).toContain(alphaId); // the /A Hide did not fire
+    // btn-hide has /A — its /AA U (none here) and any U would be shadowed;
+    // the dispatch is inert and, critically, the /A tree does not run.
+    harness.notify('btn-hide', 'mouseUp');
+    await harness.drainActions();
+    expect(harness.paintedIds()).toContain(alphaId); // the /A Hide did not fire
   });
 });

@@ -32,7 +32,8 @@
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "test:high-heap": "vitest run --config vitest.high-heap.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json"
   },
   "files": [
     "dist",

@@ -1,54 +1,38 @@
+import type { PdfPageActions } from './PdfAction';
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
-import type { PdfPageActions } from './PdfAction';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
- * @deprecated The page boxes are now `PdfRect` objects (`{ left, bottom,
- * right, top }`, y-up edges) from `../geometry`. This alias remains only
- * during the geometry consolidation.
- */
-export type { PdfRect } from '../geometry/primitives';
-
-/**
- * @deprecated Use `PdfRotation` from `../geometry`. A page's display rotation
- * in degrees clockwise — the `/Rotate` values PDF permits. Presentation
- * metadata only; content coordinates stay normalized.
- */
-export type PageRotation = PdfRotation;
-
-/**
- * The five PDF page boundary boxes, each in PDF user space as a `PdfRect`
- * (`{ left, bottom, right, top }`, y-up edges, page-box origin preserved —
- * a MediaBox may have a non-zero or negative origin). `media` and `crop` are
- * always present (`crop` defaults to `media` when the PDF omits it — the
- * viewer always needs an effective crop). `bleed`, `trim`, and `art` are
- * present only when the PDF actually declares them.
+ * The five PDF page boundary boxes as ISO 32000-1 §14.11.2 defines them: the
+ * crop box defaults to the media box and the other three to the crop box, and
+ * each is reduced to the part it shares with the media box. `crop` is the
+ * visible page, what the page shows, so in page space it is
+ * `{ x: 0, y: 0, width, height }` and the others are measured from its
+ * top-left corner.
  *
- * Coordinates are NOT rotated and NOT origin-normalized; the display
- * transform (origin shift, Y-flip, rotation) lives in the SDK, never here.
+ * The page's turn (`rotation`) never changes these numbers.
  */
-export interface PageBoxes {
-  media: PdfRect;
-  crop: PdfRect;
-  bleed?: PdfRect;
-  trim?: PdfRect;
-  art?: PdfRect;
+export interface PageBoxes<C extends Coordinates = PageCoordinates> {
+  media: C['box'];
+  crop: C['box'];
+  bleed: C['box'];
+  trim: C['box'];
+  art: C['box'];
 }
 
 /**
  * Static attributes for one page. This is the per-page element returned by
- * `pages.list()`. It carries NO annotation liveness (`revision`,
- * `weakAnnotationState`) — that lives on annotation reads and the cloud
- * manifest only.
+ * `pages.list()`.
  *
- * `size` is the UN-rotated crop dimensions (from
- * `EPDF_GetPageSizeByIndexNormalized`, which does not swap for rotation).
+ * `size` is the un-rotated size of the visible page (`boxes.crop`), not
+ * swapped for rotation.
  * `rotation` is a separate field; the SDK swaps width/height for 90/270 to
  * derive the on-screen display size. Keeping the wire un-rotated keeps it
  * consistent with the raw `boxes` and with the "transform lives in the SDK"
  * principle.
  */
-export interface PageLayout {
+export interface PageLayout<C extends Coordinates = PageCoordinates> {
   /** Display order at read time. Not an identity; shifts on a page move. */
   index: number;
   /**
@@ -65,7 +49,13 @@ export interface PageLayout {
   rotation: PdfRotation;
   /** `/UserUnit`; defaults to the PDF default of 1. */
   userUnit: number;
-  boxes: PageBoxes;
+  boxes: PageBoxes<C>;
+  /**
+   * Where the page sits in the file: its visible box (`boxes.crop`) in PDF
+   * space, the numbers PDF tools use. The only PDF-space value in the API;
+   * convert a page-space value with it (`pdfRectOf(rect, layout.pdfCropBox)`).
+   */
+  pdfCropBox: PdfRect;
   /** Page-owned `/AA` actions; absent for the usual script-less page. */
-  actions?: PdfPageActions;
+  actions?: PdfPageActions<C['destination']>;
 }

@@ -1,0 +1,1594 @@
+[
+  {
+    "runtime": "wasm",
+    "id": "p3-direct-control",
+    "action": "control",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "weakCount": 4,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 4,
+          "revision": {
+            "docSessionId": "sess_1_mue3zl5b",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 5,
+          "revision": {
+            "docSessionId": "sess_1_mue3zl5b",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 6,
+          "revision": {
+            "docSessionId": "sess_1_mue3zl5b",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 7,
+          "revision": {
+            "docSessionId": "sess_1_mue3zl5b",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      }
+    ],
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-direct-rewrite",
+    "action": "rewrite",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted",
+      "laterRevisions": 1,
+      "undone": true
+    },
+    "weakCount": 4,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 4,
+          "revision": {
+            "docSessionId": "sess_2_mue3zl6t",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 5,
+          "revision": {
+            "docSessionId": "sess_2_mue3zl6t",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 6,
+          "revision": {
+            "docSessionId": "sess_2_mue3zl6t",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 7,
+          "revision": {
+            "docSessionId": "sess_2_mue3zl6t",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "identical-rewrite",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "written again with the sealed value"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-direct-delete",
+    "action": "delete",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 3,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 4,
+          "revision": {
+            "docSessionId": "sess_3_mue3zl7c",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 5,
+          "revision": {
+            "docSessionId": "sess_3_mue3zl7c",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 6,
+          "revision": {
+            "docSessionId": "sess_3_mue3zl7c",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-direct-delete-names",
+    "action": "delete-names",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-0"
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-2"
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-3"
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-direct-names",
+    "action": "names",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-0"
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-1"
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-2"
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-3"
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-control",
+    "action": "control",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 23
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-rewrite",
+    "action": "rewrite",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted",
+      "laterRevisions": 1,
+      "undone": true
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 23
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "identical-rewrite",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "written again with the sealed value"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-delete",
+    "action": "delete",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-delete-names",
+    "action": "delete-names",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 22,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 24,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 25,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-names",
+    "action": "names",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 23
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 22,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 23,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 24,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 25,
+        "detail": "modified annotation"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-direct-control",
+    "action": "control",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "weakCount": 4,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 4,
+          "revision": {
+            "docSessionId": "sess_b_mue3zl9y",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 5,
+          "revision": {
+            "docSessionId": "sess_b_mue3zl9y",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 6,
+          "revision": {
+            "docSessionId": "sess_b_mue3zl9y",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 7,
+          "revision": {
+            "docSessionId": "sess_b_mue3zl9y",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      }
+    ],
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "p3-direct-rewrite",
+    "action": "rewrite",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted",
+      "laterRevisions": 1,
+      "undone": true
+    },
+    "weakCount": 4,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 4,
+          "revision": {
+            "docSessionId": "sess_c_mue3zlde",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 5,
+          "revision": {
+            "docSessionId": "sess_c_mue3zlde",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 6,
+          "revision": {
+            "docSessionId": "sess_c_mue3zlde",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 7,
+          "revision": {
+            "docSessionId": "sess_c_mue3zlde",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "identical-rewrite",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "written again with the sealed value"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-direct-delete",
+    "action": "delete",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 3,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 4,
+          "revision": {
+            "docSessionId": "sess_d_mue3zldo",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 5,
+          "revision": {
+            "docSessionId": "sess_d_mue3zldo",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "index",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "index": 6,
+          "revision": {
+            "docSessionId": "sess_d_mue3zldo",
+            "page": {
+              "kind": "objectNumber",
+              "pageObjectNumber": 6
+            },
+            "generation": 0
+          }
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-direct-delete-names",
+    "action": "delete-names",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-0"
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-2"
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-3"
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-direct-names",
+    "action": "names",
+    "layout": "direct",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-0"
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-1"
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-2"
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "nm",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "nm": "probe-weak-3"
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-control",
+    "action": "control",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 23
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-rewrite",
+    "action": "rewrite",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "unchanged",
+      "basis": "persisted",
+      "laterRevisions": 1,
+      "undone": true
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 23
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "identical-rewrite",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "written again with the sealed value"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-delete",
+    "action": "delete",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-delete-names",
+    "action": "delete-names",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 22,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 24,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 25,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-names",
+    "action": "names",
+    "layout": "indirect",
+    "docMdp": 3,
+    "catalogCertification": true,
+    "allowsAnnotationModification": true,
+    "summary": "valid",
+    "integrity": "valid",
+    "cryptography": "valid",
+    "trust": "trusted",
+    "modifications": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "weakCount": 0,
+    "annotationRefs": [
+      {
+        "contents": "weak-0",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 22
+        }
+      },
+      {
+        "contents": "weak-1",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 23
+        }
+      },
+      {
+        "contents": "weak-2",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 24
+        }
+      },
+      {
+        "contents": "weak-3",
+        "ref": {
+          "kind": "objectNumber",
+          "page": {
+            "kind": "objectNumber",
+            "pageObjectNumber": 6
+          },
+          "annotObjectNumber": 25
+        }
+      }
+    ],
+    "findings": [
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 22,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 23,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 24,
+        "detail": "modified annotation"
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 25,
+        "detail": "modified annotation"
+      }
+    ]
+  }
+]

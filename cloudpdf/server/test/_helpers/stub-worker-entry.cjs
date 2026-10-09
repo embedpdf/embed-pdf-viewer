@@ -19,7 +19,11 @@
  * is what lets multi-replica tests observe lost updates exactly the way
  * the native engine would produce them.
  *
- * Artifact format v2: [0x4c 'L', 0x02, ...utf8 JSON {"annots":[...]}].
+ * Artifact format v2: [0x4c 'L', 0x02, ...utf8 JSON {"annots":[...],"last":N}].
+ * `last` is the layer's last object number: like the engine, the session
+ * starts from the artifact's (or OBJECT_NUMBER_BASE), raises it to a
+ * write's `objectNumberFloor - 1`, makes one object of its own per write,
+ * and reports it with the open and with each artifact.
  * Artifacts seeded by tests with arbitrary bytes parse as "no annotations"
  * (legacy fallback), and `layerByte0` still echoes the raw first byte so
  * versioned-read tests keep their `artifact:<byte>` text probes.
@@ -80,21 +84,21 @@ function sessionKey(msg) {
   return msg.layerName ? `${msg.docId}::layer:${msg.layerName}` : msg.docId;
 }
 
-// Page addresses arrive as `PageRef`s (`{ kind: 'objectNumber', pageObjectNumber }`),
+// Page addresses arrive as `PageRef`s (`{ kind: 'objectNumber', objectNumber }`),
 // the wire vocabulary of every `/pages/{pageKey}` route and page body.
 function ponOf(page) {
-  return page.pageObjectNumber;
+  return page.objectNumber;
 }
 function pageRef(pon) {
-  return { kind: 'objectNumber', pageObjectNumber: pon };
+  return { kind: 'objectNumber', objectNumber: pon };
 }
 function ponsOf(msg) {
   return msg.pages.map(ponOf);
 }
 
 /** Serialize session annotation state into the v2 artifact format. */
-function serializeAnnots(annots) {
-  const json = Buffer.from(JSON.stringify({ annots }), 'utf8');
+function serializeAnnots(annots, last) {
+  const json = Buffer.from(JSON.stringify({ annots, last }), 'utf8');
   const view = new Uint8Array(2 + json.byteLength);
   view[0] = ARTIFACT_MAGIC;
   view[1] = ARTIFACT_VERSION;
@@ -102,15 +106,18 @@ function serializeAnnots(annots) {
   return view;
 }
 
-/** Parse a v2 artifact back into annotation state; anything else -> []. */
-function parseAnnots(bytes) {
+/** Parse a v2 artifact back into annotation state and last object number; anything else -> none. */
+function parseArtifact(bytes) {
+  const none = { annots: [], last: OBJECT_NUMBER_BASE };
   const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
-  if (buf.byteLength < 2 || buf[0] !== ARTIFACT_MAGIC || buf[1] !== ARTIFACT_VERSION) return [];
+  if (buf.byteLength < 2 || buf[0] !== ARTIFACT_MAGIC || buf[1] !== ARTIFACT_VERSION) return none;
   try {
     const parsed = JSON.parse(buf.subarray(2).toString('utf8'));
-    return Array.isArray(parsed.annots) ? parsed.annots : [];
+    const annots = Array.isArray(parsed.annots) ? parsed.annots : [];
+    const last = Number.isInteger(parsed.last) ? parsed.last : OBJECT_NUMBER_BASE;
+    return { annots, last: Math.max(last, OBJECT_NUMBER_BASE + nextSeq(annots) - 1) };
   } catch {
-    return [];
+    return none;
   }
 }
 
@@ -129,33 +136,27 @@ function layerMeta(msg) {
   const kind = msg.layer?.kind ?? 'fresh';
   if (kind === 'artifact' || kind === 'raw-delta') {
     const view = msg.layer.bytes ? Buffer.from(msg.layer.bytes) : Buffer.alloc(0);
-    const annots = parseAnnots(view);
+    const { annots, last } = parseArtifact(view);
     return {
       layerKind: kind,
       layerByte0: view.byteLength > 0 ? view[0] : null,
       annots,
       seq: nextSeq(annots),
+      last,
     };
   }
   if (kind === 'artifact-file') {
     const bytes = msg.layer.path ? readFileSync(msg.layer.path) : Buffer.alloc(0);
-    const annots = parseAnnots(bytes);
+    const { annots, last } = parseArtifact(bytes);
     return {
       layerKind: 'artifact',
       layerByte0: bytes.byteLength > 0 ? bytes[0] : null,
       annots,
       seq: nextSeq(annots),
+      last,
     };
   }
-  return { layerKind: 'fresh', layerByte0: null, annots: [], seq: 1 };
-}
-
-function pageState(pon, generation = 0, hasWeak = false) {
-  return {
-    page: pageRef(pon),
-    revision: { docSessionId: 'stub-session', page: pageRef(pon), generation },
-    weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: hasWeak },
-  };
+  return { layerKind: 'fresh', layerByte0: null, annots: [], seq: 1, last: OBJECT_NUMBER_BASE };
 }
 
 // Pure geometry for one page. Mirrors `PageLayout`: durable PON, display
@@ -165,7 +166,7 @@ function pageLayout(pon, index, rotation = 0) {
   const box = [0, 0, 612, 792];
   return {
     index,
-    ref: { kind: 'objectNumber', pageObjectNumber: pon },
+    ref: { kind: 'objectNumber', objectNumber: pon },
     label: null,
     width: 612,
     height: 792,
@@ -186,18 +187,14 @@ function layoutSnapshot(meta) {
   };
 }
 
-/** Full AnnotationDTO for a stored session annotation. */
-function annotationDto(a, index) {
+/** Full Annotation for a stored session annotation. */
+function annotationDto(a) {
   return {
     subtype: 'unsupported',
-    ref: {
-      kind: 'objectNumber',
-      page: pageRef(a.pon),
-      annotObjectNumber: OBJECT_NUMBER_BASE + a.seq,
-    },
+    ref: annotationRef(a),
     page: pageRef(a.pon),
-    index,
-    identityQuality: 'durable',
+    hasAppearance: true,
+    appearanceState: null,
     nm: a.nm,
     flags: {
       invisible: false,
@@ -211,11 +208,11 @@ function annotationDto(a, index) {
       toggleNoView: false,
       lockedContents: false,
     },
-    rect: { left: 0, top: 0, right: 10, bottom: 10 },
+    rect: { x: 0, y: 0, width: 10, height: 10 },
     contents: a.contents ?? null,
     author: null,
-    created: null,
-    modified: null,
+    createdAt: null,
+    modifiedAt: null,
     rawSubtypeCode: 0,
     rawSubtypeName: null,
   };
@@ -223,39 +220,44 @@ function annotationDto(a, index) {
 
 /** Legacy canned annotation for lenient fallbacks (ref did not resolve). */
 function cannedAnnotation(pon, index = 0) {
-  return annotationDto(
-    { pon, seq: pon + index, nm: `stub-${pon}-${index}`, contents: null },
-    index,
-  );
+  return annotationDto({ pon, seq: pon + index, nm: `stub-${pon}-${index}`, contents: null });
+}
+
+function annotationRef(a) {
+  return { kind: 'objectNumber', page: pageRef(a.pon), objectNumber: OBJECT_NUMBER_BASE + a.seq };
+}
+
+/** Where `position` falls in `rows` (the rows that stay), like the real engine. */
+function positionIn(rows, position, find) {
+  if (position === 'start') return 0;
+  if (position === 'end') return rows.length;
+  const anchor = 'before' in position ? position.before : position.after;
+  const at = rows.indexOf(find(anchor));
+  if (at < 0) throw stubError('NotFound', `no neighbour ${JSON.stringify(anchor)}`);
+  return 'before' in position ? at : at + 1;
 }
 
 /** Annotations of one page, in session order, as DTOs. */
 function pageAnnotationDtos(meta, pon) {
   const annots = (meta.annots ?? []).filter((a) => a.pon === pon);
-  return annots.map((a, index) => annotationDto(a, index));
+  return annots.map((a) => annotationDto(a));
 }
 
 /** Resolve an AnnotationRef against session state; null when absent. */
 function resolveRef(meta, ref) {
   const annots = meta.annots ?? [];
   if (ref.kind === 'objectNumber') {
-    return annots.find((a) => OBJECT_NUMBER_BASE + a.seq === ref.annotObjectNumber) ?? null;
-  }
-  if (ref.kind === 'nm') {
-    return annots.find((a) => a.pon === ponOf(ref.page) && a.nm === ref.nm) ?? null;
+    return annots.find((a) => OBJECT_NUMBER_BASE + a.seq === ref.objectNumber) ?? null;
   }
   const page = annots.filter((a) => a.pon === ponOf(ref.page));
-  return page[ref.index] ?? null;
+  return page[ref.baseIndex] ?? null;
 }
 
-function mutationMeta(pon, generation, changedValue, hasWeak = false) {
-  const state = pageState(pon, generation, hasWeak);
+function mutationMeta(pon, changedValue) {
   return {
-    affectedPages: [state],
+    affectedPages: [pageRef(pon)],
     cacheDelta: null,
-    changed: [{ kind: 'objectNumber', value: changedValue }],
-    weakRefsInvalidated: false,
-    shouldRefetch: null,
+    changed: [{ kind: 'objectNumber', page: pageRef(pon), objectNumber: changedValue }],
   };
 }
 
@@ -265,8 +267,19 @@ function mutationMeta(pon, generation, changedValue, hasWeak = false) {
  */
 function layerArtifact(msg, sessionMeta) {
   if (!msg.layerName) return undefined;
-  const view = serializeAnnots(sessionMeta?.annots ?? []);
-  return { bytes: view.buffer, size: view.byteLength };
+  const meta = sessionMeta ?? {};
+  const annots = meta.annots ?? [];
+  // The write's own objects, numbered past its floor: one, or 100 for a
+  // create whose contents ask for more than any estimate.
+  const own = changeOps(msg).some((op) => op.data?.contents === '__MANY_OBJECTS__') ? 100 : 1;
+  meta.last =
+    Math.max(
+      meta.last ?? OBJECT_NUMBER_BASE,
+      (msg.objectNumberFloor ?? 0) - 1,
+      OBJECT_NUMBER_BASE + nextSeq(annots) - 1,
+    ) + own;
+  const view = serializeAnnots(annots, meta.last);
+  return { bytes: view.buffer, size: view.byteLength, lastObjectNumber: meta.last };
 }
 
 /**
@@ -286,7 +299,11 @@ async function encodeStubRaster(raster, encode) {
   });
   const stream =
     encode.format === 'webp'
-      ? image.webp(encode.quality === undefined ? {} : { quality: encode.quality })
+      ? image.webp(
+          encode.quality === undefined
+            ? {}
+            : { quality: Math.min(100, Math.max(1, Math.round(encode.quality * 100))) },
+        )
       : image.png();
   const bytes = new Uint8Array(await stream.toBuffer());
   return {
@@ -353,27 +370,148 @@ function rejectPasswordIncorrect(msg) {
   });
 }
 
-function rejectAnnotationNotFound(msg) {
-  parentPort.postMessage({
-    kind: 'reject',
-    jobId: msg.jobId,
-    error: {
-      name: 'EngineError',
-      message: `annotation not found: ${JSON.stringify(msg.ref ?? msg.refs)}`,
-      code: 'NotFound',
-    },
-  });
+/**
+ * Object-number refs only ever come from annotations the session actually
+ * knows about — an unresolved one means the annotation is GONE (e.g. deleted
+ * by another replica before this session reloaded), and the real engine
+ * answers NotFound. Base-index refs keep the lenient canned fallback: they
+ * name a file's inline annotations, which a direct-seed layer has no state for.
+ */
+function isStrictRef(ref) {
+  return ref.kind === 'objectNumber';
+}
+
+/** The refusals a change keeps as its answer (engine-core `isKeptRefusal`). */
+const KEPT_REFUSALS = new Set([
+  'InvalidArg',
+  'NotFound',
+  'Forbidden',
+  'ProtectedDocument',
+  'MalformedPdf',
+  'PayloadTooLarge',
+  'ObjectNumberUnavailable',
+  'LayerFull',
+  'ChangeConflict',
+  'UndoUnavailable',
+]);
+
+function stubError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+function serializedOf(err) {
+  return { name: 'EngineError', code: err.code ?? 'Unknown', message: err.message };
+}
+
+/** Every op of a server request's changes. */
+function changeOps(msg) {
+  return (msg.changes ?? []).flatMap((entry) => entry.change.ops ?? []);
 }
 
 /**
- * Durable refs (objectNumber / nm) only ever come from annotations the
- * session actually knows about — an unresolved one means the annotation is
- * GONE (e.g. deleted by another replica before this session reloaded), and
- * the real engine answers NotFound. Index refs keep the lenient canned
- * fallback: direct-seed tests use them against artifacts with no state.
+ * One annotation op of a change, on the session's state, as the real
+ * mutator answers it: its item, or a thrown refusal.
  */
-function isStrictRef(ref) {
-  return ref.kind === 'objectNumber' || ref.kind === 'nm';
+function applyStubOp(meta, op, opId) {
+  const stamp = { opId, undoable: false };
+  switch (op.type) {
+    case 'annotations.create': {
+      const pon = ponOf(op.page);
+      meta.annots = meta.annots ?? [];
+      meta.seq = meta.seq ?? 1;
+      const a = {
+        pon,
+        seq: meta.seq++,
+        nm: `stub-${pon}-${meta.seq - 1}`,
+        contents: op.data?.contents ?? null,
+      };
+      meta.annots.push(a);
+      return {
+        type: op.type,
+        page: op.page,
+        annotation: annotationDto(a),
+        meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + a.seq), ...stamp },
+      };
+    }
+    case 'annotations.update': {
+      const pon = ponOf(op.ref.page);
+      const found = resolveRef(meta, op.ref);
+      if (found) {
+        if (op.patch && 'contents' in op.patch) found.contents = op.patch.contents ?? null;
+        return {
+          type: op.type,
+          page: op.ref.page,
+          annotation: annotationDto(found),
+          appearance: { action: 'regenerated', changed: true },
+          meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq), ...stamp },
+        };
+      }
+      if (isStrictRef(op.ref)) throw annotationNotFound(op.ref);
+      // Lenient fallback for base-index refs: seeded layers have no session
+      // state, so a canned annotation keeps direct-seed tests valid.
+      const ann = cannedAnnotation(pon, op.ref.baseIndex);
+      return {
+        type: op.type,
+        page: op.ref.page,
+        annotation: ann,
+        appearance: { action: 'regenerated', changed: true },
+        meta: { ...mutationMeta(pon, ann.ref.objectNumber), ...stamp },
+      };
+    }
+    case 'annotations.delete': {
+      const pon = ponOf(op.ref.page);
+      const found = resolveRef(meta, op.ref);
+      if (found) {
+        meta.annots = (meta.annots ?? []).filter((x) => x !== found);
+        return {
+          type: op.type,
+          page: op.ref.page,
+          meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq), ...stamp },
+        };
+      }
+      if (isStrictRef(op.ref)) throw annotationNotFound(op.ref);
+      return {
+        type: op.type,
+        page: op.ref.page,
+        meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + pon), ...stamp },
+      };
+    }
+    case 'annotations.reorder': {
+      const pon = ponOf(op.page);
+      const annots = meta.annots ?? [];
+      const moving = op.refs.map((ref) => resolveRef(meta, ref)).filter(Boolean);
+      if (moving.length === op.refs.length && moving.length > 0) {
+        // Restack within the page: take the moved annots out, put them back
+        // next to the neighbour, like the real engine.
+        const page = annots.filter((a) => a.pon === pon && !moving.includes(a));
+        const others = annots.filter((a) => a.pon !== pon);
+        page.splice(
+          positionIn(page, op.position, (ref) => resolveRef(meta, ref)),
+          0,
+          ...moving,
+        );
+        meta.annots = [...others, ...page];
+        return {
+          type: op.type,
+          page: op.page,
+          order: page.map(annotationRef),
+          meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + moving[0].seq), ...stamp },
+        };
+      }
+      return {
+        type: op.type,
+        page: op.page,
+        order: op.refs,
+        meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + pon), ...stamp },
+      };
+    }
+    default:
+      throw stubError('NotImplemented', `stub worker: op '${op.type}' not implemented`);
+  }
+}
+
+function annotationNotFound(ref) {
+  return stubError('NotFound', `annotation not found: ${JSON.stringify(ref)}`);
 }
 
 parentPort.on('message', (msg) => {
@@ -398,11 +536,17 @@ parentPort.on('message', (msg) => {
       // byte of the base payload still encodes page count for tests.
       const view = msg.baseBytes ? new Uint8Array(msg.baseBytes) : new Uint8Array(0);
       const pageCount = view.byteLength > 0 ? view[0] : 0;
-      openDocs.set(sessionKey(msg), { pageCount, ...layerMeta(msg) });
+      const meta = { pageCount, ...layerMeta(msg) };
+      openDocs.set(sessionKey(msg), meta);
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,
-        result: { tag: 'open', docId: msg.docId, security: openSecurity() },
+        result: {
+          tag: 'open',
+          docId: msg.docId,
+          security: openSecurity(),
+          lastObjectNumber: meta.last,
+        },
       });
       return;
     }
@@ -412,12 +556,18 @@ parentPort.on('message', (msg) => {
       // the test page-count byte.
       const bytes = msg.basePath ? readFileSync(msg.basePath) : Buffer.alloc(0);
       const pageCount = bytes.byteLength > 0 ? bytes[0] : 0;
-      openDocs.set(sessionKey(msg), { pageCount, ...layerMeta(msg) });
+      const meta = { pageCount, ...layerMeta(msg) };
+      openDocs.set(sessionKey(msg), meta);
       const resolveOpen = () =>
         parentPort.postMessage({
           kind: 'resolve',
           jobId: msg.jobId,
-          result: { tag: 'open', docId: msg.docId, security: openSecurity() },
+          result: {
+            tag: 'open',
+            docId: msg.docId,
+            security: openSecurity(),
+            lastObjectNumber: meta.last,
+          },
         });
       // Deterministic singleflight seam for the API-password integration
       // test: keep the canonical open in flight long enough for a second
@@ -526,34 +676,57 @@ parentPort.on('message', (msg) => {
             keywords: null,
             producer: 'stub-worker',
             creator: null,
-            created: null,
-            modified: null,
+            createdAt: null,
+            modifiedAt: null,
             trapped: 'unknown',
-            custom: {},
           },
         },
       });
       return;
     }
-    case 'annotations.listRawAll': {
+    case 'metadata.readCustom': {
+      if (!openDocs.get(sessionKey(msg))) {
+        rejectNotOpen(msg);
+        return;
+      }
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: { tag: 'metadata.readCustom', custom: {} },
+      });
+      return;
+    }
+    case 'annotations.list': {
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
         rejectNotOpen(msg);
         return;
       }
-      const pages = [];
-      for (let i = 0; i < meta.pageCount; i++) {
-        pages.push({
-          pageState: pageState(i + 1),
-          annotations: pageAnnotationDtos(meta, i + 1),
+      const pons = msg.pages
+        ? msg.pages.map(ponOf)
+        : Array.from({ length: meta.pageCount }, (_, i) => i + 1);
+      const missing = pons.find((pon) => pon < 1 || pon > meta.pageCount);
+      if (missing !== undefined) {
+        parentPort.postMessage({
+          kind: 'reject',
+          jobId: msg.jobId,
+          error: {
+            name: 'EngineError',
+            message: `no page with object number ${missing}`,
+            code: 'NotFound',
+          },
         });
+        return;
       }
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,
         result: {
-          tag: 'annotations.listRawAll',
-          snapshot: { pages },
+          tag: 'annotations.list',
+          list: {
+            annotations: pons.flatMap((pon) => pageAnnotationDtos(meta, pon)),
+            pages: pons.map(pageRef),
+          },
         },
       });
       return;
@@ -587,8 +760,7 @@ parentPort.on('message', (msg) => {
         jobId: msg.jobId,
         result: {
           tag: 'pages.text',
-          // No pageState: content reads carry geometry/text only; liveness
-          // (revision/weak state) rides on annotation reads + the manifest.
+          // Content reads carry geometry/text only; the manifest carries the pins.
           snapshot: {
             text,
             charCount: text.length,
@@ -597,182 +769,62 @@ parentPort.on('message', (msg) => {
       });
       return;
     }
-    // Raw and full per-page readers are wire-identical by contract
-    // (parity = output, not mechanism) — one stub serves both kinds.
-    case 'annotations.listRawPage':
-    case 'annotations.listFullPage': {
+    case 'document.applyChanges': {
+      // Boundary-kill test hook: a create with contents '__STALL__' never
+      // replies, deterministically parking the engine apply so a test can
+      // kill the host mid-operation.
+      if (changeOps(msg).some((op) => op.data?.contents === '__STALL__')) return;
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
         rejectNotOpen(msg);
         return;
       }
-      const pon = ponOf(msg.page);
-      if (pon < 1 || pon > meta.pageCount) {
-        parentPort.postMessage({
-          kind: 'reject',
-          jobId: msg.jobId,
-          error: {
-            name: 'EngineError',
-            message: `no page with object number ${pon}`,
-            code: 'NotFound',
-          },
-        });
-        return;
-      }
-      parentPort.postMessage({
-        kind: 'resolve',
-        jobId: msg.jobId,
-        result: {
-          tag: msg.kind,
-          snapshot: {
-            pageState: pageState(pon),
-            annotations: pageAnnotationDtos(meta, pon),
-          },
-        },
-      });
-      return;
-    }
-    case 'annotations.create': {
-      // Boundary-kill test hook: a draft with contents '__STALL__' never
-      // replies, deterministically parking the engine apply so a test
-      // can kill the host mid-operation.
-      if (msg.draft?.contents === '__STALL__') return;
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const pon = ponOf(msg.page);
-      meta.annots = meta.annots ?? [];
-      meta.seq = meta.seq ?? 1;
-      const a = {
-        pon,
-        seq: meta.seq++,
-        nm: `stub-${pon}-${meta.seq - 1}`,
-        contents: msg.draft?.contents ?? null,
-      };
-      meta.annots.push(a);
-      const index = meta.annots.filter((x) => x.pon === pon).length - 1;
-      const objectNumber = OBJECT_NUMBER_BASE + a.seq;
-      resolveMutation(msg, {
-        tag: 'annotations.create',
-        result: {
-          created: annotationDto(a, index),
-          meta: mutationMeta(pon, 0, objectNumber, false),
-        },
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'annotations.update': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const pon = ponOf(msg.ref.page);
-      const found = resolveRef(meta, msg.ref);
-      if (found) {
-        if (msg.patch && 'contents' in msg.patch) found.contents = msg.patch.contents ?? null;
-        const index = (meta.annots ?? []).filter((x) => x.pon === pon).indexOf(found);
-        resolveMutation(msg, {
-          tag: 'annotations.update',
-          result: {
-            updated: annotationDto(found, index),
-            meta: mutationMeta(pon, 0, OBJECT_NUMBER_BASE + found.seq, false),
-          },
-          artifact: layerArtifact(msg, meta),
-        });
-        return;
-      }
-      if (isStrictRef(msg.ref)) {
-        rejectAnnotationNotFound(msg);
-        return;
-      }
-      // Lenient fallback for INDEX refs: seeded layers have no session
-      // state — keep the old canned behavior so direct-seed tests stay valid.
-      const ann = cannedAnnotation(pon, msg.ref.index);
-      resolveMutation(msg, {
-        tag: 'annotations.update',
-        result: {
-          updated: ann,
-          meta: mutationMeta(pon, 0, ann.ref.annotObjectNumber, false),
-        },
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'annotations.delete': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const pon = ponOf(msg.ref.page);
-      const found = resolveRef(meta, msg.ref);
-      if (found) {
-        meta.annots = (meta.annots ?? []).filter((x) => x !== found);
-        resolveMutation(msg, {
-          tag: 'annotations.delete',
-          result: {
-            deleted: { kind: 'objectNumber', value: OBJECT_NUMBER_BASE + found.seq },
-            meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + found.seq, false),
-          },
-          artifact: layerArtifact(msg, meta),
-        });
-        return;
-      }
-      if (isStrictRef(msg.ref)) {
-        rejectAnnotationNotFound(msg);
-        return;
+      // Each change on its own, as the real host runs it: a refusal is its
+      // answer and takes its ops back; anything else fails the job.
+      const outcomes = [];
+      let wrote = false;
+      for (const entry of msg.changes) {
+        const before = { annots: [...(meta.annots ?? [])], seq: meta.seq };
+        try {
+          if (!entry.change.ops) {
+            throw stubError('NotImplemented', 'stub worker: undo is not implemented');
+          }
+          const items = entry.change.ops.map((op) => applyStubOp(meta, op, entry.opId));
+          const pages = new Map();
+          for (const item of items) for (const page of item.meta.affectedPages) pages.set(page.objectNumber, page);
+          outcomes.push({
+            opId: entry.opId,
+            status: 'applied',
+            result: {
+              items,
+              meta: {
+                affectedPages: [...pages.values()],
+                cacheDelta: null,
+                opId: entry.opId,
+                undoable: false,
+              },
+            },
+            record: null,
+          });
+          wrote = true;
+        } catch (err) {
+          meta.annots = before.annots;
+          meta.seq = before.seq;
+          if (!err.code || !KEPT_REFUSALS.has(err.code)) {
+            parentPort.postMessage({ kind: 'reject', jobId: msg.jobId, error: serializedOf(err) });
+            return;
+          }
+          outcomes.push({ opId: entry.opId, status: 'refused', error: serializedOf(err) });
+        }
       }
       resolveMutation(msg, {
-        tag: 'annotations.delete',
-        result: {
-          deleted: { kind: 'objectNumber', value: OBJECT_NUMBER_BASE + pon },
-          meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + pon, false),
-        },
-        artifact: layerArtifact(msg, meta),
+        tag: 'document.applyChanges',
+        outcomes,
+        ...(wrote ? { artifact: layerArtifact(msg, meta) } : {}),
       });
       return;
     }
-    case 'annotations.move': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const pon = ponOf(msg.page);
-      const annots = meta.annots ?? [];
-      const moving = msg.refs.map((ref) => resolveRef(meta, ref)).filter(Boolean);
-      if (moving.length === msg.refs.length && moving.length > 0) {
-        // Reorder within the page: remove the moved annots, reinsert at
-        // toIndex (in the page-local index space), like the real mutator.
-        const page = annots.filter((a) => a.pon === pon && !moving.includes(a));
-        const others = annots.filter((a) => a.pon !== pon);
-        page.splice(msg.toIndex, 0, ...moving);
-        meta.annots = [...others, ...page];
-        resolveMutation(msg, {
-          tag: 'annotations.move',
-          result: {
-            moved: moving.map((a, i) => annotationDto(a, msg.toIndex + i)),
-            meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + moving[0].seq, false),
-          },
-          artifact: layerArtifact(msg, meta),
-        });
-        return;
-      }
-      resolveMutation(msg, {
-        tag: 'annotations.move',
-        result: {
-          moved: msg.refs.map((_, i) => cannedAnnotation(pon, msg.toIndex + i)),
-          meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + pon, false),
-        },
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'pages.move': {
+    case 'pages.reorder': {
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
         rejectNotOpen(msg);
@@ -782,20 +834,18 @@ parentPort.on('message', (msg) => {
       const movingPons = ponsOf(msg);
       const moving = new Set(movingPons);
       const remaining = current.filter((pon) => !moving.has(pon));
-      const next = [
-        ...remaining.slice(0, msg.destIndex),
-        ...movingPons,
-        ...remaining.slice(msg.destIndex),
-      ];
+      const at = positionIn(remaining, msg.position, ponOf);
+      const next = [...remaining.slice(0, at), ...movingPons, ...remaining.slice(at)];
       meta.pageOrder = next;
-      // A move returns geometry, not liveness: the new layout + null cache
+      // A reorder returns geometry, not liveness: the new layout + empty meta
       // (the server fills in the real coherence pins on commit).
       const result = {
+        pages: movingPons.map(pageRef),
         layout: layoutSnapshot(meta),
-        cache: null,
+        meta: { affectedPages: [], cacheDelta: null },
       };
       resolveMutation(msg, {
-        tag: 'pages.move',
+        tag: 'pages.reorder',
         result,
         artifact: layerArtifact(msg, meta),
       });
@@ -815,7 +865,7 @@ parentPort.on('message', (msg) => {
       }
       resolveMutation(msg, {
         tag: 'pages.rotate',
-        result: { layout: layoutSnapshot(meta), cache: null },
+        result: { layout: layoutSnapshot(meta), meta: { affectedPages: [], cacheDelta: null } },
         artifact: layerArtifact(msg, meta),
       });
       return;
@@ -845,7 +895,7 @@ parentPort.on('message', (msg) => {
       meta.pageOrder = current.filter((pon) => !deleting.has(pon));
       resolveMutation(msg, {
         tag: 'pages.delete',
-        result: { layout: layoutSnapshot(meta), cache: null },
+        result: { layout: layoutSnapshot(meta), meta: { affectedPages: [], cacheDelta: null } },
         artifact: layerArtifact(msg, meta),
       });
       return;
@@ -903,7 +953,9 @@ parentPort.on('message', (msg) => {
       // One synthetic appearance sized 8×scale — enough for the multipart
       // path and the budget guard to be observable from tests.
       const options = msg.options || {};
-      const scale = typeof options.scale === 'number' && options.scale > 0 ? options.scale : 1;
+      const viewportScale =
+        options.viewport && options.viewport.kind === 'scale' ? options.viewport.scale : undefined;
+      const scale = typeof viewportScale === 'number' && viewportScale > 0 ? viewportScale : 1;
       const side = Math.max(1, Math.round(8 * scale));
       // Mirror deviceRaster's PRE-ALLOCATION budget guard.
       if (options.maxOutputPixels !== undefined && side * side > options.maxOutputPixels) {
@@ -926,12 +978,13 @@ parentPort.on('message', (msg) => {
           result: {
             tag: 'annotations.renderAppearances',
             result: {
-              pageState: pageState(pon),
+              page: pageRef(pon),
               appearances: [
                 {
-                  ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
+                  ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },
                   mode: 'normal',
-                  rect: { left: 0, bottom: 0, right: 8, top: 8 },
+                  state: null,
+                  rect: { x: 0, y: 0, width: 8, height: 8 },
                   raster: { width: side, height: side, data: data.buffer },
                 },
               ],
@@ -962,7 +1015,9 @@ parentPort.on('message', (msg) => {
         return;
       }
       const options = msg.options || {};
-      const scale = typeof options.scale === 'number' && options.scale > 0 ? options.scale : 1;
+      const viewportScale =
+        options.viewport && options.viewport.kind === 'scale' ? options.viewport.scale : undefined;
+      const scale = typeof viewportScale === 'number' && viewportScale > 0 ? viewportScale : 1;
       const side = Math.max(1, Math.round(8 * scale));
       if (options.maxOutputPixels !== undefined && side * side > options.maxOutputPixels) {
         parentPort.postMessage({
@@ -987,12 +1042,13 @@ parentPort.on('message', (msg) => {
               result: {
                 tag: 'annotations.renderAppearancesEncoded',
                 result: {
-                  pageState: pageState(pon),
+                  page: pageRef(pon),
                   appearances: [
                     {
-                      ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
+                      ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },
                       mode: 'normal',
-                      rect: { left: 0, bottom: 0, right: 8, top: 8 },
+                      state: null,
+                      rect: { x: 0, y: 0, width: 8, height: 8 },
                       image,
                     },
                   ],
@@ -1086,7 +1142,7 @@ parentPort.on('message', (msg) => {
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,
-        result: { tag: 'attachments.list', items: [] },
+        result: { tag: 'attachments.list', attachments: [] },
       });
       return;
     }

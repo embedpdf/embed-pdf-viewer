@@ -72,7 +72,7 @@ export class PdfPasswordVerificationsRepo {
 
   /**
    * Distinct `opened_as` values among the non-expired verifications for a
-   * document (selected by doc, not by password). Used to decide whether
+   * document (selected by doc, not by password). Tells the caller whether
    * both the user and owner passwords are already known — in which case a
    * cache-miss password is provably wrong and can be rejected without the
    * worker. Mirrors {@link findValid}'s expiry / hmac-key filters.

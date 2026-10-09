@@ -3,7 +3,7 @@ import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
 
 /**
- * Input to `pages.rotate()`. Rotation is ABSOLUTE ("set to"), never relative
+ * Input to `pages.rotate()`. Rotation is absolute ("set to"), never relative
  * ("turn by"): an absolute write is idempotent, so a retried request, an
  * idempotency-keyed replay, or (later) a replayed document event can never
  * double-rotate a page. A caller offering "rotate clockwise" computes
@@ -15,7 +15,7 @@ import type { PageRef } from '../identity/PageRef';
  */
 export interface PageRotateInput {
   /**
-   * Pages to rotate. Duplicates and unknown PONs are rejected with
+   * Pages to rotate. Duplicates and unknown page object numbers are rejected with
    * `EngineError(InvalidArg)` / `EngineError(NotFound)`.
    */
   pages: PageRef[];

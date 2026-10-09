@@ -1,21 +1,15 @@
 import type { PageRef } from '../identity/PageRef';
 
 /**
- * An explicit PDF destination (ISO 32000-1 §12.3.2.2): a page, a location,
- * and a magnification. Produced by outlines/bookmarks, link annotations,
- * `/OpenAction`, and GoTo actions; named destinations resolve to one of
- * these through the catalog's `/Dests` dictionary or name tree — the
- * ENGINE does that resolution, so the viewer only ever sees this explicit
- * form.
+ * A destination as the file writes it (ISO 32000-1 §12.3.2.2): a page, a
+ * location in the file's coordinates (y up, absolute, the page box's origin
+ * kept) and a magnification. The engine hands out {@link PageDestination}s;
+ * this shape is for values that come from the file or from another PDF
+ * tool, turned into page space with `pageDestinationOf`.
  *
- * Coordinates are PDF user space (y-up, points, absolute — NOT
- * crop-relative). `null` means "retain the current value" (the spec's
- * meaning for null array entries); a `/XYZ` zoom of `0` is equivalent to
- * null. The `fitB*` kinds refer to the page's content BOUNDING box rather
- * than the crop box.
- *
- * Viewers translate these onto the stage's reveal primitive — see
- * `destinationToReveal` in `@embedpdf/plugin-stage`.
+ * `null` keeps the viewer's current value, as in the file; a `/XYZ` zoom of
+ * `0` means the same as `null`. The `fitB*` kinds fit the page's content
+ * bounding box rather than the whole page.
  */
 export type PdfDestination =
   | {
@@ -39,3 +33,25 @@ export type PdfDestination =
   | { kind: 'fitB'; page: PageRef }
   | { kind: 'fitBH'; page: PageRef; top?: number | null }
   | { kind: 'fitBV'; page: PageRef; left?: number | null };
+
+/**
+ * A destination (ISO 32000-1 §12.3.2.2): the page it goes to and where on
+ * that page, measured from the top-left of that page's visible box, y down.
+ * Outlines, links, actions and the document's open destination all resolve
+ * to one of these; named destinations are resolved by the engine, so only
+ * this explicit form is ever handed out.
+ *
+ * `null` keeps the viewer's current value, as in the file, and a value left
+ * out means the same; an `xyz` zoom of `0` means the same as `null`. The
+ * `fitB*` kinds fit the page's content bounding box rather than the whole
+ * page. Pass one straight to the stage's `reveal`.
+ */
+export type PageDestination =
+  | { kind: 'xyz'; page: PageRef; x?: number | null; y?: number | null; zoom?: number | null }
+  | { kind: 'fit'; page: PageRef }
+  | { kind: 'fitH'; page: PageRef; y?: number | null }
+  | { kind: 'fitV'; page: PageRef; x?: number | null }
+  | { kind: 'fitR'; page: PageRef; x: number; y: number; width: number; height: number }
+  | { kind: 'fitB'; page: PageRef }
+  | { kind: 'fitBH'; page: PageRef; y?: number | null }
+  | { kind: 'fitBV'; page: PageRef; x?: number | null };

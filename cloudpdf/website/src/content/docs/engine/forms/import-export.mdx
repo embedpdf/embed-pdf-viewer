@@ -1,0 +1,250 @@
+---
+title: Import & export
+description: Take form fields out of a document as one bundle, then copy them into another document or fill its fields from it, in one call.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Import & export
+
+Export takes form fields out of a document as one **bundle**: each field whole, with its widgets,
+its value, its scripts and actions, and who made and filled it in. A bundle goes back in two
+ways:
+
+```ts
+const bundle = await source.forms.export();
+
+// The design: new fields, with their widgets, values and scripts.
+const { fields, dropped } = await target.forms.import(bundle);
+
+// Only the values: the document's own fields of the same name are filled in.
+const filled = await other.forms.importValues(bundle);
+```
+
+Use `import()` to put a form on a new version of a document, or to build a form once and reuse
+it. Use `importValues()` to fill a form in from answers you stored, or to carry answers from one
+copy of a form to another.
+
+## Export
+
+```ts
+const everything = await doc.forms.export();
+const some = await doc.forms.export({ fields: [toFieldRef('billing.name'), total.ref] });
+const onPage = await doc.forms.export({ pages: [pageRef] }); // every field with a widget there
+```
+
+| Option   | What it is                        | Default |
+| :------- | :-------------------------------- | :------ |
+| `fields` | The fields to export.             | all     |
+| `pages`  | The pages whose fields to export. | all     |
+
+A field always comes whole: with every widget it has, whatever page each one is on. A field or a
+page the document doesn't have refuses the export with `NotFound`.
+
+Two things never travel:
+
+- a signature: a signed signature field is exported unsigned;
+- the value of a field marked `noExport`, and who filled it in.
+
+## Store it as a file
+
+`FormTransfer` writes a bundle as one JSON text, and reads it back, as
+[`AnnotationTransfer`](/docs/engine/annotations/import-export#store-it-as-a-file) does for
+annotations:
+
+```ts
+import { FormTransfer } from '@cloudpdf/engine';
+
+const text = FormTransfer.stringify(bundle);
+const again = await FormTransfer.parse(text);
+```
+
+`parse()` checks the [limits](#limits) first, then the format, the version and the shape. Anything
+else is refused with `InvalidArg`.
+
+## Copy the design
+
+```ts
+const result = await doc.forms.import(bundle);
+
+result.fields; // the new fields, in bundle order
+result.refMap; // [{ from, to }]: each field's ref in the bundle, and its ref here
+result.dropped; // what was left out, and why
+result.calculationOrder; // the form's whole calculation order, when the import changed it
+```
+
+| Option        | What it is                                                                  | Default     |
+| :------------ | :-------------------------------------------------------------------------- | :---------- |
+| `pages`       | Which page each bundle page goes to.                                        | `'same'`    |
+| `attribution` | `'restore'` keeps who made and filled each field; `'stamp'` makes it yours. | `'restore'` |
+| `values`      | Whether each field gets the value the bundle holds.                         | `true`      |
+| `opId`        | A name for this import: its events carry it, and it names its undo.         | a new id    |
+
+Everything is checked before anything is written. The import is all or nothing: a failure while
+writing leaves the document exactly as it was, with no new fields and no events.
+
+Each field is made as [`create()`](/docs/engine/forms/authoring) makes it, with every setting
+the bundle has: its widgets with their place, look, flags and actions, its options, its default,
+its scripts. Parent fields are made bare from the names, as a create makes them.
+
+### Pages
+
+Pages are placed as an annotation import places them: by default each widget goes to the page
+with the same ref, and `pages` takes `'by-position'` or a list of `{ from, to }` pairs. A page a
+widget is on, or an action goes to, that maps nowhere fails the import with `InvalidArg`. See
+[Pages](/docs/engine/annotations/import-export#pages).
+
+### Who made and filled it
+
+With `attribution: 'restore'`, the default, each field keeps who created it and when, and who
+last filled it in and when (`createdBy`, `createdAt`, `filledBy`, `filledByName`, `filledAt`).
+The user who imports is recorded in `importedBy`. That writes fields in other people's names, so
+it needs `doc.forms.import` beside `doc.forms.modify`.
+
+With `attribution: 'stamp'`, each field is made as `create()` makes it: the user who imports
+created it, and filled it in when it gets a value.
+
+A field keeps its group (`groupId`) with `'restore'`. With `'stamp'`, it goes in the group it had,
+when the user may put fields there (their own, or one they have `fields:set-group` for), and in
+their own group when it had none. A group they may not set refuses the import.
+
+### Scripts and actions
+
+A field's scripts and its widgets' actions come along. A script, a submit or a link
+(JavaScript, submit-form or URI) needs `doc.forms.script`: without it, each one is left out and
+listed in `dropped`, and the field is imported without it. The actions that only change the view
+(go to a page, reset the form, show or hide) come along with `doc.forms.modify` alone.
+
+### The calculation order
+
+The fields with a calculate script join the end of the form's
+[calculation order](/docs/engine/forms/authoring), in the order the bundle has them. A field
+whose calculate script was left out has no place in it.
+
+### What's left out
+
+What an import can't carry it leaves out, lists in `dropped`, and imports the rest. Each entry
+names the field as the bundle does (`ref`), and a `widget` when it's about one widget. An entry
+with a `field` means only that member was left out, such as `actions.calculate`: the field was
+imported without it.
+
+| `reason`             | What was left out                                                                                                        |
+| :------------------- | :----------------------------------------------------------------------------------------------------------------------- |
+| `name-conflict`      | A field whose full name the document has, or an earlier field of the bundle, or that would be a field's parent or child. |
+| `no-field`           | A widget whose field isn't in the bundle.                                                                                |
+| `unsupported-family` | A field of a kind the engine doesn't model.                                                                              |
+| `script-not-allowed` | A script, a submit or a link, without `doc.forms.script`.                                                                |
+| `unsupported-action` | Actions the engine can't write, or that were read incomplete.                                                            |
+
+Because of `name-conflict`, importing the same bundle twice doesn't duplicate the fields.
+
+## Fill in from a bundle
+
+```ts
+const result = await doc.forms.importValues(bundle);
+
+result.fields; // the fields whose value changed, as they are now
+result.dropped; // what was left out, and why
+```
+
+| Option        | What it is                                                          | Default     |
+| :------------ | :------------------------------------------------------------------ | :---------- |
+| `attribution` | `'restore'` keeps who filled each field in; `'stamp'` makes it you. | `'restore'` |
+| `opId`        | A name for this import: its events carry it, and it names its undo. | a new id    |
+
+Each field the bundle holds a value for fills the document's field of the same full name, as
+`setValue()` would. A field that already holds that value is left as it is, and isn't in
+`fields`. The import runs no scripts: no keystroke, format, validate or calculate script runs, as
+for every value the engine writes.
+
+| `reason`            | What was left out                                                              |
+| :------------------ | :----------------------------------------------------------------------------- |
+| `no-field`          | The document has no field of that name.                                        |
+| `wrong-family`      | The document's field of that name is of another kind.                          |
+| `value-not-allowed` | A value the field can't take: an option it doesn't have, a button it lacks.    |
+| `locked`            | A field a signature locked.                                                    |
+| `fill-not-allowed`  | A field the user may not fill in: its group isn't one their permissions reach. |
+
+All of this is decided before the first value is written.
+
+## Events
+
+`import()` fires one `forms.created` event per field, and `importValues()` one `forms.valueSet`
+per field it filled, all with the same `origin.tx`, so you can update your interface once for the
+whole batch. See
+[Which write an event came from](/docs/engine/concepts/events#which-write-an-event-came-from).
+
+## Undo an import
+
+Each import is one change. `doc.apply({ undoOf })` with its `opId` takes it back, and the undo's
+undo brings it back again:
+
+```ts
+const imported = await doc.forms.import(bundle);
+const undo = await doc.apply({ undoOf: imported.meta.opId });
+await doc.apply({ undoOf: undo.meta.opId }); // back again
+```
+
+- The undo of `import()` deletes each field it made, with its widgets and its place in the
+  calculation order. The redo brings back the same fields, with the same refs.
+- The undo of `importValues()` puts back each field's value and who filled it in, as the undo of a
+  `setValue()` does.
+
+A field that was changed since stays, and its item is `skipped`; the rest of the import goes. As
+for every change, only the user who imported may undo it, and a final write ends undo for the
+imports before it. See [Changes & undo](/docs/engine/documents/changes).
+
+## Limits
+
+Form bundles have the [same limits](/docs/engine/annotations/import-export#limits) as annotation
+bundles, with fields and widgets together counted as items. Past a limit, the call fails with
+`PayloadTooLarge`, and `err.details.limit` names the limit.
+
+<Engine cloud>
+
+An import is one request. Its `opId`, made for you when you don't pass one, makes a retry safe: a
+second request with the same `opId` returns what the first one did and writes nothing.
+
+An export is cached until the document's form or pages change, so exporting again is cheap.
+
+</Engine>
+
+## Permissions
+
+| Call                                             | Needs                                                                         |
+| :----------------------------------------------- | :---------------------------------------------------------------------------- |
+| `export()`                                       | `doc.forms.read` and `doc.download`                                           |
+| `import(bundle, { attribution: 'stamp' })`       | `doc.forms.modify`; `doc.forms.script` to keep scripts                        |
+| `import(bundle)`                                 | `doc.forms.modify` and `doc.forms.import`; `doc.forms.script` to keep scripts |
+| `importValues(bundle, { attribution: 'stamp' })` | `doc.forms.fill`, or `fields:fill` for a group                                |
+| `importValues(bundle)`                           | that, and `doc.forms.import`                                                  |
+
+A values import leaves out the fields the user may not fill in (`fill-not-allowed`). Undoing an
+import takes what the import took. See [Permissions](/docs/engine/concepts/permissions).
+
+## Good to know
+
+### What's in a bundle
+
+```ts
+bundle.fields; // [{ data }, …]: each field as a read returns it
+bundle.widgets; // [{ data, resources: {} }, …]: each widget as the form's rows read it
+bundle.calculationOrder; // the calculation order among the fields
+bundle.pages; // [{ page, position, size }, …]
+```
+
+A bundle is plain data: the fields in the form's order, then their widgets in their fields'
+order. A widget is drawn from its data, so a form bundle carries no bytes yet.
+
+### The round trip
+
+Export a form, import the bundle into a copy of its pages, and export that: when nothing was
+dropped, you get the same bundle. Only the refs change, and the attribution: `importedBy` with
+`'restore'`, who created and filled each field with `'stamp'`. The same document also exports to
+the same bundle on the local and the cloud engine.
+
+### Not FDF or XFDF
+
+FDF and XFDF carry a form's values. A bundle carries what the engine reads: every setting of a
+field and its widgets, their scripts and actions, and who made and filled each field. Its values
+fill a form in through `importValues()`.

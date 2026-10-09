@@ -3,11 +3,11 @@
  * customization contract (README.md): additive registries in, an owned
  * chrome value in, pixels out.
  *
- * The defaults are exported AS VALUES — that is the customization model.
+ * The defaults are exported AS values — that is the customization model.
  * Schema sugar and transforms are re-exported so a consumer needs exactly
  * one import line to go from "pass nothing" to "own the structure".
  */
-export { FullViewer, themeConfigOf } from './viewer';
+export { FullViewer, themeConfigOf, themeTokenProperty } from './viewer';
 export type { FullViewerProps, ThemeConfig, ThemeTokens, ViewerCustomization } from './viewer';
 export type {
   AnnotationFontSpec,
@@ -18,17 +18,17 @@ export type {
 // The prop types a delivery needs to speak FullViewer's contract.
 export type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
 
-// ── the DRIVE door: the viewer handle + the public capability tokens ─────────
-// `get(Token)` returns each plugin's PUBLIC lens verbatim — capability types
-// arrive through the token generics, so this list of tokens IS the public-API
-// act. Internal lenses (`/internal` entries, host tokens) are deliberately
+// ── the drive door: the viewer handle + the public capability tokens ─────────
+// `get(Token)` returns each plugin's public lens verbatim — capability types
+// arrive through the token generics, so this list of tokens is the public-API
+// act. Host lenses (`/contract/host` entries, host tokens) are deliberately
 // absent and unreachable from a delivery bundle. Additions are features;
 // removals are breaking — grow this list by demand, never speculatively.
 export { createViewerHandle } from './handle';
 export type { ScopedViewerHandle, ViewerHandle } from './handle';
 export type {
   CapabilityToken,
-  DocInfo,
+  DocumentInfo,
   DocumentsCapability,
   Unsubscribe,
 } from '@embedpdf/react/runtime';
@@ -47,10 +47,10 @@ export type {
   ScaleChangeReport,
 } from '@embedpdf/react/measurement';
 export { RedactionToken } from '@embedpdf/react/redaction';
-// Stamp LIBRARIES are workspace state an embedder seeds: `viewer.get(StampToken)
-// .importLibraryPdf(companyStamps)` puts their own stamps in the stamps sidebar.
+// Stamp libraries are workspace state an embedder seeds: `viewer.get(StampToken)
+// .importLibrary(companyStamps)` puts their own stamps in the stamps sidebar.
 export { StampToken } from '@embedpdf/react/stamp';
-// Signatures: the act (`viewer.get(SignatureToken).signField(…)`) and the
+// Signatures: the act (`viewer.get(SignatureToken).sign(…)`) and the
 // signer ports a config names — one import for the whole feature.
 export { SignatureToken } from '@embedpdf/react/signature';
 export {

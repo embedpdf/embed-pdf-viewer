@@ -1,37 +1,49 @@
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-import { Demo, Toolbar, Button, StageFrame, stageFill } from './_shared/chrome';
+import './rotate-view.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
-const plugins = [stagePlugin(), renderPlugin()];
+// The pages start a quarter turn round, like a scan that came out sideways.
+const plugins = [stagePlugin({ viewRotation: 90 }), renderPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function RotateButtons() {
   const stage = useStage();
+  const viewRotation = useStageState((state) => state.viewRotation);
+
   return (
-    <Toolbar>
-      <Button onClick={() => stage.rotateViewBy(-90)}>⟲ Rotate left</Button>
-      <Button onClick={() => stage.rotateViewBy(90)}>⟳ Rotate right</Button>
-    </Toolbar>
+    <div className="toolbar">
+      <button type="button" className="button" onClick={() => stage.rotateViewBy(-90)}>
+        ⟲ Rotate left
+      </button>
+      <output className="readout">{viewRotation}°</output>
+      <button type="button" className="button" onClick={() => stage.rotateViewBy(90)}>
+        ⟳ Rotate right
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={viewRotation === 0}
+        onClick={() => stage.setViewRotation(0)}
+      >
+        Upright
+      </button>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <RotateButtons />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <RotateButtons />
+        <Stage className="stage">{() => <RenderLayer />}</Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

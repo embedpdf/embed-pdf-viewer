@@ -93,6 +93,75 @@ await client.doc.head({
 </dl>
 </details>
 
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">changes</a>({ ...params }) -> CloudPDF.DocChanges200Response</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.changes({
+    docId: "docId",
+    layerName: "layerName",
+    changes: [{
+            opId: "opId"
+        }]
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.DocChangesRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `DocClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">download</a>({ ...params }) -> core.BinaryResponse</code></summary>
 <dl>
 <dd>
@@ -446,7 +515,7 @@ await client.shares.list({
 <dl>
 <dd>
 
-The returned share id IS the public share token. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
+The returned share id is the public share token. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
 </dd>
 </dl>
 </dd>
@@ -1709,7 +1778,7 @@ await client.tokens.revoke({
 <dl>
 <dd>
 
-Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.
+Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `page` (a `PageRef`) when display order matters.
 </dd>
 </dl>
 </dd>
@@ -1997,6 +2066,60 @@ await client.doc.annotations.update({
 </dl>
 </details>
 
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">readAppearance</a>({ ...params }) -> core.BinaryResponse</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.annotations.readAppearance({
+    docId: "docId",
+    layerName: "layerName",
+    pageKey: "pageKey",
+    annotKey: "annotKey"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.ReadAppearanceAnnotationsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `AnnotationsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">exportAppearance</a>({ ...params }) -> core.BinaryResponse</code></summary>
 <dl>
 <dd>
@@ -2111,8 +2234,70 @@ await client.doc.annotations.flatten({
 </dl>
 </details>
 
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">reorder</a>({ ...params }) -> CloudPDF.DocAnnotationsReorder200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.annotations.reorder({
+    docId: "docId",
+    layerName: "layerName",
+    pageKey: "pageKey",
+    refs: [{
+            kind: "objectNumber",
+            page: {
+                kind: "objectNumber",
+                objectNumber: 1
+            },
+            objectNumber: 1
+        }],
+    position: "start"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocAnnotationsReorderRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `AnnotationsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Doc Forms
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocFormsGet200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFormsList200Response</code></summary>
 <dl>
 <dd>
 
@@ -2125,7 +2310,7 @@ await client.doc.annotations.flatten({
 <dd>
 
 ```typescript
-await client.doc.forms.get({
+await client.doc.forms.list({
     docId: "docId",
     layerName: "layerName"
 });
@@ -2144,7 +2329,7 @@ await client.doc.forms.get({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.GetFormsRequest` 
+**request:** `CloudPDF.doc.ListFormsRequest` 
     
 </dd>
 </dl>
@@ -2164,7 +2349,7 @@ await client.doc.forms.get({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">exportData</a>({ ...params }) -> core.BinaryResponse</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderCalculations</a>({ ...params }) -> CloudPDF.DocFormsReorderCalculations200Response</code></summary>
 <dl>
 <dd>
 
@@ -2177,64 +2362,14 @@ await client.doc.forms.get({
 <dd>
 
 ```typescript
-await client.doc.forms.exportData({
-    docId: "docId",
-    layerName: "layerName"
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.ExportDataFormsRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `FormsClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">importData</a>({ ...params }) -> CloudPDF.DocFormsImportData200Response</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.forms.importData({
+await client.doc.forms.reorderCalculations({
     docId: "docId",
     layerName: "layerName",
-    body: {
-        "key": "value"
-    }
+    fields: [{
+            kind: "objectNumber",
+            objectNumber: 1
+        }],
+    position: "start"
 });
 
 ```
@@ -2251,60 +2386,7 @@ await client.doc.forms.importData({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.ImportDataFormsRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `FormsClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsReset200Response</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.forms.reset({
-    docId: "docId",
-    layerName: "layerName",
-    fieldKey: "fieldKey"
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.ResetFormsRequest` 
+**request:** `CloudPDF.doc.DocFormsReorderCalculationsRequest` 
     
 </dd>
 </dl>
@@ -2361,6 +2443,229 @@ await client.doc.forms.setValue({
 <dd>
 
 **request:** `CloudPDF.doc.SetValueFormsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FormsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsReset200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.forms.reset({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocFormsResetRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FormsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">deleteWidget</a>({ ...params }) -> CloudPDF.DocFormsDeleteWidget200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.forms.deleteWidget({
+    docId: "docId",
+    layerName: "layerName",
+    pageKey: "pageKey",
+    annotKey: "annotKey"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DeleteWidgetFormsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FormsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">updateWidget</a>({ ...params }) -> CloudPDF.DocFormsUpdateWidget200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.forms.updateWidget({
+    docId: "docId",
+    layerName: "layerName",
+    pageKey: "pageKey",
+    annotKey: "annotKey",
+    patch: {}
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocFormsUpdateWidgetRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FormsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderWidgets</a>({ ...params }) -> CloudPDF.DocFormsReorderWidgets200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.forms.reorderWidgets({
+    docId: "docId",
+    layerName: "layerName",
+    pageKey: "pageKey",
+    widgets: [{
+            kind: "objectNumber",
+            page: {
+                kind: "objectNumber",
+                objectNumber: 1
+            },
+            objectNumber: 1
+        }],
+    position: "start"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocFormsReorderWidgetsRequest` 
     
 </dd>
 </dl>
@@ -2607,7 +2912,7 @@ await client.doc.pages.delete({
 <dl>
 <dd>
 
-A read, not a mutation: the source document is untouched and no event is published. Body is `{"pageObjectNumbers": number[]}`; the response body is the new PDF.
+A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.
 </dd>
 </dl>
 </dd>
@@ -2733,7 +3038,7 @@ await client.doc.pages.flatten({
 <dl>
 <dd>
 
-Multipart mutation envelope: a `body` field holding `{"destIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.
+Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.
 </dd>
 </dl>
 </dd>
@@ -2800,7 +3105,7 @@ await client.doc.pages.insert({
 <dl>
 <dd>
 
-Body is `{"size": {"width", "height"}, "count"?, "destIndex"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.
+Body is `{"size": {"width", "height"}, "count"?, "position"?}` — size in PDF points, count in [1, 100], `position` a `PagePosition` (omitted → the end).
 </dd>
 </dl>
 </dd>
@@ -2838,61 +3143,6 @@ await client.doc.pages.insertBlank({
 <dd>
 
 **request:** `CloudPDF.doc.InsertBlankPagesRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `PagesClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">move</a>({ ...params }) -> CloudPDF.DocPagesMove200Response</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.pages.move({
-    docId: "docId",
-    layerName: "layerName",
-    body: {
-        "key": "value"
-    }
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.MovePagesRequest` 
     
 </dd>
 </dl>
@@ -3022,6 +3272,63 @@ await client.doc.pages.removeName({
 </dl>
 </details>
 
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">reorder</a>({ ...params }) -> CloudPDF.DocPagesReorder200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.pages.reorder({
+    docId: "docId",
+    layerName: "layerName",
+    pages: [{
+            kind: "objectNumber",
+            objectNumber: 1
+        }],
+    position: "start"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocPagesReorderRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `PagesClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">rotate</a>({ ...params }) -> CloudPDF.DocPagesRotate200Response</code></summary>
 <dl>
 <dd>
@@ -3093,10 +3400,7 @@ await client.doc.pages.rotate({
 ```typescript
 await client.doc.redactions.apply({
     docId: "docId",
-    layerName: "layerName",
-    body: {
-        "key": "value"
-    }
+    layerName: "layerName"
 });
 
 ```
@@ -3113,7 +3417,7 @@ await client.doc.redactions.apply({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.ApplyRedactionsRequest` 
+**request:** `CloudPDF.doc.DocRedactionsApplyRequest` 
     
 </dd>
 </dl>
@@ -3200,7 +3504,7 @@ await client.doc.signatures.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">abort</a>({ ...params }) -> CloudPDF.DocSignaturesAbort200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">cancel</a>({ ...params }) -> CloudPDF.DocSignaturesCancel200Response</code></summary>
 <dl>
 <dd>
 
@@ -3213,7 +3517,7 @@ await client.doc.signatures.list({
 <dd>
 
 ```typescript
-await client.doc.signatures.abort({
+await client.doc.signatures.cancel({
     docId: "docId",
     layerName: "layerName",
     signingId: "signingId"
@@ -3233,7 +3537,7 @@ await client.doc.signatures.abort({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.AbortSignaturesRequest` 
+**request:** `CloudPDF.doc.CancelSignaturesRequest` 
     
 </dd>
 </dl>
@@ -3403,7 +3707,7 @@ await client.doc.signatures.analysis({
 <dl>
 <dd>
 
-The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is aborted, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
+Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
 </dd>
 </dl>
 </dd>
@@ -3871,6 +4175,59 @@ await client.doc.versions.signatureDigest({
 <dd>
 
 **requestOptions:** `VersionsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+## Doc Metadata Custom
+<details><summary><code>client.doc.metadata.custom.<a href="/src/api/resources/doc/resources/metadata/resources/custom/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataCustomGet200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.metadata.custom.get({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.metadata.GetCustomRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `CustomClient.RequestOptions` 
     
 </dd>
 </dl>

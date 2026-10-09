@@ -1,28 +1,34 @@
+import { initialSession } from '@embedpdf/core-annotation';
 import { describe, expect, it } from 'vitest';
 
-import { annotationReducer, DEFAULT_CHROME, initialAnnotationState } from '../src/model';
+import {
+  initialAnnotationState,
+  preferBaked,
+  withObjectNumbers,
+  withoutObjectNumbers,
+  withSession,
+} from '../src/model';
 
-describe('chrome settings state', () => {
-  it('registration config deep-merges over DEFAULT_CHROME', () => {
-    const s = initialAnnotationState({ chrome: { accent: '#e91e63', knob: { offset: 48 } } });
-    expect(s.chrome.accent).toBe('#e91e63');
-    expect(s.chrome.knob.offset).toBe(48);
-    // untouched keys survive the merge — a partial patch never drops defaults
-    expect(s.chrome.knob.hitSize).toBe(DEFAULT_CHROME.knob.hitSize);
-    expect(s.chrome.guides.enabled).toBe(true);
-    expect(s.chrome.outline.style).toBe('solid');
+describe('the session and render preferences', () => {
+  it('a message that changes nothing leaves the state alone', () => {
+    const state = initialAnnotationState();
+    expect(withSession(state, state.session)).toBe(state);
+    expect(withSession(state, { ...state.session })).toBe(state);
   });
 
-  it('SET_CHROME patches at runtime without touching the model', () => {
-    const s0 = initialAnnotationState();
-    const s1 = annotationReducer(s0, {
-      type: 'SET_CHROME',
-      patch: { guides: { enabled: false }, outline: { style: 'dashed' } },
-    });
-    expect(s1.chrome.guides.enabled).toBe(false);
-    expect(s1.chrome.guides.axisOpacity).toBe(DEFAULT_CHROME.guides.axisOpacity);
-    expect(s1.chrome.outline.style).toBe('dashed');
-    expect(s1.chrome.outline.width).toBe(DEFAULT_CHROME.outline.width);
-    expect(s1.model).toBe(s0.model); // settings and model are independent slices
+  it('records a message drew live render live from then on, until another session hands them back', () => {
+    const state = withSession(initialAnnotationState(), initialSession, ['obj:1', 'obj:2']);
+    expect(state.vector).toEqual({ 'obj:1': true, 'obj:2': true });
+    // Already live: nothing changes.
+    expect(withSession(state, state.session, ['obj:1'])).toBe(state);
+    expect(preferBaked(state, ['obj:1']).vector).toEqual({ 'obj:2': true });
+  });
+
+  it('holds the object numbers it is handed, and lets go of the ones the engine reclaimed', () => {
+    const state = withObjectNumbers(initialAnnotationState(), [900, 901, 902]);
+    expect(state.session.objectNumbers).toEqual([900, 901, 902]);
+    expect(withObjectNumbers(state, [])).toBe(state);
+    expect(withoutObjectNumbers(state, [901, 7]).session.objectNumbers).toEqual([900, 902]);
+    expect(withoutObjectNumbers(state, [7])).toBe(state);
   });
 });

@@ -2,13 +2,15 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type AnalyzeInput,
   type ChangeAnalysis,
   type DigestAlgorithm,
   type DocumentSignaturesService,
+  type WriteOptions,
   type FormFieldRef,
-  type SignatureAbortResult,
+  type SignatureCancelResult,
   type SignatureCompleteInput,
   type SignatureCompleteResult,
   type SignaturePrepareInput,
@@ -18,9 +20,8 @@ import {
 
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -35,7 +36,7 @@ interface DocClosedView {
 export class LocalDocumentSignaturesService implements DocumentSignaturesService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -45,42 +46,47 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.list', jobId, docId }) },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.list', effect: 'read', jobId, docId }),
+    });
     return this.await(submission, 'signatures.list', (payload) => payload.snapshot);
   }
 
-  contents(field: FormFieldRef): AbortablePromise<Uint8Array> {
+  getContents(field: FormFieldRef): AbortablePromise<Uint8Array> {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.contents', jobId, docId, ref: field }),
-      },
-      { priority: Priority.MEDIUM },
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.contents', effect: 'read', jobId, docId, ref: field }),
+    });
+    return this.await(
+      submission,
+      'signatures.contents',
+      (payload) => new Uint8Array(payload.bytes),
     );
-    return this.await(submission, 'signatures.contents', (payload) => new Uint8Array(payload.bytes));
   }
 
-  digest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
+  getDigest(field: FormFieldRef, algorithm: DigestAlgorithm): AbortablePromise<Uint8Array> {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.digest', jobId, docId, ref: field, algorithm }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'signatures.digest',
+          effect: 'read',
+          jobId,
+          docId,
+          ref: field,
+          algorithm,
+        }),
+    });
     return this.await(submission, 'signatures.digest', (payload) => new Uint8Array(payload.digest));
   }
 
-  revisionBytes(revisionIndex: number): AbortablePromise<Uint8Array> {
+  downloadRevision(revisionIndex: number): AbortablePromise<Uint8Array> {
     const rejected = this.gate('doc.download');
     if (rejected) return rejected;
     if (!Number.isInteger(revisionIndex) || revisionIndex < 0) {
@@ -89,88 +95,135 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       );
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.revisionBytes', jobId, docId, revisionIndex }),
-      },
-      { priority: Priority.MEDIUM },
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.revisionBytes', effect: 'read', jobId, docId, revisionIndex }),
+    });
+    return this.await(
+      submission,
+      'signatures.revisionBytes',
+      (payload) => new Uint8Array(payload.bytes),
     );
-    return this.await(submission, 'signatures.revisionBytes', (payload) => new Uint8Array(payload.bytes));
   }
 
   analyze(input: AnalyzeInput): AbortablePromise<ChangeAnalysis> {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.analyze', jobId, docId, input }) },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.analyze', effect: 'read', jobId, docId, input }),
+    });
     return this.await(submission, 'signatures.analyze', (payload) => payload.analysis);
   }
 
-  prepare(input: SignaturePrepareInput): AbortablePromise<SignaturePrepared> {
-    const rejected = this.gate('doc.sign') ?? (input.certify ? this.gate('doc.sign.certify') : null);
+  prepare(
+    input: SignaturePrepareInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignaturePrepared> {
+    // The job checks that the handle may sign this field (its group).
+    const rejected =
+      this.gate('sign-some-field') ?? (input.certify ? this.gate('doc.sign.certify') : null);
     if (rejected) return rejected;
+    const write = this.opIdFor(options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.prepare', jobId, docId, input }) },
-      { priority: Priority.HIGH },
-    );
+    const authority = this.guard.changeAuthority();
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'signatures.prepare',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          input,
+          authority,
+        }),
+    });
     return this.await(submission, 'signatures.prepare', (payload) => {
-      this.publisher.publishLocal({
-        type: 'signature.prepared',
-        signingId: payload.result.signingId,
+      this.publisher.publishWrite(write.opId, {
+        type: 'signatures.prepared',
         field: input.field,
+        ...payload.result,
       });
       return payload.result;
     });
   }
 
-  complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult> {
-    const rejected = this.gate('doc.sign');
+  complete(
+    input: SignatureCompleteInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignatureCompleteResult> {
+    const rejected = this.gate('sign-some-field');
     if (rejected) return rejected;
+    const write = this.opIdFor(options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.complete', jobId, docId, input }) },
-      { priority: Priority.HIGH },
-    );
+    const authority = this.guard.changeAuthority();
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'signatures.complete',
+          effect: 'contentWrite',
+          jobId,
+          opId: write.opId,
+          docId,
+          input,
+          authority,
+        }),
+    });
     return this.await(submission, 'signatures.complete', (payload) => {
       const result = payload.result;
       if (result.status === 'completed') {
         // The session is on new bytes: what its signatures forbid applies
         // from the next call on, and every byte-level fact must be re-read.
         this.guard.setProtection(result.protection);
-        this.publisher.publishLocal({
-          type: 'signature.completed',
-          signingId: input.signingId,
-          ...result,
-        });
-        this.publisher.publishLocal({ type: 'document.versioned', version: result.version });
+        this.publisher.publishWrite(
+          write.opId,
+          { type: 'signatures.completed', signingId: input.signingId, ...result },
+          { type: 'document.versioned', version: result.version },
+        );
       }
       return result;
     });
   }
 
-  abort(signingId: string): AbortablePromise<SignatureAbortResult> {
-    const rejected = this.gate('doc.sign');
+  cancel(signingId: string, options?: WriteOptions): AbortablePromise<SignatureCancelResult> {
+    const rejected = this.gate('sign-some-field');
     if (rejected) return rejected;
+    const write = this.opIdFor(options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.abort', jobId, docId, signingId }) },
-      { priority: Priority.HIGH },
-    );
-    return this.await(submission, 'signatures.abort', (payload) => {
-      if (payload.result.status === 'aborted') {
-        this.publisher.publishLocal({ type: 'signature.aborted', signingId });
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.cancel', effect: 'session', jobId, docId, signingId }),
+    });
+    return this.await(submission, 'signatures.cancel', (payload) => {
+      if (payload.result.status === 'cancelled') {
+        this.publisher.publishWrite(write.opId, { type: 'signatures.cancelled', signingId });
       }
       return payload.result;
     });
   }
 
+  /** The write's `opId` (the caller's, else a fresh one), or the refusal of an invalid one. */
+  private opIdFor(
+    options: WriteOptions | undefined,
+  ): { opId: string; rejected?: never } | { rejected: AbortablePromise<never> } {
+    try {
+      return { opId: opIdOf(options) };
+    } catch (err) {
+      return { rejected: AbortablePromise.rejectReason(err) };
+    }
+  }
+
+  /**
+   * The checks before a call: the document is open and the handle may `cap`.
+   * `sign-some-field`: the handle may sign some signature field (`doc.sign`,
+   * or a `fields:sign` scope); the job checks the field it signs.
+   */
   private gate(
-    cap: 'doc.forms.read' | 'doc.download' | 'doc.sign' | 'doc.sign.certify',
+    cap: 'doc.forms.read' | 'doc.download' | 'doc.sign.certify' | 'sign-some-field',
   ): AbortablePromise<never> | null {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -178,7 +231,8 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       );
     }
     try {
-      this.guard.assertCapability(cap);
+      if (cap === 'sign-some-field') this.guard.assertSomeFieldWrite('sign');
+      else this.guard.assertCapability(cap);
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }

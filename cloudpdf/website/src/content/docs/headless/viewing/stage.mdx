@@ -1,0 +1,558 @@
+---
+title: Scroll, zoom & layout
+description: Show the pages with the Stage, and control zoom, layouts, page navigation, touch and view rotation.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Scroll, zoom & layout
+
+The **Stage** is where the document is shown. It lays out the pages (scrolling, facing pages, a
+grid), keeps only the visible ones mounted, and handles scrolling, zoom and page navigation, with
+the mouse, the keyboard and on touch screens. You decide what each page draws and what the
+controls around it look like.
+
+Register `stagePlugin()` with [`renderPlugin()`](render), put `<Stage>` in your layout, and give
+it a <Word of="renderFunction" /> that draws one page:
+
+<Example name="stage/basic" mode="open" />
+
+> **Try it:** drag to pan, and zoom with Ctrl and the wheel (Cmd on a Mac) or a trackpad pinch. On
+> a phone, flick to scroll, pinch to zoom, and double-tap to zoom in.
+
+- **Only visible pages are mounted**, so a 2,000-page document scrolls as smoothly as a short one.
+- **Gestures work with no code of your own**: pan, zoom around the pointer, momentum scrolling and
+  pinch.
+- **Each page is yours.** The <Word of="renderFunction" /> runs once per visible page. Stack more layers in it (text
+  selection, annotations, search highlights) and they move with the page.
+
+## Zoom
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+`useStageState()` gives you the zoom to show, and `useStage()` the calls to change it:
+
+</Fw>
+
+<Fw only="angular">
+
+The Stage is a component, and a template reference gives you both: `stage.zoomLevel()`, a signal,
+to show, and `stage.zoomIn()` and the other calls to change it. In code, `viewChild(EpdfStage)`
+reaches it, and what you put inside `<epdf-stage>` uses `inject(EpdfStage)`:
+
+</Fw>
+
+<Example name="stage/zoom" />
+
+<Snippet name="viewing/zoom-controls" />
+
+`zoomLevel` is a plain number: `1` is 100%, `2` is 200%. And 100% means the page's real size: a Letter
+page shows as big as the paper, as it does in Acrobat.
+
+A fit mode keeps applying when the window resizes. As soon as the user pinches or presses **+**, the
+mode becomes `'custom'` and their zoom stays.
+
+| Mode          | What it does                                                   |
+| :------------ | :------------------------------------------------------------- |
+| `'automatic'` | Fits the page width, but never zooms past 100%. The default.   |
+| `'fit-page'`  | Fits the whole page in view.                                   |
+| `'fit-width'` | Fills the full width.                                          |
+| `'fit-all'`   | Zooms out until every page is visible.                         |
+
+For an exact level, a mode or a fixed page size, use `zoomTo`:
+
+```ts
+stage.zoomTo(1.5); // exactly 150%
+stage.zoomTo({ mode: 'fit-width' });
+stage.zoomTo({ pageWidth: 200 }); // every page 200 pixels wide, for thumbnails
+stage.zoomBy(1.25, { around: { x: 400, y: 300 } }); // 25% closer, around a point in the Stage
+```
+
+## Move through pages
+
+<Snippet name="viewing/page-navigation" />
+
+```ts
+stage.goToPage(4); // the fifth page
+stage.goToPage(page.ref); // or by its ref
+stage.goToFirstPage();
+stage.goToLastPage();
+```
+
+<Example name="stage/navigation" />
+
+> **Try it:** zoom in, then press **Next**. The next page lands with its top edge at the top of the
+> view, at every zoom.
+
+- **A page is its `ref` or its index.** Every call that takes a page takes either. An index counts
+  from 0, so page "1" in your UI is `goToPage(0)`, and an index past the end goes to the last page.
+- **`nextPage()` and `previousPage()` follow spreads.** When two facing pages fit, they move a whole
+  spread; zoomed in, one page.
+- **`reveal()` scrolls only as far as needed.** It makes a page visible and does nothing if it
+  already is. Use it for a thumbnail strip that follows along without jumping.
+- **You can navigate as soon as the document opens.** A call made before the Stage is on screen
+  waits for it, and the last one is where the Stage opens, without scrolling there.
+
+## Layouts
+
+The arrangement of the pages is four settings. Set them when you register the plugin, or change
+them while the app runs. The Stage keeps you on the same page while it reflows:
+
+<Example name="stage/layouts" />
+
+```ts
+stage.updateSettings({ layout: 'horizontal', spread: 'odd' });
+```
+
+| Setting  | What it decides                                      | Values                                            |
+| :------- | :--------------------------------------------------- | :------------------------------------------------ |
+| `flow`   | Scroll every page, or one page or spread at a time   | `'continuous'` (default), `'paged'`               |
+| `layout` | How pages are arranged                               | `'vertical'` (default), `'horizontal'`, `'grid'`  |
+| `spread` | Facing pages side by side, like a book               | `'none'` (default), `'odd'`, `'even'`             |
+| `sizing` | Each page at its true size, or every page equally wide | `'intrinsic'` (default), `'uniform'`            |
+
+Two combinations you'll reach for often:
+
+```ts
+// A book: facing pages, one spread at a time
+stagePlugin({ flow: 'paged', spread: 'odd' });
+
+// A thumbnail grid that wraps to the available width
+stagePlugin({ layout: 'grid', columns: 'auto', zoom: { pageWidth: 150 } });
+```
+
+`columns` applies to the grid: `'auto'` wraps to fit, `'square'` aims for a square grid, and a
+number fixes the count.
+
+## Space around pages
+
+- **`padding`** is the space between the pages and the edge of the Stage, in screen pixels. Fit
+  modes respect it, so "fit page" never touches the edges. It's `24`, or `4` on narrow screens.
+- **`gap`** is the space between pages. A number (`16`, the default) grows with the zoom, like the
+  space between sheets of paper. `{ px: 16 }` stays 16 screen pixels at every zoom, which suits a
+  thumbnail strip.
+
+```ts
+stagePlugin({ padding: 32, gap: { px: 12 } });
+```
+
+<Example name="stage/spacing" />
+
+## Adapt to the space you have
+
+A generous margin on a desktop wastes half a phone screen. Settings can depend on how much room
+the Stage has, like a CSS container query:
+
+```ts
+stagePlugin({
+  padding: 24,
+  spread: 'odd',
+  responsive: [
+    { name: 'compact', when: { maxWidth: 600 }, settings: { padding: 4 } },
+    { when: { orientation: 'portrait' }, settings: { spread: 'none' } },
+  ],
+});
+```
+
+Every rule whose `when` matches applies, in order, and a later rule wins on the settings they share.
+`when` takes `minWidth`, `maxWidth`, `minHeight`, `maxHeight` and `orientation`, all combined with
+*and*, or a function for anything else: `(box) => box.width / box.height > 2`.
+
+- **It measures the Stage, not the device.** A 500-pixel pane on a desktop is compact too, and two
+  Stages in one window decide on their own.
+- **A rule applies when the size crosses it.** In between, the user is in charge: pinch to 300%,
+  resize the window, and the zoom stays while the padding rule still applies.
+
+<Example name="stage/responsive" />
+
+> **Try it:** switch the Stage to 360 pixels. The rule turns on, the facing pages become one, and
+> the toolbar's buttons get shorter, all from the same breakpoint.
+
+Out of the box there's one rule, the `compact` margin above. Pass your own list to replace it, or
+`responsive: []` for none. `stage.setResponsiveRules([…])` changes the rules while the app runs.
+
+A named rule is also something your UI can read, so one breakpoint drives both the layout and your
+own chrome:
+
+<Snippet name="viewing/compact-layout" />
+
+## On touch screens
+
+Touch works out of the box, tuned to feel like the platform rather than a web page:
+
+- **One finger scrolls**, with momentum: flick and the page glides to a stop.
+- **Two fingers pinch-zoom** around the point between them, and pan at the same time.
+- **Double-tap zooms in steps**: the whole page, the text at full width, closer, and back out.
+- **Edges are elastic.** Pulling past the end stretches and springs back.
+- **Long-press selects a word** when the [Selection](../text/selection) plugin is registered.
+
+For a Stage that should scroll but not zoom under a pinch or Ctrl+wheel, such as a thumbnail strip,
+set its `zoomGestures` setting to `false`.
+
+## Labels and buttons on every page
+
+For UI that belongs to a page but shouldn't sit on it, like a page number below or a row of
+buttons above, reserve space with `pageFrame` and draw into it with
+<Fw only="react">the `pageChrome` prop</Fw><Fw only="vue">the `#page-chrome` slot</Fw><Fw only="svelte">the `pageChrome` snippet</Fw><Fw only="angular">an `<ng-template epdfPageChrome let-page>`</Fw>:
+
+<Example name="stage/page-labels" />
+
+The reserved bands are in screen pixels, so labels keep their size at every zoom. They count as part
+of the page: "fit page" includes them, and going to a page shows its label.
+
+Each page has a drop shadow so it reads as paper. It's the viewer's `page.shadow` setting (`'none'`
+for no shadow), next to `page.background`, the color of a page before its picture arrives. Both can
+also come from CSS, which wins over the setting:
+
+```css
+.pdf-viewer {
+  --epdf-page-shadow: 0 2px 8px rgb(0 0 0 / 0.25); /* or none */
+}
+```
+
+See [Colors & theming](../ui/theming).
+
+## Scrollbars
+
+`<Scrollbar>` is a scrollbar for the Stage that you style yourself: drag the thumb, click the track
+to page, and it hides when the pointer leaves, like a macOS scrollbar:
+
+<Example name="stage/scrollbar" />
+
+<Snippet name="viewing/scrollbar" />
+
+| Prop           | What it is                                                      | Default   |
+| :------------- | :-------------------------------------------------------------- | :-------- |
+| `axis`         | `'x'` or `'y'`                                                  | required  |
+| `autoHide`     | Milliseconds before it hides, or `false` to always show it      | `1200`    |
+| `minThumbSize` | The smallest thumb, in pixels, for very long documents          | `24`      |
+| `trackPress`   | A click on the track moves a `'page'` or `'jump'`s there        | `'page'`  |
+
+It sets `data-axis`, `data-state` and `data-dragging` for your CSS; until you style the thumb, its
+color is `--epdf-scrollbar-thumb`. To build your own, such as a
+reading-progress bar, `useScrollMetrics()` gives you `scrollTop`, `scrollHeight` and
+`clientHeight`, the same numbers a scrolling element has.
+
+## Jump to an exact spot
+
+Give `reveal()` a rectangle and it becomes your "go to this search result" call:
+
+```ts
+stage.reveal(hit.page, {
+  rect: hit.bounds, // a box in page coordinates
+  zoom: 'fit-width', // zoom so the box spans the view, or 'keep'
+  anchor: { y: 0.35 }, // about a third from the top, like a browser's find bar
+});
+```
+
+Search results, comments and bookmarks all come down to this one call.
+
+<Example name="stage/reveal" />
+
+## Follow a destination
+
+A destination is where a link, a bookmark or the document's opening view points: a page, a spot on
+it, and a zoom. `goToDestination()` goes exactly there:
+
+```ts
+stage.goToDestination(destination);
+
+// Page 5, with the point (72, 100) at the top-left of the view, at 200%
+stage.goToDestination({ kind: 'xyz', page: pages[4].ref, x: 72, y: 100, zoom: 2 });
+```
+
+| `kind`                         | Goes to                                           |
+| :----------------------------- | :------------------------------------------------ |
+| `'xyz'`                        | The point `x`, `y` at the top-left, at `zoom`     |
+| `'fit'`                        | The whole page                                    |
+| `'fitH'`                       | The page's full width, with `y` at the top        |
+| `'fitV'`                       | The page's full height, with `x` at the left      |
+| `'fitR'`                       | The box `x`, `y`, `width`, `height`, filling the view |
+| `'fitB'`, `'fitBH'`, `'fitBV'` | The same as `fit`, `fitH` and `fitV`              |
+
+Any of `x`, `y` and `zoom` can be `null` or left out: the view keeps what it has on that axis.
+
+<Example name="stage/destination" />
+
+## Make it feel right
+
+When someone clicks "next page", should the page land at the top of the view, or centered like a
+slide? Four settings answer questions like that. They all take `'start'`, `'center'`, `'end'` or a
+fraction such as `0.35`, per axis:
+
+| Setting        | The question it answers                                           | Default          |
+| :------------- | :---------------------------------------------------------------- | :--------------- |
+| `arrivalAlign` | Where does a page land when you go to it?                         | the top          |
+| `zoomAlign`    | What stays put when you zoom with a button?                       | the center       |
+| `anchorAlign`  | What stays put when the window resizes or the layout changes?     | the top          |
+| `fitAlign`     | Where does the content rest when everything fits?                 | the center       |
+
+The defaults feel like reading a document. Set them all to center for a presentation, where each
+move keeps the page centered like a slide:
+
+<Example name="stage/presets" />
+
+```ts
+const presentation = {
+  arrivalAlign: { x: 'center', y: 'center' },
+  zoomAlign: { x: 'center', y: 'center' },
+  anchorAlign: { x: 'center', y: 'center' },
+};
+
+stage.updateSettings(presentation); // one change, and you keep your place
+```
+
+One call can override the setting just for itself: `stage.goToPage(12, { arrivalAlign: { y:
+'center' } })`. `'keep'` means "don't move this axis": with `arrivalAlign: { x: 'keep', y: 'start'
+}`, someone reading the left column of a two-column paper stays in that column as they page on.
+
+## Rotate the view
+
+For a scan that came out sideways, turn how the pages are shown without changing the file:
+
+<Example name="stage/rotate-view" />
+
+```ts
+stage.rotateViewBy(90); // a quarter turn clockwise from here
+stage.setViewRotation(180); // or an exact rotation
+```
+
+To rotate pages in the PDF itself, use [Organizing pages](../documents/pages). That's an edit to the
+document, not a view setting, so keep the two on different buttons.
+
+## Remember where the user was
+
+```ts
+// One page: remember the spot before leaving, go back to it later
+const spot = stage.getViewpoint();
+stage.goToPage(2, { viewpoint: spot });
+
+// Everything: settings and position, as one object you can store
+localStorage.setItem('view', JSON.stringify(stage.getViewState()));
+stage.applyViewState(JSON.parse(localStorage.getItem('view')!));
+```
+
+A viewpoint remembers *what* you were looking at, not pixel offsets, so it restores correctly in a
+window of another size.
+
+<Example name="stage/viewpoint" />
+
+> **Try it:** scroll and zoom somewhere else, then press **Go back to page 1**.
+
+## Two views of one document
+
+Register the Stage twice, with its own id and token, for two independent views of the same
+document, such as a thumbnail strip next to the main view:
+
+<Snippet name="viewing/thumbs-token" />
+
+<Fw only={['react', 'svelte']}>
+
+Pass the token to the component and the <Word of="hooks" />: `<Stage token={ThumbsToken}>` and
+`useStage(ThumbsToken)`; the state and settings take it after the selector,
+`useStageState(select, ThumbsToken)`. Each view has its own zoom and layout; both show the same live document.
+
+</Fw>
+
+<Fw only="vue">
+
+Pass the token to the component and the composables: `<Stage :token="ThumbsToken">` and
+`useStage(ThumbsToken)`; the state and settings take it after the selector,
+`useStageState(select, ThumbsToken)`. Each view has its own zoom and layout; both show the same live document.
+
+</Fw>
+
+<Fw only="angular">
+
+Pass the token to a second `<epdf-stage>`, and give it its own reference:
+`<epdf-stage [token]="thumbsToken" #thumbs="epdfStage">`, then `thumbs.zoomTo(…)`. Each view has its
+own zoom and layout; both show the same live document.
+
+</Fw>
+
+<Example name="stage/two-views" />
+
+A thumbnail strip should usually not start text selection or drawing when someone drags it. Turn
+off its `interaction` setting; it keeps its own drag-to-scroll:
+
+```ts
+stagePlugin({
+  id: 'stage-thumbs',
+  token: ThumbsToken,
+  layout: 'grid',
+  interaction: false, // a drag doesn't select text or draw
+});
+```
+
+## Methods
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+Everything `useStage()` gives you.
+
+</Fw>
+
+<Fw only="angular">
+
+Everything the Stage component has: `stage.zoomIn()` through `#stage="epdfStage"`,
+`viewChild(EpdfStage)`, or `inject(EpdfStage)` inside it.
+
+</Fw>
+
+| Method                                                   | What it does                                                                                                                                                      |
+| :------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `zoomIn()`, `zoomOut()`                                  | Zooms one step in or out, around the [`zoomAlign`](#make-it-feel-right) point. [Zoom](#zoom)                                                                       |
+| `fitWidth()`, `fitPage()`, `fitAll()`, `fitAutomatic()`  | Switches to a fit mode, which keeps applying when the window resizes                                                                                              |
+| `zoomTo(zoom, { around? })`                              | Zooms to a level (`1.5`), a mode (`{ mode: 'fit-width' }`) or a page size (`{ pageWidth }`, `{ pageHeight }`). `around` is a point in the Stage that stays put.     |
+| `zoomBy(factor, { around? })`                            | Multiplies the zoom: `1.25` is 25% closer                                                                                                                         |
+| `goToPage(page, options?)`                               | Goes to a page, by its ref or its index. [Move through pages](#move-through-pages)                                                                                |
+| `nextPage(options?)`, `previousPage(options?)`           | Goes to the next or previous page, or a whole spread when two facing pages fit                                                                                    |
+| `goToFirstPage(options?)`, `goToLastPage(options?)`      | Goes to the first or the last page                                                                                                                                |
+| `canGoNext()`, `canGoPrevious()`                         | Whether there's a page after or before the current one, to disable your buttons                                                                                   |
+| `reveal(page, options?)`                                 | Brings a page into view, scrolling only as far as needed. With `rect`, `zoom` or `anchor`, it lands on that spot. [Jump to an exact spot](#jump-to-an-exact-spot) |
+| `goToDestination(destination)`                           | Goes where a link, a bookmark or the document's opening view points. [Follow a destination](#follow-a-destination)                                                |
+| `scrollTo({ left, top })`, `scrollBy({ left, top })`     | Scrolls like a scrolling element does, in screen pixels. It jumps unless you pass `behavior: 'smooth'`. [Scrollbars](#scrollbars)                                  |
+| `panBy(x, y)`                                            | Moves the view by `x` and `y` screen pixels                                                                                                                       |
+| `resetView()`                                            | Jumps back to the first page and keeps the zoom mode                                                                                                              |
+| `isMoving()`, `stopMotion()`                             | Whether a glide or a fling is running, and stopping it where it is                                                                                                |
+| `getCamera()`, `setCamera(camera)`                       | Where the view is, as `{ x, y, zoom }`, and moving it there at once. [Every scroll frame](#every-scroll-frame)                                                     |
+| `setViewRotation(rotation)`, `rotateViewBy(degrees)`     | Turns how the pages are shown: to `0`, `90`, `180` or `270`, or a quarter turn from here with `90` or `-90`. [Rotate the view](#rotate-the-view)                  |
+| `getViewpoint()`                                         | What the user is looking at on the current page, with the zoom, to pass back to `goToPage(page, { viewpoint })`. [Remember where the user was](#remember-where-the-user-was) |
+| `getViewState()`, `applyViewState(view)`                 | Every setting and the position as one object you can store, and restoring it. The responsive rules apply again on top.                                            |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads, changes and resets the live settings, keeping you on the same page. [Settings](#settings)                                                             |
+| `setResponsiveRules(rules)`                              | Replaces the responsive rules while the app runs. [Adapt to the space you have](#adapt-to-the-space-you-have)                                                     |
+| `listVisiblePages()`, `isPageVisible(page)`              | The pages on screen, each with its box in the Stage and the part of it that shows, and whether one page is on screen                                             |
+| `listCurrentItemPages()`                                 | The pages of the current spread, or the current page alone                                                                                                        |
+| `getPageAt(point)`                                       | The page under a point in the Stage and the point on that page, or `null` over the space between pages                                                            |
+| `viewportToPage(page, point)`, `pageToViewport(page, point)`, `pageRectToViewport(page, rect)` | Converts a point between the Stage and a page, and a box on a page to the Stage. `null` when the page isn't laid out. [Page coordinates](#page-coordinates) |
+| `getPageFrame(page)`                                     | Where a page is laid out in the Stage, on screen or not, or `null` before it's placed                                                                            |
+| `getViewportSize()`                                      | The Stage's size in screen pixels, as last measured                                                                                                               |
+
+The page moves (`goToPage()`, `nextPage()`, `previousPage()`, `goToFirstPage()`, `goToLastPage()`)
+take `{ behavior, arrivalAlign, viewpoint }`: `behavior` is the [`scrollBehavior`
+setting](#settings) for one call, `arrivalAlign` is [where the page lands](#make-it-feel-right), and
+`viewpoint` is a [saved spot](#remember-where-the-user-was) to go back to. `reveal()` and
+`goToDestination()` take `behavior` too.
+
+## State
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+<StateIntro hook="useStageState()" />
+
+</Fw>
+
+<Fw only="angular">
+
+Every value is a signal on the Stage component: read it in a template (`stage.zoomLevel()`) or a
+`computed()`, and your view updates when it changes. The method in the last column reads the same
+value once.
+
+</Fw>
+
+| Field              | What it is                                                                 | Read once                                            |
+| :----------------- | :------------------------------------------------------------------------- | :--------------------------------------------------- |
+| `zoomLevel`        | The zoom as a number: `1` is 100%                                          | `getZoomLevel()`                                     |
+| `zoomMode`         | The fit mode, such as `'fit-width'`, or `'custom'` after a pinch or an exact level | `getZoomMode()`                                      |
+| `currentPageIndex` | The current page's place in the document, from 0                           | `getCurrentPageIndex()`                              |
+| `currentPage`      | The current page's ref, or `null` before the document has pages            | `getCurrentPage()`                                   |
+| `pageCount`        | How many pages the document has                                            | `getPageCount()`                                     |
+| `viewRotation`     | How the view is turned: `0`, `90`, `180` or `270`                          | `getViewRotation()`                                  |
+| `activeRules`      | The names of the responsive rules that apply now, in order                 | `listActiveRules()`, or `matchesRule(name)` for one  |
+
+The settings come from `useStageSettings()`, and the document's pages from `usePageList()`.
+
+## Settings
+
+Set them when you register the plugin, and change them while the app runs with
+`stage.updateSettings({ … })`. `stage.resetSettings()` goes back to what you registered, and
+`useStageSettings()` gives you the current settings.
+
+| Setting          | What it does                                                                              | Default                        |
+| :--------------- | :---------------------------------------------------------------------------------------- | :----------------------------- |
+| `flow`           | Scroll every page, or one page or spread at a time                                        | `'continuous'`                 |
+| `layout`         | `'vertical'`, `'horizontal'` or `'grid'`                                                  | `'vertical'`                   |
+| `spread`         | Facing pages: `'none'`, `'odd'`, `'even'`                                                 | `'none'`                       |
+| `sizing`         | `'intrinsic'` (true sizes) or `'uniform'` (equal widths)                                  | `'intrinsic'`                  |
+| `columns`        | Grid columns: `'square'`, `'auto'` or a number                                            | `'square'`                     |
+| `zoom`           | A mode, a level, `{ pageWidth }` or `{ pageHeight }`                                      | `{ mode: 'automatic' }`        |
+| `padding`        | Space around the pages, in screen pixels                                                  | `24` (`4` when compact)        |
+| `gap`            | Space between pages: a number (grows with zoom) or `{ px }`                               | `16`                           |
+| `pageFrame`      | Space reserved around each page for your labels, in screen pixels                         | `0` on every side              |
+| `bounded`        | Keep panning within the pages; `false` for an endless canvas                              | `true`                         |
+| `direction`      | Reading direction: `'rtl'` flips the page order and spreads                               | `'ltr'`                        |
+| `arrivalAlign`   | Where a page lands when you go to it                                                      | `{ x: 'start', y: 'start' }`   |
+| `zoomAlign`      | What stays put when you zoom with a button                                                | `{ x: 'center', y: 'center' }` |
+| `anchorAlign`    | What stays put when the window resizes or the layout changes                              | `{ x: 'start', y: 'start' }`   |
+| `fitAlign`       | Where the content rests when everything fits                                              | `{ x: 'center', y: 'center' }` |
+| `viewRotation`   | How the pages are turned: `0`, `90`, `180`, `270`                                         | `0`                            |
+| `scrollBehavior` | Whether going to a page glides or jumps: `'smooth'`, `'instant'`                          | `'smooth'`                     |
+| `interaction`    | Drags reach the active tool, such as text selection; `false` for a view that only scrolls | `true`                         |
+| `panFallback`    | A drag in the space between pages scrolls, whatever the tool                              | `true`                         |
+| `zoomGestures`   | A pinch or Ctrl+wheel zooms; `false` keeps the zoom fixed                                 | `true`                         |
+| `viewUnitsPerPoint` | Screen pixels per PDF point at 100%, so 100% is the page's real size; a native app sets its own | `96 / 72` on the web           |
+
+Set once, when you register the plugin:
+
+| Setting      | What it does                                         | Default               |
+| :----------- | :--------------------------------------------------- | :-------------------- |
+| `responsive` | Rules that change settings by the Stage's size       | one `compact` rule    |
+| `id`, `token` | For a second view of the same document             | the main view         |
+
+## Events
+
+<Snippet name="viewing/page-analytics" />
+
+<Example name="stage/events" />
+
+<Fw only="angular">
+
+`(pageChange)` is the output half of `[(page)]`: the new page's index. Every event below is a stream
+on the Stage component, such as `stage.pageChanged$`, for code that holds it through
+`viewChild(EpdfStage)` or `inject(EpdfStage)`.
+
+</Fw>
+
+| Event               | Fires when                                           | Carries                                   |
+| :------------------ | :--------------------------------------------------- | :---------------------------------------- |
+| `onPageChanged`     | Another page becomes the current one                 | `page`, `pageIndex`, `previousPageIndex`  |
+| `onZoomChanged`     | The zoom level changed                               | `level`, `previousLevel`, `mode`          |
+| `onCameraChanged`   | The view moved, on every frame of a scroll or zoom   | `camera`                                  |
+| `onMotionEnded`     | Scrolling, a fling or an animated move came to rest  | `camera`                                  |
+| `onViewportChanged` | The Stage itself changed size                        | `size`                                    |
+| `onSettingsChanged` | A setting changed, by you or by a responsive rule    | `settings`, `changed`                     |
+
+## Good to know
+
+### What "current page" means
+
+The current page is the one that fills most of the view, and with spreads, the first of the
+spread. It changes as you scroll, before the scroll comes to rest.
+
+### Every scroll frame
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+`onCameraChanged` fires on every frame of a scroll or zoom. Use it for things that must track the
+view exactly, and `onMotionEnded` for anything expensive.
+
+</Fw>
+
+<Fw only="angular">
+
+`stage.cameraChanged$` emits on every frame of a scroll or zoom. Use it for things that must track
+the view exactly, and `stage.motionEnded$` for anything expensive.
+
+</Fw>
+
+### Page coordinates
+
+Positions you pass to `reveal()` and `goToDestination()` are in points from the top-left of the page,
+like every position in EmbedPDF. A destination from another PDF tool uses the file's own numbers;
+turn it into this form with `pageDestinationOf(destination, page.pdfCropBox)` from the engine. See
+[Coordinates](../concepts/coordinates).
+
+### How pages stay sharp
+
+The Stage lays the pages out; the [render plugin](render) draws them, at every zoom, within the
+memory budget you set.

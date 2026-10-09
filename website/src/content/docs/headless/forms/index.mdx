@@ -1,0 +1,286 @@
+---
+title: Filling forms
+description: Let people fill in PDF forms, read and set values from your code, check required fields, and move form data in and out.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Filling forms
+
+Many PDFs are forms: text boxes, checkboxes, dropdowns, signature fields. Register `formPlugin()` and
+put `<FormLayer>` in each page, and people can fill them in:
+
+<Snippet name="forms/form-layer" />
+
+<Example name="form/basic" />
+
+Each field becomes a real HTML control, placed and styled like the field in the PDF: people type in text
+boxes, tick checkboxes, pick from lists, and move between fields with Tab. A value is saved into the
+document as it's entered, so it's there when the PDF is downloaded, and every PDF app shows it. The
+form layer paints the fields as the engine draws them, so while it's on the page, the render layer
+leaves them out of the page picture.
+
+## Read the form
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+`useFormState()` gives you every field, and <Word of="rerenders" /> when a value changes:
+
+</Fw>
+
+<Fw only="angular">
+
+`form.fields()` is every field, as a signal: your view updates when a value changes.
+
+</Fw>
+
+<Snippet name="forms/field-list" />
+
+Each field has its full `name` (such as `billing.name`), its `family` (`'text'`, `'checkbox'`,
+`'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`), its value, and a `ref`: its
+address for everything else. The fields and their values are the engine's; see
+[Forms](/docs/engine/forms#read-the-form) for every family's value.
+
+For one field, such as a total you show in your own UI, use `useFormValue()`:
+
+<Snippet name="forms/invoice-total" />
+
+`toFieldRef(name)` makes a ref from a field's full name, for when you know a field by name.
+
+<Example name="form/read" />
+
+## Fill in a field
+
+`setValue()` takes the same values a field reads:
+
+```ts
+await form.setValue(name.ref, { value: 'Ada Lovelace' }); // text
+await form.setValue(agree.ref, { checked: true }); // checkbox
+await form.setValue(plan.ref, { value: 'yearly' }); // radio group: the button's export value
+await form.setValue(country.ref, { value: 'NL' }); // dropdown: an option's value
+await form.setValue(toppings.ref, { selectedValues: ['cheese', 'olives'] }); // list
+```
+
+It runs the same checks and scripts as typing does, and resolves with `{ field, status }`: `status`
+is `'applied'`, `'unchanged'`, or `'rejected'` when the form's own validation refused the value.
+
+<Fw only="angular">
+
+Your own inputs can fill in fields too. `form.controlOf(ref)` gives you a field as an Angular
+`FormControl`: it holds the field's value, and fills in the field when the control changes, with
+the same checks and scripts:
+
+<Snippet name="forms/form-control" />
+
+</Fw>
+
+To fill many fields at once, such as from your backend, pass them by name:
+
+```ts
+await form.importValues({ 'billing.name': 'Ada Lovelace', 'billing.country': 'NL', agree: true });
+```
+
+<Example name="form/fill" />
+
+## Check required fields
+
+A form marks some fields as required. Check them before you submit or download:
+
+```ts
+const { valid, missing } = form.validate();
+
+const widget = !valid && form.getWidget(missing[0].widgets[0]);
+if (widget) stage.reveal(widget.page, { rect: widget.rect });
+```
+
+`missing` lists the required fields that are empty, in page order, so you can take the user to the
+first one. Only the fields the user may fill in count: another signer's are theirs to fill.
+
+<Example name="form/validate" />
+
+## Calculations, formatting and validation
+
+Many forms add up totals, format dates and check values with scripts. With JavaScript on in the
+[actions plugin](documents/actions), they run as people type, as in Acrobat:
+
+<Snippet name="forms/scripts" />
+
+When a script refuses a value, such as a date in the wrong format, the field keeps its old value and
+<Fw only={['react', 'vue', 'svelte']}>`onValidationRejected`</Fw><Fw only="angular">`validationRejected$`</Fw> tells you why, so you can show a message.
+
+## Reset the form
+
+```ts
+await form.reset(); // every field the user may fill in, back to its default
+await form.reset([name.ref, email.ref]); // some fields
+```
+
+## Move form data in and out
+
+For your own backend, plain values are simplest:
+
+```ts
+const values = form.exportValues(); // { 'billing.name': 'Ada Lovelace', agree: true, … }
+await form.importValues(values);
+```
+
+Fields are matched by their full name. A field the form doesn't have, or a value it can't take, is
+skipped; the rest still land.
+
+To copy the fields themselves to another document, with their boxes, values and scripts, take
+them out as a bundle and import it there. `FormTransfer` turns a bundle into one JSON text to
+store, and back:
+
+```ts
+const bundle = await form.export(); // every field; or form.export({ fields }), ({ pages })
+const text = FormTransfer.stringify(bundle);
+
+const { fields, dropped } = await otherForm.import(await FormTransfer.parse(text));
+```
+
+The import adds the fields as one change you can undo. A field whose name the form has already is
+left out and listed in `dropped`. By default each field keeps who created and filled it in, which
+needs `canRestoreAttribution()`; pass `{ attribution: 'stamp' }` to make them yours. See
+[Import & export](/docs/engine/forms/import-export).
+
+<Example name="form/data" />
+
+## Methods
+
+What `useForm()` gives you for reading and filling. The verbs that change the form itself are
+on [Building forms](forms/building#methods).
+
+| Method                     | What it does                                                                                                                                   |
+| :------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get(ref)`                 | One field, with its value, or `null` when the form has no such field. [Read the form](#read-the-form)                                           |
+| `getValue(ref)`            | One field's value, in the shape `setValue()` takes, or `null`. In a component, use `useFormValue(ref)`.                                        |
+| `getFieldForWidget(widget)` | The field a box belongs to, from the box's ref                                                                                                |
+| `getWidget(widget)`        | A box's row: its page, its place (`rect`), its look and its state, or `null` when no page shows it                                             |
+| `getWidgets(ref)`          | Every box a field shows in, as rows in the field's order: a radio group's buttons, or a field repeated on several pages                       |
+| `listWidgets(page)`        | Each field box on a page, with its place, its control, its value and whether it can be filled. For drawing the fields yourself.                |
+| `getWidgetAt(page, point)` | The field box under a point on a page, with its field, or `null`                                                                               |
+| `setValue(ref, value)`     | Fills in a field with `{ value }`, `{ checked }` or `{ selectedValues }`, running the form's checks and scripts. Resolves `{ field, status }`. [Fill in a field](#fill-in-a-field) |
+| `setValues(entries)`       | Fills in several fields in order, each `{ ref, value }`; one that fails doesn't stop the rest. Resolves `{ applied, skipped, failed }`.        |
+| `importValues(values)`     | Fills in fields by full name from a plain object. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
+| `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |
+| `export(selection?)`       | Whole fields with their boxes, values and scripts, as a bundle: every field, or `{ fields }` or `{ pages }`. [Move form data in and out](#move-form-data-in-and-out) |
+| `import(bundle, options?)` | Adds a bundle's fields, as one change. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
+| `reset(refs?)`             | Puts back each field's default, for every field the user may fill in or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
+| `validate()`               | Checks the required fields the user may fill in. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields) |
+| `activateWidget(widget)`   | Does what a click on a field box does, such as running a button's action                                                                       |
+| `getSnapshot()`            | Everything at once, as the engine's `list()` returns it: `fields`, `widgets`, `formKind`, `needsAppearances` and `calculationOrder`             |
+| `refresh()`                | Reads the whole form again, and <Fw only={['react', 'vue', 'svelte']}>`onResynced`</Fw><Fw only="angular">`resynced$`</Fw> fires. You rarely need it: the plugin follows every change, whoever made it.                      |
+| `canRead()`, `canFill(ref)` | Whether reading the form, and filling in a field, are allowed. [Permissions](#permissions)                                                   |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useFormSettings()`. [Settings](#settings) |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useFormState()" />
+
+| Field           | What it is                                                                                      | Read once                                            |
+| :-------------- | :---------------------------------------------------------------------------------------------- | :--------------------------------------------------- |
+| `fields`        | Every field, with its value                                                                     | `list()`, or `list({ family, page, name })` for some |
+| `status`        | Whether the form is read: `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`           | `getStatus()`                                        |
+| `formKind`      | What the document has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'`                   | `getFormKind()`                                      |
+| `selectedField` | In design mode, the field of the selected box, or `null`; see [Building forms](forms/building#change-a-fields-settings) | `getSelectedField()`          |
+
+For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field's value changes.
+
+## Settings
+
+Set them when you register the plugin, and change them while the app runs with
+`form.updateSettings({ … })`; `form.resetSettings()` goes back to what you registered, and
+`useFormSettings()` gives you the current settings.
+
+| Setting             | What it does                                                               | Default                      | From CSS                       |
+| :------------------ | :------------------------------------------------------------------------- | :--------------------------- | :----------------------------- |
+| `validation`        | Run the form's own checks (`'scripts'`), or accept every value (`'none'`)  | `'scripts'`                  | —                              |
+| `focus.color`       | The ring around the field being filled in                                  | the viewer's accent          | `--epdf-form-focus`            |
+| `fields.border`     | The edge of a field that has no border of its own                          | the viewer's accent at 55%   | `--epdf-form-field-border`     |
+| `fields.background` | Inside a field that has no background of its own                           | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
+| `fields.color`      | The check mark and text of a field that has no color of its own            | `'#1f2a44'`                    | `--epdf-form-field-color`      |
+
+Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too.
+
+The colors are what the viewer draws around fields; a field's own colors are saved in the PDF (see
+[Building forms](forms/building)). A CSS variable wins over the setting: see
+[Colors & theming](ui/theming).
+
+<Example name="form/colors" />
+
+## Events
+
+<Snippet name="forms/autosave" />
+
+| Event                  | Fires when                                                                | Carries           |
+| :--------------------- | :------------------------------------------------------------------------ | :---------------- |
+| `onValueChanged`       | A field's value changed                                                   | `field`, `origin` |
+| `onValidationRejected` | The form's validation refused a value                                     | `field`, `issues` |
+| `onResynced`           | The whole form was read, as when it opens, after `refresh()` or a repair  | `snapshot`        |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+
+Fields that are added, changed or removed have their own events; see
+[Building forms](forms/building#events).
+
+## Permissions
+
+| Permission       | What it allows   | Check               |
+| :--------------- | :--------------- | :------------------ |
+| `doc.forms.read` | Reading the form | `form.canRead()`    |
+| `doc.forms.fill` | Filling it in    | `form.canFill(ref)` |
+
+Without it, the fields show their values but can't be changed. A user with a `fields:fill`
+permission for one group fills in that group's fields only: `form.canFill(ref)` answers per field,
+the other fields can't be changed and Tab skips them, `validate()` leaves them out, and `reset()`
+leaves them as they are. See [Signers and groups](/docs/engine/forms/groups).
+
+## Good to know
+
+### Forms and annotations
+
+A field's widgets are the form's: the annotation plugin never lists them. With the
+[annotation plugin](annotations) registered, the `<FormLayer>` and the annotation layer share the page: fields stay fillable with the
+`pointer` tool, and become movable boxes in [design mode](forms/building).
+
+### Keyboard
+
+Tab moves to the next field in the page's order. In a text box, Enter confirms and Escape puts back
+the value it had.
+
+### Collecting responses
+
+<Engine local>
+
+On the local engine, the values live in the document in this tab until it's downloaded.
+
+<CloudPdfCallout
+  title="Collect form responses on your server"
+  href="https://www.cloudpdf.com/docs/headless/forms"
+  cta="Collect forms with CloudPDF"
+>
+
+With CloudPDF, each value is stored on your server as it's entered, so a half-filled form survives a
+closed tab, and your backend reads the answers without asking the user to download or upload a
+file.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+Each value is stored on your server as it's entered, so a half-filled form survives a closed tab.
+
+</Engine>
+
+### XFA forms
+
+Some PDFs also carry a form in the older XFA format. The viewer works with the document's regular
+fields and never runs XFA; see [Forms](/docs/engine/forms#xfa-forms).
+
+### Signed documents
+
+A signature can lock the whole form, or some fields. Locked fields show their values and can't be
+changed; see [Signatures](forms/signatures).

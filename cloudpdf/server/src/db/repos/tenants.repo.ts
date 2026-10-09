@@ -44,8 +44,8 @@ export class TenantsRepo {
   }
 
   /**
-   * Insert if absent. Returns the row. Race-safe via ON CONFLICT DO
-   * NOTHING (both dialects).
+   * Insert if absent. Returns the row. Race-safe via on CONFLICT do
+   * nothing (both dialects).
    */
   async ensure(input: {
     id: string;
@@ -95,7 +95,7 @@ export class TenantsRepo {
       .orderBy('id', 'desc');
     if (opts.before) {
       const { createdAt, id } = opts.before;
-      // OR-spelled keyset comparison, planned against idx_tenants_created_id.
+      // Or-spelled keyset comparison, planned against idx_tenants_created_id.
       q = q.where((eb) =>
         eb.or([
           eb('created_at', '<', createdAt),
@@ -141,16 +141,6 @@ export class TenantsRepo {
     await this.db.deleteFrom('share_grants').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('tenant_usage_counter').where('tenant_id', '=', tenantId).execute();
 
-    await this.db
-      .deleteFrom('weak_annotation_session_pages')
-      .where('session_id', 'in', (eb) =>
-        eb.selectFrom('weak_annotation_sessions').select('id').where('tenant_id', '=', tenantId),
-      )
-      .execute();
-    await this.db
-      .deleteFrom('weak_annotation_sessions')
-      .where('tenant_id', '=', tenantId)
-      .execute();
     await this.db
       .deleteFrom('layer_pages')
       .where('layer_id', 'in', (eb) =>

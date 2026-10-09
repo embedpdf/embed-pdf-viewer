@@ -1,106 +1,128 @@
 /**
- * The headless <Toolbar> — where measurement meets the pure solver.
- *
- * The schema is structure-only; what fits is OBSERVED, not configured:
+ * The headless <Toolbar>: it measures what fits and makes room, and you draw
+ * every part.
  *
  *   1. a hidden measurement layer renders every unit in every variant (plus
- *      collapsed group forms and the overflow trigger), each wrapped in a
- *      ResizeObserver — so locale flips, font loads, browser zoom, and
- *      embedder CSS all re-measure themselves with zero handling code;
- *   2. ui-core's solve() assigns each unit a variant / collapsed / overflow —
- *      pure, deterministic, tested in isolation;
- *   3. the live row renders the assignment; the overflow menu is DERIVED
- *      (projectOverflow) — the complement of the visible set, never authored.
+ *      folded groups and the "More" button), each watched by
+ *      `@embedpdf/web`'s `observeWidth`, so a new language, a font loading,
+ *      browser zoom and your CSS all re-measure on their own; the widths
+ *      become fit metrics (`createToolbarWidths`);
+ *   2. core-ui's `solve()` gives each unit a variant, a folded group or the
+ *      "More" menu, and `layoutToolbar` turns that fit into the parts to
+ *      draw: pure and tested on their own;
+ *   3. the live row renders that; the "More" menu is derived (`projectOverflow`)
+ *      from what didn't fit, never written by hand.
  *
- * Rendering is render-prop driven with functional defaults: the app owns the
- * pixels, this component owns the physics.
+ * Every part is a render prop with a plain default: the app owns the pixels,
+ * this component owns the fitting. The defaults' colors come from the
+ * `--epdf-toolbar-*` CSS variables only.
  */
 
-// One-line-per-feature: registration travels with the UI.
-export * from '@embedpdf/core-ui';
+// The toolbar's vocabulary: the schema a bar is written in, and the helpers that change one.
+export {
+  DEFAULT_IMPORTANCE,
+  PINNED,
+  addItem,
+  chromeHelpers,
+  custom,
+  defineChrome,
+  group,
+  item,
+  removeItems,
+  replaceItem,
+  validateChrome,
+} from '@embedpdf/core-ui';
+export type {
+  AddItemSpec,
+  BarChild,
+  BarGroup,
+  BarItem,
+  BarSchema,
+  BarSections,
+  ChromeHelpers,
+  ChromeSchema,
+  CustomItem,
+  FrameSchema,
+  Importance,
+  MenuSchema,
+  MenuSection,
+  OverflowRow,
+  OverflowSection,
+  Variant,
+} from '@embedpdf/core-ui';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { filterBar, normalizeBar, projectOverflow, projectStrip, solve } from '@embedpdf/core-ui';
+import {
+  groupMenuView,
+  layoutToolbar,
+  normalizeBar,
+  sameStripGroups,
+  stripGroupsOf,
+} from '@embedpdf/core-ui';
 import type {
   BarSchema,
-  FitMetrics,
-  NormalizedGroup,
-  NormalizedSection,
-  NormalizedUnit,
-  OverflowSection,
+  CollapsedGroupView as CollapsedGroupViewOf,
+  CustomSlotCtx,
+  GroupDisclosureView as GroupDisclosureViewOf,
+  LiveSection,
+  OverflowMenuView as OverflowMenuViewOf,
+  StripView as StripViewOf,
+  StripViewGroup as StripViewGroupOf,
+  ToolbarPart,
 } from '@embedpdf/core-ui';
-import { resolvedCommandsEqual } from '@embedpdf/plugin-commands/contract';
-// The overflow projection asks a host fact (the menu target), so the host lens is bound here.
+import { resolvedCommandsEqual, unregisteredCommand } from '@embedpdf/plugin-commands/contract';
+// The "More" menu asks which menu a command opens, a host fact, so the host lens is bound here.
 import { CommandsToken } from '@embedpdf/plugin-commands/contract/host';
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
+import {
+  createToolbarWidths,
+  observeContentWidth,
+  observeWidth,
+  paintDefault,
+  toolbarMeasureKey,
+} from '@embedpdf/web';
 import { useCapability, useDocumentId, useKernel, useKernelValue } from './runtime';
 
 // ── public render-prop contracts ─────────────────────────────────────────────
 
-export interface CollapsedGroupView {
-  readonly id: string;
-  readonly labelKey?: string;
-  readonly collapse: 'menu' | 'select';
-  readonly role: 'buttons' | 'tabs';
-  /** The group's commands (custom items via their terminal), resolved live. */
-  readonly commands: readonly ResolvedCommand[];
-  execute(id: string): void;
-}
+/** A group folded into one control: its commands, resolved live, and how to run one. */
+export type CollapsedGroupView = CollapsedGroupViewOf<ResolvedCommand>;
 
-export interface OverflowMenuView {
-  readonly sections: readonly OverflowSection[];
-  readonly isOpen: boolean;
-  close(): void;
-  resolve(id: string): ResolvedCommand | null;
-  execute(id: string): void;
-}
+/** The "More" menu: what didn't fit, in sections, and the calls a menu needs. */
+export type OverflowMenuView = OverflowMenuViewOf<ResolvedCommand>;
 
 /**
- * A shed group's disclosure — the derived trigger rendered INSIDE the group
- * (v2's overflow-tabs-button). `commands` is what sits behind the trigger:
- * the shed children in bar order, resolved live. In the measurement layer the
- * trigger is measured with the FULL group as content, so a count-dependent
- * trigger (e.g. a "+3" badge) is budgeted at its widest form.
+ * A shed group's disclosure — the derived trigger rendered inside the group.
+ * `commands` is what sits behind the trigger: the shed children in bar order,
+ * resolved live. In the measurement layer the trigger is measured with the
+ * full group as content, so a count-dependent trigger (e.g. a "+3" badge) is
+ * budgeted at its widest form.
  */
-export interface GroupDisclosureView {
-  readonly id: string;
-  readonly labelKey?: string;
-  readonly role: 'buttons' | 'tabs';
-  readonly commands: readonly ResolvedCommand[];
-  execute(id: string): void;
-}
+export type GroupDisclosureView = GroupDisclosureViewOf<ResolvedCommand>;
+
+/** Passed to custom-slot renderers alongside the variant. */
+export type { CustomSlotCtx };
 
 // ── the strip view — a bar projected through the registry, live ──────────────
 
-export interface StripViewGroup {
-  readonly id: string;
-  readonly labelKey?: string;
-  /** Visible commands, bar order. Groups are separator boundaries. */
-  readonly commands: readonly ResolvedCommand[];
-}
+/** A group of a strip: its visible commands, bar order. Groups are separator boundaries. */
+export type StripViewGroup = StripViewGroupOf<ResolvedCommand>;
 
 /** A contextual strip, resolved: only visible commands, only non-empty groups. */
-export interface StripView {
-  readonly groups: readonly StripViewGroup[];
-  execute(id: string): void;
-}
+export type StripView = StripViewOf<ResolvedCommand>;
 
-const stripGroupsEqual = (a: readonly StripViewGroup[], b: readonly StripViewGroup[]): boolean =>
-  a.length === b.length &&
-  a.every(
-    (g, i) =>
-      g.id === b[i].id &&
-      g.commands.length === b[i].commands.length &&
-      g.commands.every((c, j) => resolvedCommandsEqual(c, b[i].commands[j])),
-  );
+const stripGroupsEqual = (
+  left: readonly StripViewGroup[],
+  right: readonly StripViewGroup[],
+): boolean => sameStripGroups(left, right, resolvedCommandsEqual);
 
 const NO_STRIP_GROUPS: readonly StripViewGroup[] = [];
 
 /**
  * The live projection of a bar through the command registry — <Toolbar>'s
  * un-measured sibling, for contextual strips (ChromeSchema.strips). The schema
- * declares what COULD appear; each command's `visible` derivation decides what
- * DOES; null means nothing currently applies, so `if (!view) return null` is
+ * declares what could appear; each command's `visible` derivation decides what
+ * does; null means nothing currently applies, so `if (!view) return null` is
  * the caller's entire show/hide logic. `execute` is pre-bound to this
  * subtree's document. Reads are value-equal (resolvedCommandsEqual), so
  * consumers re-render on real change, not on every store action.
@@ -109,20 +131,13 @@ export function useStripView(bar: BarSchema | undefined): StripView | null {
   const commands = useCapability(CommandsToken);
   const documentId = useDocumentId();
   const normalized = useMemo(() => (bar ? normalizeBar(bar) : null), [bar]);
-  const groups = useKernelValue(() => {
-    if (!normalized) return NO_STRIP_GROUPS;
-    const resolved = new Map<string, ResolvedCommand>();
-    const visible = (id: string) => {
-      const cmd = commands.resolveCommand(id, documentId ?? undefined);
-      if (cmd) resolved.set(id, cmd);
-      return cmd?.visible === true;
-    };
-    return projectStrip(normalized, visible).map((g) => ({
-      id: g.id,
-      labelKey: g.labelKey,
-      commands: g.commands.map((id) => resolved.get(id)!),
-    }));
-  }, stripGroupsEqual);
+  const groups = useKernelValue(
+    () =>
+      normalized
+        ? stripGroupsOf(normalized, (id) => commands.resolveCommand(id, documentId ?? undefined))
+        : NO_STRIP_GROUPS,
+    stripGroupsEqual,
+  );
   return useMemo(
     () =>
       groups.length === 0
@@ -140,47 +155,46 @@ export interface ToolbarProps {
   bar: BarSchema;
   /** Px between adjacent items (CSS flex gap; the solver budgets the same number). */
   gap?: number;
-  /** Width of the separator ELEMENT your renderSeparator draws. Default 1. */
+  /** Width of the separator element your renderSeparator draws. Default 1. */
   separatorWidth?: number;
   className?: string;
   style?: React.CSSProperties;
-  /** A command button at a given variant. Default: a plain <button>. */
+  /** A command button at a given variant. Default: a plain <button> with the command's label. */
   renderCommand?: (cmd: ResolvedCommand, variant: string, run: () => void) => React.ReactNode;
   /**
-   * Renderers for custom slots, per named variant. A custom unit with NO
-   * entry here renders as a native `<slot name={slot}>` socket with its
-   * terminal command as fallback content: in light DOM that displays the
-   * fallback (today's behavior); inside a shadow root the host's light-DOM
-   * children project into it — the children-as-slots contract. Sockets are
-   * measured LIVE (they can't be duplicated into the measurement layer:
-   * only the first same-named slot in tree order gets the projected nodes).
+   * Your own items, one renderer per name (from `custom(name, command)`),
+   * called with the variant the fit chose. A renderer that returns
+   * `undefined` draws the item's command instead (`renderCommand` with the
+   * terminal command, variant `'icon'`). An item with no entry here renders
+   * as a native `<slot name={slot}>` socket with that command as fallback
+   * content: in light DOM that displays the fallback; inside a shadow root
+   * the host's light-DOM children project into it — the children-as-slots
+   * contract. Sockets are measured live (they can't be duplicated into the
+   * measurement layer: only the first same-named slot in tree order gets the
+   * projected nodes). `ctx.measure` is a new function on every render;
+   * capture it in a ref to use it in an effect.
    */
   renderCustom?: Record<string, (variant: string, ctx: CustomSlotCtx) => React.ReactNode>;
-  /** A group in its collapsed form. Default: <select> for 'select', menu button for 'menu'. */
+  /**
+   * A group in its collapsed form. Default: <select> for 'select', menu button for 'menu'; a
+   * renderer that returns `undefined` leaves the group to the default.
+   */
   renderCollapsed?: (view: CollapsedGroupView) => React.ReactNode;
   /** A shed group's disclosure trigger (+ its popover — the renderer owns the
-   *  open state). Default: a chevron button opening a radio menu. */
+   *  open state). Default: a chevron button opening a radio menu; `undefined`
+   *  leaves it to the default too. */
   renderGroupTrigger?: (view: GroupDisclosureView) => React.ReactNode;
   /** Derived separator between adjacent visible groups. Default: a 1px line. */
   renderSeparator?: () => React.ReactNode;
+  /** The "More" button. Default: a plain ⋯ button. */
   renderOverflowTrigger?: (isOpen: boolean, toggle: () => void) => React.ReactNode;
   /** The derived overflow menu. Default: a minimal popover. */
   renderOverflowMenu?: (view: OverflowMenuView) => React.ReactNode;
 }
 
-/** Passed to custom-slot renderers alongside the variant. */
-export interface CustomSlotCtx {
-  /** 'live' = the visible row; 'measure' = the hidden measurement layer. */
-  layer: 'live' | 'measure';
-  /** Report this unit's width to the solver — for content the measurement
-   *  layer can't duplicate. Identity is NOT stable across renders; capture
-   *  via ref if used in an effect. */
-  measure: (width: number) => void;
-}
-
 // ── measurement ───────────────────────────────────────────────────────────────
 
-/** Report this node's border-box width under `k`, live, via ResizeObserver. */
+/** Report this node's border-box width under `k`, live. */
 function Measured({
   k,
   onWidth,
@@ -191,15 +205,10 @@ function Measured({
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const report = () => onWidth(k, el.getBoundingClientRect().width);
-    report();
-    const observer = new ResizeObserver(report);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [k, onWidth]);
+  useLayoutEffect(
+    () => (ref.current ? observeWidth(ref.current, (width) => onWidth(k, width)) : undefined),
+    [k, onWidth],
+  );
   return (
     <span ref={ref} style={{ display: 'inline-flex', flexShrink: 0 }}>
       {children}
@@ -211,7 +220,7 @@ function Measured({
  * The socket for an unregistered custom unit: a real `<slot>` element. Inside
  * the <embedpdf-viewer> shadow root the browser projects same-named light-DOM
  * children into it; anywhere else it just displays its fallback (the terminal
- * command). Measured live — the projected content lives in the HOST's world,
+ * command). Measured live — the projected content lives in the host's world,
  * so its width can only be observed where it actually renders.
  */
 function NativeSlotSocket({
@@ -226,17 +235,12 @@ function NativeSlotSocket({
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLSlotElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const report = () => onWidth(k, el.getBoundingClientRect().width);
-    report();
-    // Projection changes (a child slotted in/out) resize the socket's
-    // inline-flex box, so one observer covers both content and assignment.
-    const observer = new ResizeObserver(report);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [k, onWidth]);
+  // Projection changes (a child slotted in/out) resize the socket's
+  // inline-flex box, so one observer covers both content and assignment.
+  useLayoutEffect(
+    () => (ref.current ? observeWidth(ref.current, (width) => onWidth(k, width)) : undefined),
+    [k, onWidth],
+  );
   return (
     <slot
       ref={ref}
@@ -260,11 +264,15 @@ const measureLayerStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-// ── defaults (functional, unstyled-ish; products replace them) ───────────────
+// ── defaults: plain, and meant to be replaced ────────────────────────────────
+
+const SURFACE = paintDefault('toolbar-surface');
+const BORDER = paintDefault('toolbar-border');
+const ACTIVE = paintDefault('toolbar-active');
 
 const defaultRenderCommand = (
   cmd: ResolvedCommand,
-  variant: string,
+  _variant: string,
   run: () => void,
 ): React.ReactNode => (
   <button
@@ -280,15 +288,17 @@ const defaultRenderCommand = (
       gap: 4,
       padding: '4px 8px',
       whiteSpace: 'nowrap',
-      background: cmd.active ? 'rgba(0,0,0,0.12)' : 'transparent',
-      border: '1px solid rgba(0,0,0,0.15)',
+      color: 'inherit',
+      font: 'inherit',
+      background: cmd.active ? ACTIVE : 'transparent',
+      border: `1px solid ${BORDER}`,
       borderRadius: 4,
       cursor: cmd.enabled ? 'pointer' : 'default',
       opacity: cmd.enabled ? 1 : 0.4,
     }}
   >
-    {variant === 'label' ? cmd.label : (cmd.icon ?? cmd.label)}
-    {variant === 'icon+label' ? ` ${cmd.label}` : null}
+    {/* Icons are the app's: the plain button shows the label in every variant. */}
+    {cmd.label}
   </button>
 );
 
@@ -307,9 +317,11 @@ const defaultRenderOverflowTrigger = (isOpen: boolean, toggle: () => void): Reac
       display: 'inline-flex',
       alignItems: 'center',
       padding: '4px 8px',
-      border: '1px solid rgba(0,0,0,0.15)',
+      color: 'inherit',
+      font: 'inherit',
+      border: `1px solid ${BORDER}`,
       borderRadius: 4,
-      background: isOpen ? 'rgba(0,0,0,0.12)' : 'transparent',
+      background: isOpen ? ACTIVE : 'transparent',
       cursor: 'pointer',
     }}
   >
@@ -331,15 +343,15 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
           zIndex: 41,
           minWidth: 200,
           padding: 4,
-          background: 'white',
-          border: '1px solid rgba(0,0,0,0.15)',
+          background: SURFACE,
+          border: `1px solid ${BORDER}`,
           borderRadius: 6,
           boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
         }}
       >
         {view.sections.map((section, i) => (
           <React.Fragment key={i}>
-            {i > 0 && <div style={{ height: 1, background: 'rgba(0,0,0,0.1)', margin: '4px 0' }} />}
+            {i > 0 && <div style={{ height: 1, background: BORDER, margin: '4px 0' }} />}
             {section.rows.map((row) => {
               const cmd = view.resolve(row.command);
               if (!cmd) return null;
@@ -363,6 +375,8 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
                     gap: 16,
                     padding: '6px 8px',
                     border: 'none',
+                    color: 'inherit',
+                    font: 'inherit',
                     background: 'transparent',
                     cursor: cmd.enabled ? 'pointer' : 'default',
                     opacity: cmd.enabled ? 1 : 0.4,
@@ -386,16 +400,22 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
 
 function DefaultCollapsed({ view }: { view: CollapsedGroupView }) {
   if (view.collapse === 'select') {
-    const active = view.commands.find((c) => c.active);
+    const active = view.commands.find((command) => command.active);
     return (
       <select
         value={active?.id ?? ''}
-        onChange={(e) => view.execute(e.target.value)}
-        style={{ padding: '4px 6px', borderRadius: 4 }}
+        onChange={(event) => view.execute(event.target.value)}
+        style={{
+          padding: '4px 6px',
+          font: 'inherit',
+          borderRadius: 4,
+          border: `1px solid ${BORDER}`,
+          background: SURFACE,
+        }}
       >
-        {view.commands.map((c) => (
-          <option key={c.id} value={c.id} disabled={!c.enabled}>
-            {c.label}
+        {view.commands.map((command) => (
+          <option key={command.id} value={command.id} disabled={!command.enabled}>
+            {command.label}
           </option>
         ))}
       </select>
@@ -407,46 +427,24 @@ function DefaultCollapsed({ view }: { view: CollapsedGroupView }) {
 
 function CollapsedMenuButton({ view }: { view: CollapsedGroupView }) {
   const [isOpen, setOpen] = useState(false);
-  const sections: OverflowSection[] = [
-    {
-      labelKey: view.labelKey,
-      role: view.role === 'tabs' ? 'radio' : undefined,
-      rows: view.commands.map((c) => ({ type: 'command' as const, command: c.id })),
-    },
-  ];
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
-      {defaultRenderOverflowTrigger(isOpen, () => setOpen((o) => !o))}
-      <DefaultOverflowMenu
-        view={{
-          sections,
-          isOpen,
-          close: () => setOpen(false),
-          resolve: (id) => view.commands.find((c) => c.id === id) ?? null,
-          execute: view.execute,
-        }}
-      />
+      {defaultRenderOverflowTrigger(isOpen, () => setOpen((previous) => !previous))}
+      <DefaultOverflowMenu view={groupMenuView(view, isOpen, () => setOpen(false))} />
     </span>
   );
 }
 
 /** Default shed-group disclosure: a chevron opening a radio menu of the
- *  hidden children — v2's overflow-tabs-button, derived. */
+ *  hidden children. */
 function DefaultGroupTrigger({ view }: { view: GroupDisclosureView }) {
   const [isOpen, setOpen] = useState(false);
-  const someActive = view.commands.some((c) => c.active);
-  const sections: OverflowSection[] = [
-    {
-      labelKey: view.labelKey,
-      role: view.role === 'tabs' ? 'radio' : undefined,
-      rows: view.commands.map((c) => ({ type: 'command' as const, command: c.id })),
-    },
-  ];
+  const someActive = view.commands.some((command) => command.active);
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((previous) => !previous)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         title="More"
@@ -454,34 +452,23 @@ function DefaultGroupTrigger({ view }: { view: GroupDisclosureView }) {
           display: 'inline-flex',
           alignItems: 'center',
           padding: '4px 6px',
-          border: '1px solid rgba(0,0,0,0.15)',
+          color: 'inherit',
+          font: 'inherit',
+          border: `1px solid ${BORDER}`,
           borderRadius: 4,
-          // hint that the active item is hiding in here
-          background: isOpen || someActive ? 'rgba(0,0,0,0.12)' : 'transparent',
+          // A hint that the active item is in here.
+          background: isOpen || someActive ? ACTIVE : 'transparent',
           cursor: 'pointer',
         }}
       >
         ▾
       </button>
-      <DefaultOverflowMenu
-        view={{
-          sections,
-          isOpen,
-          close: () => setOpen(false),
-          resolve: (id) => view.commands.find((c) => c.id === id) ?? null,
-          execute: view.execute,
-        }}
-      />
+      <DefaultOverflowMenu view={groupMenuView(view, isOpen, () => setOpen(false))} />
     </span>
   );
 }
 
 // ── the toolbar ───────────────────────────────────────────────────────────────
-
-const unitKey = (u: NormalizedUnit, variant: string) => `u:${u.key}@${variant}`;
-const groupKey = (id: string) => `g:${id}`;
-const groupTriggerKey = (id: string) => `gt:${id}`;
-const TRIGGER_KEY = 't:';
 
 export function Toolbar({
   bar,
@@ -510,196 +497,113 @@ export function Toolbar({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[entries.length - 1]?.contentRect.width;
-      if (w !== undefined) setContainerWidth((prev) => (Math.abs(prev - w) > 0.5 ? w : prev));
-    });
-    observer.observe(el);
-    setContainerWidth(el.clientWidth);
-    return () => observer.disconnect();
-  }, []);
+  useLayoutEffect(
+    () =>
+      containerRef.current
+        ? observeContentWidth(containerRef.current, setContainerWidth)
+        : undefined,
+    [],
+  );
 
-  const widthsRef = useRef(new Map<string, number>());
+  // A width that changed renders (and solves) again.
+  const [widths] = useState(createToolbarWidths);
   const [, bumpMeasureVersion] = useReducer((x: number) => x + 1, 0);
   const onWidth = useMemo(
     () => (key: string, width: number) => {
-      const prev = widthsRef.current.get(key);
-      if (prev !== undefined && Math.abs(prev - width) <= 0.5) return;
-      widthsRef.current.set(key, width);
-      bumpMeasureVersion();
+      if (widths.report(key, width)) bumpMeasureVersion();
     },
-    [],
+    [widths],
   );
 
   const resolveCmd = (id: string): ResolvedCommand | null =>
     commands.resolveCommand(id, documentId ?? undefined);
   const executeCmd = (id: string) =>
     void commands.execute(id, { documentId: documentId ?? undefined });
-  const commandOf = (u: NormalizedUnit) => (u.kind === 'command' ? u.command : u.terminal);
 
-  // Structure → visible structure → fit. Cheap enough to run per render; all
-  // heavy lifting is O(items), and items is ~dozens.
+  // Structure → visible structure → fit → parts (core-ui's `layoutToolbar`).
+  // Cheap enough to run per render: O(items), and items is ~dozens.
   const normalized = useMemo(() => normalizeBar(bar), [bar]);
-  // `=== true` and not `!== false`: an UNREGISTERED command resolves to null,
-  // and a unit the registry can't name must not render or consume budget —
-  // the schema validator's dev warning is the feedback channel, not raw text
-  // in the toolbar.
-  const visibleBar = filterBar(normalized, (u) => resolveCmd(commandOf(u))?.visible === true);
-  const metrics: FitMetrics = {
-    unit: (key, variant) => widthsRef.current.get(`u:${key}@${variant}`),
-    groupCollapsed: (id) => widthsRef.current.get(groupKey(id)),
-    groupTrigger: (id) => widthsRef.current.get(groupTriggerKey(id)),
-    overflowTrigger: widthsRef.current.get(TRIGGER_KEY) ?? 32,
-    gap,
-    // The separator is one extra flex child: its element width plus one flex gap.
-    separator: separatorWidth + gap,
-  };
-  const fit = solve(visibleBar, metrics, containerWidth);
-  const overflowSections = projectOverflow(visibleBar, fit, (id) => commands.getMenuTarget(id));
+  const layout = layoutToolbar({
+    bar: normalized,
+    resolve: resolveCmd,
+    unregistered: unregisteredCommand,
+    execute: executeCmd,
+    menuTarget: (id) => commands.getMenuTarget(id),
+    metrics: widths.metrics(gap, separatorWidth),
+    measureKey: toolbarMeasureKey,
+    containerWidth,
+  });
 
   const [overflowOpen, setOverflowOpen] = useState(false);
   useEffect(() => {
-    if (!fit.hasOverflow) setOverflowOpen(false);
-  }, [fit.hasOverflow]);
+    if (!layout.hasOverflow) setOverflowOpen(false);
+  }, [layout.hasOverflow]);
 
-  /** External = custom unit with no registered renderer → native socket,
-   *  live-measured (it must NOT appear in the measurement layer: only the
+  /** External = custom part with no registered renderer → native socket,
+   *  live-measured (it must not appear in the measurement layer: only the
    *  first same-named <slot> in tree order receives the projected nodes). */
-  const isExternalSlot = (u: NormalizedUnit): boolean =>
-    u.kind === 'custom' && !renderCustom?.[u.slot];
+  const isExternalSlot = (part: ToolbarPart<ResolvedCommand>): boolean =>
+    part.kind === 'custom' && !renderCustom?.[part.name];
 
-  // ── unit / group rendering (shared by live row and measure layer) ──────────
-  const renderUnitAt = (
-    u: NormalizedUnit,
-    variant: string,
+  // ── part rendering (shared by live row and measure layer) ──────────────────
+  // A render prop that returns `undefined` leaves the part to its default.
+  const renderPart = (
+    part: ToolbarPart<ResolvedCommand>,
     layer: 'live' | 'measure',
   ): React.ReactNode => {
-    if (u.kind === 'custom') {
-      const registered = renderCustom?.[u.slot];
-      if (registered) {
-        const custom = registered(variant, {
-          layer,
-          measure: (width) => onWidth(unitKey(u, variant), width),
-        });
-        if (custom !== undefined) return custom;
-      } else if (layer === 'live') {
-        const cmd = resolveCmd(u.terminal);
+    switch (part.kind) {
+      case 'command':
+        return renderCommand(part.command, part.variant, part.run);
+      case 'custom': {
+        // The item's command, as a button: what it draws when nothing else does.
+        const terminal = () =>
+          part.terminal ? renderCommand(part.terminal, 'icon', part.runTerminal) : null;
+        const registered = renderCustom?.[part.name];
+        if (registered) {
+          const custom = registered(part.variant, {
+            layer,
+            measure: (width) => onWidth(part.measureKey, width),
+          });
+          return custom === undefined ? terminal() : custom;
+        }
+        if (layer === 'measure') return null;
         return (
-          <NativeSlotSocket name={u.slot} k={unitKey(u, variant)} onWidth={onWidth}>
-            {cmd ? renderCommand(cmd, 'icon', () => executeCmd(u.terminal)) : null}
+          <NativeSlotSocket name={part.name} k={part.measureKey} onWidth={onWidth}>
+            {terminal()}
           </NativeSlotSocket>
         );
-      } else {
-        return null;
       }
-      const cmd = resolveCmd(u.terminal);
-      return cmd ? renderCommand(cmd, 'icon', () => executeCmd(u.terminal)) : null;
+      case 'collapsed': {
+        const drawn = renderCollapsed?.(part.view);
+        return drawn === undefined ? <DefaultCollapsed view={part.view} /> : drawn;
+      }
+      case 'disclosure': {
+        const drawn = renderGroupTrigger?.(part.view);
+        return drawn === undefined ? <DefaultGroupTrigger view={part.view} /> : drawn;
+      }
     }
-    const cmd = resolveCmd(u.command);
-    if (!cmd)
-      return renderCommand(
-        {
-          id: u.command,
-          label: u.command,
-          shortcuts: [],
-          enabled: false,
-          active: false,
-          visible: true,
-          categories: [],
-        },
-        variant,
-        () => {},
-      );
-    return renderCommand(cmd, variant, () => executeCmd(u.command));
   };
 
-  const collapsedView = (g: NormalizedGroup): CollapsedGroupView => ({
-    id: g.id,
-    labelKey: g.labelKey,
-    collapse: g.collapse ?? 'menu',
-    role: g.role,
-    commands: g.units
-      .map((u) => resolveCmd(commandOf(u)))
-      .filter((c): c is ResolvedCommand => c !== null && c.visible),
-    execute: executeCmd,
-  });
-
-  const renderCollapsedGroup = (g: NormalizedGroup): React.ReactNode =>
-    renderCollapsed ? (
-      renderCollapsed(collapsedView(g))
-    ) : (
-      <DefaultCollapsed view={collapsedView(g)} />
-    );
-
-  /** The disclosure view: shed children for the live trigger; the WHOLE group
-   *  for the measured trigger, so width is budgeted at its fullest content. */
-  const disclosureView = (g: NormalizedGroup, allChildren: boolean): GroupDisclosureView => ({
-    id: g.id,
-    labelKey: g.labelKey,
-    role: g.role,
-    commands: g.units
-      .filter((u) => allChildren || fit.units.get(u.key)?.kind === 'shed')
-      .map((u) => resolveCmd(commandOf(u)))
-      .filter((c): c is ResolvedCommand => c !== null && c.visible),
-    execute: executeCmd,
-  });
-
-  const renderDisclosure = (g: NormalizedGroup, allChildren: boolean): React.ReactNode =>
-    renderGroupTrigger ? (
-      renderGroupTrigger(disclosureView(g, allChildren))
-    ) : (
-      <DefaultGroupTrigger view={disclosureView(g, allChildren)} />
-    );
-
-  const renderLiveGroup = (g: NormalizedGroup): React.ReactNode[] => {
-    const assignment = fit.groups.get(g.id);
-    if (!assignment || assignment.overflowed) return [];
-    if (assignment.collapsed)
-      return [<React.Fragment key={g.id}>{renderCollapsedGroup(g)}</React.Fragment>];
-    const nodes: React.ReactNode[] = [];
-    for (const u of g.units) {
-      const a = fit.units.get(u.key);
-      if (a?.kind !== 'variant') continue;
-      nodes.push(<React.Fragment key={u.key}>{renderUnitAt(u, a.variant, 'live')}</React.Fragment>);
-    }
-    // The derived group-local disclosure (v2's overflow-tabs-button).
-    if (assignment.shedCount > 0) {
-      nodes.push(
-        <React.Fragment key={`${g.id}::trigger`}>{renderDisclosure(g, false)}</React.Fragment>,
-      );
-    }
-    return nodes.length ? [<React.Fragment key={g.id}>{nodes}</React.Fragment>] : [];
-  };
-
-  const renderLiveSection = (section: NormalizedSection | undefined): React.ReactNode => {
-    if (!section) return null;
-    const rendered = section.groups
-      .map((g) => ({ id: g.id, nodes: renderLiveGroup(g) }))
-      .filter((g) => g.nodes.length > 0);
-    return rendered.map((g, i) => (
-      <React.Fragment key={g.id}>
+  const renderLiveSection = (section: LiveSection<ResolvedCommand>): React.ReactNode =>
+    section.groups.map((group, i) => (
+      <React.Fragment key={group.id}>
         {i > 0 && renderSeparator()}
-        {g.nodes}
+        {group.parts.map((part) => (
+          <React.Fragment key={part.key}>{renderPart(part, 'live')}</React.Fragment>
+        ))}
       </React.Fragment>
     ));
-  };
-
-  const sectionByName = (name: 'start' | 'center' | 'end') =>
-    visibleBar.sections.find((s) => s.name === name);
 
   /**
-   * Segment layout — v2's spacer model, natively. The center segment carries
-   * auto margins: it BALANCES in the leftover space (true center when the
-   * flanks are symmetric) and yields when they aren't, collapsing to zero
-   * before anything can overlap. The container itself has NO gap — segments
+   * Segment layout. The center segment carries auto margins: it balances in
+   * the leftover space (true center when the flanks are symmetric) and yields
+   * when they aren't, collapsing to zero
+   * before anything can overlap. The container itself has no gap — segments
    * space themselves — so the solver's global budget (sum of unit widths +
    * per-unit gaps) is exactly the layout's minimum width: what the solver
    * says fits, fits. Its cross-segment gap allowance (≤ 2×gap) becomes slack
    * the auto margins absorb, keeping ≥ gap between segments at the floor.
-   * Segments never grow or shrink: fit is the SOLVER's job, not flexbox's.
+   * Segments never grow or shrink: fit is the solver's job, not flexbox's.
    */
   const sectionStyle = (position: 'start' | 'center' | 'end'): React.CSSProperties => ({
     display: 'flex',
@@ -710,7 +614,7 @@ export function Toolbar({
   });
 
   const overflowView: OverflowMenuView = {
-    sections: overflowSections,
+    sections: layout.overflow,
     isOpen: overflowOpen,
     close: () => setOverflowOpen(false),
     resolve: resolveCmd,
@@ -723,56 +627,36 @@ export function Toolbar({
       className={className}
       style={{ position: 'relative', display: 'flex', alignItems: 'center', ...style }}
     >
-      <div style={sectionStyle('start')}>{renderLiveSection(sectionByName('start'))}</div>
-      <div style={sectionStyle('center')}>{renderLiveSection(sectionByName('center'))}</div>
-      <div style={sectionStyle('end')}>
-        {renderLiveSection(sectionByName('end'))}
-        {fit.hasOverflow && (
-          <span style={{ position: 'relative', display: 'inline-flex' }}>
-            {renderOverflowTrigger(overflowOpen, () => setOverflowOpen((o) => !o))}
-            {renderOverflowMenu ? (
-              renderOverflowMenu(overflowView)
-            ) : (
-              <DefaultOverflowMenu view={overflowView} />
-            )}
-          </span>
-        )}
-      </div>
+      {layout.sections.map((section) => (
+        <div key={section.name} style={sectionStyle(section.name)}>
+          {renderLiveSection(section)}
+          {section.name === 'end' && layout.hasOverflow && (
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              {renderOverflowTrigger(overflowOpen, () => setOverflowOpen((previous) => !previous))}
+              {renderOverflowMenu ? (
+                renderOverflowMenu(overflowView)
+              ) : (
+                <DefaultOverflowMenu view={overflowView} />
+              )}
+            </span>
+          )}
+        </div>
+      ))}
 
       {/* The measurement layer: every unit in every variant, every collapsed
           group form, and the trigger — hidden, inert, observed. Text reflow
-          (locale, fonts, zoom) fires the observers; no change-handling code. */}
+          (locale, fonts, zoom) fires the observers; no change-handling code.
+          External sockets are excluded: they are live-measured, and a
+          duplicate <slot> here would steal the projection from the row. */}
       <div aria-hidden style={measureLayerStyle}>
-        {visibleBar.sections.flatMap((s) =>
-          s.groups.flatMap((g) => [
-            // External sockets are excluded: they are live-measured, and a
-            // duplicate <slot> here would steal the projection from the row.
-            ...g.units
-              .filter((u) => !isExternalSlot(u))
-              .flatMap((u) =>
-                u.variants.map((variant) => (
-                  <Measured key={unitKey(u, variant)} k={unitKey(u, variant)} onWidth={onWidth}>
-                    {renderUnitAt(u, variant, 'measure')}
-                  </Measured>
-                )),
-              ),
-            ...(g.collapse
-              ? [
-                  <Measured key={groupKey(g.id)} k={groupKey(g.id)} onWidth={onWidth}>
-                    {renderCollapsedGroup(g)}
-                  </Measured>,
-                ]
-              : []),
-            ...(g.shed
-              ? [
-                  <Measured key={groupTriggerKey(g.id)} k={groupTriggerKey(g.id)} onWidth={onWidth}>
-                    {renderDisclosure(g, true)}
-                  </Measured>,
-                ]
-              : []),
-          ]),
-        )}
-        <Measured k={TRIGGER_KEY} onWidth={onWidth}>
+        {layout.measured
+          .filter((part) => !isExternalSlot(part))
+          .map((part) => (
+            <Measured key={part.measureKey} k={part.measureKey} onWidth={onWidth}>
+              {renderPart(part, 'measure')}
+            </Measured>
+          ))}
+        <Measured k={toolbarMeasureKey.overflowTrigger} onWidth={onWidth}>
           {renderOverflowTrigger(false, () => {})}
         </Measured>
       </div>

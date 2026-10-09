@@ -5,9 +5,9 @@
  * stays plugin-free, per the layering law).
  *
  * Honesty about reach: `navigator.vibrate` works on Android browsers and is
- * NOT implemented in iOS Safari — there the default provider is a silent
+ * not implemented in iOS Safari — there the default provider is a silent
  * no-op until Apple ships a haptics API. (The community switch-control hacks
- * were evaluated and deliberately NOT shipped: Apple patched programmatic
+ * were evaluated and deliberately not shipped: Apple patched programmatic
  * triggering in iOS 26.5, leaving only tap-on-control tricks that don't fit a
  * viewer's gesture moments.) The real iPhone haptic today comes through a
  * native shell: a WKWebView embedder installs a script message handler and
@@ -35,7 +35,9 @@ export const vibrationFeedback: WebPlatformFeedback = {
   selection: () => vibrate(8),
   impact: (weight = 'light') => vibrate(weight === 'heavy' ? 30 : weight === 'medium' ? 20 : 10),
   notify: (kind) =>
-    vibrate(kind === 'error' ? [12, 60, 12, 60, 12] : kind === 'warning' ? [15, 70, 15] : [10, 50, 10]),
+    vibrate(
+      kind === 'error' ? [12, 60, 12, 60, 12] : kind === 'warning' ? [15, 70, 15] : [10, 50, 10],
+    ),
 };
 
 interface WKMessageHandler {
@@ -44,7 +46,7 @@ interface WKMessageHandler {
 
 /**
  * A provider for native iOS shells: forwards each call to a WKWebView script
- * message handler the HOST APP installed under `handlerName` — an explicit
+ * message handler the host app installed under `handlerName` — an explicit
  * contract between the embedder and their own app, never a global this library
  * sniffs on its own. The message shape is
  * `{ family: 'selection' } | { family: 'impact', weight } | { family: 'notify', kind }`;
@@ -58,25 +60,25 @@ export const wkFeedback = (
 ): WebPlatformFeedback => {
   const handler = (): WKMessageHandler | undefined => {
     if (typeof window === 'undefined') return undefined;
-    const w = window as Window & {
+    const webkitWindow = window as Window & {
       webkit?: { messageHandlers?: Record<string, WKMessageHandler | undefined> };
     };
-    return w.webkit?.messageHandlers?.[handlerName];
+    return webkitWindow.webkit?.messageHandlers?.[handlerName];
   };
   return {
     selection: () => {
-      const h = handler();
-      if (h) h.postMessage({ family: 'selection' });
+      const messageHandler = handler();
+      if (messageHandler) messageHandler.postMessage({ family: 'selection' });
       else fallback.selection();
     },
     impact: (weight = 'light') => {
-      const h = handler();
-      if (h) h.postMessage({ family: 'impact', weight });
+      const messageHandler = handler();
+      if (messageHandler) messageHandler.postMessage({ family: 'impact', weight });
       else fallback.impact(weight);
     },
     notify: (kind) => {
-      const h = handler();
-      if (h) h.postMessage({ family: 'notify', kind });
+      const messageHandler = handler();
+      if (messageHandler) messageHandler.postMessage({ family: 'notify', kind });
       else fallback.notify(kind);
     },
   };

@@ -13,7 +13,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
-import { ActionsToken } from '../src/internal';
+import { ActionsToken } from '../src/host-contract';
 import type { ActionsHostCapability } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -30,7 +30,7 @@ const fixturePath = resolve(
 );
 
 /**
- * The dispatcher against a REAL engine and the real payload fixture: trees
+ * The dispatcher against a real engine and the real payload fixture: trees
  * come from `annotations.list()`, hide names resolve through `doc.forms`,
  * and the executor/sink/adapter seams carry recording fakes.
  */
@@ -38,7 +38,7 @@ describe('plugin-actions integration (real engine)', () => {
   let engine: Engine;
   let kernel: Kernel;
   let actions: ActionsHostCapability;
-  let pon = 0;
+  let firstPage = 0;
   let treeOf: (nm: string) => PdfActionTree;
   let refOf: (nm: string) => AnnotationRef;
 
@@ -85,8 +85,15 @@ describe('plugin-actions integration (real engine)', () => {
           fields: [],
           changedWidgets: [],
         })),
-        changedWidgets: [],
-        meta: null,
+        widgets: [],
+        meta: {
+          affectedPages: [],
+          cacheDelta: null,
+          opId: 'test',
+          undoable: false,
+          changedFields: [],
+          changedWidgets: [],
+        },
       };
     });
     actions.registerAnnotCommitSink(async (entries) => {
@@ -105,7 +112,7 @@ describe('plugin-actions integration (real engine)', () => {
       };
     });
     actions.setUiAdapter({
-      openUri: (uri, opts) => calls.push({ seam: 'uri', detail: { uri, ...opts } }),
+      openUri: (uri, options) => calls.push({ seam: 'uri', detail: { uri, ...options } }),
       print: () => calls.push({ seam: 'print', detail: null }),
     });
 
@@ -115,10 +122,11 @@ describe('plugin-actions integration (real engine)', () => {
       { kind: 'bytes', id: 'action-payloads-probe', bytes },
       { scope: ['*'] },
     );
-    const page = (await opened.pages.list()).pages[0];
-    pon = page.ref.pageObjectNumber;
-    const { annotations } = await opened.page(toPageRef(pon)).annotations.list();
-    const byNm = new Map(annotations.map((a) => [a.nm, a]));
+    const { pages } = await opened.pages.list();
+    const page = pages[0];
+    firstPage = page.ref.objectNumber;
+    const { annotations } = await opened.page(toPageRef(firstPage)).annotations.list();
+    const byNm = new Map(annotations.map((annotation) => [annotation.nm, annotation]));
     treeOf = (nm: string) => {
       const tree = byNm.get(nm)?.actions?.activate;
       if (!tree) throw new Error(`no activate tree on '${nm}'`);
@@ -142,14 +150,15 @@ describe('plugin-actions integration (real engine)', () => {
     source: { kind: 'api' as const },
     event: { scope: 'activate' as const },
   };
-  const lastCallsSince = (mark: number) => calls.slice(mark).map((c) => c.seam);
+  const lastCallsSince = (mark: number) => calls.slice(mark).map((call) => call.seam);
 
   it('routes a GoTo /FitR tree to the navigation executor with its payload', async () => {
     const result = await actions.execute(treeOf('goto-fitr'), user);
     expect(result.status).toBe('executed');
     expect(calls.at(-1)).toMatchObject({
       seam: 'goto',
-      detail: { kind: 'fitR', left: 10, bottom: 20, right: 300, top: 400 },
+      // The file's [10 20 300 400] on a letter page, from the page's top-left.
+      detail: { kind: 'fitR', x: 10, y: 392, width: 290, height: 380 },
     });
   });
 
@@ -212,10 +221,10 @@ describe('plugin-actions integration (real engine)', () => {
     const mark = calls.length;
     const result = await actions.execute(treeOf('chain-js-goto-hide'), user);
     expect(result.status).toBe('executed');
-    // Walk order executes JS then Hide inline (the note1 NAME rides the
+    // Walk order executes JS then Hide inline (the note1 name rides the
     // forms plane); the GoTo navigation thunk fires last.
     expect(lastCallsSince(mark)).toEqual(['js', 'hideForm', 'goto']);
-    expect(result.nodes.map((n) => [n.path.join('.'), n.type, n.status])).toEqual([
+    expect(result.nodes.map((node) => [node.path.join('.'), node.type, node.status])).toEqual([
       ['', 'javascript', 'executed'],
       ['0', 'goto', 'executed'],
       ['0.0', 'hide', 'executed'],
@@ -237,9 +246,9 @@ describe('plugin-actions integration (real engine)', () => {
     const mark = calls.length;
     const result = await actions.dispatch({
       scope: 'activate',
-      // The ref a trigger source really passes: the DTO's own (objectNumber).
+      // The ref a trigger source really passes: the annotation's own (objectNumber).
       ref: refOf('named-next'),
-      page: toPageRef(pon),
+      page: toPageRef(firstPage),
     });
     expect(result.status).toBe('executed');
     expect(lastCallsSince(mark)).toEqual(['named']);

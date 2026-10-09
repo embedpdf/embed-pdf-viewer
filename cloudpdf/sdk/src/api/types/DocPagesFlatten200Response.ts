@@ -3,99 +3,32 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocPagesFlatten200Response {
-    meta: DocPagesFlatten200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
+    pages: CloudPDF.PageRef[];
+    usage: DocPagesFlatten200Response.Usage;
+    results: DocPagesFlatten200Response.Results.Item[];
+    meta: CloudPDF.MutationMeta;
 }
 
 export namespace DocPagesFlatten200Response {
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
-    }
+    export const Usage = {
+        Display: "display",
+        Print: "print",
+    } as const;
+    export type Usage = (typeof Usage)[keyof typeof Usage];
+    export type Results = Results.Item[];
 
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                page: Item.Page;
-                revision: Item.Revision;
-                weakAnnotationState: CloudPDF.DocPagesFlatten200ResponseMetaAffectedPagesItemWeakAnnotationState;
-            }
-
-            export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
+    export namespace Results {
+        export interface Item {
+            page: CloudPDF.PageRef;
+            status: Item.Status;
         }
 
-        export interface CacheDelta {
-            previousDocVersion: number;
-            docVersion: number;
-            annotationsVersion?: number | undefined;
-            layerVersion?: number | undefined;
-            working?: boolean | undefined;
-            pages: CacheDelta.Pages.Item[];
-        }
-
-        export namespace CacheDelta {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    page: Item.Page;
-                    cache: Item.Cache;
-                }
-
-                export namespace Item {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-
-                    export interface Cache {
-                        contentVersion: number;
-                        annotationVersion: number;
-                    }
-                }
-            }
+        export namespace Item {
+            export const Status = {
+                Applied: "applied",
+                Unchanged: "unchanged",
+            } as const;
+            export type Status = (typeof Status)[keyof typeof Status];
         }
     }
 }

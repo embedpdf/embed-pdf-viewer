@@ -1,0 +1,14 @@
+# @embedpdf/svelte — ./history
+
+HISTORY_DEFAULTS [VariableDeclaration] (from packages/plugin/history/src/contract.ts): HISTORY_DEFAULTS: HistorySettings ={ limit: 100}
+HistoryCapability [InterfaceDeclaration] (from packages/plugin/history/src/contract.ts): export interface HistoryCapability extends SettingsApi<HistorySettings>{ undo(): void; redo(): void; canUndo(): boolean; canRedo(): boolean; getUndoLabel(): ChangeLabel | null; getRedoLabel(): ChangeLabel | null; clear(): void; readonly onUndone: EventHook<HistoryUndoneEvent>; readonly onUndoFailed: EventHook<HistoryUndoFailedEvent>; }
+HistoryConfig [TypeAliasDeclaration] (from packages/plugin/history/src/contract.ts): export type HistoryConfig = DeepPartial<HistorySettings>;
+HistorySettings [InterfaceDeclaration] (from packages/plugin/history/src/contract.ts): export interface HistorySettings{ readonly limit: number; }
+HistoryToken [VariableDeclaration] (from packages/plugin/history/src/token.ts): HistoryToken = createCapabilityToken<HistoryCapability>('history', { hint: "add historyPlugin() from '@embedpdf/plugin-history' to your plugins list", } )
+HistoryUndoFailedEvent [InterfaceDeclaration] (from packages/plugin/history/src/contract.ts): export interface HistoryUndoFailedEvent{ readonly label: ChangeLabel; readonly redo: boolean; readonly reason: 'unavailable' | 'refused'; readonly error: PluginError; }
+HistoryUndoneEvent [InterfaceDeclaration] (from packages/plugin/history/src/contract.ts): export interface HistoryUndoneEvent{ readonly label: ChangeLabel; readonly redo: boolean; readonly skipped: number; }
+historyPlugin [VariableDeclaration] (from packages/plugin/history/src/history.plugin.ts): historyPlugin = (config?: HistoryConfig) => definePlugin({ id: 'history', token: HistoryToken, scope: 'document', state: emptyHistory, settings:{ defaults: HISTORY_DEFAULTS, registered: config} , create: createHistoryController, } )
+historyState [VariableDeclaration] (from packages/plugin/history/src/state.ts): historyState = defineState(HistoryToken, { read: (history) => ({ canUndo: history.canUndo(), canRedo: history.canRedo(), undoLabel: history.getUndoLabel(), redoLabel: history.getRedoLabel(), } ), empty:{ canUndo: false, canRedo: false, undoLabel: null, redoLabel: null, } , } )
+useHistory [FunctionDeclaration] (from packages/framework/svelte/src/history/readers.ts): export function useHistory(): HistoryCapability{ return useCapability(HistoryToken); }
+useHistoryEvent [FunctionDeclaration] (from packages/framework/svelte/src/history/readers.ts): export function useHistoryEvent<T>( select: (history: HistoryCapability) => EventHook<T>, handler: (event: T) => void, ): void{ useCapabilityEvent(HistoryToken, select, handler); }
+useHistoryState [VariableDeclaration] (from packages/framework/svelte/src/history/readers.ts): useHistoryState = stateReader(historyState)

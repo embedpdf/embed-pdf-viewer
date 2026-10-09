@@ -1,5 +1,5 @@
 /**
- * Shared types for the docs search stack (DOCS-PLATFORM-ARCHITECTURE.md):
+ * Shared types for the docs search stack (docs/conventions/docs-architecture.md):
  * the index is a per-site build artifact over post-resolution content, the
  * machinery is the kit's, and the corpus/URL rules are each site's binding.
  *
@@ -51,6 +51,11 @@ export type DocsSection = {
   variantProse: Record<string, string>;
   /** Identifiers worth exact-matching, keyed by integration ('*' = shared). */
   symbols: Record<string, string[]>;
+  /**
+   * The integrations the page isn't published for yet (the publish gate):
+   * their readers don't find it.
+   */
+  withheldFrom?: string[];
 };
 
 export type DocsSearchHit = {

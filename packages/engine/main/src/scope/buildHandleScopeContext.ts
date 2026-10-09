@@ -4,7 +4,7 @@ import {
   parseScope,
   validateScopeArray,
   type DocumentProtection,
-  type IdentityClaims,
+  type Identity,
   type SignedDocumentPolicy,
 } from '@embedpdf/engine-core/runtime';
 
@@ -25,7 +25,7 @@ export interface BuildHandleScopeContextInput {
   /** Raw scope array from `OpenOptions.scope`; defaults to `['*']`. */
   scope?: ReadonlyArray<string>;
   /** Identity claims from `OpenOptions.identity`; defaults to `{}`. */
-  identity?: IdentityClaims;
+  identity?: Identity;
   /**
    * Raw PDF permission bits from `FPDF_GetDocPermissions` (or `null`
    * for unencrypted documents with no bits set). Decoded into the
@@ -81,26 +81,17 @@ export function buildHandleScopeContext(input: BuildHandleScopeContextInput): Ha
  * every mutation.
  *
  * Rules:
- *   - `annotations:*:self` needs `identity.user_id`
- *   - `annotations:*:group=X` needs `identity.groups` to include `X`
- *     (matching the resolver's group-membership check)
- *   - `annotations:*:createdBy=Y` is row-scoped, not caller-scoped, so
- *     no identity field is required at open time.
+ *   - `annotations:*:self` needs `identity.userId`
+ *   - every other filter compares a fact on the record with the value the
+ *     scope names (`group=X`, `createdBy=Y`, `all`), so it needs no
+ *     identity field.
  */
-function assertIdentityForCollabScopes(
-  scope: ReadonlyArray<string>,
-  identity: IdentityClaims,
-): void {
+function assertIdentityForCollabScopes(scope: ReadonlyArray<string>, identity: Identity): void {
   for (const s of scope) {
     const parsed = parseScope(s);
     if (parsed.kind !== 'collab') continue;
-    if (parsed.filter.kind === 'self' && !identity.user_id) {
+    if (parsed.filter.kind === 'self' && !identity.userId) {
       throw new MissingIdentity(s);
-    }
-    if (parsed.filter.kind === 'group') {
-      if (!identity.groups?.includes(parsed.filter.groupId)) {
-        throw new MissingIdentity(s);
-      }
     }
   }
 }

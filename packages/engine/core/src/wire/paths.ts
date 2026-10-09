@@ -1,12 +1,13 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { ModificationLevel } from '../signature/types';
 import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
-import type { AnalysisToken } from './tokens';
+import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
+import type { AnalysisToken, AnnotationsExportToken, FormExportToken } from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
  * @cloudpdf/server import these so they cannot drift.
  *
- * **URL layout convention (paths v2)**
+ * **URL layout convention**
  *
  * Each resource type lives at its own distinct path prefix. This
  * lets prefix-matching CDNs (Bunny, Cloud CDN, Azure FD) enforce
@@ -18,28 +19,39 @@ import type { AnalysisToken } from './tokens';
  *   /v1/docs/{id}                                       — doc root
  *   /v1/docs/{id}/manifest@{ver}                        — doc-level read
  *   /v1/docs/{id}/render/pages/{N}/data@{ver}                — render is its own prefix
+ *   /v1/docs/{id}/render/{annotations,fields,all}/pages/{N}/data@{ver} — and each picture family
  *   /v1/docs/{id}/text/pages/{N}/data@{ver}                  — text is its own prefix
  *   /v1/docs/{id}/geometry/pages/{N}/data@{ver}              — geometry is its own prefix
  *   /v1/docs/{id}/layers/{L}/manifest@{ver}
  *   /v1/docs/{id}/layers/{L}/metadata@{ver}
+ *   /v1/docs/{id}/layers/{L}/metadata/custom@{ver}                — the Info dict's own keys
  *   /v1/docs/{id}/layers/{L}/render/pages/{N}/data@{ver}
  *   /v1/docs/{id}/layers/{L}/text/pages/{N}/data@{ver}
  *   /v1/docs/{id}/layers/{L}/geometry/pages/{N}/data@{ver}
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items@{ver}    — collection (read)
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items          — collection (create)
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/{key}    — member
- *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/move     — batch reorder
- *   /v1/docs/{id}/layers/{L}/pages/move                           — batch page reorder
+ *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/reorder  — stacking order
+ *   /v1/docs/{id}/layers/{L}/pages/reorder                        — page order
  *   /v1/docs/{id}/layers/{L}/pages/rotate                         — batch absolute rotation
  *   /v1/docs/{id}/layers/{L}/pages/delete                         — batch page delete
- *   /v1/docs/{id}/layers/{L}/form                                 — reconciled snapshot (read)
+ *   /v1/docs/{id}/form@{ver}                                      — the form: fields + widget rows (read)
+ *   /v1/docs/{id}/form/pages/{N}/appearances@{ver}                — a page's widget images (read)
+ *   /v1/docs/{id}/layers/{L}/form@{ver}
+ *   /v1/docs/{id}/layers/{L}/form/pages/{N}/appearances@{ver}
+ *   /v1/docs/{id}/layers/{L}/form                                 — the form, current (read)
+ *   /v1/docs/{id}/layers/{L}/form/widgets/{N}/{key}               — a widget's place and look (patch)
+ *   /v1/docs/{id}/layers/{L}/form/widgets/{N}/reorder             — the widgets' stacking order
  *   /v1/docs/{id}/layers/{L}/form/fields                          — field collection (create)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}                    — field member (read/patch/delete)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/value              — value write (fill)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/reset              — reset to /DV (fill)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/widgets            — adopt a widget (attach)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/widgets/detach     — release a widget
- *   /v1/docs/{id}/layers/{L}/form/data                            — FDF/XFDF export (GET) / import (POST)
+ *   /v1/docs/{id}/layers/{L}/form/export@{token}                  — form bundle export (GET)
+ *   /v1/docs/{id}/layers/{L}/form/export                          — form bundle export by body (POST)
+ *   /v1/docs/{id}/layers/{L}/form/import                          — design import (multipart POST)
+ *   /v1/docs/{id}/layers/{L}/form/import-values                   — values import (multipart POST)
  *   /v1/docs/{id}/layers/{L}/form/repair                          — durable reconciliation
  *   /v1/docs/{id}/layers/{L}/download@{ver}
  *
@@ -54,14 +66,18 @@ import {
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
+  encodeAnnotationsExportToken,
+  encodeFormExportToken,
   encodeAttachmentsToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
+  encodeFormToken,
   encodeLayoutToken,
   encodeMetadataToken,
   encodeRenderToken,
   encodeTokenText,
+  encodeWidgetAppearancesRenderToken,
   type DownloadToken,
   type TokenInput,
 } from './tokens';
@@ -75,7 +91,7 @@ export const wirePaths = {
    * against the token like every layer route — the grant is
    * layer-scoped in substance: CDN coverage, scopes, and the client's
    * binding all carry the layer). Path-addressed so the affinity tier —
-   * the `X-CloudPDF-Doc` header derivation AND the chart's uri-mode
+   * the `X-CloudPDF-Doc` header derivation and the chart's uri-mode
    * regex — pins the session bootstrap to the document's pod from the
    * very first request. Default-layer callers spell `layers/default/`,
    * same as every other layer route.
@@ -83,9 +99,16 @@ export const wirePaths = {
   access: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/access`,
 
-  /** Deprecated alias (docId in the BODY) — served for one prerelease
+  /** Deprecated alias (docId in the body) — served for one prerelease
    *  cycle so pre-rename clients keep working; remove after. */
   accessLegacy: '/v1/access',
+
+  /**
+   * POST `{ count }`: hand the caller's editing session `count` more object
+   * numbers at once (at most 1,000), for a large paste.
+   */
+  objectNumbers: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/object-numbers`,
 
   /**
    * GET: open the document referenced by the doc-scoped JWT and
@@ -134,9 +157,9 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(layoutVersion)}`,
 
   /**
-   * Immutable BASE page-geometry list (plane-scope model): the shared-URL
+   * Immutable base page-geometry list (plane-scope model): the shared-URL
    * variant a layout-inheriting layer resolves at — every visitor's page
-   * list is ONE CDN object served from the base worker session.
+   * list is one CDN object served from the base worker session.
    */
   docLayout: (docId: string, layoutVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layout@${encodeLayoutToken(layoutVersion)}`,
@@ -158,16 +181,31 @@ export const wirePaths = {
   layerMetadataCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
-  /** Immutable BASE metadata (plane-scope model): the shared-URL variant a
+  /** Immutable base metadata (plane-scope model): the shared-URL variant a
    *  metadata-inheriting layer resolves at. */
   docMetadata: (docId: string, metadataVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/metadata@${encodeMetadataToken(metadataVersion)}`,
+
+  /**
+   * GET: the Info dict's custom keys for the layer at a specific
+   * `metadataVersion` — the same version pointer as `layerMetadata`, since
+   * both halves live in one dict. Content-addressed like it.
+   */
+  layerCustomMetadata: (docId: string, layerName: string, metadataVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom@${encodeMetadataToken(metadataVersion)}`,
+
+  layerCustomMetadataCurrent: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom`,
+
+  /** Immutable base custom keys: the shared-URL twin of `layerCustomMetadata`. */
+  docCustomMetadata: (docId: string, metadataVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/metadata/custom@${encodeMetadataToken(metadataVersion)}`,
 
   /** Immutable catalog-owned actions, independently pinned in the manifest. */
   layerActions: (docId: string, layerName: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion)}`,
 
-  /** Immutable BASE catalog actions (plane-scope model): the shared-URL
+  /** Immutable base catalog actions (plane-scope model): the shared-URL
    *  variant an actions-inheriting layer resolves at. */
   docActions: (docId: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/actions@${encodeActionsToken(actionsVersion)}`,
@@ -175,7 +213,7 @@ export const wirePaths = {
   // ---------------------------------------------------------------------
   // Digital signatures. Layer reads pin `docVersion` (a signature is a
   // layer state change like any other edit); version-scoped reads are
-  // content-addressed by the base sha and immutable forever. The RESOURCE
+  // content-addressed by the base sha and immutable forever. The resource
   // comes before the sha so each family keeps its own CDN prefix.
   // ---------------------------------------------------------------------
 
@@ -196,7 +234,7 @@ export const wirePaths = {
   layerSignatureComplete: (docId: string, layerName: string, signingId: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}/complete`,
   /** DELETE: discard a pending signing. */
-  layerSignatureAbort: (docId: string, layerName: string, signingId: string) =>
+  layerSignatureCancel: (docId: string, layerName: string, signingId: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}`,
 
   /** The document's base versions, oldest first (grows; never cached). */
@@ -233,15 +271,19 @@ export const wirePaths = {
   layerMetadataUpdate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
+  /** POST: set and remove the Info dict's custom keys for the layer. */
+  layerCustomMetadataUpdate: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom`,
+
   /**
-   * Immutable BASE /EmbeddedFiles listing: the shared-URL variant an
+   * Immutable base /EmbeddedFiles listing: the shared-URL variant an
    * attachments-undiverged layer resolves at — every visitor's sidebar list
-   * is ONE CDN object served from the base worker session.
+   * is one CDN object served from the base worker session.
    */
   docAttachments: (docId: string, attachmentsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
 
-  /** Immutable BASE decoded bytes of one embedded file (twin of
+  /** Immutable base decoded bytes of one embedded file (twin of
    *  `layerAttachmentFile` — same capability tier split). */
   docAttachmentFile: (docId: string, key: string, attachmentsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
@@ -283,9 +325,9 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
 
   /**
-   * Immutable BASE bytes of a FileAttachment annotation's embedded file
+   * Immutable base bytes of a FileAttachment annotation's embedded file
    * (plane-scope model). Depends on the `annotations` plane (the annotation
-   * exists in this view) AND the `attachments` plane (the pin); the origin
+   * exists in this view) and the `attachments` plane (the pin); the origin
    * guard requires both inherited.
    */
   docAnnotationFile: (docId: string, page: PageRef, annotKey: string, attachmentsVersion: number) =>
@@ -313,24 +355,17 @@ export const wirePaths = {
   docPageGeometryCurrent: (docId: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  docPageRender: (docId: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
-
-  docPageRenderCurrent: (docId: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
-
   /**
-   * Immutable BASE annotated render (plane-scope model). Its OWN path family,
-   * not a token flag under `/render/pages/`: an annotated render depends on
-   * `content + annotations`, an annotation-free one on `content` alone, and
-   * edge grants are prefix-scoped — the prefix law says a path's prefix must
-   * identify its full plane-dependency set. Annotatedness is therefore
-   * PATH-ONLY (the token/path law): the wire token has no
-   * `includeAnnotations` key at all; the annotated family's token carries
-   * `annotationVersion`, the free family's cannot.
+   * A page picture of one family (`PAGE_RENDER_FAMILIES`). The family is a
+   * path of its own, never a token field: each depends on its own planes and
+   * needs its own rights, and an edge grant sees only prefixes. Its token
+   * carries the family's pins.
    */
-  docPageRenderAnnotated: (docId: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+  docPageRender: (docId: string, family: PageRenderFamily, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+
+  docPageRenderCurrent: (docId: string, family: PageRenderFamily, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
   layerPageGeometry: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
@@ -338,35 +373,38 @@ export const wirePaths = {
   layerPageGeometryCurrent: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  layerPageRender: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+  layerPageRender: (
+    docId: string,
+    layerName: string,
+    family: PageRenderFamily,
+    page: PageRef,
+    token: TokenInput,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
 
-  layerPageRenderCurrent: (docId: string, layerName: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
-
-  /** Layer twin of `docPageRenderAnnotated` — the grammar is uniform:
-   *  annotatedness is path-only at BOTH tiers. */
-  layerPageRenderAnnotated: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
-
-  layerPageRenderAnnotatedCurrent: (docId: string, layerName: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data`,
+  layerPageRenderCurrent: (
+    docId: string,
+    layerName: string,
+    family: PageRenderFamily,
+    page: PageRef,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /**
-   * Immutable BASE annotation list for a single page (plane-scope model):
+   * Immutable base annotation list for a single page (plane-scope model):
    * the shared-URL variant an annotations-inheriting layer resolves at — a
-   * base's own annotations (weak-identity ones included) are simply visible
-   * through every pristine layer, so 1,000 visitors' sidebars are ONE CDN
+   * base's own annotations (inline ones included) are simply visible
+   * through every pristine layer, so 1,000 visitors' sidebars are one CDN
    * object served from the base worker session.
    */
   docPageAnnotations: (docId: string, page: PageRef, annotationVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
 
-  /** Immutable BASE whole-document annotation listing (bulk hydration). */
+  /** Immutable base whole-document annotation listing (bulk hydration). */
   docAnnotationsAll: (docId: string, annotationsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
 
-  /** Immutable BASE appearance batch (twin of
+  /** Immutable base appearance batch (twin of
    *  `layerPageAnnotationAppearances` — same `annotations` plane gate). */
   docPageAnnotationAppearances: (docId: string, page: PageRef, token: TokenInput) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,
@@ -385,7 +423,31 @@ export const wirePaths = {
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
 
-  /** Immutable LAYER whole-document annotation listing (bulk hydration). */
+  /** Immutable base annotation export: a bundle as multipart, needing
+   *  `doc.annotate.read` and `doc.download`. */
+  docAnnotationsExport: (docId: string, token: AnnotationsExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/export@${encodeAnnotationsExportToken(token)}`,
+
+  /** Immutable layer annotation export (twin of `docAnnotationsExport`). */
+  layerAnnotationsExport: (docId: string, layerName: string, token: AnnotationsExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/export@${encodeAnnotationsExportToken(token)}`,
+
+  /**
+   * A layer annotation export whose selection a URL can't carry (position
+   * refs, long ref lists): a POST of the pins and the selection, not cached.
+   */
+  layerAnnotationsExportRequest: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/export`,
+
+  /** A layer's changes: user actions, each its ops in one transaction, or an undo (`doc.apply`). */
+  layerChanges: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/changes`,
+
+  /** A bundle's annotations, created in the layer as one change (`doc.annotations.import`). */
+  layerAnnotationsImport: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/import`,
+
+  /** Immutable layer whole-document annotation listing (bulk hydration). */
   layerAnnotationsAll: (docId: string, layerName: string, annotationsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
 
@@ -402,7 +464,7 @@ export const wirePaths = {
    * Content-addressed via the appearance render token (`annotationVersion`
    * plus render options like scale/format); CDN may cache forever. Appearance
    * pixels depend only on the annotation `/AP` stream, so `contentVersion` is
-   * deliberately NOT part of the key.
+   * deliberately not part of the key.
    */
   layerPageAnnotationAppearances: (
     docId: string,
@@ -421,8 +483,18 @@ export const wirePaths = {
   layerAnnotationByKey: (docId: string, layerName: string, page: PageRef, key: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(key)}`,
 
-  layerPageAnnotationsMove: (docId: string, layerName: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/move`,
+  /** GET: an annotation's `appearance` resource, its drawing as a one-page
+   *  PDF — a derived read (application/pdf, no-store), gated like pages/extract. */
+  layerAnnotationAppearanceResource: (
+    docId: string,
+    layerName: string,
+    page: PageRef,
+    key: string,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(key)}/resources/appearance`,
+
+  layerPageAnnotationsReorder: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/reorder`,
   /** POST: flatten a chosen set of the page's annotations into its content
    *  (a content + annotation mutation of that page). */
   layerPageAnnotationsFlatten: (docId: string, layerName: string, page: PageRef) =>
@@ -433,15 +505,52 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/appearance`,
 
   /**
-   * GET: the reconciled form snapshot (field tree + widget joins) for the
-   * layer's CURRENT state. Forms are document-scoped (one AcroForm per
-   * document), so there is no per-page collection and — unlike annotations —
-   * no content-addressed `@version` variant: the snapshot is always served
-   * `no-store`. Mutation results carry the per-page `cacheDelta` that keeps
-   * annotation/render caches coherent when widget appearances change.
+   * Immutable base form: the fields, every widget row, the calculation
+   * order (`doc.forms.list()`), at the document's `formsVersion`. Needs
+   * `doc.forms.read`, under its own prefix, so the CDN signs it apart from
+   * the annotations.
    */
-  layerForm: (docId: string, layerName: string) =>
+  docForm: (docId: string, formsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/form@${encodeFormToken(formsVersion)}`,
+
+  /** Immutable layer form (twin of `docForm`). */
+  layerForm: (docId: string, layerName: string, formsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form@${encodeFormToken(formsVersion)}`,
+
+  /** GET: the layer's form as it is now — for API callers, served `no-store`. */
+  layerFormCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form`,
+
+  /**
+   * Immutable base batch of a page's widget images, every mode and state, as
+   * `multipart/form-data` (`page.forms.renderAppearances()`), keyed by the
+   * page's `widgetVersion`.
+   */
+  docPageFormAppearances: (docId: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/form/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeWidgetAppearancesRenderToken(token)}`,
+
+  /** Immutable layer twin of `docPageFormAppearances`. */
+  layerPageFormAppearances: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeWidgetAppearancesRenderToken(token)}`,
+
+  layerPageFormAppearancesCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/pages/${encodeURIComponent(encodePageKey(page))}/appearances`,
+
+  /**
+   * PATCH: a widget's place and look (`doc.forms.updateWidget`). `key` is
+   * the widget's annotation key. Not under `form/pages/`, which the CDN
+   * signs for reads.
+   */
+  /** POST: the form's calculation order (`doc.forms.reorderCalculations`). */
+  layerFormCalculationsReorder: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/calculations/reorder`,
+
+  /** POST: the stacking order of a page's widgets (`doc.forms.reorderWidgets`). */
+  layerFormWidgetsReorder: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/widgets/${encodeURIComponent(encodePageKey(page))}/reorder`,
+
+  layerFormWidget: (docId: string, layerName: string, page: PageRef, key: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/widgets/${encodeURIComponent(encodePageKey(page))}/${encodeURIComponent(key)}`,
 
   /** POST: create a field (optionally with styled widget placements). */
   layerFormFields: (docId: string, layerName: string) =>
@@ -459,11 +568,11 @@ export const wirePaths = {
   layerFormFieldValue: (docId: string, layerName: string, fieldKey: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/value`,
 
-  /** POST: reset the field to /DV (or clear). Empty body. */
-  layerFormFieldReset: (docId: string, layerName: string, fieldKey: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/reset`,
+  /** POST: reset fields to /DV (or clear): `{ refs? }`, the whole form without `refs`. */
+  layerFormReset: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/reset`,
 
-  /** POST: adopt an inert widget annotation (`{ widget, onState? }`). */
+  /** POST: add a widget to the field, the body its placement (`WidgetPlacement`). */
   layerFormFieldWidgets: (docId: string, layerName: string, fieldKey: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/widgets`,
 
@@ -476,13 +585,25 @@ export const wirePaths = {
   layerFormFieldWidgetsDetach: (docId: string, layerName: string, fieldKey: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/widgets/detach`,
 
-  /**
-   * GET: serialized form data (`?format=fdf|xfdf`, default `xfdf`).
-   * POST: import an FDF/XFDF payload (raw bytes body; format sniffed
-   * server-side unless `?format=` pins it).
-   */
-  layerFormData: (docId: string, layerName: string, format?: 'fdf' | 'xfdf') =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/data${format ? `?format=${format}` : ''}`,
+  /** Immutable base form export: a bundle as multipart, needing `doc.forms.read` and `doc.download`. */
+  docFormExport: (docId: string, token: FormExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/form/export@${encodeFormExportToken(token)}`,
+
+  /** Immutable layer form export (twin of `docFormExport`). */
+  layerFormExport: (docId: string, layerName: string, token: FormExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/export@${encodeFormExportToken(token)}`,
+
+  /** A layer form export whose selection a URL can't carry: a POST of the pins and the selection, not cached. */
+  layerFormExportRequest: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/export`,
+
+  /** A bundle's design, created in the layer as one change (`doc.forms.import`). */
+  layerFormImport: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/import`,
+
+  /** A bundle's values, written in the layer as one change (`doc.forms.importValues`). */
+  layerFormImportValues: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/import-values`,
 
   /** POST: durable reconciliation (`{ bakeAppearances? }`). */
   layerFormRepair: (docId: string, layerName: string) =>
@@ -493,7 +614,7 @@ export const wirePaths = {
 
   /**
    * GET: one budgeted search slice, versioned form. The token
-   * (`encodeSearchToken`) IS the cache key: content epoch + query +
+   * (`encodeSearchToken`) is the cache key: content epoch + query +
    * position. Immutable; CDN may cache forever. Mode is the path — rects
    * and full are separate resources so permission tiers never share
    * cache entries (`'rects'` needs `doc.text.search`; `'full'` also
@@ -507,7 +628,7 @@ export const wirePaths = {
 
   /**
    * GET: unversioned form — same fields as flat query params (`q` as
-   * plain text), served from the CURRENT content, always `no-store`.
+   * plain text), served from the current content, always `no-store`.
    * The debug/simple-client variant; the SDK uses the versioned form.
    */
   layerSearchRectsCurrent: (docId: string, layerName: string) =>
@@ -521,15 +642,15 @@ export const wirePaths = {
   layerPageScale: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${encodeURIComponent(encodePageKey(page))}/scale`,
 
-  layerPagesMove: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/move`,
+  layerPagesReorder: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/reorder`,
 
   layerPagesRotate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/rotate`,
 
   layerPagesDelete: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/delete`,
-  /** POST: register/rename a `/Names /Pages` entry — a page-STRUCTURE
+  /** POST: register/rename a `/Names /Pages` entry — a page-structure
    *  mutation (docVersion + layoutVersion advance; reads ride `/layout`). */
   layerPagesNames: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/names`,
@@ -542,7 +663,7 @@ export const wirePaths = {
 
   /**
    * POST (multipart mutation envelope): copy every page of the `source`
-   * resource part (a standalone PDF) in at the body's `destIndex`.
+   * resource part (a standalone PDF) in at the body's `toIndex`.
    */
   layerPagesInsert: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/insert`,
@@ -553,7 +674,7 @@ export const wirePaths = {
 
   /**
    * POST (plain JSON → `application/pdf` bytes): export the listed pages,
-   * in caller order, as a standalone PDF. A READ over the current layer
+   * in caller order, as a standalone PDF. A read over the current layer
    * state (gated like /download), so it is a POST only for its body —
    * nothing mutates and no event is published.
    */
@@ -573,23 +694,6 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/download@${encodeDownloadToken(token)}`,
 
   /**
-   * Weak-annotation-sessions: pluralized in v2 so the collection
-   * lives at `/weak-annotation-sessions` and members at
-   * `/weak-annotation-sessions/{sessionId}` — REST-conventional.
-   */
-  layerWeakAnnotationSession: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions`,
-
-  layerWeakAnnotationSessionHeartbeat: (docId: string, layerName: string, sessionId: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions/${encodeURIComponent(sessionId)}/heartbeat`,
-
-  layerWeakAnnotationSessionPages: (docId: string, layerName: string, sessionId: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions/${encodeURIComponent(sessionId)}/pages`,
-
-  layerWeakAnnotationSessionRelease: (docId: string, layerName: string, sessionId: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions/${encodeURIComponent(sessionId)}`,
-
-  /**
    * POST: pre-warm the doc cache + worker open before any user
    * request lands. Body is `{ docId }`. Doc-scoped token required.
    */
@@ -597,7 +701,7 @@ export const wirePaths = {
 } as const;
 
 /**
- * Fastify-style templates for the PLAIN (unversioned) doc-plane routes —
+ * Fastify-style templates for the plain (unversioned) doc-plane routes —
  * the backend-callable subset that the `@cloudpdf/contract` contract
  * documents. The immutable `@{version}` variants above remain viewer
  * protocol and are deliberately absent. These templates are the single
@@ -623,7 +727,7 @@ export function analysisQueryString(query: AnalysisQueryInput): string {
   if (query.exploratoryLevel !== undefined) params.set('level', query.exploratoryLevel);
   if (query.detail !== undefined) params.set('detail', query.detail);
   // The judging policy version: a cache key on the immutable version URL, so
-  // a policy bump never serves a verdict judged the old way.
+  // a policy bump never serves a verdict judged under another policy.
   params.set('policy', String(SIGNATURE_POLICY_VERSION));
   return params.toString();
 }
@@ -631,26 +735,36 @@ export function analysisQueryString(query: AnalysisQueryInput): string {
 export const wireTemplates = {
   docHead: '/v1/docs/:docId/head',
   layerManifest: '/v1/docs/:docId/layers/:layerName/manifest',
+  layerChanges: '/v1/docs/:docId/layers/:layerName/changes',
   layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
+  layerCustomMetadata: '/v1/docs/:docId/layers/:layerName/metadata/custom',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',
   layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pageKey/data',
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
   layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items',
   layerAnnotationItem:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+  layerAnnotationItemsReorder:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/reorder',
   layerAnnotationItemsFlatten:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/flatten',
   layerAnnotationItemsAppearance:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
+  layerAnnotationItemAppearanceResource:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
+  layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+  layerFormWidgetsReorder: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',
+  layerFormCalculationsReorder: '/v1/docs/:docId/layers/:layerName/form/calculations/reorder',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
-  layerFormFieldReset: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset',
+  layerFormReset: '/v1/docs/:docId/layers/:layerName/form/reset',
   layerFormFieldSignatureAppearance:
     '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
-  layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
+  layerFormImport: '/v1/docs/:docId/layers/:layerName/form/import',
+  layerFormImportValues: '/v1/docs/:docId/layers/:layerName/form/import-values',
   layerPageViewports: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/viewports',
   layerPageScale: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/scale',
-  layerPagesMove: '/v1/docs/:docId/layers/:layerName/pages/move',
+  layerPagesReorder: '/v1/docs/:docId/layers/:layerName/pages/reorder',
   layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
   layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',
   layerPagesNames: '/v1/docs/:docId/layers/:layerName/pages/names',
@@ -665,7 +779,7 @@ export const wireTemplates = {
   layerSignaturesAnalysis: '/v1/docs/:docId/layers/:layerName/signatures/analysis',
   layerSignaturesPrepare: '/v1/docs/:docId/layers/:layerName/signatures/prepare',
   layerSignatureComplete: '/v1/docs/:docId/layers/:layerName/signatures/:signingId/complete',
-  layerSignatureAbort: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
+  layerSignatureCancel: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
   docVersions: '/v1/docs/:docId/versions',
   docVersionSignatures: '/v1/docs/:docId/versions/signatures/:sha',
   docVersionSignatureContents: '/v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents',

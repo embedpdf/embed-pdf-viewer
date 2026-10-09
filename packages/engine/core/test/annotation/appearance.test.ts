@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { appearanceImpactOf, semanticEqual } from '../../src/shared';
-import type { AnnotationDTO, WireAnnotationPatch } from '../../src/shared';
+import { appearanceChangeOf, appearanceImpactOf, semanticEqual } from '../../src/shared';
+import type { Annotation, AnnotationPatch } from '../../src/shared';
+import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 
 /* Minimal DTO/patch fixtures: the classifier only reads the fields it
  * compares, so tests cast focused literals rather than materialise the full
  * AnnotationBase envelope. */
-const dto = (v: Record<string, unknown>): AnnotationDTO => v as unknown as AnnotationDTO;
-const patch = (v: Record<string, unknown>): WireAnnotationPatch =>
-  v as unknown as WireAnnotationPatch;
+const dto = (v: Record<string, unknown>): Annotation<PdfCoordinates> =>
+  v as unknown as Annotation<PdfCoordinates>;
+const patch = (v: Record<string, unknown>): AnnotationPatch<PdfCoordinates> =>
+  v as unknown as AnnotationPatch<PdfCoordinates>;
 
 const rect = (left: number, bottom: number, right: number, top: number) => ({
   left,
@@ -23,10 +25,10 @@ describe('measurement appearance impact', () => {
     (subtype) => {
       const change = patch({ subtype, contents: '6 m' });
       expect(
-        appearanceImpactOf(dto({ subtype, contents: '3 m', caption: { enabled: true } }), change),
+        appearanceImpactOf(dto({ subtype, contents: '3 m', captionEnabled: true }), change),
       ).toBe('regenerate');
       expect(
-        appearanceImpactOf(dto({ subtype, contents: '3 m', caption: { enabled: false } }), change),
+        appearanceImpactOf(dto({ subtype, contents: '3 m', captionEnabled: false }), change),
       ).toBe('inert');
       expect(appearanceImpactOf(dto({ subtype, contents: '3 m' }), change)).toBe('inert');
     },
@@ -40,11 +42,11 @@ describe('measurement appearance impact', () => {
         { x: 100, y: 0 },
         { x: 100, y: 100 },
       ],
-      caption: { enabled: true, center: { x: 50, y: 20 } },
+      captionEnabled: true,
+      captionCenter: { x: 50, y: 20 },
     });
     const moved = {
       subtype: 'polygon',
-      rect: rect(10, 20, 110, 120),
       vertices: [
         { x: 10, y: 20 },
         { x: 110, y: 20 },
@@ -52,16 +54,13 @@ describe('measurement appearance impact', () => {
       ],
     };
     expect(appearanceImpactOf(current, patch(moved))).toBe('regenerate');
+    expect(appearanceImpactOf(current, patch({ ...moved, captionCenter: { x: 60, y: 40 } }))).toBe(
+      'translation',
+    );
     expect(
       appearanceImpactOf(
         current,
-        patch({ ...moved, caption: { enabled: true, center: { x: 60, y: 40 } } }),
-      ),
-    ).toBe('translation');
-    expect(
-      appearanceImpactOf(
-        current,
-        patch({ ...moved, caption: { enabled: false, center: { x: 60, y: 40 } } }),
+        patch({ ...moved, captionEnabled: false, captionCenter: { x: 60, y: 40 } }),
       ),
     ).toBe('regenerate');
   });
@@ -72,13 +71,14 @@ const squareDto = (over: Record<string, unknown> = {}) =>
   dto({
     subtype: 'square',
     rect: rect(100, 100, 200, 200),
-    color: { r: 0, g: 128, b: 0 },
+    box: rect(100, 100, 200, 200),
+    rotation: null,
+    color: '#008000',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
     borderStyle: 'solid',
     cloudyIntensity: null,
-    rectDifferences: null,
     ...over,
   });
 
@@ -86,14 +86,13 @@ const squareDto = (over: Record<string, unknown> = {}) =>
 const fullSquarePatch = (over: Record<string, unknown> = {}) =>
   patch({
     subtype: 'square',
-    rect: rect(100, 100, 200, 200),
-    color: { r: 0, g: 128, b: 0 },
+    box: rect(100, 100, 200, 200),
+    color: '#008000',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
     borderStyle: 'solid',
     cloudyIntensity: null,
-    rectDifferences: null,
     ...over,
   });
 
@@ -122,8 +121,24 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
 
   it('f32 float drift in a full projection is inert', () => {
     const p = fullSquarePatch({
-      rect: rect(100.0001, 99.9999, 200.0001, 199.9999),
+      box: rect(100.0001, 99.9999, 200.0001, 199.9999),
       opacity: 0.9999999,
+    });
+    expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
+  });
+
+  it('fields a write accepts but never applies are inert, so a read can be sent back', () => {
+    const p = patch({
+      subtype: 'square',
+      page: { kind: 'objectNumber', objectNumber: 3 },
+      hasAppearance: true,
+      appearanceState: null,
+      author: 'Someone else',
+      modifiedAt: '2026-01-01T00:00:00Z',
+      userId: 'u_other',
+      importedBy: null,
+      popup: null,
+      actions: null,
     });
     expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
   });
@@ -131,9 +146,8 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
   it('metadata-only keys are inert (flags, relationships, grouping)', () => {
     const p = patch({
       subtype: 'square',
-      flags: { hidden: true },
-      inReplyTo: null,
-      replyType: null,
+      hidden: true,
+      reply: null,
     });
     expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
   });
@@ -154,10 +168,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
   it('tri-state: clearing an already-absent entry is a no-op', () => {
     // DTO totality states absence as null; a null-clear patch diffs away.
     expect(
-      appearanceImpactOf(
-        squareDto(),
-        patch({ subtype: 'square', cloudyIntensity: null, rectDifferences: null }),
-      ),
+      appearanceImpactOf(squareDto(), patch({ subtype: 'square', cloudyIntensity: null })),
     ).toBe('inert');
   });
 
@@ -171,7 +182,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
     );
   });
 
-  it('advisory rotation on the vertex family is inert; box rotation is not', () => {
+  it('a turn draws a polygon again, as it does a box', () => {
     const poly = dto({
       subtype: 'polygon',
       rect: rect(0, 0, 100, 100),
@@ -181,11 +192,13 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
         { x: 50, y: 90 },
       ],
     });
-    expect(appearanceImpactOf(poly, patch({ subtype: 'polygon', rotation: 45 }))).toBe('inert');
+    expect(appearanceImpactOf(poly, patch({ subtype: 'polygon', rotation: 45 }))).toBe(
+      'regenerate',
+    );
     expect(
       appearanceImpactOf(
         squareDto(),
-        patch({ subtype: 'square', rotation: 45, rect: rect(100, 100, 200, 200) }),
+        patch({ subtype: 'square', rotation: 45, box: rect(100, 100, 200, 200) }),
       ),
     ).toBe('regenerate');
   });
@@ -194,22 +207,22 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
 describe('appearanceImpactOf — verified rigid translation', () => {
   it('a pure move inside a FULL projection classifies as translation', () => {
     // The exact real-world case: today's plugin ships every style key on a
-    // drag. Unchanged values diff away; the remaining rect is a same-size move.
-    const p = fullSquarePatch({ rect: rect(130, 80, 230, 180) });
+    // drag. Unchanged values diff away; the remaining box is a same-size move.
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180) });
     expect(appearanceImpactOf(squareDto(), p)).toBe('translation');
   });
 
   it('a resize is NOT a translation', () => {
-    const p = fullSquarePatch({ rect: rect(100, 100, 210, 200) });
+    const p = fullSquarePatch({ box: rect(100, 100, 210, 200) });
     expect(appearanceImpactOf(squareDto(), p)).toBe('regenerate');
   });
 
   it('a move combined with a real style change regenerates', () => {
-    const p = fullSquarePatch({ rect: rect(130, 80, 230, 180), strokeWidth: 4 });
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180), strokeWidth: 4 });
     expect(appearanceImpactOf(squareDto(), p)).toBe('regenerate');
   });
 
-  it('polygon: rect + vertices shifted by one delta is a translation', () => {
+  it('polygon: vertices shifted by one delta are a translation', () => {
     const poly = dto({
       subtype: 'polygon',
       rect: rect(0, 0, 100, 100),
@@ -221,7 +234,6 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     });
     const moved = patch({
       subtype: 'polygon',
-      rect: rect(5, -7, 105, 93),
       vertices: [
         { x: 15, y: 3 },
         { x: 95, y: 3 },
@@ -231,7 +243,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(poly, moved)).toBe('translation');
   });
 
-  it('polygon: a rect move that leaves vertices behind regenerates', () => {
+  it('polygon: a rect alone is not a move (the engine works it out from the vertices)', () => {
     const poly = dto({
       subtype: 'polygon',
       rect: rect(0, 0, 100, 100),
@@ -255,7 +267,6 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     });
     const skewed = patch({
       subtype: 'ink',
-      rect: rect(10, 10, 110, 110),
       inkList: [
         [
           { x: 20, y: 20 },
@@ -266,7 +277,6 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(ink, skewed)).toBe('regenerate');
     const rigid = patch({
       subtype: 'ink',
-      rect: rect(10, 10, 110, 110),
       inkList: [
         [
           { x: 20, y: 20 },
@@ -277,56 +287,52 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(appearanceImpactOf(ink, rigid)).toBe('translation');
   });
 
-  it('text markup: rect + quadPoints riding one delta is a translation', () => {
+  it('text markup: quadPoints riding one delta are a translation', () => {
     const hl = dto({
       subtype: 'highlight',
       rect: rect(0, 0, 100, 20),
       quadPoints: [
         {
-          p1: { x: 0, y: 20 },
-          p2: { x: 100, y: 20 },
-          p3: { x: 0, y: 0 },
-          p4: { x: 100, y: 0 },
+          upperLeft: { x: 0, y: 20 },
+          upperRight: { x: 100, y: 20 },
+          lowerLeft: { x: 0, y: 0 },
+          lowerRight: { x: 100, y: 0 },
         },
       ],
     });
     const moved = patch({
       subtype: 'highlight',
-      rect: rect(0, -30, 100, -10),
       quadPoints: [
         {
-          p1: { x: 0, y: -10 },
-          p2: { x: 100, y: -10 },
-          p3: { x: 0, y: -30 },
-          p4: { x: 100, y: -30 },
+          upperLeft: { x: 0, y: -10 },
+          upperRight: { x: 100, y: -10 },
+          lowerLeft: { x: 0, y: -30 },
+          lowerRight: { x: 100, y: -30 },
         },
       ],
     });
     expect(appearanceImpactOf(hl, moved)).toBe('translation');
   });
 
-  it('rotated box: translation must carry the transform group unchanged + shifted', () => {
-    const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
-    // rect moved with rotation omitted: the tri-state writer PRESERVES the
-    // rotation, but the (also preserved) unrotatedRect did not ride the delta
-    // — an unproven translation, so the safe path re-bakes.
+  it('turned box: a move of the box that keeps its turn is a translation', () => {
+    const turned = squareDto({ rotation: 90, rect: rect(100, 100, 200, 200) });
+    // The rotation omitted is kept (tri-state), so the box alone moves it.
     expect(
-      appearanceImpactOf(rotated, patch({ subtype: 'square', rect: rect(110, 100, 210, 200) })),
-    ).toBe('regenerate');
-    // the full group riding the same delta is a translation
-    const moved = patch({
-      subtype: 'square',
-      rect: rect(110, 100, 210, 200),
-      rotation: 90,
-      unrotatedRect: rect(110, 100, 210, 200),
-    });
-    expect(appearanceImpactOf(rotated, moved)).toBe('translation');
+      appearanceImpactOf(turned, patch({ subtype: 'square', box: rect(110, 100, 210, 200) })),
+    ).toBe('translation');
+    // Stated unchanged, the same.
+    const moved = patch({ subtype: 'square', box: rect(110, 100, 210, 200), rotation: 90 });
+    expect(appearanceImpactOf(turned, moved)).toBe('translation');
+    // A new turn draws it again.
+    const spun = patch({ subtype: 'square', box: rect(110, 100, 210, 200), rotation: 45 });
+    expect(appearanceImpactOf(turned, spun)).toBe('regenerate');
   });
 
-  it('free-text callout: rect + calloutLine + box translate together', () => {
+  it('free-text callout: box + calloutLine translate together', () => {
     const callout = dto({
       subtype: 'free-text',
       rect: rect(0, 0, 300, 100),
+      box: rect(150, 0, 300, 100),
       calloutLine: [
         { x: 10, y: 10 },
         { x: 80, y: 40 },
@@ -336,7 +342,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     });
     const moved = patch({
       subtype: 'free-text',
-      rect: rect(20, 10, 320, 110),
+      box: rect(170, 10, 320, 110),
       calloutLine: [
         { x: 30, y: 20 },
         { x: 100, y: 50 },
@@ -348,56 +354,69 @@ describe('appearanceImpactOf — verified rigid translation', () => {
   });
 
   it('tri-state clears that remove a real entry regenerate', () => {
-    const cloudy = squareDto({
-      cloudyIntensity: 2,
-      rectDifferences: { left: 9, top: 9, right: 9, bottom: 9 },
-    });
-    expect(
-      appearanceImpactOf(
-        cloudy,
-        patch({ subtype: 'square', cloudyIntensity: null, rectDifferences: null }),
-      ),
-    ).toBe('regenerate');
+    const cloudy = squareDto({ cloudyIntensity: 2, rect: rect(91, 91, 209, 209) });
+    expect(appearanceImpactOf(cloudy, patch({ subtype: 'square', cloudyIntensity: null }))).toBe(
+      'regenerate',
+    );
   });
 
-  it('the plugin total trio (rotation: null on an unrotated shape) diffs away on a move', () => {
-    // Unrotated shapes emit { rotation: null, unrotatedRect: null } — null on
-    // an absent entry is a no-op, so a pure move still verifies as a
-    // translation and preserves /AP.
-    const p = fullSquarePatch({
-      rect: rect(130, 80, 230, 180),
-      rotation: null,
-      unrotatedRect: null,
-    });
+  it('rotation: null on an upright shape diffs away on a move', () => {
+    // Upright shapes emit `rotation: null` — null on an absent entry is a
+    // no-op, so a pure move still verifies as a translation and preserves /AP.
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180), rotation: null });
     expect(appearanceImpactOf(squareDto(), p)).toBe('translation');
   });
 
   it('clearing a REAL rotation during a move regenerates', () => {
-    const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
-    const p = patch({
-      subtype: 'square',
-      rect: rect(110, 100, 210, 200),
-      rotation: null,
-      unrotatedRect: null,
-    });
+    const rotated = squareDto({ rotation: 90 });
+    const p = patch({ subtype: 'square', box: rect(110, 100, 210, 200), rotation: null });
     expect(appearanceImpactOf(rotated, p)).toBe('regenerate');
   });
 
   it('an epsilon-scale move is inert, a sub-visible-but-real move is a translation', () => {
     expect(
-      appearanceImpactOf(
-        squareDto(),
-        fullSquarePatch({ rect: rect(100.0005, 100, 200.0005, 200) }),
-      ),
+      appearanceImpactOf(squareDto(), fullSquarePatch({ box: rect(100.0005, 100, 200.0005, 200) })),
     ).toBe('inert');
     expect(
-      appearanceImpactOf(squareDto(), fullSquarePatch({ rect: rect(100.1, 100, 200.1, 200) })),
+      appearanceImpactOf(squareDto(), fullSquarePatch({ box: rect(100.1, 100, 200.1, 200) })),
     ).toBe('translation');
   });
 
   it('a subtype mismatch is conservatively regenerate', () => {
     expect(
-      appearanceImpactOf(squareDto(), patch({ subtype: 'circle', rect: rect(0, 0, 1, 1) })),
+      appearanceImpactOf(squareDto(), patch({ subtype: 'circle', box: rect(0, 0, 1, 1) })),
     ).toBe('regenerate');
+  });
+});
+
+describe('appearanceChangeOf — the distance a translation moves by', () => {
+  it("in the file's coordinates: how far the box's corner moved", () => {
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180) });
+    expect(appearanceChangeOf(squareDto(), p)).toEqual({
+      impact: 'translation',
+      by: { x: 30, y: -20 },
+    });
+  });
+
+  it('in page space: the same question, on page-space boxes and points', () => {
+    const square = {
+      subtype: 'square',
+      rect: { x: 100, y: 100, width: 100, height: 100 },
+      box: { x: 100, y: 100, width: 100, height: 100 },
+      rotation: null,
+      color: '#008000',
+    } as unknown as Annotation;
+    const moved = { subtype: 'square', box: { x: 130, y: 120, width: 100, height: 100 } };
+    expect(appearanceChangeOf(square, moved as AnnotationPatch)).toEqual({
+      impact: 'translation',
+      by: { x: 30, y: 20 },
+    });
+    const resized = { subtype: 'square', box: { x: 100, y: 100, width: 120, height: 100 } };
+    expect(appearanceChangeOf(square, resized as AnnotationPatch)).toEqual({
+      impact: 'regenerate',
+    });
+    expect(appearanceChangeOf(square, { subtype: 'square', locked: true })).toEqual({
+      impact: 'inert',
+    });
   });
 });

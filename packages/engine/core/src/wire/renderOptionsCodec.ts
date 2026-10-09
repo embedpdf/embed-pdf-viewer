@@ -1,53 +1,48 @@
 import { flatten, type WireFlat } from './flatten';
-import { encodeAnnotationAppearancesRenderToken, encodeRenderToken } from './tokens';
-import type {
-  AnnotationAppearanceImageOptions,
-  AnnotationAppearanceRenderOptions,
+import {
+  encodeAnnotationAppearancesRenderToken,
+  encodeAppearanceModes,
+  encodeRenderToken,
+  encodeWidgetAppearancesRenderToken,
+} from './tokens';
+import {
+  appearanceModesOf,
+  type AnnotationAppearanceImageOptions,
+  type AnnotationAppearanceRenderOptions,
 } from '../dto/AnnotationRender';
 import type { PageImageOptions, PageRenderOptions } from '../dto/PageRender';
 
+/** A picture's pins: `contentVersion`, and the pins of what its family draws. */
 export interface RenderVersions {
   contentVersion: number;
   annotationVersion?: number;
+  widgetVersion?: number;
 }
 
 /**
  * Project image render options plus cache versions into the flat wire shape
  * the render token encoder consumes. The output is a generic dotted-key map
- * (`viewport.kind`, `target.rect.left`, …) — the schema and codec never need
+ * (`viewport.kind`, `target.rect.x`, …) — the schema and codec never need
  * to know about specific option fields. Adding a new render option means
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * Token/path rule: tokens carry VERSION PINS and RENDER
- * PARAMETERS; anything that changes the artifact's plane-dependency set is
- * PATH-expressed. Annotatedness changes the planes (`content` vs
- * `content + annotations`), so the wire map never carries
- * `includeAnnotations` — the caller picks the path FAMILY
- * (`…/render/pages/` vs `…/render/annotated/pages/`) and passes
- * `annotationVersion` iff it chose the annotated one. Contradictory states
- * are unrepresentable; each family's query schema enforces its own pin
- * grammar structurally.
- *
- * Semantic validation (viewport-kind invariants, per-family pin presence,
- * rect coherence) lives in `PageRenderQuerySchema` /
- * `PageRenderAnnotatedQuerySchema` and runs when the resulting URL is
- * decoded server-side. Round-tripping (flatten → encode → decode →
- * unflatten → schema parse) recovers the original SDK options.
+ * What the picture draws is never in the token: the caller picks the
+ * family's path (`PAGE_RENDER_FAMILIES`) and passes that family's pins.
+ * Each family's query schema checks its own pins when the URL is decoded
+ * server-side. Round-tripping (flatten → encode → decode → unflatten →
+ * schema parse) recovers the original SDK options.
  */
 export function renderImageOptionsToWire(
   options: PageImageOptions,
   versions: RenderVersions,
 ): WireFlat {
-  // Path-expressed, never token-expressed (see above).
-  const { includeAnnotations: _pathExpressed, ...wireOptions } = options;
-  return flatten({
-    ...wireOptions,
-    contentVersion: versions.contentVersion,
-    ...(versions.annotationVersion !== undefined
-      ? { annotationVersion: versions.annotationVersion }
-      : {}),
-  });
+  const {
+    includeAnnotations: _inThePath,
+    includeFormFields: _alsoInThePath,
+    ...wireOptions
+  } = options;
+  return flatten({ ...wireOptions, ...versions });
 }
 
 /**
@@ -62,27 +57,25 @@ export function renderImageOptionsToToken(
 }
 
 /**
- * Re-attach `includeAnnotations` onto the worker-side `PageRenderOptions`
- * shape. Pure shape transform; consumed by the server route after
- * `PageRenderQuerySchema` has produced the SDK-shaped options.
+ * The worker-side `PageRenderOptions` of a parsed picture request: the
+ * render options, and what its family draws (stamped by the family's query
+ * schema). Pure shape transform; image encoding stays out.
  */
-export function pageRenderOptionsFromImageOptions(
-  options: PageImageOptions,
-  includeAnnotations: boolean,
-): PageRenderOptions {
+export function pageRenderOptionsFromImageOptions(options: PageImageOptions): PageRenderOptions {
   return {
     ...(options.target ? { target: options.target } : {}),
     ...(options.viewport ? { viewport: options.viewport } : {}),
     ...(options.rotation !== undefined ? { rotation: options.rotation } : {}),
     ...(options.background !== undefined ? { background: options.background } : {}),
-    includeAnnotations,
+    includeAnnotations: options.includeAnnotations ?? false,
+    includeFormFields: options.includeFormFields ?? false,
   };
 }
 
 /**
  * Cache version for the appearance render token. Appearances depend only on
  * the annotation `/AP` stream, so `annotationVersion` is the sole key —
- * deliberately NOT `contentVersion`.
+ * deliberately not `contentVersion`.
  */
 export interface AnnotationRenderVersion {
   annotationVersion: number;
@@ -97,10 +90,7 @@ export function annotationAppearancesImageOptionsToWire(
   options: AnnotationAppearanceImageOptions,
   versions: AnnotationRenderVersion,
 ): WireFlat {
-  return flatten({
-    ...options,
-    annotationVersion: versions.annotationVersion,
-  });
+  return appearancesToWire(options, { annotationVersion: versions.annotationVersion });
 }
 
 /** Convenience: build the full encoded appearance render token in one call. */
@@ -114,6 +104,47 @@ export function annotationAppearancesImageOptionsToToken(
 }
 
 /**
+ * Cache version for the widget appearance token: a page's widget images
+ * change exactly when its widgets do.
+ */
+export interface WidgetRenderVersion {
+  widgetVersion: number;
+}
+
+/** The widget twin of {@link annotationAppearancesImageOptionsToWire}. */
+export function widgetAppearancesImageOptionsToWire(
+  options: AnnotationAppearanceImageOptions,
+  versions: WidgetRenderVersion,
+): WireFlat {
+  return appearancesToWire(options, { widgetVersion: versions.widgetVersion });
+}
+
+/** The widget twin of {@link annotationAppearancesImageOptionsToToken}. */
+export function widgetAppearancesImageOptionsToToken(
+  options: AnnotationAppearanceImageOptions,
+  versions: WidgetRenderVersion,
+): string {
+  return encodeWidgetAppearancesRenderToken(widgetAppearancesImageOptionsToWire(options, versions));
+}
+
+/**
+ * Appearance options and a pin, flat. `modes` only when it asks for fewer
+ * than every mode, as one value, so every request for all of them is one URL.
+ */
+function appearancesToWire(
+  options: AnnotationAppearanceImageOptions,
+  pin: Record<string, number>,
+): WireFlat {
+  const { modes, ...rest } = options;
+  const asked = appearanceModesOf(modes);
+  return flatten({
+    ...rest,
+    ...(asked ? { modes: encodeAppearanceModes(asked) } : {}),
+    ...pin,
+  });
+}
+
+/**
  * Strip image-encoding fields, leaving the worker-side
  * `AnnotationAppearanceRenderOptions`. Pure shape transform consumed by the
  * server route after `AnnotationAppearancesQuerySchema` produces the
@@ -123,7 +154,7 @@ export function annotationRenderOptionsFromImageOptions(
   options: AnnotationAppearanceImageOptions,
 ): AnnotationAppearanceRenderOptions {
   return {
-    ...(options.scale !== undefined ? { scale: options.scale } : {}),
+    ...(options.viewport ? { viewport: options.viewport } : {}),
     ...(options.rotation !== undefined ? { rotation: options.rotation } : {}),
     ...(options.modes ? { modes: options.modes } : {}),
   };

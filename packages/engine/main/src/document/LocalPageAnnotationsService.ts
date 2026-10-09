@@ -1,42 +1,49 @@
 import {
   AbortablePromise,
+  annotationResourceBuffers,
   CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
-  createPageImageHandle,
-  normalizeAnnotationDraft,
-  normalizeAnnotationPatch,
+  deletedAnnotationsOf,
+  hasAnnotationResources,
+  opIdOf,
+  resolveAnnotationResources,
+  withFileFromResource,
   wirePack,
   type EngineRenderPolicy,
-  type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
   type AnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
-  type AnnotationListPageSnapshot,
+  type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
+  type AnnotationResourceRole,
+  type AnnotationCreateOptions,
+  type AnnotationUpdateOptions,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
-  type AnnotationMoveResult,
-  type PageFlattenUsage,
+  type AnnotationPosition,
+  type AnnotationReorderResult,
+  type FlattenWriteOptions,
   type AnnotationUpdateResult,
-  type AttachmentContent,
-  type CollabTarget,
-  type PageAnnotationsService,
-  type PageObjectNumber,
+  type LocalPageAnnotationsService as LocalPageAnnotationsServiceContract,
   type PageRef,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
+import {
+  renderAppearanceImages,
+  renderAppearanceRasters,
+  type AppearanceBatchContext,
+} from './appearanceBatch';
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
-import { assertAppearanceOnLattice, withAppearanceBudget } from '../render/renderPolicyGuard';
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -50,13 +57,13 @@ interface DocClosedView {
  * sees its own writes immediately.
  *
  * Every mutation publishes its result to the document's event stream
- * AFTER the worker confirms — ground truth, never optimistic.
+ * after the worker confirms — ground truth, never optimistic.
  */
-export class LocalPageAnnotationsService implements PageAnnotationsService {
+export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceContract {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly encoder: LocalImageEncoder,
     private readonly guard: ScopeGuard,
@@ -64,7 +71,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
-  list(): AbortablePromise<AnnotationListPageSnapshot> {
+  list(): AbortablePromise<AnnotationList> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -79,39 +86,31 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.listFullPage',
-            jobId,
-            docId,
-            page: ref,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
-    return AbortablePromise.run<AnnotationListPageSnapshot>(async (signal) => {
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'annotations.list', effect: 'read', jobId, docId, pages: [ref] }),
+    });
+    return AbortablePromise.run<AnnotationList>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
-      if (payload.tag !== 'annotations.listFullPage') {
+      if (payload.tag !== 'annotations.list') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      return payload.snapshot;
+      return payload.list;
     });
   }
 
-  downloadFile(ref: AnnotationRef): AbortablePromise<AttachmentContent> {
+  downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // Attachment bytes egress content (a partial download), so like
-    // `pages.extract` this gates on `doc.download` — seeing the annotation
-    // (`doc.annotate.read`) does not imply extracting its file.
+    // A resource egresses content (a partial download), so like
+    // `pages.extract` this gates on `doc.download`: seeing the annotation
+    // (`doc.annotate.read`) does not imply extracting its bytes.
     try {
       this.guard.assertCapability('doc.download');
     } catch (err) {
@@ -119,134 +118,56 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     }
     const docId = this.docId;
     const page = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.readFile',
-            jobId,
-            docId,
-            page,
-            ref,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
-    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+    const kind = role === 'file' ? 'annotations.readFile' : 'annotations.readAppearance';
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ kind, effect: 'read', jobId, docId, page, ref }),
+    });
+    return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
+      if (payload.tag === 'annotations.readAppearance') return new Uint8Array(payload.bytes);
       if (payload.tag !== 'annotations.readFile') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      const { content } = payload;
-      if (content.bytes === undefined) {
+      if (payload.content.bytes === undefined) {
         throw new EngineError(
           EngineErrorCode.WireFormat,
           'annotations.readFile returned no bytes (path mode is server-only)',
         );
       }
-      return {
-        bytes: new Uint8Array(content.bytes),
-        name: content.name,
-        ...(content.mimeType !== undefined ? { mimeType: content.mimeType } : {}),
-      };
+      return new Uint8Array(payload.content.bytes);
     });
+  }
+
+  renderAppearancesRaw(
+    options?: AnnotationAppearanceRenderOptions,
+  ): AbortablePromise<AnnotationAppearancesResult> {
+    return renderAppearanceRasters(this.appearanceBatch(), 'annotations', options);
   }
 
   renderAppearances(
-    options?: AnnotationAppearanceRenderOptions,
-  ): AbortablePromise<AnnotationAppearancesResult> {
-    if (this.view.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
-      );
-    }
-    // Rendering an appearance reveals the annotation's `/AP` stream, so it
-    // gates on the same `doc.annotate.read` capability as `list()` — reading
-    // an annotation implies you may see how it draws.
-    // The deployment policy applies the same way it does to full pages:
-    // appearances are sized by `rect × scale`, so an enforced appearance
-    // lattice bounds the scale and the pixel budget rides into the worker.
-    try {
-      this.guard.assertCapability('doc.annotate.read');
-      assertAppearanceOnLattice(this.policy, options);
-    } catch (err) {
-      return AbortablePromise.rejectReason(err);
-    }
-    const effectiveOptions = withAppearanceBudget(this.policy, options);
-    const docId = this.docId;
-    const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.renderAppearances',
-            jobId,
-            docId,
-            page: ref,
-            ...(effectiveOptions ? { options: effectiveOptions } : {}),
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
-    return AbortablePromise.run<AnnotationAppearancesResult>(async (signal) => {
-      const onAbort = () => submission.abort(signal.reason);
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-      const payload = await submission;
-      if (payload.tag !== 'annotations.renderAppearances') {
-        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
-      }
-      return payload.result;
-    });
-  }
-
-  renderAppearanceImages(
     options: AnnotationAppearanceImageOptions = {},
   ): AbortablePromise<AnnotationAppearanceImagesResult> {
-    return AbortablePromise.run<AnnotationAppearanceImagesResult>(async (signal) => {
-      const raw = this.renderAppearances(options);
-      const onAbort = () => raw.abort(signal.reason);
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-      const result = await raw;
-      if (signal.aborted)
-        throw new EngineError(EngineErrorCode.Aborted, 'annotation appearance render aborted');
-
-      // Encode each raster sequentially. `encoder.encode` transfers the
-      // raster's backing buffer into a worker, so we never touch
-      // `appearance.raster.data` again after this point.
-      const appearances: AnnotationAppearanceImage[] = [];
-      for (const appearance of result.appearances) {
-        if (signal.aborted)
-          throw new EngineError(EngineErrorCode.Aborted, 'annotation appearance render aborted');
-        const encoded = await this.encoder.encode(appearance.raster, options, signal);
-        if (encoded.source.kind !== 'bytes') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            'local appearance image handle expected a byte source',
-          );
-        }
-        const bytes = encoded.source.bytes;
-        const image = createPageImageHandle(encoded, {
-          async blob() {
-            return new Blob([copyToExactArrayBuffer(bytes)], { type: encoded.contentType });
-          },
-        });
-        appearances.push({
-          ref: appearance.ref,
-          mode: appearance.mode,
-          rect: appearance.rect,
-          image,
-        });
-      }
-      return { pageState: result.pageState, appearances };
-    });
+    return renderAppearanceImages(this.appearanceBatch(), this.encoder, 'annotations', options);
   }
 
-  create(draft: AnnotationDraft): AbortablePromise<AnnotationCreateResult> {
+  private appearanceBatch(): AppearanceBatchContext {
+    return {
+      docId: this.docId,
+      page: this.ref,
+      queue: this.queue,
+      isClosed: () => this.view.isClosed(),
+      guard: this.guard,
+      policy: this.policy,
+    };
+  }
+
+  create(
+    draft: AnnotationDraft,
+    options: AnnotationCreateOptions = {},
+  ): AbortablePromise<AnnotationCreateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -256,43 +177,53 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     // `annotations:create:filter` collab scope (target is the handle's
     // own identity). Under the narrowing model, presence of `modify`
     // also satisfies create when no create-collab is given.
+    // A group other than the caller's own takes the same authority as
+    // reassigning one (cloud parity).
+    const groupId = (draft as { groupId?: string | null }).groupId ?? undefined;
+    let opId: string;
     try {
-      const target = this.guard.targetForSelfCreate();
-      this.guard.assertCollab('create', target);
+      opId = opIdOf(options);
+      if (groupId !== undefined && groupId !== this.guard.identity().groupId) {
+        this.guard.assertSetGroup(groupId);
+      }
+      this.guard.assertCollab('create', this.guard.targetForSelfCreate(groupId));
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
-    const actor = this.guard.actorForCreate();
+    const actor = this.guard.actorForCreate(groupId);
+    const { resources, objectNumber } = options;
+    // A `File` brings its name and type; the bytes travel without them.
+    const data = withFileFromResource(draft, resources);
 
     const docId = this.docId;
     const ref = this.ref;
+    // Queued now, so it keeps its place among this document's calls while
+    // its bytes are read.
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      line: { effect: 'write', docId, page: ref },
+      buildPack: async (jobId: JobId) => {
+        // Each resource becomes a private copy (async: Blob bytes resolve
+        // async). The copy rides the wirePack transfer list and is detached
+        // by the worker transport, while the caller's bytes stay intact.
+        const wireResources = await resolveAnnotationResources(resources);
+        return wirePack(
+          {
+            kind: 'annotations.create',
+            effect: 'write',
+            jobId,
+            opId,
+            docId,
+            page: ref,
+            draft: data,
+            ...(objectNumber !== undefined ? { objectNumber } : {}),
+            ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
+            ...(actor ? { actor } : {}),
+          },
+          annotationResourceBuffers(wireResources),
+        );
+      },
+    });
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
-      // Split inline BinarySource fields (stamp images, …) into the wire
-      // draft + resource buffers. Async because Blob bytes resolve async.
-      // Each resource is a private copy made by resolveBinarySource (one
-      // copy per call, at the argument boundary); that copy rides the
-      // wirePack transfer list and is detached by the worker transport,
-      // while the caller's Uint8Array stays intact and reusable.
-      const { wire, resources } = await normalizeAnnotationDraft(draft);
-      const resourceBuffers = Object.values(resources).map((r) => r.bytes);
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack(
-              {
-                kind: 'annotations.create',
-                jobId,
-                docId,
-                page: ref,
-                draft: wire,
-                ...(resourceBuffers.length > 0 ? { resources } : {}),
-                ...(actor ? { actor } : {}),
-              },
-              resourceBuffers,
-            ),
-        },
-        { priority: Priority.HIGH },
-      );
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -300,8 +231,8 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       if (payload.tag !== 'annotations.create') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
-        type: 'annotation.created',
+      this.publisher.publishWrite(opId, {
+        type: 'annotations.created',
         page: this.ref,
         ...payload.result,
       });
@@ -309,53 +240,52 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  update(ref: AnnotationRef, patch: AnnotationPatch): AbortablePromise<AnnotationUpdateResult> {
+  update(
+    ref: AnnotationRef,
+    patch: AnnotationPatch,
+    options: AnnotationUpdateOptions = {},
+  ): AbortablePromise<AnnotationUpdateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    // The worker checks the caller's authority against the annotation inside
+    // the write (its owner, a group reassignment) and stamps the actor it
+    // gives. A signature's protection is the document's, checked here.
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+      this.guard.assertAnnotationsUnprotected();
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const authority = this.guard.annotationAuthority();
+    const { resources } = options;
+    const docId = this.docId;
+    // Queued now, as in create().
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      line: { effect: 'write', docId },
+      buildPack: async (jobId: JobId) => {
+        // Owned copies, as in create().
+        const wireResources = await resolveAnnotationResources(resources);
+        return wirePack(
+          {
+            kind: 'annotations.update',
+            effect: 'write',
+            jobId,
+            opId,
+            docId,
+            ref,
+            patch,
+            authority,
+            ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
+          },
+          annotationResourceBuffers(wireResources),
+        );
+      },
+    });
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-      // Look up the target row's collab identity before the mutation so
-      // the collab check can fire against the existing /EMBD_Metadata.
-      // V1 approach: page-fetch + filter — same as the cloud's
-      // `LayerService.getAnnotationCollabTarget`. Optimizable to a
-      // targeted worker job later.
-      const target = await this.collabTargetForRef(ref, signal);
-      this.guard.assertCollab('update', target);
-
-      // Group reassignment runs `:set-group` against the caller's
-      // default group before building the actor (cloud PATCH parity).
-      const patchGroupId = (patch as { groupId?: string }).groupId;
-      const isReassigning = typeof patchGroupId === 'string' && patchGroupId !== target.groupId;
-      if (isReassigning) {
-        this.guard.assertSetGroup(patchGroupId);
-      }
-      const actor = this.guard.actorForUpdate(target.groupId, patchGroupId);
-
-      const docId = this.docId;
-      // Same binary split as create(): wire patch + owned resource copies
-      // that the transport may detach without touching the caller's bytes.
-      const { wire, resources } = await normalizeAnnotationPatch(patch);
-      const resourceBuffers = Object.values(resources).map((r) => r.bytes);
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack(
-              {
-                kind: 'annotations.update',
-                jobId,
-                docId,
-                ref,
-                patch: wire,
-                ...(resourceBuffers.length > 0 ? { resources } : {}),
-                ...(actor ? { actor } : {}),
-              },
-              resourceBuffers,
-            ),
-        },
-        { priority: Priority.HIGH },
-      );
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -363,8 +293,8 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       if (payload.tag !== 'annotations.update') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
-        type: 'annotation.updated',
+      this.publisher.publishWrite(opId, {
+        type: 'annotations.updated',
         page: this.ref,
         ...payload.result,
       });
@@ -372,29 +302,37 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     });
   }
 
-  delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult> {
+  delete(ref: AnnotationRef, options?: WriteOptions): AbortablePromise<AnnotationDeleteResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    // The annotation goes with its thread and popups: the worker checks the
+    // caller's authority against each of them inside the write. A
+    // signature's protection is the document's, checked here.
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+      this.guard.assertAnnotationsUnprotected();
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const authority = this.guard.annotationAuthority();
     return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
-      const target = await this.collabTargetForRef(ref, signal);
-      this.guard.assertCollab('delete', target);
-
       const docId = this.docId;
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack({
-              kind: 'annotations.delete',
-              jobId,
-              docId,
-              ref,
-            }),
-        },
-        { priority: Priority.HIGH },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId: JobId) =>
+          wirePack({
+            kind: 'annotations.delete',
+            effect: 'write',
+            jobId,
+            opId,
+            docId,
+            ref,
+            authority,
+          }),
+      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -402,55 +340,63 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       if (payload.tag !== 'annotations.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
-        type: 'annotation.deleted',
+      this.publisher.publishWrite(opId, {
+        type: 'annotations.deleted',
         page: this.ref,
+        deleted: deletedAnnotationsOf(payload.result),
         ...payload.result,
       });
       return payload.result;
     });
   }
 
-  move(refs: AnnotationRef[], toIndex: number): AbortablePromise<AnnotationMoveResult> {
+  reorder(
+    refs: AnnotationRef[],
+    position: AnnotationPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<AnnotationReorderResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // Move is a structural reorder — gates on `doc.annotate.modify`,
-    // not on per-record collab (no specific target to check). For
-    // wildcard / admin tokens, this passes trivially.
+    // The worker checks the caller's authority against each annotation it
+    // moves, inside the write: a reorder takes `doc.annotate.modify`. A
+    // signature's protection is the document's, checked here.
+    let opId: string;
     try {
-      this.guard.assertCapability('doc.annotate.modify');
+      opId = opIdOf(options);
+      this.guard.assertAnnotationsUnprotected();
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
+    const authority = this.guard.annotationAuthority();
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.move',
-            jobId,
-            docId,
-            page: ref,
-            refs,
-            toIndex,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
-    return AbortablePromise.run<AnnotationMoveResult>(async (signal) => {
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.reorder',
+          effect: 'write',
+          jobId,
+          opId,
+          docId,
+          page: ref,
+          refs,
+          position,
+          authority,
+        }),
+    });
+    return AbortablePromise.run<AnnotationReorderResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
-      if (payload.tag !== 'annotations.move') {
+      if (payload.tag !== 'annotations.reorder') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
-        type: 'annotation.moved',
+      this.publisher.publishWrite(opId, {
+        type: 'annotations.reordered',
         page: this.ref,
         ...payload.result,
       });
@@ -460,8 +406,9 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
 
   flatten(
     refs: AnnotationRef[],
-    usage: PageFlattenUsage = 'display',
+    options?: FlattenWriteOptions,
   ): AbortablePromise<AnnotationFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -469,7 +416,9 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     }
     // `pages.flatten` for a chosen set: rewrites page content and removes
     // the painted annotations, so it carries the whole-page verb's gates.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.modify');
       this.guard.assertCapability('doc.annotate.modify');
     } catch (err) {
@@ -477,20 +426,19 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.flatten',
-            jobId,
-            docId,
-            page: ref,
-            refs,
-            usage,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.flatten',
+          effect: 'contentWrite',
+          jobId,
+          opId,
+          docId,
+          page: ref,
+          refs,
+          usage,
+        }),
+    });
     return AbortablePromise.run<AnnotationFlattenResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -499,8 +447,8 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       if (payload.tag !== 'annotations.flatten') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      if (payload.result.meta !== null) {
-        this.publisher.publishLocal({ type: 'annotations.flattened', ...payload.result });
+      if (payload.wrote) {
+        this.publisher.publishWrite(opId, { type: 'annotations.flattened', ...payload.result });
       }
       return payload.result;
     });
@@ -521,19 +469,17 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.exportAppearance',
-            jobId,
-            docId,
-            page: ref,
-            refs,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.exportAppearance',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          page: ref,
+          refs,
+        }),
+    });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -545,60 +491,4 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       return new Uint8Array(payload.bytes);
     });
   }
-
-  /**
-   * Resolve the collab subject (userId / groupId) of the target row
-   * an UPDATE or DELETE is about to act on. Mirrors the cloud's
-   * `LayerService.getAnnotationCollabTarget` — page-fetch + filter
-   * over the existing listFullPage worker job. Returns `{}` when the
-   * row can't be located; the collab resolver then denies
-   * `:self`/`:group=X` filters and the mutator's own InvalidReference
-   * surfaces the real error.
-   */
-  private async collabTargetForRef(ref: AnnotationRef, signal: AbortSignal): Promise<CollabTarget> {
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.listFullPage',
-            jobId,
-            docId: this.docId,
-            page: ref.page,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
-    const onAbort = () => submission.abort(signal.reason);
-    if (signal.aborted) onAbort();
-    else signal.addEventListener('abort', onAbort, { once: true });
-
-    const payload = await submission;
-    if (payload.tag !== 'annotations.listFullPage') {
-      throw new EngineError(
-        EngineErrorCode.WireFormat,
-        `unexpected payload tag while resolving collab target: ${payload.tag}`,
-      );
-    }
-    const match = payload.snapshot.annotations.find((a) => {
-      switch (ref.kind) {
-        case 'objectNumber':
-          return a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === ref.annotObjectNumber;
-        case 'nm':
-          return a.nm === ref.nm;
-        case 'index':
-          return a.index === ref.index;
-      }
-    });
-    if (!match) return {};
-    return {
-      ...(match.userId !== undefined ? { userId: match.userId } : {}),
-      ...(match.groupId !== undefined ? { groupId: match.groupId } : {}),
-    };
-  }
-}
-
-function copyToExactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const body = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(body).set(bytes);
-  return body;
 }

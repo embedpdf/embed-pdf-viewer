@@ -1,0 +1,298 @@
+---
+title: Annotations in code
+description: Read, create, change, reorder and delete annotations from your own code, with changes shown at once.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Annotations in code
+
+Everything people do with the pointer, your code can do too. `useAnnotation()` gives you the
+annotations on screen, and every change you make shows at once, before the engine has saved it:
+
+```ts
+const { annotation: square } = await annotation.create(page.ref, {
+  subtype: 'square',
+  box: { x: 72, y: 92, width: 200, height: 100 },
+  color: '#0078ff',
+});
+
+await annotation.update(square.ref, { contents: 'Check this table' });
+await annotation.delete(square.ref);
+```
+
+<Example name="annotation/create-update" />
+
+> **Try it:** each button is one call. **Saving…** shows while the engine writes a change.
+
+An annotation here is the engine's record: the same kinds, fields and names as the
+[engine's annotation pages](/docs/engine/annotations). Each kind's page there lists its fields.
+These pages cover what the plugin adds on top.
+
+## Read annotations
+
+```ts
+annotation.list(); // every annotation, in drawing order
+annotation.list({ pages: [page.ref] }); // one page
+annotation.list({ subtype: 'highlight' }); // one kind
+annotation.get(ref); // one, or null
+annotation.getAt(page.ref, { x: 120, y: 80 }); // the topmost one at a point, or null
+```
+
+To keep a component up to date, use `useAnnotationList()`. Your component <Word of="rerenders" />
+when the list changes:
+
+<Snippet name="annotations/with-code/list" />
+
+<Example name="annotation/list" />
+
+> **Try it:** pick a kind, then click a row to go to it.
+
+Each annotation has a `subtype` (its kind), a `rect` (where it is on its page), a `page` and a
+`ref`. Keep the `ref`: it's how you change or delete the annotation later. Positions are in
+points from the top-left of the page; see [Coordinates](../concepts/coordinates).
+
+Annotations are loaded in the background when a document opens. `useAnnotationState()` has a
+`status`: `'loading'` until they're all in, then `'ready'`.
+
+## Create an annotation
+
+`create()` takes the page, then the annotation's kind and fields:
+
+```ts
+const { annotation: note } = await annotation.create(page.ref, {
+  subtype: 'text',
+  rect: { x: 500, y: 72, width: 20, height: 20 },
+  contents: 'Is this total right?',
+});
+```
+
+Fields you leave out get the kind's default. For example, a new annotation prints with the page
+unless you pass `print: false`. Every kind the engine can create, the plugin can too; the
+[engine's pages](/docs/engine/annotations) show each one.
+
+Some options change how the plugin treats the new annotation:
+
+```ts
+await annotation.create(page.ref, { subtype: 'square', box }, undefined, {
+  tool: 'square',
+  select: true,
+});
+```
+
+| Option   | What it does                                                                                   |
+| :------- | :--------------------------------------------------------------------------------------------- |
+| `tool`   | Starts from that tool's defaults, the user's current drawing style, before your own fields.    |
+| `select` | Selects the new annotation, as drawing it would. Without it, code never changes the selection. |
+
+Stamps and file attachments carry bytes. They go in the third argument, `resources`, named for what
+they are: a stamp's `appearance`, an attachment's `file`.
+
+```ts
+const image = await (await fetch('/approved.png')).blob();
+await annotation.create(page.ref, { subtype: 'stamp', box }, { appearance: image });
+
+// A file pinned to the page, drawn as an icon, 20 × 20 like a note
+await annotation.create(
+  page.ref,
+  { subtype: 'file-attachment', rect: { x: 40, y: 60, width: 20, height: 20 } },
+  { file: pickedFile }, // a File brings its name and type
+);
+```
+
+For stamps from a library, see [Stamps](stamps).
+
+### From the selected text
+
+`createFromSelection()` turns the text a person selected into a highlight, an underline, a
+strikeout or a squiggly line, one per page:
+
+```ts
+const { annotations } = await annotation.createFromSelection('highlight');
+```
+
+It takes a tool id, so your own markup tools work too. The text selection is cleared afterwards;
+pass `{ clear: false }` to keep it.
+
+<Example name="annotation/from-selection" />
+
+> **Try it:** the title's first line is selected: press **Highlight**. Then select other words
+> with the pointer and mark them.
+
+## Change an annotation
+
+`update()` takes the `ref` and only the fields you want to change:
+
+```ts
+await annotation.update(ref, { color: '#dc143c', contents: 'Reviewed' });
+```
+
+A field you leave out keeps its value, and `null` removes it (`{ interiorColor: null }` for no
+fill). You can also pass an annotation you read straight back, which makes "change a copy, then
+save it" simple:
+
+```ts
+const square = annotation.get(ref);
+if (square?.subtype === 'square') await annotation.update(ref, { ...square, opacity: 0.5 });
+```
+
+To move or resize any annotation, send a new `rect`:
+
+```ts
+const { rect } = annotation.get(ref)!;
+await annotation.update(ref, { rect: { ...rect, x: rect.x + 40 } }); // 40 points right
+```
+
+For a shape drawn from points, like a line or ink, the engine moves every point for you. The rules
+for resizing are on the engine's [Annotations](/docs/engine/annotations#move-or-resize-by-rect)
+page.
+
+Rotation is a field too: `update(ref, { rotation: 90 })` turns a shape or a stamp to 90° clockwise.
+
+## Delete an annotation
+
+```ts
+await annotation.delete(ref);
+```
+
+Deleting an annotation also deletes its popup and its replies, as other PDF apps do.
+
+## Change the drawing order
+
+Annotations on a page are drawn in order, and the last one is on top. `reorder()` moves
+annotations together, in the order you pass them, next to another annotation of the page or to the
+back or the front:
+
+```ts
+await annotation.reorder([ref], 'start'); // to the back
+await annotation.reorder([ref], 'end'); // to the front
+await annotation.reorder([ref], { after: other }); // just above another annotation
+```
+
+Form fields are drawn above every annotation and keep their own order, so `reorder()` never
+places an annotation above a field.
+
+<Example name="annotation/order" />
+
+> **Try it:** send the green rectangle to the back, then select another and bring it to the
+> front.
+
+## Changes show at once
+
+A change shows the moment you make it. The engine saves it in the background, and your `await`
+resolves once it has. Until then the annotation is **pending**:
+
+```ts
+annotation.isPending(ref); // true while the engine is still saving a change to it
+```
+
+You rarely need this: `get()` and `list()` already show the change. It's useful for a small
+"saving…" hint.
+
+If the engine refuses a change (a lock set by someone else, or permission taken away), the change
+disappears again, and an event says why:
+
+<Snippet name="annotations/with-code/write-failed" />
+
+The `await` of the call that made the change rejects with the same error.
+
+## Copy an annotation
+
+A read passed to `create()` makes the same annotation again, on another page or in another
+document:
+
+```ts
+const copy = annotation.get(ref)!;
+
+await annotation.create(otherPage.ref, copy);
+```
+
+<Example name="annotation/copy" />
+
+> **Try it:** copy the rectangle, then copy the copy: it moves a page further each time. Select the
+> text box to copy it instead.
+
+Stamps and file attachments also need their bytes. Download them first:
+
+```ts
+const drawing = await annotation.downloadResource(stamp.ref, 'appearance');
+await annotation.create(otherPage.ref, stamp, { appearance: drawing });
+
+const file = await annotation.downloadResource(attachment.ref, 'file');
+await annotation.create(otherPage.ref, attachment, { file });
+```
+
+To copy on the **same page**, clear its unique name first: `{ ...copy, nm: null }`. A name is
+unique per page, so a copy with a taken name is refused.
+
+To copy many annotations at once, use [export and import](saving#export-and-import).
+
+## Methods
+
+What `useAnnotation()` gives you directly. Its parts have their own pages: `selection`, `draft` and
+`text` are on [Selecting & editing](selecting#methods), `tools` and `stamps` on
+[Tools & defaults](tools#methods), and `comments` on [Comments & replies](comments#methods).
+
+| Method                                                         | What it does                                                                                                                                                                                                                                     |
+| :------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get(ref)`                                                     | One annotation as it shows now, pending changes included, or `null`                                                                                                                                                                              |
+| `list({ pages?, subtype? })`                                   | Every annotation in drawing order, or the ones on some pages or of one kind. In a component, use `useAnnotationList(filter)`. [Read annotations](#read-annotations)                                                                              |
+| `getAt(page, point)`                                           | The topmost annotation at a point on a page, or `null`. A selected annotation's handles count as the annotation.                                                                                                                                 |
+| `isPending(ref)`                                               | Whether the engine is still saving a change to it. [Changes show at once](#changes-show-at-once)                                                                                                                                                 |
+| `create(page, fields, resources?, { tool?, select? })`         | Creates an annotation from its kind and fields, and shows it at once. A stamp's drawing or an attachment's file goes in `resources`, as `{ appearance }` or `{ file }`. Resolves `{ annotation }`. [Create an annotation](#create-an-annotation) |
+| `createFromSelection(tool, { clear? })`                        | Turns the selected text into a highlight, an underline, a strikeout or a squiggly line, one per page. Resolves `{ annotations }`. [From the selected text](#from-the-selected-text)                                                              |
+| `update(ref, changes, resources?)`                             | Changes only the fields you pass, and `null` removes one. New `resources` replace a stamp's drawing or an attachment's file. Resolves `{ annotation }`. [Change an annotation](#change-an-annotation)                                            |
+| `delete(ref)`                                                  | Deletes an annotation, with its popup and its replies. [Delete an annotation](#delete-an-annotation)                                                                                                                                             |
+| `reorder(refs, position)`                                      | Moves annotations to a new place in their page's drawing order: next to another annotation, or to the back or front. [Change the drawing order](#change-the-drawing-order)                                                                       |
+| `export({ refs?, pages? })`, `import(bundle, options?)`        | Takes annotations out as a bundle, with the bytes they carry, or puts a bundle in. `import` resolves `{ annotations, refMap, dropped }`. [Export and import](saving#export-and-import)                                                           |
+| `downloadResource(ref, role)`                                  | Downloads a stamp's drawing (`'appearance'`) or an attachment's file (`'file'`), ready to pass back to `create()`. [Copy an annotation](#copy-an-annotation)                                                                                     |
+| `links.get(ref)`, `links.set(ref, target)`, `links.clear(ref)` | Where an annotation links to, such as a page or a website: read it, set it, or remove the link                                                                                                                                                   |
+| `refresh()`                                                    | Reads every annotation from the engine again. Changes arrive by themselves, so you rarely need it.                                                                                                                                               |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()`  | Reads `snap`, `chrome` and `afterCreate`, changes them while the app runs, or goes back to what you registered. In a component, use `useAnnotationSettings()`. [Settings](../annotations#settings)                                               |
+| `canRead()`, `canCreate()`, `canUpdate(ref)`, `canDelete(ref)` | Whether the user may see, create, change or delete annotations. The checks that take a `ref` answer for that annotation. [Permissions](#permissions)                                                                                             |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## Permissions
+
+| Permission           | What it allows     | Check                       |
+| :------------------- | :----------------- | :-------------------------- |
+| `doc.annotate.read`  | Seeing annotations | `annotation.canRead()`      |
+| `annotations:create` | Creating them      | `annotation.canCreate()`    |
+| `annotations:update` | Changing them      | `annotation.canUpdate(ref)` |
+| `annotations:delete` | Deleting them      | `annotation.canDelete(ref)` |
+
+A permission can end in `:self`, the user's own annotations, or `:group`, their group's.
+`annotations:update:self` lets someone change what they made and only look at the rest, so the checks
+that take a `ref` answer per annotation. They also follow the annotation's own flags: for a `locked`
+one, `canDelete(ref)` is false, so your UI offers no delete button, even though your own code may still
+delete it (see [Locked annotations](#locked-annotations)). More on
+[Permissions](../concepts/permissions).
+
+## Good to know
+
+### Locked annotations
+
+The `locked` flag stops people from moving, resizing or deleting an annotation, and
+`lockedContents` stops them from changing its text. These flags are for the people using your
+app: your own code can still change a locked annotation, as the engine can. To stop the code
+too, check the flags first.
+
+### What a copy can't carry
+
+A few annotations can't be made again from their read, and `create()` refuses them with
+`invalid-input`:
+
+- a link whose action the engine can't create, such as one that runs JavaScript;
+- a popup whose annotation is gone;
+- a value another app wrote that the engine can't write, such as a beveled border;
+- a kind the engine doesn't know (`subtype: 'unsupported'`).
+
+[Import](saving#export-and-import) leaves these out and tells you which ones, and why.
+
+### Changes other people make
+
+On a shared document, other people's changes arrive as events and show up in `list()` by
+themselves. See [Events, saving & sharing](saving).

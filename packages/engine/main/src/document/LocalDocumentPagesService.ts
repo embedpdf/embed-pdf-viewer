@@ -2,29 +2,31 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type DocumentPagesService,
   type PageDeleteResult,
   type PageInsertBlankSpec,
   type PageInsertResult,
   type PageListSnapshot,
-  type PageMoveResult,
   type PageNameInput,
   type PageNameResult,
   type PageRemoveNameInput,
-  type PageObjectNumber,
   type PageRotateResult,
-  type PageRotation,
   type PageFlattenResult,
-  type PageFlattenUsage,
+  type FlattenWriteOptions,
+  type PageInsertBlankOptions,
+  type WriteOptions,
+  type PagePosition,
   type PageRef,
+  type PageReorderResult,
+  type PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -40,7 +42,7 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
 /**
  * Document-scoped page service for the local engine. All work funnels
  * through the same in-process worker the rest of the engine uses, so
- * `pages.move()` is sequenced against any in-flight annotation
+ * `pages.reorder()` is sequenced against any in-flight annotation
  * mutations: a page reorder cannot land while a write to one of those
  * pages is mid-flight, and the reorder is observed atomically by every
  * subsequent read.
@@ -48,7 +50,7 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
 export class LocalDocumentPagesService implements DocumentPagesService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -69,12 +71,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'pages.list', jobId, docId }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ kind: 'pages.list', effect: 'read', jobId, docId }),
+    });
     return AbortablePromise.run<PageListSnapshot>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -87,65 +86,71 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult> {
+  reorder(
+    pages: PageRef[],
+    position: PagePosition,
+    options?: WriteOptions,
+  ): AbortablePromise<PageReorderResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // pages.move maps to the cloud's POST /pages/move (gated by
+    // pages.reorder maps to the cloud's POST /pages/reorder (gated by
     // `doc.pages.assemble`).
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.move',
-            jobId,
-            docId,
-            pages,
-            destIndex,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
-    return AbortablePromise.run<PageMoveResult>(async (signal) => {
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.reorder',
+          effect: 'contentWrite',
+          jobId,
+          opId,
+          docId,
+          pages,
+          position,
+        }),
+    });
+    return AbortablePromise.run<PageReorderResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
-      if (payload.tag !== 'pages.move') {
+      if (payload.tag !== 'pages.reorder') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
-        type: 'pages.moved',
-        pages,
-        destIndex,
-        ...payload.result,
-      });
+      this.publisher.publishWrite(opId, { type: 'pages.reordered', ...payload.result });
       return payload.result;
     });
   }
 
-  setName(input: PageNameInput): AbortablePromise<PageNameResult> {
-    return this.runNameJob({ kind: 'pages.setName', ...input }, 'pages.setName', input.name);
+  setName(input: PageNameInput, options?: WriteOptions): AbortablePromise<PageNameResult> {
+    return this.runNameJob(
+      { kind: 'pages.setName', effect: 'write', ...input },
+      'pages.setName',
+      input.name,
+      options,
+    );
   }
 
-  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult> {
+  removeName(input: PageRemoveNameInput, options?: WriteOptions): AbortablePromise<PageNameResult> {
     return this.runNameJob(
-      { kind: 'pages.removeName', name: input.name },
+      { kind: 'pages.removeName', effect: 'write', name: input.name },
       'pages.removeName',
       input.name,
+      options,
     );
   }
 
   /**
-   * Named pages are LAYOUT: both verbs are page-structure mutations mapped
+   * Named pages are layout: both verbs are page-structure mutations mapped
    * to the cloud's POST /pages/names and /pages/names/delete (gated by
    * `doc.pages.assemble`, like every page-structure verb) and publish one
    * `pages.named` event carrying the fresh layout.
@@ -154,31 +159,32 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     request:
       | {
           kind: 'pages.setName';
+          effect: 'write';
           name: string;
           page: PageRef;
           replace?: string;
         }
-      | { kind: 'pages.removeName'; name: string },
+      | { kind: 'pages.removeName'; effect: 'write'; name: string },
     tag: 'pages.setName' | 'pages.removeName',
     name: string,
+    options: WriteOptions | undefined,
   ): AbortablePromise<PageNameResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ ...request, jobId, docId }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ ...request, jobId, opId, docId }),
+    });
     return AbortablePromise.run<PageNameResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -187,7 +193,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== tag) {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.named',
         name,
         page: request.kind === 'pages.setName' ? request.page : null,
@@ -197,7 +203,11 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  rotate(pages: PageRef[], rotation: PageRotation): AbortablePromise<PageRotateResult> {
+  rotate(
+    pages: PageRef[],
+    rotation: PdfRotation,
+    options?: WriteOptions,
+  ): AbortablePromise<PageRotateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -205,25 +215,26 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     // pages.rotate maps to the cloud's POST /pages/rotate (gated by
     // `doc.pages.assemble`, like every page-structure verb).
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.rotate',
-            jobId,
-            docId,
-            pages,
-            rotation,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.rotate',
+          effect: 'contentWrite',
+          jobId,
+          opId,
+          docId,
+          pages,
+          rotation,
+        }),
+    });
     return AbortablePromise.run<PageRotateResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -232,7 +243,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.rotate') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.rotated',
         pages,
         rotation,
@@ -242,7 +253,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  delete(pages: PageRef[]): AbortablePromise<PageDeleteResult> {
+  delete(pages: PageRef[], options?: WriteOptions): AbortablePromise<PageDeleteResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -250,24 +261,25 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     // pages.delete maps to the cloud's POST /pages/delete (gated by
     // `doc.pages.assemble`, like every page-structure verb).
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.delete',
-            jobId,
-            docId,
-            pages,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.delete',
+          effect: 'contentWrite',
+          jobId,
+          opId,
+          docId,
+          pages,
+        }),
+    });
     return AbortablePromise.run<PageDeleteResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -276,7 +288,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.deleted',
         pages,
         ...payload.result,
@@ -285,16 +297,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  flatten(
-    pages: PageRef[],
-    usage: PageFlattenUsage = 'display',
-  ): AbortablePromise<PageFlattenResult> {
+  flatten(pages: PageRef[], options?: FlattenWriteOptions): AbortablePromise<PageFlattenResult> {
+    const usage = options?.usage ?? 'display';
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    let opId: string;
     try {
+      opId = opIdOf(options);
       // Flatten rewrites page content and removes painted annotations. Broad
       // annotation authority is deliberate; collab-scoped deletion cannot be
       // safely enforced by a whole-page verb.
@@ -304,13 +316,18 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(error);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pages.flatten', jobId, docId, pages, usage }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.flatten',
+          effect: 'contentWrite',
+          jobId,
+          opId,
+          docId,
+          pages,
+          usage,
+        }),
+    });
     return AbortablePromise.run<PageFlattenResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -319,25 +336,28 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.flatten') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      if (payload.result.meta !== null) {
-        this.publisher.publishLocal({
-          type: 'pages.flattened',
-          ...payload.result,
-        });
+      if (payload.wrote) {
+        this.publisher.publishWrite(opId, { type: 'pages.flattened', ...payload.result });
       }
       return payload.result;
     });
   }
 
-  insert(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult> {
+  insert(
+    bytes: Uint8Array | ArrayBuffer,
+    position: PagePosition = 'end',
+    options?: WriteOptions,
+  ): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // pages.insert is a structure verb like move/delete — same gate; it will
-    // map to the cloud's POST /pages/insert (multipart) when that ships.
+    // pages.insert is a structure verb like reorder/delete — same gate (the
+    // cloud's multipart POST /pages/insert).
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -347,13 +367,21 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     // can't disturb a larger buffer the caller still owns (the open() rule);
     // a bare ArrayBuffer transfers as-is — the call takes ownership.
     const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pages.insert', jobId, docId, bytes: buffer, destIndex }, [buffer]),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'pages.insert',
+            effect: 'contentWrite',
+            jobId,
+            opId,
+            docId,
+            bytes: buffer,
+            position,
+          },
+          [buffer],
+        ),
+    });
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -362,16 +390,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.insert') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
-        type: 'pages.inserted',
-        destIndex,
-        ...payload.result,
-      });
+      this.publisher.publishWrite(opId, { type: 'pages.inserted', ...payload.result });
       return payload.result;
     });
   }
 
-  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult> {
+  insertBlank(
+    spec: PageInsertBlankSpec,
+    position: PagePosition = 'end',
+    options: PageInsertBlankOptions = {},
+  ): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -380,26 +408,28 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     // The blank-page sibling of pages.insert: same structure gate, same
     // event; it will map to the cloud's JSON POST /pages/insert-blank when
     // that ships. Pure parameters — nothing to transfer.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.insertBlank',
-            jobId,
-            docId,
-            size: spec.size,
-            count: spec.count,
-            destIndex,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.insertBlank',
+          effect: 'contentWrite',
+          jobId,
+          opId,
+          docId,
+          size: spec.size,
+          count: spec.count,
+          position,
+          ...(options.objectNumbers ? { objectNumbers: [...options.objectNumbers] } : {}),
+        }),
+    });
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -408,11 +438,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.insertBlank') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
-        type: 'pages.inserted',
-        destIndex,
-        ...payload.result,
-      });
+      this.publisher.publishWrite(opId, { type: 'pages.inserted', ...payload.result });
       return payload.result;
     });
   }
@@ -424,7 +450,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       );
     }
     // pages.extract egresses content bytes (a partial download), so it is
-    // gated by `doc.download` — NOT `doc.pages.assemble`: it reads, never
+    // gated by `doc.download` — not `doc.pages.assemble`: it reads, never
     // restructures. No event is published: nothing about the document changed.
     try {
       this.guard.assertCapability('doc.download');
@@ -432,18 +458,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.extract',
-            jobId,
-            docId,
-            pages,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.extract',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          pages,
+        }),
+    });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

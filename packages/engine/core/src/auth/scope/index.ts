@@ -13,7 +13,9 @@ export type {
   CollabEntity,
   CollabFilter,
   DocCapability,
-  IdentityClaims,
+  FieldAction,
+  FieldFilter,
+  Identity,
   ParsedCapability,
   ParsedCollab,
   ParsedScope,
@@ -28,11 +30,30 @@ export { parseScope, validateScopeArray } from './parser';
 
 export { InvalidScope, MissingIdentity, PermissionDenied } from './errors';
 
+export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './authority';
+export {
+  allowsCapability,
+  annotationWriteCapabilities,
+  annotationWriteCapability,
+  authorizeAnnotationCreate,
+  authorizeCapability,
+  authorizeUnprotected,
+  authorizeAnnotationDelete,
+  authorizeAnnotationUpdate,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
+  authorizeFieldGroup,
+  authorizeFieldWrite,
+} from './authority';
+
 export type { CollabTarget } from './resolver';
+export { collabTargetOf } from './resolver';
 export {
   checkAnyCapability,
+  checkAnyFieldAction,
   checkCapability,
   checkCollab,
+  checkFieldAction,
   checkSetGroup,
   expandedCapabilities,
   expandRawScope,

@@ -52,14 +52,23 @@ describe('matchShortcut', () => {
   });
 
   it('matches printable keys regardless of shift-produced identity', () => {
-    // 'Ctrl+=' on a US layout with shift held produces key '+': the v2
-    // shortcut set lists 'Ctrl+=' and 'Ctrl+NumpadAdd' separately, so '='
+    // 'Ctrl+=' on a US layout with shift held produces key '+': a shortcut
+    // set may list 'Ctrl+=' and 'Ctrl+NumpadAdd' separately, so '='
     // must match only '='.
     const parsed = parseShortcut('Ctrl+=');
     expect(matchShortcut(parsed, stroke({ key: '=', ctrlKey: true }), { isMac: false })).toBe(true);
     expect(
       matchShortcut(parsed, stroke({ key: '+', ctrlKey: true, shiftKey: true }), { isMac: false }),
     ).toBe(false);
+  });
+
+  it('tells a letter with Shift from the letter without it', () => {
+    const undo = parseShortcut('Mod+z');
+    const redo = parseShortcut('Shift+Mod+z');
+    const shifted = stroke({ key: 'Z', metaKey: true, shiftKey: true });
+    expect(matchShortcut(undo, shifted, { isMac: true })).toBe(false);
+    expect(matchShortcut(redo, shifted, { isMac: true })).toBe(true);
+    expect(matchShortcut(undo, stroke({ key: 'z', metaKey: true }), { isMac: true })).toBe(true);
   });
 
   it('matches long key names against event.code for numpad keys', () => {
@@ -78,5 +87,14 @@ describe('formatShortcut', () => {
     expect(formatShortcut('Mod+K', { isMac: false })).toBe('Ctrl+K');
     expect(formatShortcut('Ctrl+Shift+Z', { isMac: true })).toBe('⌃⇧Z');
     expect(formatShortcut('Ctrl+Shift+Z', { isMac: false })).toBe('Ctrl+Shift+Z');
+  });
+
+  it('shows named keys as each platform does', () => {
+    expect(formatShortcut('ArrowRight', { isMac: true })).toBe('→');
+    expect(formatShortcut('Home', { isMac: false })).toBe('Home');
+    expect(formatShortcut('Delete', { isMac: true })).toBe('⌦');
+    expect(formatShortcut('Delete', { isMac: false })).toBe('Delete');
+    expect(formatShortcut('Mod+NumpadAdd', { isMac: false })).toBe('Ctrl+Num +');
+    expect(formatShortcut('F1', { isMac: false })).toBe('F1');
   });
 });

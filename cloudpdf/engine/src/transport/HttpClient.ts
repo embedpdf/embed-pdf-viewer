@@ -2,7 +2,10 @@ import {
   AbortError,
   EngineError,
   EngineErrorCode,
+  parseObjectNumberRanges,
+  type ObjectNumberRange,
   type SerializedEngineError,
+  type TokenSource,
 } from '@embedpdf/engine-core/runtime';
 import {
   applyCdnAccess,
@@ -20,26 +23,30 @@ export interface HttpClientOptions {
    * scenario where the doc-scoped token is provided per-`open` and
    * the engine itself has no engine-level credentials.
    */
-  token?: string | (() => string | Promise<string>);
+  token?: TokenSource;
   /**
-   * Engine-instance session id, sent as `X-Engine-Session-Id` on every
-   * request. The server stores it on mutation audit rows so this
-   * instance's SSE stream can drop its own echoes (exactly-once events).
+   * The open document's session id, sent as `X-Engine-Session-Id` where the
+   * server reads it: on writes, `/access`, the event stream and the bulk
+   * reservation (see {@link RequestOptions}). The server keeps the editing
+   * session's object numbers under it, and stores it on a write's audit
+   * row, so the document's own stream can drop its echoes. Each open
+   * document has its own (see {@link HttpClient.forDocument}); the engine's
+   * client has none.
    */
   sessionId?: string;
   /** Replace the global fetch (e.g. in Node tests with undici). */
   fetch?: typeof globalThis.fetch;
   /**
-   * Document affinity key: `X-CloudPDF-Doc` is sent BY DEFAULT on
+   * Document affinity key: `X-CloudPDF-Doc` is sent by default on
    * origin-bound doc requests so consistent-hash load balancers can pin
    * a document's traffic to one warm replica. Routing hints are
-   * unconditional client behavior — whether they are USED is the
+   * unconditional client behavior — whether they are used is the
    * operator's choice at the load balancer, never the app's. Derived
    * from the request path (`/v1/docs/:docId/…` — the same extraction
    * the Helm chart's uri-mode fallback uses); never sent on
    * CDN-rewritten requests.
    *
-   * `false` is an ESCAPE HATCH, not a feature toggle: use it only
+   * `false` is an escape hatch, not a feature toggle: use it only
    * against a stale server whose CORS allowlist predates the header
    * (browser preflights would fail) or behind a proxy that rejects
    * unknown request headers.
@@ -68,6 +75,31 @@ export interface CdnBinding {
 }
 
 /**
+ * What a write sends beside its request: its `opId` as `Idempotency-Key`,
+ * so a retry is answered with what the first try committed, and how many
+ * object numbers to top the editing session up by.
+ */
+export interface WriteRequest {
+  /** Absent for a request of changes: its body names each change by its own `opId`. */
+  readonly opId?: string;
+  /** `EmbedPDF-Reserve-Object-Numbers`, when more than 0. */
+  readonly reserveObjectNumbers?: number;
+  /** Called with the numbers the response hands out (`EmbedPDF-Object-Numbers`). */
+  readonly onObjectNumbers?: (ranges: ObjectNumberRange[]) => void;
+}
+
+/** How one request is sent, beyond its path and body. */
+export interface RequestOptions {
+  /**
+   * A write: sent as the editing session with its `Idempotency-Key`, and
+   * sent again with the same key after a network failure.
+   */
+  readonly write?: WriteRequest;
+  /** Sent as the editing session though not a write: `/access`, the bulk reservation. */
+  readonly session?: boolean;
+}
+
+/**
  * A raw-bytes response plus its headers. The attachment-file leaves carry
  * their metadata as headers (`Content-Type`, `X-EmbedPDF-File-Name`), so
  * unlike `getBytes` the caller needs the `Headers` object back.
@@ -87,17 +119,20 @@ export class HttpClient {
   private static readonly MAX_RETRIES = 2;
   private static readonly RETRY_AFTER_CAP_MS = 5_000;
   private static readonly RETRY_AFTER_DEFAULT_MS = 1_000;
-  private readonly sessionId: string | null;
+  /** A write whose request failed on the network is sent again after these waits. */
+  private static readonly NETWORK_RETRY_MS = [250, 1_000, 3_000];
+  /** The open document's session id; `null` on the engine's own client. */
+  readonly sessionId: string | null;
   private cdnBinding: CdnBinding | null = null;
 
-  constructor(opts: HttpClientOptions) {
-    this.base = opts.baseUrl.replace(/\/$/, '');
-    const token = opts.token;
+  constructor(private readonly options: HttpClientOptions) {
+    this.base = options.baseUrl.replace(/\/$/, '');
+    const token = options.token;
     this.tokenFn = token === undefined ? null : typeof token === 'function' ? token : () => token;
-    this.sessionId = opts.sessionId ?? null;
-    this.fetchFn = opts.fetch ?? globalThis.fetch.bind(globalThis);
-    this.docAffinityHeader = opts.docAffinityHeader ?? true;
-    this.onRetry = opts.onRetry;
+    this.sessionId = options.sessionId ?? null;
+    this.fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
+    this.docAffinityHeader = options.docAffinityHeader ?? true;
+    this.onRetry = options.onRetry;
   }
 
   /** Normalized server base URL (no trailing slash). */
@@ -116,18 +151,17 @@ export class HttpClient {
   }
 
   /**
-   * Return a clone of this client bound to a different bearer. Used
-   * by `CloudEngine.open` to mint a per-handle client carrying the
-   * per-open token, so each opened document's RPCs go out under
-   * the right authorization without disturbing the engine-level
-   * token.
+   * A client for one open document: this client's settings, the document's
+   * own editing session, its own CDN binding, and `token` as its bearer
+   * when the open names one (else this client's). Two open documents never
+   * share object numbers, event echoes or a CDN binding, even two opens of
+   * the same document on one engine.
    */
-  withToken(token: string | (() => string | Promise<string>)): HttpClient {
+  forDocument({ sessionId, token }: { sessionId: string; token?: TokenSource }): HttpClient {
     return new HttpClient({
-      baseUrl: this.baseUrl,
-      token,
-      ...(this.sessionId ? { sessionId: this.sessionId } : {}),
-      fetch: this.fetchFn,
+      ...this.options,
+      ...(token !== undefined ? { token } : {}),
+      sessionId,
     });
   }
 
@@ -140,11 +174,11 @@ export class HttpClient {
     headers: Record<string, string>,
     signal: AbortSignal,
   ): Promise<Response> {
-    return this.request(path, {
-      method: 'GET',
-      headers: new Headers({ Accept: 'text/event-stream', ...headers }),
-      signal,
-    });
+    return this.request(
+      path,
+      { method: 'GET', headers: new Headers({ Accept: 'text/event-stream', ...headers }), signal },
+      { session: true },
+    );
   }
 
   /**
@@ -152,13 +186,13 @@ export class HttpClient {
    * route everything to origin again — useful on session close or
    * when an adapter swap happens mid-session (rare).
    *
-   * The HttpClient stays dumb about WHEN to do this; the cloud
+   * The HttpClient stays dumb about when to do this; the cloud
    * document handle pushes the binding in after /access succeeds.
    *
    * Side effect: in the browser, signedCookies are written to
    * `document.cookie` once per setCdnAccess call so the CDN edge
-   * receives them on subsequent fetches. Node side ignores cookies
-   * for now (cookie jar wiring deferred until needed for tests).
+   * receives them on subsequent fetches. Outside the browser signed
+   * cookies are ignored: this client keeps no cookie jar.
    */
   setCdnAccess(binding: CdnBinding | null): void {
     this.cdnBinding = binding;
@@ -340,8 +374,9 @@ export class HttpClient {
     body: FormData,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.request(path, { method: 'POST', body, signal });
+    const res = await this.request(path, { method: 'POST', body, signal }, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -351,8 +386,9 @@ export class HttpClient {
     body: FormData,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.request(path, { method: 'PATCH', body, signal });
+    const res = await this.request(path, { method: 'PATCH', body, signal }, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -361,8 +397,9 @@ export class HttpClient {
     body: unknown,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.requestJson(path, 'POST', body, signal);
+    const res = await this.requestJson(path, 'POST', body, signal, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -371,8 +408,27 @@ export class HttpClient {
     body: unknown,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    return this.parseJsonResponse(await this.requestJson(path, 'PUT', body, signal), parser);
+    return this.parseJsonResponse(
+      await this.requestJson(path, 'PUT', body, signal, options),
+      parser,
+    );
+  }
+
+  /** POST a JSON body and parse a `multipart/form-data` response (a large annotation export). */
+  async postJsonFormData(path: string, body: unknown, signal: AbortSignal): Promise<FormData> {
+    const res = await this.request(path, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: new Headers({
+        'Content-Type': 'application/json',
+        Accept: 'multipart/form-data',
+      }),
+      signal,
+    });
+    if (!res.ok) await this.throwFromBody(res);
+    return await res.formData();
   }
 
   /** POST a JSON body and return the raw binary response (pages.extract). */
@@ -389,12 +445,13 @@ export class HttpClient {
     contentType: string,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
     const headers = new Headers({ 'Content-Type': contentType });
     // Copy into a fresh ArrayBuffer: `bytes` may be a view over a larger
     // (or SharedArrayBuffer-backed) buffer, which fetch bodies reject.
     const body = new Uint8Array(bytes).buffer as ArrayBuffer;
-    const res = await this.request(path, { method: 'POST', body, headers, signal });
+    const res = await this.request(path, { method: 'POST', body, headers, signal }, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -403,26 +460,20 @@ export class HttpClient {
     body: unknown,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.requestJson(path, 'PATCH', body, signal);
+    const res = await this.requestJson(path, 'PATCH', body, signal, options);
     return await this.parseJsonResponse(res, parser);
   }
 
-  async deleteJson<T>(path: string, parser: (raw: unknown) => T, signal: AbortSignal): Promise<T> {
-    const res = await this.request(path, { method: 'DELETE', signal });
+  async deleteJson<T>(
+    path: string,
+    parser: (raw: unknown) => T,
+    signal: AbortSignal,
+    options: RequestOptions = {},
+  ): Promise<T> {
+    const res = await this.request(path, { method: 'DELETE', signal }, options);
     return await this.parseJsonResponse(res, parser);
-  }
-
-  async deleteEmpty(path: string, signal: AbortSignal): Promise<void> {
-    const res = await this.request(path, { method: 'DELETE', signal });
-    if (res.status === 204) return;
-    if (!res.ok) await this.throwFromBody(res);
-  }
-
-  async postEmpty(path: string, body: unknown, signal: AbortSignal): Promise<void> {
-    const res = await this.requestJson(path, 'POST', body, signal);
-    if (res.status === 204) return;
-    if (!res.ok) await this.throwFromBody(res);
   }
 
   private requestJson(
@@ -430,25 +481,40 @@ export class HttpClient {
     method: 'POST' | 'PATCH' | 'PUT',
     body: unknown,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<Response> {
     const headers = new Headers({ 'Content-Type': 'application/json' });
-    return this.request(path, {
-      method,
-      body: JSON.stringify(body ?? {}),
-      headers,
-      signal,
-    });
+    return this.request(
+      path,
+      { method, body: JSON.stringify(body ?? {}), headers, signal },
+      options,
+    );
   }
 
-  private async request(path: string, init: RequestInit): Promise<Response> {
-    const { url, extraHeader, routedToCdn } = this.resolveOutgoing(path);
+  private async request(
+    path: string,
+    init: RequestInit,
+    options: RequestOptions = {},
+  ): Promise<Response> {
+    const { url, extraHeader, routedToCdn } = this.resolveOutgoing(path, init.method ?? 'GET');
     const headers = new Headers(init.headers ?? {});
     if (this.tokenFn) {
       const token = await this.tokenFn();
       headers.set('Authorization', `Bearer ${token}`);
     }
     if (!headers.has('Accept')) headers.set('Accept', 'application/json');
-    if (this.sessionId) headers.set('X-Engine-Session-Id', this.sessionId);
+    // The session header only where the server reads it: on any other read
+    // it would turn a plain CDN request into one that needs a preflight.
+    const { write } = options;
+    if (this.sessionId && (write || options.session)) {
+      headers.set('X-Engine-Session-Id', this.sessionId);
+    }
+    if (write) {
+      if (write.opId !== undefined) headers.set('Idempotency-Key', write.opId);
+      if (write.reserveObjectNumbers && write.reserveObjectNumbers > 0) {
+        headers.set('EmbedPDF-Reserve-Object-Numbers', String(write.reserveObjectNumbers));
+      }
+    }
     if (extraHeader) headers.set(extraHeader.name, extraHeader.value);
     // Document affinity key: origin-bound doc requests only (a CDN GET is a
     // "simple" request today — a custom header would create preflights
@@ -458,12 +524,36 @@ export class HttpClient {
       const doc = /^\/v1\/docs\/([^/]+)\//.exec(path);
       if (doc) headers.set('X-CloudPDF-Doc', decodeURIComponent(doc[1]!));
     }
-    // Code-keyed backpressure retry: ONLY our own 503s (`EngineBusy` =
+    // Code-keyed backpressure retry: Only our own 503s (`EngineBusy` =
     // shed before dispatch, `EngineRestarting` = the apply never landed)
-    // — both mean NOTHING HAPPENED, so retrying is method-agnostic-safe,
-    // mutations included. A foreign 503 keeps today's semantics.
-    for (let attempt = 0; ; attempt++) {
-      const res = await this.execute(url, { ...init, headers });
+    // — both mean nothing happened, so retrying is method-agnostic-safe,
+    // mutations included. A foreign 503 is returned without a retry.
+    for (let attempt = 0, networkFailures = 0; ; attempt++) {
+      let res: Response;
+      try {
+        res = await this.execute(url, { ...init, headers });
+      } catch (err) {
+        // A write that may or may not have landed goes again under the same
+        // key: the server answers a repeat with what the first one committed.
+        const wait = HttpClient.NETWORK_RETRY_MS[networkFailures];
+        if (
+          !write ||
+          wait === undefined ||
+          !EngineError.is(err, EngineErrorCode.Network) ||
+          isStreamBody(init.body ?? null)
+        ) {
+          throw err;
+        }
+        networkFailures++;
+        const waitMs = wait * (0.9 + 0.2 * Math.random());
+        this.onRetry?.({ path, code: EngineErrorCode.Network, attempt, waitMs });
+        await sleepRacingAbort(waitMs, init.signal ?? null);
+        continue;
+      }
+      if (res.ok && write?.onObjectNumbers) {
+        const ranges = parseObjectNumberRanges(res.headers.get('EmbedPDF-Object-Numbers'));
+        if (ranges.length > 0) write.onObjectNumbers(ranges);
+      }
       if (
         res.status !== 503 ||
         attempt >= HttpClient.MAX_RETRIES ||
@@ -524,17 +614,23 @@ export class HttpClient {
 
   /**
    * Decide where this request actually goes. With no CDN binding (or
-   * binding's `cdn` is null) every request stays on origin. Otherwise
+   * binding's `cdn` is null) every request stays on origin, and so does
+   * every request that isn't a read (`GET`, `HEAD`): a write must reach the
+   * server itself, whatever read its path looks like. Otherwise
    * `applyCdnAccess` decides per-request based on the resource the
    * path resolves to (and whether the caller's scope granted CDN
    * access to it).
    */
-  private resolveOutgoing(path: string): {
+  private resolveOutgoing(
+    path: string,
+    method: string,
+  ): {
     url: string;
     extraHeader: { name: string; value: string } | null;
     routedToCdn: boolean;
   } {
-    if (!this.cdnBinding || !this.cdnBinding.cdn) {
+    const read = method === 'GET' || method === 'HEAD';
+    if (!read || !this.cdnBinding || !this.cdnBinding.cdn) {
       return { url: `${this.baseUrl}${path}`, extraHeader: null, routedToCdn: false };
     }
     const applied = applyCdnAccess({
@@ -576,8 +672,11 @@ export class HttpClient {
 function mapStatusToCode(status: number): EngineErrorCode {
   if (status === 401) return EngineErrorCode.Unauthenticated;
   if (status === 403) return EngineErrorCode.Forbidden;
-  if (status === 409) return EngineErrorCode.WeakAnnotationSessionConflict;
+  // A conflict whose body names no code: the layer moved under the write.
+  if (status === 409) return EngineErrorCode.LayerVersionConflict;
   if (status === 404) return EngineErrorCode.NotFound;
+  // A request body past the server's limit, refused before any route runs.
+  if (status === 413) return EngineErrorCode.PayloadTooLarge;
   if (status === 422) return EngineErrorCode.DocOpenFailed;
   if (status === 499) return EngineErrorCode.Aborted;
   if (status === 400) return EngineErrorCode.InvalidArg;

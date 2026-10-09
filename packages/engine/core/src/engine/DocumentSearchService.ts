@@ -12,9 +12,9 @@ import type { SearchRequest, SearchSlice } from '../search/types';
  * requested budget to their own ceilings, so no single call can hold a
  * worker (or the server) for minutes.
  *
- * Reads are gated by `doc.text.search`; `mode: 'full'` (snippets) also
- * requires `doc.text.copy` — see {@link SearchMode}. Results always
- * reflect the CURRENT layer view: text removed by redaction in this
+ * Reads are gated by `doc.text.search`; `snippets: true` also requires
+ * `doc.text.copy` — see {@link SearchRequest.snippets}. Results always
+ * reflect the current layer view: text removed by redaction in this
  * layer is unfindable, and a cursor issued before a content mutation is
  * rejected rather than resumed over stale pages.
  *

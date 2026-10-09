@@ -11,10 +11,10 @@ interface InitErrorMsg {
 }
 
 /**
- * Latch a live worker's readiness handshake NOW, before anything else runs.
+ * Latch a live worker's readiness handshake now, before anything else runs.
  *
  * A dedicated worker starts initializing the moment `new Worker()` executes,
- * and its `ready` / `init-error` message is DROPPED if no listener is attached
+ * and its `ready` / `init-error` message is dropped if no listener is attached
  * when it fires. Any code that accepts an already-created `Worker` but defers
  * the transport (lazy engine boot) must therefore attach this latch
  * synchronously at accept time, then hand the promise to
@@ -24,7 +24,7 @@ interface InitErrorMsg {
 export function watchWorkerReady(worker: Worker): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     // The handshake can end three ways, and only one is a message: a worker
-    // whose SCRIPT never runs (bad URL, CSP-rejected, syntax error, module
+    // whose script never runs (bad URL, CSP-rejected, syntax error, module
     // resolution failure) fires `error` instead — without these listeners the
     // promise would hang forever. Deliberately no timeout: a slow wasm fetch
     // + compile on a weak device is legitimate, and `error`/`messageerror`

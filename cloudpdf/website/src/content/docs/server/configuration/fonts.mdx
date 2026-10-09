@@ -15,8 +15,7 @@ other script, configure **fallback fonts** on the server.
 This is a **server-side** decision on purpose. Cloud clients can't register fonts (the
 client `engine.fonts` API is local-engine only); the deployment owns the font policy and
 applies it uniformly to every render and every saved annotation appearance. The local
-engine has its own [Custom fonts](/docs/engine/core-concepts/custom-fonts) API for the
-in-browser case.
+engine, which runs in the browser, registers its fonts there instead.
 
 ## Configure with `CLOUDPDF_FALLBACK_FONTS`
 

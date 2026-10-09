@@ -1,5 +1,5 @@
 /**
- * @embedpdf/plugin-render/contract — the PUBLIC render vocabulary.
+ * @embedpdf/plugin-render/contract — the public render vocabulary.
  *
  * Page rasters for developers: exact-size renders, thumbnails, batches, the
  * deployment's render policy, and invalidation (both directions: the
@@ -9,75 +9,111 @@
  */
 import {
   type BatchResult,
-  type ChangeOrigin,
+  type DeepPartial,
   type EngineRenderPolicy,
   type EventHook,
+  type EventOrigin,
   type OperationOptions,
   type PageImageHandle,
   type PageImageOptions,
   type PageRef,
+  type SettingsApi,
 } from '@embedpdf/core';
 import type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
 
 export type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
+export { samePageViewDemand } from './paint-plan';
 
-// ── configuration ───────────────────────────────────────────────────────────
+// ── settings ────────────────────────────────────────────────────────────────
 
 /** Encode format the engine can produce for a raster. */
 export type RenderFormat = NonNullable<PageImageOptions['format']>;
 
 /**
- * `renderPlugin(config)` — the render STRATEGY: what the viewer chooses to
- * spend, and which render points it uses when the engine permits anything.
- * The shape mirrors the deployment policy (`policy.fullPage` / `policy.tiles`),
- * and the one composition rule is: a strategy value applies as written under
- * a `continuous` policy, and the advertised lattice wins when there is one —
- * so the same config runs unchanged against local and cloud.
+ * The render strategy: what the viewer chooses to spend, and which render
+ * points it uses when the engine permits anything. The shape mirrors the
+ * deployment policy (`policy.fullPage` / `policy.tiles`), and the one
+ * composition rule is: a strategy value applies as written under a
+ * `continuous` policy, and the advertised lattice wins when there is one,
+ * so the same settings run unchanged against local and cloud. They belong to
+ * the plugin as registered: `updateSettings()` changes every document.
  */
-export interface RenderConfig {
+export interface RenderSettings {
   /** Base plane: the pixel budget + render points. */
-  fullPage?: FullPageOptions;
+  readonly fullPage: FullPageOptions;
   /** Tile plane strategy; `false` disables the plane entirely. */
-  tiles?: TilesOptions | false;
+  readonly tiles: TilesOptions | false;
   /**
-   * Encode format for BOTH planes. Unset → engine default (png local, the
+   * Encode format for both planes. Unset → engine default (png local, the
    * deployment's format on cloud). `'bmp'` is the local fast path — no
    * compression, no encoder-worker round trip; under a lattice it conforms
    * to `policy.formats`.
    */
-  format?: RenderFormat;
-  /** Encoder quality (webp/png); ignored for bmp. */
-  quality?: number;
+  readonly format: RenderFormat | undefined;
+  /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. */
+  readonly quality: number | undefined;
   /** Diagnostic logging of tile scheduling and fetch outcomes (console `debug`). */
-  debug?: boolean;
+  readonly debug: boolean;
 }
+
+/** What the render settings are when the app registers none. */
+export const RENDER_DEFAULTS: RenderSettings = {
+  fullPage: { maxWidth: 640, quantize: 'exact' },
+  tiles: {
+    size: 512,
+    quantize: 'exact',
+    maxScale: 128,
+    bleed: 1,
+    prefetch: { margin: 0.5, velocityBias: true },
+    settleMs: 150,
+    fadeMs: 0,
+  },
+  format: undefined,
+  quality: undefined,
+  debug: false,
+};
+
+/** What `renderPlugin(config)` takes: any of the settings, merged over the defaults. */
+export type RenderConfig = DeepPartial<RenderSettings>;
 
 // ── the raster vocabulary ───────────────────────────────────────────────────
 
 /**
+ * What a picture draws beside the page content. An option left out draws
+ * what the user may read: the annotations with `doc.annotate.read`, the form
+ * fields with `doc.forms.read`, and no form fields when `includeAnnotations`
+ * is `false`. `true` for something the user may not read is refused
+ * (`permission-denied`). Leave out what you paint yourself: a layer that
+ * paints annotations passes `includeAnnotations: false`, which leaves the
+ * form fields out too unless you ask for them (`includeFormFields: true`).
+ */
+export interface PageLayerOptions {
+  /** Draw the annotations (form fields' widgets excepted). */
+  includeAnnotations?: boolean;
+  /** Draw the form fields, each in the state its field shows. */
+  includeFormFields?: boolean;
+}
+
+/**
  * An encoded page image: `source` is bytes or a URL, `format`/`contentType`
- * say what they are, `width`/`height` the pixel size when known, and
+ * say what they are, `width`/`height` its pixel size, and
  * `objectUrl()` mints a revocable object URL for an `<img>`.
  */
 export type PageImage = PageImageHandle;
 
-export interface RenderPageOptions extends OperationOptions {
+export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
   /** Exact output width in device pixels (height keeps the page's aspect). */
   width?: number;
   /** Device pixels per PDF point; ignored when `width` is given. Default 1. */
   scale?: number;
-  /** Bake annotations into the bitmap (default true). */
-  includeAnnotations?: boolean;
   /** Per-call encode overrides; default to the plugin's strategy. */
   format?: RenderFormat;
   quality?: number;
 }
 
-export interface RenderThumbnailOptions extends OperationOptions {
+export interface RenderThumbnailOptions extends OperationOptions, PageLayerOptions {
   /** The thumbnail's width in device pixels. */
   maxWidth: number;
-  /** Bake annotations (default true). */
-  includeAnnotations?: boolean;
 }
 
 export interface RenderPagesOptions extends RenderPageOptions {
@@ -92,18 +128,20 @@ export interface PageRender {
 }
 
 /**
- * The two invalidation scopes — every pixel-changing fact is one of them:
+ * The invalidation scopes — every pixel-changing fact is one of them:
  *
- *   'annotations' — only baked APPEARANCES changed (an annotation mutated, a
- *                   form widget re-baked). Base renders keep their pixels.
- *   'content'     — the PAGE ITSELF changed (redaction applied, text edited).
- *                   Invalidates everything: content strictly contains annotations.
+ *   'annotations' — an annotation changed. Pictures without annotations keep
+ *                   their pixels.
+ *   'fields'      — a form field changed: a fill, a widget's place or look,
+ *                   a signing. Pictures without form fields keep their pixels.
+ *   'content'     — the page itself changed (redaction applied, flattened).
+ *                   Invalidates every picture of the page.
  */
-export type InvalidateScope = 'content' | 'annotations';
+export type InvalidateScope = 'content' | 'annotations' | 'fields';
 
 export interface InvalidateOptions {
-  /** The pages whose pixels changed; omitted = every page. */
-  pages?: readonly PageRef[];
+  /** The pages whose pixels changed, by ref or index; omitted = every page. */
+  pages?: readonly (PageRef | number)[];
   /** Defaults to `'content'` — a caller who doesn't say is safest repainted fully. */
   scope?: InvalidateScope;
 }
@@ -115,12 +153,16 @@ export interface InvalidateOptions {
 export interface RenderInvalidatedEvent {
   readonly pages: readonly PageRef[];
   readonly scope: InvalidateScope;
-  readonly origin: ChangeOrigin;
+  /**
+   * Where the document mutation came from. Null when a caller requested the
+   * invalidation through {@link RenderCapability.invalidate}.
+   */
+  readonly origin: EventOrigin | null;
 }
 
-// ── the PUBLIC capability ───────────────────────────────────────────────────
+// ── the public capability ───────────────────────────────────────────────────
 
-export interface RenderCapability {
+export interface RenderCapability extends SettingsApi<RenderSettings> {
   /**
    * Would page rasters be served to this session (`doc.render`)? When false
    * every render refuses locally with `permission-denied` — no doomed engine
@@ -128,35 +170,44 @@ export interface RenderCapability {
    */
   canRender(): boolean;
   /**
-   * Render one page at the requested size. The size is honoured exactly
-   * (nothing is snapped to the viewer's render points); the shared raster
-   * cache serves the call when it already holds a matching image. Rejects
-   * `permission-denied` without `doc.render`, `not-found` for a page that
-   * is not in this document, `operation-cancelled` on abort.
+   * Render one page, by its ref or its index, at the requested size. The
+   * size is honoured exactly (nothing is snapped to the viewer's render
+   * points); the shared raster cache serves the call when it already holds a
+   * matching image. Rejects `permission-denied` without `doc.render`,
+   * `not-found` for a page that is not in this document,
+   * `operation-cancelled` when `signal` fires.
    */
-  renderPage(page: PageRef, options?: RenderPageOptions): Promise<PageImage>;
-  /** Sugar for a small raster at `maxWidth` device pixels. */
-  renderThumbnail(page: PageRef, options: RenderThumbnailOptions): Promise<PageImage>;
-  /** Render several pages with bounded concurrency; best-effort per page. */
+  renderPage(page: PageRef | number, options?: RenderPageOptions): Promise<PageImage>;
+  /** Sugar for a small raster at `maxWidth` device pixels. Rejects like `renderPage`. */
+  renderThumbnail(page: PageRef | number, options: RenderThumbnailOptions): Promise<PageImage>;
+  /**
+   * Render several pages with bounded concurrency; best-effort per page: each
+   * rendered page with its image, in the order given, and each page that
+   * failed (as given) with why. Rejects `permission-denied` without
+   * `doc.render`, `operation-cancelled` when `signal` fires.
+   */
   renderPages(
-    pages: readonly PageRef[],
+    pages: readonly (PageRef | number)[],
     options?: RenderPagesOptions,
-  ): Promise<BatchResult<PageRender, PageRef>>;
+  ): Promise<BatchResult<PageRender, PageRef | number>>;
   /** The deployment's advertised render policy (a document fact). */
   getRenderPolicy(): EngineRenderPolicy;
   /**
-   * The version of the raster the given options would produce. Key a
-   * long-lived render on it: when it bumps, refetch. Base renders version on
-   * content facts; annotated renders on content AND annotation facts. Bumps
-   * only on CONFIRMED mutations — never optimistically.
+   * The version of the picture the given options would produce. Key a
+   * long-lived render on it: when it bumps, refetch. A picture versions on
+   * content facts, plus annotation facts when it draws annotations and form
+   * facts when it draws form fields. Bumps only on confirmed mutations —
+   * never optimistically. 0 for a page that isn't in the document.
    */
-  getRenderEpoch(page: PageRef, includeAnnotations?: boolean): number;
+  getRenderEpoch(page: PageRef | number, layers?: PageLayerOptions): number;
   /**
    * Declare that page pixels changed — the open door for facts the built-in
    * event map doesn't know (a plugin's own mutation vocabulary, anything
-   * third-party). Call at CONFIRMATION, never for optimistic previews.
+   * third-party). Call at confirmation, never for optimistic previews.
+   * Fires `onInvalidated`; a page that isn't in the document is skipped.
    */
   invalidate(options?: InvalidateOptions): void;
+  /** Pages' pixels changed and they will redraw. */
   readonly onInvalidated: EventHook<RenderInvalidatedEvent>;
 }
 

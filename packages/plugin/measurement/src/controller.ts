@@ -2,11 +2,11 @@
  * The measurement controller: the composition root. It builds the plugin's
  * services once, wires each area with the services it declares, and
  * assembles the capability from the areas' API slices. No behavior lives
- * here — every verb and read has a home in `read/`, `write/` or `sync/`.
+ * here: every verb and read has a home in `read/`, `write/` or `sync/`.
  */
 import { composeApi } from '@embedpdf/core';
-import type { MeasurementConfig } from './contract';
-import type { MeasurementHostCapability } from './host-contract';
+
+import type { MeasurementCapability } from './contract';
 import { createScaleReads } from './read/scale';
 import { createServices, type MeasurementContext } from './services';
 import { createViewportSync } from './sync/viewports';
@@ -14,20 +14,19 @@ import { createCalibration } from './write/calibration';
 import { createMeasuring } from './write/create';
 import { createScaleWrites } from './write/scale';
 
-export function createMeasurementController(
-  ctx: MeasurementContext,
-  config: MeasurementConfig = {},
-): { api: MeasurementHostCapability; connect(): void } {
+export function createMeasurementController(ctx: MeasurementContext) {
   const services = createServices(ctx);
   const { events, store } = services;
+  const settings = ctx.settings();
 
-  const reads = createScaleReads(services, config);
-  const viewports = createViewportSync(ctx, services, config);
-  const scale = createScaleWrites(ctx, services, config, reads, viewports);
+  const viewports = createViewportSync(ctx, services);
+  const reads = createScaleReads(ctx, services, viewports);
+  const scale = createScaleWrites(ctx, services, viewports);
   const calibration = createCalibration(ctx, services);
-  const measuring = createMeasuring(services);
+  const measuring = createMeasuring(ctx, services, viewports);
 
-  const api = composeApi('measurement', [
+  const api: MeasurementCapability = composeApi('measurement', [
+    settings.api,
     reads.api,
     scale.api,
     calibration.api,
@@ -40,7 +39,7 @@ export function createMeasurementController(
       onCalibrationCompleted: events.calibrationCompleted.on,
       onCalibrationDismissed: events.calibrationDismissed.on,
     },
-  ]) satisfies MeasurementHostCapability;
+  ]);
 
   return {
     api,
@@ -49,14 +48,4 @@ export function createMeasurementController(
       viewports.connect();
     },
   };
-}
-
-/** The capability alone, connected at once — the shape unit tests build. */
-export function createMeasurementCapability(
-  ctx: MeasurementContext,
-  config: MeasurementConfig = {},
-): MeasurementHostCapability {
-  const { api, connect } = createMeasurementController(ctx, config);
-  connect();
-  return api;
 }

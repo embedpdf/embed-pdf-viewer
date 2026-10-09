@@ -1,17 +1,14 @@
-import type { Annot, TextStyle } from '@embedpdf/core-annotation';
-import type { FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { DRAWN_FLAGS, type ModelAnnotation, type TextStyle } from '@embedpdf/core-annotation';
+import type { AnnotationDraft, FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
+import { annotationOfDraft, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
-  bodyFromTextStyle,
   cssFontFamilyForFace,
   cssFontFamilyForFont,
-  faceForFont,
   fontForFace,
   rangeProps,
-  richDocOf,
-  runDeltaForProps,
+  runDeltaForFields,
   textCommitPatch,
 } from '../src/rich-text';
 
@@ -48,40 +45,26 @@ const text: TextStyle = {
   textAlign: 'left',
 };
 
-const annot = (extra: Partial<Annot> = {}): Annot =>
-  ({
-    id: 'a',
-    ref: null,
-    page: toPageRef(1),
-    subtype: 'freeText',
-    geom: { t: 'text', rect: { x: 0, y: 0, width: 100, height: 20 } },
-    style: {
-      color: '#000000',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: 1,
-      blendMode: 'normal',
-      border: { kind: 'solid' },
-    },
-    text,
-    source: 'vector',
-    apVersion: 0,
-    ...extra,
-  }) as unknown as Annot;
+/** A free-text record, its annotation read from its draft. */
+const annot = (): ModelAnnotation => {
+  const draft = {
+    subtype: 'free-text',
+    box: { x: 0, y: 0, width: 100, height: 20 },
+    intent: 'free-text',
+    contents: '',
+    ...text,
+    color: '#000000',
+    strokeWidth: 1,
+    ...DRAWN_FLAGS,
+  } as AnnotationDraft;
+  const annotation = annotationOfDraft(draft, {
+    ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 1 },
+  });
+  return { id: 'a', unconfirmed: true, source: 'vector', annotation };
+};
 
 describe('faces', () => {
-  it('maps standard fonts, registered keys and unknown families both ways', () => {
-    expect(faceForFont('helvetica-bold-oblique')).toEqual({
-      family: 'Helvetica',
-      weight: 700,
-      italic: true,
-    });
-    expect(faceForFont('roboto-bold', fonts)).toEqual({
-      family: 'Roboto',
-      weight: 700,
-      italic: false,
-    });
-    expect(faceForFont('Mystery')).toEqual({ family: 'Mystery' });
+  it('maps a face to the font that names it: a registered key, a standard name, else the family', () => {
     expect(fontForFace({ family: 'Helvetica', weight: 700, italic: true })).toBe(
       'helvetica-bold-oblique',
     );
@@ -102,35 +85,18 @@ describe('faces', () => {
 });
 
 describe('documents', () => {
-  it('synthesises a body from the /DA text style for a draft without a DTO', () => {
-    expect(bodyFromTextStyle({ ...text, fontFamily: 'times-bold', underline: true })).toMatchObject(
-      { family: 'Times', weight: 700, italic: false, size: 12, decoration: ['underline'] },
-    );
-    expect(
-      bodyFromTextStyle({ ...text, bold: true, italic: true, fontColor: '#ff0000' }),
-    ).toMatchObject({
-      family: 'Helvetica',
-      weight: 700,
-      italic: true,
-      color: '#FF0000',
-    });
-    const doc = richDocOf(annot({ data: { subtype: 'free-text', contents: 'a\rb' } } as never));
-    expect(doc.paragraphs).toEqual([{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }]);
-    expect(doc.body.family).toBe('Helvetica');
-  });
-
   it('commits the rich paragraphs, with paragraph properties equal to the body stripped', () => {
     const plain = [{ runs: [{ text: 'hello' }] }];
     const styled = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
-    const a = annot({ data: { subtype: 'free-text' } } as never);
-    expect(textCommitPatch(a, plain)).toEqual({ richText: { paragraphs: plain } });
-    expect(textCommitPatch(a, styled)).toEqual({ richText: { paragraphs: styled } });
+    const record = annot();
+    expect(textCommitPatch(record, plain)).toEqual({ richText: { paragraphs: plain } });
+    expect(textCommitPatch(record, styled)).toEqual({ richText: { paragraphs: styled } });
     // Paragraph align/dir equal to the body's (the editor round-trips what it
     // renders) are not overrides; a differing one is kept.
     const echoed = [{ align: 'left' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(a, echoed)).toEqual({ richText: { paragraphs: plain } });
+    expect(textCommitPatch(record, echoed)).toEqual({ richText: { paragraphs: plain } });
     const centred = [{ align: 'center' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(a, centred)).toEqual({
+    expect(textCommitPatch(record, centred)).toEqual({
       richText: { paragraphs: [{ align: 'center', runs: [{ text: 'hello' }] }] },
     });
   });
@@ -139,7 +105,7 @@ describe('documents', () => {
 describe('props ↔ runs', () => {
   it('turns the range keys into a run delta and leaves the rest for the body', () => {
     expect(
-      runDeltaForProps(
+      runDeltaForFields(
         {
           bold: true,
           italic: false,
@@ -154,12 +120,12 @@ describe('props ↔ runs', () => {
       delta: { weight: 700, italic: false, decoration: ['underline'], size: 9, color: '#00FF00' },
       rest: { opacity: 0.5 },
     });
-    expect(runDeltaForProps({ fontFamily: 'roboto-bold' }, fonts).delta).toEqual({
+    expect(runDeltaForFields({ fontFamily: 'roboto-bold' }, fonts).delta).toEqual({
       family: 'Roboto',
       weight: 700,
       italic: false,
     });
-    expect(runDeltaForProps({ bold: false, underline: false }).delta).toEqual({
+    expect(runDeltaForFields({ bold: false, underline: false }).delta).toEqual({
       weight: 400,
       decoration: [],
     });

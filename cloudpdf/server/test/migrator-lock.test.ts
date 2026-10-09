@@ -89,7 +89,7 @@ afterAll(async () => {
 });
 
 describe.runIf(RUN_PG)('migrate lock [postgres]', () => {
-  /** Two Kysely instances onto the SAME isolated schema — two "replicas". */
+  /** Two Kysely instances onto the same isolated schema — two "replicas". */
   async function makeDbPair(): Promise<{ a: Kysely<Schema>; b: Kysely<Schema> }> {
     schemaCounter += 1;
     const schemaName = `lock_${process.pid}_${Date.now()}_${schemaCounter}`;

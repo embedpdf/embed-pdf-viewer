@@ -1,10 +1,10 @@
-import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, type AnnotationRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { ActionSource, ActionTrigger, ActionTriggerResult } from './contract';
 
-/** One hoverable target, as a feed sees it. `events` lets a feed that KNOWS
- *  tree presence (folded model, fill item) skip the inert half of a pair —
- *  omitted flags default to true. */
+/** One hoverable target, as a feed sees it. `events` lets a feed that knows
+ *  which trees exist (a folded model, a fill item) skip the inert half of a
+ *  pair; omitted flags default to true. */
 export interface HoverTarget {
   ref: AnnotationRef;
   page: PageRef;
@@ -20,31 +20,23 @@ export interface HoverPump {
   reset(): void;
 }
 
-const sameTarget = (a: HoverTarget | null, b: HoverTarget | null): boolean => {
-  if (a === null || b === null) return a === b;
-  if (a.ref.kind !== b.ref.kind || a.page.pageObjectNumber !== b.page.pageObjectNumber) {
-    return false;
-  }
-  if (a.ref.kind === 'objectNumber' && b.ref.kind === 'objectNumber') {
-    return a.ref.annotObjectNumber === b.ref.annotObjectNumber;
-  }
-  if (a.ref.kind === 'nm' && b.ref.kind === 'nm') return a.ref.nm === b.ref.nm;
-  if (a.ref.kind === 'index' && b.ref.kind === 'index') {
-    return a.ref.index === b.ref.index && a.ref.revision === b.ref.revision;
-  }
-  return false;
+const sameTarget = (left: HoverTarget | null, right: HoverTarget | null): boolean => {
+  if (left === null || right === null) return left === right;
+  return (
+    left.page.objectNumber === right.page.objectNumber &&
+    annotationKey(left.ref) === annotationKey(right.ref)
+  );
 };
 
 /**
- * The ONE hover state machine every event plane shares (D8): per pointer
- * feed, `{ delivered, desired, inFlight }`. On each settle it delivers the
+ * The one hover state machine every event plane shares: per pointer feed,
+ * `{ delivered, desired, inFlight }`. On each settle it delivers the
  * transition `delivered → desired` as `Exit(delivered)` then
- * `Enter(desired)`, SUBMITTED BACK-TO-BACK SYNCHRONOUSLY — dispatch takes
- * its queue slot before returning, so the ordered pair can never be split by
- * a slow resolution (the per-annotation-tail reordering the review caught).
- * Under pressure intermediate targets are skipped by design: the pointer
- * sweeping A→B→C while A's exit is in flight delivers `Exit(A) → Enter(C)`,
- * never a stale `Enter(B)`.
+ * `Enter(desired)`, submitted back to back synchronously: dispatch takes its
+ * queue slot before returning, so a slow resolution can never split or
+ * reorder the pair. Under pressure intermediate targets are skipped by
+ * design: the pointer sweeping A→B→C while A's exit is in flight delivers
+ * `Exit(A) → Enter(C)`, never a stale `Enter(B)`.
  */
 export function createHoverPump(
   dispatch: (trigger: ActionTrigger) => Promise<ActionTriggerResult>,

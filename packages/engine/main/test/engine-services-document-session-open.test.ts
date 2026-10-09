@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { toPageRef, wirePack, type WorkerResponse } from '@embedpdf/engine-core/runtime';
-import { ManifestPageSchema } from '@embedpdf/engine-core/wire';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { BaseDocumentRegistry } from '../../services/src/document-session/lifecycle/BaseDocumentRegistry';
 import { DocumentSession } from '../../services/src/document-session/DocumentSession';
-import { openLayerDocument } from '../../services/src/document-session/lifecycle/PdfDocumentOpener';
+import {
+  openLayerDocument,
+  type AcquiredBaseDocument,
+} from '../../services/src/document-session/lifecycle/PdfDocumentOpener';
 import { WorkerHost } from '../../services/src/worker-host/WorkerHost';
 
 const ptr = (value: number): Ptr => BigInt(value) as Ptr;
@@ -24,7 +26,7 @@ function createFakeRuntime(): PdfRuntimeModule & {
   let nextPtr = 1000;
   const memory = new Map<string, number | bigint>();
   const pagesByDoc = new Map<Ptr, number[]>();
-  const ponByPagePtr = new Map<Ptr, number>();
+  const pageObjectNumberByPagePtr = new Map<Ptr, number>();
   const calls = {
     closeDocuments: [] as Ptr[],
     loadMemDocuments: [] as Array<{ ptr: Ptr; size: number; password: string }>,
@@ -96,20 +98,20 @@ function createFakeRuntime(): PdfRuntimeModule & {
         pagesByDoc.get(docPtr)?.[pageIndex] ?? 0,
       FPDF_LoadPage: (docPtr: Ptr, pageIndex: number) => {
         calls.loadPages.push({ docPtr, pageIndex });
-        const pon = pagesByDoc.get(docPtr)?.[pageIndex];
-        if (!pon) return ptr(0);
+        const pageObjectNumber = pagesByDoc.get(docPtr)?.[pageIndex];
+        if (!pageObjectNumber) return ptr(0);
         const pagePtr = ptr(Number(docPtr) * 100 + pageIndex);
-        ponByPagePtr.set(pagePtr, pon);
+        pageObjectNumberByPagePtr.set(pagePtr, pageObjectNumber);
         return pagePtr;
       },
       EPDFDoc_LoadPageByObjectNumber: (docPtr: Ptr, pageObjectNumber: number) => {
         if (!pagesByDoc.get(docPtr)?.includes(pageObjectNumber)) return ptr(0);
         const pagePtr = ptr(Number(docPtr) * 1000 + pageObjectNumber);
-        ponByPagePtr.set(pagePtr, pageObjectNumber);
+        pageObjectNumberByPagePtr.set(pagePtr, pageObjectNumber);
         return pagePtr;
       },
       FPDF_ClosePage: () => undefined,
-      EPDFPage_GetObjectNumber: (pagePtr: Ptr) => ponByPagePtr.get(pagePtr) ?? 0,
+      EPDFPage_GetObjectNumber: (pagePtr: Ptr) => pageObjectNumberByPagePtr.get(pagePtr) ?? 0,
       // Security probe run on every open. The harness opens unencrypted
       // fixtures: report success with kind=0 (none); the caller pre-zeroes
       // the out-params so the defaults (no perms, revision 0) flow through.
@@ -120,8 +122,7 @@ function createFakeRuntime(): PdfRuntimeModule & {
       // apply its documented fallbacks (0x0 size, rotation 0, userUnit 1,
       // null label, zero-rect media).
       EPDF_GetPageBoxByIndex: () => 0,
-      EPDF_GetPageSizeByIndexNormalized: () => 0,
-      EPDF_GetPageRotationByIndex: () => 0,
+      EPDF_GetPageRotateByIndex: () => 0,
       EPDF_GetPageUserUnitByIndex: () => 0,
       FPDF_GetPageLabel: () => 0,
       // No page-level actions in this ownership/routing fixture.
@@ -129,6 +130,8 @@ function createFakeRuntime(): PdfRuntimeModule & {
       // No named pages either: `pages.list` reads both catalog name trees.
       EPDFDoc_GetNamedPageCount: () => 0,
       EPDFDoc_GetNamedPageAt: () => 0,
+      // Every open reports the document's last object number.
+      EPDFLayer_GetLastObjectNumber: () => 0,
       EPDF_LoadMemBaseDocument64: (dataPtr: Ptr, size: number, password: string) => {
         calls.loadMemBases.push({ ptr: dataPtr, size, password });
         return ptr(201);
@@ -180,37 +183,6 @@ describe('DocumentSession open ownership', () => {
     expect(runtime.calls.closeDocuments).toEqual([ptr(101)]);
   });
 
-  test('pageState keeps weak annotation knowledge explicit', () => {
-    const runtime = createFakeRuntime();
-    const session = new DocumentSession(runtime);
-
-    session.open(new Uint8Array([1]), null);
-
-    const initial = session.pageState(1101);
-    expect(initial.weakAnnotationState).toEqual({ kind: 'unknown' });
-    expect(
-      ManifestPageSchema.safeParse({
-        state: initial,
-        cache: { contentVersion: 1, annotationVersion: 1 },
-      }).success,
-    ).toBe(false);
-
-    session.recordWeakFlag(1101, false);
-    const known = session.pageState(1101);
-    expect(known.weakAnnotationState).toEqual({
-      kind: 'known',
-      hasAnyWeakAnnotations: false,
-    });
-    expect(
-      ManifestPageSchema.safeParse({
-        state: known,
-        cache: { contentVersion: 1, annotationVersion: 1 },
-      }).success,
-    ).toBe(true);
-
-    session.close();
-  });
-
   test('base registry shares one loaded memory base until the last release', () => {
     const runtime = createFakeRuntime();
     const registry = new BaseDocumentRegistry(runtime);
@@ -241,8 +213,9 @@ describe('DocumentSession open ownership', () => {
 
   test('layer session closes document before artifact access and shared base', () => {
     const runtime = createFakeRuntime();
-    const base = {
+    const base: AcquiredBaseDocument = {
       key: 'base-a',
+      kind: 'memory',
       basePtr: ptr(201),
       release: () => {
         runtime.calls.order.push('base-handle');
@@ -265,13 +238,14 @@ describe('DocumentSession open ownership', () => {
   test('renderEncoded kinds fail fast with NotImplemented on hosts without an injected encoder', () => {
     // The `*.renderEncoded` wire kinds are cloud-server surface: the server
     // worker injects a sharp-backed encoder; browser/local hosts (this
-    // two-argument construction) must reject WITHOUT paying for a render.
+    // two-argument construction) must reject without paying for a render.
     const runtime = createFakeRuntime();
     const responses: WorkerResponse[] = [];
     const host = new WorkerHost(runtime, (pack) => responses.push(pack.payload));
 
     host.receive({
       kind: 'pages.renderEncoded',
+      effect: 'read',
       jobId: 9,
       docId: 'doc-never-opened',
       page: toPageRef(1),
@@ -295,28 +269,41 @@ describe('DocumentSession open ownership', () => {
 
     host.receive({
       kind: 'open.fatMem',
+      effect: 'open',
       jobId: 1,
       docId: 'doc-a',
       bytes: new ArrayBuffer(1),
       password: null,
-      // This test counts the fake runtime's handles: keep the base-view
-      // session a plain document so the accounting below stays exact.
-      sessionKind: 'plain',
     });
     host.receive({
       kind: 'open.layerMemBase',
+      effect: 'open',
       jobId: 2,
       docId: 'doc-a',
       layerName: 'alice',
       baseKey: 'base-a',
       baseBytes: new ArrayBuffer(1),
-      layer: { kind: 'fresh' },
+      // A saved layer, so this session's document differs from the
+      // base-view session's fresh one in the fake runtime's accounting.
+      layer: { kind: 'artifact', bytes: new ArrayBuffer(1) },
       password: null,
     });
-    host.receive({ kind: 'pages.list', jobId: 3, docId: 'doc-a' });
-    host.receive({ kind: 'pages.list', jobId: 4, docId: 'doc-a', layerName: 'alice' });
-    host.receive({ kind: 'close', jobId: 5, docId: 'doc-a' });
-    host.receive({ kind: 'pages.list', jobId: 6, docId: 'doc-a', layerName: 'alice' });
+    host.receive({ kind: 'pages.list', effect: 'read', jobId: 3, docId: 'doc-a' });
+    host.receive({
+      kind: 'pages.list',
+      effect: 'read',
+      jobId: 4,
+      docId: 'doc-a',
+      layerName: 'alice',
+    });
+    host.receive({ kind: 'close', effect: 'close', jobId: 5, docId: 'doc-a' });
+    host.receive({
+      kind: 'pages.list',
+      effect: 'read',
+      jobId: 6,
+      docId: 'doc-a',
+      layerName: 'alice',
+    });
 
     expect(responses.map((r) => r.kind)).toEqual([
       'resolve',
@@ -334,15 +321,17 @@ describe('DocumentSession open ownership', () => {
     if (baseList.kind !== 'resolve' || layerList.kind !== 'resolve') return;
     expect(baseList.result).toMatchObject({
       tag: 'pages.list',
-      snapshot: { pages: [{ ref: toPageRef(1101) }] },
+      snapshot: { pages: [{ ref: toPageRef(3101) }, { ref: toPageRef(3102) }] },
     });
     expect(layerList.result).toMatchObject({
       tag: 'pages.list',
-      snapshot: { pages: [{ ref: toPageRef(3101) }, { ref: toPageRef(3102) }] },
+      snapshot: { pages: [{ ref: toPageRef(3201) }, { ref: toPageRef(3202) }] },
     });
     expect(runtime.calls.loadPages).toEqual([]);
-    expect(runtime.calls.closeDocuments).toEqual([ptr(101), ptr(301)]);
-    expect(runtime.calls.releaseBases).toEqual([ptr(201)]);
+    // Closing the document closes both sessions' layers and releases both
+    // bases (the fake hands every memory base the same pointer).
+    expect(runtime.calls.closeDocuments).toEqual([ptr(301), ptr(302)]);
+    expect(runtime.calls.releaseBases).toEqual([ptr(201), ptr(201)]);
   });
 
   test('worker can open the base-view session from a file-backed base', () => {
@@ -352,6 +341,7 @@ describe('DocumentSession open ownership', () => {
 
     host.receive({
       kind: 'open.layerFileBase',
+      effect: 'open',
       jobId: 1,
       docId: 'doc-file',
       baseKey: 'base-file',
@@ -359,8 +349,8 @@ describe('DocumentSession open ownership', () => {
       layer: { kind: 'fresh' },
       password: null,
     });
-    host.receive({ kind: 'pages.list', jobId: 2, docId: 'doc-file' });
-    host.receive({ kind: 'close', jobId: 3, docId: 'doc-file' });
+    host.receive({ kind: 'pages.list', effect: 'read', jobId: 2, docId: 'doc-file' });
+    host.receive({ kind: 'close', effect: 'close', jobId: 3, docId: 'doc-file' });
 
     expect(responses.map((r) => r.kind)).toEqual(['resolve', 'resolve', 'resolve']);
     const list = responses[1];
@@ -383,6 +373,7 @@ describe('DocumentSession open ownership', () => {
 
     host.receive({
       kind: 'open.layerMemBase',
+      effect: 'open',
       jobId: 1,
       docId: 'layer-a',
       baseKey: 'shared-base',
@@ -392,6 +383,7 @@ describe('DocumentSession open ownership', () => {
     });
     host.receive({
       kind: 'open.layerMemBase',
+      effect: 'open',
       jobId: 2,
       docId: 'layer-b',
       baseKey: 'shared-base',
@@ -399,8 +391,8 @@ describe('DocumentSession open ownership', () => {
       layer: { kind: 'fresh' },
       password: null,
     });
-    host.receive({ kind: 'close', jobId: 3, docId: 'layer-a' });
-    host.receive({ kind: 'close', jobId: 4, docId: 'layer-b' });
+    host.receive({ kind: 'close', effect: 'close', jobId: 3, docId: 'layer-a' });
+    host.receive({ kind: 'close', effect: 'close', jobId: 4, docId: 'layer-b' });
 
     expect(responses.map((r) => r.kind)).toEqual(['resolve', 'resolve', 'resolve', 'resolve']);
     expect(runtime.calls.loadMemBases).toHaveLength(1);

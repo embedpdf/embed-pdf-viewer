@@ -1,5 +1,5 @@
 /**
- * SVG → CSS cursor string. The armed-tool indicator is the CURSOR itself (the
+ * SVG → CSS cursor string. The armed-tool indicator is the cursor itself (the
  * only zero-latency pointer-locked pixel the web has — the OS composites it),
  * so an app hands its toolbar icon here and assigns the result via the
  * interaction hub's `setToolCursor`.
@@ -47,4 +47,38 @@ export function svgCursor({ svg, hotspot, fallback = 'crosshair' }: SvgCursorOpt
   const uri = `data:image/svg+xml,${encodeURIComponent(svg)}`;
   const spot = hotspot ? ` ${Math.round(hotspot.x)} ${Math.round(hotspot.y)}` : '';
   return `url("${uri}")${spot}, ${fallback}`;
+}
+
+/** One cursor slot: an SVG image ({@link SvgCursorOptions}) or a plain CSS cursor ('crosshair', 'url(…) 4 4, copy'). */
+export type ToolCursorImage = SvgCursorOptions | string;
+
+/**
+ * A tool's cursors: the tool, and its cursors by keyword. Build `svg` from the same icon your
+ * toolbar shows, so the cursor and the button never drift apart.
+ */
+export interface ToolCursorSpec {
+  toolId: string;
+  /**
+   * keyword → cursor: replace the keywords this tool can show (its own cursor, 'crosshair' or
+   * 'copy', and hover claims, 'text' over text) with the tool's look. Keywords left out show as
+   * they are: a markup tool's 'default' stays the bare arrow, a 'move' claim drops the icon. An
+   * SVG value's `fallback` defaults to the keyword it replaces.
+   */
+  cursors: Record<string, ToolCursorImage>;
+}
+
+/**
+ * A tool's cursors as CSS cursor values, for the interaction hub's `setToolCursor(toolId,
+ * cursors)`: a string stays as it is, an SVG becomes its `url(…)` cursor, falling back to the
+ * keyword it replaces unless it names its own fallback.
+ */
+export function toolCursorsOf(cursors: Record<string, ToolCursorImage>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(cursors).map(([keyword, image]) => [
+      keyword,
+      typeof image === 'string'
+        ? image
+        : svgCursor(image.fallback === undefined ? { ...image, fallback: keyword } : image),
+    ]),
+  );
 }

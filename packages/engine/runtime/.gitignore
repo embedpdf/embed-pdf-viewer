@@ -9,3 +9,4 @@ build/local-staging/
 .cache/
 
 npm/*/lib/
+.render-baseline/

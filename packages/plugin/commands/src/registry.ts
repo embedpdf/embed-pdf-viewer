@@ -1,27 +1,37 @@
-/** The definition registry: definitions plus their pre-parsed shortcuts. */
-import { PluginError } from '@embedpdf/core';
+/** A command definition with its shortcuts parsed once, and how the registry tells a family apart. */
 import { parseShortcut, type ParsedShortcut } from '@embedpdf/core-ui';
 
-import type { CommandDef, RegisterCommandOptions } from './contract';
+import type { CommandDef, CommandFamily } from './contract';
 
 export interface RegisteredCommand {
-  readonly def: CommandDef;
+  readonly definition: CommandDef;
   readonly shortcuts: readonly string[];
   readonly parsed: readonly ParsedShortcut[];
 }
 
-export type CommandRegistry = Map<string, RegisteredCommand>;
+export const registeredCommand = (definition: CommandDef): RegisteredCommand => {
+  const shortcuts =
+    definition.shortcut === undefined ? [] : ([] as string[]).concat(definition.shortcut);
+  return { definition, shortcuts, parsed: shortcuts.map(parseShortcut) };
+};
 
-export function registerCommand(
-  registry: CommandRegistry,
-  def: CommandDef,
-  options: RegisterCommandOptions = {},
-): RegisteredCommand {
-  if (registry.has(def.id) && !options.replace) {
-    throw new PluginError('conflict', 'commands', `duplicate command '${def.id}'`);
+export const isCommandFamily = (item: CommandDef | CommandFamily): item is CommandFamily =>
+  'prefix' in item;
+
+/** The commands the settings define, by id (a later id replaces an earlier one), and their families. */
+export interface ConfiguredCommands {
+  readonly commands: ReadonlyMap<string, RegisteredCommand>;
+  readonly families: readonly CommandFamily[];
+}
+
+export function configuredCommands(
+  items: readonly (CommandDef | CommandFamily)[],
+): ConfiguredCommands {
+  const commands = new Map<string, RegisteredCommand>();
+  const families: CommandFamily[] = [];
+  for (const item of items) {
+    if (isCommandFamily(item)) families.push(item);
+    else commands.set(item.id, registeredCommand(item));
   }
-  const shortcuts = def.shortcut === undefined ? [] : ([] as string[]).concat(def.shortcut);
-  const entry: RegisteredCommand = { def, shortcuts, parsed: shortcuts.map(parseShortcut) };
-  registry.set(def.id, entry);
-  return entry;
+  return { commands, families };
 }

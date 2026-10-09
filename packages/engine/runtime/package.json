@@ -75,6 +75,8 @@
     "test:pdfium:embedder:docker": "PDFIUM_TEST_SUITE=embedder bash ./scripts/test-pdfium-docker.sh",
     "test:pdfium:goldens:linux": "PDFIUM_TEST_SUITE=embedder bash ./scripts/test-pdfium-docker.sh --write-pngs",
     "test:parity": "node --test ./test/*.test.mjs",
+    "render-baseline": "node ./test/render-baseline/render-baseline.mjs",
+    "render-perf": "node ./test/render-perf/render-perf.mjs",
     "verify:packages": "bash ./scripts/verify-packages.sh",
     "verify:browser-purity": "node ./scripts/verify-browser-purity.mjs",
     "dev": "bash ./scripts/dev.sh",

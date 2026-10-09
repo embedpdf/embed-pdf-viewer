@@ -18,11 +18,11 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 /**
  * In-engine encoding.
  *
- * The stub worker implements the `*.renderEncoded` kinds with REAL sharp
+ * The stub worker implements the `*.renderEncoded` kinds with real sharp
  * (the same dependency the API-side `SharpImageEncoder` uses), so these
  * tests can assert the strongest property directly: the escape hatch
  * (`encodeInEngine: false` — raw rasters over the boundary + API-side
- * encode) produces BYTE-IDENTICAL responses to the default in-engine
+ * encode) produces byte-identical responses to the default in-engine
  * path, for both the page-render route and the appearances multipart.
  */
 
@@ -199,7 +199,8 @@ describe('encode-in-engine', () => {
 
     // Appearances: same stub appearance, worker-encoded vs API-encoded —
     // manifests and image parts must match byte for byte.
-    const appearancesPath = '/layers/main/annotations/pages/obj:1/appearances?scale=1';
+    const appearancesPath =
+      '/layers/main/annotations/pages/obj:1/appearances?viewport.kind=scale&viewport.scale=1';
     const am = await get(inEngine, 't1', 'docenc002', appearancesPath);
     const bm = await get(legacy, 't1', 'docenc002', appearancesPath);
     expect(am.status).toBe(200);

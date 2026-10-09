@@ -1,0 +1,363 @@
+---
+title: Changes & undo
+description: Apply several writes as one user action, all or none, and undo or redo any change.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Changes & undo
+
+A change is one user action: the writes it makes, applied together, all or none. Every change can
+be undone, and so can every annotation, form or metadata call you make on its own.
+
+```ts
+import { toFieldRef } from '@cloudpdf/engine';
+
+const approved = await doc.apply({
+  ops: [
+    { type: 'annotations.update', ref: square.ref, patch: { color: '#16a34a' } },
+    { type: 'forms.setValue', field: toFieldRef('status'), value: { value: 'Approved' } },
+  ],
+});
+
+// Both writes go back:
+await doc.apply({ undoOf: approved.meta.opId });
+```
+
+## Apply a change
+
+`apply()` takes a list of `ops`. Each op is one of the calls you already know, written as data: a
+`type`, and the arguments the call takes, by name. The engine applies them in order:
+
+```ts
+const result = await doc.apply({
+  ops: [
+    {
+      type: 'annotations.create',
+      page: page.ref,
+      data: { subtype: 'square', box: { x: 72, y: 92, width: 200, height: 100 } },
+    },
+    { type: 'annotations.delete', ref: oldSquare.ref },
+    { type: 'metadata.update', patch: { modifiedAt: new Date() } },
+  ],
+});
+```
+
+When one op fails, none of them is written, no event fires, and `apply()` rejects with that op's
+error. The document is as it was before the call.
+
+| Op `type`                      | Its fields                                                | The call it stands for                                                          |
+| :----------------------------- | :-------------------------------------------------------- | :------------------------------------------------------------------------------ |
+| `annotations.create`           | `page`, `data`, `objectNumber`, `resources`               | `page.annotations.create(data, { objectNumber, resources })`                    |
+| `annotations.update`           | `ref`, `patch`, `resources`, `expect`                     | `page.annotations.update(ref, patch, { resources })`                            |
+| `annotations.delete`           | `ref`, `expect`                                           | `page.annotations.delete(ref)`                                                  |
+| `annotations.reorder`          | `page`, `refs`, `position`                                | `page.annotations.reorder(refs, position)`                                      |
+| `forms.setValue`               | `field`, `value`, `expect`                                | `doc.forms.setValue(field, value)`                                              |
+| `forms.reset`                  | `fields`                                                  | `doc.forms.reset(fields)`                                                       |
+| `forms.create`                 | `draft`, `objectNumber`, `widgetObjectNumbers`            | `doc.forms.create(draft, { objectNumber, widgetObjectNumbers })`                |
+| `forms.update`                 | `field`, `patch`, `expect`                                | `doc.forms.update(field, patch)`                                                |
+| `forms.delete`                 | `field`, `expect`                                         | `doc.forms.delete(field)`                                                       |
+| `forms.addWidget`              | `field`, `placement`, `objectNumber`, `splitObjectNumber` | `doc.forms.addWidget(field, placement, { objectNumber, splitObjectNumber })`    |
+| `forms.removeWidget`           | `field`, `widget`                                         | `doc.forms.removeWidget(field, widget)`                                         |
+| `forms.deleteWidget`           | `widget`, `expect`                                        | `doc.forms.deleteWidget(widget)`                                                |
+| `forms.updateWidget`           | `widget`, `patch`, `expect`                               | `doc.forms.updateWidget(widget, patch)`                                         |
+| `forms.reorderWidgets`         | `page`, `widgets`, `position`                             | `doc.forms.reorderWidgets(widgets, position)`                                   |
+| `forms.reorderCalculations`    | `fields`, `position`                                      | `doc.forms.reorderCalculations(fields, position)`                               |
+| `forms.setSignatureAppearance` | `field`, `appearance`                                     | `doc.forms.setSignatureAppearance(field, appearance)`                           |
+| `forms.setDisplay`             | `field`, `display`, `expect`                              | Shows or hides a field's widgets, as a form script does                         |
+| `forms.setAppearanceText`      | `field`, `text`                                           | Sets the text a field shows without changing its value, as a format script does |
+| `metadata.update`              | `patch`, `expect`                                         | `doc.metadata.update(patch)`                                                    |
+| `metadata.updateCustom`        | `patch`                                                   | `doc.metadata.custom.update(patch)`                                             |
+
+Put everything one action does into one change: it's one step in the user's undo history, and
+its events arrive together.
+
+### What comes back
+
+`result.items` has one item per op, in op order. Each item is what the op's call returns, with
+the op's `type` added (and the `page`, for annotation ops). `result.meta` is about the whole
+change:
+
+```ts
+const created = result.items[0];
+if (created.type === 'annotations.create') select(created.annotation.ref);
+
+result.meta.opId; // the change's name: what undo takes
+result.meta.undoable; // true
+```
+
+| Field                | What it is                                                                                |
+| :------------------- | :---------------------------------------------------------------------------------------- |
+| `meta.opId`          | The change's `opId`: the one you passed, or one made up for it.                           |
+| `meta.undoable`      | Whether `{ undoOf: opId }` can undo it. See [What can't be undone](#what-cant-be-undone). |
+| `meta.affectedPages` | Every page whose annotations the change touched.                                          |
+
+A change with no ops writes nothing: it resolves at once, with no items, and `undoable: false`.
+
+### Refer to something an earlier op makes
+
+A later op can work on what an earlier op of the same change creates. Take the new object's
+number from the document's pool first, so its ref is known before anything is written:
+
+```ts
+await doc.objectNumbers.reserve(1);
+const objectNumber = doc.objectNumbers.take()!;
+const note = { kind: 'objectNumber', page: page.ref, objectNumber } as const;
+const rect = { x: 500, y: 72, width: 20, height: 20 };
+
+await doc.apply({
+  ops: [
+    {
+      type: 'annotations.create',
+      page: page.ref,
+      data: { subtype: 'text', rect, contents: 'Is this total right?' },
+      objectNumber,
+    },
+    {
+      type: 'annotations.create',
+      page: page.ref,
+      data: { subtype: 'text', rect, contents: 'Asking finance.', reply: { to: note } },
+    },
+  ],
+});
+```
+
+Undo this change and the note and its reply go together. Object numbers are explained in
+[Refs & identity](/docs/engine/concepts/identity#naming-an-object-before-it-exists).
+
+## Undo and redo
+
+Undo a change by its `opId`:
+
+```ts
+const undo = await doc.apply({ undoOf: approved.meta.opId });
+```
+
+That works for every change, and for every call the table above lists, made on its own: each
+returns its `opId` in `meta`, the way a change does.
+
+```ts
+const { meta } = await page.annotations.update(ref, { contents: 'Seen' });
+await doc.apply({ undoOf: meta.opId });
+```
+
+An undo is a change of its own, with its own `opId`. Undo the undo, and the change applies again:
+that's redo.
+
+```ts
+await doc.apply({ undoOf: undo.meta.opId }); // redo
+```
+
+An undo button needs two lists of `opId`s:
+
+```ts
+import type { Change } from '@cloudpdf/engine';
+
+const done: string[] = [];
+const undone: string[] = [];
+
+async function act(change: Change) {
+  const { meta } = await doc.apply(change);
+  done.push(meta.opId);
+  undone.length = 0;
+}
+
+async function undo() {
+  const opId = done.pop();
+  if (opId) undone.push((await doc.apply({ undoOf: opId })).meta.opId);
+}
+
+async function redo() {
+  const opId = undone.pop();
+  if (opId) done.push((await doc.apply({ undoOf: opId })).meta.opId);
+}
+```
+
+Undo works through the engine, not on a copy you keep: it reads the document as it is now, and
+puts back what the change wrote.
+
+### When the document changed since
+
+An undo puts back only what still shows what the change set. Someone may have changed the same
+thing since: another user on the cloud, or your own later change. What they changed is left as
+they left it:
+
+- A field someone changed since keeps its new value. The item names it in `skipped`, such as
+  `skipped: ['color']`.
+- An op whose annotation or field is gone, or was changed all over, is left alone entirely. Its
+  item is `{ type: 'skipped', op }`, with `op` the type of item it would have been.
+- A create isn't undone when someone changed what it made, or replied to it.
+- A reorder puts each annotation or widget back next to the neighbours it had, unless it was
+  moved since or the one below it changed. Neighbours that are gone are skipped over.
+
+Nothing is written for what's left alone, and no event fires for it. Tell the user when it
+happened:
+
+```ts
+const undo = await doc.apply({ undoOf: opId });
+const leftAlone = undo.items.some((item) => item.type === 'skipped' || 'skipped' in item);
+if (leftAlone) showToast('Some of this was changed since, and was kept.');
+```
+
+It goes by value: a field changed and then set back to what your change set counts as unchanged,
+and is undone. Undoing the same change twice is harmless: the second undo finds nothing left to
+put back.
+
+Undoing a delete brings back what was deleted as it was: the same refs, its place among the
+page's annotations, its replies and popup, and who wrote it. The item is `annotations.restore`,
+with the annotations that came back, `forms.restore`, with the field, or `forms.restoreWidget`, with
+the widget back at its place and in its field.
+
+### What can't be undone
+
+`meta.undoable` says whether a write can be undone. It's `false` for:
+
+- **A write that changed nothing**, such as a change with no ops.
+- **Writes a change can't hold**: page edits, attachments, form data imports. They're writes of
+  their own. An [annotation import](/docs/engine/annotations/import-export#undo-an-import) is a
+  change and can be undone.
+- **Final writes**: [applying redactions](/docs/engine/documents/redaction),
+  [flattening](/docs/engine/documents/pages#flatten-a-pages-annotations),
+  [signing](/docs/engine/forms/signatures) and
+  [repairing a form](/docs/engine/forms/authoring#repair-a-broken-form). They take content out of
+  the document or seal it, so there's nothing to go back to.
+
+A final write also ends undo for every change before it. Undoing one of those fails with
+`UndoUnavailable` and `details.reason: 'final-change'`. Changes after the final write can be
+undone as usual.
+
+```ts
+import { EngineError, EngineErrorCode } from '@cloudpdf/engine';
+
+try {
+  await doc.apply({ undoOf: opId });
+} catch (error) {
+  if (EngineError.is(error, EngineErrorCode.UndoUnavailable)) {
+    showToast('This can no longer be undone.');
+  } else {
+    throw error;
+  }
+}
+```
+
+## Guard a change with `expect`
+
+By default, a change writes over whatever is there: the last write wins. When your change only
+makes sense if the document still holds what the user saw, say so with `expect`. It takes the
+same shape as what the op writes:
+
+```ts
+await doc.apply({
+  ops: [
+    {
+      type: 'annotations.update',
+      ref: square.ref,
+      patch: { color: '#16a34a' },
+      expect: { color: '#e11d48' }, // only while it's still red
+    },
+  ],
+});
+```
+
+When the document doesn't match, the whole change is refused with `ChangeConflict`, and nothing
+is written. `error.details.opIndex` is the op that didn't match and `error.details.fields` the
+fields that differed. `annotations.delete` and `forms.delete` expect the values the thing has
+before it goes. A reorder takes no `expect`: its position names a neighbour, which is already
+what it assumes.
+
+## Asking again
+
+The `opId` names the change. Asked again with the same `opId`, a change isn't applied a second
+time: you get the first answer back, and no event fires again. A change that was refused answers
+its refusal again, even if it would now apply, so a retry can never land after something that came
+later.
+
+```ts
+const opId = crypto.randomUUID();
+const first = await doc.apply(change, { opId });
+const again = await doc.apply(change, { opId }); // the same result; nothing written
+```
+
+A different change under an `opId` that already has an answer fails with `IdempotencyKeyReused`.
+Use a fresh `opId` for every change. See [Events](/docs/engine/concepts/events#which-write-an-event-came-from)
+for what an `opId` may contain.
+
+## Who may undo
+
+Only the user who made a change can undo it; anyone else gets `Forbidden`. An undo is also checked
+against what the user may do now, like any write: a user who can no longer change annotations
+can't undo an annotation change either. A change needs, op by op, the permissions each call
+needs; see [Permissions](/docs/engine/concepts/permissions).
+
+<Engine local>
+
+## How long undo lasts
+
+The engine keeps what undo needs while the document is open, in this tab: the last 4,096 changes,
+and up to 64 MB of the objects they replaced. When it has to let go of the oldest, undoing them
+fails with `UndoUnavailable` and `details.reason: 'expired'`. Closing the document ends its undo
+history.
+
+<CloudPdfCallout
+  title="Undo that outlasts the tab"
+  href="https://www.cloudpdf.com/docs/engine/documents/changes"
+  cta="Read about changes in CloudPDF"
+>
+
+With CloudPDF, the server keeps each change and what undoes it for 30 days. A user can undo after
+a reload, or from another device, and the undo leaves alone what colleagues changed since.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+## How long undo lasts
+
+The server keeps each change, and what undoes it, for 30 days (your deployment can set another
+period). A user can undo a change after a reload or from another device. After that, undoing it
+fails with `UndoUnavailable` and `details.reason: 'expired'`.
+
+## How changes are sent
+
+Changes go to the server one request at a time per document, in the order you make them. Changes
+you make while a request is on its way wait together, and go out as one request when it returns:
+a burst of edits on a slow connection becomes a few requests, not one per edit. Each `apply()`
+still resolves with its own result, and a change and its undo can travel in the same request.
+
+A request lost on the network goes again with the same `opId`s, so nothing is applied twice.
+
+A change holds at most 512 ops; more fails with `PayloadTooLarge`. Split a bigger job into
+several changes.
+
+</Engine>
+
+## Good to know
+
+### Events
+
+A change fires the events its ops' calls fire, in op order, all with the change's `opId` in
+`origin.tx`. An undo fires what it did: `annotations.updated` for a field put back,
+`annotations.deleted` for a create taken back, `annotations.restored` and `forms.restored` for
+what came back. Its events carry `origin.undoOf`, the `opId` of the change it undid. See
+[Events](/docs/engine/concepts/events).
+
+### How the engine puts things back
+
+When a change runs, the engine keeps a copy of everything it's about to replace or delete. When
+nothing touched those objects since, an undo puts the copies back exactly, down to the
+annotation's appearance. When something did, it falls back to putting back each field that still
+holds the value the change wrote.
+
+<Engine cloud>
+
+### From your server
+
+The server takes changes over HTTP too, so a backend job can make them and undo them with the
+same `opId`s. See [Apply changes](/docs/api-reference/document-operations/changes) in the API
+reference.
+
+</Engine>

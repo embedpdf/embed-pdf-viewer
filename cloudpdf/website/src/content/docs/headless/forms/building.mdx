@@ -1,0 +1,199 @@
+---
+title: Building forms
+description: 'Turn any PDF into a form: place text boxes, checkboxes, radio buttons, lists and signature fields, and change their settings.'
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Building forms
+
+The form plugin can also add fields to a PDF, and change or remove the ones it has, so people can turn
+any document into a form. Switch to **design mode**, pick a field tool, and click or drag on the page:
+
+<Snippet name="forms/field-palette" />
+
+Building needs the [annotation plugin](../annotations) next to the form plugin: in design mode, fields
+are boxes you select, move, resize and style like any annotation.
+
+| Tool             | Places                      | A click makes |
+| :--------------- | :-------------------------- | :------------ |
+| `form-text`      | A text box                  | 160 × 24      |
+| `form-checkbox`  | A checkbox                  | 18 × 18       |
+| `form-radio`     | A radio button              | 18 × 18       |
+| `form-combobox`  | A dropdown                  | 140 × 24      |
+| `form-listbox`   | A list                      | 140 × 72      |
+| `form-signature` | A field someone signs later | 160 × 48      |
+
+A see-through preview of the field follows the pointer, drawn as the field will be, so people see
+where it lands before they click. Drag instead of clicking for another size. The tool stays active, so placing ten checkboxes is ten
+clicks.
+
+<Example name="form/designer" />
+
+## Design mode
+
+The `form-edit` tool is design mode: fields stop being fillable and become boxes you can select, move
+and resize. The `pointer` tool makes them fillable again:
+
+```ts
+interaction.activateTool('form-edit'); // design the form
+interaction.activateTool('pointer'); // fill it in
+```
+
+## Change a field's settings
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+`useFormState().selectedField` is the field of the selected box, for a settings panel:
+
+</Fw>
+
+<Fw only="angular">
+
+`form.selectedField()` is the field of the selected box, for a settings panel:
+
+</Fw>
+
+<Snippet name="forms/field-settings" />
+
+`update()` takes only what you change, with the same settings a field reads:
+
+| Setting                                      | What it is                                            |
+| :------------------------------------------- | :---------------------------------------------------- |
+| `name`                                       | The full name. Dots make groups: `customer.email`     |
+| `required`                                   | PDF apps ask for a value before the form is submitted |
+| `readOnly`                                   | People can't change the value                         |
+| `alternateName`                              | The tooltip, also read by screen readers              |
+| `defaultValue`                               | What a reset puts back                                |
+| `options`                                    | For a dropdown or list: `{ label, value }` pairs      |
+| `maxLength`, `multiline`, `password`, `comb` | For a text box                                        |
+
+A field's look, such as its border, background and font, belongs to its box: change it like any
+annotation's, with the [style panel](../annotations/selecting#a-style-panel).
+
+<Example name="form/field-settings" />
+
+## Add fields from code
+
+`create()` takes the same settings the engine takes, with the page and the box for each place the
+field shows:
+
+```ts
+const { field } = await form.create({
+  family: 'combobox',
+  name: 'country',
+  options: [
+    { label: 'Netherlands', value: 'NL' },
+    { label: 'Belgium', value: 'BE' },
+  ],
+  widgets: [{ page: page.ref, rect: { x: 72, y: 252, width: 148, height: 20 } }],
+});
+```
+
+A radio group is one field with a box per button, each with the value it stands for:
+
+```ts
+await form.create({
+  family: 'radio',
+  name: 'plan',
+  widgets: [
+    { page: page.ref, rect: { x: 72, y: 136, width: 16, height: 16 }, exportValue: 'monthly' },
+    { page: page.ref, rect: { x: 72, y: 166, width: 16, height: 16 }, exportValue: 'yearly' },
+  ],
+});
+```
+
+A field placed with a tool gets a name like `text_1`; rename it in your settings panel. Every
+family's settings are on [Creating form fields](/docs/engine/forms/authoring).
+
+<Example name="form/create" />
+
+## Scripts and calculations
+
+A field's scripts go in `actions` when you create or change it: a calculated total, a formatted
+amount, a check on what the user typed. The viewer runs them while the user fills the form in.
+
+```ts
+await form.update(total.ref, {
+  actions: {
+    calculate: {
+      type: 'javascript',
+      script: 'event.value = this.getField("subtotal").value * 1.21;',
+    },
+  },
+});
+await form.reorderCalculations([tax.ref], { before: total.ref });
+```
+
+A calculate script puts the field at the end of the order calculations run in;
+`reorderCalculations()` moves it. Writing a script needs `canWriteScripts()`. See
+[Scripts and calculations](/docs/engine/forms/authoring#scripts-and-calculations).
+
+A box can do something when it's clicked, too, such as reset the form: give its entry of
+`widgets` in `create()` its `actions`. A script, a submit or a web link there needs
+`canWriteScripts()` as well. See [Widget actions](/docs/engine/forms/authoring#widget-actions).
+A push button (`family: 'pushbutton'`) is a box that only does that, with a `caption`; see
+[A push button](/docs/engine/forms/authoring#a-push-button).
+
+## Remove a field
+
+```ts
+await form.delete(field.ref);
+```
+
+This removes the field and every box it has. To remove one box of a field that shows in several places,
+such as a reference number on every page, use `form.deleteWidget(widget.ref)`. It resolves the field
+as it is now.
+
+## Methods
+
+What `useForm()` gives you for building forms. Reading, filling and the form's state are on
+[Filling forms](../forms#methods).
+
+| Method                                  | What it does                                                                                                                                                                                          |
+| :-------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create(draft)`                         | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)                                                                                 |
+| `update(ref, patch)`                    | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings)                                                                      |
+| `delete(ref)`                           | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
+| `deleteWidget(widget)`                  | Removes one box from its page, and from its field when it has one. Resolves `{ field }`, or `{ field: null }` for a box in no field. [Remove a field](#remove-a-field)                                |
+| `removeWidget(ref, widget)`             | Takes one box out of its field; it stays on the page, in no field, until `deleteWidget()` removes it                                                                                                  |
+| `reorderCalculations(fields, position)` | Moves fields in the order calculate scripts run in. Resolves `{ calculationOrder }`. [Scripts and calculations](#scripts-and-calculations)                                                            |
+| `repair(options?)`                      | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
+| `canDesign()`                           | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
+| `canRestoreAttribution()`               | Whether an import may keep who created and filled in its fields, instead of naming the importing user. [Permissions](#permissions)                                                                    |
+| `canWriteScripts()`                     | Whether scripts, submit buttons and links may be written into fields and their boxes. [Permissions](#permissions)                                                                                     |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## Events
+
+<Snippet name="forms/select-new-field" />
+
+| Event            | Fires when                 | Carries           |
+| :--------------- | :------------------------- | :---------------- |
+| `onFieldCreated` | A field was added          | `field`, `origin` |
+| `onFieldUpdated` | A field's settings changed | `field`, `origin` |
+| `onFieldDeleted` | A field was removed        | `ref`, `origin`   |
+
+## Permissions
+
+| Permission         | What it allows                                                  | Check                          |
+| :----------------- | :-------------------------------------------------------------- | :----------------------------- |
+| `doc.forms.modify` | Adding, changing, removing and repairing fields                 | `form.canDesign()`             |
+| `doc.forms.import` | Importing fields and values with who created and filled them in | `form.canRestoreAttribution()` |
+| `doc.forms.script` | Writing scripts, submit buttons and links into fields and boxes | `form.canWriteScripts()`       |
+
+Hide the field tools when `canDesign()` is false, and the script, submit and link options of a
+field's or a box's actions when `canWriteScripts()` is false. Scripts already in the form run either way.
+
+## Good to know
+
+### Fields and boxes
+
+A field is the data: its name, its value, its settings. A **widget** is a box where the field shows on
+a page. Most fields have one; a radio group has one per button, and a field can show on several pages,
+all with the same value.
+
+### Signature fields
+
+A signature field is a place for someone to sign later. Signing it is on [Signatures](signatures).

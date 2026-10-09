@@ -1,6 +1,6 @@
+/** The context every area of the actions plugin receives: no session state, the actions settings. */
 import type { PluginContext } from '@embedpdf/core';
 
-import type { ActionsAction, ActionsState } from '../model';
+import type { ActionsSettings } from '../contract';
 
-/** The plugin context every area receives — the kernel's, typed to this slice. */
-export type ActionsContext = PluginContext<ActionsState, ActionsAction>;
+export type ActionsContext = PluginContext<void, ActionsSettings>;

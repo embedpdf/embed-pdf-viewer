@@ -1,0 +1,199 @@
+---
+title: Annotations
+description: Show the annotations in a PDF, let people draw new ones, and work with them from code.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Cards, Card } from '@/components/docs/cards';
+
+{/* This page is served at `…/headless/<framework>/annotations` with NO trailing
+    slash, so a relative href resolves against `…/headless/<framework>/`.
+    Sibling pages are `annotations/tools`, other sections `text/selection`. */}
+
+# Annotations
+
+Annotations are what people add on top of a page: highlights, sticky notes, shapes, stamps and
+text boxes. The annotation plugin shows the ones a PDF already has, lets people draw and edit new
+ones, and gives your code the same abilities. Every annotation is saved into the PDF, so it looks
+the same in every other PDF app.
+
+## Show the annotations in a PDF
+
+Register `interactionPlugin()` and `annotationPlugin()`, then put an `<AnnotationLayer>` above the
+rendered page:
+
+<Example name="annotation/layer" />
+
+> **Try it:** click the rectangle and drag it, or a corner to resize it. Double-click the text box
+> to type in it.
+
+<Snippet name="annotations/index/layer" />
+
+While the annotation layer is on the page, the render layer leaves the annotations out of the page
+picture by itself. The annotation layer draws them instead, so they can be selected, moved and
+changed.
+
+`interactionPlugin()` is the shared input system. Every tool, from text selection to drawing,
+speaks through it; see [Selecting & copying](text/selection) for how it works.
+
+## Let people draw
+
+A **tool** says what a click or a drag on the page creates. Activate one and people can draw:
+
+<Example name="annotation/draw" />
+
+> **Try it:** drag on the page to draw a rectangle, then pick another tool. **Highlight** marks the
+> text you select.
+
+<Snippet name="annotations/index/toolbar" />
+
+- **`pointer`** selects: click an annotation to select it, then move, resize or turn it.
+- **`square`** draws a rectangle: drag, or just click for a default-size one.
+- **`ink`** draws freehand.
+- **`highlight`** highlights the text you select.
+- **`note`** drops a sticky note where you click.
+
+After you draw, the new annotation is selected and the tool stays active, so you can draw another.
+You can change both; see [What happens after drawing](annotations/tools#what-happens-after-drawing).
+
+## How it fits together
+
+Everything on these pages is one of five things:
+
+| Thing          | What it is                                                                         | Where you use it                           |
+| :------------- | :--------------------------------------------------------------------------------- | :----------------------------------------- |
+| **Annotation** | A record in the PDF: its kind, position, colors and text.                          | `annotation.list()`                        |
+| **Tool**       | What a click or drag creates, with which defaults, cursor and preview.             | `annotationPlugin({ tools })`              |
+| **Layer**      | What each page draws: the annotations, the selection box and handles, the preview. | `<AnnotationLayer>`                        |
+| **Overlay**    | Your own UI attached to an annotation, such as a menu or a hover card.             | `<AnnotationMenu>`                         |
+| **API**        | Reading, creating, changing and deleting annotations, and listening for changes.   | `useAnnotation()`                          |
+
+An annotation here is the same record the engine reads and writes: the same kinds, the same fields
+and the same names. What you learn in the [engine's annotation pages](/docs/engine/annotations)
+holds here too.
+
+## The built-in tools
+
+| Tool                                              | Makes                                       | How                                   |
+| :------------------------------------------------ | :------------------------------------------ | :------------------------------------ |
+| `square`, `circle`                                | A rectangle or an ellipse                   | Drag, or click for a default size     |
+| `line`                                            | A line                                      | Drag, or click for a default length   |
+| `polygon`, `polyline`                             | A closed or open shape of points            | Click each point, double-click to end |
+| `ink`, `ink-highlight`                            | Freehand drawing, or a see-through marker   | Draw                                  |
+| `free-text`, `free-text-callout`                  | A text box, or one with a line pointing out | Click or drag, then type              |
+| `highlight`, `underline`, `strikeout`, `squiggly` | A mark over text                            | Select text                           |
+| `insert-text`, `replace-text`                     | A suggested insertion or replacement        | Select text                           |
+| `note`                                            | A sticky note                               | Click                                 |
+| `stamp`                                           | An image or a PDF drawing                   | Click, then pick a file               |
+| `attachment`                                      | A file pinned to a spot                     | Click, then pick a file               |
+| `link`                                            | An area that opens a page or a website      | Drag                                  |
+
+Measurement tools (`distance`, `perimeter`, `area`) and redaction (`redact`) are annotation tools
+too. Their plugins add the rest of what they need.
+
+You can change any tool, or add your own; see [Tools & defaults](annotations/tools).
+
+## Who wrote it
+
+Every annotation records who made it and who last changed it (`author`, `createdAt`,
+`modifiedAt`). You don't set these on the annotation: they come from the user the document was
+opened for.
+
+<Engine local>
+
+Tell the viewer who the user is, once. Every document it opens uses it:
+
+<Example name="annotation/identity" />
+
+> **Try it:** draw a rectangle. The list says Dana Smith made it, and when.
+
+<Snippet name="annotations/index/identity" />
+
+`displayName` becomes the `author` other PDF apps show, and `userId` records who owns the
+annotation. The same identity decides which annotations count as the user's own when
+[permissions](concepts/permissions) say "only their own".
+
+To open one document as someone else, give its entry in `initialDocuments` its own `identity`. It
+replaces the viewer's for that document:
+
+```ts
+const initialDocuments = [
+  { source: contract, identity: { userId: 'bot', displayName: 'Import job' } },
+];
+```
+
+A document keeps the identity it was opened with. <Fw only={['react', 'vue', 'svelte']}>If you change the viewer's `identity`, documents
+you open afterwards use the new one.</Fw>
+
+<Fw only="angular">
+
+To change the viewer's identity, for example when someone else signs in, use
+`inject(EpdfViewer).updateSettings({ identity })`. Documents you open afterwards use the new one. To
+follow your app's login:
+
+```ts
+effect(() => viewer.updateSettings({ identity: auth.identity() }));
+```
+
+</Fw>
+
+</Engine>
+
+<Engine cloud>
+
+It comes from the identity in the user's token; see
+[Authentication](/docs/engine/authentication#what-a-token-carries).
+
+</Engine>
+
+## Settings
+
+Set them when you register the plugin. `snap`, `chrome` and `afterCreate` can change while the app
+runs, with `annotation.updateSettings({ … })`; `annotation.resetSettings()` goes back to what you
+registered, and `useAnnotationSettings()` gives you the current settings.
+
+| Setting       | What it does                                                          | Page                                                        |
+| :------------ | :-------------------------------------------------------------------- | :---------------------------------------------------------- |
+| `tools`       | Change the built-in tools, or add your own                            | [Tools & defaults](annotations/tools)                       |
+| `afterCreate` | Select a new annotation? Keep the tool active?                        | [What happens after drawing](annotations/tools#what-happens-after-drawing) |
+| `chrome`      | The selection's outline, handles and rotation handle, and their colors | [Change the handles](annotations/selecting#change-the-handles) |
+| `snap`        | Snapping to other annotations and to angles                           | [Snapping](annotations/selecting#snapping)                  |
+
+Every color in `chrome` can also come from CSS, for dark mode or a different look per viewer: see
+[Colors & theming](ui/theming).
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Annotations in code"
+    description="Read, create, change and delete annotations from your own code."
+    href="annotations/with-code"
+  />
+  <Card
+    title="Events, saving & sharing"
+    description="Listen for changes, save them into the PDF, or move them to your own server."
+    href="annotations/saving"
+  />
+  <Card
+    title="Tools & defaults"
+    description="Default colors, your own tools, the cursor, and a preview before placing."
+    href="annotations/tools"
+  />
+  <Card
+    title="Selecting & editing"
+    description="Selection, a menu, a style panel, and your own handles."
+    href="annotations/selecting"
+  />
+  <Card
+    title="Your own annotation look"
+    description="Draw an annotation with your own component, and show cards on hover."
+    href="annotations/custom-rendering"
+  />
+  <Card
+    title="Comments & replies"
+    description="Build a comments sidebar with threads, replies and review states."
+    href="annotations/comments"
+  />
+</Cards>

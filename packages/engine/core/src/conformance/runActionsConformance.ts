@@ -6,7 +6,7 @@ import { toPageRef } from '../identity/PageRef';
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
 
 /** The script payload rides only the javascript/rendition arms. */
-function scriptOf(node: PdfActionNode | null | undefined): string {
+function scriptOf<Destination>(node: PdfActionNode<Destination> | null | undefined): string {
   if (!node) return '';
   if (node.type === 'javascript') return node.script;
   if (node.type === 'rendition') return node.script ?? '';
@@ -19,7 +19,7 @@ export interface ActionsConformanceFixtures {
   annotation: ConformanceFixture;
   field: ConformanceFixture;
   /** `action_payloads.pdf` — every executable payload shape on one page of
-   *  /NM-keyed links. REQUIRED on both flavours: payload parity is a gate. */
+   *  /NM-keyed links. Required on both flavours: payload parity is a gate. */
   payloads: ConformanceFixture;
   /** `open_action_dest.pdf` — a destination-form catalog `/OpenAction`. */
   openDestination: ConformanceFixture;
@@ -56,7 +56,7 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.document);
       try {
         expect(Boolean(doc.actions)).toBe(true);
-        const snapshot = await doc.actions!.read();
+        const snapshot = await doc.actions!.get();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
         expect(snapshot.willSave?.root?.type).toBe('javascript');
@@ -66,7 +66,7 @@ export function runActionsConformance(
         expect(scriptOf(snapshot.didPrint?.root)).toMatch(/Did Print/);
 
         const form = await doc.forms.list();
-        expect(form.calculationOrder).toEqual([{ kind: 'objectNumber', fieldObjectNumber: 9 }]);
+        expect(form.calculationOrder).toEqual([{ kind: 'objectNumber', objectNumber: 9 }]);
       } finally {
         await doc.close();
       }
@@ -90,16 +90,16 @@ export function runActionsConformance(
       try {
         const firstPage = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(firstPage.ref).annotations.list();
-        const button = snapshot.annotations.find(
-          (annotation) =>
-            annotation.ref.kind === 'objectNumber' && annotation.ref.annotObjectNumber === 7,
+        // The button is a widget: its row comes with the form.
+        const button = (await doc.forms.list()).widgets.find(
+          (widget) => widget.ref.kind === 'objectNumber' && widget.ref.objectNumber === 7,
         );
         const link = snapshot.annotations.find(
           (annotation) =>
-            annotation.ref.kind === 'objectNumber' && annotation.ref.annotObjectNumber === 8,
+            annotation.ref.kind === 'objectNumber' && annotation.ref.objectNumber === 8,
         );
         expect(button?.actions?.activate?.root?.type).toBe('uri');
-        // A link carries BOTH planes: the base-level scripting action model
+        // A link carries both planes: the base-level scripting action model
         // (chain shape, for the orchestrator) and its own normalized target
         // (payload, for navigation). They must agree on the action type.
         expect(link?.subtype).toBe('link');
@@ -126,7 +126,7 @@ export function runActionsConformance(
           // cannot — it has no JavaScript code)…
           expect(link.target).toEqual({ kind: 'javascript' });
         }
-        // …while the script text lives ONLY on the scripting plane's model.
+        // …while the script text lives only on the scripting plane's model.
         expect(link?.actions?.activate?.root?.type).toBe('javascript');
         expect(scriptOf(link?.actions?.activate?.root)).toMatch(/app\.alert/);
       } finally {
@@ -141,9 +141,8 @@ export function runActionsConformance(
         expect(form.fields).toHaveLength(1);
         expect(form.fields[0].actions?.format?.root?.type).toBe('javascript');
         expect(scriptOf(form.fields[0].actions?.format?.root)).toMatch(/AFDate_FormatEx/);
-        const page = (await doc.pages.list()).pages[0];
-        const widget = (await doc.page(page.ref).annotations.list()).annotations[0];
-        expect(widget.actions).toBe(undefined);
+        expect(form.widgets).toHaveLength(1);
+        expect(form.widgets[0]!.actions).toBe(null);
       } finally {
         await doc.close();
       }
@@ -154,7 +153,7 @@ export function runActionsConformance(
       try {
         const page = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(page.ref).annotations.list();
-        const pon = page.ref.pageObjectNumber;
+        const pageObjectNumber = page.ref.objectNumber;
         const rootOf = (nm: string) => {
           const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
           expect(Boolean(annotation)).toBe(true);
@@ -165,19 +164,24 @@ export function runActionsConformance(
           return annotation?.subtype === 'link' ? annotation.target : null;
         };
 
+        // The file's /FitR 10 20 300 400, from the page's top-left.
+        const visible = page.pdfCropBox;
         expect(rootOf('goto-fitr')).toMatchObject({
           type: 'goto',
           destination: {
             kind: 'fitR',
-            page: toPageRef(pon),
-            left: 10,
-            bottom: 20,
-            right: 300,
-            top: 400,
+            page: toPageRef(pageObjectNumber),
+            x: 10 - visible.left,
+            y: visible.top - 400,
+            width: 290,
+            height: 380,
           },
         });
-        // Dual planes agree by construction: the target IS the tree's projection.
-        expect(targetOf('goto-fitr')).toMatchObject({ kind: 'goto', destination: { kind: 'fitR' } });
+        // Dual planes agree by construction: the target is the tree's projection.
+        expect(targetOf('goto-fitr')).toMatchObject({
+          kind: 'goto',
+          destination: { kind: 'fitR' },
+        });
 
         expect(rootOf('uri-map')).toMatchObject({
           type: 'uri',
@@ -191,9 +195,9 @@ export function runActionsConformance(
         const mixedTargets = mixed?.type === 'hide' ? mixed.targets : [];
         expect(mixedTargets).toHaveLength(2);
         expect(mixedTargets[0]).toEqual({ kind: 'name', name: 'note1' });
-        expect(
-          mixedTargets[1]?.kind === 'objectNumber' && mixedTargets[1].objectNumber > 0,
-        ).toBe(true);
+        expect(mixedTargets[1]?.kind === 'objectNumber' && mixedTargets[1].objectNumber > 0).toBe(
+          true,
+        );
         expect(rootOf('hide-scalar')).toMatchObject({
           type: 'hide',
           targets: [{ kind: 'name', name: 'fieldB' }],
@@ -206,10 +210,18 @@ export function runActionsConformance(
           fields: [{ kind: 'name', name: 'calc1' }],
           exclude: true,
         });
-        expect(rootOf('reset-absent')).toMatchObject({ type: 'reset-form', fields: null, exclude: true });
-        expect(rootOf('reset-empty')).toMatchObject({ type: 'reset-form', fields: [], exclude: false });
+        expect(rootOf('reset-absent')).toMatchObject({
+          type: 'reset-form',
+          fields: null,
+          exclude: true,
+        });
+        expect(rootOf('reset-empty')).toMatchObject({
+          type: 'reset-form',
+          fields: [],
+          exclude: false,
+        });
 
-        // SubmitForm's ATOMIC payload (Phase 4). /UF beats /F in a
+        // SubmitForm's atomic payload. /UF beats /F in a
         // conforming << /FS /URL >> spec; a bare-string /F is the
         // producer-compat extension; bit 9 dominates format with GetMethod
         // kept alive (ISO 32000-2 Table 240).
@@ -254,9 +266,16 @@ export function runActionsConformance(
         // A mixed /Next chain carries every payload in PDF order.
         const chain = rootOf('chain-js-goto-hide');
         expect(chain).toMatchObject({ type: 'javascript', script: "app.alert('chain');" });
+        // The file's /XYZ 5 10 1.25, from the page's top-left.
         expect(chain?.next[0]).toMatchObject({
           type: 'goto',
-          destination: { kind: 'xyz', page: toPageRef(pon), left: 5, top: 10, zoom: 1.25 },
+          destination: {
+            kind: 'xyz',
+            page: toPageRef(pageObjectNumber),
+            x: 5 - visible.left,
+            y: visible.top - 10,
+            zoom: 1.25,
+          },
         });
         expect(chain?.next[0]?.next[0]).toMatchObject({
           type: 'hide',
@@ -276,8 +295,8 @@ export function runActionsConformance(
         for (const [nm, subtype] of [
           ['goto-malformed', 'GoTo'],
           ['hide-partial', 'Hide'], // a partial target list must never half-execute
-          // The atomic-payload law: a submit whose REQUIRED /F is not a URL
-          // (or is absent) degrades WHOLE — never a half payload.
+          // The atomic-payload law: a submit whose required /F is not a URL
+          // (or is absent) degrades whole — never a half payload.
           ['submit-not-url', 'SubmitForm'],
           ['submit-no-f', 'SubmitForm'],
         ] as const) {
@@ -300,15 +319,16 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.openDestination);
       try {
         expect(Boolean(doc.actions)).toBe(true);
-        const snapshot = await doc.actions!.read();
+        const snapshot = await doc.actions!.get();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
+        // The file's [/XYZ 10 700 1.5] on a letter page, from the page's top-left.
         expect(snapshot.openDestination).toEqual({
           kind: 'xyz',
-          page: toPageRef(pon),
-          left: 10,
-          top: 700,
+          page: toPageRef(pageObjectNumber),
+          x: 10,
+          y: 92,
           zoom: 1.5,
         });
       } finally {

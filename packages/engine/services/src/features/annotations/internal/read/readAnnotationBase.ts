@@ -1,25 +1,35 @@
 import type {
   AnnotationBase,
   PageObjectNumber,
-  RevisionToken,
   PdfAnnotationActions,
+  PdfDestination,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readAnnotFlags, readAnnotRect, readAnnotString } from './annotationReadPrimitives';
-import { readAnnotationIdentity } from './readAnnotationIdentity';
-import { readAnnotationRelationship } from './readAnnotationRelationship';
+import {
+  readAnnotFlags,
+  readAnnotRect,
+  readAnnotString,
+  readAppearanceState,
+} from './annotationReadPrimitives';
+import { readAnnotationRelationship, readLinkedAnnotationRef } from './readAnnotationRelationship';
 import { readEmbedMetadata } from './readEmbedMetadata';
-import { blendModeFromCode } from '../blendMode';
 import { pdfDateToIso } from '../../../../shared/pdf-date';
 import { ActionReadBudgetTracker, readActionModel } from '../../../actions/ActionModelReader';
+import { blendModeFromCode } from '../blendMode';
+import { annotationRefOf } from '../identity/annotationName';
+
+/** `FPDF_ANNOT_APPEARANCEMODE_NORMAL`: the `/AP /N` stream. */
+const APPEARANCE_MODE_NORMAL = 0;
 
 /**
- * Reads the wire shell every annotation DTO carries: identity, flags,
- * rect, contents, author, dates. No subtype-specific fields. The
- * per-subtype reader builds its DTO by extending this with its own
- * fields and `subtype: '...'` discriminator.
+ * Reads the fields every annotation DTO carries: identity, flags, rect,
+ * contents, relationships, attribution and actions, each present and `null`
+ * when absent. No subtype-specific fields. The per-subtype reader builds its
+ * DTO by extending this with its own fields and `subtype: '...'`
+ * discriminator.
  */
 export function readAnnotationBase(
   fn: PdfFunctions,
@@ -28,10 +38,9 @@ export function readAnnotationBase(
   annotPtr: Ptr,
   pageObjectNumber: PageObjectNumber,
   index: number,
-  revision: RevisionToken,
   actionBudget = new ActionReadBudgetTracker(),
-): AnnotationBase {
-  const identity = readAnnotationIdentity(fn, mem, annotPtr, pageObjectNumber, index, revision);
+): AnnotationBase<PdfCoordinates> {
+  const page = toPageRef(pageObjectNumber);
   const rect = readAnnotRect(fn, mem, annotPtr);
   const flags = readAnnotFlags(fn, annotPtr);
   const contents = readAnnotString(fn, mem, annotPtr, 'Contents');
@@ -40,34 +49,36 @@ export function readAnnotationBase(
   const createdRaw = readAnnotString(fn, mem, annotPtr, 'CreationDate');
   const modifiedRaw = readAnnotString(fn, mem, annotPtr, 'M');
   const blendMode = blendModeFromCode(fn.EPDFAnnot_GetBlendMode(annotPtr));
-  // EmbedPDF /EMBD_Metadata is optional; absent for legacy or anonymous
-  // annotations. We spread the present fields into the DTO so the wire
-  // never carries explicit `undefined` keys.
+  // /EMBD_Metadata is absent for anonymous annotations and those written by other tools.
   const embd = readEmbedMetadata(fn, mem, annotPtr);
-  const relationship = readAnnotationRelationship(fn, mem, annotPtr, pageObjectNumber);
+  const relationship = readAnnotationRelationship(fn, mem, docPtr, annotPtr, pageObjectNumber);
+  const popup = readLinkedAnnotationRef(fn, mem, docPtr, annotPtr, 'Popup', pageObjectNumber);
   const actions = readAnnotationActions(fn, mem, docPtr, annotPtr, actionBudget);
 
   return {
-    ref: identity.ref,
-    page: toPageRef(pageObjectNumber),
-    index,
-    identityQuality: identity.identityQuality,
-    nm: identity.nm,
-    flags,
+    ref: annotationRefOf(fn, mem, docPtr, page, annotPtr, index),
+    page,
+    hasAppearance: fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL),
+    appearanceState: readAppearanceState(fn, mem, annotPtr),
+    nm: readAnnotString(fn, mem, annotPtr, 'NM'),
+    ...flags,
     rect,
     contents,
     subject,
     author,
-    created: createdRaw ? pdfDateToIso(createdRaw) : null,
-    modified: modifiedRaw ? pdfDateToIso(modifiedRaw) : null,
+    createdAt: createdRaw ? pdfDateToIso(createdRaw) : null,
+    modifiedAt: modifiedRaw ? pdfDateToIso(modifiedRaw) : null,
     blendMode,
-    inReplyTo: relationship.inReplyTo,
-    replyType: relationship.replyType,
-    ...(embd?.userId !== undefined ? { userId: embd.userId } : {}),
-    ...(embd?.groupId !== undefined ? { groupId: embd.groupId } : {}),
-    ...(embd?.createdBy !== undefined ? { createdBy: embd.createdBy } : {}),
-    ...(embd?.updatedBy !== undefined ? { updatedBy: embd.updatedBy } : {}),
-    ...(actions ? { actions } : {}),
+    reply: relationship.inReplyTo
+      ? { to: relationship.inReplyTo, type: relationship.replyType ?? 'reply' }
+      : null,
+    popup,
+    groupId: embd?.groupId ?? null,
+    userId: embd?.userId ?? null,
+    createdBy: embd?.createdBy ?? null,
+    modifiedBy: embd?.modifiedBy ?? null,
+    importedBy: embd?.importedBy ?? null,
+    actions: actions ?? null,
   };
 }
 
@@ -77,7 +88,7 @@ function readAnnotationActions(
   docPtr: Ptr,
   annotPtr: Ptr,
   budget: ActionReadBudgetTracker,
-): PdfAnnotationActions | undefined {
+): PdfAnnotationActions<PdfDestination> | undefined {
   const events = [
     ['activate', 0],
     ['cursorEnter', 1],
@@ -91,7 +102,7 @@ function readAnnotationActions(
     ['pageVisible', 9],
     ['pageInvisible', 10],
   ] as const;
-  const actions: PdfAnnotationActions = {};
+  const actions: PdfAnnotationActions<PdfDestination> = {};
   for (const [key, event] of events) {
     const action = readActionModel(
       fn,

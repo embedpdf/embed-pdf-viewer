@@ -13,17 +13,17 @@ import {
 
 /**
  * Kill at every write boundary to verify generation fencing under engine-host
- * death, asserted at the OBSERVABLE level — no interleaving may ever
+ * death, asserted at the observable level — no interleaving may ever
  * let a session be blessed at a version it does not embody, readers
  * must park behind the surviving write marker, and durable truth is
  * exactly what the next reader sees.
  *
- *   S1 — host killed DURING the engine apply: the write fails cleanly,
+ *   S1 — host killed during the engine apply: the write fails cleanly,
  *        nothing becomes durable, a retry succeeds.
- *   S2 — host killed AFTER apply, during the artifact upload: the
+ *   S2 — host killed after apply, during the artifact upload: the
  *        API-side commit is unaffected and lands; a concurrent reader
  *        stays parked behind the write marker for the whole window and
- *        then sees the COMMITTED annotation (never the pre-commit
+ *        then sees the committed annotation (never the pre-commit
  *        artifact blessed as fresh).
  *   S3 — /readyz's engine clause: persistent host unavailability fails
  *        readiness (threshold 0 here); recovery restores it.
@@ -41,7 +41,7 @@ describe('engine-host write fence (kill at every boundary)', () => {
     await seedDocument(fx, 'tenant-s1', 'docfence001');
 
     // '__STALL__' parks the stub's annotations.create forever: the write
-    // is deterministically mid-APPLY when we kill.
+    // is deterministically mid-apply when we kill.
     const stalled = createAnnotation(fx, 'tenant-s1', 'docfence001', 'alice', '__STALL__');
     await until(() => clientFor(fx, 'docfence001').stats().inFlight >= 1);
     await sleep(150); // let the pre-create opens complete; the stall remains
@@ -82,7 +82,7 @@ describe('engine-host write fence (kill at every boundary)', () => {
     fx.gate.onWaiting = waiting;
 
     const write = createAnnotation(fx, 'tenant-s2', 'docfence002', 'alice', 'k2');
-    await waitingP; // engine apply DONE, upload blocked — the mid-commit window
+    await waitingP; // engine apply done, upload blocked — the mid-commit window
 
     const genBefore = clientFor(fx, 'docfence002').generation();
     process.kill(clientFor(fx, 'docfence002').hostPid()!, 'SIGKILL');
@@ -92,7 +92,7 @@ describe('engine-host write fence (kill at every boundary)', () => {
         clientFor(fx, 'docfence002').health().state === 'ready',
     );
 
-    // A reader during the window must PARK behind the write marker —
+    // A reader during the window must park behind the write marker —
     // it may not slip through and recreate a session the late commit
     // could bless (the fence attack).
     let readerSettled = false;
@@ -110,8 +110,8 @@ describe('engine-host write fence (kill at every boundary)', () => {
     const written = await write;
     expect(written.status).toBe(200);
 
-    // The parked reader now resolves and sees the COMMITTED annotation:
-    // its session reloaded from the committed artifact on the NEW host —
+    // The parked reader now resolves and sees the committed annotation:
+    // its session reloaded from the committed artifact on the new host —
     // never a pre-commit session blessed as current.
     const read = await reader;
     expect(read.status).toBe(200);

@@ -8,16 +8,16 @@ import {
   type PageGeometrySnapshot,
   type RotatedGeometryRun,
 } from '../dto/PageGeometrySnapshot';
-import { pdfQuadBounds } from '../geometry/convert';
 import type { Engine } from '../engine/Engine';
 import { toPageRef } from '../identity/PageRef';
+import { pageQuadBounds } from '../pageSpace/helpers';
 import { PageGeometrySnapshotSchema } from '../wire/schemas';
 
-const FLAG_EMPTY = 2;
-/** Absolute tolerance for coordinate assertions (PDF points). */
+/** Absolute tolerance for coordinate assertions (points). */
 const COORD_TOLERANCE = 1e-3;
 /** Tolerance for baseline-angle assertions (radians). */
-const ANGLE_TOLERANCE = 1e-3;
+/** Degrees. */
+const ROTATION_TOLERANCE = 0.06;
 
 /**
  * Per-fixture expectations for the oriented-text geometry harness. One
@@ -38,7 +38,7 @@ export interface PageGeometryOrientationFixture extends ConformanceFixture {
       }
     | {
         kind: 'rotated';
-        /** Baseline angles (radians, CCW, PDF y-up) rotated runs may carry. */
+        /** Turns (degrees clockwise) rotated runs may carry. */
         rotations: number[];
         ascentFlip: boolean;
         /**
@@ -77,8 +77,8 @@ export function runPageGeometryOrientationConformance(
       close: () => Promise<void>;
     }> => {
       const doc = await openFixture(engine, opts);
-      const snapshot = await doc.page(toPageRef(opts.fixture.pageObjectNumber)).geometry.read();
-      return { snapshot, close: () => doc.close() };
+      const layout = await doc.page(toPageRef(opts.fixture.pageObjectNumber)).text.layout();
+      return { snapshot: { runs: [...layout.runs] }, close: () => doc.close() };
     };
 
     test('snapshot round-trips the wire schema', async () => {
@@ -96,12 +96,12 @@ export function runPageGeometryOrientationConformance(
       }
     });
 
-    test('run charStart indices tile the page glyph sequence', async () => {
+    test('run starts tile the page character sequence', async () => {
       const { snapshot, close } = await readSnapshot();
       try {
         let next = 0;
         for (const run of snapshot.runs) {
-          expect(run.charStart).toBe(next);
+          expect(run.start).toBe(next);
           next += run.glyphs.length;
         }
       } finally {
@@ -118,10 +118,10 @@ export function runPageGeometryOrientationConformance(
             expect(isRotatedGeometryRun(run)).toBe(false);
             if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
-              expect('looseQuad' in glyph).toBe(false);
-              if (glyph.flags & FLAG_EMPTY) {
-                // Degenerate glyphs keep the legacy zeroed-box convention.
-                expect(glyph.looseBox).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
+              expect('width' in glyph.loose).toBe(true); // a box, not a quad
+              if (glyph.empty) {
+                // Degenerate glyphs keep the zeroed-box convention.
+                expect(glyph.loose).toEqual({ x: 0, y: 0, width: 0, height: 0 });
               }
             }
           }
@@ -133,8 +133,8 @@ export function runPageGeometryOrientationConformance(
             expect(isRotatedGeometryRun(run)).toBe(false);
             if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
-              expect(glyph.flags & FLAG_EMPTY).toBe(FLAG_EMPTY);
-              expect(glyph.looseBox).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });
+              expect(glyph.empty).toBe(true);
+              expect(glyph.loose).toEqual({ x: 0, y: 0, width: 0, height: 0 });
             }
           }
           return;
@@ -145,8 +145,8 @@ export function runPageGeometryOrientationConformance(
 
         for (const run of rotatedRuns) {
           expect(
-            expectation.rotations.some((angle) =>
-              angleClose(run.rotation, angle, ANGLE_TOLERANCE),
+            expectation.rotations.some((rotation) =>
+              rotationClose(run.rotation, rotation, ROTATION_TOLERANCE),
             ),
           ).toBe(true);
           expect(run.ascentFlip).toBe(expectation.ascentFlip);
@@ -158,8 +158,7 @@ export function runPageGeometryOrientationConformance(
             .flatMap((run) => run.glyphs)
             .filter(
               (glyph) =>
-                (glyph.flags & FLAG_EMPTY) === 0 &&
-                Math.abs(glyph.looseQuad.p3.x - glyph.looseQuad.p1.x) > 1,
+                !glyph.empty && Math.abs(glyph.loose.lowerLeft.x - glyph.loose.upperLeft.x) > 1,
             );
           expect(shearedGlyphs.length > 0).toBe(true);
         }
@@ -170,34 +169,40 @@ export function runPageGeometryOrientationConformance(
 
     function assertRotatedRunGeometry(run: RotatedGeometryRun): void {
       for (const glyph of run.glyphs) {
-        if (glyph.flags & FLAG_EMPTY) {
-          expect(glyph.looseQuad).toEqual({
-            p1: { x: 0, y: 0 },
-            p2: { x: 0, y: 0 },
-            p3: { x: 0, y: 0 },
-            p4: { x: 0, y: 0 },
+        if (glyph.empty) {
+          expect(glyph.loose).toEqual({
+            upperLeft: { x: 0, y: 0 },
+            upperRight: { x: 0, y: 0 },
+            lowerLeft: { x: 0, y: 0 },
+            lowerRight: { x: 0, y: 0 },
           });
           continue;
         }
-        const q = glyph.looseQuad;
-        // The cell is a parallelogram: both baseline-direction edges match,
-        // and both side edges match (slots: p1 US, p2 UE, p3 LS, p4 LE).
-        expect(Math.abs(q.p2.x - q.p1.x - (q.p4.x - q.p3.x)) <= COORD_TOLERANCE).toBe(true);
-        expect(Math.abs(q.p2.y - q.p1.y - (q.p4.y - q.p3.y)) <= COORD_TOLERANCE).toBe(true);
+        const q = glyph.loose;
+        // The cell is a parallelogram: the upper edge runs like the lower one.
+        expect(
+          Math.abs(q.upperRight.x - q.upperLeft.x - (q.lowerRight.x - q.lowerLeft.x)) <=
+            COORD_TOLERANCE,
+        ).toBe(true);
+        expect(
+          Math.abs(q.upperRight.y - q.upperLeft.y - (q.lowerRight.y - q.lowerLeft.y)) <=
+            COORD_TOLERANCE,
+        ).toBe(true);
         // Contained in the run's page-space AABB.
-        const bounds = pdfQuadBounds(q);
-        expect(bounds.left >= run.rect.left - COORD_TOLERANCE).toBe(true);
-        expect(bounds.right <= run.rect.right + COORD_TOLERANCE).toBe(true);
-        expect(bounds.bottom >= run.rect.bottom - COORD_TOLERANCE).toBe(true);
-        expect(bounds.top <= run.rect.top + COORD_TOLERANCE).toBe(true);
+        const bounds = pageQuadBounds(q);
+        const { rect } = run;
+        expect(bounds.x >= rect.x - COORD_TOLERANCE).toBe(true);
+        expect(bounds.x + bounds.width <= rect.x + rect.width + COORD_TOLERANCE).toBe(true);
+        expect(bounds.y >= rect.y - COORD_TOLERANCE).toBe(true);
+        expect(bounds.y + bounds.height <= rect.y + rect.height + COORD_TOLERANCE).toBe(true);
       }
     }
   });
 }
 
-function angleClose(a: number, b: number, tolerance: number): boolean {
-  const delta = a - b;
-  return Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) <= tolerance;
+function rotationClose(a: number, b: number, tolerance: number): boolean {
+  const delta = ((((a - b) % 360) + 540) % 360) - 180;
+  return Math.abs(delta) <= tolerance;
 }
 
 async function openFixture(engine: Engine, opts: PageGeometryOrientationOptions) {

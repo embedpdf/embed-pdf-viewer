@@ -1,19 +1,18 @@
 /**
- * The link editor POPOVER — v2's "add a link" popup, reborn. It rides the
- * SAME selection anchor as the action strip (`<AnnotationMenu>` solves
- * WHERE), opening from the strip's link icon (`annotation:link` toggles the
- * `link-editor` shell surface) and rendering IN PLACE of the strip while
- * open — one anchored card at a time.
+ * The link editor popover. It rides the same selection anchor as the action
+ * strip (`<AnnotationMenu>` solves where), opening from the strip's link icon
+ * (`annotation:link` toggles the `link-editor` shell surface) and rendering in
+ * place of the strip while open — one anchored card at a time.
  *
  * Reads the selection's current target from selection props (the `linkOf`
  * lens — parents derive from their committed child annotations) and writes
- * through the ONE `updateSelection({ link })` path; the plugin's reconciler
- * materializes/retargets the attached children. Links are a VERB on the
+ * through the one `selection.updateLink(target)` path; the plugin's reconciler
+ * materializes/retargets the attached children. Links are a verb on the
  * selection, not a style — which is why this is a popover, not a sidebar
  * section.
  */
 import { useState, type ReactNode } from 'react';
-import { useAnnotation, useSelectionProps } from '@embedpdf/react/annotation';
+import { useAnnotation, useAnnotationProperties } from '@embedpdf/react/annotation';
 import type { PdfLinkTarget } from '@embedpdf/react/link';
 import { useKernel } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
@@ -50,7 +49,7 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
   const t = useT();
   const kernel = useKernel();
   const anno = useAnnotation();
-  const props = useSelectionProps();
+  const props = useAnnotationProperties();
   const value = (props.values.link ?? null) as PdfLinkTarget | null;
   const [mode, setMode] = useState<'uri' | 'page'>(value?.kind === 'goto' ? 'page' : 'uri');
   const [uri, setUri] = useState(value?.kind === 'uri' ? value.uri : '');
@@ -60,18 +59,14 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
     if (mode === 'uri') {
       const trimmed = uri.trim();
       if (!trimmed) return;
-      anno.updateSelection({ link: { kind: 'uri', uri: trimmed } });
+      anno.selection.updateLink({ kind: 'uri', uri: trimmed });
       onClose();
       return;
     }
-    // Page number (1-based) → the page's OBJECT NUMBER (stable across moves).
-    const activeId = kernel.documents.getActiveId();
-    const meta = activeId ? kernel.getState().core.documents[activeId] : null;
-    const layout = meta?.pages[Math.max(0, Number(pageNo) - 1)];
-    if (!layout) return;
-    anno.updateSelection({
-      link: { kind: 'goto', destination: { kind: 'fit', page: layout.ref } },
-    });
+    // Page number (1-based) → the page's object number (stable across moves).
+    const page = kernel.documents.getPage(Math.max(0, Number(pageNo) - 1));
+    if (!page) return;
+    anno.selection.updateLink({ kind: 'goto', destination: { kind: 'fit', page: page.ref } });
     onClose();
   };
 
@@ -104,8 +99,8 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
           placeholder="https://…"
           autoFocus
           value={uri}
-          onChange={(e) => setUri(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && apply()}
+          onChange={(event) => setUri(event.target.value)}
+          onKeyDown={(event) => event.key === 'Enter' && apply()}
         />
       ) : (
         <input
@@ -115,8 +110,8 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
           placeholder="Page number"
           autoFocus
           value={pageNo}
-          onChange={(e) => setPageNo(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && apply()}
+          onChange={(event) => setPageNo(event.target.value)}
+          onKeyDown={(event) => event.key === 'Enter' && apply()}
         />
       )}
       <button

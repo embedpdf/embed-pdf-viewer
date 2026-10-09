@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
@@ -10,7 +10,7 @@ import { FAMILY_BY_CODE } from '../../../forms/internal/readFormSnapshot';
 
 /**
  * Resolve the owning field's object number for a widget annotation, or 0
- * when unattached. (The /Parent of a widget is a FIELD dictionary - not an
+ * when unattached. (The /Parent of a widget is a field dictionary - not an
  * annotation - so FPDFAnnot_GetLinkedAnnot cannot follow it; the reconciled
  * form model is the authoritative join.)
  */
@@ -26,27 +26,39 @@ export function resolveWidgetFieldObjectNumber(
   return runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
 }
 
-/** Stamp `fieldObjectNumber` onto every widget DTO in a freshly read list. */
+/**
+ * Stamp the field ref and family onto every widget DTO in a freshly read
+ * list. Only a push button's `/MK /CA` is a caption; another widget's (a
+ * checkbox's symbol) reads as none.
+ */
 export function joinWidgetFieldNumbers(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
-  annotations: AnnotationDTO[],
+  annotations: Annotation<PdfCoordinates>[],
 ): void {
   for (const annotation of annotations) {
     if (annotation.subtype !== 'widget') continue;
-    if (annotation.ref.kind !== 'objectNumber') continue;
+    if (annotation.ref.kind !== 'objectNumber') {
+      annotation.caption = null;
+      continue;
+    }
     const model = acquireFormModel(runtime, session);
     const fieldIndex = runtime.fn.EPDFForm_GetFieldIndexForWidget(
       model,
-      annotation.ref.annotObjectNumber,
+      annotation.ref.objectNumber,
     );
-    if (fieldIndex < 0) {
-      annotation.fieldObjectNumber = 0;
+    const fieldObjectNumber =
+      fieldIndex < 0 ? 0 : runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
+    if (fieldObjectNumber <= 0) {
+      // In no field, or in one stored inline, which no ref can address.
+      annotation.field = null;
       annotation.fieldFamily = 'unknown';
+      annotation.caption = null;
       continue;
     }
-    annotation.fieldObjectNumber = runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
+    annotation.field = { kind: 'objectNumber', objectNumber: fieldObjectNumber };
     annotation.fieldFamily =
       FAMILY_BY_CODE[runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
+    if (annotation.fieldFamily !== 'pushbutton') annotation.caption = null;
   }
 }

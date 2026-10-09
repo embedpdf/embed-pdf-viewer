@@ -93,7 +93,7 @@ describe('LocalEngine layer open', () => {
     expect(handle.id).toBe('doc-fat');
     expect(transport.sent).toHaveLength(1);
     const pack = transport.sent[0]!;
-    expect(pack.payload).toMatchObject({ kind: 'open.fatMem', docId: 'doc-fat' });
+    expect(pack.payload).toMatchObject({ kind: 'open.fatMem', effect: 'open', docId: 'doc-fat' });
     expect(pack.transfer).toHaveLength(1);
 
     await handle.close();
@@ -117,6 +117,7 @@ describe('LocalEngine layer open', () => {
     const pack = transport.sent[0]!;
     expect(pack.payload).toMatchObject({
       kind: 'open.layerMemBase',
+      effect: 'open',
       docId: 'doc-layer-a',
       baseKey: 'shared-base',
       layer: { kind: 'fresh' },
@@ -146,6 +147,7 @@ describe('LocalEngine layer open', () => {
     const pack = transport.sent[0]!;
     expect(pack.payload).toMatchObject({
       kind: 'open.layerMemBase',
+      effect: 'open',
       docId: 'doc-layer-b',
       baseKey: 'shared-base',
       layer: { kind: 'artifact' },
@@ -170,12 +172,13 @@ describe('LocalEngine layer open', () => {
       layer: { kind: 'fresh' },
     });
 
-    const bytes = await handle.downloadLayer!();
+    const bytes = await handle.downloadLayer();
     expect(Array.from(bytes)).toEqual([5, 5, 5]);
 
     const saveReq = transport.sent.find((p) => p.payload.kind === 'document.saveLayerBuffer');
     expect(saveReq?.payload).toMatchObject({
       kind: 'document.saveLayerBuffer',
+      effect: 'snapshot',
       docId: 'doc-export',
     });
 

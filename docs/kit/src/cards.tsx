@@ -1,14 +1,20 @@
 import {
+  Attachment01Icon,
+  Comment01Icon,
   CpuIcon,
   HighlighterIcon,
   Image02Icon,
   Layout01Icon,
+  Link01Icon,
   PuzzleIcon,
+  RulerIcon,
   Search01Icon,
   ServerStack01Icon,
+  Shapes01Icon,
   StampIcon,
   TaskEdit01Icon,
   TextSelectionIcon,
+  TextSquareIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Link from 'next/link';
@@ -66,6 +72,12 @@ const GRID_CARD_ICONS = {
   render: Image02Icon,
   selection: TextSelectionIcon,
   annotation: HighlighterIcon,
+  note: Comment01Icon,
+  'free-text': TextSquareIcon,
+  shape: Shapes01Icon,
+  link: Link01Icon,
+  attachment: Attachment01Icon,
+  measurement: RulerIcon,
   form: TaskEdit01Icon,
   search: Search01Icon,
   stamp: StampIcon,

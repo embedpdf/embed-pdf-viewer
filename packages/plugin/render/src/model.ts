@@ -1,55 +1,84 @@
-/** The render ledger: per-page raster versions and the tile wake-up counter. */
-import type { PageObjectNumber } from '@embedpdf/core';
+/**
+ * The render ledger: per-page raster versions. Every function below is a
+ * pure transition or projection; the controller applies the transitions with
+ * `ctx.state.update`.
+ */
+import type { PageObjectNumber, PageRenderLayers } from '@embedpdf/core';
 import type { InvalidateScope } from './contract';
 
 /**
- * Per-page versions of the two raster products a page has — base
- * (`includeAnnotations: false`) and annotated. Fed by the document event
- * stream and by the `invalidate` verb: a confirmed pixel-changing fact — own
- * or remote — bumps the touched pages, and anything holding a rendered
- * bitmap refetches.
+ * Per-page versions of what a page picture can draw: the page content, its
+ * annotations and its form fields. Fed by the document event stream and by
+ * the `invalidate` verb: a confirmed pixel-changing fact, own or remote,
+ * bumps the touched pages, and anything holding a rendered bitmap refetches.
+ * A picture's version is the sum of the parts it draws, and is part of every
+ * raster and tile key.
  */
 export interface RenderState {
-  /** Base-raster versions — bumped by CONTENT facts (redaction, text edit). */
+  /** Content versions, bumped by content facts (redaction, flatten). */
   readonly contentEpochs: Readonly<Record<PageObjectNumber, number>>;
-  /** Appearance versions — bumped by ANNOTATION facts (annotations, form widgets). */
-  readonly annotatedEpochs: Readonly<Record<PageObjectNumber, number>>;
-  /**
-   * Tile paint-plan wake-ups. The tile manager's state lives OUTSIDE the
-   * store — it holds live handles and abort controllers — so re-plans bump
-   * this counter to make subscribed layers read `getPlan` again. The value
-   * itself carries no meaning.
-   */
-  readonly paintVersions: Readonly<Record<PageObjectNumber, number>>;
+  /** Annotation versions, bumped by annotation facts (widgets excepted). */
+  readonly annotationEpochs: Readonly<Record<PageObjectNumber, number>>;
+  /** Form field versions, bumped by form facts: a fill, a widget's move or look, a signing. */
+  readonly fieldEpochs: Readonly<Record<PageObjectNumber, number>>;
 }
-
-export type RenderAction =
-  | { type: 'invalidate'; scope: InvalidateScope; pages: readonly PageObjectNumber[] }
-  | { type: 'paintAdvanced'; page: PageObjectNumber };
 
 export const initialRenderState = (): RenderState => ({
   contentEpochs: {},
-  annotatedEpochs: {},
-  paintVersions: {},
+  annotationEpochs: {},
+  fieldEpochs: {},
 });
 
 const bump = (
-  epochs: Readonly<Record<number, number>>,
-  pons: readonly number[],
-): Record<number, number> => {
-  const next: Record<number, number> = { ...epochs };
-  for (const pon of pons) next[pon] = (next[pon] ?? 0) + 1;
+  epochs: Readonly<Record<PageObjectNumber, number>>,
+  pageObjectNumbers: readonly PageObjectNumber[],
+): Record<PageObjectNumber, number> => {
+  const next: Record<PageObjectNumber, number> = { ...epochs };
+  for (const pageObjectNumber of pageObjectNumbers) {
+    next[pageObjectNumber] = (next[pageObjectNumber] ?? 0) + 1;
+  }
   return next;
 };
 
-/** Pure. A 'content' fact bumps ONLY the content ledger; annotated readers
- *  sum both, which is how content invalidation reaches them too. */
-export function reduceRender(state: RenderState, action: RenderAction): RenderState {
-  if (action.type === 'paintAdvanced') {
-    return { ...state, paintVersions: bump(state.paintVersions, [action.page]) };
+/**
+ * Bump the pages' versions in the ledger the scope names. A content fact
+ * bumps only the content ledger; every picture counts content (see
+ * {@link renderEpochOf}), which is how content invalidation reaches them all.
+ */
+export function invalidatePages(
+  state: RenderState,
+  pageObjectNumbers: readonly PageObjectNumber[],
+  scope: InvalidateScope,
+): RenderState {
+  if (pageObjectNumbers.length === 0) return state;
+  switch (scope) {
+    case 'content':
+      return { ...state, contentEpochs: bump(state.contentEpochs, pageObjectNumbers) };
+    case 'annotations':
+      return { ...state, annotationEpochs: bump(state.annotationEpochs, pageObjectNumbers) };
+    case 'fields':
+      return { ...state, fieldEpochs: bump(state.fieldEpochs, pageObjectNumbers) };
   }
-  if (action.type !== 'invalidate' || action.pages.length === 0) return state;
-  return action.scope === 'content'
-    ? { ...state, contentEpochs: bump(state.contentEpochs, action.pages) }
-    : { ...state, annotatedEpochs: bump(state.annotatedEpochs, action.pages) };
 }
+
+/** The version of one picture of a page: its content, plus the annotations and form fields it draws. */
+export function renderEpochOf(
+  state: RenderState,
+  pageObjectNumber: PageObjectNumber,
+  layers: PageRenderLayers,
+): number {
+  return (
+    (state.contentEpochs[pageObjectNumber] ?? 0) +
+    (layers.includeAnnotations ? (state.annotationEpochs[pageObjectNumber] ?? 0) : 0) +
+    (layers.includeFormFields ? (state.fieldEpochs[pageObjectNumber] ?? 0) : 0)
+  );
+}
+
+/** The version of a page's form field pictures (its widgets' looks). */
+export function fieldEpochOf(state: RenderState, pageObjectNumber: PageObjectNumber): number {
+  return state.fieldEpochs[pageObjectNumber] ?? 0;
+}
+
+/** What a picture draws, as one key part: `a1f0` draws annotations and no form fields. */
+export const layersKeyOf = (layers: PageRenderLayers): string =>
+  `a${layers.includeAnnotations ? 1 : 0}f${layers.includeFormFields ? 1 : 0}`;

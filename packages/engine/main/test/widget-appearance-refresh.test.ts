@@ -1,8 +1,8 @@
 /**
- * Regression: a widget style patch through the ANNOTATION plane followed by a
- * value write through the FORM plane must both be visible in the appearance
- * render — the exact interleaving a viewer produces (style a field in design
- * mode, then fill it). Guards the "yellow background lost / committed text
+ * Regression: a widget style patch (`forms.updateWidget`) followed by a value
+ * write must both be visible in the widget's appearance render — the exact
+ * interleaving a viewer produces (style a field in design mode, then fill
+ * it). Guards the "yellow background lost / committed text
  * invisible" bug class where the appearance raster came back empty or one
  * write behind.
  */
@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type {
   AnnotationRef,
-  DocumentHandle,
-  Engine,
+  LocalDocumentHandle,
+  LocalEngine,
   FormFieldDTO,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
@@ -57,11 +57,11 @@ function countPixels(
 }
 
 describe('widget appearance refresh across planes (engine-local, wasm)', () => {
-  let engine: Engine;
-  let doc: DocumentHandle;
+  let engine: LocalEngine;
+  let doc: LocalDocumentHandle;
   let field: FormFieldDTO;
   let widgetRef: AnnotationRef;
-  let pon: number;
+  let pageObjectNumber: number;
 
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
@@ -72,11 +72,11 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
     if (!found) throw new Error('fixture is missing the First_Name field');
     field = found;
     const widget = field.widgets[0]!;
-    pon = widget.page!.pageObjectNumber;
+    pageObjectNumber = widget.page!.objectNumber;
     widgetRef = {
       kind: 'objectNumber',
-      annotObjectNumber: widget.annotObjectNumber,
-      page: toPageRef(pon),
+      objectNumber: widget.objectNumber,
+      page: toPageRef(pageObjectNumber),
     };
   }, 30_000);
 
@@ -87,20 +87,19 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
 
   /** The widget's appearance raster, or null when none is emitted. */
   async function widgetRaster(): Promise<Raster | null> {
-    const result = await doc.page(toPageRef(pon)).annotations.renderAppearances({ scale: 2 });
+    const result = await doc
+      .page(toPageRef(pageObjectNumber))
+      .forms.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
     const entry = result.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === (widgetRef as { annotObjectNumber: number }).annotObjectNumber,
+        a.ref.objectNumber === (widgetRef as { objectNumber: number }).objectNumber,
     );
     return entry?.raster ?? null;
   }
 
-  test('an annotation-plane style patch shows up in the appearance render', async () => {
-    await doc.page(toPageRef(pon)).annotations.update(widgetRef, {
-      subtype: 'widget',
-      interiorColor: { r: 255, g: 213, b: 0 },
-    });
+  test('a widget style patch shows up in the appearance render', async () => {
+    await doc.forms.updateWidget(widgetRef, { interiorColor: '#ffd500' });
     const raster = await widgetRaster();
     expect(raster, 'style patch must produce a renderable /AP').not.toBeNull();
     const yellowish = countPixels(
@@ -112,10 +111,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   });
 
   test('a form-plane value write is visible in the SAME render pass, not one behind', async () => {
-    await doc.forms.setValue(
-      { kind: 'objectNumber', fieldObjectNumber: field.fieldObjectNumber },
-      { type: 'text', value: 'Hello' },
-    );
+    await doc.forms.setValue(field.ref, { value: 'Hello' });
     const raster = await widgetRaster();
     expect(raster).not.toBeNull();
     // Text glyphs: dark opaque pixels over the yellow fill.

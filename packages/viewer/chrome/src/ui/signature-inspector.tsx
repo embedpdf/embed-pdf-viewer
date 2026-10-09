@@ -8,44 +8,36 @@
  */
 import { useEffect, useState } from 'react';
 import { Anchored } from '@embedpdf/react/anchored';
-import { useSelector } from '@embedpdf/react/runtime';
-// The inspector reads the fill feed (a host projection); same runtime token, wider type.
-import { FormHostToken } from '@embedpdf/react/form';
+import { FormToken } from '@embedpdf/react/form';
+import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import {
   useSignature,
-  useSignatureSnapshot,
-  useSignatureVerdicts,
+  useSignatureState,
   type FormFieldRef,
   type SignatureVerdict,
 } from '@embedpdf/react/signature';
 import { Icon } from './icons';
 
-const verdictKey = (v: SignatureVerdict | null): string =>
-  !v
+const verdictKey = (verdict: SignatureVerdict | null): string =>
+  !verdict
     ? 'demo.verdictIndeterminate'
-    : v.summary === 'valid'
+    : verdict.summary === 'valid'
       ? 'demo.verdictValid'
-      : v.summary === 'valid-untrusted'
+      : verdict.summary === 'valid-untrusted'
         ? 'demo.verdictValidUntrusted'
-        : v.summary === 'invalid'
-          ? v.modifications.basis === 'working-copy'
+        : verdict.summary === 'invalid'
+          ? verdict.modifications.basis === 'working-copy'
             ? 'demo.verdictWillInvalidate'
             : 'demo.verdictInvalid'
           : 'demo.verdictIndeterminate';
 
 /** A PDF date string (`D:YYYYMMDDHHmmSSZ` or with a zone offset) as a locale date; the raw text when it is not one. */
-const pdfDate = (raw: string): string => {
-  const m = /^D:(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(Z|[+-]\d{2}'?\d{2}'?)?/.exec(raw);
-  if (!m) return raw;
-  const [, y, mo = '01', d = '01', h = '00', mi = '00', s = '00', zone] = m;
-  const offset =
-    !zone || zone === 'Z'
-      ? 'Z'
-      : `${zone[0]}${zone.slice(1, 3)}:${zone.slice(3).replace(/'/g, '') || '00'}`;
-  const date = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}${offset}`);
-  return Number.isNaN(date.getTime()) ? raw : date.toLocaleString();
+/** A moment in the reader's locale; the text itself if it isn't one. */
+const dateTime = (iso: string): string => {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
 };
 
 const tone = (summary: SignatureVerdict['summary'] | null): string =>
@@ -61,28 +53,27 @@ export function SignatureInspector() {
   const t = useT();
   const surface = useSurface('signature-inspector');
   const signature = useSignature();
-  const snapshot = useSignatureSnapshot();
-  const verdicts = useSignatureVerdicts();
+  // Re-render when the signatures are read, and when one or its verdict changes.
+  const status = useSignatureState((state) => state.status);
+  useSignatureState((state) => state.signatures);
   const [validating, setValidating] = useState(false);
   const field = surface.props?.field as FormFieldRef | undefined;
   const dto = field ? signature.getSignature(field) : null;
   const verdict = field ? signature.getVerdict(field) : null;
   const widget = dto?.widget ?? null;
-  const box = useSelector(FormHostToken, (c) =>
-    widget && widget.annotObjectNumber > 0
-      ? (c.getFillItem(widget.annotObjectNumber)?.box ?? null)
-      : null,
-  );
+  // Where the signature shows is its widget's row in the form.
+  const form = useOptionalCapability(FormToken);
+  const box = (widget && form?.getWidget(widget)?.rect) ?? null;
 
   // Open on a field never validated: judge it now.
   useEffect(() => {
-    if (!surface.isOpen || !dto?.signed || verdicts) return;
+    if (!surface.isOpen || !dto?.signed || signature.listVerdicts()) return;
     setValidating(true);
     void signature.validate().finally(() => setValidating(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surface.isOpen, dto?.index]);
 
-  if (!surface.isOpen || !field || !dto || !snapshot) return null;
+  if (!surface.isOpen || !field || !dto || status !== 'ready') return null;
 
   const revalidate = () => {
     setValidating(true);
@@ -117,9 +108,7 @@ export function SignatureInspector() {
         {row(t('demo.inspectSigner'), dto.signer.name ?? '—')}
         {dto.signer.reason ? row(t('demo.inspectReason'), dto.signer.reason) : null}
         {dto.signer.location ? row(t('demo.inspectLocation'), dto.signer.location) : null}
-        {dto.signer.claimedTime
-          ? row(t('demo.inspectTime'), pdfDate(dto.signer.claimedTime))
-          : null}
+        {dto.signer.signedAt ? row(t('demo.inspectTime'), dateTime(dto.signer.signedAt)) : null}
       </div>
       <div className="border-border-subtle mt-2 flex flex-col gap-1 border-t pt-2">
         {row(
@@ -190,13 +179,13 @@ function DownloadRevision({ field }: { field: FormFieldRef }) {
       const bytes = await signature.readRevision({ revisionIndex });
       const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${dto.fieldName}-signed.pdf`;
-      a.click();
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${dto.fieldName}-signed.pdf`;
+      anchor.click();
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('[embedpdf] signed revision download failed:', err);
+    } catch (error) {
+      console.error('[embedpdf] signed revision download failed:', error);
     } finally {
       setBusy(false);
     }

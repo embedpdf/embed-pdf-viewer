@@ -2,15 +2,18 @@ import { describe, expect, test } from 'vitest';
 
 import {
   deriveProtection,
+  describeProtection,
+  isProtectableCapability,
   protectedCapabilities,
   APPROVAL_BASELINE,
+  PROTECTABLE_CAPABILITIES,
   SIGNATURE_POLICY_VERSION,
 } from '../src/signature/protection';
 import type { SignatureDTO } from '../src/signature/types';
 
 const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   index: 0,
-  field: { kind: 'objectNumber', fieldObjectNumber: 10 },
+  field: { kind: 'objectNumber', objectNumber: 10 },
   fieldName: 'sig',
   widget: null,
   signed: true,
@@ -21,7 +24,7 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   contentsSize: 8,
   coverage: 'whole-revision',
   revisionIndex: 1,
-  signer: { name: null, reason: null, location: null, contactInfo: null, claimedTime: null },
+  signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
   docMdp: null,
   catalogCertification: false,
   fieldMdp: null,
@@ -31,8 +34,8 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
 });
 
 /**
- * Two answers, not one: what a signer DECLARED (enforced) and what a
- * validator JUDGES later changes against. An approval signature declares
+ * Two answers, not one: what a signer declared (enforced) and what a
+ * validator judges later changes against. An approval signature declares
  * nothing and is judged at the baseline; a declaration governs both.
  */
 describe('deriveProtection: enforced vs judged', () => {
@@ -56,16 +59,24 @@ describe('deriveProtection: enforced vs judged', () => {
     const p3 = deriveProtection([sig({ catalogCertification: true, docMdp: 3 })]);
     expect(p3).toMatchObject({ enforced: 'annotate', judged: 'annotate' });
     expect(protectedCapabilities(p3).has('doc.annotate.modify')).toBe(false);
+    expect(protectedCapabilities(p3).has('doc.annotate.import')).toBe(false);
     // A declaration refuses everything outside what it permits: structure too.
     expect(protectedCapabilities(p3).has('doc.pages.assemble')).toBe(true);
     expect(protectedCapabilities(p3).has('doc.forms.modify')).toBe(true);
+    // Writing scripts into the form is designing it.
+    expect(protectedCapabilities(p3).has('doc.forms.script')).toBe(true);
     const p2 = deriveProtection([sig({ catalogCertification: true, docMdp: 2 })]);
     expect(p2).toMatchObject({ enforced: 'fill', judged: 'fill' });
     expect(protectedCapabilities(p2).has('doc.annotate.modify')).toBe(true);
+    // Restoring someone else's annotations is still writing annotations.
+    expect(protectedCapabilities(p2).has('doc.annotate.import')).toBe(true);
     expect(protectedCapabilities(p2).has('doc.forms.fill')).toBe(false);
+    expect(protectedCapabilities(p2).has('doc.forms.import')).toBe(false);
     const p1 = deriveProtection([sig({ catalogCertification: true, docMdp: 1 })]);
     expect(p1).toMatchObject({ enforced: 'lta', judged: 'lta' });
     expect(protectedCapabilities(p1).has('doc.forms.fill')).toBe(true);
+    // Restoring who filled the fields in is still filling them.
+    expect(protectedCapabilities(p1).has('doc.forms.import')).toBe(true);
   });
 
   test('a signed field lock with /P tightens; a later approval never loosens a certification', () => {
@@ -83,5 +94,22 @@ describe('deriveProtection: enforced vs judged', () => {
     const p = deriveProtection([sig({ signed: false, lock: { action: 'all', fields: [] } })]);
     expect(p.fieldLocks).toEqual([]);
     expect(p.judged).toBeNull();
+  });
+
+  test('the protectable capabilities are exactly what the strictest protection removes', () => {
+    const strictest = deriveProtection([sig({ catalogCertification: true, docMdp: 1 })]);
+    expect([...protectedCapabilities(strictest)].sort()).toEqual(
+      [...PROTECTABLE_CAPABILITIES].sort(),
+    );
+    expect(isProtectableCapability('doc.forms.fill')).toBe(true);
+    expect(isProtectableCapability('doc.forms.read')).toBe(false);
+    expect(isProtectableCapability('doc.sign')).toBe(false);
+  });
+
+  test('a refusal names the certification and the capability', () => {
+    const p2 = deriveProtection([sig({ index: 0, catalogCertification: true, docMdp: 2 })]);
+    expect(describeProtection('doc.annotate.modify', p2)).toBe(
+      "the document is signed: certification signature 0 (permission 2) forbids 'doc.annotate.modify'",
+    );
   });
 });

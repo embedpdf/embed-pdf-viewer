@@ -24,7 +24,7 @@ const robotoPath = resolve(here, 'fixtures', 'Roboto-Regular.ttf');
 /** A page known to exist and be editable in annotations.pdf (see the mutation
  *  conformance fixture, which authors on the same page). */
 const PAGE = 3;
-const RECT = { left: 50, bottom: 250, right: 350, top: 320 };
+const RECT = { x: 50, y: 250, width: 300, height: 70 };
 
 let annotationsPdf: Uint8Array;
 let roboto: Uint8Array;
@@ -88,6 +88,18 @@ describe('engine.fonts (local engine)', () => {
     expect(engine.fonts.list()).toEqual([]);
   });
 
+  test("register() refuses a standard font's name or no key", async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    for (const key of ['helvetica', 'times-roman', '']) {
+      const err = await rejection(engine.fonts.register({ key, data: roboto }));
+      expect(err.code).toBe(EngineErrorCode.InvalidArg);
+    }
+    expect(engine.fonts.list()).toEqual([]);
+    // Only the exact standard names are taken.
+    await engine.fonts.register({ key: 'Helvetica', data: roboto });
+    expect(engine.fonts.list()).toHaveLength(1);
+  });
+
   test('addFallback() rejects an unregistered key', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const err = await rejection(engine.fonts.addFallback('never-registered'));
@@ -106,9 +118,9 @@ describe('engine.fonts (local engine)', () => {
       fontSize: 18,
       textAlign: 'left',
       contents: 'Hello',
-      rect: RECT,
+      box: RECT,
     });
-    expect(created.created.subtype).toBe('free-text');
+    expect(created.annotation.subtype).toBe('free-text');
 
     const saved = await doc.download();
     const text = latin1(saved);
@@ -116,7 +128,7 @@ describe('engine.fonts (local engine)', () => {
     // The registered font reached the embedded appearance...
     expect(text).toContain('FontFile2');
     expect(text).toContain('Roboto');
-    // ...as a SUBSET, not the whole 305 KB face. A full embed would dwarf this.
+    // ...as a subset, not the whole 305 KB face. A full embed would dwarf this.
     expect(saved.byteLength).toBeLessThan(roboto.byteLength / 2);
 
     await doc.close();
@@ -133,7 +145,7 @@ describe('engine.fonts (local engine)', () => {
         fontSize: 18,
         textAlign: 'left',
         contents: 'Hello',
-        rect: RECT,
+        box: RECT,
       }),
     );
     expect(err.code).toBe(EngineErrorCode.InvalidArg);
@@ -150,9 +162,9 @@ describe('engine.fonts (local engine)', () => {
       fontSize: 18,
       textAlign: 'left',
       contents: 'Hello',
-      rect: RECT,
+      box: RECT,
     });
-    expect(created.created.subtype).toBe('free-text');
+    expect(created.annotation.subtype).toBe('free-text');
     const saved = await doc.download();
     // A standard font is never embedded; the doc stays tiny.
     expect(saved.byteLength).toBeLessThan(roboto.byteLength / 2);
