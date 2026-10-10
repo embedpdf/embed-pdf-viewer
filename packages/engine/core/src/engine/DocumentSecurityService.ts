@@ -1,5 +1,5 @@
 import type { Identity } from '../auth/scope/types';
-import type { DocCapability, PdfBits } from '../auth/scope';
+import type { DocCapability, FieldRights, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { DocumentProtection } from '../signature/types';
 import type { EditSessionAccess } from '../identity/ObjectNumbers';
@@ -276,6 +276,15 @@ export interface DocumentSecurityService {
    */
   allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
   allowsField(action: 'set-group', target: { groupId: string }): boolean;
+
+  /**
+   * The same rules as {@link allowsField}, as lists: for filling in, signing
+   * and putting a field in a group, every field (`{ all: true }`) or the
+   * groups the session's scope names. A form designer offers exactly these
+   * groups, and a filler sees whose fields are theirs. A courtesy for UI,
+   * like `allowsField`.
+   */
+  fieldRights(): FieldRights;
 
   /**
    * Who the session acts for: from the document token's `identity` claim on

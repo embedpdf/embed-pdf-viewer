@@ -144,18 +144,6 @@ export function resultInPageSpace(
           widgets: widgets(payload.result.widgets),
         },
       };
-    case 'forms.applyEffects':
-      return {
-        ...payload,
-        result: {
-          ...payload.result,
-          results: payload.result.results.map((effect) => ({
-            ...effect,
-            fields: effect.fields.map((field) => pageFormFieldOf(field, boxOf)),
-          })),
-          widgets: widgets(payload.result.widgets),
-        },
-      };
     case 'forms.setValue':
     case 'forms.createField':
     case 'forms.updateField':

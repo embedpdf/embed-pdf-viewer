@@ -8,7 +8,6 @@ import {
   authorizeFieldWrite,
   authorizeUnprotected,
   fieldValueOf,
-  deserializeError,
   EngineError,
   EngineErrorCode,
   draftWritesScripts,
@@ -19,7 +18,6 @@ import {
   type FieldScriptEvent,
   type ChangeItemType,
   type ChangeOp,
-  type FormEffect,
   type FormImportOp,
   isSkippedItem,
   type FormFieldDTO,
@@ -57,7 +55,6 @@ import { applyReorder, planReorder, readPageStack } from '../../annotations/inte
 import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
 import { FormImporter } from '../../forms/FormImporter';
 import { FormMutator } from '../../forms/FormMutator';
-import { FormsEffectsApplier } from '../../forms/FormsEffectsApplier';
 import {
   orderBack,
   readCalculationOrder,
@@ -66,7 +63,7 @@ import {
   type OrderChange,
 } from '../../forms/internal/calculationOrder';
 import { acquireFormModel } from '../../forms/internal/formModelCache';
-import { formMutationMeta } from '../../forms/internal/formMutationMeta';
+import { formMutationMeta, redrawnByValue } from '../../forms/internal/formMutationMeta';
 import { readFieldAt } from '../../forms/internal/readFormSnapshot';
 import { resolveFieldRef } from '../../forms/internal/resolveFieldRef';
 import { withWidgetRows } from '../../forms/internal/widgetRows';
@@ -117,22 +114,26 @@ export function setValue(ctx: ChangeContext, op: Op<'forms.setValue'>, opIndex: 
 
 /** `forms.setDisplay`: a script's visibility effect. */
 export function setDisplay(ctx: ChangeContext, op: Op<'forms.setDisplay'>): Done {
-  authorizeScriptOutput(ctx, readField(ctx, op.field));
-  return writeEffect(ctx, 'forms.setDisplay', op.field, {
-    kind: 'setDisplay',
-    ref: op.field,
-    display: op.display,
-  });
+  const before = readField(ctx, op.field);
+  authorizeScriptOutput(ctx, before);
+  return writeEffect(
+    ctx,
+    'forms.setDisplay',
+    (mutator) => mutator.setDisplay(op.field, op.display, ctx.signal),
+    before,
+  );
 }
 
 /** `forms.setAppearanceText`: a script's formatted text, drawn without changing the value. */
 export function setAppearanceText(ctx: ChangeContext, op: Op<'forms.setAppearanceText'>): Done {
-  authorizeFill(ctx, readField(ctx, op.field));
-  return writeEffect(ctx, 'forms.setAppearanceText', op.field, {
-    kind: 'setAppearanceText',
-    ref: op.field,
-    text: op.text,
-  });
+  const before = readField(ctx, op.field);
+  authorizeFill(ctx, before);
+  return writeEffect(
+    ctx,
+    'forms.setAppearanceText',
+    (mutator) => mutator.setAppearanceText(op.field, op.text, ctx.signal),
+    before,
+  );
 }
 
 /** `forms.reset`; its reverse puts back each field it changed. */
@@ -150,8 +151,11 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
   );
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
   const changed = new Set(result.fields.map((field) => numberOf(field.ref)));
+  const item: ChangeItem<PdfCoordinates> = { type: 'forms.reset', ...rows(ctx, result) };
+  // Every field was at its default already: nothing was written to undo.
+  if (changed.size === 0) return { item, reverse: [] };
   return {
-    item: { type: 'forms.reset', ...rows(ctx, result) },
+    item,
     reverse: [
       {
         kind: 'objects.revert',
@@ -884,27 +888,20 @@ function writeValue(ctx: ChangeContext, before: ReadField, value: FormFieldValue
   };
 }
 
-/** A script effect on one field, as one write: refused whole when the effect is. */
+/** A script's display or formatted text on one field, as one write. */
 function writeEffect(
   ctx: ChangeContext,
   type: 'forms.setDisplay' | 'forms.setAppearanceText',
-  ref: FormFieldRef,
-  effect: FormEffect,
+  write: (mutator: FormMutator) => { meta: FormMutationMeta },
+  before: ReadField,
 ): Done {
-  const before = readField(ctx, ref);
-  return recordRevert(ctx, before, type, () => {
-    const { result } = new FormsEffectsApplier(
-      ctx.runtime,
-      ctx.session,
-      ctx.authority.identity,
-    ).apply([effect], ctx.signal);
-    const outcome = result.results[0]!;
-    if (outcome.status !== 'applied' && outcome.status !== 'unchanged') {
-      if (outcome.error) throw deserializeError(outcome.error);
-      throw new Error(`a form effect was ${outcome.status}`);
-    }
+  let wrote = false;
+  const done = recordRevert(ctx, before, type, () => {
+    wrote = write(new FormMutator(ctx.runtime, ctx.session)).meta.changedWidgets.length > 0;
     return { field: readFieldByNumber(ctx, before.objectNumber).field };
   });
+  // Widgets that already showed so were left as they were: nothing to undo.
+  return wrote ? done : { item: done.item, reverse: [] };
 }
 
 /**
@@ -1218,11 +1215,34 @@ function valueOf(field: FormFieldDTO<PdfCoordinates>): FormFieldValue {
   return fieldValueOf(field) ?? { value: null };
 }
 
-function fieldResult(ctx: ChangeContext, field: FormFieldDTO<PdfCoordinates>) {
+function fieldResult(
+  ctx: ChangeContext,
+  field: FormFieldDTO<PdfCoordinates>,
+  redrawn: FormWidget[] = field.widgets as FormWidget[],
+) {
   return rows(ctx, {
     field,
-    meta: formMutationMeta(ctx.session.writeStamp(), [field.ref], field.widgets as FormWidget[]),
+    meta: formMutationMeta(
+      ctx.session.writeStamp(),
+      [field.ref],
+      field.widgets as FormWidget[],
+      redrawn,
+    ),
   });
+}
+
+/**
+ * The widgets of `field` a write of `type` draws again: a value write
+ * redraws a text or choice field's, and only switches a checkbox's or radio
+ * group's state; showing or hiding draws nothing.
+ */
+function redrawnBy(type: ChangeItemType, field: FormFieldDTO<PdfCoordinates>): FormWidget[] {
+  const widgets = field.widgets as FormWidget[];
+  if (type === 'forms.setDisplay') return [];
+  if (type === 'forms.setValue' || type === 'forms.reset') {
+    return redrawnByValue(field.family, widgets);
+  }
+  return widgets;
 }
 
 /** `result` with the rows of the widgets it changed, read now. */
@@ -1243,6 +1263,7 @@ function resetResult(
         ctx.session.writeStamp(),
         fields.map((field) => field.ref),
         fields.flatMap((field) => field.widgets as FormWidget[]),
+        fields.flatMap((field) => redrawnBy('forms.reset', field)),
       ),
     }),
   };
@@ -1256,5 +1277,5 @@ function formItem(
 ): ChangeItem<PdfCoordinates> {
   if (type === 'forms.reset') return resetResult(ctx, fields);
   const field = fields[0]!;
-  return { type, ...fieldResult(ctx, field) } as ChangeItem<PdfCoordinates>;
+  return { type, ...fieldResult(ctx, field, redrawnBy(type, field)) } as ChangeItem<PdfCoordinates>;
 }

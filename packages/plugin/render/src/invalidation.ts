@@ -55,7 +55,6 @@ export function pixelChangeOf(
     case 'annotations.reordered': // z-order: baked stacking can change
       return changeOf([event.page.objectNumber], 'annotations');
     case 'forms.valueSet':
-    case 'forms.effectsApplied':
     case 'forms.created':
     case 'forms.updated':
     case 'forms.deleted':

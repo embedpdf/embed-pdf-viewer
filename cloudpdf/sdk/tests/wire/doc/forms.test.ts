@@ -83,11 +83,13 @@ describe("FormsClient", () => {
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
                     borderStyle: "solid",
+                    dashArray: [1.1],
                     fontFamily: "courier",
                     fontSize: 1.1,
                     fontColor: "fontColor",
                     textAlign: "left",
                     caption: "caption",
+                    checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
                 },
@@ -161,6 +163,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -347,11 +350,13 @@ describe("FormsClient", () => {
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
                     borderStyle: "solid",
+                    dashArray: [1.1],
                     fontFamily: "courier",
                     fontSize: 1.1,
                     fontColor: "fontColor",
                     textAlign: "left",
                     caption: "caption",
+                    checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
                 },
@@ -379,6 +384,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -536,11 +542,13 @@ describe("FormsClient", () => {
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
                     borderStyle: "solid",
+                    dashArray: [1.1],
                     fontFamily: "courier",
                     fontSize: 1.1,
                     fontColor: "fontColor",
                     textAlign: "left",
                     caption: "caption",
+                    checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
                 },
@@ -568,6 +576,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -696,6 +705,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -822,11 +832,13 @@ describe("FormsClient", () => {
                 interiorColor: "interiorColor",
                 strokeWidth: 1.1,
                 borderStyle: "solid",
+                dashArray: [1.1],
                 fontFamily: "courier",
                 fontSize: 1.1,
                 fontColor: "fontColor",
                 textAlign: "left",
                 caption: "caption",
+                checkStyle: "check",
                 field: { kind: "objectNumber", objectNumber: 1 },
                 fieldFamily: "text",
             },
@@ -854,6 +866,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -961,6 +974,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 

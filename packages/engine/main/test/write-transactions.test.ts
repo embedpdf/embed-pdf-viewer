@@ -165,11 +165,14 @@ describe.each(['wasm', 'native'] as const)(
           write: () => doc.forms.setValue(fqn('probe'), { value: `value ${++n}` }),
         },
         {
-          what: 'forms.applyEffects',
+          what: 'apply',
           write: () =>
-            doc.forms.applyEffects([
-              { kind: 'setValue', ref: fqn('probe'), value: { value: `effect ${++n}` } },
-            ]),
+            doc.apply({
+              ops: [
+                { type: 'forms.setValue', field: fqn('probe'), value: { value: `apply ${++n}` } },
+                { type: 'forms.setDisplay', field: fqn('probe'), display: 'noPrint' },
+              ],
+            }),
         },
         { what: 'forms.reset', write: () => doc.forms.reset(fqn('probe')) },
         {

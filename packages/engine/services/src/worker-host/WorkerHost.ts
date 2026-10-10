@@ -106,7 +106,6 @@ import {
   type RenderEncode,
   type PagesTextWorkerRequest,
   type SearchQueryWorkerRequest,
-  type FormsApplyEffectsWorkerRequest,
   type PageRef,
   type PagesWorkingSetWorkerRequest,
   type RequestEffect,
@@ -166,13 +165,7 @@ import {
   type ChangeRecord,
 } from '../features/changes';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
-import {
-  FormExporter,
-  FormMutator,
-  FormReader,
-  FormsEffectsApplier,
-  disposeFormModel,
-} from '../features/forms';
+import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
 import { MetadataReader } from '../features/metadata';
@@ -594,9 +587,6 @@ export class WorkerHost {
           break;
         case 'forms.reset':
           resultPack = this.handleFormsReset(msg, ctrl.signal);
-          break;
-        case 'forms.applyEffects':
-          resultPack = this.handleFormsApplyEffects(msg, ctrl.signal);
           break;
         case 'forms.export':
           resultPack = this.handleFormsExport(msg, ctrl.signal);
@@ -2408,23 +2398,6 @@ export class WorkerHost {
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
-  }
-
-  private handleFormsApplyEffects(
-    req: FormsApplyEffectsWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    const session = this.requireSession(req);
-    const { result, wrote } = new FormsEffectsApplier(this.runtime, session, req.actor ?? {}).apply(
-      req.effects,
-      signal,
-    );
-    if (!wrote) return wirePack({ tag: 'forms.applyEffects', result, wrote });
-    return this.finishMutation(
-      session,
-      { tag: 'forms.applyEffects', result, wrote },
-      req.artifactPath,
-    );
   }
 
   private handleFormsExport(

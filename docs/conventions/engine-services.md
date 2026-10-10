@@ -94,8 +94,6 @@ Feature behavior belongs in `features/`, not in worker adapters.
   annotation is named by its position only while no entry has moved.
 - A batch is all or nothing too: redaction apply and page flatten throw when a page fails or the
   call is cancelled, and their per-page results only say `applied` or `unchanged`.
-  `forms.applyEffects` is the exception: it still reports a failed effect and skips the rest, and
-  the transaction commits what its result reports.
 - Writes bump `cacheSeq` (derived caches) as they go; `finishMutation` bumps `editsSeq` (unsaved
   edits, the signing version) once per committed write.
 

@@ -179,18 +179,6 @@ describe('field index', () => {
     index = foldFormEvent(
       index,
       event({
-        type: 'forms.effectsApplied',
-        results: [
-          { index: 0, status: 'applied', fields: [text({ value: 'script' })], changedWidgets: [] },
-        ],
-        meta: { changedFields: [], changedWidgets: [] },
-      }),
-    ) as FieldIndex;
-    expect((fieldByKey(index, 'obj:4') as { value: string }).value).toBe('script');
-
-    index = foldFormEvent(
-      index,
-      event({
         type: 'forms.deleted',
         deleted: { kind: 'objectNumber', objectNumber: 7 },
         meta: {

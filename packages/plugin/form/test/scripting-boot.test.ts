@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   toPageRef,
   type DocumentHandle,
-  type FormEffect,
+  type ChangeOp,
   type FormSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
@@ -79,7 +79,7 @@ function textField(objnum: number, name: string) {
   };
 }
 
-function makeDoc(applied: FormEffect[][]) {
+function makeDoc(applied: ChangeOp[][]) {
   return {
     id: 'diag-doc',
     security: { identity: null },
@@ -101,13 +101,11 @@ function makeDoc(applied: FormEffect[][]) {
         ],
       }),
     },
-    forms: {
-      list: async () => snapshot(),
-      applyEffects: vi.fn(async (effects: FormEffect[]) => {
-        applied.push(effects);
-        return { results: effects.map(() => ({ status: 'applied' as const })) };
-      }),
-    },
+    apply: vi.fn(async ({ ops }: { ops: ChangeOp[] }) => {
+      applied.push(ops);
+      return { items: [], meta: { undoable: true } as never };
+    }),
+    forms: { list: async () => snapshot() },
   } as unknown as DocumentHandle;
 }
 
@@ -121,7 +119,7 @@ const snapshot = (): FormSnapshot =>
 
 describe('FormScriptingController — boot failures degrade, never brick', () => {
   it('a throwing boot script still lets the user commit (and again after)', async () => {
-    const applied: FormEffect[][] = [];
+    const applied: ChangeOp[][] = [];
     const doc = makeDoc(applied);
     const realm = standaloneRealm(doc, () => null, {
       sandboxFactory: async () => failingBootSandbox(),
@@ -140,8 +138,8 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     expect(first.status).toBe('applied');
     expect(applied[0]).toEqual([
       {
-        kind: 'setValue',
-        ref: { kind: 'objectNumber', objectNumber: 7 },
+        type: 'forms.setValue',
+        field: { kind: 'objectNumber', objectNumber: 7 },
         value: { value: 'HELLO' },
       },
     ]);
@@ -161,7 +159,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
   });
 
   it('a failing doc.actions.get also degrades to a diagnostic', async () => {
-    const applied: FormEffect[][] = [];
+    const applied: ChangeOp[][] = [];
     const doc = makeDoc(applied);
     // The fake's `read` is a plain async function, not an AbortablePromise.
     (doc.actions as unknown as { get: () => Promise<never> }).get = async () => {

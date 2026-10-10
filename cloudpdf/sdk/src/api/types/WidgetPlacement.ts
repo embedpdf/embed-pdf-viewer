@@ -13,11 +13,13 @@ export interface WidgetPlacement {
     interiorColor?: (string | null) | undefined;
     strokeWidth?: number | undefined;
     borderStyle?: WidgetPlacement.BorderStyle | undefined;
+    dashArray?: (number[] | null) | undefined;
     fontFamily?: (WidgetPlacement.FontFamily | null) | undefined;
     fontSize?: (number | null) | undefined;
     fontColor?: (string | null) | undefined;
     textAlign?: WidgetPlacement.TextAlign | undefined;
     caption?: (string | null) | undefined;
+    checkStyle?: (WidgetPlacement.CheckStyle | null) | undefined;
 }
 
 export namespace WidgetPlacement {
@@ -40,6 +42,7 @@ export namespace WidgetPlacement {
         Dashed: "dashed",
         Beveled: "beveled",
         Inset: "inset",
+        Underline: "underline",
     } as const;
     export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
     export const FontFamily = {
@@ -65,4 +68,13 @@ export namespace WidgetPlacement {
         Right: "right",
     } as const;
     export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+    export const CheckStyle = {
+        Check: "check",
+        Cross: "cross",
+        Star: "star",
+        Circle: "circle",
+        Square: "square",
+        Diamond: "diamond",
+    } as const;
+    export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
 }

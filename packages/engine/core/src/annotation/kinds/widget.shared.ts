@@ -8,11 +8,13 @@ const WIDGET_STYLE_NAMES = [
   'interiorColor',
   'strokeWidth',
   'borderStyle',
+  'dashArray',
   'fontFamily',
   'fontSize',
   'fontColor',
   'textAlign',
   'caption',
+  'checkStyle',
 ] as const;
 
 type WidgetStyleName = (typeof WIDGET_STYLE_NAMES)[number];

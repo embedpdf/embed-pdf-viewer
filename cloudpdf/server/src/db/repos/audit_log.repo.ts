@@ -42,7 +42,6 @@ export type AuditMutationKind =
   | 'form.reorderCalculations'
   /** A widget deleted from its page and its field (`doc.forms.deleteWidget`). */
   | 'form.deleteWidget'
-  | 'form.applyEffects'
   | 'form.setSignatureAppearance'
   /** A signing was prepared on this layer: the layer is locked until it ends. */
   | 'signature.prepare'

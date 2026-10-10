@@ -26,7 +26,6 @@ import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
-import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldValue } from '../forms/value';
@@ -727,18 +726,6 @@ export interface FormsResetWorkerRequest extends WriteJobFields {
    * grants, checked field by field inside the write.
    */
   authority: ChangeAuthority;
-}
-
-export interface FormsApplyEffectsWorkerRequest extends WriteJobFields {
-  kind: 'forms.applyEffects';
-  effect: 'write';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  effects: FormEffect[];
-  artifactPath?: string;
-  /** The user whose fill ran the scripts, stamped as the filler of each value they change. */
-  actor?: AnnotationActor;
 }
 
 /** `doc.forms.export`: the fields a selection takes, as a bundle. A snapshot read. */
@@ -1606,7 +1593,6 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsListWorkerRequest
   | FormsSetValueWorkerRequest
   | FormsResetWorkerRequest
-  | FormsApplyEffectsWorkerRequest
   | FormsExportWorkerRequest
   | FormsImportWorkerRequest
   | FormsImportValuesWorkerRequest
@@ -1839,14 +1825,6 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'forms.reset';
       result: FormResetResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'forms.applyEffects';
-      result: FormEffectsResult<C>;
-      /** False when the batch wrote nothing: no artifact, event, or version bump. */
-      wrote: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

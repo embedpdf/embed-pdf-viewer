@@ -36,7 +36,8 @@ AnnotCommitResult [InterfaceDeclaration]: export interface AnnotCommitResult{ re
 AnnotCommitSink [TypeAliasDeclaration]: export type AnnotCommitSink = (entries: AnnotCommitEntry[]) => Promise<AnnotCommitResult>;
 DetachedScriptRealm [InterfaceDeclaration]: export interface DetachedScriptRealm extends ScriptRealmPort{ dispose(): void; }
 DocumentTriggerEvent [TypeAliasDeclaration] (from packages/plugin/actions/src/contract.ts): export type DocumentTriggerEvent = | 'open' | 'will-save' | 'did-save' | 'will-print' | 'did-print' | 'will-close';
-FormCommitSink [TypeAliasDeclaration]: export type FormCommitSink = (effects: FormEffect[]) => Promise<FormEffectsResult>;
+FormCommitSink [TypeAliasDeclaration]: export type FormCommitSink = (effects: FormEffect[]) => Promise<FormCommitSinkResult>;
+FormCommitSinkResult [InterfaceDeclaration]: export interface FormCommitSinkResult{ status: 'applied' | 'failed'; error?: string; }
 HoverPump [InterfaceDeclaration] (from packages/plugin/actions/src/hover-pump.ts): export interface HoverPump{ hover(target: HoverTarget | null): void; reset(): void; }
 HoverTarget [InterfaceDeclaration] (from packages/plugin/actions/src/hover-pump.ts): export interface HoverTarget{ ref: AnnotationRef; page: PageRef; source?: ActionSource; events?:{ enter?: boolean; exit?: boolean} ; }
 OpenSequenceCompletedEvent [InterfaceDeclaration] (from packages/plugin/actions/src/contract.ts): export interface OpenSequenceCompletedEvent{ readonly result: ActionTriggerResult; }

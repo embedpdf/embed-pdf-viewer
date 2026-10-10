@@ -40,11 +40,13 @@ export interface WidgetAnnotation {
     interiorColor: string | null;
     strokeWidth: number;
     borderStyle: WidgetAnnotation.BorderStyle;
+    dashArray: number[] | null;
     fontFamily: WidgetAnnotation.FontFamily | null;
     fontSize: number | null;
     fontColor: string | null;
     textAlign: WidgetAnnotation.TextAlign;
     caption: string | null;
+    checkStyle: WidgetAnnotation.CheckStyle | null;
     field: CloudPDF.FormFieldRef | null;
     fieldFamily: WidgetAnnotation.FieldFamily;
 }
@@ -107,6 +109,7 @@ export namespace WidgetAnnotation {
         Dashed: "dashed",
         Beveled: "beveled",
         Inset: "inset",
+        Underline: "underline",
     } as const;
     export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
     export const FontFamily = {
@@ -132,6 +135,15 @@ export namespace WidgetAnnotation {
         Right: "right",
     } as const;
     export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+    export const CheckStyle = {
+        Check: "check",
+        Cross: "cross",
+        Star: "star",
+        Circle: "circle",
+        Square: "square",
+        Diamond: "diamond",
+    } as const;
+    export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
     export const FieldFamily = {
         Text: "text",
         Checkbox: "checkbox",

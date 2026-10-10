@@ -21,7 +21,6 @@ import {
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldUpdateResult,
-  type FormEffectsResult,
   type FormImportResult,
   type FormValuesImportResult,
   type FormRepairResult,
@@ -302,8 +301,6 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         origin,
         ...(row.payload as FormCalculationsReorderResult),
       };
-    case 'form.applyEffects':
-      return { type: 'forms.effectsApplied', origin, ...(row.payload as FormEffectsResult) };
     case 'signature.prepare': {
       const { field, ...wire } = row.payload as { field: FormFieldRef } & SignaturePreparedWire;
       return { type: 'signatures.prepared', origin, field, ...decodePrepared(wire) };

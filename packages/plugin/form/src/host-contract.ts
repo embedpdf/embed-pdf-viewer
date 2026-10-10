@@ -8,7 +8,6 @@ import { createHostToken } from '@embedpdf/core';
 import type {
   AnnotationRef,
   FormEffect,
-  FormEffectsResult,
   FormFieldRef,
   PageRef,
   PdfActionTargetRef,
@@ -21,6 +20,7 @@ import type {
   PdfAnnotationEventKind,
   SubmitIntent,
 } from '@embedpdf/plugin-actions/contract';
+import type { FormCommitSinkResult } from '@embedpdf/plugin-actions/contract/host';
 
 import type { FormCapability, FormCommitResult, FormSetValueResult } from './contract';
 import type { Box, ShownWidget } from './model';
@@ -62,8 +62,8 @@ export interface FormHostCapability extends FormCapability {
     actionContext: ActionContext,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest>;
-  /** Write what a document script changed in the fields; never rejects, a refusal is reported per effect. */
-  commitScriptFormEffects(effects: FormEffect[]): Promise<FormEffectsResult>;
+  /** Write what a document script changed in the fields, as one change; never rejects, a refusal reports why. */
+  commitScriptFormEffects(effects: FormEffect[]): Promise<FormCommitSinkResult>;
   /**
    * The text someone is typing in a field, before it's written (write/typing.ts): a keystroke
    * calls `draftText`, blur or Enter `commitDraftText` (the field's scripts run then), Escape

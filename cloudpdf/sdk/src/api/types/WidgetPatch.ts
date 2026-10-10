@@ -40,11 +40,13 @@ export interface WidgetPatch {
     interiorColor?: (string | null) | undefined;
     strokeWidth?: number | undefined;
     borderStyle?: WidgetPatch.BorderStyle | undefined;
+    dashArray?: (number[] | null) | undefined;
     fontFamily?: (WidgetPatch.FontFamily | null) | undefined;
     fontSize?: (number | null) | undefined;
     fontColor?: (string | null) | undefined;
     textAlign?: WidgetPatch.TextAlign | undefined;
     caption?: (string | null) | undefined;
+    checkStyle?: (WidgetPatch.CheckStyle | null) | undefined;
     field?: unknown | undefined;
     fieldFamily?: unknown | undefined;
 }
@@ -109,6 +111,7 @@ export namespace WidgetPatch {
         Dashed: "dashed",
         Beveled: "beveled",
         Inset: "inset",
+        Underline: "underline",
     } as const;
     export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
     export const FontFamily = {
@@ -134,4 +137,13 @@ export namespace WidgetPatch {
         Right: "right",
     } as const;
     export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+    export const CheckStyle = {
+        Check: "check",
+        Cross: "cross",
+        Star: "star",
+        Circle: "circle",
+        Square: "square",
+        Diamond: "diamond",
+    } as const;
+    export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
 }

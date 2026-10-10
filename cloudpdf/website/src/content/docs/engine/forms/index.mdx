@@ -277,13 +277,12 @@ A field's scripts are in `field.actions` (`keystroke`, `format`, `validate` and 
 the list's `calculationOrder` holds the fields whose totals are calculated, in order. To write them,
 see [Scripts and calculations](/docs/engine/forms/authoring#scripts-and-calculations).
 
-The viewer's form plugin runs these scripts and writes their results in one call,
-`doc.forms.applyEffects(effects)`: an ordered list of changes, each a `setValue`, a `reset`, a
-`setDisplay` (whether the field shows and prints) or a `setAppearanceText` (the formatted text the
-field shows, while its value stays the same). Each effect reports whether it was `applied`,
-`unchanged`, `rejected`, `failed` or `skipped`; a failed effect doesn't undo the ones before it,
-and a field a signature locked is `rejected`. You only need `applyEffects()` when you run form
-scripts yourself.
+The viewer's form plugin runs these scripts and writes their results as one
+[change](/docs/engine/documents/changes): `forms.setValue`, `forms.reset`, `forms.setDisplay`
+(whether the field shows and prints) and `forms.setAppearanceText` (the formatted text the field
+shows, while its value stays the same) ops, in the order the scripts asked for them. All of them
+are written, or none is: a field a signature locked refuses the whole change. You only need these
+ops when you run form scripts yourself.
 
 ### Recovered fields
 
@@ -298,6 +297,10 @@ A field's widgets can be on different pages. The `meta` of a `setValue()` or `re
 lists every widget whose look changed, with its page (`meta.changedWidgets`). For a radio group
 that's the button switched off and the one switched on. Use it to render only the pages that
 changed.
+
+`meta.redrawnWidgets` lists those whose picture the engine drew again, such as a text field's
+widgets after a new value. A checkbox or radio button that switches shows another picture it
+already has, so it isn't in the list.
 
 ### Checkboxes with several widgets
 

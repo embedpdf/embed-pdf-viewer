@@ -185,7 +185,6 @@ export type {
   FormsListWorkerRequest,
   FormsSetValueWorkerRequest,
   FormsResetWorkerRequest,
-  FormsApplyEffectsWorkerRequest,
   FormsExportWorkerRequest,
   FormsImportWorkerRequest,
   FormsImportValuesWorkerRequest,

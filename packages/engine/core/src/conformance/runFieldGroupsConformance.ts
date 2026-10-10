@@ -138,6 +138,48 @@ export function runFieldGroupsConformance(
           | undefined
       )?.value;
 
+    test('each token lists the groups it may fill in, sign and assign', async () => {
+      const rights: Record<string, unknown> = {};
+      for (const token of Object.keys(FIELD_GROUP_TOKENS) as FieldGroupToken[]) {
+        await as(token, async (doc) => {
+          rights[token] = doc.security.fieldRights();
+          // The lists answer as `allowsField` does, group by group.
+          const listed = doc.security.fieldRights();
+          for (const groupId of ['buyer', 'seller', 'legal', null]) {
+            for (const action of ['fill', 'sign'] as const) {
+              const right = listed[action];
+              const inList = right.all || (groupId !== null && right.groups.includes(groupId));
+              expect(inList).toBe(doc.security.allowsField(action, { groupId }));
+            }
+          }
+          for (const groupId of ['buyer', 'seller', 'legal']) {
+            const right = listed.setGroup;
+            const inList = right.all || right.groups.includes(groupId);
+            expect(inList).toBe(doc.security.allowsField('set-group', { groupId }));
+          }
+        });
+      }
+      expect(rights).toEqual({
+        buyer: {
+          fill: { all: false, groups: ['buyer'] },
+          sign: { all: false, groups: ['buyer'] },
+          setGroup: { all: false, groups: [] },
+        },
+        seller: {
+          fill: { all: false, groups: ['seller'] },
+          sign: { all: false, groups: ['seller'] },
+          setGroup: { all: false, groups: ['seller'] },
+        },
+        // Designing the form includes filling it in.
+        designer: {
+          fill: { all: true },
+          sign: { all: false, groups: [] },
+          setGroup: { all: false, groups: ['buyer', 'legal'] },
+        },
+        everything: { fill: { all: true }, sign: { all: true }, setGroup: { all: true } },
+      });
+    });
+
     test("a field's group reads from its /EMBD_Metadata; its widget has none", async () => {
       await as('everything', async (doc) => {
         const { fields, widgets } = await doc.forms.list();

@@ -291,14 +291,16 @@ export function runSignatureConformance(
           caught = err;
         }
         expect(EngineError.is(caught, EngineErrorCode.ProtectedDocument)).toBe(true);
-        // A script's effects can't reach it either: the effect is rejected.
-        const effects = await doc.forms.applyEffects([
-          { kind: 'setValue', ref: lockedRef, value: { value: 'changed' } },
-        ]);
-        expect(effects.results[0]).toMatchObject({
-          status: 'rejected',
-          error: { code: EngineErrorCode.ProtectedDocument },
-        });
+        // A script's results can't reach it either: the change is refused.
+        let scripted: unknown;
+        try {
+          await doc.apply({
+            ops: [{ type: 'forms.setValue', field: lockedRef, value: { value: 'changed' } }],
+          });
+        } catch (err) {
+          scripted = err;
+        }
+        expect(EngineError.is(scripted, EngineErrorCode.ProtectedDocument)).toBe(true);
         // A values import leaves it out, and says so.
         const bundle = await doc.forms.export({ fields: [lockedRef] });
         const [row] = bundle.fields;

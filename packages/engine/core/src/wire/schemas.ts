@@ -63,7 +63,6 @@ import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/DocumentSecurityService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { FormEffectsResult, FormEffect } from '../forms/effects';
 import {
   FormFieldDraftSchema,
   FormFieldDTOSchema,
@@ -1109,6 +1108,7 @@ export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
   undoable: z.boolean(),
   changedFields: z.array(FormFieldRefSchema),
   changedWidgets: z.array(FormWidgetSchema),
+  redrawnWidgets: z.array(FormWidgetSchema),
 });
 
 /**
@@ -1149,31 +1149,6 @@ export const FormResetBodySchema = z
 
 /** What `updateWidget` takes on the wire: the widget patch (`PATCH …/form/widgets/{p}/{key}`). */
 export const FormWidgetUpdateBodySchema = z.object({ patch: WidgetPatchSchema }).strict();
-
-export const FormEffectSchema: z.ZodType<FormEffect> = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('setValue'), ref: FormFieldRefSchema, value: FormFieldValueSchema }),
-  z.object({
-    kind: z.literal('setDisplay'),
-    ref: FormFieldRefSchema,
-    display: z.enum(['visible', 'hidden', 'noPrint', 'noView']),
-  }),
-  z.object({ kind: z.literal('setAppearanceText'), ref: FormFieldRefSchema, text: z.string() }),
-  z.object({ kind: z.literal('reset'), refs: z.array(FormFieldRefSchema) }),
-]);
-
-export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
-  results: z.array(
-    z.object({
-      index: z.number().int().nonnegative(),
-      status: z.enum(['applied', 'unchanged', 'rejected', 'failed', 'skipped']),
-      fields: z.array(FormFieldDTOSchema),
-      changedWidgets: z.array(FormWidgetSchema),
-      error: EngineErrorPayloadSchema.optional(),
-    }),
-  ),
-  widgets: z.array(WidgetDTOSchema),
-  meta: FormMutationMetaSchema,
-}) as unknown as z.ZodType<FormEffectsResult>;
 
 export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
   fields: z.array(FormFieldDTOSchema),

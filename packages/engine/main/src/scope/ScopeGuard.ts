@@ -1,25 +1,27 @@
 import {
-  EngineError,
-  EngineErrorCode,
-  protectedCapabilities,
-  type DocumentProtection,
-  PermissionDenied,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
+  type AnnotationActor,
+  type AnnotationAuthority,
+  type ChangeAuthority,
   checkAnyCapability,
   checkCapability,
   checkCollab,
   checkSetGroup,
-  allowsFieldWrite,
-  allowsSomeFieldWrite,
-  decodePdfBits,
-  describeProtection,
-  expandRawScope,
-  type AnnotationActor,
-  type AnnotationAuthority,
-  type ChangeAuthority,
   type CollabAction,
   type CollabTarget,
+  decodePdfBits,
+  describeProtection,
   type DocCapability,
+  type DocumentProtection,
+  EngineError,
+  EngineErrorCode,
+  expandRawScope,
+  type FieldRights,
+  fieldRightsOf,
   type FieldWriteAction,
+  PermissionDenied,
+  protectedCapabilities,
 } from '@embedpdf/engine-core/runtime';
 
 import type { HandleScopeContext } from './HandleScopeContext';
@@ -159,6 +161,16 @@ export class ScopeGuard {
     return checkSetGroup('fields', groupId, this.ctx.identity.groupId, this.ctx.scope);
   }
 
+  /** The fields the handle may fill in and sign, and the groups it may put them in, as lists. */
+  fieldRights(): FieldRights {
+    return fieldRightsOf(
+      this.ctx.scope,
+      this.ctx.pdfBits,
+      this.protection,
+      this.ctx.identity.groupId,
+    );
+  }
+
   /** Whether the handle may `action` (fill in, or sign) the field in `groupId`. */
   canFieldWrite(groupId: string | null, action: FieldWriteAction): boolean {
     return allowsFieldWrite(this.changeAuthority(), groupId, action);
@@ -171,16 +183,6 @@ export class ScopeGuard {
   assertSomeFieldWrite(action: FieldWriteAction): void {
     if (allowsSomeFieldWrite(this.changeAuthority(), action)) return;
     this.assertCapability(action === 'fill' ? 'doc.forms.fill' : 'doc.sign');
-  }
-
-  /**
-   * Throws unless the handle may fill in every field: a write that checks
-   * no field (script effects) takes a filler no `fields:fill` scope narrows.
-   */
-  assertEveryFieldFill(): void {
-    this.assertCapability('doc.forms.fill');
-    if (!this.canFieldWrite(null, 'fill'))
-      throw new PermissionDenied('doc.forms.fill', 'engine-local');
   }
 
   assertCollab(action: CollabAction, target: CollabTarget): void {

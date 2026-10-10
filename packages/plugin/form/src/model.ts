@@ -193,14 +193,6 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
             event.calculationOrder,
           )
         : reload();
-    case 'forms.effectsApplied':
-      return upsertWidgets(
-        upsertFields(
-          index,
-          event.results.flatMap((result) => result.fields),
-        ),
-        event.widgets,
-      );
     // A repair reports only counts; the others remove pages, or paint their
     // widgets into the content.
     case 'forms.repaired':
@@ -269,7 +261,7 @@ export interface FormWidgetLook {
   readonly border: string | null;
   /** The border width in points. */
   readonly borderWidth: number;
-  readonly borderStyle: 'solid' | 'dashed' | 'beveled' | 'inset';
+  readonly borderStyle: 'solid' | 'dashed' | 'beveled' | 'inset' | 'underline';
   /** The background color (`/MK /BG`), or `null` for a see-through widget. */
   readonly background: string | null;
   /** The text color (`/DA`), or `null` when the field names none. */

@@ -16,12 +16,13 @@ import {
   type ScriptValue,
   type ScriptWorldInput,
 } from '@embedpdf/core-acrojs';
-import type {
-  DocumentHandle,
-  FormEffect,
-  FormFieldRef,
-  FormFieldValue,
-  PdfActionTree,
+import {
+  formEffectOps,
+  type DocumentHandle,
+  type FormEffect,
+  type FormFieldRef,
+  type FormFieldValue,
+  type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
 import type { FormCommitResult, FormUiEffect } from '../contract';
@@ -37,7 +38,7 @@ import {
   snapshotField,
   type Overlay,
 } from './overlay';
-import { pageNumberFor, scriptError, statusFromEffects, utf8Length } from './results';
+import { pageNumberFor, scriptError, utf8Length } from './results';
 
 /**
  * The controller never owns a realm. It rides a realm port — this document's
@@ -124,7 +125,6 @@ export class FormScriptingController {
       return {
         status: 'unchanged',
         scripted: true,
-        effectsResult: null,
         uiEffects: [],
         diagnostics: [],
       };
@@ -498,28 +498,13 @@ export class FormScriptingController {
       });
     }
     if (effects.length === 0) {
-      return { status: 'unchanged', scripted: true, effectsResult: null, uiEffects, diagnostics };
+      return { status: 'unchanged', scripted: true, uiEffects, diagnostics };
     }
-    if (!this.options.doc.forms.applyEffects) {
-      return this.failed(
-        uiEffects,
-        diagnostics,
-        scriptError('This engine does not support batched form effects'),
-      );
-    }
-
-    const effectsResult = await this.options.doc.forms.applyEffects(effects);
-    const status = statusFromEffects(effectsResult);
-    return {
-      status,
-      scripted: true,
-      effectsResult,
-      uiEffects,
-      diagnostics,
-      ...(status === 'failed'
-        ? { error: scriptError('One or more native form effects failed') }
-        : {}),
-    };
+    // One change: every effect is written, or none is and the refusal throws.
+    // A change that wrote nothing has nothing to undo.
+    const written = await this.options.doc.apply({ ops: formEffectOps(effects) });
+    const status = written.meta.undoable ? 'applied' : 'unchanged';
+    return { status, scripted: true, uiEffects, diagnostics };
   }
 
   private failed(
@@ -530,7 +515,6 @@ export class FormScriptingController {
     return {
       status: 'failed',
       scripted: true,
-      effectsResult: null,
       uiEffects,
       diagnostics,
       error,
@@ -542,33 +526,9 @@ export class FormScriptingController {
     uiEffects: FormUiEffect[],
     diagnostics: ScriptDiagnostic[],
   ): Promise<FormCommitResult> {
-    if (bootEffects.length === 0) {
-      return {
-        status: 'rejected',
-        scripted: true,
-        effectsResult: null,
-        uiEffects,
-        diagnostics,
-      };
-    }
-    if (!this.options.doc.forms.applyEffects) {
-      return this.failed(
-        uiEffects,
-        diagnostics,
-        scriptError('Batched form effects are unavailable'),
-      );
-    }
-    const effectsResult = await this.options.doc.forms.applyEffects(bootEffects);
-    if (statusFromEffects(effectsResult) === 'failed') {
-      return this.failed(uiEffects, diagnostics, scriptError('A name-tree boot effect failed'));
-    }
-    return {
-      status: 'rejected',
-      scripted: true,
-      effectsResult,
-      uiEffects,
-      diagnostics,
-    };
+    // The open scripts' effects are written even when the value is refused.
+    if (bootEffects.length > 0) await this.options.doc.apply({ ops: formEffectOps(bootEffects) });
+    return { status: 'rejected', scripted: true, uiEffects, diagnostics };
   }
 }
 

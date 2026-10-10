@@ -15,6 +15,8 @@ import type {
   StrikeoutIntent,
   TextAlignment,
   VerticalAlignment,
+  WidgetBorderStyle,
+  WidgetCheckStyle,
 } from './primitives';
 import { STANDARD_FONTS } from './primitives';
 import { PdfPointSchema, PdfRectSchema } from '../geometry/schemas';
@@ -34,6 +36,23 @@ export const AnnotationBorderStyleSchema: z.ZodType<AnnotationBorderStyle> = z.e
   'dashed',
   'beveled',
   'inset',
+]);
+
+export const WidgetBorderStyleSchema: z.ZodType<WidgetBorderStyle> = z.enum([
+  'solid',
+  'dashed',
+  'beveled',
+  'inset',
+  'underline',
+]);
+
+export const WidgetCheckStyleSchema: z.ZodType<WidgetCheckStyle> = z.enum([
+  'check',
+  'cross',
+  'star',
+  'circle',
+  'square',
+  'diamond',
 ]);
 
 /** What a write takes for a border that isn't a widget's. */

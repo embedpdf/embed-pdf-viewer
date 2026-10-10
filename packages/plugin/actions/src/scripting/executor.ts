@@ -59,11 +59,7 @@ export function registerScriptExecutor(
         });
       } else {
         const result = await ports.formCommitSink(output.formEffects);
-        const firstFailure = result.results.find(
-          (entry) => entry.status === 'failed' || entry.status === 'rejected',
-        );
-        if (firstFailure)
-          failure = `form effect ${firstFailure.index}: ${firstFailure.error?.message ?? firstFailure.status}`;
+        if (result.status === 'failed') failure = `form effects: ${result.error ?? 'failed'}`;
       }
     }
     if (output.annotEffects.length > 0) {

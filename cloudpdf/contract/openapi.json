@@ -15464,7 +15464,15 @@
               },
               "borderStyle": {
                 "type": "string",
-                "enum": ["solid", "dashed", "beveled", "inset"]
+                "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+              },
+              "dashArray": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "nullable": true
               },
               "fontFamily": {
                 "type": "string",
@@ -15505,6 +15513,11 @@
               },
               "caption": {
                 "type": "string",
+                "nullable": true
+              },
+              "checkStyle": {
+                "type": "string",
+                "enum": ["check", "cross", "star", "circle", "square", "diamond"],
                 "nullable": true
               },
               "field": {},
@@ -20238,7 +20251,15 @@
           },
           "borderStyle": {
             "type": "string",
-            "enum": ["solid", "dashed", "beveled", "inset"]
+            "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+          },
+          "dashArray": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "nullable": true
           },
           "fontFamily": {
             "type": "string",
@@ -20279,6 +20300,11 @@
           },
           "caption": {
             "type": "string",
+            "nullable": true
+          },
+          "checkStyle": {
+            "type": "string",
+            "enum": ["check", "cross", "star", "circle", "square", "diamond"],
             "nullable": true
           }
         },
@@ -20501,7 +20527,15 @@
           },
           "borderStyle": {
             "type": "string",
-            "enum": ["solid", "dashed", "beveled", "inset"]
+            "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+          },
+          "dashArray": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "nullable": true
           },
           "fontFamily": {
             "type": "string",
@@ -20542,6 +20576,11 @@
           },
           "caption": {
             "type": "string",
+            "nullable": true
+          },
+          "checkStyle": {
+            "type": "string",
+            "enum": ["check", "cross", "star", "circle", "square", "diamond"],
             "nullable": true
           },
           "field": {
@@ -20604,11 +20643,13 @@
           "interiorColor",
           "strokeWidth",
           "borderStyle",
+          "dashArray",
           "fontFamily",
           "fontSize",
           "fontColor",
           "textAlign",
           "caption",
+          "checkStyle",
           "field",
           "fieldFamily"
         ],
@@ -20800,7 +20841,15 @@
           },
           "borderStyle": {
             "type": "string",
-            "enum": ["solid", "dashed", "beveled", "inset"]
+            "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+          },
+          "dashArray": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "nullable": true
           },
           "fontFamily": {
             "type": "string",
@@ -20843,6 +20892,11 @@
             "type": "string",
             "nullable": true
           },
+          "checkStyle": {
+            "type": "string",
+            "enum": ["check", "cross", "star", "circle", "square", "diamond"],
+            "nullable": true
+          },
           "field": {},
           "fieldFamily": {}
         },
@@ -20882,6 +20936,12 @@
             "items": {
               "$ref": "#/components/schemas/FormWidget"
             }
+          },
+          "redrawnWidgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormWidget"
+            }
           }
         },
         "required": [
@@ -20890,7 +20950,8 @@
           "opId",
           "undoable",
           "changedFields",
-          "changedWidgets"
+          "changedWidgets",
+          "redrawnWidgets"
         ],
         "additionalProperties": false
       },
@@ -21028,9 +21089,6 @@
               "display": {
                 "type": "string",
                 "enum": ["visible", "hidden", "noPrint", "noView"]
-              },
-              "expect": {
-                "$ref": "#/components/schemas/ChangeOp/anyOf/5/properties/display"
               }
             },
             "required": ["type", "field", "display"],

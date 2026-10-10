@@ -7,6 +7,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
+import { formEffectOps } from '../forms/effects';
 import type { FormFieldDTO } from '../forms/field';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
@@ -222,64 +223,72 @@ export function runFormConformance(
       }
     });
 
-    test('applies ordered script effects once and produces zero churn for a no-op batch', async () => {
+    test("a script run's effects are one change: all of it, or none of it", async () => {
       const doc = await open(opts.fixtures.toggleFields);
-      if (!doc.forms.applyEffects) {
-        await doc.close();
-        return;
-      }
       try {
-        const events: DocumentEvent[] = [];
+        const events: Extract<DocumentEvent, { type: 'forms.valueSet' }>[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
-          if (event.type === 'forms.effectsApplied') events.push(event);
+          if (event.type === 'forms.valueSet') events.push(event);
         });
-        const result = await doc.forms.applyEffects([
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { value: 'abcdef' },
-          },
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'missing.effect.field' },
-            value: { value: 'ignored' },
-          },
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { value: 'abcde' },
-          },
-        ]);
-        expect(result.results.map((entry) => entry.status)).toEqual([
-          'applied',
-          'rejected',
-          'unchanged',
-        ]);
-        // The meta names the written field and every widget an effect repainted.
-        expect(result.meta.changedFields.length).toBe(1);
-        expect(result.meta.changedWidgets).toEqual(
-          result.results.flatMap((entry) => entry.changedWidgets),
-        );
-        expect(events).toHaveLength(1);
-        const appliedText = result.results[0]?.fields[0];
-        if (appliedText?.family !== 'text') throw new Error('expected text family');
-        expect(appliedText.value).toBe('abcde');
+        const text = { kind: 'fqn', name: 'maxlen_text' } as const;
+        const before = await doc.forms.get(text);
+        // One effect names a field the form doesn't have: nothing is written.
+        const refusal = await doc
+          .apply({
+            ops: formEffectOps([
+              { kind: 'setValue', ref: text, value: { value: 'abcdef' } },
+              {
+                kind: 'setValue',
+                ref: { kind: 'fqn', name: 'missing.effect.field' },
+                value: { value: 'ignored' },
+              },
+            ]),
+          })
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+        expect(refusal === null).toBe(false);
+        const untouched = await doc.forms.get(text);
+        if (untouched.family === 'text' && before.family === 'text') {
+          expect(untouched.value).toBe(before.value);
+        }
+        expect(events).toHaveLength(0);
 
-        const noOp = await doc.forms.applyEffects([
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { value: 'abcde' },
-          },
-        ]);
-        expect(noOp.results.map((entry) => entry.status)).toEqual(['unchanged']);
-        // Nothing written: the meta names nothing, and no event fires.
-        expect(noOp.meta.changedFields).toEqual([]);
-        expect(noOp.meta.changedWidgets).toEqual([]);
-        expect(noOp.meta.affectedPages).toEqual([]);
-        expect(noOp.meta.cacheDelta).toBeNull();
-        expect(events).toHaveLength(1);
+        // Every effect in order, as one change: the last value wins, cut to the length.
+        const result = await doc.apply({
+          ops: formEffectOps([
+            { kind: 'setValue', ref: text, value: { value: 'abcdef' } },
+            { kind: 'setValue', ref: text, value: { value: 'xyz' } },
+          ]),
+        });
+        expect(result.items.map((item) => item.type)).toEqual(['forms.setValue', 'forms.setValue']);
+        const after = await doc.forms.get(text);
+        if (after.family !== 'text') throw new Error('expected text family');
+        expect(after.value).toBe('xyz');
+        // One burst: the change's events share its opId.
+        expect(new Set(events.map((event) => event.origin.tx?.id))).toEqual(
+          new Set([result.meta.opId]),
+        );
         unsubscribe();
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a reset or display that changes nothing has nothing to undo', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      try {
+        const text = { kind: 'fqn', name: 'maxlen_text' } as const;
+        const hide = { ops: formEffectOps([{ kind: 'setDisplay', ref: text, display: 'hidden' }]) };
+        const reset = { ops: formEffectOps([{ kind: 'reset', refs: [text] }]) };
+        await doc.forms.setValue(text, { value: 'abc' });
+
+        expect((await doc.apply(hide)).meta.undoable).toBe(true);
+        expect((await doc.apply(reset)).meta.undoable).toBe(true);
+        // Already hidden, already at its default: the same change again writes nothing.
+        expect((await doc.apply(hide)).meta.undoable).toBe(false);
+        expect((await doc.apply(reset)).meta.undoable).toBe(false);
       } finally {
         await doc.close();
       }

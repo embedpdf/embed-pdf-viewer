@@ -44,8 +44,6 @@ import {
   type WireResourceMap,
   type AnnotationRef,
   type AnnotationUpdateResult,
-  type FormEffect,
-  type FormEffectsResult,
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
@@ -67,7 +65,6 @@ import {
   type FormCalculationsReorderResult,
   type FieldPosition,
   type WidgetPatch,
-  type FormWidget,
   type Identity,
   type WidgetPlacement,
   type MetadataPatch,
@@ -1295,65 +1292,6 @@ export class LayerService {
       'form.reset',
       signal,
     );
-  }
-
-  async applyFormEffects(
-    ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; effects: FormEffect[] },
-    signal?: AbortSignal,
-  ): Promise<FormEffectsResult> {
-    const opId = writeOpIdOf(ctx);
-    // The scripts' values count as filled in by the user whose fill ran them.
-    const actor = actorFromContext(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      const { layer } = materialized;
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.runLayerWrite(
-          input.docId,
-          (jobId) =>
-            wirePack({
-              kind: 'forms.applyEffects' as const,
-              effect: 'write' as const,
-              jobId,
-              opId,
-              docId: input.docId,
-              layerName: input.layerName,
-              effects: input.effects,
-              artifactPath,
-              ...(actor ? { actor } : {}),
-            }),
-          signal,
-        );
-        if (payload.tag !== 'forms.applyEffects') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected forms.applyEffects payload: ${payload.tag}`,
-          );
-        }
-        const result = payload.result;
-        if (!payload.wrote) return result;
-
-        const touchedPages = widgetPages(result.meta.changedWidgets);
-        const failed = result.results.filter((entry) => entry.status === 'failed');
-        for (const entry of failed) {
-          touchedPages.push(...widgetPages(entry.fields.flatMap((field) => field.widgets)));
-        }
-        // A failed native call is outcome-indeterminate. If its field could
-        // not be re-read, invalidate every page rather than under-reporting
-        // a possibly changed widget appearance.
-        const conservativePages = failed.some((entry) => entry.fields.length === 0)
-          ? allPages(materialized)
-          : touchedPages;
-
-        return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
-          auditKind: 'form.applyEffects',
-          touchedPages: conservativePages,
-          result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
   }
 
   /**
@@ -4956,14 +4894,6 @@ function requireLayerArtifact(payload: unknown): LayerArtifactInput {
     );
   }
   return artifact;
-}
-
-/**
- * The pages a widget change report touched. A widget stored as a direct
- * object has no page (`page === null`) and is skipped.
- */
-function widgetPages(widgets: ReadonlyArray<FormWidget>): PageObjectNumber[] {
-  return widgets.flatMap((widget) => (widget.page === null ? [] : [widget.page.objectNumber]));
 }
 
 /** One key grammar for everything scoped to a layer's write pipeline. */

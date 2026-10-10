@@ -3,14 +3,7 @@
  * sink (script `setValue`, `setDisplay` and reset effects are written through
  * the plugin that owns the fields) and the submit dataset resolver.
  */
-import {
-  EngineError,
-  EngineErrorCode,
-  opIdOf,
-  serializeError,
-  type FormEffectsResult,
-  type FormMutationMeta,
-} from '@embedpdf/engine-core/runtime';
+import { formEffectOps, serializeError } from '@embedpdf/engine-core/runtime';
 import type {
   ActionContext,
   ActionDiagnostic,
@@ -51,60 +44,17 @@ export function createScriptEffects(ctx: FormContext) {
     api: {
       resolveSubmitDataset,
       commitScriptFormEffects: async (effects) => {
-        const doc = ctx.doc;
-        // The batch's id, minted here so a batch that never runs reports it too.
-        const opId = opIdOf(undefined);
-        if (!doc.forms.applyEffects) {
-          // The sink never throws: report every effect as failed instead.
-          return {
-            results: effects.map((_, index) => ({
-              index,
-              status: 'failed' as const,
-              fields: [],
-              changedWidgets: [],
-              error: serializeError(
-                new EngineError(EngineErrorCode.NotImplemented, 'no form-effects batch door'),
-              ),
-            })),
-            widgets: [],
-            meta: nothingChanged(opId),
-          };
-        }
-        let result: FormEffectsResult;
         try {
-          result = await doc.forms.applyEffects(effects, { opId });
+          // One change: every effect is written, or none is. The fields
+          // mirror applies them from the change's events.
+          await ctx.doc.apply({ ops: formEffectOps(effects) });
+          return { status: 'applied' };
         } catch (error) {
-          // The sink never throws: a refused batch (for example a permission
-          // refusal) reports every effect as failed.
-          const refusal = serializeError(error);
-          return {
-            results: effects.map((_, index) => ({
-              index,
-              status: 'failed' as const,
-              fields: [],
-              changedWidgets: [],
-              error: refusal,
-            })),
-            widgets: [],
-            meta: nothingChanged(opId),
-          };
+          // The sink never throws: a refused change (a permission refusal, a
+          // missing field) reports why.
+          return { status: 'failed', error: serializeError(error).message };
         }
-        // The form's mirror applies the confirmed effects from the
-        // `forms.effectsApplied` event.
-        return result;
       },
     } satisfies Partial<FormHostCapability>,
-  };
-}
-
-/** The meta of a batch that wrote nothing. */
-function nothingChanged(opId: string): FormMutationMeta {
-  return {
-    affectedPages: [],
-    cacheDelta: null,
-    opId,
-    undoable: false,
-    changedFields: [],
-    changedWidgets: [],
   };
 }

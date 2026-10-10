@@ -60,7 +60,6 @@ describe('recalculation', () => {
     expect(result.status).toBe('applied');
     expect(result.error ?? null).toBeNull();
     expect(result.diagnostics).toEqual([]);
-    expect(result.effectsResult?.results.every((entry) => entry.status === 'applied')).toBe(true);
     const after = await doc.forms.list();
     const total = after.fields.find((field) => field.name === 'total_amount');
     expect(total?.valueEntry).toEqual({ kind: 'scalar', value: '$1700.00' });

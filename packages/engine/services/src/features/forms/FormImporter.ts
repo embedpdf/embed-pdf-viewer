@@ -1,20 +1,22 @@
 import {
-  assertFormBundleManifest,
-  EngineError,
-  pdfFormFieldDraftOf,
-  planFormImport,
-  planFormValuesImport,
-  toPageRef,
   type AnnotationActor,
+  assertFormBundleManifest,
   type BundleImportPages,
   type BundleLimits,
+  EngineError,
+  fieldValueWriteOf,
   type FormFieldDTO,
   type FormFieldRef,
   type FormImportResult,
   type FormValuesImportDrop,
   type FormWidget,
+  isNoOpWrite,
   type PdfCoordinates,
+  pdfFormFieldDraftOf,
+  planFormImport,
+  planFormValuesImport,
   type PlannedValueWrite,
+  toPageRef,
   type WidgetFlags,
   type WireFormBundle,
 } from '@embedpdf/engine-core/runtime';
@@ -23,7 +25,6 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 import { FormMutator } from './FormMutator';
 import { readCalculationOrder, sameOrder } from './internal/calculationOrder';
 import { restoreFieldCreation, restoreFieldFill } from './internal/fieldAttribution';
-import { isNoOpWrite, nativeWriteOf } from './internal/fieldValues';
 import { acquireFormModel } from './internal/formModelCache';
 import { formMutationMeta } from './internal/formMutationMeta';
 import { readFieldAt } from './internal/readFormSnapshot';
@@ -165,7 +166,7 @@ export class FormImporter {
   /**
    * What a values import of `bundle` writes, nothing written yet: each
    * field the bundle holds a value for, matched by full name, when it can
-   * take the value (`nativeWriteOf`) and no signature locked it. A field
+   * take the value (`fieldValueWriteOf`) and no signature locked it. A field
    * stored as a direct object can't be written, so it can't take the value
    * either.
    */
@@ -185,7 +186,7 @@ export class FormImporter {
       refusal: (field, value) => {
         if (field.ref.kind !== 'objectNumber') return 'value-not-allowed';
         try {
-          nativeWriteOf(field, value);
+          fieldValueWriteOf(field, value);
         } catch (error) {
           if (EngineError.is(error)) return 'value-not-allowed';
           throw error;
@@ -196,7 +197,7 @@ export class FormImporter {
     });
     return {
       writes: plan.writes.filter(
-        ({ target, value }) => !isNoOpWrite(target, nativeWriteOf(target, value)),
+        ({ target, value }) => !isNoOpWrite(target, fieldValueWriteOf(target, value)),
       ),
       dropped: plan.dropped,
     };

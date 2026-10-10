@@ -36,7 +36,6 @@ export function createActivation(
       return {
         status: 'unchanged',
         scripted: false,
-        effectsResult: null,
         uiEffects: [],
         diagnostics: [],
       };
@@ -46,7 +45,6 @@ export function createActivation(
       return {
         status: 'unchanged',
         scripted: true,
-        effectsResult: null,
         uiEffects: [],
         diagnostics: [],
       };

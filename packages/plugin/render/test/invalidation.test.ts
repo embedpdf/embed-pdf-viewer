@@ -33,7 +33,6 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
 
   it.each([
     'forms.valueSet',
-    'forms.effectsApplied',
     'forms.created',
     'forms.updated',
     'forms.deleted',

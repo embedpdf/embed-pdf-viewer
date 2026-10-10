@@ -45,8 +45,6 @@ import {
   type FormRepairResult,
   type FormSetValueResult,
   type FormSnapshot,
-  type FormEffect,
-  type FormEffectsResult,
   type FieldWriteAction,
 } from '@embedpdf/engine-core/runtime';
 
@@ -164,34 +162,6 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           ...fact,
         })),
       );
-      return payload.result;
-    });
-  }
-
-  applyEffects(effects: FormEffect[], options?: WriteOptions): AbortablePromise<FormEffectsResult> {
-    // The effects aren't checked field by field: they take a filler of every field.
-    const write = this.beginEveryFieldWrite(options);
-    if (write.rejected) return write.rejected;
-    const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) =>
-        wirePack({
-          kind: 'forms.applyEffects',
-          effect: 'write',
-          jobId,
-          opId: write.opId,
-          docId,
-          effects,
-          ...this.actor(),
-        }),
-    });
-    return this.await(submission, 'forms.applyEffects', (payload) => {
-      if (payload.wrote) {
-        this.publisher.publishWrite(write.opId, {
-          type: 'forms.effectsApplied',
-          ...payload.result,
-        });
-      }
       return payload.result;
     });
   }
@@ -649,13 +619,6 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     options: WriteOptions | undefined,
   ): ReturnType<LocalDocumentFormsService['beginWrite']> {
     return this.begin(() => this.guard.assertSomeFieldWrite(action), options);
-  }
-
-  /** A write that fills in fields without checking each: the handle may fill in every field. */
-  private beginEveryFieldWrite(
-    options: WriteOptions | undefined,
-  ): ReturnType<LocalDocumentFormsService['beginWrite']> {
-    return this.begin(() => this.guard.assertEveryFieldFill(), options);
   }
 
   private begin(

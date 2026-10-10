@@ -1,18 +1,12 @@
 import {
   AbortablePromise,
-  EngineError,
-  EngineErrorCode,
+  type AnnotationOwner,
   checkCapability,
   checkCollab,
   checkFieldAction,
   checkSetGroup,
   collabTargetOf,
   decodePdfBits,
-  expandRawScope,
-  passwordPromptFromState,
-  protectedCapabilities,
-  securityStateFromHead,
-  type AnnotationOwner,
   type DocCapability,
   type DocumentAccessInfo,
   type DocumentProtection,
@@ -21,9 +15,17 @@ import {
   type DocumentUnlockInput,
   type DocumentUnlockResult,
   type EditSessionAccess,
+  EngineError,
+  EngineErrorCode,
+  expandRawScope,
+  type FieldRights,
+  fieldRightsOf,
   type Identity,
   type PageLayerRights,
   type PasswordPrompt,
+  passwordPromptFromState,
+  protectedCapabilities,
+  securityStateFromHead,
 } from '@embedpdf/engine-core/runtime';
 import { AccessResponseSchema, wirePaths, type DocumentHead } from '@embedpdf/engine-core/wire';
 
@@ -182,6 +184,11 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       this.pdfBits(),
       this.protection,
     );
+  }
+
+  /** The same inputs as `allowsField`, as lists. */
+  fieldRights(): FieldRights {
+    return fieldRightsOf(this.rawScope(), this.pdfBits(), this.protection, this.identity?.groupId);
   }
 
   /** Raw scope for the collab resolver: server-canonical post-/access, else the JWT claim. */

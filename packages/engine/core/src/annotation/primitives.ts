@@ -154,6 +154,19 @@ export type BlendMode =
  */
 export type AnnotationBorderStyle = 'solid' | 'dashed' | 'beveled' | 'inset';
 
+/**
+ * A form widget's border (`/BS /S`): the four annotation styles, and
+ * `underline`, a line along the bottom only, which only a widget draws.
+ */
+export type WidgetBorderStyle = AnnotationBorderStyle | 'underline';
+
+/**
+ * A symbol a checkbox or radio button shows while it's on (`/MK /CA`, a
+ * ZapfDingbats character). Without one, a checkbox shows a check and a radio
+ * button a circle.
+ */
+export type WidgetCheckStyle = 'check' | 'cross' | 'star' | 'circle' | 'square' | 'diamond';
+
 /** The border styles an annotation other than a widget draws: `beveled` and `inset` are read, not written. */
 export type DrawnBorderStyle = Extract<AnnotationBorderStyle, 'solid' | 'dashed'>;
 

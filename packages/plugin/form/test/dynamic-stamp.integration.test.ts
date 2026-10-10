@@ -58,12 +58,6 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       const result = await controller.recalculate();
 
       expect(result.status).toBe('applied');
-      expect(result.effectsResult?.results.map(({ status }) => status)).toEqual([
-        'applied',
-        'applied',
-        'applied',
-        'applied',
-      ]);
       const reread = await doc.forms.list();
       expect(
         Object.fromEntries(reread.fields.map((field) => [field.name, field.valueEntry])),

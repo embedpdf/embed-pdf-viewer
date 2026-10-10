@@ -1,7 +1,7 @@
 import type {
   FieldPosition,
   FieldScriptWrite,
-  ListPosition,
+  FormFieldDisplay,
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
@@ -13,6 +13,7 @@ import type {
   FormResetResult,
   FormSetValueResult,
   FormWidget,
+  ListPosition,
   MutationMeta,
   PdfCoordinates,
   WidgetPlacement,
@@ -20,9 +21,15 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
+  type FieldValueWrite,
+  fieldValueWriteOf,
+  fitWidgetToFamily,
   formWidget,
+  isAtDefault,
+  isNoOpWrite,
   placedWidgetOf,
   reorderedList,
+  valueEntriesEqual,
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotationActor, AnnotationRef, PlacedWidget } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
@@ -32,11 +39,10 @@ import { throwIfAborted } from '../../shared/abort';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { createUnattachedWidget } from './internal/authorWidget';
-import { fitCaptionToFamily } from './internal/widgetCaption';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
 import { assertFieldNotLocked, readFieldLocks } from './internal/signatureLocks';
-import { formMutationMeta } from './internal/formMutationMeta';
+import { formMutationMeta, redrawnByValue } from './internal/formMutationMeta';
 import { bakeWidgetAppearance } from '../signature/internal/appearance';
 import {
   readSignaturesFromModel,
@@ -55,14 +61,7 @@ import {
   writeFieldGroup,
 } from './internal/fieldAttribution';
 import { writeFieldScripts } from './internal/fieldScripts';
-import {
-  applyNativeWrite,
-  isAtDefault,
-  isNoOpWrite,
-  nativeWriteOf,
-  valueEntriesEqual,
-  type NativeFieldWrite,
-} from './internal/fieldValues';
+import { applyNativeWrite } from './internal/fieldValues';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt } from './internal/readFormSnapshot';
 import {
@@ -72,7 +71,7 @@ import {
 } from './internal/resolveFieldRef';
 import { AnnotationMutator } from '../annotations/AnnotationMutator';
 import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
-import { readUtf16String } from '../../runtime/memory/strings';
+import { readUtf16String, withUtf16String } from '../../runtime/memory/strings';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 const FAMILY_CODE = {
@@ -86,6 +85,8 @@ const FAMILY_CODE = {
 } as const;
 
 /** Widgets a single value write can touch; far above any real form. */
+/** `EPDF_FORM_DISPLAY_*`: Acrobat's `Field.display` values. */
+const DISPLAY_CODE = { visible: 0, hidden: 1, noPrint: 2, noView: 3 } as const;
 const CHANGED_WIDGETS_CAPACITY = 256;
 
 // Mirrors EPDF_FORM_REPAIR_* in public/epdf_form.h.
@@ -136,11 +137,84 @@ export class FormMutator {
 
     const docPtr = this.session.requireDocPtr();
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    const write = nativeWriteOf(before, value);
+    const write = fieldValueWriteOf(before, value);
     const fills = !isNoOpWrite(before, write);
     const changed = this.applyWrite(resolved.fieldObjectNumber, write);
     if (fills) stampFieldFill(this.runtime, docPtr, resolved.fieldObjectNumber, actor);
     return this.readBack(resolved.fieldObjectNumber, changed);
+  }
+
+  /**
+   * Show, hide or keep from printing every widget of a field, as a script's
+   * `Field.display` does: only the four flags it names change.
+   */
+  setDisplay(
+    ref: FormFieldRef,
+    display: FormFieldDisplay,
+    signal: AbortSignal,
+  ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
+    throwIfAborted(signal);
+    const resolved = resolveFieldRef(
+      this.runtime,
+      acquireFormModel(this.runtime, this.session),
+      ref,
+    );
+    this.assertWritable(resolved);
+    const docPtr = this.session.requireDocPtr();
+    const changed = this.withChangedWidgets((buf, cap, countPtr) =>
+      this.runtime.fn.EPDFForm_SetFieldDisplay(
+        docPtr,
+        resolved.fieldObjectNumber,
+        DISPLAY_CODE[display],
+        buf,
+        cap,
+        countPtr,
+      ),
+    );
+    if (changed === null) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the field could not be shown or hidden');
+    }
+    // Flags draw nothing: no picture changes.
+    return this.readBack(resolved.fieldObjectNumber, changed, false);
+  }
+
+  /**
+   * Draw a text field's or dropdown's widgets with `text` (a format script's
+   * result) without changing its value.
+   */
+  setAppearanceText(
+    ref: FormFieldRef,
+    text: string,
+    signal: AbortSignal,
+  ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
+    throwIfAborted(signal);
+    const model = acquireFormModel(this.runtime, this.session);
+    const resolved = resolveFieldRef(this.runtime, model, ref);
+    this.assertWritable(resolved);
+    const docPtr = this.session.requireDocPtr();
+    const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    if (field.family !== 'text' && field.family !== 'combobox') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `appearance text does not apply to a ${field.family} field`,
+      );
+    }
+    const changed = withUtf16String(this.runtime.mem, text, (textPtr) =>
+      this.withChangedWidgets((buf, cap, countPtr) =>
+        this.runtime.fn.EPDFForm_SetFieldAppearanceText(
+          docPtr,
+          resolved.fieldObjectNumber,
+          textPtr,
+          buf,
+          cap,
+          countPtr,
+        ),
+      ),
+    );
+    if (changed === null) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the appearance text could not be drawn');
+    }
+    return this.readBack(resolved.fieldObjectNumber, changed, true);
   }
 
   /**
@@ -188,16 +262,17 @@ export class FormMutator {
 
     const fields: FormFieldDTO<PdfCoordinates>[] = [];
     const changedWidgets: FormWidget[] = [];
+    const redrawnWidgets: FormWidget[] = [];
     for (const { before, changed } of written) {
       const after = this.readBackField(fieldObjectNumberOf(before));
       if (changed.length === 0 && valueEntriesEqual(before.valueEntry, after.valueEntry)) continue;
       fields.push(after);
       const changedSet = new Set(changed);
-      for (const widget of after.widgets) {
-        if (changedSet.has(widget.objectNumber)) {
-          changedWidgets.push(formWidget(widget.objectNumber, widget.page));
-        }
-      }
+      const fieldWidgets = after.widgets
+        .filter((widget) => changedSet.has(widget.objectNumber))
+        .map((widget) => formWidget(widget.objectNumber, widget.page));
+      changedWidgets.push(...fieldWidgets);
+      redrawnWidgets.push(...redrawnByValue(after.family, fieldWidgets));
     }
     return {
       fields,
@@ -205,6 +280,7 @@ export class FormMutator {
         this.session.writeStamp(),
         fields.map((field) => field.ref),
         changedWidgets,
+        redrawnWidgets,
       ),
     };
   }
@@ -288,7 +364,7 @@ export class FormMutator {
     const docPtr = this.session.requireDocPtr();
 
     const placements = (draft.widgets ?? []).map((placement) =>
-      placedWidgetOf(fitCaptionToFamily(draft.family, placement)),
+      placedWidgetOf(fitWidgetToFamily(draft.family, placement)),
     );
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     const onStates = placements.map((placement) => onStateOf(draft.family, placement));
@@ -728,7 +804,7 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    const fitted = placedWidgetOf(fitCaptionToFamily(before.family, placement));
+    const fitted = placedWidgetOf(fitWidgetToFamily(before.family, placement));
     const pageIndex = this.preflightPlacement(fitted);
     const onState = onStateOf(before.family, fitted);
     // A merged field/widget splits: its widget half becomes a new widget, at
@@ -887,7 +963,7 @@ export class FormMutator {
   }
 
   /** Run the native value write. Returns the changed widget objnums. */
-  private applyWrite(fieldObjectNumber: number, write: NativeFieldWrite): number[] {
+  private applyWrite(fieldObjectNumber: number, write: FieldValueWrite): number[] {
     const docPtr = this.session.requireDocPtr();
     const changed = this.withChangedWidgets((buf, cap, countPtr) =>
       applyNativeWrite(this.runtime, docPtr, fieldObjectNumber, write, { buf, cap, countPtr }),
@@ -926,6 +1002,8 @@ export class FormMutator {
   private readBack(
     fieldObjectNumber: number,
     changedObjNums: number[],
+    /** Whether the write drew the widgets again; a value write: by the field's family. */
+    redraws?: boolean,
   ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     this.session.invalidateDerived();
     const fresh = acquireFormModel(this.runtime, this.session);
@@ -945,7 +1023,16 @@ export class FormMutator {
       .map((w) => formWidget(w.objectNumber, w.page));
     return {
       field,
-      meta: formMutationMeta(this.session.writeStamp(), [field.ref], changedWidgets),
+      meta: formMutationMeta(
+        this.session.writeStamp(),
+        [field.ref],
+        changedWidgets,
+        redraws === undefined
+          ? redrawnByValue(field.family, changedWidgets)
+          : redraws
+            ? changedWidgets
+            : [],
+      ),
     };
   }
 }

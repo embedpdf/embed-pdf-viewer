@@ -609,9 +609,6 @@ export const wirePaths = {
   layerFormRepair: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/repair`,
 
-  layerFormEffects: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/effects`,
-
   /**
    * GET: one budgeted search slice, versioned form. The token
    * (`encodeSearchToken`) is the cache key: content epoch + query +

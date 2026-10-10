@@ -13,12 +13,7 @@ import type {
   ScriptTransaction,
   ScriptUiEffect,
 } from '@embedpdf/core-acrojs';
-import type {
-  DocumentHandle,
-  FormEffect,
-  FormEffectsResult,
-  PageRef,
-} from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, FormEffect, PageRef } from '@embedpdf/engine-core/runtime';
 
 import type {
   ActionContext,
@@ -76,9 +71,14 @@ export interface AnnotCommitResult {
 }
 export type AnnotCommitSink = (entries: AnnotCommitEntry[]) => Promise<AnnotCommitResult>;
 
-/** The form plugin's document commit: engine `applyEffects` + snapshot
- *  reconciliation (its existing commit tail, extracted). */
-export type FormCommitSink = (effects: FormEffect[]) => Promise<FormEffectsResult>;
+/** What the form plugin's commit did: every effect written as one change, or none of them. */
+export interface FormCommitSinkResult {
+  status: 'applied' | 'failed';
+  /** Why the change was refused, when it was. */
+  error?: string;
+}
+/** The form plugin's document commit: a script run's form effects, written as one change. */
+export type FormCommitSink = (effects: FormEffect[]) => Promise<FormCommitSinkResult>;
 
 /**
  * Which realm produced a script result. `'document'` = this document's own

@@ -95,7 +95,6 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     type: z.literal('forms.setDisplay'),
     field: FormFieldRefSchema,
     display: FormFieldDisplaySchema,
-    expect: FormFieldDisplaySchema.optional(),
   }),
   z.object({
     type: z.literal('forms.setAppearanceText'),

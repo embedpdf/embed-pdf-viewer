@@ -1,5 +1,4 @@
 import type { PageScaleResult } from '../mutation/PageScaleResult';
-import type { FormEffectsResult } from '../forms/effects';
 import type { PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
@@ -228,7 +227,6 @@ export type DocumentEvent =
       type: 'forms.calculationsReordered';
       origin: EventOrigin;
     } & FormCalculationsReorderResult)
-  | ({ type: 'forms.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
   | ({
       type: 'pages.flattened';
       pages: PageRef[];

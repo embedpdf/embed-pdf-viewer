@@ -150,11 +150,10 @@ export function runFormAttributionConformance(
     test("a script's value counts as filled in by the user whose fill ran it", async () => {
       const doc = await open(ALICE);
       try {
-        const { results } = await doc.forms.applyEffects([
-          { kind: 'setValue', ref: NAME, value: { value: 'Calculated' } },
-        ]);
-        expect(results[0]!.status).toBe('applied');
-        expect(results[0]!.fields[0]!.filledBy).toBe('alice');
+        // A script's results go in the change of the fill that ran it.
+        await doc.apply({
+          ops: [{ type: 'forms.setValue', field: NAME, value: { value: 'Calculated' } }],
+        });
         expect((await fieldOf(doc, 'name')).filledBy).toBe('alice');
       } finally {
         await doc.close();

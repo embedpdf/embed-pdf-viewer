@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { runFormConformance, type ConformanceTestRunner } from '@embedpdf/engine-core/conformance';
-import type { FormEffect, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import { formEffectOps, type FormEffect, type FormFieldRef } from '@embedpdf/engine-core/runtime';
 import {
   javaScriptProgramFromActionTree,
   scriptFieldsFromSnapshot,
@@ -110,7 +110,7 @@ function sameRef(left: FormFieldRef, right: FormFieldRef): boolean {
       : false;
 }
 
-test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer', async () => {
+test('dynamic-stamp script effects apply as one change and persist in its layer', async () => {
   if (!fx) throw new Error('fixture not initialised');
   const engine = cloudEngine({
     baseUrl: fx.baseUrl,
@@ -165,16 +165,15 @@ test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer
 
     const eventTypes: string[] = [];
     const unsubscribe = doc.events.subscribe((event) => eventTypes.push(event.type));
-    const applied = await doc.forms.applyEffects!(effects);
+    const applied = await doc.apply({ ops: formEffectOps(effects) });
     unsubscribe();
-    expect(applied.results.map(({ status }) => status)).toEqual([
-      'applied',
-      'applied',
-      'applied',
-      'applied',
+    expect(applied.items.map(({ type }) => type)).toEqual([
+      'forms.setValue',
+      'forms.setValue',
+      'forms.setValue',
+      'forms.setValue',
     ]);
-    expect(applied.meta).not.toBeNull();
-    expect(eventTypes).toContain('forms.effectsApplied');
+    expect(eventTypes).toContain('forms.valueSet');
 
     const reread = await doc.forms.list();
     expect(

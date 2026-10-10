@@ -278,6 +278,71 @@ export function checkFieldAction(
 }
 
 /**
+ * The form fields a session may act on, by group: every field (`all`), or
+ * only the fields of `groups` (none when the list is empty). A field in no
+ * group counts only under `all`.
+ */
+export type FieldGroupRight =
+  | { readonly all: true }
+  | { readonly all: false; readonly groups: readonly string[] };
+
+/** What a session may do with form fields, per action, as group lists a viewer can show. */
+export interface FieldRights {
+  /** The fields it may fill in. */
+  readonly fill: FieldGroupRight;
+  /** The fields it may sign. */
+  readonly sign: FieldGroupRight;
+  /** The groups it may put a field in: its own default group always among them. */
+  readonly setGroup: FieldGroupRight;
+}
+
+/**
+ * {@link checkFieldAction} and {@link checkSetGroup} as lists: for each
+ * action, every field or the groups the scope names, so a designer can
+ * offer exactly the groups a field may go in, and a filler see whose fields
+ * are theirs. The same rules, read the other way round.
+ */
+export function fieldRightsOf(
+  rawScope: ReadonlyArray<string>,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+  callerDefaultGroupId: string | undefined,
+): FieldRights {
+  const parsed = rawScope.map(parseScope);
+  const wildcard = parsed.some((s) => s.kind === 'wildcard');
+  const fieldScopes = (action: 'fill' | 'sign' | 'set-group') =>
+    parsed.filter(
+      (s) =>
+        s.kind === 'collab' && s.entity === 'fields' && (s.action === action || s.action === '*'),
+    ) as Extract<ParsedScope, { entity: 'fields' }>[];
+  const fromScopes = (
+    scopes: Extract<ParsedScope, { entity: 'fields' }>[],
+    extra: readonly string[] = [],
+  ): FieldGroupRight => {
+    if (scopes.some((s) => s.filter.kind === 'all')) return { all: true };
+    const groups = scopes.flatMap((s) => (s.filter.kind === 'group' ? [s.filter.groupId] : []));
+    return { all: false, groups: [...new Set([...groups, ...extra])] };
+  };
+  const NONE: FieldGroupRight = { all: false, groups: [] };
+
+  const writing = (action: 'fill' | 'sign'): FieldGroupRight => {
+    const broad: DocCapability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
+    if (protectedCapabilities(protection).has(broad)) return NONE;
+    if (wildcard) return { all: true };
+    const scopes = fieldScopes(action);
+    if (scopes.length > 0) return fromScopes(scopes);
+    return expandedCapabilities(parsed, pdfBits, protection).has(broad) ? { all: true } : NONE;
+  };
+
+  const own = callerDefaultGroupId !== undefined ? [callerDefaultGroupId] : [];
+  return {
+    fill: writing('fill'),
+    sign: writing('sign'),
+    setGroup: wildcard ? { all: true } : fromScopes(fieldScopes('set-group'), own),
+  };
+}
+
+/**
  * Whether the scope lets the caller `action` some form field: the broad
  * capability, or any `fields:<action>` scope. What a form verb checks
  * before its fields are known; each field is checked in the write.

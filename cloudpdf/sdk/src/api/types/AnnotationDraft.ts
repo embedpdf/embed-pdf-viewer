@@ -1981,11 +1981,13 @@ export namespace AnnotationDraft {
         interiorColor?: (string | null) | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationDraftWidget.BorderStyle | undefined;
+        dashArray?: (number[] | null) | undefined;
         fontFamily?: (AnnotationDraftWidget.FontFamily | null) | undefined;
         fontSize?: (number | null) | undefined;
         fontColor?: (string | null) | undefined;
         textAlign?: AnnotationDraftWidget.TextAlign | undefined;
         caption?: (string | null) | undefined;
+        checkStyle?: (AnnotationDraftWidget.CheckStyle | null) | undefined;
         field?: unknown | undefined;
         fieldFamily?: unknown | undefined;
     }
@@ -2043,6 +2045,7 @@ export namespace AnnotationDraft {
             Dashed: "dashed",
             Beveled: "beveled",
             Inset: "inset",
+            Underline: "underline",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
         export const FontFamily = {
@@ -2068,6 +2071,15 @@ export namespace AnnotationDraft {
             Right: "right",
         } as const;
         export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+        export const CheckStyle = {
+            Check: "check",
+            Cross: "cross",
+            Star: "star",
+            Circle: "circle",
+            Square: "square",
+            Diamond: "diamond",
+        } as const;
+        export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
     }
 
     export interface Redact {

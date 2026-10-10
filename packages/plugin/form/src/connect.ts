@@ -97,7 +97,7 @@ export function connectForm(ctx: FormContext, form: FormHostCapability): void {
       if (result.status === 'failed') {
         return { status: 'failed', error: result.error?.message ?? 'reset failed' };
       }
-      if (result.effectsResult === null) {
+      if (result.status === 'unchanged') {
         return {
           status: 'inert',
           reason: result.diagnostics[0]?.message ?? 'reset-form resolved no fields',

@@ -5,7 +5,6 @@ import type { FormFieldDTO } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldValue } from '../forms/value';
-import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/submission';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { SignatureAppearanceInput } from '../signature/types';
@@ -103,14 +102,6 @@ export interface DocumentFormsService {
     fields?: FormFieldRef | FormFieldRef[],
     options?: WriteOptions,
   ): AbortablePromise<FormResetResult>;
-
-  /**
-   * Apply one script run's ordered effects as one worker/cloud job. The batch
-   * is not rollback-atomic. All references are preflighted before writes;
-   * after a post-preflight internal failure the remaining effects are marked
-   * skipped and any landed state is finalized as one artifact/event/version.
-   */
-  applyEffects(effects: FormEffect[], options?: WriteOptions): AbortablePromise<FormEffectsResult>;
 
   /**
    * Deliver a resolved form submission to the document's home. Present only

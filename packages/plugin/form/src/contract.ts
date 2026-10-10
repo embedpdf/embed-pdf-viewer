@@ -18,7 +18,6 @@ import type {
   AnnotationRef,
   FieldPosition,
   FormBundle,
-  FormEffectsResult,
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
@@ -190,7 +189,6 @@ export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
 export interface FormCommitResult {
   status: FormCommitStatus;
   scripted: boolean;
-  effectsResult: FormEffectsResult | null;
   uiEffects: FormUiEffect[];
   diagnostics: ScriptDiagnostic[];
   error?: ScriptExecutionError;

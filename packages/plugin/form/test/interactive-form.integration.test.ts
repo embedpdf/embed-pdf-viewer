@@ -141,7 +141,6 @@ describe('interactive form JavaScript acceptance', () => {
 
       expect(printResult).toMatchObject({
         status: 'unchanged',
-        effectsResult: null,
         uiEffects: [{ kind: 'print', phase: 'user' }],
       });
 

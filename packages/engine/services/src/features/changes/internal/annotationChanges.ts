@@ -1,5 +1,12 @@
 import {
+  type Annotation,
+  type AnnotationAuthority,
+  type AnnotationFamily,
+  type AnnotationImportOp,
   annotationKey,
+  type AnnotationPatch,
+  type AnnotationRef,
+  type AnnotationUpdateResult,
   annotationWriteCapabilities,
   annotationWriteCapability,
   authorizeAnnotationCreate,
@@ -7,29 +14,23 @@ import {
   authorizeAnnotationUpdate,
   authorizeCapability,
   authorizeUnprotected,
-  deletedWith,
-  EngineError,
-  EngineErrorCode,
-  formWidget,
-  isSkippedItem,
-  type Annotation,
-  type AnnotationAuthority,
-  type AnnotationFamily,
-  type AnnotationImportOp,
-  type AnnotationPatch,
-  type AnnotationRef,
-  type AnnotationUpdateResult,
   type ChangeAuthority,
   type ChangeItem,
   type ChangeOp,
+  deletedWith,
+  EngineError,
+  EngineErrorCode,
+  fitWidgetToFamily,
+  formWidget,
   type FormWidget,
-  type WidgetPatch,
+  isSkippedItem,
   type PageObjectNumber,
   type PageRef,
-  type PdfCoordinates,
   type PdfAnnotationActions,
+  type PdfCoordinates,
   type PdfDestination,
   widgetActionsOf,
+  type WidgetPatch,
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 
@@ -53,7 +54,6 @@ import {
   type PlannedReorder,
 } from '../../annotations/internal/stackingOrder';
 import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
-import { fitCaptionToFamily } from '../../forms/internal/widgetCaption';
 import { RawAnnotationReader } from '../../annotations/RawAnnotationReader';
 import { formMutationMeta } from '../../forms/internal/formMutationMeta';
 import type {
@@ -530,7 +530,7 @@ export function writeUpdate(
   const before = readAnnotation(ctx, ref);
   const written =
     before.subtype === 'widget'
-      ? fitCaptionToFamily(before.fieldFamily, patch as WidgetPatch<PdfCoordinates>)
+      ? fitWidgetToFamily(before.fieldFamily, patch as WidgetPatch<PdfCoordinates>)
       : patch;
   const linked = linkedTo(before, written).map((other) => ({
     objectNumber: objectNumberOf(ctx, other),
@@ -572,13 +572,18 @@ function updatedItem(
   }
   const widget = result.annotation;
   if (widget.subtype !== 'widget') throw new Error('a widget update read back no widget');
+  const changed = formWidget(objectNumberOf(ctx, ref), ref.page);
   return {
     type: 'forms.updateWidget',
     widget,
     appearance: result.appearance,
-    meta: formMutationMeta(ctx.session.writeStamp(), widget.field ? [widget.field] : [], [
-      formWidget(objectNumberOf(ctx, ref), ref.page),
-    ]),
+    // A move keeps the widget's look: its picture is the one it had.
+    meta: formMutationMeta(
+      ctx.session.writeStamp(),
+      widget.field ? [widget.field] : [],
+      [changed],
+      result.appearance.changed ? [changed] : [],
+    ),
   };
 }
 

@@ -78,23 +78,7 @@ describe('plugin-actions integration (real engine)', () => {
           effect.kind === 'setDisplay' ? { display: effect.display } : { kind: effect.kind },
         ),
       });
-      return {
-        results: effects.map((_, index) => ({
-          index,
-          status: 'applied' as const,
-          fields: [],
-          changedWidgets: [],
-        })),
-        widgets: [],
-        meta: {
-          affectedPages: [],
-          cacheDelta: null,
-          opId: 'test',
-          undoable: false,
-          changedFields: [],
-          changedWidgets: [],
-        },
-      };
+      return { status: 'applied' };
     });
     actions.registerAnnotCommitSink(async (entries) => {
       calls.push({

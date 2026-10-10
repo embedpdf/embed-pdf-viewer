@@ -120,7 +120,6 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly type: 'forms.setDisplay';
       readonly field: FormFieldRef;
       readonly display: FormFieldDisplay;
-      readonly expect?: FormFieldDisplay;
     }
   | {
       readonly type: 'forms.setAppearanceText';

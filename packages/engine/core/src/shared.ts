@@ -229,6 +229,8 @@ export type {
   AnnotationReplyType,
   AnnotationBorderStyle,
   DrawnBorderStyle,
+  WidgetBorderStyle,
+  WidgetCheckStyle,
   StandardFont,
   FreeTextFont,
   TextAlignment,
@@ -622,18 +624,30 @@ export type {
 } from './forms/patch';
 export type { FormFieldValue } from './forms/value';
 export { fieldValueOf } from './forms/value';
+export {
+  fieldValueWriteOf,
+  isAtDefault,
+  isNoOpWrite,
+  valueEntriesEqual,
+  type FieldValueWrite,
+} from './forms/write';
+export {
+  fieldAfterReset,
+  fieldAfterValue,
+  formFieldAfter,
+  formFieldOfDraft,
+  widgetsAfterDisplay,
+  type FieldDraftContext,
+  type FieldWithWidgets,
+} from './forms/predict';
+export { fitWidgetToFamily, widgetAfterPatch } from './forms/widgets';
 export type {
   FormSubmissionEntry,
   FormSubmissionRequest,
   FormSubmissionReceipt,
 } from './forms/submission';
-export type {
-  FormFieldDisplay,
-  FormEffect,
-  FormEffectStatus,
-  FormEffectResult,
-  FormEffectsResult,
-} from './forms/effects';
+export type { FormFieldDisplay, FormEffect } from './forms/effects';
+export { formEffectOps } from './forms/effects';
 export type {
   BaseVersionInfo,
   DigestAlgorithm,
@@ -891,6 +905,9 @@ export {
   checkCapability,
   checkCollab,
   checkFieldAction,
+  fieldRightsOf,
+  type FieldGroupRight,
+  type FieldRights,
   checkSetGroup,
   expandedCapabilities,
   expandRawScope,

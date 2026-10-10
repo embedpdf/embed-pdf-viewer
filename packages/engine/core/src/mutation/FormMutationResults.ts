@@ -18,6 +18,13 @@ export interface FormMutationMeta extends MutationMeta {
   /** The fields written, by object number. */
   changedFields: FormFieldRef[];
   changedWidgets: FormWidget[];
+  /**
+   * The widgets of `changedWidgets` whose look was drawn again (a text or
+   * choice value, a new look): their pictures changed. A checkbox or radio
+   * button whose value only switched its state isn't one, nor is a widget
+   * shown or hidden: their pictures are the ones they had.
+   */
+  redrawnWidgets: FormWidget[];
 }
 
 /**
@@ -77,6 +84,7 @@ export function formResetFacts<C extends Coordinates>(
         undoable: result.meta.undoable,
         changedFields: [field.ref],
         changedWidgets,
+        redrawnWidgets: result.meta.redrawnWidgets.filter((widget) => own.has(widget.objectNumber)),
       },
     };
   });

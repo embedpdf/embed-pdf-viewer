@@ -59,7 +59,6 @@ export function createValueWrites(
     return {
       status: result.meta.changedWidgets.length > 0 ? 'applied' : 'unchanged',
       scripted: false,
-      effectsResult: null,
       uiEffects: [],
       diagnostics: [],
     };

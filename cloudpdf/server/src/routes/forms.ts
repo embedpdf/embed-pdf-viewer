@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  allowsFieldWrite,
   DEFAULT_BUNDLE_LIMITS,
   EngineError,
   EngineErrorCode,
@@ -8,12 +7,10 @@ import {
   decodeFieldRefKey,
   toPageRef,
   draftWritesScripts,
-  PermissionDenied,
   wirePack,
   writesScripts,
   type BundleLimits,
   type FieldPosition,
-  type FormEffect,
   type FormFieldDraft,
   type FormFieldPatch,
   type FormFieldRef,
@@ -28,7 +25,6 @@ import {
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
 import {
-  FormEffectSchema,
   FormExportRequestSchema,
   FormFieldDraftSchema,
   FormFieldPatchSchema,
@@ -742,33 +738,6 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       );
     },
   );
-
-  app.post('/v1/docs/:docId/layers/:layerName/form/effects', async (req, reply) => {
-    const { docId, layerName } = layerParams(req);
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.forms.fill',
-      pdfBits,
-      protection,
-    );
-    // The effects aren't checked field by field: they take a filler no `fields:fill` scope narrows.
-    if (!allowsFieldWrite(changeAuthorityOf(ctx, pdfBits, protection), null, 'fill')) {
-      throw new PermissionDenied('doc.forms.fill', 'target');
-    }
-    const body = (req.body ?? {}) as { effects?: unknown };
-    const effects = parseOrInvalidArg<FormEffect[]>(
-      FormEffectSchema.array() as unknown as SchemaLike<FormEffect[]>,
-      body.effects,
-      'body.effects',
-    );
-    setNoStore(reply);
-    return layerService.applyFormEffects(ctx, { docId, layerName, effects }, abortSignalOf(reply));
-  });
 
   app.post(
     '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/widgets',

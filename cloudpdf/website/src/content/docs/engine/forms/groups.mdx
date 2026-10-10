@@ -137,5 +137,17 @@ doc.security.allowsField('sign', field); // …sign this signature field?
 doc.security.allowsField('set-group', { groupId: 'buyer' }); // …put fields in the buyer's group?
 ```
 
+To show whose fields are the user's before they pick one, ask for every field at once:
+
+```ts
+const rights = doc.security.fieldRights();
+rights.fill; // { all: true }, or { all: false, groups: ['buyer'] }
+rights.sign; // the same, for signature fields
+rights.setGroup; // the groups the user may put a field in
+```
+
+`{ all: true }` is every field. Otherwise only the fields in `groups` are the user's; a field in
+no group isn't, and an empty list is no field at all.
+
 The engine checks every write the same way, so these answers never disagree with a call. See
 [Permissions](/docs/engine/concepts/permissions#form-fields).

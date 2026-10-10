@@ -135,7 +135,6 @@ describe('foldRecords', () => {
     for (const formEvent of [
       { type: 'forms.repaired', widgetsLinked: 1, appearancesBaked: 2 },
       { type: 'forms.created', field: { widgets } },
-      { type: 'forms.effectsApplied', meta: { changedWidgets: widgets } },
       { type: 'forms.valueSet', meta: { changedWidgets: widgets } },
       { type: 'signatures.completed', signature: { widget: widgets[0] } },
     ]) {

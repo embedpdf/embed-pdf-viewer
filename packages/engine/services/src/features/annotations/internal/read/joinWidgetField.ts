@@ -7,6 +7,7 @@ import type { DocumentSession } from '../../../../document-session/DocumentSessi
 // mutations. No module cycle: the cache imports nothing from annotations.
 import { acquireFormModel } from '../../../forms/internal/formModelCache';
 import { FAMILY_BY_CODE } from '../../../forms/internal/readFormSnapshot';
+import { checkStyleOfCaption } from '../../../forms/internal/widgetCaption';
 
 /**
  * Resolve the owning field's object number for a widget annotation, or 0
@@ -28,8 +29,8 @@ export function resolveWidgetFieldObjectNumber(
 
 /**
  * Stamp the field ref and family onto every widget DTO in a freshly read
- * list. Only a push button's `/MK /CA` is a caption; another widget's (a
- * checkbox's symbol) reads as none.
+ * list. `/MK /CA` is a push button's caption, and a checkbox's or radio
+ * button's symbol (`checkStyle`); another widget's reads as neither.
  */
 export function joinWidgetFieldNumbers(
   runtime: PdfRuntimeModule,
@@ -59,6 +60,9 @@ export function joinWidgetFieldNumbers(
     annotation.field = { kind: 'objectNumber', objectNumber: fieldObjectNumber };
     annotation.fieldFamily =
       FAMILY_BY_CODE[runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
+    if (annotation.fieldFamily === 'checkbox' || annotation.fieldFamily === 'radio') {
+      annotation.checkStyle = checkStyleOfCaption(annotation.caption ?? null);
+    }
     if (annotation.fieldFamily !== 'pushbutton') annotation.caption = null;
   }
 }

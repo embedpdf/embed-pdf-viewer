@@ -79,7 +79,6 @@ export namespace ChangeOp {
         type: "forms.setDisplay";
         field: CloudPDF.FormFieldRef;
         display: ChangeOpFormsSetDisplay.Display;
-        expect?: ChangeOpFormsSetDisplay.Expect | undefined;
     }
 
     export namespace ChangeOpFormsSetDisplay {
@@ -90,13 +89,6 @@ export namespace ChangeOp {
             NoView: "noView",
         } as const;
         export type Display = (typeof Display)[keyof typeof Display];
-        export const Expect = {
-            Visible: "visible",
-            Hidden: "hidden",
-            NoPrint: "noPrint",
-            NoView: "noView",
-        } as const;
-        export type Expect = (typeof Expect)[keyof typeof Expect];
     }
 
     export interface FormsSetAppearanceText {

@@ -1,25 +1,33 @@
 import {
   AbortablePromise,
+  type AnnotationOwner,
+  collabTargetOf,
+  type DocCapability,
+  type DocumentSecurityProbeInfo,
+  type DocumentSecurityService,
+  type DocumentSecurityState,
+  type DocumentUnlockInput,
+  type DocumentUnlockResult,
   EngineError,
   EngineErrorCode,
-  collabTargetOf,
+  type FieldRights,
+  type Identity,
+  type PasswordPrompt,
   passwordPromptFromState,
   securityStateFromProbe,
   wirePack,
-  type Identity,
-  type DocumentSecurityService,
-  type DocumentSecurityState,
-  type DocumentSecurityProbeInfo,
-  type DocumentUnlockInput,
-  type DocumentUnlockResult,
-  type PasswordPrompt,
-  type AnnotationOwner,
-  type DocCapability,
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
 import type { JobQueue } from '../worker/WorkerQueue';
+
+/** What a handle without a scope context may do with form fields: nothing. */
+const NO_FIELD_RIGHTS: FieldRights = {
+  fill: { all: false, groups: [] },
+  sign: { all: false, groups: [] },
+  setGroup: { all: false, groups: [] },
+};
 
 export class LocalDocumentSecurityService implements DocumentSecurityService {
   private securityState: DocumentSecurityState;
@@ -105,6 +113,11 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
     if (!guard) return false;
     if (action === 'set-group') return guard.canSetFieldGroup(target.groupId ?? '');
     return guard.canFieldWrite(target.groupId, action);
+  }
+
+  /** The guard's field rights; none without a scope context. */
+  fieldRights(): FieldRights {
+    return this.guard?.fieldRights() ?? NO_FIELD_RIGHTS;
   }
 
   /** Identity claims supplied at `engine.open()`, or null when none. */

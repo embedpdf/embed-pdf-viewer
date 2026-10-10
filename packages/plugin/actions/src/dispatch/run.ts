@@ -143,11 +143,8 @@ export function createRunner(
         const result = await ports.formCommitSink(
           fieldRefs.map((ref) => ({ kind: 'setDisplay', ref, display })),
         );
-        const firstFailure = result.results.find(
-          (entry) => entry.status === 'failed' || entry.status === 'rejected',
-        );
-        if (firstFailure) {
-          failedDetail = firstFailure.error?.message ?? firstFailure.status;
+        if (result.status === 'failed') {
+          failedDetail = result.error ?? 'failed';
           diagnoseHide({ code: 'executor-failed', message: `hide: ${failedDetail}` });
         }
       }

@@ -366,6 +366,7 @@ export function formImportFacts<C extends Coordinates>(
         undoable: result.meta.undoable,
         changedFields: [field.ref],
         changedWidgets,
+        redrawnWidgets: result.meta.redrawnWidgets.filter((widget) => own.has(widget.objectNumber)),
       },
     };
   });

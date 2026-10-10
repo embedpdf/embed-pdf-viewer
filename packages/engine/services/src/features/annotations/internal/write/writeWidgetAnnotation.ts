@@ -24,14 +24,19 @@ import {
 } from '@embedpdf/engine-runtime';
 
 import { withUtf16String } from '../../../../runtime/memory/strings';
+import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions';
+import { checkStyleCharacter } from '../../../forms/internal/widgetCaption';
 import { readAnnotRect } from '../read/annotationReadPrimitives';
 import { readWidgetTurn } from '../read/readWidgetAnnotation';
-import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions';
-import { borderStyleToCode } from '../shapeBorderStyle';
+import { widgetBorderStyleToCode } from '../shapeBorderStyle';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { standardFontToCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
-import { setAnnotRect } from './annotationWritePrimitives';
+import {
+  clearBorderDashPattern,
+  setAnnotRect,
+  setBorderDashPattern,
+} from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
@@ -70,9 +75,15 @@ export function applyWidgetStyle(
   if (style.strokeWidth !== undefined || style.borderStyle !== undefined) {
     fn.EPDFAnnot_SetBorderStyle(
       annotPtr,
-      borderStyleToCode(style.borderStyle ?? 'solid'),
+      widgetBorderStyleToCode(style.borderStyle ?? 'solid'),
       style.strokeWidth ?? 1,
     );
+  }
+
+  if (style.dashArray === null) {
+    clearBorderDashPattern(fn, annotPtr);
+  } else if (style.dashArray !== undefined) {
+    setBorderDashPattern(fn, mem, annotPtr, style.dashArray);
   }
 
   if (
@@ -95,13 +106,17 @@ export function applyWidgetStyle(
     fn.EPDFAnnot_SetTextAlignment(annotPtr, textAlignmentToCode(style.textAlign));
   }
 
-  // Only a push button's widget gets here with a caption (`fitCaptionToFamily`).
-  if (style.caption === null) {
+  // `/MK /CA`: only a push button's widget gets here with a caption, and only
+  // a checkbox's or radio button's with a check style (`fitCaptionToFamily`).
+  // A `null` symbol removes it: the family's own (a check, a circle) shows.
+  const mkText =
+    style.checkStyle !== undefined
+      ? style.checkStyle && checkStyleCharacter(style.checkStyle)
+      : style.caption;
+  if (mkText === null) {
     fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, NULL_PTR);
-  } else if (style.caption !== undefined) {
-    withUtf16String(mem, style.caption, (text) =>
-      fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, text),
-    );
+  } else if (mkText !== undefined) {
+    withUtf16String(mem, mkText, (text) => fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, text));
   }
 }
 
