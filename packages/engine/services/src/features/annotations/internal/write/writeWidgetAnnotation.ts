@@ -10,6 +10,8 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
+  faceForFreeTextFont,
+  familyKey,
   normalizePdfRect,
   pdfQuarterTurnBox,
   pdfRectTurnedBounds,
@@ -26,18 +28,24 @@ import {
 import { withUtf16String } from '../../../../runtime/memory/strings';
 import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions';
 import { checkStyleCharacter } from '../../../forms/internal/widgetCaption';
-import { readAnnotRect } from '../read/annotationReadPrimitives';
+import {
+  readAnnotRect,
+  readDefaultAppearance,
+  readDefaultAppearanceFace,
+} from '../read/annotationReadPrimitives';
 import { readWidgetTurn } from '../read/readWidgetAnnotation';
 import { widgetBorderStyleToCode } from '../shapeBorderStyle';
 import type { AnnotationWriteContext } from './annotationWriteContext';
-import { standardFontToCode } from '../standardFont';
+import { KEEP_FONT_CODE } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import {
   clearBorderDashPattern,
   setAnnotRect,
   setBorderDashPattern,
+  setDefaultAppearance,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
+import { applyDefaultAppearance } from './writeDefaultAppearance';
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
 const MK_BACKGROUND_COLOR = 1; // EPDF_MK_COLOR_BG
@@ -58,6 +66,7 @@ export function applyWidgetStyle(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   style: WidgetStyleDraftFields,
+  ctx?: AnnotationWriteContext,
 ): void {
   if (style.color === null) {
     fn.EPDFAnnot_ClearMKColor(annotPtr, MK_BORDER_COLOR);
@@ -91,15 +100,7 @@ export function applyWidgetStyle(
     style.fontSize !== undefined ||
     style.fontColor !== undefined
   ) {
-    const { r, g, b } = rgbOf(style.fontColor ?? '#000000');
-    fn.EPDFAnnot_SetDefaultAppearance(
-      annotPtr,
-      standardFontToCode(style.fontFamily ?? 'helvetica'),
-      style.fontSize ?? 12,
-      r,
-      g,
-      b,
-    );
+    applyWidgetFont(fn, mem, annotPtr, style, ctx);
   }
 
   if (style.textAlign !== undefined) {
@@ -118,6 +119,53 @@ export function applyWidgetStyle(
   } else if (mkText !== undefined) {
     withUtf16String(mem, mkText, (text) => fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, text));
   }
+}
+
+/**
+ * Write `/DA` with what `style` changes. What it leaves out keeps what `/DA`
+ * says now, so a colour change keeps the font and its size. A font is a
+ * standard font's name or a registered font's key; naming the face `/DA`
+ * already has keeps that font, whatever the document has it as.
+ */
+function applyWidgetFont(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  style: WidgetStyleDraftFields,
+  ctx: AnnotationWriteContext | undefined,
+): void {
+  const current = readDefaultAppearance(fn, mem, annotPtr);
+  const fontSize =
+    style.fontSize === undefined ? (current?.fontSize ?? 12) : (style.fontSize ?? 12);
+  const color =
+    style.fontColor === undefined ? (current?.color ?? '#000000') : (style.fontColor ?? '#000000');
+  const keeps =
+    current !== null &&
+    (style.fontFamily === undefined ||
+      (style.fontFamily !== null && namesCurrentFace(fn, mem, annotPtr, style.fontFamily, ctx)));
+  if (keeps) {
+    setDefaultAppearance(fn, annotPtr, KEEP_FONT_CODE, fontSize, color);
+    return;
+  }
+  applyDefaultAppearance(fn, annotPtr, style.fontFamily ?? 'helvetica', fontSize, color, ctx);
+}
+
+/** Whether `font` names the face `/DA` has now. */
+function namesCurrentFace(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  font: string,
+  ctx: AnnotationWriteContext | undefined,
+): boolean {
+  const current = readDefaultAppearanceFace(fn, mem, annotPtr);
+  if (!current) return false;
+  const named = faceForFreeTextFont(font, ctx?.describeRegisteredFont);
+  return (
+    familyKey(named.family) === familyKey(current.family) &&
+    (named.weight === undefined || named.weight === current.weight) &&
+    (named.italic === undefined || named.italic === current.italic)
+  );
 }
 
 /**
@@ -159,12 +207,13 @@ export function applyWidgetDraft(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   draft: PlacedDraft<WidgetDraft<PdfCoordinates>>,
+  ctx?: AnnotationWriteContext,
 ): void {
   // The base writer never writes actions; a widget's are its own (below).
   const { actions: _actions, ...base } = draft;
   applyAnnotationBaseDraft(fn, mem, annotPtr, base);
   writeWidgetBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null }, null);
-  applyWidgetStyle(fn, mem, annotPtr, draft);
+  applyWidgetStyle(fn, mem, annotPtr, draft, ctx);
 }
 
 /**
@@ -208,7 +257,7 @@ export function applyWidgetPatch(
   const { actions: _actions, ...base } = patch;
   applyAnnotationBasePatch(fn, mem, annotPtr, base);
   applyWidgetBoxPatch(fn, mem, annotPtr, patch);
-  applyWidgetStyle(fn, mem, annotPtr, patch);
+  applyWidgetStyle(fn, mem, annotPtr, patch, ctx);
   if (patch.actions !== undefined) {
     if (!ctx?.runtime || !ctx.docPtr) {
       throw new EngineError(

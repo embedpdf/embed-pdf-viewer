@@ -76,6 +76,7 @@ const LISTBOX: FormFieldDTO = {
     { label: 'Banana', value: 'Banana', selected: false },
     { label: 'Cherry', value: 'Cherry', selected: true },
   ],
+  topIndex: 0,
   widgets: [
     {
       ref: {

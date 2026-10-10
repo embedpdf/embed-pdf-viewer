@@ -5,18 +5,24 @@ import type {
   PdfCoordinates,
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import { colorOf, pdfQuarterTurnBox, quarterTurnOf } from '@embedpdf/engine-core/runtime';
+import {
+  colorOf,
+  freeTextFontForFace,
+  pdfQuarterTurnBox,
+  quarterTurnOf,
+} from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../../runtime/memory/strings';
 import { readI32 } from '../../../../runtime/memory/structs';
 import { widgetBorderStyleFromCode } from '../shapeBorderStyle';
-import { standardFontFromCode } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
+import type { AnnotationReadContext } from './annotationReadContext';
 import {
   readBorderStyle,
   readDefaultAppearance,
+  readDefaultAppearanceFace,
   readTextAlignment,
 } from './annotationReadPrimitives';
 import { readBorderFields } from './readStyle';
@@ -58,9 +64,15 @@ export function readWidget(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
+  _subtypeCode?: number,
+  ctx?: AnnotationReadContext,
 ): WidgetAnnotation<PdfCoordinates> {
   const border = readBorderFields(fn, mem, annotPtr);
   const da = readDefaultAppearance(fn, mem, annotPtr);
+  // The face the /DA names, named as free text names it: a registered font
+  // reads back as its key, a standard one as its name, any other as its family.
+  const face = readDefaultAppearanceFace(fn, mem, annotPtr);
+  const fonts = ctx?.fonts;
   const rotation = readWidgetTurn(fn, annotPtr);
   return {
     ...base,
@@ -82,7 +94,12 @@ export function readWidget(
     // A widget draws `underline` too, which no other annotation does.
     borderStyle: widgetBorderStyleFromCode(readBorderStyle(fn, mem, annotPtr).styleCode),
     dashArray: border.dashArray,
-    fontFamily: da ? standardFontFromCode(da.fontCode) : null,
+    fontFamily: face
+      ? freeTextFontForFace(
+          face,
+          fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
+        )
+      : null,
     fontSize: da ? da.fontSize : null,
     fontColor: da ? da.color : null,
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),

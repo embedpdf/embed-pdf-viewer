@@ -22,6 +22,14 @@ export interface PageBoxes<C extends Coordinates = PageCoordinates> {
 }
 
 /**
+ * The order a page's annotations take keyboard focus in (`/Tabs`): row by
+ * row, column by column, in the structure tree's order, in the order the
+ * page lists them (`annotations`, PDF 2.0), or its form fields first in
+ * that order (`widgets`, PDF 2.0).
+ */
+export type PageTabOrder = 'rows' | 'columns' | 'structure' | 'annotations' | 'widgets';
+
+/**
  * Static attributes for one page. This is the per-page element returned by
  * `pages.list()`.
  *
@@ -49,6 +57,8 @@ export interface PageLayout<C extends Coordinates = PageCoordinates> {
   rotation: PdfRotation;
   /** `/UserUnit`; defaults to the PDF default of 1. */
   userUnit: number;
+  /** The order its annotations take keyboard focus in; `null` when the page doesn't say. */
+  tabOrder: PageTabOrder | null;
   boxes: PageBoxes<C>;
   /**
    * Where the page sits in the file: its visible box (`boxes.crop`) in PDF

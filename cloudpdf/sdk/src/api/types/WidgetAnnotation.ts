@@ -41,7 +41,7 @@ export interface WidgetAnnotation {
     strokeWidth: number;
     borderStyle: WidgetAnnotation.BorderStyle;
     dashArray: number[] | null;
-    fontFamily: WidgetAnnotation.FontFamily | null;
+    fontFamily: string | null;
     fontSize: number | null;
     fontColor: string | null;
     textAlign: WidgetAnnotation.TextAlign;
@@ -112,23 +112,6 @@ export namespace WidgetAnnotation {
         Underline: "underline",
     } as const;
     export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-    export const FontFamily = {
-        Courier: "courier",
-        CourierBold: "courier-bold",
-        CourierBoldOblique: "courier-bold-oblique",
-        CourierOblique: "courier-oblique",
-        Helvetica: "helvetica",
-        HelveticaBold: "helvetica-bold",
-        HelveticaBoldOblique: "helvetica-bold-oblique",
-        HelveticaOblique: "helvetica-oblique",
-        TimesRoman: "times-roman",
-        TimesBold: "times-bold",
-        TimesBoldItalic: "times-bold-italic",
-        TimesItalic: "times-italic",
-        Symbol: "symbol",
-        ZapfDingbats: "zapf-dingbats",
-    } as const;
-    export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
     export const TextAlign = {
         Left: "left",
         Center: "center",

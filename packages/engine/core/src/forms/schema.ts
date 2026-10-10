@@ -117,6 +117,7 @@ export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = z.discriminatedUnion(
     defaultValue: z.array(z.string()),
     multiSelect: z.boolean(),
     options: z.array(FormFieldOptionSchema),
+    topIndex: z.number().int().nonnegative(),
   }),
   z.object({
     ...FormFieldBaseShape,

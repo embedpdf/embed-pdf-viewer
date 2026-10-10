@@ -182,7 +182,7 @@ export function applyDraft(
     return;
   }
   if (isWidgetSubtype(draft.subtype)) {
-    applyWidgetDraft(fn, mem, annotPtr, draft as PlacedDraft<WidgetDraft<PdfCoordinates>>);
+    applyWidgetDraft(fn, mem, annotPtr, draft as PlacedDraft<WidgetDraft<PdfCoordinates>>, ctx);
     return;
   }
   if (isPopupSubtype(draft.subtype)) {

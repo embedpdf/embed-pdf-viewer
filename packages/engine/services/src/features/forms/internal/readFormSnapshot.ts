@@ -13,7 +13,7 @@ import type {
   PdfFieldActions,
   ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
-import { formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
+import { formWidget, toPageRef, topRowOf } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
@@ -231,6 +231,7 @@ export function readFieldAt(
         defaultValue: entryValues(defaultValueEntry),
         multiSelect: (rawFlags & FF_MULTI_SELECT) !== 0,
         options,
+        topIndex: topRowOf(fn.EPDFForm_GetFieldTopIndex(model, fieldIndex), options),
         widgets: readPlainWidgets(runtime, model, fieldIndex),
       };
     }

@@ -25,6 +25,7 @@ export namespace DocPagesSetName200Response {
                 size: Item.Size;
                 rotation: number;
                 userUnit: number;
+                tabOrder: Item.TabOrder | null;
                 boxes: Item.Boxes;
                 pdfCropBox: Item.PdfCropBox;
                 actions?: CloudPDF.PdfPageActions | undefined;
@@ -35,6 +36,15 @@ export namespace DocPagesSetName200Response {
                     width: number;
                     height: number;
                 }
+
+                export const TabOrder = {
+                    Rows: "rows",
+                    Columns: "columns",
+                    Structure: "structure",
+                    Annotations: "annotations",
+                    Widgets: "widgets",
+                } as const;
+                export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
 
                 export interface Boxes {
                     media: Boxes.Media;

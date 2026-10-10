@@ -15,12 +15,12 @@
     "./annotation": "./src/annotation.tsx",
     "./commands": "./src/commands.ts",
     "./form": "./src/form.tsx",
+    "./history": "./src/history.ts",
     "./i18n": "./src/i18n.ts",
     "./interaction": "./src/interaction.tsx",
     "./link": "./src/link.tsx",
     "./measurement": "./src/measurement.tsx",
     "./metadata": "./src/metadata.ts",
-    "./history": "./src/history.ts",
     "./page-edit": "./src/page-edit.ts",
     "./page-view": "./src/page-view.tsx",
     "./redaction": "./src/redaction.tsx",
@@ -65,6 +65,10 @@
         "import": "./dist/form.js",
         "require": "./dist/form.cjs"
       },
+      "./history": {
+        "import": "./dist/history.js",
+        "require": "./dist/history.cjs"
+      },
       "./i18n": {
         "import": "./dist/i18n.js",
         "require": "./dist/i18n.cjs"
@@ -84,10 +88,6 @@
       "./metadata": {
         "import": "./dist/metadata.js",
         "require": "./dist/metadata.cjs"
-      },
-      "./history": {
-        "import": "./dist/history.js",
-        "require": "./dist/history.cjs"
       },
       "./page-edit": {
         "import": "./dist/page-edit.js",

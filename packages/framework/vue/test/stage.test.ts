@@ -46,6 +46,7 @@ const pageAt = (index: number): PageLayout => {
     size: { width: 612, height: 792 },
     rotation: 0,
     userUnit: 1,
+    tabOrder: null,
     boxes: { media: box, crop: box, bleed: box, trim: box, art: box },
     pdfCropBox: { left: 0, bottom: 0, right: 612, top: 792 },
   };

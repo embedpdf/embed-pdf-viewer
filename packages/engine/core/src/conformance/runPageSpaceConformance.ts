@@ -124,6 +124,12 @@ export function runPageSpaceConformance(
           });
         });
 
+        test('the tab order', async () => {
+          await eachPage(async (page, layout) => {
+            expect(layout.tabOrder).toBe(page.expected.tabOrder ?? null);
+          });
+        });
+
         test("a render starts at the visible page box's top-left", async () => {
           await eachShownPage(async (page, layout) => {
             const visible = page.expected.visible;

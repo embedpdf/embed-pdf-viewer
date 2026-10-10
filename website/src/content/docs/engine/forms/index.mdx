@@ -62,15 +62,15 @@ if (field.family === 'checkbox') console.log(field.checked); // boolean
 if (field.family === 'listbox') console.log(field.selectedValues); // string[]
 ```
 
-| Family       | Its value                                                          | Also                                                                            |
-| :----------- | :----------------------------------------------------------------- | :------------------------------------------------------------------------------ |
-| `text`       | `value`, a string                                                  | `defaultValue`, `maxLength` (`null`: no limit), `multiline`, `password`, `comb` |
-| `checkbox`   | `checked`                                                          | `exportValue`: what the form data holds while it's checked                      |
-| `radio`      | `value`: the export value of the chosen button, or `'Off'`         | `noToggleToOff`, `radiosInUnison`                                               |
-| `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`                           |
-| `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`, `defaultValue` (option values)                        |
-| `pushbutton` | none: a button only runs an action                                 | Each widget's `caption`, on its row in `widgets`                                |
-| `signature`  | none here: see [Digital signatures](/docs/engine/forms/signatures) |                                                                                 |
+| Family       | Its value                                                          | Also                                                                                             |
+| :----------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
+| `text`       | `value`, a string                                                  | `defaultValue`, `maxLength` (`null`: no limit), `multiline`, `password`, `comb`                  |
+| `checkbox`   | `checked`                                                          | `exportValue`: what the form data holds while it's checked                                       |
+| `radio`      | `value`: the export value of the chosen button, or `'Off'`         | `noToggleToOff`, `radiosInUnison`                                                                |
+| `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`                                            |
+| `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`, `defaultValue` (option values), `topIndex` (the option in its top row) |
+| `pushbutton` | none: a button only runs an action                                 | Each widget's `caption`, on its row in `widgets`                                                 |
+| `signature`  | none here: see [Digital signatures](/docs/engine/forms/signatures) |                                                                                                  |
 
 Each option of a dropdown (`combobox`) or list is `{ label, value, selected }`. `label` is what the
 user sees; `value` is what the form stores, and what you pass when you fill the field in.
@@ -311,6 +311,10 @@ that export value.
 In the file, each checkbox and radio widget also has an `onState`: the name of its checked look
 (PDF's appearance state). It's usually the same as the export value, and widgets the engine
 creates always use their `exportValue` for it. You never need it to fill a field in.
+
+The field's value in the file (`valueEntry`) is the checked widget's `onState`, or `'Off'`, as the
+PDF standard says. Some tools write the widget's position instead (`'0'`, `'1'`); such a value
+still resets to that widget.
 
 ### XFA forms
 

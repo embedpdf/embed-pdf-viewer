@@ -26,7 +26,7 @@ export type { CustomMetadata } from './dto/CustomMetadata';
 export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
-export type { PageLayout, PageBoxes } from './dto/PageLayout';
+export type { PageLayout, PageBoxes, PageTabOrder } from './dto/PageLayout';
 export type {
   PdfActionType,
   PdfActionNode,
@@ -552,10 +552,13 @@ export {
 } from './annotation/defaults';
 export {
   faceForFreeTextFont,
+  familyKey,
+  freeTextFontForFace,
   isStandardFontName,
   STANDARD_FACES,
   type DescribeFont,
   type FaceRequest,
+  type KeyForFace,
 } from './annotation/fontFaces';
 
 // Page space: positions from the top-left of a page's visible box, y down.
@@ -625,17 +628,21 @@ export type {
 export type { FormFieldValue } from './forms/value';
 export { fieldValueOf } from './forms/value';
 export {
+  assertChoiceDefault,
   fieldValueWriteOf,
   isAtDefault,
   isNoOpWrite,
   valueEntriesEqual,
+  type ChoiceDefaultTarget,
   type FieldValueWrite,
 } from './forms/write';
 export {
   fieldAfterReset,
   fieldAfterValue,
   formFieldAfter,
+  defaultEntryOfDraft,
   formFieldOfDraft,
+  topRowOf,
   widgetsAfterDisplay,
   type FieldDraftContext,
   type FieldWithWidgets,

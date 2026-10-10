@@ -1,7 +1,7 @@
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
-import { withScratch } from '../../../runtime/memory/scratch';
+import { withI32Array } from '../../../runtime/memory/scratch';
 
 /**
  * The form's calculation order (`/AcroForm /CO`): the fields whose calculate
@@ -37,10 +37,9 @@ export function writeCalculationOrder(
   order: readonly number[],
 ): void {
   const { fn, mem } = runtime;
-  const written = withScratch(mem, Math.max(1, order.length * 4), (buf) => {
-    order.forEach((objectNumber, at) => mem.poke(buf, 'i32', objectNumber, at * 4));
-    return fn.EPDFForm_SetCalculationOrder(docPtr, buf, order.length);
-  });
+  const written = withI32Array(mem, order, (orderPtr, count) =>
+    fn.EPDFForm_SetCalculationOrder(docPtr, orderPtr, count),
+  );
   if (!written) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'the calculation order could not be written');
   }

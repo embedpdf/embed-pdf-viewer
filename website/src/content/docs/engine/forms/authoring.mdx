@@ -138,19 +138,19 @@ submits the form or opens a web address needs `doc.forms.script` too.
 Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
 fields you change later with `doc.forms.updateWidget()`:
 
-| Field           | What it is                                                                              |
-| :-------------- | :-------------------------------------------------------------------------------------- |
-| `color`         | Border color, `'#rrggbb'`                                                               |
-| `interiorColor` | Background color                                                                        |
-| `strokeWidth`   | Border width in points                                                                  |
-| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field) |
-| `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                      |
-| `fontFamily`    | One of the standard PDF fonts, such as `'helvetica'` or `'courier'`                     |
-| `fontSize`      | Text size in points                                                                     |
-| `fontColor`     | Text color                                                                              |
-| `textAlign`     | `'left'`, `'center'` or `'right'`                                                       |
-| `caption`       | A push button's caption; other widgets take none                                        |
-| `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                            |
+| Field           | What it is                                                                                       |
+| :-------------- | :----------------------------------------------------------------------------------------------- |
+| `color`         | Border color, `'#rrggbb'`                                                                        |
+| `interiorColor` | Background color                                                                                 |
+| `strokeWidth`   | Border width in points                                                                           |
+| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field)          |
+| `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                               |
+| `fontFamily`    | A standard PDF font, such as `'helvetica'` or `'courier'`, or the `key` of a font you registered |
+| `fontSize`      | Text size in points                                                                              |
+| `fontColor`     | Text color                                                                                       |
+| `textAlign`     | `'left'`, `'center'` or `'right'`                                                                |
+| `caption`       | A push button's caption; other widgets take none                                                 |
+| `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                                     |
 
 ```ts
 widgets: [
@@ -166,6 +166,10 @@ widgets: [
 
 A mark is `'check'`, `'cross'`, `'star'`, `'circle'`, `'square'` or `'diamond'`. With
 `checkStyle: null`, a checkbox draws a check and a radio button a circle.
+
+A font the document already has, and that you didn't register, reads as its family name, such as
+`'Roboto'`. Changing a widget's color or size keeps its font; to change the font, name a standard
+font or a registered one.
 
 To change the look later, update the widget with the same fields (see
 [Move and style widgets](#move-and-style-widgets)). An entry also takes what the widget does when

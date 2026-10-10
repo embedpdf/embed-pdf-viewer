@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import {
   ColorSchema,
-  StandardFontSchema,
   TextAlignmentSchema,
   WidgetBorderStyleSchema,
   WidgetCheckStyleSchema,
@@ -13,7 +12,7 @@ import {
 } from '../../../dto/PdfAction.schema';
 import { FormFieldRefSchema } from '../../../identity/FormFieldRef.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, widgetBoxFields } from '../shared-fields';
+import { annotationBaseFields, FontNameSchema, widgetBoxFields } from '../shared-fields';
 
 export const WidgetDeclaration = defineKind('widget', {
   ...annotationBaseFields,
@@ -24,7 +23,12 @@ export const WidgetDeclaration = defineKind('widget', {
   borderStyle: field.data(WidgetBorderStyleSchema).optional(),
   /** The border's dash pattern (`/BS /D`), for a dashed border; `null` for the default (3 on, 3 off). */
   dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
-  fontFamily: field.data(StandardFontSchema).nullable().optional(),
+  /**
+   * The font `/DA` names, as a free text names its font: a standard font's
+   * name, a registered font's key, or the family of a font the document has.
+   * `null` when `/DA` names none. A write takes a standard name or a key.
+   */
+  fontFamily: field.data(FontNameSchema).nullable().optional(),
   fontSize: field.data(z.number().nonnegative()).nullable().optional(),
   fontColor: field.data(ColorSchema).nullable().optional(),
   textAlign: field.data(TextAlignmentSchema).optional(),

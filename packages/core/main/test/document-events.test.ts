@@ -31,6 +31,7 @@ function page(pageObjectNumber: number, index: number, rotation: PdfRotation = 0
     size: { width: 600, height: 800 },
     rotation,
     userUnit: 1,
+    tabOrder: null,
     boxes: pageSpaceBoxesOf({
       media: { ...box },
       crop: { ...box },

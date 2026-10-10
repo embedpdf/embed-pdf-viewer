@@ -142,6 +142,7 @@ function layoutSnapshot() {
         size: { width: 612, height: 792 },
         rotation: 0 as const,
         userUnit: 1,
+        tabOrder: null,
         boxes: {
           media: { ...pageBox },
           crop: { ...pageBox },

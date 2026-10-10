@@ -139,6 +139,7 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
     size,
     rotation: page.rotation ?? 0,
     userUnit: page.userUnit ?? 1,
+    tabOrder: null,
     boxes: {
       media: { ...visible },
       crop: { ...visible },

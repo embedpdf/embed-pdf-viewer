@@ -276,18 +276,26 @@ export function runFormConformance(
       }
     });
 
-    test('a reset or display that changes nothing has nothing to undo', async () => {
+    test('a value, reset or display that changes nothing has nothing to undo', async () => {
       const doc = await open(opts.fixtures.toggleFields);
       try {
         const text = { kind: 'fqn', name: 'maxlen_text' } as const;
+        const fill = {
+          ops: formEffectOps([{ kind: 'setValue', ref: text, value: { value: 'abc' } }]),
+        };
         const hide = { ops: formEffectOps([{ kind: 'setDisplay', ref: text, display: 'hidden' }]) };
         const reset = { ops: formEffectOps([{ kind: 'reset', refs: [text] }]) };
-        await doc.forms.setValue(text, { value: 'abc' });
+        await doc.forms.setValue(text, { value: 'xyz' });
 
+        expect((await doc.apply(fill)).meta.undoable).toBe(true);
         expect((await doc.apply(hide)).meta.undoable).toBe(true);
         expect((await doc.apply(reset)).meta.undoable).toBe(true);
-        // Already hidden, already at its default: the same change again writes nothing.
+        // The value it holds, already hidden, already at its default: the
+        // same change again writes nothing.
+        await doc.forms.setValue(text, { value: 'abc' });
+        expect((await doc.apply(fill)).meta.undoable).toBe(false);
         expect((await doc.apply(hide)).meta.undoable).toBe(false);
+        await doc.apply(reset);
         expect((await doc.apply(reset)).meta.undoable).toBe(false);
       } finally {
         await doc.close();
@@ -722,6 +730,52 @@ export function runFormConformance(
         expect(after.length).toBe(before.length - 3);
         await expect(doc.forms.get({ kind: 'fqn', name: 'renamed_radio' })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,
+        });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("a widget's colour change keeps its font and size", async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      try {
+        const { field } = await doc.forms.create({
+          family: 'text',
+          name: 'styled',
+          widgets: [
+            {
+              page,
+              rect: { x: 20, y: 160, width: 160, height: 24 },
+              fontFamily: 'courier',
+              fontSize: 9,
+            },
+          ],
+        });
+        const widget = field.widgets[0]!.ref!;
+        const { widget: recoloured } = await doc.forms.updateWidget(widget, {
+          fontColor: '#cc0000',
+        });
+        expect(recoloured).toMatchObject({
+          fontFamily: 'courier',
+          fontSize: 9,
+          fontColor: '#cc0000',
+        });
+        // A new size keeps the font and the colour.
+        const { widget: resized } = await doc.forms.updateWidget(widget, { fontSize: 11 });
+        expect(resized).toMatchObject({
+          fontFamily: 'courier',
+          fontSize: 11,
+          fontColor: '#cc0000',
+        });
+        // A standard font that isn't the widget's changes it.
+        const { widget: refonted } = await doc.forms.updateWidget(widget, {
+          fontFamily: 'times-roman',
+        });
+        expect(refonted).toMatchObject({
+          fontFamily: 'times-roman',
+          fontSize: 11,
+          fontColor: '#cc0000',
         });
       } finally {
         await doc.close();

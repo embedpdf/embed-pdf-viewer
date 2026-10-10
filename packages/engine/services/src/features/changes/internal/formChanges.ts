@@ -868,8 +868,16 @@ function writeValue(ctx: ChangeContext, before: ReadField, value: FormFieldValue
     ctx.authority.identity,
   );
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
+  const item: ChangeItem<PdfCoordinates> = { type: 'forms.setValue', ...rows(ctx, result) };
+  // The value it already held: nothing was written to undo.
+  if (
+    result.meta.changedWidgets.length === 0 &&
+    valuesEqual(valueOf(before.field), valueOf(result.field))
+  ) {
+    return { item, reverse: [] };
+  }
   return {
-    item: { type: 'forms.setValue', ...rows(ctx, result) },
+    item,
     reverse: [
       {
         ...revertStep('forms.setValue', objects, [before.objectNumber]),

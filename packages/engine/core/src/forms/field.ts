@@ -195,6 +195,8 @@ export interface ListBoxFieldDTO<C extends Coordinates = PageCoordinates> extend
   /** Whether several options may be selected at once. */
   multiSelect: boolean;
   options: FormFieldOption[];
+  /** The option shown in the box's top row (`/TI`): its position in `options`. */
+  topIndex: number;
 }
 
 /** A push button: pure trigger, holds no value. Never written or exported. */

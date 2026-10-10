@@ -1295,6 +1295,7 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   size: PdfSizeSchema,
   rotation: PdfRotationSchema,
   userUnit: z.number().positive(),
+  tabOrder: z.enum(['rows', 'columns', 'structure', 'annotations', 'widgets']).nullable(),
   boxes: PageBoxesSchema,
   pdfCropBox: PdfRectSchema,
   actions: PdfPageActionsSchema.optional(),

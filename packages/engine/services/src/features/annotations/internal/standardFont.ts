@@ -32,6 +32,13 @@ const CODE_TO_FONT: Record<number, StandardFont> = Object.fromEntries(
   Object.entries(FONT_TO_CODE).map(([font, code]) => [code, font as StandardFont]),
 ) as Record<number, StandardFont>;
 
+/**
+ * `FPDF_FONT_UNKNOWN`: rewriting `/DA` with it keeps the font `/DA` names
+ * (the annotation's own, its field's or the form's) and changes only the
+ * size and colour.
+ */
+export const KEEP_FONT_CODE = -1;
+
 /** Default when a `/DA` font is missing or unrecognised. */
 export const DEFAULT_STANDARD_FONT: StandardFont = 'helvetica';
 

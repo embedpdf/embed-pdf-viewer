@@ -124,6 +124,7 @@ function createFakeRuntime(): PdfRuntimeModule & {
       EPDF_GetPageBoxByIndex: () => 0,
       EPDF_GetPageRotateByIndex: () => 0,
       EPDF_GetPageUserUnitByIndex: () => 0,
+      EPDF_GetPageTabOrderByIndex: () => 0,
       FPDF_GetPageLabel: () => 0,
       // No page-level actions in this ownership/routing fixture.
       EPDFDoc_GetPageActionModel: () => ptr(0),

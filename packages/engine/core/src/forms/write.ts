@@ -74,6 +74,40 @@ export function fieldValueWriteOf(
   throw invalidValue(`a ${field.family} field takes ${TAKES[field.family]}, not ${shapeOf(value)}`);
 }
 
+/** What a choice field's default is checked against: its options and how it takes values. */
+export interface ChoiceDefaultTarget {
+  family: 'combobox' | 'listbox';
+  options: readonly { value: string }[];
+  /** A dropdown that allows free text. */
+  edit?: boolean;
+  /** A list box that takes several values. */
+  multiSelect?: boolean;
+}
+
+/**
+ * Check a choice field's default (`/DV`) before it is written: option values
+ * (one free text for a dropdown that allows editing), none twice, and one
+ * value unless the list box takes several. `InvalidArg` otherwise.
+ */
+export function assertChoiceDefault(target: ChoiceDefaultTarget, values: readonly string[]): void {
+  const invalid = (message: string) =>
+    new EngineError(EngineErrorCode.InvalidArg, message, { details: { field: 'defaultValue' } });
+  if (new Set(values).size !== values.length) throw invalid('the default values must not repeat');
+  if (values.length > 1 && !(target.family === 'listbox' && target.multiSelect)) {
+    throw invalid(
+      `a ${target.family === 'listbox' ? 'list without multiSelect' : 'dropdown'} has one default`,
+    );
+  }
+  const freeText = target.family === 'combobox' && target.edit === true;
+  const optionValues = new Set(target.options.map((option) => option.value));
+  const unknown = values.find((value) => !optionValues.has(value));
+  if (unknown !== undefined && !freeText) {
+    throw invalid(
+      `'${unknown}' is not an option value of the ${target.family === 'listbox' ? 'list' : 'dropdown'}`,
+    );
+  }
+}
+
 /** Whether `write` would leave `field` as it is. */
 export function isNoOpWrite(field: FormFieldDTO<Coordinates>, write: FieldValueWrite): boolean {
   switch (write.kind) {

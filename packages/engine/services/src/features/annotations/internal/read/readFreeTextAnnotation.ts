@@ -1,15 +1,16 @@
-import type {
-  AnnotationBase,
-  CalloutLine,
-  Color,
-  FreeTextAnnotation,
-  PdfCoordinates,
+import {
+  freeTextFontForFace,
+  type AnnotationBase,
+  type CalloutLine,
+  type Color,
+  type FreeTextAnnotation,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentFromName } from '../freeTextIntent';
-import { freeTextFontForFace, readEngineRichText } from '../richTextWire';
+import { readEngineRichText } from '../richTextWire';
 import { standardFontFromCode, DEFAULT_STANDARD_FONT } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
 import { VERTICAL_ALIGNMENT_KEY, verticalAlignmentFromCode } from '../verticalAlignment';

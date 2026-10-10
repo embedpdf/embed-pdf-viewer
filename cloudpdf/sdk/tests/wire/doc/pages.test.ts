@@ -176,6 +176,7 @@ describe("PagesClient", () => {
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
                         userUnit: 1.1,
+                        tabOrder: null,
                         boxes: {
                             media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                             crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -412,6 +413,7 @@ describe("PagesClient", () => {
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
                         userUnit: 1.1,
+                        tabOrder: null,
                         boxes: {
                             media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                             crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -540,6 +542,7 @@ describe("PagesClient", () => {
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
                         userUnit: 1.1,
+                        tabOrder: null,
                         boxes: {
                             media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                             crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -668,6 +671,7 @@ describe("PagesClient", () => {
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
                         userUnit: 1.1,
+                        tabOrder: null,
                         boxes: {
                             media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                             crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -797,6 +801,7 @@ describe("PagesClient", () => {
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
                         userUnit: 1.1,
+                        tabOrder: null,
                         boxes: {
                             media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                             crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -953,6 +958,7 @@ describe("PagesClient", () => {
                         size: { width: 1.1, height: 1.1 },
                         rotation: 1.1,
                         userUnit: 1.1,
+                        tabOrder: null,
                         boxes: {
                             media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                             crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },

@@ -7,9 +7,8 @@
  *
  * What these can't know is left as it was, and a read after the write tells:
  * dates and who filled a field in, the fonts a document's own default
- * appearance names, a `/V` an ancestor field holds (a cleared value then
- * reads as an empty string, not as none), and whether a checkbox's or radio
- * group's value names its widget by position (a field with `/Opt`).
+ * appearance names, and a `/V` an ancestor field holds (a cleared value then
+ * reads as an empty string, not as none).
  */
 import type { FormFieldOptionInput, FormFieldDraft, WidgetPlacement } from './draft';
 import type { FormFieldDisplay } from './effects';
@@ -17,7 +16,7 @@ import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget 
 import type { FormFieldPatch } from './patch';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
-import { fieldValueWriteOf } from './write';
+import { assertChoiceDefault, fieldValueWriteOf } from './write';
 import type { Annotation } from '../annotation/kinds';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import { EngineError } from '../errors/EngineError';
@@ -96,7 +95,7 @@ export function fieldAfterReset<C extends Coordinates>(
       if (defaults.kind === 'array' || defaults.kind === 'unsupported') throw notReset(field);
       const state = defaults.kind === 'scalar' ? defaults.value : null;
       if (state === null || state === 'Off') return toggled(current, -1);
-      const target = field.widgets.findIndex((widget) => widget.onState === state);
+      const target = widgetNamedBy(field.widgets, state);
       if (target < 0) throw notReset(field);
       return toggled(current, target);
     }
@@ -144,6 +143,33 @@ const DISPLAY_FLAGS = {
 } as const satisfies Record<FormFieldDisplay, Partial<Record<string, boolean>>>;
 
 /* ── creating and changing fields ───────────────────────────────────────── */
+
+/**
+ * The default (`/DV`) a draft gives its field: a text field's or dropdown's
+ * one value, a list box's option values in option order; none without one.
+ */
+export function defaultEntryOfDraft<C extends Coordinates>(
+  draft: FormFieldDraft<C>,
+): FormValueEntry {
+  if (
+    (draft.family === 'combobox' || draft.family === 'listbox') &&
+    draft.defaultValue !== undefined
+  ) {
+    const values = Array.isArray(draft.defaultValue) ? draft.defaultValue : [draft.defaultValue];
+    assertChoiceDefault({ ...draft, options: draft.options ?? [] }, values);
+  }
+  switch (draft.family) {
+    case 'text':
+    case 'combobox':
+      return draft.defaultValue !== undefined ? scalar(draft.defaultValue) : none();
+    case 'listbox':
+      return choiceEntryOf(
+        inOptionOrder((draft.options ?? []).map(optionOf), draft.defaultValue ?? []),
+      );
+    default:
+      return none();
+  }
+}
 
 /** What a draft alone doesn't say about the field `forms.create` makes. */
 export interface FieldDraftContext {
@@ -210,7 +236,7 @@ export function formFieldOfDraft(
       field = {
         ...base,
         family: 'text',
-        defaultValueEntry: draft.defaultValue !== undefined ? scalar(draft.defaultValue) : none(),
+        defaultValueEntry: defaultEntryOfDraft(draft),
         value: '',
         defaultValue,
         maxLength: draft.maxLength ?? null,
@@ -252,7 +278,7 @@ export function formFieldOfDraft(
       field = {
         ...base,
         family: 'combobox',
-        defaultValueEntry: draft.defaultValue !== undefined ? scalar(draft.defaultValue) : none(),
+        defaultValueEntry: defaultEntryOfDraft(draft),
         value: '',
         defaultValue: draft.defaultValue ?? '',
         edit: draft.edit ?? false,
@@ -265,11 +291,12 @@ export function formFieldOfDraft(
       field = {
         ...base,
         family: 'listbox',
-        defaultValueEntry: choiceEntryOf(inOptionOrder(options, defaults)),
+        defaultValueEntry: defaultEntryOfDraft(draft),
         selectedValues: [],
         defaultValue: inOptionOrder(options, defaults),
         multiSelect: draft.multiSelect ?? false,
         options,
+        topIndex: 0,
         widgets,
       };
       break;
@@ -323,6 +350,7 @@ export function formFieldAfter<C extends Coordinates>(
           : Array.isArray(patch.defaultValue)
             ? patch.defaultValue
             : [patch.defaultValue];
+      assertChoiceDefault(field, values);
       field = withDefault(field, values) as typeof field;
     }
   }
@@ -366,9 +394,22 @@ function redrawn<C extends Coordinates>(
 }
 
 /**
+ * The widget a checkbox's or radio group's default names: the one whose
+ * on-state it is, or, when none is, the one at that position (a field with
+ * `/Opt` written by a tool that names its widgets by position). `-1`: none.
+ */
+function widgetNamedBy(widgets: readonly ToggleFieldWidget[], state: string): number {
+  const named = widgets.findIndex((widget) => widget.onState === state);
+  if (named >= 0 || !/^\d+$/.test(state)) return named;
+  return Number(state) < widgets.length ? Number(state) : -1;
+}
+
+/**
  * A checkbox or radio group with widget `target` checked (`-1`: none), and
  * the widgets that go with it: every widget with its export value and
- * on-state for a checkbox or radios in unison, otherwise that one.
+ * on-state for a checkbox or radios in unison, otherwise that one. Its value
+ * names the checked widget's on-state (`/V` names the appearance state that
+ * is on), or `Off`.
  */
 function toggled<C extends Coordinates>(
   current: FieldWithWidgets<C>,
@@ -386,7 +427,7 @@ function toggled<C extends Coordinates>(
         : at === target);
     return widget.checked === checked ? widget : { ...widget, checked };
   });
-  const valueEntry: FormValueEntry = scalar(on ? on.exportValue : 'Off');
+  const valueEntry: FormValueEntry = scalar(on ? on.onState : 'Off');
   const next =
     field.family === 'checkbox'
       ? {
@@ -471,7 +512,12 @@ function withOptions<C extends Coordinates>(
   const current =
     field.family === 'combobox' ? (field.value === '' ? [] : [field.value]) : field.selectedValues;
   const kept = keptValues(current, exports, keepsFreeText);
-  const reselected = choiceFieldWith({ ...field, options }, kept);
+  // A list box's top row stays among its options.
+  const listed =
+    field.family === 'listbox'
+      ? { ...field, options, topIndex: topRowOf(field.topIndex, options) }
+      : { ...field, options };
+  const reselected = choiceFieldWith(listed, kept);
   const defaults = valuesOfEntry(field.defaultValueEntry);
   if (field.defaultValueEntry.kind === 'none') return reselected;
   const keptDefaults = keptValues(defaults, exports, keepsFreeText);
@@ -480,6 +526,11 @@ function withOptions<C extends Coordinates>(
     keptDefaults,
     true,
   );
+}
+
+/** A list box's top row: an option's position, the last one past the end. */
+export function topRowOf(topIndex: number, options: readonly unknown[]): number {
+  return Math.max(0, Math.min(topIndex, options.length - 1));
 }
 
 /** The values still among `exports`; free text survives when nothing else does. */

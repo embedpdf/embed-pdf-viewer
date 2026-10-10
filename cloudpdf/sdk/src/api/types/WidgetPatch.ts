@@ -41,7 +41,7 @@ export interface WidgetPatch {
     strokeWidth?: number | undefined;
     borderStyle?: WidgetPatch.BorderStyle | undefined;
     dashArray?: (number[] | null) | undefined;
-    fontFamily?: (WidgetPatch.FontFamily | null) | undefined;
+    fontFamily?: (string | null) | undefined;
     fontSize?: (number | null) | undefined;
     fontColor?: (string | null) | undefined;
     textAlign?: WidgetPatch.TextAlign | undefined;
@@ -114,23 +114,6 @@ export namespace WidgetPatch {
         Underline: "underline",
     } as const;
     export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-    export const FontFamily = {
-        Courier: "courier",
-        CourierBold: "courier-bold",
-        CourierBoldOblique: "courier-bold-oblique",
-        CourierOblique: "courier-oblique",
-        Helvetica: "helvetica",
-        HelveticaBold: "helvetica-bold",
-        HelveticaBoldOblique: "helvetica-bold-oblique",
-        HelveticaOblique: "helvetica-oblique",
-        TimesRoman: "times-roman",
-        TimesBold: "times-bold",
-        TimesBoldItalic: "times-bold-italic",
-        TimesItalic: "times-italic",
-        Symbol: "symbol",
-        ZapfDingbats: "zapf-dingbats",
-    } as const;
-    export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
     export const TextAlign = {
         Left: "left",
         Center: "center",

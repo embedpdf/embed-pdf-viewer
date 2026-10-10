@@ -15475,22 +15475,10 @@
                 "nullable": true
               },
               "fontFamily": {
-                "type": "string",
-                "enum": [
-                  "courier",
-                  "courier-bold",
-                  "courier-bold-oblique",
-                  "courier-oblique",
-                  "helvetica",
-                  "helvetica-bold",
-                  "helvetica-bold-oblique",
-                  "helvetica-oblique",
-                  "times-roman",
-                  "times-bold",
-                  "times-bold-italic",
-                  "times-italic",
-                  "symbol",
-                  "zapf-dingbats"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/fontFamily"
+                  }
                 ],
                 "nullable": true
               },
@@ -19378,6 +19366,10 @@
                 "items": {
                   "$ref": "#/components/schemas/FormField/anyOf/3/properties/options/items"
                 }
+              },
+              "topIndex": {
+                "type": "integer",
+                "minimum": 0
               }
             },
             "required": [
@@ -19403,7 +19395,8 @@
               "selectedValues",
               "defaultValue",
               "multiSelect",
-              "options"
+              "options",
+              "topIndex"
             ],
             "additionalProperties": false
           },
@@ -20263,22 +20256,7 @@
           },
           "fontFamily": {
             "type": "string",
-            "enum": [
-              "courier",
-              "courier-bold",
-              "courier-bold-oblique",
-              "courier-oblique",
-              "helvetica",
-              "helvetica-bold",
-              "helvetica-bold-oblique",
-              "helvetica-oblique",
-              "times-roman",
-              "times-bold",
-              "times-bold-italic",
-              "times-italic",
-              "symbol",
-              "zapf-dingbats"
-            ],
+            "minLength": 1,
             "nullable": true
           },
           "fontSize": {
@@ -20539,22 +20517,7 @@
           },
           "fontFamily": {
             "type": "string",
-            "enum": [
-              "courier",
-              "courier-bold",
-              "courier-bold-oblique",
-              "courier-oblique",
-              "helvetica",
-              "helvetica-bold",
-              "helvetica-bold-oblique",
-              "helvetica-oblique",
-              "times-roman",
-              "times-bold",
-              "times-bold-italic",
-              "times-italic",
-              "symbol",
-              "zapf-dingbats"
-            ],
+            "minLength": 1,
             "nullable": true
           },
           "fontSize": {
@@ -20853,22 +20816,7 @@
           },
           "fontFamily": {
             "type": "string",
-            "enum": [
-              "courier",
-              "courier-bold",
-              "courier-bold-oblique",
-              "courier-oblique",
-              "helvetica",
-              "helvetica-bold",
-              "helvetica-bold-oblique",
-              "helvetica-oblique",
-              "times-roman",
-              "times-bold",
-              "times-bold-italic",
-              "times-italic",
-              "symbol",
-              "zapf-dingbats"
-            ],
+            "minLength": 1,
             "nullable": true
           },
           "fontSize": {
@@ -26689,6 +26637,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -26759,6 +26712,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -26910,6 +26864,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -26980,6 +26939,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -27131,6 +27091,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -27201,6 +27166,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -27352,6 +27318,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -27422,6 +27393,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -27573,6 +27545,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -27643,6 +27620,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -27843,6 +27821,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -27913,6 +27896,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -28070,6 +28054,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -28140,6 +28129,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],

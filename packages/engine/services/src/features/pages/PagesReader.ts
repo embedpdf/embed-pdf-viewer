@@ -3,6 +3,7 @@ import type {
   PageBoxes,
   PageLayout,
   PageListSnapshot,
+  PageTabOrder,
   PdfCoordinates,
   PdfDestination,
   PdfPageActions,
@@ -28,7 +29,7 @@ import type {
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
-import { readUtf16String } from '../../runtime/memory/strings';
+import { readUtf16String, readUtf8String } from '../../runtime/memory/strings';
 import {
   F32_BYTES,
   I32_BYTES,
@@ -84,6 +85,7 @@ export class PagesReader {
             size: pdfRectSize(boxes.crop),
             rotation: readRotation(fn, mem, docPtr, index, intPtr),
             userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
+            tabOrder: readTabOrder(fn, mem, docPtr, index),
             boxes,
             pdfCropBox: boxes.crop,
             ...(actions ? { actions } : {}),
@@ -211,6 +213,28 @@ function readUserUnit(
   if (!fn.EPDF_GetPageUserUnitByIndex(docPtr, index, userUnitPtr)) return 1;
   const value = readF32(mem, userUnitPtr, 0);
   return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+/** `/Tabs` names, as the file writes them. */
+const TAB_ORDER: Readonly<Record<string, PageTabOrder>> = {
+  R: 'rows',
+  C: 'columns',
+  S: 'structure',
+  A: 'annotations',
+  W: 'widgets',
+};
+
+/** The page's `/Tabs`; `null` when it sets none, or one PDF doesn't define. */
+function readTabOrder(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  docPtr: Ptr,
+  index: number,
+): PageTabOrder | null {
+  const name = readUtf8String(mem, (buf, capacity) =>
+    fn.EPDF_GetPageTabOrderByIndex(docPtr, index, buf, capacity),
+  );
+  return name ? (TAB_ORDER[name] ?? null) : null;
 }
 
 function readLabel(

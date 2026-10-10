@@ -210,6 +210,7 @@ export namespace FormField {
         defaultValue: string[];
         multiSelect: boolean;
         options: FormFieldListbox.Options.Item[];
+        topIndex: number;
     }
 
     export namespace FormFieldListbox {
