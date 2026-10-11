@@ -656,15 +656,13 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   // model — it never drives it (exit is hub-driven, see the edit handler), so a
   // transient focus-steal by the page surface can't end the edit.
   useEffect(() => {
-    if (item.editing) {
-      const el = ref.current;
-      if (!el) return;
-      el.focus();
-      // Enter at the TOP — the same anchoring the baked appearance uses
-      // (/Q vertical-align top), so baked → edit → baked never jumps. The
-      // browser still follows the caret once the user clicks or types.
-      el.scrollTop = 0;
-    }
+    const el = ref.current;
+    if (!el) return;
+    if (item.editing) el.focus();
+    // Enter AND leave at the TOP — the same anchoring the baked appearance uses
+    // (/Q vertical-align top), so baked → edit → baked never jumps. The
+    // browser follows the caret while editing; leaving resets that scroll.
+    el.scrollTop = 0;
   }, [item.editing]);
 
   // Isolate the editor from the interaction hub: a pointerdown inside it must NOT
