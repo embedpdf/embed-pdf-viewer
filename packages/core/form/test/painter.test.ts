@@ -90,6 +90,12 @@ describe('the painter', () => {
     expect(glyphs.kind === 'glyphs' && glyphs.fontFamily).toMatch(
       /^"epdf-[0-9a-f]{16}", Helvetica/,
     );
+    // The face it draws in comes with it, for whatever draws it to mount.
+    expect(glyphs.kind === 'glyphs' && glyphs.program).toMatchObject({
+      family: (glyphs.kind === 'glyphs' && glyphs.fontFamily.slice(1, 22)) || '',
+      weight: 400,
+      style: 'normal',
+    });
     expect(glyphs.clip).toEqual({ x: 11, y: 21, width: 98, height: 18 });
 
     const turned = widgetScene(widgetDrawing(widget({ rotation: 90 }), textField('Hi'))!, {

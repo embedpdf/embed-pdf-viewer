@@ -120,6 +120,15 @@ export function createView(
     return record;
   };
 
+  /** The lender's live drawing of a record it shows, when it draws one. */
+  const painterOf = (
+    shown: Annotation,
+    lender: AnnotationLender,
+  ): Pick<ModelAnnotation, 'painter'> => {
+    const painter = lender.painter(shown);
+    return painter ? { painter } : {};
+  };
+
   /** A lent record as the model has it, cached per shown row and the confirmed row it was made from. */
   const lent = new WeakMap<
     Annotation,
@@ -143,21 +152,25 @@ export function createView(
         source: confirmedOnce.has(annotationKey(shown.ref)) ? 'baked' : 'vector',
         pictureVersion: lender.pictureVersion(shown.ref),
         authority: lender.authority(shown),
+        ...painterOf(shown, lender),
       };
     } else {
-      // The lender's picture is its drawing: it moves with a move, and is
-      // drawn where its shape is for the rest.
+      // The lender's picture is drawn where its shape is; its painter draws it live while a
+      // gesture or a change reshapes or restyles it, as a square is drawn.
       const base: ModelAnnotation = {
         ...fromDTO(truth),
         source: sourceOfConfirmed(truth, false),
         pictureVersion: lender.pictureVersion(truth.ref),
         authority: lender.authority(truth),
+        ...painterOf(shown, lender),
       };
       const patch = { ...annotationPatchBetween(truth, shown), subtype: truth.subtype };
       record =
         shown === truth
           ? base
           : { ...base, annotation: shown, ...drawnAfter(base, patch as AnnotationPatch) };
+      // A new look the lender made itself (a setting, a value): drawn live until its picture is there.
+      if (lender.pending(shown.ref)) record = { ...record, source: 'vector' };
     }
     lent.set(shown, { truth, record });
     return record;

@@ -213,15 +213,9 @@ export { bodyPieces, paintedNear, paintedTouches, type PaintedPiece } from './pa
 export * from './measurement';
 export * from './measurement-shape';
 // How an annotation is drawn: the engine's raster, or live (see appearance.ts).
-export {
-  drawnAfter,
-  drawsLive,
-  sourceOfConfirmed,
-  sourceOfNew,
-  type DrawState,
-} from './appearance';
+export { drawnAfter, sourceOfConfirmed, sourceOfNew, type DrawState } from './appearance';
 export { annotationSelectionFrame, type SelectionFrame } from './selection';
-export { scene } from './scene';
+export { hasLiveDrawing, scene } from './scene';
 export { straightenInkStroke } from './ink';
 export type { BlendMode } from '@embedpdf/engine-core/runtime';
 export type {
@@ -256,6 +250,7 @@ export type {
   UpdateResult,
   RenderItem,
   RenderNode,
+  SceneFontProgram,
   SceneNode,
   SnapSettings,
   Stroke,

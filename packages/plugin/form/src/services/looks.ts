@@ -10,14 +10,13 @@
  * a field just placed. The layer then draws the painter's scene, as it does
  * while the picture it holds is older than the widget's look.
  */
-import { memoByKey } from '@embedpdf/core';
+import { memoByKey, type Mirror } from '@embedpdf/core';
 import type { SceneNode } from '@embedpdf/core-annotation';
 import {
-  drawingPrograms,
+  paints,
   textEditorLayout,
   widgetDrawing,
   widgetScene,
-  type FontProgram,
   type TextEditorLayout,
 } from '@embedpdf/core-form';
 import type { AnnotationRef, FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
@@ -27,27 +26,34 @@ import {
   pictureVersionOf,
   shownWidgetsOf,
   widgetRowOf,
+  type Box,
   type FieldIndex,
   type ShownWidget,
 } from '../model';
-import type { FormServices } from '../services';
+import type { FormDesign } from './design';
+import type { FormattedTexts } from './formatted';
 
 const NOTHING_SHOWN: readonly ShownWidget[] = Object.freeze([]);
 
-/** A widget as the painter draws it: its scene on the page, and the font programs its text needs. */
+/** A widget as the painter draws it: its scene on the page (its text carries the faces it needs). */
 export interface WidgetPainting {
   readonly scene: readonly SceneNode[];
-  readonly programs: readonly FontProgram[];
 }
 
 const numberOf = (ref: AnnotationRef): number =>
   ref.kind === 'objectNumber' ? ref.objectNumber : -1;
 
+export type WidgetLooks = ReturnType<typeof createWidgetLooks>;
+
 export function createWidgetLooks({
   fields,
   formatted,
   design,
-}: Pick<FormServices, 'fields' | 'formatted' | 'design'>) {
+}: {
+  readonly fields: Mirror<FieldIndex>;
+  readonly formatted: FormattedTexts;
+  readonly design: FormDesign;
+}) {
   /** What the widget's picture depends on, as one string. */
   const lookKeyOf = (row: WidgetAnnotation, field: FormFieldDTO | null): string => {
     const box = row.box ?? row.rect;
@@ -109,6 +115,20 @@ export function createWidgetLooks({
           }),
   );
 
+  /** The painter's drawing of `row` (in the view's field, as this session formatted it) at `box`, turned. */
+  const paint = (
+    row: WidgetAnnotation,
+    box: Box,
+    rotation: number | null | undefined,
+  ): readonly SceneNode[] | null => {
+    const view = fields.view();
+    const field = fieldForWidget(view, numberOf(row.ref));
+    if (!field) return null;
+    const text = formatted.textOf(field);
+    const drawing = widgetDrawing({ ...row, box }, field, text === null ? {} : { text });
+    return drawing && widgetScene(drawing, { box, rotation });
+  };
+
   /** The painter's drawing of a widget as the view has it; `null` for one it doesn't draw. */
   const sceneOf = memoByKey(
     (number: number) => {
@@ -117,20 +137,28 @@ export function createWidgetLooks({
       const field = row ? fieldForWidget(view, number) : null;
       return [row, field, field ? formatted.textOf(field) : null] as const;
     },
-    (_number, row, field, text): WidgetPainting | null => {
-      if (!row || !field) return null;
-      const drawing = widgetDrawing(row, field, text === null ? {} : { text });
-      if (!drawing) return null;
-      return {
-        scene: widgetScene(drawing, { box: row.box ?? row.rect, rotation: row.rotation }),
-        programs: drawingPrograms(drawing),
-      };
+    (_number, row): WidgetPainting | null => {
+      const scene = row && paint(row, row.box ?? row.rect, row.rotation);
+      return scene ? { scene } : null;
     },
   );
 
   return {
     listShownWidgets: (pageObjectNumber: number) => shownOn(pageObjectNumber),
     getWidgetPainting: (ref: AnnotationRef) => sceneOf(numberOf(ref)),
+    /** The widget's look in the view isn't its confirmed look yet: it draws live until its picture is. */
+    isPending: (ref: AnnotationRef): boolean => {
+      const number = numberOf(ref);
+      return lookOf(fields.view(), number) !== lookOf(fields.get(), number);
+    },
+    /**
+     * How the painter draws a widget row live, upright in a box (where a gesture has it); `null`
+     * for one whose field it doesn't draw (a signature).
+     */
+    painterOf: (row: WidgetAnnotation): ((box: Box) => readonly SceneNode[]) | null => {
+      const field = fieldForWidget(fields.view(), numberOf(row.ref));
+      return field && paints(field) ? (box) => paint(row, box, 0) ?? [] : null;
+    },
     getTextEditorLayout: (ref: AnnotationRef, text: string): TextEditorLayout | null => {
       const view = fields.view();
       const number = numberOf(ref);

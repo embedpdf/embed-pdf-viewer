@@ -15,6 +15,7 @@ import { createDesign, type FormDesign } from './design';
 import { createEvents, type FormEvents } from './events';
 import { createFillRights, type FillRights } from './fill-rights';
 import { createFormattedTexts, type FormattedTexts } from './formatted';
+import { createWidgetLooks, type WidgetLooks } from './looks';
 import { createWidgetPictures, type WidgetPictures } from './pictures';
 import { createScriptingSeam, type FormScripting } from './scripting';
 import { resolveSiblings, type FormSiblings } from './siblings';
@@ -34,6 +35,8 @@ export interface FormServices {
   readonly formatted: FormattedTexts;
   /** The engine's pictures of each page's widgets, at their picture versions. */
   readonly pictures: WidgetPictures;
+  /** What each widget looks like now: pending or confirmed, and the painter's drawing of it. */
+  readonly looks: WidgetLooks;
   /**
    * Fills take turns on one serial queue until they are sent (write/fill.ts),
    * and a repair until the engine answers.
@@ -47,15 +50,18 @@ export function createServices(ctx: FormContext): FormServices {
   const siblings = resolveSiblings(ctx);
   const events = createEvents(ctx);
   const fields = createFieldsMirror(ctx, events);
+  const design = createDesign(ctx, siblings);
+  const formatted = createFormattedTexts(ctx, fields);
   return {
     fields,
     rights: createFillRights(ctx, fields),
     events,
     siblings,
     scripting: createScriptingSeam(ctx, siblings),
-    design: createDesign(ctx, siblings),
-    formatted: createFormattedTexts(ctx, fields),
+    design,
+    formatted,
     pictures: createWidgetPictures(fields, siblings),
+    looks: createWidgetLooks({ fields, formatted, design }),
     enqueue: ctx.serialQueue('writes'),
     keyOf: (ref) => canonicalKey(fields.view(), ref),
   };

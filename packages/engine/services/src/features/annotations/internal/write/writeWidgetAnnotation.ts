@@ -30,11 +30,12 @@ import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions
 import { checkStyleCharacter } from '../../../forms/internal/widgetCaption';
 import {
   readAnnotRect,
+  readBorderStyle,
   readDefaultAppearance,
   readDefaultAppearanceFace,
 } from '../read/annotationReadPrimitives';
 import { readWidgetTurn } from '../read/readWidgetAnnotation';
-import { widgetBorderStyleToCode } from '../shapeBorderStyle';
+import { widgetBorderStyleFromCode, widgetBorderStyleToCode } from '../shapeBorderStyle';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { KEEP_FONT_CODE } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
@@ -81,11 +82,14 @@ export function applyWidgetStyle(
     fn.EPDFAnnot_SetMKColor(annotPtr, MK_BACKGROUND_COLOR, r, g, b);
   }
 
+  // Style and width share one call: the one a change leaves out keeps what the border has (a
+  // widget without `/BS` has a solid 1-point border).
   if (style.strokeWidth !== undefined || style.borderStyle !== undefined) {
+    const current = readBorderStyle(fn, mem, annotPtr);
     fn.EPDFAnnot_SetBorderStyle(
       annotPtr,
-      widgetBorderStyleToCode(style.borderStyle ?? 'solid'),
-      style.strokeWidth ?? 1,
+      widgetBorderStyleToCode(style.borderStyle ?? widgetBorderStyleFromCode(current.styleCode)),
+      style.strokeWidth ?? current.width,
     );
   }
 

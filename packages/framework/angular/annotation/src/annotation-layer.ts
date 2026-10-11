@@ -36,7 +36,7 @@ import {
   untracked,
 } from '@angular/core';
 import { annotationKey } from '@embedpdf/core';
-import { drawsLive, type RenderItem } from '@embedpdf/core-annotation';
+import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
 import {
   CapabilityBinding,
   injectKernelHost,
@@ -341,10 +341,7 @@ export class EpdfAnnotationLayer {
           picture: urls && shownAppearance(urls, item.id, state),
           version: item.pictureVersion ?? 0,
           loaded: urls !== null,
-          paint: () =>
-            item.source !== 'baked' || (item.annotation && drawsLive(item.annotation))
-              ? item
-              : null,
+          paint: () => (hasLiveDrawing(item) ? item : null),
         }),
         appearance: urls && bakedAppearanceOf(urls, item.id, state),
         look: null,

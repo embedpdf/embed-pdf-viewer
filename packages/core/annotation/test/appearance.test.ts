@@ -3,7 +3,7 @@
  * change, during a gesture, and when it is new. One rule for gestures,
  * sidebar edits and code edits.
  */
-import { toPageRef, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type Annotation, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { modelWith, recordOf, step, STYLE, withAnnotation } from './support';
@@ -17,7 +17,9 @@ import {
 } from '../src/appearance';
 import { DRAWN_FLAGS } from '../src/flags';
 import { shapeOf } from '../src/record';
-import type { Message, ModelAnnotation } from '../src/types';
+import { scene } from '../src/scene';
+import type { Message, ModelAnnotation, Rect } from '../src/types';
+import { pageItems } from '../src/view';
 
 const PAGE = toPageRef(1);
 const BOX = { x: 100, y: 100, width: 100, height: 60 };
@@ -154,6 +156,43 @@ describe('during a gesture', () => {
     expect(sourceDuring(resizing, 'obj:1')).toBe('vector');
     const [released] = step(step(selected, editPtr('down', 200, 160))[0], editPtr('up', 200, 160));
     expect(sourceDuring(released, 'obj:1')).toBe('baked');
+  });
+});
+
+describe('a lent form widget', () => {
+  /** A form widget the form plugin lends, standing where `baked` puts a square. */
+  const widget = (over: Partial<ModelAnnotation> = {}): ModelAnnotation => ({
+    ...withAnnotation(baked('square'), { subtype: 'widget' } as Partial<Annotation>),
+    ...over,
+  });
+  const selected = (record: ModelAnnotation) =>
+    step(step(modelWith([record]), editPtr('down', 150, 130))[0], editPtr('up', 150, 130))[0];
+  /** The south-east handle, dragged 30 points right and down. */
+  const resized = (model: ReturnType<typeof selected>) =>
+    step(step(model, editPtr('down', 200, 160))[0], editPtr('move', 230, 190))[0];
+
+  it('draws live while it is resized, by its lender, at the box the gesture has', () => {
+    const painted: Rect[] = [];
+    const painter = (box: Rect) => (painted.push(box), []);
+    const resizing = resized(selected(widget({ painter })));
+    expect(sourceDuring(resizing, 'obj:1')).toBe('vector');
+    const [item] = pageItems(resizing, PAGE);
+    expect(scene(item!)).toEqual([]);
+    expect(painted).toEqual([{ ...BOX, width: 130, height: 90 }]);
+  });
+
+  it('keeps its raster, carried along, while it moves', () => {
+    const model = modelWith([widget({ painter: () => [] })]);
+    const [moving] = step(step(model, editPtr('down', 150, 130))[0], editPtr('move', 170, 140));
+    expect(sourceDuring(moving, 'obj:1')).toBe('baked');
+  });
+
+  it('with no lender to draw it, stretches its raster to the box the gesture has', () => {
+    const resizing = resized(selected(widget()));
+    expect(sourceDuring(resizing, 'obj:1')).toBe('baked');
+    const [item] = pageItems(resizing, PAGE);
+    expect(item!.apBox).toEqual({ ...BOX, width: 130, height: 90 });
+    expect(item!.lentScene).toBeUndefined();
   });
 });
 

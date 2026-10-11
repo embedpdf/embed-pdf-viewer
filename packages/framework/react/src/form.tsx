@@ -50,7 +50,6 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
-  createFontMounts,
   createShownUrls,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
@@ -87,7 +86,8 @@ import {
 } from './runtime';
 import type { PageContextValue } from './runtime';
 import { settingsHook, stateHook } from './state';
-import { svgElements } from './svg-shapes';
+import { useFontMounts } from './font-mounts';
+import { SvgShapes } from './svg-shapes';
 
 // ── what every control shares ──────────────────────────────────────────────
 
@@ -541,8 +541,6 @@ function FieldPictures({ page }: { page: PageContextValue }) {
       paint: () => form.getWidgetPainting(widget.ref),
     }),
   );
-  // The painted text in the engine's own faces.
-  useFontMounts(looks.flatMap((look) => (look?.kind === 'painting' ? look.painting.programs : [])));
 
   return (
     <>
@@ -567,7 +565,7 @@ function FieldPictures({ page }: { page: PageContextValue }) {
                 pointerEvents: 'none',
               }}
             >
-              {svgElements(svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }))}
+              <SvgShapes shapes={svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT })} />
             </svg>
           );
         }
@@ -597,13 +595,6 @@ function FieldPictures({ page }: { page: PageContextValue }) {
 }
 
 const NO_PROGRAMS: readonly MountableFontProgram[] = Object.freeze([]);
-
-/** The engine's faces a part of the layer draws text in, mounted while it's there. */
-function useFontMounts(programs: readonly MountableFontProgram[]) {
-  const [mounts] = useState(() => createFontMounts());
-  useEffect(() => () => mounts.release(), [mounts]);
-  useEffect(() => mounts.mount(programs));
-}
 
 // ── hooks ──────────────────────────────────────────────────────────────────
 

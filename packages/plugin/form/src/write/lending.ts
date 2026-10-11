@@ -28,7 +28,12 @@ const objectNumberOf = (ref: AnnotationRef): number =>
 
 export function createWidgetLender(
   ctx: FormContext,
-  { fields, design, pictures }: Pick<FormServices, 'fields' | 'design' | 'pictures'>,
+  {
+    fields,
+    design,
+    pictures,
+    looks,
+  }: Pick<FormServices, 'fields' | 'design' | 'pictures' | 'looks'>,
 ): AnnotationLender {
   const records = memo(
     () => [design.lending(), fields.get().snapshot, fields.view().snapshot] as const,
@@ -102,5 +107,10 @@ export function createWidgetLender(
     pictureEpoch: pictures.epoch,
     pictureVersion: pictures.versionOf,
     renderAppearances: pictures.render,
+    // A widget draws live, by the painter, while a gesture reshapes it, while its look isn't
+    // confirmed (a restyle, a resize, a field just placed), and until its new picture is there.
+    pending: looks.isPending,
+    painter: (record) =>
+      record.subtype === 'widget' ? looks.painterOf(record as WidgetAnnotation) : null,
   };
 }

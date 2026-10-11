@@ -10,6 +10,7 @@
   // The draft calls are the host lens's.
   import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
   import {
+    createFontMounts,
     createTextFieldEditor,
     cssText,
     rectInPixels,
@@ -39,9 +40,25 @@
   // the edit ends.
   $effect(() => editor.setValue(item.value));
 
+  // The text being typed, where the engine will draw it, in its face.
+  const layout = $derived(
+    item.annotationRef ? form.getTextEditorLayout(item.annotationRef, editing.draft) : null,
+  );
+  const mounts = createFontMounts();
+  $effect(() => () => mounts.release());
+  $effect(() => {
+    if (layout) mounts.mount([layout.program]);
+  });
+
   const editorStyle = $derived(
     cssText(
-      textFieldEditorStyleOf(item, rectInPixels(item.box, page.transform), colors, editing.focused),
+      textFieldEditorStyleOf(
+        item,
+        rectInPixels(item.box, page.transform),
+        colors,
+        editing.focused,
+        layout,
+      ),
     ),
   );
 

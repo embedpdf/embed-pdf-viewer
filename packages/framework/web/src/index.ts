@@ -163,7 +163,7 @@ export type {
   SelectionEndpointShape,
   SelectionEndpointsShape,
 } from './anchor-equality';
-export { ghostOpacity, sceneViewBox, svgShapesOf } from './annotation-scene';
+export { fontProgramsOf, ghostOpacity, sceneViewBox, svgShapesOf } from './annotation-scene';
 export type {
   ScenePaint,
   SceneShapeNode,

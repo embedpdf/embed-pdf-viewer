@@ -5,7 +5,7 @@
   as `native`.
 -->
 <script lang="ts">
-  import { drawsLive, type RenderItem } from '@embedpdf/core-annotation';
+  import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
   import {
     pictureOrPainting,
     rasterInFrame,
@@ -29,8 +29,7 @@
       picture: urls && shownAppearance(urls, item.id, item.annotation?.appearanceState ?? null),
       version: item.pictureVersion ?? 0,
       loaded: urls !== null,
-      paint: () =>
-        item.source !== 'baked' || (item.annotation && drawsLive(item.annotation)) ? item : null,
+      paint: () => (hasLiveDrawing(item) ? item : null),
     }),
   );
   const raster = $derived(item.raster ? rasterInFrame(item.raster, item.frame) : null);

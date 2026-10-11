@@ -12,6 +12,7 @@ import type {
   Model,
   Rect,
   RenderItem,
+  SceneNode,
   KindName,
   TextEndAnchor,
   Quad,
@@ -111,6 +112,18 @@ export interface AnnotationLender {
   pictureEpoch(page: PageRef): string;
   /** A record's confirmed picture version; kept for one that went, so an undo brings it back with it. */
   pictureVersion(record: AnnotationRef): number;
+  /**
+   * The record's look as it shows isn't its confirmed look yet, whatever changed it (a restyle,
+   * a resize, one just placed, a change the lender made itself): it draws live, by its
+   * {@link painter}, until the engine's picture of it is there.
+   */
+  pending(record: AnnotationRef): boolean;
+  /**
+   * How the lender draws the record live: the record upright in `box` (its box, or where a
+   * gesture has it), in page space; `null` for one it doesn't draw. A record with a painter
+   * draws live while a gesture reshapes it, as a square does.
+   */
+  painter(record: Annotation): ((box: Rect) => readonly SceneNode[]) | null;
   /** Its records' pictures on a page, at rest, in every state, each with its record's picture version. */
   renderAppearances(
     page: PageRef,

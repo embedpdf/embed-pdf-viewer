@@ -8,7 +8,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { CSSProperties } from 'vue';
-import { drawsLive, type RenderItem } from '@embedpdf/core-annotation';
+import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
 import {
   pictureOrPainting,
   rasterInFrame,
@@ -30,8 +30,7 @@ const shows = computed(() => {
     picture: urls && shownAppearance(urls, item.id, item.annotation?.appearanceState ?? null),
     version: item.pictureVersion ?? 0,
     loaded: urls !== null,
-    paint: () =>
-      item.source !== 'baked' || (item.annotation && drawsLive(item.annotation)) ? item : null,
+    paint: () => (hasLiveDrawing(item) ? item : null),
   });
 });
 

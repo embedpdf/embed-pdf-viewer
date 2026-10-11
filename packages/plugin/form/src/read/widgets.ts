@@ -1,7 +1,7 @@
 /**
  * The widgets' reads: each page's widgets (from the form's widget rows), the
  * ones it shows for the form layer to paint (and the painter's scene of each,
- * `read/looks.ts`), the fill projection with the session's fill permission
+ * `services/looks.ts`), the fill projection with the session's fill permission
  * folded in, and the widget hit test.
  */
 import { memoByKey } from '@embedpdf/core';
@@ -11,7 +11,6 @@ import type { FormHostCapability } from '../host-contract';
 import { pageWidgetsOf, widgetAt, type Box, type ShownWidget, type WidgetHit } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { fillItems, type FormWidgetItem } from './fill-items';
-import { createWidgetLooks } from './looks';
 
 const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
 const NOTHING_SHOWN: readonly ShownWidget[] = Object.freeze([]);
@@ -21,12 +20,10 @@ export function createWidgetReads(
   {
     fields,
     rights,
-    design,
-    formatted,
+    looks,
     pictures,
-  }: Pick<FormServices, 'fields' | 'rights' | 'design' | 'formatted' | 'pictures'>,
+  }: Pick<FormServices, 'fields' | 'rights' | 'looks' | 'pictures'>,
 ) {
-  const looks = createWidgetLooks({ fields, formatted, design });
   /** Every page's widgets come with the form: one read for the document. */
   const loadWidgets = (_page: PageRef): Promise<void> => fields.settled();
 

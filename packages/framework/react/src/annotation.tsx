@@ -25,7 +25,7 @@
 export * from '@embedpdf/plugin-annotation';
 import type { EventHook, PageRef } from '@embedpdf/core';
 import {
-  drawsLive,
+  hasLiveDrawing,
   scene,
   MITER_LIMIT,
   type FieldValues,
@@ -120,7 +120,7 @@ import {
   useViewerSettings,
 } from './runtime';
 import type { PageContextValue, PageLayout } from './runtime';
-import { svgElements } from './svg-shapes';
+import { SvgShapes } from './svg-shapes';
 
 export { useAnnotationSettings, useAnnotationState } from './annotation-hooks';
 export {
@@ -338,7 +338,7 @@ function Shape({ item }: { item: RenderItem }) {
         ...(item.source === 'ghost' ? { opacity: ghostOpacity(item.ghostOpacity ?? 0.5) } : {}),
       }}
     >
-      {svgElements(svgShapesOf(scene(item), { miterLimit: MITER_LIMIT }))}
+      <SvgShapes shapes={svgShapesOf(scene(item), { miterLimit: MITER_LIMIT })} />
     </svg>
   );
 }
@@ -858,10 +858,7 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
           picture: urls && shownAppearance(urls, item.id, state),
           version: item.pictureVersion ?? 0,
           loaded: urls !== null,
-          paint: () =>
-            item.source !== 'baked' || (item.annotation && drawsLive(item.annotation))
-              ? item
-              : null,
+          paint: () => (hasLiveDrawing(item) ? item : null),
         });
         const native: React.ReactNode =
           shows?.kind === 'painting' ? (

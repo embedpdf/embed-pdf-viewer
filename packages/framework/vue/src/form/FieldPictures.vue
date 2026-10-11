@@ -5,14 +5,13 @@
   value, a calculation, a restyle shows at once. Hidden widgets aren't drawn.
 -->
 <script setup lang="ts">
-import { computed, onUnmounted, shallowRef, watch, watchEffect } from 'vue';
+import { computed, onUnmounted, shallowRef, watch } from 'vue';
 import { annotationKey, shallowEqual } from '@embedpdf/core';
 import { MITER_LIMIT } from '@embedpdf/core-annotation';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import type { ShownWidget, WidgetPainting } from '@embedpdf/plugin-form/contract/host';
+import type { ShownWidget } from '@embedpdf/plugin-form/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
-  createFontMounts,
   createShownUrls,
   loadAppearanceUrls,
   pictureOrPainting,
@@ -32,12 +31,7 @@ const NO_WIDGETS: readonly ShownWidget[] = Object.freeze([]);
 /** A widget as the template draws it: its picture, or the painter's shapes in its box. */
 type ShownLook = { key: string; frame: PixelRect } & (
   | { kind: 'picture'; url: string }
-  | {
-      kind: 'painting';
-      programs: WidgetPainting['programs'];
-      viewBox: string;
-      shapes: SvgShape[];
-    }
+  | { kind: 'painting'; viewBox: string; shapes: SvgShape[] }
 );
 
 const page = usePage();
@@ -65,11 +59,7 @@ const scale = useOptionalSelector(
 const urls = shallowRef<Record<string, AppearanceUrl> | null>(null);
 // The pictures shown stay valid until the next ones are shown.
 const shown = createShownUrls();
-const mounts = createFontMounts();
-onUnmounted(() => {
-  shown.release();
-  mounts.release();
-});
+onUnmounted(() => shown.release());
 watch(
   [form, () => page.value.ref, scale, epoch],
   ([host, pageRef, at], _previous, onCleanup) => {
@@ -112,7 +102,6 @@ const looks = computed(() =>
       {
         kind: 'painting',
         key,
-        programs: look.painting.programs,
         viewBox: `${x} ${y} ${width} ${height}`,
         shapes: svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }),
         frame: rectInPixels(widget.rect, page.value.transform),
@@ -120,10 +109,6 @@ const looks = computed(() =>
     ];
   }),
 );
-// The painted text in the engine's own faces.
-watchEffect(() => {
-  for (const look of looks.value) if (look.kind === 'painting') mounts.mount(look.programs);
-});
 </script>
 
 <template>

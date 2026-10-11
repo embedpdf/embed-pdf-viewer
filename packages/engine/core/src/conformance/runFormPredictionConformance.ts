@@ -433,6 +433,18 @@ const CASES: readonly PredictionCase[] = [
     op: { type: 'updateWidget', patch: { borderStyle: 'dashed', dashArray: [2, 1] } },
   },
   {
+    name: 'widget: a new border style keeps the width',
+    draft: text(),
+    before: [{ type: 'updateWidget', patch: { borderStyle: 'solid', strokeWidth: 3 } }],
+    op: { type: 'updateWidget', patch: { borderStyle: 'dashed' } },
+  },
+  {
+    name: 'widget: a new width keeps the border style',
+    draft: text(),
+    before: [{ type: 'updateWidget', patch: { borderStyle: 'dashed' } }],
+    op: { type: 'updateWidget', patch: { strokeWidth: 3 } },
+  },
+  {
     name: 'widget: a checkbox with a cross',
     draft: checkbox([undefined]),
     op: { type: 'updateWidget', patch: { checkStyle: 'cross' } },

@@ -11,11 +11,9 @@
   import {
     FormToken as FormHostToken,
     type ShownWidget,
-    type WidgetPainting,
   } from '@embedpdf/plugin-form/contract/host';
   import { RenderToken } from '@embedpdf/plugin-render/contract/host';
   import {
-    createFontMounts,
     createShownUrls,
     loadAppearanceUrls,
     pictureOrPainting,
@@ -41,11 +39,7 @@
     key: string;
     frame: PixelRect;
     url: string | null;
-    painting: {
-      programs: WidgetPainting['programs'];
-      viewBox: string;
-      shapes: SvgShape[];
-    } | null;
+    painting: { viewBox: string; shapes: SvgShape[] } | null;
   }
 
   const page = usePage();
@@ -69,11 +63,7 @@
   let urls = $state.raw<Record<string, AppearanceUrl> | null>(null);
   // The pictures shown stay valid until the next ones are shown.
   const shown = createShownUrls();
-  const mounts = createFontMounts();
-  $effect(() => () => {
-    shown.release();
-    mounts.release();
-  });
+  $effect(() => () => shown.release());
   $effect(() => {
     const host = form.current;
     const ref = page.ref;
@@ -117,7 +107,6 @@
           key,
           url: null,
           painting: {
-            programs: look.painting.programs,
             viewBox: `${x} ${y} ${width} ${height}`,
             shapes: svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }),
           },
@@ -126,10 +115,6 @@
       ];
     }),
   );
-  // The painted text in the engine's own faces.
-  $effect(() => {
-    for (const look of looks) if (look.painting) mounts.mount(look.painting.programs);
-  });
 </script>
 
 {#each looks as look (look.key)}

@@ -10,7 +10,7 @@
  * | Nothing visible (a lock, the author, a square's comment)    | Unchanged                                                      |
  * | A pure move                                                 | Unchanged; a baked raster moves the same distance              |
  * | Anything else visible (restyle, resize, turn, text, points) | Live                                                           |
- * | A stamp, form widget or link (no live drawing)              | Always the raster, drawn where its shape is                    |
+ * | A stamp, link or form widget, no live drawing (not lent)    | Always the raster, drawn where its shape is                    |
  *
  * The change is the engine's own verdict (`appearanceChangeOf`): where the
  * engine keeps the appearance it has, so does the view, so an imported
@@ -27,6 +27,10 @@
  * live: every viewer draws that one from its fields, so the engine's raster
  * would be its drawing too, made in memory. A note or file attachment draws
  * its icon.
+ *
+ * A lent form widget has a live drawing: its lender's (`painter`). It follows
+ * the rule like a square, while its raster stays drawn where its shape is.
+ * Its lender says when its look is new; the plugin draws it live then.
  *
  * The plugin holds the rest (its `vector` preference): a record this session
  * drew live stays live for the session, and another session's edit hands it
@@ -49,12 +53,17 @@ import type { Id, Model, ModelAnnotation, Shape, Rect, ViewEnv } from './types';
 /** The part of a record that says how it is drawn. */
 export type DrawState = Pick<ModelAnnotation, 'source' | 'apBox'>;
 
-/** Has the annotation a live drawing? Stamps, form widgets and links don't: their raster is the drawing. */
-export const drawsLive = (annotation: Annotation): boolean => !kindOf(annotation).caps.rasterOnly;
+/**
+ * Has the record a live drawing? Its kind's own, or its lender's (a lent form
+ * widget, drawn by the form's painter). Stamps, links and form widgets have
+ * none of their own: their raster is their drawing.
+ */
+export const drawsLive = (record: Pick<ModelAnnotation, 'annotation' | 'painter'>): boolean =>
+  record.painter !== undefined || !kindOf(record.annotation).caps.rasterOnly;
 
 /** How a record this session creates is drawn at first. */
 export const sourceOfNew = (annotation: Annotation): ModelAnnotation['source'] =>
-  drawsLive(annotation) ? 'vector' : 'baked';
+  drawsLive({ annotation }) ? 'vector' : 'baked';
 
 /**
  * How a record the engine reports is drawn: live when this session drew it
@@ -65,7 +74,7 @@ export const sourceOfConfirmed = (
   annotation: Annotation,
   vector: boolean,
 ): ModelAnnotation['source'] =>
-  drawsLive(annotation) && (vector || !annotation.hasAppearance) ? 'vector' : 'baked';
+  drawsLive({ annotation }) && (vector || !annotation.hasAppearance) ? 'vector' : 'baked';
 
 /**
  * What changes in how `record` is drawn once `patch` is written: the rule at
@@ -74,7 +83,7 @@ export const sourceOfConfirmed = (
  * then.
  */
 export function drawnAfter(record: ModelAnnotation, patch: AnnotationPatch): Partial<DrawState> {
-  if (!drawsLive(record.annotation)) return {};
+  if (!drawsLive(record)) return {};
   const change = appearanceChangeOf(
     record.annotation,
     resolveAnnotationPatch(record.annotation, patch),
@@ -109,7 +118,7 @@ export function sourceDuring(model: Model, id: Id): ModelAnnotation['source'] {
   const record = model.byId[id];
   // No live drawing: the raster follows the gesture (`rasterPlacement`), and
   // the engine's refitted appearance replaces it after the commit.
-  if (!drawsLive(record.annotation)) return record.source;
+  if (!drawsLive(record)) return record.source;
   // A text box being typed into: the raster can't hide just its text, so a
   // blend would show it twice.
   if (model.editing === id && shapeOf(record.annotation).kind === 'text-box') return 'vector';
@@ -141,9 +150,10 @@ function rasterInShape(record: ModelAnnotation, box: Rect): Rect {
  * Where a record's raster is drawn right now, in view space: its box and the
  * turn to put back about its middle.
  *
- * - A stamp or form widget: where its shape is (`shapeNow`, the gesture in
- *   progress included), turned with it: its raster is its drawing. A
- *   stamp's keeps its proportions in a resized box (`rasterInShape`).
+ * - A stamp, link or form widget: where its shape is (`shapeNow`, the gesture
+ *   in progress included), turned with it, lent or not: its raster is the
+ *   drawing of its shape. A stamp's keeps its proportions in a resized box
+ *   (`rasterInShape`).
  * - Every other kind: at the raster's box (`apBox`), carried along by a move
  *   in progress. A screen-anchored annotation's box rides the same
  *   similarity its shape projects through (`anchoredBox`), composed with any
@@ -156,7 +166,7 @@ export function rasterPlacement(
   shapeNow: Shape,
 ): { box?: Rect; rot?: number } {
   const record = model.byId[id];
-  if (!drawsLive(record.annotation)) {
+  if (kindOf(record.annotation).caps.rasterOnly) {
     return {
       box: shapeNow.kind === 'box' ? rasterInShape(record, shapeNow.box) : record.apBox,
       rot: geomRotation(shapeNow) || undefined,

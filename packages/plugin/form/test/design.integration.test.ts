@@ -16,6 +16,7 @@ import {
   type FormFieldRef,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
+import { hasLiveDrawing, scene } from '@embedpdf/core-annotation';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
 import { historyPlugin, HistoryToken } from '@embedpdf/plugin-history';
@@ -331,6 +332,85 @@ describe('design through lending', () => {
       const restyled = form.updateWidget(widget, { color: '#ff0000' });
       expect(form.getWidget(widget)?.color).toBe('#ff0000');
       expect((await restyled).widget.color).toBe('#ff0000');
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('a restyled field draws live, by the painter, until the engine has drawn it again', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, form, page } = booted;
+      booted.design();
+      const widget = booted.widgetOf(NAME);
+      const itemOf = () =>
+        annotation
+          .listPageItems(page)
+          .find((item) => item.ref && annotationKey(item.ref) === annotationKey(widget))!;
+      expect(itemOf().source).toBe('baked');
+      const version = itemOf().pictureVersion;
+
+      booted.hold();
+      void form
+        .updateWidget(widget, { color: '#ff0000', borderStyle: 'dashed', strokeWidth: 3 })
+        .catch(() => {});
+      // At once, drawn by the form's painter: a red dashed border, 3 points wide.
+      const live = itemOf();
+      expect(live.source).toBe('vector');
+      expect(
+        scene(live).some(
+          (node) =>
+            node.paint.stroke === '#ff0000' &&
+            node.paint.dash !== undefined &&
+            node.paint.width === 3,
+        ),
+      ).toBe(true);
+
+      await booted.release();
+      await settled(booted);
+      // Confirmed: drawn by the engine again, at a new picture version. Until that picture
+      // arrives, the painter can still draw it.
+      const confirmed = itemOf();
+      expect(confirmed.source).toBe('baked');
+      expect(confirmed.pictureVersion).toBeGreaterThan(version ?? 0);
+      expect(hasLiveDrawing(confirmed)).toBe(true);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('a field being resized draws live, by the painter, at the size the drag has, from the first drag', async () => {
+    const booted = await boot();
+    try {
+      const { annotation, page } = booted;
+      booted.design();
+      const widget = booted.widgetOf(NAME);
+      const itemOf = () =>
+        annotation
+          .listPageItems(page)
+          .find((item) => item.ref && annotationKey(item.ref) === annotationKey(widget))!;
+      const before = itemOf();
+      expect(before.source).toBe('baked');
+      annotation.selection.set([widget]);
+      // The south-east handle, on the box's corner, dragged 40 points right and 10 down.
+      const corner = { x: before.box.x + before.box.width, y: before.box.y + before.box.height };
+      annotation.editPointer('down', page, corner, false, 1);
+      annotation.editPointer('move', page, { x: corner.x + 40, y: corner.y + 10 }, false, 1);
+
+      const dragging = itemOf();
+      expect(dragging.source).toBe('vector');
+      expect(dragging.box.width).toBeCloseTo(before.box.width + 40, 3);
+      // The painter laid its text out in the dragged box: clipped to its right edge.
+      const text = scene(dragging).find((node) => node.kind === 'glyphs');
+      expect(text?.clip).toBeDefined();
+      expect(text!.clip!.x + text!.clip!.width).toBeCloseTo(
+        dragging.box.x +
+          dragging.box.width -
+          (dragging.annotation as { strokeWidth: number }).strokeWidth,
+        3,
+      );
+      annotation.editPointer('up', page, { x: corner.x + 40, y: corner.y + 10 }, false, 1);
+      await settled(booted);
     } finally {
       await booted.destroy();
     }

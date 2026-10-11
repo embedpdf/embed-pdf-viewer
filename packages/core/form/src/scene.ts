@@ -4,10 +4,10 @@
  * by the widget's quarter turn about the middle of its box, as core-annotation
  * scene nodes. Paths become SVG path data; each text run becomes a `glyphs`
  * node, every character at the place the engine puts it, in the standard
- * face's CSS (its mounted program first).
+ * face's CSS (its program first, which the node carries for mounting).
  */
 import type { Paint, SceneNode } from '@embedpdf/core-annotation';
-import { standardFontCss, standardFontProgram, type FontProgram } from '@embedpdf/core-fonts';
+import { standardFontCss, standardFontProgram } from '@embedpdf/core-fonts';
 
 import type { DrawOp, PathSegment, Rgb, WidgetDrawing } from './drawing/types';
 import type { PdfRect } from './layout/variable-text';
@@ -134,6 +134,7 @@ export function widgetScene(drawing: WidgetDrawing, placement: WidgetPlacement):
               fontWeight: css.fontWeight,
               fontStyle: css.fontStyle,
               ...(turn ? { rotation: turn } : {}),
+              program: standardFontProgram(op.font),
               paint: { fill: hexOf(op.color) },
               ...clipped,
             });
@@ -145,17 +146,4 @@ export function widgetScene(drawing: WidgetDrawing, placement: WidgetPlacement):
   };
   walk(drawing.ops, undefined);
   return nodes;
-}
-
-/** The font programs a drawing's text is drawn in: mount them for its glyphs to be the engine's. */
-export function drawingPrograms(drawing: WidgetDrawing): FontProgram[] {
-  const fonts = new Set<Parameters<typeof standardFontProgram>[0]>();
-  const walk = (ops: readonly DrawOp[]) => {
-    for (const op of ops) {
-      if (op.kind === 'text') fonts.add(op.font);
-      else if (op.kind === 'clip') walk(op.ops);
-    }
-  };
-  walk(drawing.ops);
-  return [...fonts].map((font) => standardFontProgram(font));
 }

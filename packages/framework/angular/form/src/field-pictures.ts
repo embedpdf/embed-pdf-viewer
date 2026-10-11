@@ -25,14 +25,9 @@ import {
 } from '@embedpdf/angular/runtime';
 import { annotationKey } from '@embedpdf/core';
 import { MITER_LIMIT } from '@embedpdf/core-annotation';
-import {
-  FormToken as FormHostToken,
-  type ShownWidget,
-  type WidgetPainting,
-} from '@embedpdf/plugin-form/contract/host';
+import { FormToken as FormHostToken, type ShownWidget } from '@embedpdf/plugin-form/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
-  createFontMounts,
   createShownUrls,
   loadAppearanceUrls,
   pictureOrPainting,
@@ -49,12 +44,7 @@ const NO_WIDGETS: readonly ShownWidget[] = Object.freeze([]);
 /** A widget as the template draws it: its picture, or the painter's shapes in its box. */
 type ShownLook = { key: string; frame: PixelRect } & (
   | { kind: 'picture'; url: string }
-  | {
-      kind: 'painting';
-      programs: WidgetPainting['programs'];
-      viewBox: string;
-      shapes: SvgShape[];
-    }
+  | { kind: 'painting'; viewBox: string; shapes: SvgShape[] }
 );
 
 @Component({
@@ -119,7 +109,6 @@ export class EpdfFieldPictures {
   private readonly urls = signal<Record<string, AppearanceUrl> | null>(null);
   /** The pictures shown stay valid until the next ones are shown. */
   private readonly shown = createShownUrls();
-  private readonly mounts = createFontMounts();
 
   protected readonly looks = computed(() => {
     const urls = this.urls();
@@ -150,7 +139,6 @@ export class EpdfFieldPictures {
         {
           kind: 'painting',
           key,
-          programs: look.painting.programs,
           viewBox: `${x} ${y} ${width} ${height}`,
           shapes: svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }),
           frame: rectInPixels(widget.rect, transform),
@@ -161,10 +149,7 @@ export class EpdfFieldPictures {
 
   constructor() {
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
-    inject(DestroyRef).onDestroy(() => {
-      this.shown.release();
-      this.mounts.release();
-    });
+    inject(DestroyRef).onDestroy(() => this.shown.release());
     effect((onCleanup) => {
       const form = this.form.capability();
       const scale = this.scale();
@@ -181,11 +166,6 @@ export class EpdfFieldPictures {
           ),
         ),
       );
-    });
-    // The painted text in the engine's own faces.
-    effect(() => {
-      for (const look of this.looks())
-        if (look.kind === 'painting') this.mounts.mount(look.programs);
     });
   }
 }

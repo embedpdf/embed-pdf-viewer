@@ -51,5 +51,5 @@ WidgetActivationResult [TypeAliasDeclaration] (from packages/plugin/form/src/con
 WidgetAddress [TypeAliasDeclaration] (from packages/plugin/form/src/contract.ts): export type WidgetAddress = AnnotationRef | FormWidget;
 WidgetAnnotation [TypeAliasDeclaration] (from packages/engine/core/src/annotation/kinds/widget/index.ts): export type WidgetAnnotation<C extends Coordinates = PageCoordinates> = ReadOf< typeof WidgetDeclaration, C >;
 WidgetHit [InterfaceDeclaration] (from packages/plugin/form/src/model.ts): export interface WidgetHit{ readonly annotObjectNumber: number; readonly field: FormFieldDTO; readonly box: Box; }
-WidgetPainting [InterfaceDeclaration] (from packages/plugin/form/src/read/looks.ts): export interface WidgetPainting{ readonly scene: readonly SceneNode[]; readonly programs: readonly FontProgram[]; }
+WidgetPainting [InterfaceDeclaration] (from packages/plugin/form/src/services/looks.ts): export interface WidgetPainting{ readonly scene: readonly SceneNode[]; }
 toFieldRef [FunctionDeclaration] (from packages/engine/core/src/identity/FormFieldRef.ts): export function toFieldRef(name: string): FormFieldRef{ return{ kind: 'fqn', name} ; }

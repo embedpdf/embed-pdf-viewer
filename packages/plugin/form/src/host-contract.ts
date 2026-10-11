@@ -26,12 +26,12 @@ import type { AppearancePicture } from '@embedpdf/plugin-render/contract/host';
 
 import type { FormCapability, FormCommitResult, FormSetValueResult } from './contract';
 import type { Box, ShownWidget } from './model';
-import type { WidgetPainting } from './read/looks';
+import type { WidgetPainting } from './services/looks';
 import { FormToken as PublicFormToken } from './token';
 
 export * from './contract';
 export type { ShownWidget } from './model';
-export type { WidgetPainting } from './read/looks';
+export type { WidgetPainting } from './services/looks';
 export type { TextEditorLayout } from '@embedpdf/core-form';
 
 /**
@@ -70,9 +70,9 @@ export interface FormHostCapability extends FormCapability {
   ): Promise<readonly AppearancePicture[]>;
   /**
    * What the widget looks like as the view has it, drawn by the painter (`@embedpdf/core-form`): its
-   * scene in page space, and the font programs its text needs mounted (the engine's own faces). The
-   * same object while nothing it shows changes; `null` for a widget the painter doesn't draw (a
-   * signature).
+   * scene in page space, its text in the engine's own faces (each glyphs node carries the program
+   * to mount). The same object while nothing it shows changes; `null` for a widget the painter
+   * doesn't draw (a signature).
    */
   getWidgetPainting(widget: AnnotationRef): WidgetPainting | null;
   /**

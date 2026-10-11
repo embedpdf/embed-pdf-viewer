@@ -58,6 +58,19 @@ export function textLookOf<C extends Coordinates = PageCoordinates>(
   };
 }
 
+/** Whether the painter draws this field's widgets: not a signature, nor a family the engine doesn't know. */
+export const paints = (field: Pick<FormFieldDTO, 'family'>): boolean =>
+  PAINTED_FAMILIES.has(field.family);
+
+const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
+  'checkbox',
+  'radio',
+  'text',
+  'combobox',
+  'listbox',
+  'pushbutton',
+]);
+
 /**
  * The drawing, or `null` for a widget the painter doesn't draw (a signature,
  * a family the engine doesn't know).
@@ -67,6 +80,7 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
   field: FormFieldDTO<C>,
   shown: ShownValue = {},
 ): WidgetDrawing | null {
+  if (!paints(field)) return null;
   const box = (widget.box ?? widget.rect) as unknown as { width: number; height: number };
   const bbox: PdfRect = { left: 0, bottom: 0, right: box.width, top: box.height };
   const border = borderStyleInfo(widget);
@@ -94,14 +108,6 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
     return drawing(
       field.family === 'checkbox' ? checkboxOps(look, checked) : radioOps(look, checked),
     );
-  }
-  if (
-    field.family !== 'text' &&
-    field.family !== 'combobox' &&
-    field.family !== 'listbox' &&
-    field.family !== 'pushbutton'
-  ) {
-    return null;
   }
 
   const text = textLookOf(widget);

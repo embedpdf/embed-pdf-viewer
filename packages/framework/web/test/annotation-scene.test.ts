@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ghostOpacity, sceneViewBox, svgShapesOf } from '../src/annotation-scene';
+import { fontProgramsOf, ghostOpacity, sceneViewBox, svgShapesOf } from '../src/annotation-scene';
 
 const options = { miterLimit: 10 };
 
@@ -121,6 +121,12 @@ describe('svgShapesOf', () => {
   });
 
   it('places painted glyphs one by one, leaves spaces out, and clips a node to its box', () => {
+    const program = {
+      family: 'epdf-0123456789abcdef',
+      weight: 700,
+      style: 'italic' as const,
+      load: async () => new Uint8Array(),
+    };
     const [clipped] = svgShapesOf(
       [
         {
@@ -133,6 +139,7 @@ describe('svgShapesOf', () => {
           fontWeight: 700,
           fontStyle: 'italic',
           rotation: 90,
+          program,
           paint: { fill: '#ff0000' },
           clip: { x: 5, y: 6, width: 90, height: 18 },
         },
@@ -157,8 +164,11 @@ describe('svgShapesOf', () => {
           'font-style': 'italic',
           fill: '#ff0000',
         }),
+        program,
       },
     ]);
+    // The face the text draws in, for the renderer to mount.
+    expect(fontProgramsOf([clipped!, clipped!])).toEqual([program]);
   });
 });
 

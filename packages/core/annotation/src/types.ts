@@ -225,6 +225,13 @@ export interface ModelAnnotation {
    */
   pictureVersion?: number;
   /**
+   * A lent record's live drawing, from its lender (a form widget, drawn by the
+   * form's painter): the record drawn upright in `box`, in page space. It
+   * gives a kind with no live drawing of its own one (`drawsLive`), so the
+   * record draws live while a gesture reshapes it, as a square does.
+   */
+  painter?: (box: Rect) => readonly SceneNode[];
+  /**
    * This session's authority over this record (see permissions.md), set by the
    * plugin from the security service; the core only reads it. Fused into
    * `annotTransformable`/`annotDeletable`, so a record the session may not
@@ -844,6 +851,12 @@ export interface RenderItem {
    * what isn't made yet.
    */
   pictureVersion?: number;
+  /**
+   * A lent record's live drawing, by its lender (`ModelAnnotation.painter`),
+   * upright in `box` (where a gesture has it): `scene(item)` draws it in place
+   * of the kind's own. Made when it's first asked for, not before.
+   */
+  lentScene?: () => readonly SceneNode[];
   /** How opaque a ghost paints (0–1); a painter lets `--epdf-ghost-opacity` win over it. */
   ghostOpacity?: number;
   selected: boolean;
@@ -943,7 +956,8 @@ export type SceneNode = (
   /** Painted text placed character by character: `offsets[i]` is how far
    *  along the baseline from `at` character `i` starts, so each glyph lands
    *  where the PDF puts it (a form widget's painted text). `rotation` turns
-   *  the run about `at`, degrees clockwise. */
+   *  the run about `at`, degrees clockwise. `program` is the face it draws
+   *  in, for whatever draws it to mount (`fontFamily` names it first). */
   | {
       kind: 'glyphs';
       at: Point;
@@ -954,12 +968,24 @@ export type SceneNode = (
       fontWeight?: number;
       fontStyle?: 'normal' | 'italic';
       rotation?: number;
+      program?: SceneFontProgram;
       paint: Paint;
     }
 ) & {
   /** Drawn only inside this upright rectangle (a widget's text box). */
   clip?: Rect;
 };
+
+/**
+ * A font program a scene's text draws in: mounted under its own family, in
+ * its own weight and style, so the browser takes it as it is.
+ */
+export interface SceneFontProgram {
+  readonly family: string;
+  readonly weight: number;
+  readonly style: 'normal' | 'italic';
+  load(): Promise<Uint8Array>;
+}
 
 /** Pure geometry settings for recognising and axis-snapping a freehand stroke. */
 export interface InkStraightenOptions {

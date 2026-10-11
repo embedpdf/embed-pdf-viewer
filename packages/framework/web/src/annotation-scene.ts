@@ -9,6 +9,7 @@
  * imports.
  */
 import { paint } from './theme';
+import type { MountableFontProgram } from './web-font';
 
 /** How a scene node paints: the structural twin of core-annotation's `Paint`. */
 export interface ScenePaint {
@@ -63,6 +64,8 @@ export type SceneShapeNode = (
       fontWeight?: number;
       fontStyle?: 'normal' | 'italic';
       rotation?: number;
+      /** The face it draws in: whatever draws it mounts it. */
+      program?: MountableFontProgram;
       paint: ScenePaint;
     }
 ) & {
@@ -94,6 +97,21 @@ export interface SvgShape {
   blend?: string;
   /** What a clipping `svg` holds, in drawing order. */
   children?: SvgShape[];
+  /** The face a `text` draws in: the renderer mounts it (`fontProgramsOf`). */
+  program?: MountableFontProgram;
+}
+
+/** The faces shapes draw their text in, each once: a renderer mounts them while it shows the shapes. */
+export function fontProgramsOf(shapes: readonly SvgShape[]): MountableFontProgram[] {
+  const programs = new Map<string, MountableFontProgram>();
+  const walk = (each: readonly SvgShape[]) => {
+    for (const shape of each) {
+      if (shape.program) programs.set(shape.program.family, shape.program);
+      if (shape.children) walk(shape.children);
+    }
+  };
+  walk(shapes);
+  return [...programs.values()];
 }
 
 export interface SvgShapesOptions {
@@ -239,6 +257,7 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
           ...painted,
         },
         text: drawn.map((glyph) => glyph.character).join(''),
+        ...(node.program ? { program: node.program } : {}),
         ...blend,
       };
     }

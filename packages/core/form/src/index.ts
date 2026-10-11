@@ -4,11 +4,11 @@
  * layout (`CPVT`), and checked against the engine by the parity gate
  * (engine `widget-painter-parity.test.ts`). Pure: no DOM, no engine.
  */
-export { widgetDrawing, type ShownValue } from './drawing';
+export { paints, widgetDrawing, type ShownValue } from './drawing';
 export { textEditorLayout, type TextEditorLayout } from './editor';
 export type { DrawOp, PathSegment, Rgb, TextRun, WidgetDrawing } from './drawing';
 export { layoutFontOf, type LayoutFont } from './font';
-export { drawingPrograms, widgetScene, type WidgetPlacement } from './scene';
+export { widgetScene, type WidgetPlacement } from './scene';
 export type { FontProgram } from '@embedpdf/core-fonts';
 export {
   layoutVariableText,
