@@ -218,6 +218,7 @@ Set any of these at registration with `renderPlugin({ … })`:
 | `format`            | Encode format for all rasters: `'png'`, `'webp'`, `'bmp'` (local-only) | engine default |
 | `quality`           | Encoder quality for webp/png                                           | engine default |
 | `debug`             | Log tile scheduling and fetch outcomes to the console                  | `false`   |
+| `cacheBytes`        | Raster cache budget in bytes; least recently used rasters go first     | 128 MB    |
 
 On the cloud engine, the deployment's advertised policy overrides `quantize`
 values and constrains `format`; your options apply unchanged on the local
