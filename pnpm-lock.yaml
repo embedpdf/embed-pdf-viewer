@@ -891,6 +891,44 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  packages/core/fonts:
+    dependencies:
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+    devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
+  packages/core/form:
+    dependencies:
+      '@embedpdf/core-annotation':
+        specifier: workspace:*
+        version: link:../annotation
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../fonts
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+    devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   packages/core/geometry:
     devDependencies:
       '@embedpdf/tooling-build':
@@ -1714,6 +1752,9 @@ importers:
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../interaction
+      '@embedpdf/plugin-render':
+        specifier: workspace:*
+        version: link:../render
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../selection
@@ -1779,6 +1820,9 @@ importers:
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
+      '@embedpdf/core-form':
+        specifier: workspace:*
+        version: link:../../core/form
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../../core/geometry

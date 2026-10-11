@@ -11,6 +11,7 @@ import type { CSSProperties } from 'vue';
 import { MITER_LIMIT, scene } from '@embedpdf/core-annotation';
 import type { RenderItem } from '@embedpdf/core-annotation';
 import { ghostOpacity, sceneViewBox, svgShapesOf } from '@embedpdf/web';
+import SvgShapes from '../runtime/SvgShapes.vue';
 
 const props = defineProps<{ item: RenderItem }>();
 
@@ -32,20 +33,10 @@ const style = computed(
       : {}),
   }),
 );
-/** A shape's blend is CSS, never an attribute. */
-const blendOf = (blend: string | undefined): CSSProperties | undefined =>
-  blend ? { mixBlendMode: blend as CSSProperties['mixBlendMode'] } : undefined;
 </script>
 
 <template>
   <svg v-if="viewBox" :viewBox="viewBox" :style="style">
-    <component
-      :is="shape.tag"
-      v-for="(shape, index) in shapes"
-      :key="index"
-      v-bind="shape.attributes"
-      :style="blendOf(shape.blend)"
-      >{{ shape.text }}</component
-    >
+    <SvgShapes :shapes="shapes" />
   </svg>
 </template>

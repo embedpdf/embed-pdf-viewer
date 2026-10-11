@@ -41,7 +41,7 @@ const inlineOn = (pageObjectNumber: number, baseIndex: number): Annotation =>
   });
 
 const recordsOf = (...dtos: Annotation[]): AnnotationRecords => ({
-  byKey: Object.fromEntries(dtos.map((dto) => [annotationKey(dto.ref), { dto, apVersion: 0 }])),
+  byKey: Object.fromEntries(dtos.map((dto) => [annotationKey(dto.ref), { dto, pictureVersion: 0 }])),
   order: dtos.map((dto) => annotationKey(dto.ref)),
 });
 
@@ -145,7 +145,7 @@ describe('foldRecords', () => {
 
 describe('appearance versions', () => {
   const square = recordOn(11, 1);
-  const versionOf = (records: AnnotationRecords, key = 'obj:1') => records.byKey[key]?.apVersion;
+  const versionOf = (records: AnnotationRecords, key = 'obj:1') => records.byKey[key]?.pictureVersion;
 
   it('a created record starts with a freshly baked appearance', () => {
     const records = applied(
@@ -191,6 +191,6 @@ describe('annotations born inline in the file', () => {
       }),
     );
     expect(next.order).toEqual(['base:11:3', 'obj:7']);
-    expect(next.byKey['base:11:3']!.apVersion).toBe(1);
+    expect(next.byKey['base:11:3']!.pictureVersion).toBe(1);
   });
 });

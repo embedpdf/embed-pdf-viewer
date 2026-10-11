@@ -393,7 +393,7 @@ describe('the records mirror', () => {
 
     expect(harness.model().byId['obj:30']).toBeUndefined();
     expect(harness.model().order).toEqual(['obj:31']);
-    expect(harness.model().byId['obj:31']!.apVersion ?? 0).toBe(0);
+    expect(harness.model().byId['obj:31']!.pictureVersion ?? 0).toBe(0);
   });
 
   it('applies events live when the load fails', async () => {
@@ -439,7 +439,7 @@ describe('the records mirror', () => {
     expect(harness.model().byId['obj:41']).toBeUndefined();
     expect(harness.model().byId['obj:40']).toBeDefined();
     // A reload re-fetches rasters once: changes during the gap were invisible.
-    expect(harness.model().byId['obj:40']!.apVersion).toBe(1);
+    expect(harness.model().byId['obj:40']!.pictureVersion).toBe(1);
     for (const id of newIds) expect(harness.model().byId[id]).toBeDefined();
   });
 
@@ -1029,15 +1029,15 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
     const harness = createHarness();
     await seed(harness, hydrationSquare(70));
     harness.emit(updatedEvent(hydrationSquare(70), 45, false));
-    expect(harness.model().byId['obj:70']!.apVersion ?? 0).toBe(0);
+    expect(harness.model().byId['obj:70']!.pictureVersion ?? 0).toBe(0);
     expect(harness.model().byId['obj:70']!.source).toBe('baked');
   });
 
-  it('a REGENERATED remote update advances apVersion exactly once', async () => {
+  it('a REGENERATED remote update advances pictureVersion exactly once', async () => {
     const harness = createHarness();
     await seed(harness, hydrationSquare(70));
     harness.emit(updatedEvent(hydrationSquare(70), 45, true));
-    expect(harness.model().byId['obj:70']!.apVersion).toBe(1);
+    expect(harness.model().byId['obj:70']!.pictureVersion).toBe(1);
   });
 
   it('a remote z-order move never re-fetches appearances', async () => {
@@ -1050,7 +1050,7 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
       order: [hydrationSquare(70).ref],
       meta: META,
     } as unknown as DocumentEvent);
-    expect(harness.model().byId['obj:70']!.apVersion ?? 0).toBe(0);
+    expect(harness.model().byId['obj:70']!.pictureVersion ?? 0).toBe(0);
   });
 });
 

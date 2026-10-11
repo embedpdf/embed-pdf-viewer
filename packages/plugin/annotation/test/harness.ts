@@ -22,6 +22,8 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { pageAnnotationOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+import { renderPlugin } from '@embedpdf/plugin-render';
+import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 import { vi } from 'vitest';
 
@@ -217,95 +219,109 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     return { items, meta: { ...metaOf(), opId, undoable: true } };
   };
 
+  const pages = [
+    options.crop
+      ? { ref: PAGE, crop: options.crop }
+      : { ref: PAGE, size: { width: 600, height: 800 } },
+    { ref: PAGE2, size: { width: 600, height: 800 } },
+  ];
+  const doc = {
+    objectNumbers: {
+      take: () => nextNumber++,
+      held: Infinity,
+      reserve: async () => {},
+      onLost: (listener: (lost: { numbers: number[]; reason: 'reclaimed' }) => void) => {
+        lostListeners.add(listener);
+        return () => lostListeners.delete(listener);
+      },
+    },
+    // One change at a time, in the order they came: as both engines answer.
+    apply: (change: Change, options?: { opId?: string }) => {
+      const opId = options?.opId ?? 'no-op-id';
+      applied.push({ change, opId });
+      let aborted = false;
+      const start = () => {
+        if (aborted) throw new Error('aborted');
+        return runChange(change, opId);
+      };
+      // Nothing ahead of it: it starts at once.
+      const run = waiting === 0 ? start() : line.then(start);
+      waiting += 1;
+      const done = () => {
+        waiting -= 1;
+      };
+      void run.then(done, done);
+      line = run.catch(() => {});
+      return Object.assign(run, {
+        abort: () => {
+          aborted = true;
+        },
+      });
+    },
+    page: (page: PageRef) => ({
+      annotations: {
+        renderAppearances: (options: unknown) =>
+          Object.assign(
+            renderAppearances(options).then((result) => ({ page, ...result })),
+            { abort: () => {} },
+          ),
+        list: async () => readAll(await list()),
+        downloadResource: (ref: AnnotationRef, role: string) => downloadResource(ref, role),
+      },
+    }),
+    annotations: {
+      export: (selection?: unknown) => exportBundle(selection),
+      import: (bundle: unknown, options?: unknown) => importBundle(bundle, options),
+      // Some pages read through each page's list, so a test queues page reads once.
+      list: async (options?: { pages?: readonly PageRef[] }) => {
+        if (!options?.pages) return readAll(await listAll());
+        const lists = await Promise.all(options.pages.map(async () => readAll(await list())));
+        return {
+          annotations: lists.flatMap((page) => page.annotations),
+          pages: lists.flatMap((page) => page.pages ?? []),
+        };
+      },
+    },
+    security: {
+      allows,
+      identity: { userId: 'me' },
+      // One mock per question `allowsAnnotation` answers.
+      allowsAnnotation: (
+        action: 'create' | 'update' | 'delete' | 'set-group',
+        target?: { userId?: string | null; groupId?: string | null },
+      ) =>
+        action === 'create'
+          ? allowsAnnotationCreate()
+          : action === 'set-group'
+            ? true
+            : allowsAnnotationMutation(action, {
+                ...(target?.userId ? { userId: target.userId } : {}),
+                ...(target?.groupId ? { groupId: target.groupId } : {}),
+              }),
+    },
+  } as never;
+  // The real render plugin, on the same document: its appearance door fetches
+  // the page's pictures from the engine (`renderAppearances`), shares and keeps them.
+  const renderDefinition = renderPlugin();
+  const renderCtx = createTestContext({
+    id: 'render',
+    state: (renderDefinition.state as () => unknown)(),
+    settings: renderDefinition.settings,
+    pages,
+    doc,
+  });
+  const render = renderDefinition.create(renderCtx as never) as { api: unknown };
   const ctx = createTestContext<AnnotationState, AnnotationSettings>({
     id: 'annotation',
     state: initialAnnotationState(),
     settings: { defaults: ANNOTATION_DEFAULTS, registered: options.config },
     capabilities: [
       [InteractionToken, interaction],
+      [RenderHostToken, render.api],
       ...(options.selection ? [[SelectionToken, options.selection] as const] : []),
     ],
-    pages: [
-      options.crop
-        ? { ref: PAGE, crop: options.crop }
-        : { ref: PAGE, size: { width: 600, height: 800 } },
-      { ref: PAGE2, size: { width: 600, height: 800 } },
-    ],
-    doc: {
-      objectNumbers: {
-        take: () => nextNumber++,
-        held: Infinity,
-        reserve: async () => {},
-        onLost: (listener: (lost: { numbers: number[]; reason: 'reclaimed' }) => void) => {
-          lostListeners.add(listener);
-          return () => lostListeners.delete(listener);
-        },
-      },
-      // One change at a time, in the order they came: as both engines answer.
-      apply: (change: Change, options?: { opId?: string }) => {
-        const opId = options?.opId ?? 'no-op-id';
-        applied.push({ change, opId });
-        let aborted = false;
-        const start = () => {
-          if (aborted) throw new Error('aborted');
-          return runChange(change, opId);
-        };
-        // Nothing ahead of it: it starts at once.
-        const run = waiting === 0 ? start() : line.then(start);
-        waiting += 1;
-        const done = () => {
-          waiting -= 1;
-        };
-        void run.then(done, done);
-        line = run.catch(() => {});
-        return Object.assign(run, {
-          abort: () => {
-            aborted = true;
-          },
-        });
-      },
-      page: (page: PageRef) => ({
-        annotations: {
-          renderAppearances: (options: unknown) =>
-            Object.assign(
-              renderAppearances(options).then((result) => ({ page, ...result })),
-              { abort: () => {} },
-            ),
-          list: async () => readAll(await list()),
-          downloadResource: (ref: AnnotationRef, role: string) => downloadResource(ref, role),
-        },
-      }),
-      annotations: {
-        export: (selection?: unknown) => exportBundle(selection),
-        import: (bundle: unknown, options?: unknown) => importBundle(bundle, options),
-        // Some pages read through each page's list, so a test queues page reads once.
-        list: async (options?: { pages?: readonly PageRef[] }) => {
-          if (!options?.pages) return readAll(await listAll());
-          const lists = await Promise.all(options.pages.map(async () => readAll(await list())));
-          return {
-            annotations: lists.flatMap((page) => page.annotations),
-            pages: lists.flatMap((page) => page.pages ?? []),
-          };
-        },
-      },
-      security: {
-        allows,
-        identity: { userId: 'me' },
-        // One mock per question `allowsAnnotation` answers.
-        allowsAnnotation: (
-          action: 'create' | 'update' | 'delete' | 'set-group',
-          target?: { userId?: string | null; groupId?: string | null },
-        ) =>
-          action === 'create'
-            ? allowsAnnotationCreate()
-            : action === 'set-group'
-              ? true
-              : allowsAnnotationMutation(action, {
-                  ...(target?.userId ? { userId: target.userId } : {}),
-                  ...(target?.groupId ? { groupId: target.groupId } : {}),
-                }),
-      },
-    } as never,
+    pages,
+    doc,
   });
   const instance = createAnnotationController(ctx);
   const { api } = instance;

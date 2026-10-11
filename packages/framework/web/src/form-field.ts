@@ -98,7 +98,7 @@ export type FieldTextStyle = CssFont & {
 };
 
 /** Pixels per page point where the widget is drawn. */
-const scaleOf = (field: { box: { width: number } }, frame: PixelRect): number =>
+export const scaleOf = (field: { box: { width: number } }, frame: PixelRect): number =>
   field.box.width > 0 ? frame.width / field.box.width : 1;
 
 /** A text field as the layer's editor shows it while focused, in the field's own font. */

@@ -307,11 +307,22 @@ describe('<FormLayer> field pictures', () => {
             }),
           },
         });
-        vi.spyOn(kernel.capability(RenderHostToken), 'renderFieldAppearances').mockResolvedValue([
+        const drawn = [
           picture(text!.ref, null, { x: 72, y: 100, width: 160, height: 20 }),
           picture(check!.ref, 'Off', checkBox),
           picture(check!.ref, 'Yes', checkBox),
-        ] as never);
+        ];
+        // The render plugin's door, as it answers: the asked widgets' pictures, each at its version.
+        const fetches = vi.spyOn(kernel.capability(RenderHostToken), 'renderAppearances');
+        fetches.mockImplementation(
+          async (_page, { items }) =>
+            drawn.map((each) => ({
+              ...each,
+              version:
+                items.find((item) => annotationKey(item.ref) === annotationKey(each.ref))
+                  ?.version ?? 0,
+            })) as never,
+        );
         page.value = letterPage('blank', ref);
         flushSync();
 
@@ -326,9 +337,23 @@ describe('<FormLayer> field pictures', () => {
         // Placed by the box the engine drew it into, in page pixels.
         expect(view.container.querySelectorAll('img')[1]!.style.top).toBe('140px');
 
+        // A checkbox switches to the picture it holds: nothing is fetched.
+        const asked = fetches.mock.calls.length;
         await fireEvent.click(await waitFor(() => view.getByRole('checkbox', { name: 'agree' })));
         await waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
         await waitFor(() => expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`));
+        expect(fetches.mock.calls.length).toBe(asked);
+
+        // A fill shows at once: the painter draws the new value while the page's newer pictures
+        // load (here they never do). The check box keeps its picture: it didn't change.
+        fetches.mockReturnValue(new Promise(() => {}) as never);
+        await form.setValue(toFieldRef('name'), { value: 'Ada' });
+        const painted = () =>
+          [...view.container.querySelectorAll('svg text')]
+            .map((text) => text.textContent)
+            .join(' ');
+        await waitFor(() => expect(painted()).toBe('Ada'));
+        expect(pictures()).toEqual([`blob:${checkKey}:Yes`]);
       } finally {
         view.unmount();
         await kernel.destroy();

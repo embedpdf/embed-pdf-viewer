@@ -47,7 +47,7 @@ export interface AnnotationRecord {
    * reports new raster content (a re-bake, a reload), and
    * only then: the page's rasters are fetched again exactly when it changes.
    */
-  readonly apVersion: number;
+  readonly pictureVersion: number;
 }
 
 /** Every confirmed annotation of the document, by annotation key. */
@@ -78,7 +78,7 @@ function put(
     const key = annotationKey(dto.ref);
     const previous = byKey[key];
     if (!previous) added.push(key);
-    byKey[key] = { dto, apVersion: (previous?.apVersion ?? 0) + (bump ? 1 : 0) };
+    byKey[key] = { dto, pictureVersion: (previous?.pictureVersion ?? 0) + (bump ? 1 : 0) };
   }
   return { byKey, order: added.length ? [...records.order, ...added] : records.order };
 }
@@ -109,7 +109,7 @@ function fromSnapshot(current: AnnotationRecords, dtos: readonly Annotation[]): 
     const key = annotationKey(dto.ref);
     const previous = current.byKey[key];
     if (!(key in byKey)) order.push(key);
-    byKey[key] = { dto, apVersion: previous ? previous.apVersion + 1 : 0 };
+    byKey[key] = { dto, pictureVersion: previous ? previous.pictureVersion + 1 : 0 };
   }
   return { byKey, order };
 }
@@ -293,7 +293,7 @@ export function predictRecords(records: AnnotationRecords, op: PredictedOp): Ann
       const before = onPage[op.index];
       const at = before === undefined ? records.order.length : records.order.indexOf(before);
       return {
-        byKey: { ...records.byKey, [key]: { dto: op.annotation, apVersion: 0 } },
+        byKey: { ...records.byKey, [key]: { dto: op.annotation, pictureVersion: 0 } },
         order: [...records.order.slice(0, at), key, ...records.order.slice(at)],
       };
     }

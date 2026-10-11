@@ -8,7 +8,7 @@
  * `form-field` ({@link textFieldStyleOf}, {@link listBoxStyleOf}); its colors
  * from the form settings ({@link formColorsOf}).
  */
-import { listBoxStyleOf, textFieldStyleOf } from './form-field';
+import { listBoxStyleOf, scaleOf, textFieldStyleOf } from './form-field';
 import type { FieldLook, FormColors, ListBoxStyle, TextFieldStyle } from './form-field';
 import type { PixelRect } from './page-pixels';
 
@@ -62,6 +62,27 @@ export function widgetBoxStyleOf(
   };
 }
 
+/**
+ * Where a text field's editor shows the text typed in it, so it sits where the engine will draw
+ * it (the form plugin's `getTextEditorLayout`), in page points.
+ */
+export interface TextEditorLayout {
+  readonly fontFamily: string;
+  readonly fontWeight: number;
+  readonly fontStyle: 'normal' | 'italic';
+  readonly fontSize: number;
+  readonly lineHeight: number;
+  readonly padding: {
+    readonly top: number;
+    readonly right: number;
+    readonly bottom: number;
+    readonly left: number;
+  };
+  /** A comb's room between characters; it starts at the left padding, whatever the alignment. */
+  readonly letterSpacing: number;
+  readonly comb: boolean;
+}
+
 /** A text field's editor: see-through at rest, the field's own look while focused. */
 export type TextFieldEditorStyle = FormControlFill &
   TextFieldStyle & {
@@ -69,6 +90,8 @@ export type TextFieldEditorStyle = FormControlFill &
     outline: string;
     outlineOffset: string;
     padding: string;
+    /** In pixels, with its unit: one line of the engine's layout. */
+    lineHeight?: string;
     resize: 'none';
     cursor: 'text';
     /** 1 while focused, 0 at rest, where the field's picture shows through. */
@@ -83,13 +106,21 @@ export type TextFieldEditorStyle = FormControlFill &
  * focus ring; at rest it is see-through over the field's picture. A disabled
  * control would swallow clicks, and the box below runs the widget's action
  * (the read-only "button" pattern), so a disabled one lets them through.
+ *
+ * With the engine's `layout` of the text being typed, the editor writes it
+ * where the engine will draw it: in the engine's face (mounted), at the size
+ * it draws (a fitted size resolved), in the box inside the border, a line of
+ * the face's height (one line centred, as the engine centres it).
  */
 export function textFieldEditorStyleOf(
   field: Parameters<typeof textFieldStyleOf>[0] & { disabled: boolean },
   frame: PixelRect,
   colors: FormColors,
   focused: boolean,
+  layout: TextEditorLayout | null = null,
 ): TextFieldEditorStyle {
+  const scale = scaleOf(field, frame);
+  const pixels = (points: number) => `${points * scale}px`;
   return {
     ...FORM_CONTROL_FILL,
     border: 'none',
@@ -97,6 +128,26 @@ export function textFieldEditorStyleOf(
     outlineOffset: '-2px',
     padding: '0 2px',
     ...textFieldStyleOf(field, frame, colors),
+    ...(layout
+      ? {
+          fontFamily: layout.fontFamily,
+          fontWeight: layout.fontWeight,
+          fontStyle: layout.fontStyle,
+          fontSize: pixels(layout.fontSize),
+          lineHeight: pixels(layout.lineHeight),
+          padding: [
+            layout.padding.top,
+            layout.padding.right,
+            layout.padding.bottom,
+            layout.padding.left,
+          ]
+            .map(pixels)
+            .join(' '),
+          ...(layout.comb
+            ? { letterSpacing: pixels(layout.letterSpacing), textAlign: 'left' as const }
+            : {}),
+        }
+      : {}),
     resize: 'none',
     cursor: 'text',
     opacity: focused ? 1 : 0,

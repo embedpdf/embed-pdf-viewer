@@ -7,19 +7,19 @@
  */
 import type { Mirror } from '@embedpdf/core';
 
-import { emptyFieldIndex, foldFormEvent, indexFields, type FieldIndex } from '../model';
+import { emptyFieldIndex, foldFormEvent, indexLoadedFields, type FieldIndex } from '../model';
 import { predictFormOp } from './predict';
 import type { FormContext } from '../services/context';
 import type { FormEvents } from '../services/events';
 
 export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror<FieldIndex> {
-  return ctx.mirror<FieldIndex>({
+  const fields: Mirror<FieldIndex> = ctx.mirror<FieldIndex>({
     name: 'fields',
     initial: emptyFieldIndex,
     // A reviewer-shaped token without `doc.forms.read` is a common narrowed
     // scope: skip the doomed read and report `forbidden`.
     readable: () => ctx.allows('doc.forms.read'),
-    load: async (doc) => ({ value: indexFields(await doc.forms.list()) }),
+    load: async (doc) => ({ value: indexLoadedFields(fields.get(), await doc.forms.list()) }),
     fold: foldFormEvent,
     predict: predictFormOp,
     changed: ({ cause, event, next }) => {
@@ -53,4 +53,5 @@ export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror
       }
     },
   });
+  return fields;
 }

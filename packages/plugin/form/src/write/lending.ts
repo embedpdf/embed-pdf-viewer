@@ -28,9 +28,8 @@ const objectNumberOf = (ref: AnnotationRef): number =>
 
 export function createWidgetLender(
   ctx: FormContext,
-  { fields, design, siblings }: Pick<FormServices, 'fields' | 'design' | 'siblings'>,
+  { fields, design, pictures }: Pick<FormServices, 'fields' | 'design' | 'pictures'>,
 ): AnnotationLender {
-  const { render } = siblings;
   const records = memo(
     () => [design.lending(), fields.get().snapshot, fields.view().snapshot] as const,
     (lending, confirmed, shown) =>
@@ -100,10 +99,8 @@ export function createWidgetLender(
     },
     // The pictures the form layer draws too, from one store: switching modes
     // fetches nothing, and a page's pictures change only with its widgets.
-    pictureEpoch: (page) => String(render?.getFieldAppearanceEpoch(page) ?? 0),
-    renderAppearances: (page, scale, signal) =>
-      render
-        ? render.renderFieldAppearances(page, { scale, ...(signal ? { signal } : {}) })
-        : Promise.resolve([]),
+    pictureEpoch: pictures.epoch,
+    pictureVersion: pictures.versionOf,
+    renderAppearances: pictures.render,
   };
 }

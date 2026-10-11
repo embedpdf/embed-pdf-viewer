@@ -74,11 +74,6 @@ export function renderEpochOf(
   );
 }
 
-/** The version of a page's form field pictures (its widgets' looks). */
-export function fieldEpochOf(state: RenderState, pageObjectNumber: PageObjectNumber): number {
-  return state.fieldEpochs[pageObjectNumber] ?? 0;
-}
-
 /** What a picture draws, as one key part: `a1f0` draws annotations and no form fields. */
 export const layersKeyOf = (layers: PageRenderLayers): string =>
   `a${layers.includeAnnotations ? 1 : 0}f${layers.includeFormFields ? 1 : 0}`;

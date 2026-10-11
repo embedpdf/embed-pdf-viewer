@@ -34,6 +34,7 @@ export * from '@embedpdf/plugin-form';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { annotationKey, type EventHook } from '@embedpdf/core';
+import { MITER_LIMIT } from '@embedpdf/core-annotation';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import {
@@ -49,20 +50,24 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  createFontMounts,
   createShownUrls,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
   formColorsOf,
   isolatePointerDown,
   listBoxControlStyleOf,
-  loadFieldPictureUrls,
+  loadAppearanceUrls,
+  pictureOrPainting,
   pressToggle,
   rectInPixels,
-  shownFieldPicture,
+  shownAppearance,
+  svgShapesOf,
   textFieldEditorStyleOf,
   widgetBoxStyleOf,
   type AppearanceUrl,
   type FormColors,
+  type MountableFontProgram,
 } from '@embedpdf/web';
 
 import { NativeListBox } from './form-listbox';
@@ -82,6 +87,7 @@ import {
 } from './runtime';
 import type { PageContextValue } from './runtime';
 import { settingsHook, stateHook } from './state';
+import { svgElements } from './svg-shapes';
 
 // ── what every control shares ──────────────────────────────────────────────
 
@@ -239,6 +245,9 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
   useEffect(() => editor.setValue(item.value), [editor, item.value]);
 
   const frame = rectInPixels(item.box, page.transform);
+  // The text being typed, where the engine will draw it, in its face.
+  const layout = item.annotationRef ? form.getTextEditorLayout(item.annotationRef, draft) : null;
+  useFontMounts(layout ? [layout.program] : NO_PROGRAMS);
   const editorProps = {
     value: draft,
     maxLength: item.maxLength ?? undefined,
@@ -251,7 +260,7 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       if (editor.keyDown(event.key, item.multiline)) event.currentTarget.blur();
     },
-    style: textFieldEditorStyleOf(item, frame, colors, focused),
+    style: textFieldEditorStyleOf(item, frame, colors, focused, layout),
   };
   return (
     // A click runs the widget's action too, as in Acrobat: the editor's
@@ -487,54 +496,86 @@ export function FormLayer() {
 }
 
 /**
- * The pictures of the page's fields, as the engine draws them, from the render
- * plugin's shared field pictures. Every state is loaded, so a check box shows
- * its new state as soon as its value changes; hidden widgets aren't drawn.
+ * The page's fields as they look now. Each widget shows its picture, as the
+ * engine draws it (the form plugin's, every state loaded, so a check box
+ * shows its new state at once), or the painter's drawing while its look is
+ * pending or its picture is of an older version (`pictureOrPainting`): a
+ * value, a calculation, a restyle shows at once. Hidden widgets aren't drawn.
  */
 function FieldPictures({ page }: { page: PageContextValue }) {
-  const render = useOptionalCapability(RenderToken);
+  const form = useCapability(FormHostToken);
   const widgets = useSelector(
     FormHostToken,
     (form) => form.listShownWidgets(page.ref),
     shallowArray,
   );
-  // Loaded again when the page's fields change, and at appearance-scale crossings.
-  const epoch = useOptionalSelector(
-    RenderToken,
-    (render) => render.getFieldAppearanceEpoch(page.ref),
-    0,
-  );
+  // Loaded again when one of the page's widgets is drawn again, and at appearance-scale crossings.
+  const epoch = useSelector(FormHostToken, (form) => form.getAppearanceEpoch(page.ref));
   const scale = useOptionalSelector(
     RenderToken,
     (render) => render.getAppearanceScale(page.transform.renderScale),
     0,
   );
-  const [urls, setUrls] = useState<Record<string, AppearanceUrl>>({});
+  // `null` until the page's first pictures arrive.
+  const [urls, setUrls] = useState<Record<string, AppearanceUrl> | null>(null);
   // The pictures shown stay valid until the next ones are shown.
   const [shown] = useState(createShownUrls);
   useEffect(() => () => shown.release(), [shown]);
 
   useEffect(() => {
-    if (!render || !scale) return;
-    return loadFieldPictureUrls(
+    if (!scale) return;
+    return loadAppearanceUrls(
       shown,
-      (signal) => render.renderFieldAppearances(page.ref, { scale, signal }),
+      (signal) => form.renderAppearances(page.ref, scale, signal),
       annotationKey,
       setUrls,
     );
-  }, [shown, render, page.ref, scale, epoch]);
+  }, [shown, form, page.ref, scale, epoch]);
+
+  const looks = widgets.map((widget) =>
+    pictureOrPainting({
+      pending: widget.pending,
+      picture: urls && shownAppearance(urls, annotationKey(widget.ref), widget.appearanceState),
+      version: widget.pictureVersion,
+      loaded: urls !== null,
+      paint: () => form.getWidgetPainting(widget.ref),
+    }),
+  );
+  // The painted text in the engine's own faces.
+  useFontMounts(looks.flatMap((look) => (look?.kind === 'painting' ? look.painting.programs : [])));
 
   return (
     <>
-      {widgets.map((widget) => {
+      {widgets.map((widget, index) => {
+        const look = looks[index];
+        if (!look) return null;
         const key = annotationKey(widget.ref);
-        const picture = shownFieldPicture(urls, key, widget.appearanceState);
-        if (!picture) return null;
-        const frame = rectInPixels(picture.box, page.transform);
+        if (look.kind === 'painting') {
+          const { x, y, width, height } = widget.rect;
+          const frame = rectInPixels(widget.rect, page.transform);
+          return (
+            <svg
+              key={key}
+              viewBox={`${x} ${y} ${width} ${height}`}
+              style={{
+                position: 'absolute',
+                left: frame.left,
+                top: frame.top,
+                width: frame.width,
+                height: frame.height,
+                overflow: 'visible',
+                pointerEvents: 'none',
+              }}
+            >
+              {svgElements(svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }))}
+            </svg>
+          );
+        }
+        const frame = rectInPixels(look.picture.box, page.transform);
         return (
           <img
             key={key}
-            src={picture.url}
+            src={look.picture.url}
             alt=""
             draggable={false}
             style={{
@@ -553,6 +594,15 @@ function FieldPictures({ page }: { page: PageContextValue }) {
       })}
     </>
   );
+}
+
+const NO_PROGRAMS: readonly MountableFontProgram[] = Object.freeze([]);
+
+/** The engine's faces a part of the layer draws text in, mounted while it's there. */
+function useFontMounts(programs: readonly MountableFontProgram[]) {
+  const [mounts] = useState(() => createFontMounts());
+  useEffect(() => () => mounts.release(), [mounts]);
+  useEffect(() => mounts.mount(programs));
 }
 
 // ── hooks ──────────────────────────────────────────────────────────────────

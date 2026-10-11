@@ -9,6 +9,7 @@
 import {
   createHostToken,
   type AnnotationAppearanceImage,
+  type AnnotationRef,
   type EventHook,
   type OperationOptions,
   type PageLayerRights,
@@ -74,10 +75,28 @@ export interface ViewDemand {
   dispose(): void;
 }
 
-/** What {@link RenderHostCapability.renderFieldAppearances} takes. */
-export interface FieldAppearancesOptions extends OperationOptions {
+/** Whose pictures: a page's annotations, or its form widgets. */
+export type AppearanceFamily = 'annotations' | 'widgets';
+
+/** One of an owner's items on a page, at the version of its picture. */
+export interface AppearanceItem {
+  readonly ref: AnnotationRef;
+  /** Moves when the engine draws the item again (`pictureVersion`): its pictures are fetched again. */
+  readonly version: number;
+}
+
+/** What {@link RenderHostCapability.renderAppearances} takes. */
+export interface AppearancesOptions extends OperationOptions {
+  readonly family: AppearanceFamily;
   /** Device px per PDF point, conformed through {@link RenderHostCapability.getAppearanceScale}. */
-  scale: number;
+  readonly scale: number;
+  /** The owner's items on the page whose pictures it wants, each at its version. */
+  readonly items: readonly AppearanceItem[];
+}
+
+/** The engine's picture of an item in one of its states, and the version of the item it shows. */
+export interface AppearancePicture extends AnnotationAppearanceImage {
+  readonly version: number;
 }
 
 export interface RenderCompletedEvent {
@@ -119,18 +138,24 @@ export interface RenderHostCapability extends RenderCapability {
   /** This view's tile surface. Stable per view id; pair with `dispose`. */
   createViewDemand(viewId: string): ViewDemand;
   /**
-   * Every form field picture of a page: each widget's look at rest, in every
-   * state it stores, each labelled with its state, so a checkbox switches
-   * picture with no request. The form plane paints them. Asks for the same
-   * page, scale and version share one fetch. Rejects `permission-denied`
-   * without `doc.forms.read`.
+   * The engine's pictures of the owner's items on a page (`family`): each
+   * item's look at rest, in every state it stores, each labelled with its
+   * state and tagged with the item's version, so a checkbox switches picture
+   * with no request, and a layer can tell a picture older than its item.
+   * The owner keys the ask on its items' versions: asks for the same page,
+   * family, scale and items share one fetch, and the last few sets of each
+   * page are kept. Rejects `permission-denied` without `doc.annotate.read`
+   * (annotations) or `doc.forms.read` (widgets).
    */
-  renderFieldAppearances(
+  renderAppearances(
     page: PageRef,
-    options: FieldAppearancesOptions,
-  ): Promise<readonly AnnotationAppearanceImage[]>;
-  /** The version of a page's form field pictures: key a fetch on it. Bumps on confirmed form facts. */
-  getFieldAppearanceEpoch(page: PageRef): number;
+    options: AppearancesOptions,
+  ): Promise<readonly AppearancePicture[]>;
+  /**
+   * An item's last pictures, every state, kept a while after it left its page:
+   * an undo that brings it back shows them at once. Empty for one never drawn.
+   */
+  keptAppearances(family: AppearanceFamily, item: AnnotationRef): readonly AppearancePicture[];
   /** The appearance scale a render scale conforms to under the deployment's policy. */
   getAppearanceScale(renderScale: number): number;
   /** A base raster resolved / failed (the conforming and exact doors alike). */

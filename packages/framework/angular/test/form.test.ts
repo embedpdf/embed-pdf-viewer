@@ -163,8 +163,11 @@ describe('<epdf-form-layer> over fields made from code', () => {
       const checkbox = element(fixture).querySelector<HTMLElement>(
         '[role="checkbox"][aria-label="agree"]',
       )!;
+      // A click activates the widget once its write is answered: waited for, so it runs before the page goes.
+      const activated = vi.spyOn(kernelOf(fixture).capability(FormHostToken), 'activateWidget');
       checkbox.click();
       await vi.waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
+      await vi.waitFor(() => expect(activated).toHaveBeenCalled());
 
       // Each control's box sits over its widget, and always takes the pointer.
       expect(checkbox.style.position).toBe('absolute');
@@ -238,14 +241,22 @@ describe('<epdf-form-layer> field pictures', () => {
           }),
         },
       });
-      vi.spyOn(
-        kernelOf(fixture).capability(RenderHostToken),
-        'renderFieldAppearances',
-      ).mockResolvedValue([
+      const drawn = [
         picture(text!.ref, null, { x: 72, y: 100, width: 160, height: 20 }),
         picture(check!.ref, 'Off', checkBox),
         picture(check!.ref, 'Yes', checkBox),
-      ] as never);
+      ];
+      // The render plugin's door, as it answers: the asked widgets' pictures, each at its version.
+      const fetches = vi.spyOn(kernelOf(fixture).capability(RenderHostToken), 'renderAppearances');
+      fetches.mockImplementation(
+        async (_page, { items }) =>
+          drawn.map((each) => ({
+            ...each,
+            version:
+              items.find((item) => annotationKey(item.ref) === annotationKey(each.ref))?.version ??
+              0,
+          })) as never,
+      );
       await showPage(fixture, 'blank', page);
 
       const images = () => [...element(fixture).querySelectorAll('epdf-field-pictures img')];
@@ -259,12 +270,32 @@ describe('<epdf-form-layer> field pictures', () => {
       // Placed by the box the engine drew it into, in page pixels.
       expect((images()[1] as HTMLElement).style.top).toBe('140px');
 
+      // A click activates the widget once its write is answered: waited for, so it runs before the page goes.
+      const activated = vi.spyOn(kernelOf(fixture).capability(FormHostToken), 'activateWidget');
+      // A checkbox switches to the picture it holds: nothing is fetched.
+      const asked = fetches.mock.calls.length;
       element(fixture).querySelector<HTMLElement>('[role="checkbox"][aria-label="agree"]')!.click();
       await vi.waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
       await vi.waitFor(async () => {
         await fixture.whenStable();
         expect(pictures()[1]).toBe(`blob:${checkKey}:Yes`);
       });
+      await vi.waitFor(() => expect(activated).toHaveBeenCalled());
+      expect(fetches.mock.calls.length).toBe(asked);
+
+      // A fill shows at once: the painter draws the new value while the page's newer pictures
+      // load (here they never do). The check box keeps its picture: it didn't change.
+      fetches.mockReturnValue(new Promise(() => {}) as never);
+      await form.setValue(toFieldRef('name'), { value: 'Ada' });
+      const painted = () =>
+        [...element(fixture).querySelectorAll('epdf-field-pictures svg text')]
+          .map((text) => text.textContent)
+          .join(' ');
+      await vi.waitFor(async () => {
+        await fixture.whenStable();
+        expect(painted()).toBe('Ada');
+      });
+      expect(pictures()).toEqual([`blob:${checkKey}:Yes`]);
     },
   );
 });

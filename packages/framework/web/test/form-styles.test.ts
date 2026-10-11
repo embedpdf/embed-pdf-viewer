@@ -72,6 +72,41 @@ describe('textFieldEditorStyleOf', () => {
     });
   });
 
+  it('writes the text where the engine will draw it, with its layout', () => {
+    const layout = {
+      fontFamily: '"epdf-0123456789abcdef", Helvetica, Arial, sans-serif',
+      fontWeight: 400,
+      fontStyle: 'normal' as const,
+      fontSize: 9.5,
+      lineHeight: 11.1,
+      padding: { top: 1, right: 2, bottom: 1, left: 2 },
+      letterSpacing: 0,
+      comb: false,
+    };
+    expect(textFieldEditorStyleOf(field, frame, colors, true, layout)).toMatchObject({
+      fontFamily: layout.fontFamily,
+      fontSize: '19px',
+      lineHeight: '22.2px',
+      padding: '2px 4px 2px 4px',
+      textAlign: 'left',
+    });
+    // A comb starts at its first cell and spaces its characters by the cells.
+    const comb = {
+      ...field,
+      look: { ...look, textAlign: 'center' as const },
+      comb: true,
+      maxLength: 4,
+    };
+    expect(
+      textFieldEditorStyleOf(comb, frame, colors, true, {
+        ...layout,
+        padding: { ...layout.padding, left: 8 },
+        letterSpacing: 18,
+        comb: true,
+      }),
+    ).toMatchObject({ letterSpacing: '36px', textAlign: 'left', padding: '2px 4px 2px 16px' });
+  });
+
   it('is see-through at rest, and lets the pointer through when disabled', () => {
     const resting = textFieldEditorStyleOf({ ...field, disabled: true }, frame, colors, false);
     expect(resting).toMatchObject({ outline: 'none', opacity: 0, pointerEvents: 'none' });

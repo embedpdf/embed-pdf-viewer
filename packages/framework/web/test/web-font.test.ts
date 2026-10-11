@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { mountWebFont, observeWebFonts } from '../src/web-font';
+import { createFontMounts, mountFontProgram, mountWebFont, observeWebFonts } from '../src/web-font';
 
 /** A `Document` with a font set, and a `FontFace` that loads at once. */
 function fakeDocument() {
@@ -72,6 +72,51 @@ describe('mountWebFont', () => {
     expect(faces.size).toBe(1); // the second holder keeps it
     second();
     expect(faces.size).toBe(0);
+  });
+
+  it('mounts a program under its family, in its own weight and style', async () => {
+    vi.stubGlobal('FontFace', FakeFontFace);
+    const { doc, faces } = fakeDocument();
+    const load = vi.fn(async () => new Uint8Array([4, 5]));
+    const program = {
+      family: 'epdf-0123456789abcdef',
+      weight: 700,
+      style: 'italic' as const,
+      load,
+    };
+    const unmount = await mountFontProgram(program, { document: doc });
+    const face = [...faces][0] as unknown as FakeFontFace;
+    expect([face.family, face.descriptors]).toEqual([
+      'epdf-0123456789abcdef',
+      { weight: '700', style: 'italic' },
+    ]);
+    expect([...new Uint8Array(face.source)]).toEqual([4, 5]);
+    unmount();
+    expect(faces.size).toBe(0);
+  });
+
+  it('mounts each program a layer asks for once, and lets them all go together', async () => {
+    vi.stubGlobal('FontFace', FakeFontFace);
+    const { doc, faces } = fakeDocument();
+    const program = (family: string) => ({
+      family,
+      weight: 400,
+      style: 'normal' as const,
+      load: vi.fn(async () => new Uint8Array([1])),
+    });
+    const sans = program('epdf-aaaaaaaaaaaaaaaa');
+    const serif = program('epdf-bbbbbbbbbbbbbbbb');
+    const mounts = createFontMounts({ document: doc });
+    mounts.mount([sans]);
+    mounts.mount([sans, serif]);
+    await vi.waitFor(() => expect(faces.size).toBe(2));
+    expect(sans.load).toHaveBeenCalledTimes(1);
+    mounts.release();
+    await vi.waitFor(() => expect(faces.size).toBe(0));
+    // A layer that comes back holds again.
+    mounts.mount([sans]);
+    await vi.waitFor(() => expect(faces.size).toBe(1));
+    expect(sans.load).toHaveBeenCalledTimes(2);
   });
 
   it('is a no-op without the FontFace API', async () => {

@@ -73,7 +73,7 @@ export function createView(
     const record: ModelAnnotation = {
       ...projected,
       source: sourceOfConfirmed(projected.annotation, vector),
-      apVersion: stored.apVersion,
+      pictureVersion: stored.pictureVersion,
       authority: authorityOf(ctx, stored.dto),
     };
     confirmed.set(stored, { vector, record });
@@ -141,6 +141,7 @@ export function createView(
         ...fromDTO(shown),
         unconfirmed: true,
         source: confirmedOnce.has(annotationKey(shown.ref)) ? 'baked' : 'vector',
+        pictureVersion: lender.pictureVersion(shown.ref),
         authority: lender.authority(shown),
       };
     } else {
@@ -149,7 +150,7 @@ export function createView(
       const base: ModelAnnotation = {
         ...fromDTO(truth),
         source: sourceOfConfirmed(truth, false),
-        apVersion: 0,
+        pictureVersion: lender.pictureVersion(truth.ref),
         authority: lender.authority(truth),
       };
       const patch = { ...annotationPatchBetween(truth, shown), subtype: truth.subtype };

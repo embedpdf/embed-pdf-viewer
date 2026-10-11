@@ -216,14 +216,14 @@ export interface ModelAnnotation {
    */
   apRot?: number;
   /**
-   * Revision of the engine-baked `/AP` content (absent ≡ 0). The raster a baked
+   * The version of the engine's picture of it (absent ≡ 0). The picture a baked
    * annotation shows depends on exactly this and the render scale — never on
    * position (`apBox` translates the blit) or rotation (`apRot` transforms it) —
-   * so the shell re-fetches appearances precisely when it changes. Owned by the
+   * so the shell re-fetches pictures precisely when it changes. Owned by the
    * plugin's confirmed records, which advance it when the engine reports a
    * re-baked appearance; the core only reads it.
    */
-  apVersion?: number;
+  pictureVersion?: number;
   /**
    * This session's authority over this record (see permissions.md), set by the
    * plugin from the security service; the core only reads it. Fused into
@@ -838,6 +838,12 @@ export interface RenderItem {
    * place (`ghost`, see-through by `ghostOpacity`).
    */
   source: 'baked' | 'vector' | 'draft' | 'ghost';
+  /**
+   * The version of the record's engine picture (`ModelAnnotation.pictureVersion`):
+   * a picture drawn at another version shows another look of it. Absent for
+   * what isn't made yet.
+   */
+  pictureVersion?: number;
   /** How opaque a ghost paints (0–1); a painter lets `--epdf-ghost-opacity` win over it. */
   ghostOpacity?: number;
   selected: boolean;
@@ -916,7 +922,7 @@ export interface Paint {
  * surface a new framework renderer must implement. Supersedes the geometry-only
  * `RenderNode` for rendering; `geomScene` stays the internal geometry helper.
  */
-export type SceneNode =
+export type SceneNode = (
   | { kind: 'rect'; rect: Rect; paint: Paint }
   | { kind: 'ellipse'; rect: Rect; paint: Paint }
   | { kind: 'line'; a: Point; b: Point; paint: Paint }
@@ -933,7 +939,27 @@ export type SceneNode =
       fontFamily?: string;
       rotation?: number;
       paint: Paint;
-    };
+    }
+  /** Painted text placed character by character: `offsets[i]` is how far
+   *  along the baseline from `at` character `i` starts, so each glyph lands
+   *  where the PDF puts it (a form widget's painted text). `rotation` turns
+   *  the run about `at`, degrees clockwise. */
+  | {
+      kind: 'glyphs';
+      at: Point;
+      text: string;
+      offsets: number[];
+      fontSize: number;
+      fontFamily: string;
+      fontWeight?: number;
+      fontStyle?: 'normal' | 'italic';
+      rotation?: number;
+      paint: Paint;
+    }
+) & {
+  /** Drawn only inside this upright rectangle (a widget's text box). */
+  clip?: Rect;
+};
 
 /** Pure geometry settings for recognising and axis-snapping a freehand stroke. */
 export interface InkStraightenOptions {

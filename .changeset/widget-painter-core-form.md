@@ -1,0 +1,5 @@
+---
+'@embedpdf/core-form': major
+---
+
+Introduces the form widget painter: `widgetDrawing(widget, field, shown?)` draws what the engine's appearance generator writes for a text field, combo box, list box, push button, check box or radio button (its background, border in every style, plate and text laid out by a port of the engine's text layout: fitted sizes, wrapping, combs, alignment, passwords; the check symbols; the quarter turn), and `widgetScene(drawing, placement)` puts it on the page as scene nodes. A parity gate checks it against the engine within 0.01 pt. A font that isn't one of the 14 standard fonts, or a character its font can't write, draws approximately, and the drawing says so. `textEditorLayout(widget, field, text)` says where an HTML editor shows the text being typed: the face, the size the engine draws at, the text's box, the line height and a comb's spacing.

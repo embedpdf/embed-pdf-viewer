@@ -14,6 +14,8 @@ import type { FormContext } from './context';
 import { createDesign, type FormDesign } from './design';
 import { createEvents, type FormEvents } from './events';
 import { createFillRights, type FillRights } from './fill-rights';
+import { createFormattedTexts, type FormattedTexts } from './formatted';
+import { createWidgetPictures, type WidgetPictures } from './pictures';
 import { createScriptingSeam, type FormScripting } from './scripting';
 import { resolveSiblings, type FormSiblings } from './siblings';
 
@@ -28,6 +30,10 @@ export interface FormServices {
   readonly scripting: FormScripting;
   /** Whether the widgets are lent to the annotation plugin now (design mode). */
   readonly design: FormDesign;
+  /** The texts this session's format scripts wrote, for the painter. */
+  readonly formatted: FormattedTexts;
+  /** The engine's pictures of each page's widgets, at their picture versions. */
+  readonly pictures: WidgetPictures;
   /**
    * Fills take turns on one serial queue until they are sent (write/fill.ts),
    * and a repair until the engine answers.
@@ -48,6 +54,8 @@ export function createServices(ctx: FormContext): FormServices {
     siblings,
     scripting: createScriptingSeam(ctx, siblings),
     design: createDesign(ctx, siblings),
+    formatted: createFormattedTexts(ctx, fields),
+    pictures: createWidgetPictures(fields, siblings),
     enqueue: ctx.serialQueue('writes'),
     keyOf: (ref) => canonicalKey(fields.view(), ref),
   };

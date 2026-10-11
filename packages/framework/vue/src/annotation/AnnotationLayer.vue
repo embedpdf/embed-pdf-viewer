@@ -21,6 +21,7 @@ import type { Annotation, TextItem } from '@embedpdf/plugin-annotation';
 // chrome, appearances…): the same runtime token as the public one, typed wider.
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
   annotationDrawingOf,
   bakedAppearanceOf,
@@ -134,7 +135,8 @@ watch(
 
 // ── baked appearances ────────────────────────────────────────────────────────
 
-const urls = shallowRef<Record<string, AppearanceUrl>>({});
+// `null` until the page's first pictures arrive.
+const urls = shallowRef<Record<string, AppearanceUrl> | null>(null);
 // The pictures shown stay valid until the next ones are shown.
 const shown = createShownUrls();
 onUnmounted(() => shown.release());
@@ -148,12 +150,13 @@ const bakedKey = useOptionalSelector(
   (host) => host.getAppearanceEpoch(page.value.ref),
   '',
 );
-// The bake scale follows the document's render policy: zoom steps inside one
-// rung of the appearance lattice bake nothing again.
+// The appearance scale follows the document's render policy: zoom steps inside
+// one rung of the appearance lattice bake nothing again. Without the render
+// plugin, only this session's pictures load.
 const bakeScale = useOptionalSelector(
-  AnnotationHostToken,
-  (host) => host.getBakeScale(page.value.transform.renderScale),
-  0,
+  RenderToken,
+  (render) => render.getAppearanceScale(page.value.transform.renderScale),
+  page.value.transform.renderScale,
 );
 watch(
   [annotation, () => page.value.ref, bakeScale, bakedKey],
@@ -219,7 +222,7 @@ function nativeOf(id: string): Component {
   if (!native) {
     native = markRaw(() => {
       const item = itemsById.value.get(id);
-      return item ? h(NativeDrawing, { item, url: urls.value[id]?.url ?? null }) : null;
+      return item ? h(NativeDrawing, { item, urls: urls.value }) : null;
     });
     natives.set(id, native);
   }
@@ -277,7 +280,9 @@ const componentOf = (component: Component): Component => toRaw(component);
           :item="item"
           :page="page"
           :native="nativeOf(item.id)"
-          :appearance="bakedAppearanceOf(urls, item.id)"
+          :appearance="
+            urls && bakedAppearanceOf(urls, item.id, item.annotation?.appearanceState ?? null)
+          "
           :interactive="drawing.interactive"
         />
       </AnnotationFrame>
@@ -290,7 +295,7 @@ const componentOf = (component: Component): Component => toRaw(component);
         :page="page"
         :inert="drawing.kind === 'native' && drawing.inert"
       >
-        <NativeDrawing :item="item" :url="urls[item.id]?.url ?? null" />
+        <NativeDrawing :item="item" :urls="urls" />
       </AnnotationFrame>
     </template>
     <FreeTextBox v-for="text in ownTexts" :key="text.id" :item="text" :page="page" />

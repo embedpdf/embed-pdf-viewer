@@ -8,6 +8,7 @@
  *   pluginService(), EpdfPluginService      how a plugin's service is built
  *   EPDF_PAGE, injectPage()                 the page a layer draws on
  *   paintsPagePart(), injectPaintedParts()  which parts of a page its layers paint
+ *   <svg:g [epdfSvgShapes]>                 a scene's shapes as SVG elements
  */
 
 // The core's types and helpers, so app code has one import for the viewer.
@@ -27,5 +28,6 @@ export { provideEmbedPdf, EPDF_SCOPED_SERVICES } from './provide';
 export * from './scope';
 export * from './page-context';
 export * from './page-layers';
+export * from './svg-shapes';
 export * from './dev';
 export * from './theme';

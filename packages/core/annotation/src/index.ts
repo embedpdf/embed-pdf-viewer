@@ -213,7 +213,13 @@ export { bodyPieces, paintedNear, paintedTouches, type PaintedPiece } from './pa
 export * from './measurement';
 export * from './measurement-shape';
 // How an annotation is drawn: the engine's raster, or live (see appearance.ts).
-export { drawnAfter, sourceOfConfirmed, sourceOfNew, type DrawState } from './appearance';
+export {
+  drawnAfter,
+  drawsLive,
+  sourceOfConfirmed,
+  sourceOfNew,
+  type DrawState,
+} from './appearance';
 export { annotationSelectionFrame, type SelectionFrame } from './selection';
 export { scene } from './scene';
 export { straightenInkStroke } from './ink';

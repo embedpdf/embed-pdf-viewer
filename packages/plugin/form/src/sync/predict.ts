@@ -219,7 +219,9 @@ function createdField(
   });
   // The first field of a document without a form creates its /AcroForm.
   const formed =
-    snapshot.formKind === 'none' ? indexFields({ ...snapshot, formKind: 'acroform' }) : index;
+    snapshot.formKind === 'none'
+      ? indexFields({ ...snapshot, formKind: 'acroform' }, index.pictureVersions)
+      : index;
   const next = withFields(formed, [created]);
   return op.draft.actions?.calculate
     ? withCalculationOrder(next, [...snapshot.calculationOrder, created.field.ref])

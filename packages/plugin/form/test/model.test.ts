@@ -18,7 +18,9 @@ import {
   fieldKeyOf,
   foldFormEvent,
   indexFields,
+  indexLoadedFields,
   pageWidgetsOf,
+  pictureVersionOf,
   removeWidgets,
   shownWidgetsOf,
   upsertWidgets,
@@ -184,6 +186,44 @@ describe('field index', () => {
       }),
     ) as FieldIndex;
     expect(fieldForWidget(index, 8)).toBeNull();
+  });
+
+  test('moves a widget’s picture version when the engine draws it again, and only then', () => {
+    const page = toPageRef(3);
+    const row = (objectNumber: number) =>
+      ({
+        subtype: 'widget',
+        ref: { kind: 'objectNumber', page, objectNumber },
+        page,
+        rect: { x: 0, y: 0, width: 10, height: 10 },
+      }) as unknown as WidgetAnnotation;
+    let index: FieldIndex = indexFields({ ...snapshot([text()]), widgets: [row(4), row(7)] });
+    const valueSet = (meta: object) =>
+      foldFormEvent(index, event({ type: 'forms.valueSet', field: text(), meta })) as FieldIndex;
+    // A checkbox that only switched state: nothing drawn, nothing to fetch.
+    index = valueSet({ changedWidgets: [{ page, objectNumber: 4 }], redrawnWidgets: [] });
+    expect([pictureVersionOf(index, 4), pictureVersionOf(index, 7)]).toEqual([0, 0]);
+    // A text value: the engine drew its widget again.
+    index = valueSet({
+      changedWidgets: [{ page, objectNumber: 4 }],
+      redrawnWidgets: [{ page, objectNumber: 4 }],
+    });
+    expect([pictureVersionOf(index, 4), pictureVersionOf(index, 7)]).toEqual([1, 0]);
+    // A fact that doesn't say what it drew drew what it changed; one naming only a page, all of it.
+    index = valueSet({ changedWidgets: [{ page, objectNumber: 7 }] });
+    index = valueSet({ changedWidgets: [{ page }] });
+    expect([pictureVersionOf(index, 4), pictureVersionOf(index, 7)]).toEqual([2, 2]);
+    // A signing draws the signed widget.
+    index = foldFormEvent(
+      index,
+      event({ type: 'signatures.completed', signature: { widget: { page, objectNumber: 7 } } }),
+    ) as FieldIndex;
+    expect(pictureVersionOf(index, 7)).toBe(3);
+    // A widget that went keeps its version, and a load moves every one past the one it had.
+    index = removeWidgets(index, [formWidget(4, page)]);
+    expect(pictureVersionOf(index, 4)).toBe(2);
+    index = indexLoadedFields(index, { ...snapshot([text()]), widgets: [row(7), row(9)] });
+    expect([4, 7, 9].map((number) => pictureVersionOf(index, number))).toEqual([3, 4, 0]);
   });
 
   test('takes the calculation order from a write that changed it, and from a reorder', () => {

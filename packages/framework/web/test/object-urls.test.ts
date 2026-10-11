@@ -4,10 +4,9 @@ import {
   bakedAppearanceOf,
   createShownUrls,
   loadAppearanceUrls,
-  loadFieldPictureUrls,
   loadObjectUrl,
   objectUrlOf,
-  shownFieldPicture,
+  shownAppearance,
 } from '../src/object-urls';
 
 let made = 0;
@@ -61,13 +60,15 @@ describe('loadAppearanceUrls', () => {
     const revoke = vi.fn();
     return {
       ref: key,
+      state: null,
       rect: { x: 0, y: 0, width: 1, height: 1 },
+      version: 2,
       image: { objectUrl: () => ({ abortWith: async () => ({ url: `url:${key}`, revoke }) }) },
       revoke,
     };
   };
 
-  it('hands over every URL by key, and keeps them until the next set is shown', async () => {
+  it('hands over every URL by key and state, with its version, and keeps them until the next set is shown', async () => {
     const shown = createShownUrls();
     const first = [picture('a'), picture('b')];
     const onLoaded = vi.fn();
@@ -79,8 +80,8 @@ describe('loadAppearanceUrls', () => {
     );
     await flush();
     expect(onLoaded).toHaveBeenCalledWith({
-      'key:a': { url: 'url:a', box: first[0]!.rect },
-      'key:b': { url: 'url:b', box: first[1]!.rect },
+      'key:a|': { url: 'url:a', box: first[0]!.rect, version: 2 },
+      'key:b|': { url: 'url:b', box: first[1]!.rect, version: 2 },
     });
     // The page changed: the next load starts, and what shows stays valid meanwhile.
     cancel();
@@ -138,30 +139,23 @@ describe('loadAppearanceUrls', () => {
   });
 });
 
-describe('bakedAppearanceOf', () => {
-  it('is the loaded URL of the annotation, or null until it loads', () => {
-    const urls = { 'obj:7': { url: 'blob:7', box: { x: 0, y: 0, width: 10, height: 10 } } };
-    expect(bakedAppearanceOf(urls, 'obj:7')).toEqual({ url: 'blob:7' });
-    expect(bakedAppearanceOf(urls, 'obj:8')).toBeNull();
-  });
-});
-
-describe('field pictures', () => {
+describe('every state of every item', () => {
   const box = { x: 0, y: 0, width: 10, height: 10 };
-  const picture = (widget: string, state: string | null) => ({
-    ref: widget,
+  const picture = (item: string, state: string | null) => ({
+    ref: item,
     state,
     rect: box,
+    version: 0,
     image: {
       objectUrl: () => ({
-        abortWith: async () => ({ url: `url:${widget}:${state}`, revoke: () => {} }),
+        abortWith: async () => ({ url: `url:${item}:${state}`, revoke: () => {} }),
       }),
     },
   });
 
-  it('loads every state, and a widget shows the one it is in', async () => {
+  it('are loaded, and an item shows the one it is in', async () => {
     const onLoaded = vi.fn();
-    loadFieldPictureUrls(
+    loadAppearanceUrls(
       createShownUrls(),
       async () => [picture('check', 'Yes'), picture('check', 'Off'), picture('name', null)],
       (ref) => `obj:${ref}`,
@@ -169,12 +163,15 @@ describe('field pictures', () => {
     );
     await flush();
     const urls = onLoaded.mock.calls[0]![0];
-    expect(shownFieldPicture(urls, 'obj:check', 'Yes')?.url).toBe('url:check:Yes');
-    // A widget with states that names none shows `Off`.
-    expect(shownFieldPicture(urls, 'obj:check', null)?.url).toBe('url:check:Off');
-    // A widget without states shows its only picture.
-    expect(shownFieldPicture(urls, 'obj:name', null)?.url).toBe('url:name:null');
-    expect(shownFieldPicture(urls, 'obj:check', 'Maybe')).toBeNull();
-    expect(shownFieldPicture(urls, 'obj:other', null)).toBeNull();
+    expect(shownAppearance(urls, 'obj:check', 'Yes')?.url).toBe('url:check:Yes');
+    // An item with states that names none shows `Off`.
+    expect(shownAppearance(urls, 'obj:check', null)?.url).toBe('url:check:Off');
+    // An item without states shows its only picture.
+    expect(shownAppearance(urls, 'obj:name', null)?.url).toBe('url:name:null');
+    expect(shownAppearance(urls, 'obj:check', 'Maybe')).toBeNull();
+    expect(shownAppearance(urls, 'obj:other', null)).toBeNull();
+    // A renderer's `appearance`: the URL of the state it shows, or null until it loads.
+    expect(bakedAppearanceOf(urls, 'obj:check', 'Yes')).toEqual({ url: 'url:check:Yes' });
+    expect(bakedAppearanceOf(urls, 'obj:other', null)).toBeNull();
   });
 });

@@ -248,6 +248,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
           ...redactionLabelOf(record.annotation),
           measure,
           source: sourceDuring(model, id),
+          pictureVersion: record.pictureVersion ?? 0,
           selected: model.selected.includes(id),
           ...(model.hovered === id ? { hovered: true } : {}),
           rot: geomRotation(geometry),

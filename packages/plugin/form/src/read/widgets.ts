@@ -1,30 +1,32 @@
 /**
  * The widgets' reads: each page's widgets (from the form's widget rows), the
- * ones it shows for the form layer to paint, the fill projection with the
- * session's fill permission folded in, and the widget hit test.
+ * ones it shows for the form layer to paint (and the painter's scene of each,
+ * `read/looks.ts`), the fill projection with the session's fill permission
+ * folded in, and the widget hit test.
  */
 import { memoByKey } from '@embedpdf/core';
 import type { FormFieldDTO, PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { FormHostCapability } from '../host-contract';
-import {
-  pageWidgetsOf,
-  shownWidgetsOf,
-  widgetAt,
-  type Box,
-  type ShownWidget,
-  type WidgetHit,
-} from '../model';
+import { pageWidgetsOf, widgetAt, type Box, type ShownWidget, type WidgetHit } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { fillItems, type FormWidgetItem } from './fill-items';
+import { createWidgetLooks } from './looks';
 
 const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
 const NOTHING_SHOWN: readonly ShownWidget[] = Object.freeze([]);
 
 export function createWidgetReads(
   ctx: FormContext,
-  { fields, rights, design }: Pick<FormServices, 'fields' | 'rights' | 'design'>,
+  {
+    fields,
+    rights,
+    design,
+    formatted,
+    pictures,
+  }: Pick<FormServices, 'fields' | 'rights' | 'design' | 'formatted' | 'pictures'>,
 ) {
+  const looks = createWidgetLooks({ fields, formatted, design });
   /** Every page's widgets come with the form: one read for the document. */
   const loadWidgets = (_page: PageRef): Promise<void> => fields.settled();
 
@@ -42,13 +44,6 @@ export function createWidgetReads(
     if (!page) return null;
     return widgetAt(fields.view(), widgetsOn(page.objectNumber), point);
   };
-
-  // In design mode the annotation layer draws the widgets it borrowed.
-  const shownOn = memoByKey(
-    (pageObjectNumber: number) => [fields.view(), design.lending()],
-    (pageObjectNumber, index, lent): readonly ShownWidget[] =>
-      lent ? NOTHING_SHOWN : shownWidgetsOf(index, pageObjectNumber),
-  );
 
   // A field the user may not fill in (a signature field: sign) has its
   // widgets `disabled`, the same flag a field's read-only flag sets, so the
@@ -76,8 +71,12 @@ export function createWidgetReads(
       },
       listShownWidgets: (pageArgument) => {
         const page = ctx.getPage(pageArgument)?.ref;
-        return page ? shownOn(page.objectNumber) : NOTHING_SHOWN;
+        return page ? looks.listShownWidgets(page.objectNumber) : NOTHING_SHOWN;
       },
+      getAppearanceEpoch: pictures.epoch,
+      renderAppearances: pictures.render,
+      getWidgetPainting: looks.getWidgetPainting,
+      getTextEditorLayout: looks.getTextEditorLayout,
       ensureLoaded: loadWidgets,
       getWidgetAt,
       getPageBox,

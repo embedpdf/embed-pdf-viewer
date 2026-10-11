@@ -55,6 +55,13 @@ export interface FieldIndex {
   readonly byWidget: Readonly<Record<number, number>>;
   /** Widget annotation object number → index into `snapshot.widgets`, its row. */
   readonly rowByWidget: Readonly<Record<number, number>>;
+  /**
+   * Widget annotation object number → the version of its picture. It moves
+   * when the engine draws the widget again, and only then: its pictures are
+   * fetched again exactly when it moves. A widget that went keeps its entry,
+   * so one made again with its number never takes an older picture.
+   */
+  readonly pictureVersions: Readonly<Record<number, number>>;
 }
 
 export const emptyFieldIndex = (): FieldIndex => ({
@@ -63,9 +70,13 @@ export const emptyFieldIndex = (): FieldIndex => ({
   byName: {},
   byWidget: {},
   rowByWidget: {},
+  pictureVersions: {},
 });
 
-export function indexFields(snapshot: FormSnapshot): FieldIndex {
+export function indexFields(
+  snapshot: FormSnapshot,
+  pictureVersions: FieldIndex['pictureVersions'] = {},
+): FieldIndex {
   const byKey: Record<FieldKey, number> = {};
   const byName: Record<string, number> = {};
   const byWidget: Record<number, number> = {};
@@ -80,8 +91,33 @@ export function indexFields(snapshot: FormSnapshot): FieldIndex {
   snapshot.widgets.forEach((row, position) => {
     if (row.ref.kind === 'objectNumber') rowByWidget[row.ref.objectNumber] = position;
   });
-  return { snapshot, byKey, byName, byWidget, rowByWidget };
+  return { snapshot, byKey, byName, byWidget, rowByWidget, pictureVersions };
 }
+
+/** The index of `snapshot`, keeping `index`'s picture versions. */
+const reindex = (index: FieldIndex, snapshot: FormSnapshot): FieldIndex =>
+  indexFields(snapshot, index.pictureVersions);
+
+/**
+ * A fresh read of the whole form: every widget's picture version moves past
+ * the one it had, so a reload re-fetches every picture (the pictures may
+ * have changed while the event stream wasn't trusted). A new widget starts at 0.
+ */
+export function indexLoadedFields(previous: FieldIndex, snapshot: FormSnapshot): FieldIndex {
+  const pictureVersions: Record<number, number> = {};
+  for (const [number, version] of Object.entries(previous.pictureVersions)) {
+    pictureVersions[Number(number)] = version + 1;
+  }
+  for (const row of snapshot.widgets) {
+    const number = widgetNumber(row);
+    if (number > 0) pictureVersions[number] ??= 0;
+  }
+  return indexFields(snapshot, pictureVersions);
+}
+
+/** The picture version of a widget; 0 for one the index has never seen. */
+export const pictureVersionOf = (index: FieldIndex, annotObjectNumber: number): number =>
+  index.pictureVersions[annotObjectNumber] ?? 0;
 
 /** Replace a field by key, or append it when it is new. */
 export function upsertFields(index: FieldIndex, fields: readonly FormFieldDTO[]): FieldIndex {
@@ -92,7 +128,7 @@ export function upsertFields(index: FieldIndex, fields: readonly FormFieldDTO[])
     if (position === undefined) next.push(field);
     else next[position] = field;
   }
-  return indexFields({ ...index.snapshot, fields: next });
+  return reindex(index, { ...index.snapshot, fields: next });
 }
 
 const widgetNumber = (widget: WidgetAnnotation): number =>
@@ -107,7 +143,7 @@ export function upsertWidgets(index: FieldIndex, rows: readonly WidgetAnnotation
     if (replaced) incoming.delete(widgetNumber(row));
     return replaced ?? row;
   });
-  return indexFields({ ...index.snapshot, widgets: [...next, ...incoming.values()] });
+  return reindex(index, { ...index.snapshot, widgets: [...next, ...incoming.values()] });
 }
 
 /** The page's widget rows in `order` (bottom to top), in their slots: other pages' keep theirs. */
@@ -123,7 +159,7 @@ export function reorderWidgetRows(
     order.map(annotationKey),
     (row) => annotationKey(row.ref),
   );
-  return indexFields({ ...index.snapshot, widgets });
+  return reindex(index, { ...index.snapshot, widgets });
 }
 
 /** Drop the rows of widgets that went (with their field, or with their page). */
@@ -132,7 +168,7 @@ export function removeWidgets(index: FieldIndex, gone: readonly FormWidget[]): F
   const numbers = new Set(gone.map((widget) => widget.objectNumber));
   const widgets = index.snapshot.widgets.filter((row) => !numbers.has(widgetNumber(row)));
   if (widgets.length === index.snapshot.widgets.length) return index;
-  return indexFields({ ...index.snapshot, widgets });
+  return reindex(index, { ...index.snapshot, widgets });
 }
 
 export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
@@ -143,7 +179,7 @@ export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
       : field.name !== ref.name,
   );
   if (fields.length === index.snapshot.fields.length) return index;
-  return indexFields({ ...index.snapshot, fields });
+  return reindex(index, { ...index.snapshot, fields });
 }
 
 /**
@@ -151,8 +187,51 @@ export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
  * carries the fields and the widget rows it touched as the engine read them
  * back, so the index never needs a re-read except for a repair, whose result
  * reports only counts, and for writes that remove widgets with their pages.
+ * The widgets the engine drew again take a new picture version.
  */
 export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldIndex | MirrorReload {
+  return foldFormFacts(withRedrawnPictures(index, redrawnWidgetsOf(event)), event);
+}
+
+/** A widget an event says it drew: its page, and its number when the event names it. */
+type PlacedWidget = { readonly page: PageRef | null; readonly objectNumber?: number };
+
+/**
+ * The widgets a confirmed fact drew again: the ones the engine says it
+ * redrew (`meta.redrawnWidgets`: a checkbox that only switched its state isn't
+ * one), else the ones it changed; the signed widget of a signing.
+ */
+function redrawnWidgetsOf(event: DocumentEvent): readonly PlacedWidget[] {
+  if (event.type === 'signatures.completed') {
+    return event.signature.widget ? [event.signature.widget] : [];
+  }
+  if (!event.type.startsWith('forms.') || !('meta' in event)) return [];
+  const meta = event.meta as {
+    readonly changedWidgets?: readonly PlacedWidget[];
+    readonly redrawnWidgets?: readonly PlacedWidget[];
+  };
+  return meta.redrawnWidgets ?? meta.changedWidgets ?? [];
+}
+
+/** Each widget drawn again takes a new picture version; one named by its page only, all of that page's. */
+function withRedrawnPictures(index: FieldIndex, redrawn: readonly PlacedWidget[]): FieldIndex {
+  if (redrawn.length === 0) return index;
+  const numbers = new Set<number>();
+  for (const widget of redrawn) {
+    if (widget.objectNumber) numbers.add(widget.objectNumber);
+    else if (widget.page) {
+      for (const row of index.snapshot?.widgets ?? []) {
+        if (row.page.objectNumber === widget.page.objectNumber) numbers.add(widgetNumber(row));
+      }
+    }
+  }
+  if (numbers.size === 0) return index;
+  const pictureVersions = { ...index.pictureVersions };
+  for (const number of numbers) pictureVersions[number] = (pictureVersions[number] ?? 0) + 1;
+  return { ...index, pictureVersions };
+}
+
+function foldFormFacts(index: FieldIndex, event: DocumentEvent): FieldIndex | MirrorReload {
   switch (event.type) {
     case 'forms.valueSet':
     case 'forms.widgetAdded':
@@ -169,7 +248,7 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
       const created = upsertWidgets(upsertFields(index, [event.field]), event.widgets);
       return withCalculationOrder(
         created.snapshot?.formKind === 'none'
-          ? indexFields({ ...created.snapshot, formKind: 'acroform' })
+          ? reindex(created, { ...created.snapshot, formKind: 'acroform' })
           : created,
         event.calculationOrder,
       );
@@ -221,7 +300,7 @@ export function withCalculationOrder(
   order: readonly (FormFieldRef | null)[] | undefined,
 ): FieldIndex {
   if (!order || !index.snapshot) return index;
-  return indexFields({ ...index.snapshot, calculationOrder: [...order] });
+  return reindex(index, { ...index.snapshot, calculationOrder: [...order] });
 }
 
 export const fieldByKey = (index: FieldIndex, key: FieldKey): FormFieldDTO | null => {
@@ -319,24 +398,48 @@ export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): Page
   return widgets;
 }
 
-/** A widget a page shows: its address and the appearance state it shows. */
+/** A widget a page shows: its address, the appearance state it shows, and how new its look is. */
 export interface ShownWidget {
   readonly ref: AnnotationRef;
+  /** Where it stands on its page, in page space: its picture's box, and the painter's. */
+  readonly rect: Box;
   /** The state it shows (`/AS`), or `null` for a widget without states. */
   readonly appearanceState: string | null;
+  /**
+   * Its look in the view isn't its confirmed look yet (a value, a restyle, a
+   * new field): its picture shows something older, so the painter draws it.
+   */
+  readonly pending: boolean;
+  /** Its confirmed picture version: a picture drawn at another one shows another look. */
+  readonly pictureVersion: number;
 }
 
+/** How new a shown widget's look is: whether it's pending, and its confirmed picture version. */
+export type WidgetLookOf = (
+  row: WidgetAnnotation,
+) => Pick<ShownWidget, 'pending' | 'pictureVersion'>;
+
+const AT_REST: ReturnType<WidgetLookOf> = { pending: false, pictureVersion: 0 };
+
 /** The widgets one page shows, in the order the page draws them. */
-export function shownWidgetsOf(index: FieldIndex, pageObjectNumber: number): ShownWidget[] {
+export function shownWidgetsOf(
+  index: FieldIndex,
+  pageObjectNumber: number,
+  lookOf: WidgetLookOf = () => AT_REST,
+): ShownWidget[] {
   const shown: ShownWidget[] = [];
   for (const row of index.snapshot?.widgets ?? []) {
     if (row.page.objectNumber !== pageObjectNumber || !shownOnScreen(row)) continue;
-    shown.push({ ref: row.ref, appearanceState: row.appearanceState });
+    shown.push({
+      ref: row.ref,
+      rect: row.rect,
+      appearanceState: row.appearanceState,
+      ...lookOf(row),
+    });
   }
   return shown;
 }
 
-/** A widget's row, by its object number; `null` when no page shows it. */
 export function widgetRowOf(index: FieldIndex, annotObjectNumber: number): WidgetAnnotation | null {
   const position = index.rowByWidget[annotObjectNumber];
   return position === undefined ? null : (index.snapshot?.widgets[position] ?? null);

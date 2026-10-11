@@ -38,7 +38,7 @@ interface ScenePoint {
 }
 
 /** One painted node: the structural twin of core-annotation's `SceneNode`. */
-export type SceneShapeNode =
+export type SceneShapeNode = (
   | { kind: 'rect'; rect: SceneBox; paint: ScenePaint }
   | { kind: 'ellipse'; rect: SceneBox; paint: ScenePaint }
   | { kind: 'line'; a: ScenePoint; b: ScenePoint; paint: ScenePaint }
@@ -52,10 +52,34 @@ export type SceneShapeNode =
       fontFamily?: string;
       rotation?: number;
       paint: ScenePaint;
-    };
+    }
+  | {
+      kind: 'glyphs';
+      at: ScenePoint;
+      text: string;
+      offsets: number[];
+      fontSize: number;
+      fontFamily: string;
+      fontWeight?: number;
+      fontStyle?: 'normal' | 'italic';
+      rotation?: number;
+      paint: ScenePaint;
+    }
+) & {
+  /** Drawn only inside this upright box. */
+  clip?: SceneBox;
+};
 
-/** The SVG elements a scene draws with. */
-export type SvgShapeTag = 'rect' | 'ellipse' | 'line' | 'path' | 'text' | 'polygon' | 'polyline';
+/** The SVG elements a scene draws with; a nested `svg` clips what's inside it to its box. */
+export type SvgShapeTag =
+  | 'rect'
+  | 'ellipse'
+  | 'line'
+  | 'path'
+  | 'text'
+  | 'polygon'
+  | 'polyline'
+  | 'svg';
 
 /**
  * One SVG element: its tag, its attributes under their SVG names
@@ -68,6 +92,8 @@ export interface SvgShape {
   attributes: Readonly<Record<string, string | number>>;
   text?: string;
   blend?: string;
+  /** What a clipping `svg` holds, in drawing order. */
+  children?: SvgShape[];
 }
 
 export interface SvgShapesOptions {
@@ -100,74 +126,123 @@ function paintAttributes(
   return attributes;
 }
 
-/** Each scene node as one SVG element, in drawing order, in the scene's own page-point units. */
+/**
+ * Each scene node as one SVG element, in drawing order, in the scene's own
+ * page-point units. A clipped node comes inside an `svg` of its clip box,
+ * which shows only what's inside it (no ids, so every framework draws it the
+ * same).
+ */
 export function svgShapesOf(
   nodes: readonly SceneShapeNode[],
   options: SvgShapesOptions,
 ): SvgShape[] {
   return nodes.map((node) => {
-    const painted = paintAttributes(node.paint, options.miterLimit);
-    const blend = node.paint.blend ? { blend: node.paint.blend } : {};
-    switch (node.kind) {
-      case 'rect':
-        return {
-          tag: 'rect',
-          attributes: {
-            x: node.rect.x,
-            y: node.rect.y,
-            width: node.rect.width,
-            height: node.rect.height,
-            ...painted,
-          },
-          ...blend,
-        };
-      case 'ellipse':
-        return {
-          tag: 'ellipse',
-          attributes: {
-            cx: node.rect.x + node.rect.width / 2,
-            cy: node.rect.y + node.rect.height / 2,
-            rx: node.rect.width / 2,
-            ry: node.rect.height / 2,
-            ...painted,
-          },
-          ...blend,
-        };
-      case 'line':
-        return {
-          tag: 'line',
-          attributes: { x1: node.a.x, y1: node.a.y, x2: node.b.x, y2: node.b.y, ...painted },
-          ...blend,
-        };
-      case 'path':
-        return { tag: 'path', attributes: { d: node.d, ...painted }, ...blend };
-      case 'text':
-        return {
-          tag: 'text',
-          attributes: {
-            x: node.at.x,
-            y: node.at.y,
-            ...(node.rotation
-              ? { transform: `rotate(${node.rotation} ${node.at.x} ${node.at.y})` }
-              : {}),
-            'font-size': node.fontSize,
-            ...(node.fontFamily ? { 'font-family': node.fontFamily } : {}),
-            ...painted,
-          },
-          text: node.text,
-          ...blend,
-        };
-      case 'poly':
-        return {
-          tag: node.closed ? 'polygon' : 'polyline',
-          attributes: {
-            points: node.points.map((point) => `${point.x},${point.y}`).join(' '),
-            ...painted,
-          },
-          ...blend,
-        };
-    }
+    const shape = svgShapeOf(node, options);
+    if (!node.clip) return shape;
+    const { x, y, width, height } = node.clip;
+    return {
+      tag: 'svg',
+      attributes: {
+        x,
+        y,
+        width,
+        height,
+        viewBox: `${x} ${y} ${width} ${height}`,
+        overflow: 'hidden',
+      },
+      children: [shape],
+    };
   });
+}
+
+function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
+  const painted = paintAttributes(node.paint, options.miterLimit);
+  const blend = node.paint.blend ? { blend: node.paint.blend } : {};
+  switch (node.kind) {
+    case 'rect':
+      return {
+        tag: 'rect',
+        attributes: {
+          x: node.rect.x,
+          y: node.rect.y,
+          width: node.rect.width,
+          height: node.rect.height,
+          ...painted,
+        },
+        ...blend,
+      };
+    case 'ellipse':
+      return {
+        tag: 'ellipse',
+        attributes: {
+          cx: node.rect.x + node.rect.width / 2,
+          cy: node.rect.y + node.rect.height / 2,
+          rx: node.rect.width / 2,
+          ry: node.rect.height / 2,
+          ...painted,
+        },
+        ...blend,
+      };
+    case 'line':
+      return {
+        tag: 'line',
+        attributes: { x1: node.a.x, y1: node.a.y, x2: node.b.x, y2: node.b.y, ...painted },
+        ...blend,
+      };
+    case 'path':
+      return { tag: 'path', attributes: { d: node.d, ...painted }, ...blend };
+    case 'text':
+      return {
+        tag: 'text',
+        attributes: {
+          x: node.at.x,
+          y: node.at.y,
+          ...(node.rotation
+            ? { transform: `rotate(${node.rotation} ${node.at.x} ${node.at.y})` }
+            : {}),
+          'font-size': node.fontSize,
+          ...(node.fontFamily ? { 'font-family': node.fontFamily } : {}),
+          ...painted,
+        },
+        text: node.text,
+        ...blend,
+      };
+    case 'poly':
+      return {
+        tag: node.closed ? 'polygon' : 'polyline',
+        attributes: {
+          points: node.points.map((point) => `${point.x},${point.y}`).join(' '),
+          ...painted,
+        },
+        ...blend,
+      };
+    case 'glyphs': {
+      // One x per character: each glyph starts where the PDF starts it. A space draws nothing and
+      // SVG would collapse it (and an x with it), so it's left out.
+      const drawn = node.text
+        .split('')
+        .flatMap((character, index) =>
+          /\s/.test(character) ? [] : [{ character, x: node.at.x + (node.offsets[index] ?? 0) }],
+        );
+      return {
+        tag: 'text',
+        attributes: {
+          x: drawn.map((glyph) => glyph.x).join(' '),
+          y: node.at.y,
+          ...(node.rotation
+            ? { transform: `rotate(${node.rotation} ${node.at.x} ${node.at.y})` }
+            : {}),
+          'font-size': node.fontSize,
+          'font-family': node.fontFamily,
+          ...(node.fontWeight !== undefined ? { 'font-weight': node.fontWeight } : {}),
+          ...(node.fontStyle !== undefined ? { 'font-style': node.fontStyle } : {}),
+          ...painted,
+        },
+        text: drawn.map((glyph) => glyph.character).join(''),
+        ...blend,
+      };
+    }
+  }
 }
 
 /**

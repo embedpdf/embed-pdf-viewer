@@ -19,6 +19,8 @@
       "@embedpdf/core",
       "@embedpdf/core-acrojs",
       "@embedpdf/core-annotation",
+      "@embedpdf/core-fonts",
+      "@embedpdf/core-form",
       "@embedpdf/core-geometry",
       "@embedpdf/core-js-sandbox",
       "@embedpdf/core-signature",

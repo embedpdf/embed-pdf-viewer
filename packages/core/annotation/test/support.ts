@@ -150,7 +150,7 @@ export function recordOf(input: RecordInput): ModelAnnotation {
     source: input.source,
     ...(input.apBox ? { apBox: input.apBox } : {}),
     ...(input.apRot !== undefined ? { apRot: input.apRot } : {}),
-    ...(input.apVersion !== undefined ? { apVersion: input.apVersion } : {}),
+    ...(input.pictureVersion !== undefined ? { pictureVersion: input.pictureVersion } : {}),
     ...(input.authority ? { authority: input.authority } : {}),
     annotation: { ...written, ...label, ...stated } as Annotation,
   };

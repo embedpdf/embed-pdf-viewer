@@ -50,7 +50,7 @@ import type { Id, Model, ModelAnnotation, Shape, Rect, ViewEnv } from './types';
 export type DrawState = Pick<ModelAnnotation, 'source' | 'apBox'>;
 
 /** Has the annotation a live drawing? Stamps, form widgets and links don't: their raster is the drawing. */
-const drawsLive = (annotation: Annotation): boolean => !kindOf(annotation).caps.rasterOnly;
+export const drawsLive = (annotation: Annotation): boolean => !kindOf(annotation).caps.rasterOnly;
 
 /** How a record this session creates is drawn at first. */
 export const sourceOfNew = (annotation: Annotation): ModelAnnotation['source'] =>

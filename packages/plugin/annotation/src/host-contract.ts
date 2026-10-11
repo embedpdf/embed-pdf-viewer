@@ -32,6 +32,7 @@ import type {
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
+import type { AppearancePicture } from '@embedpdf/plugin-render/contract/host';
 
 import type {
   Annotation,
@@ -58,15 +59,18 @@ export {
 } from './priorities';
 
 /**
- * One annotation's look at rest, as the render layer paints it: the engine's
- * picture, or, while the annotation's create is on its way, the one this
- * device made (a placed stamp's preview), which the engine's replaces.
+ * One annotation's look at rest in one of its states, as the render layer
+ * paints it: the engine's picture, or, while the annotation's create is on
+ * its way, the one this device made (a placed stamp's preview), which the
+ * engine's replaces. `version` is the record's picture version it shows
+ * (`RenderItem.pictureVersion`): one drawn at another version shows another look.
  */
 export interface AnnotationAppearancePicture extends Pick<
   AnnotationAppearanceImage,
   'ref' | 'mode' | 'state' | 'rect'
 > {
   readonly image: ImageSource;
+  readonly version: number;
 }
 
 /**
@@ -105,12 +109,14 @@ export interface AnnotationLender {
   authority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
   /** What its records' pictures on a page depend on: a new value means new pictures. */
   pictureEpoch(page: PageRef): string;
-  /** Its records' pictures on a page, at rest, in every state. */
+  /** A record's confirmed picture version; kept for one that went, so an undo brings it back with it. */
+  pictureVersion(record: AnnotationRef): number;
+  /** Its records' pictures on a page, at rest, in every state, each with its record's picture version. */
   renderAppearances(
     page: PageRef,
     scale: number,
     signal?: AbortSignal,
-  ): Promise<readonly AnnotationAppearanceImage[]>;
+  ): Promise<readonly AppearancePicture[]>;
 }
 
 export interface RecalibrationReport {
@@ -187,8 +193,18 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     zoom?: number,
   ): ChromeNode[];
   listLinkItems(page: PageRef): LinkNavItem[];
+  /**
+   * What a page's pictures depend on: its baked records at their picture
+   * versions, the stamps this session placed, the pictures kept for an undone
+   * delete and the lender's widgets. Load the pictures again when it changes,
+   * or when the appearance scale (`render.getAppearanceScale`) does.
+   */
   getAppearanceEpoch(page: PageRef): string;
-  getBakeScale(renderScale: number): number;
+  /**
+   * Every picture a page's annotations show at rest, in every state, each
+   * with its record's picture version: the engine's (through the render
+   * plugin; none without it), the lender's, and this session's placed stamps.
+   */
   renderAppearances(
     page: PageRef,
     scale: number,

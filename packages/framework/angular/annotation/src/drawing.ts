@@ -3,21 +3,12 @@
  *
  *   [epdfAnnotationFrame]      the box an annotation draws into, placed and turned like it
  *   <epdf-annotation-native>   its own drawing in that box: the engine's picture or its scene
- *   [epdfSvgAttributes]        an SVG element's attributes from a record (templates can't spread)
  *
  * No bounds math and no per-kind logic: the core computes each item's frame, box and scene,
  * and `@embedpdf/web` turns them into pixels and SVG elements, the same for every framework.
  */
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  Directive,
-  effect,
-  ElementRef,
-  inject,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, Directive, input } from '@angular/core';
+import { EpdfSvgShapes } from '@embedpdf/angular/runtime';
 import { MITER_LIMIT, scene, type RenderItem } from '@embedpdf/core-annotation';
 import {
   ghostOpacity,
@@ -25,6 +16,7 @@ import {
   sceneViewBox,
   svgShapesOf,
   type FramePixels,
+  type PictureOrPainting,
 } from '@embedpdf/web';
 
 /**
@@ -57,40 +49,13 @@ export class EpdfAnnotationFrame {
 }
 
 /**
- * An SVG element's attributes from a record of SVG names (`stroke-width`), as `@embedpdf/web`
- * describes a scene node. Set again when the record changes; an attribute that left the record
- * is removed.
- */
-@Directive({ selector: '[epdfSvgAttributes]' })
-export class EpdfSvgAttributes {
-  readonly attributes = input.required<Readonly<Record<string, string | number>>>({
-    alias: 'epdfSvgAttributes',
-  });
-
-  constructor() {
-    const element = inject<ElementRef<SVGElement>>(ElementRef).nativeElement;
-    let shown: Readonly<Record<string, string | number>> = {};
-    effect(() => {
-      const next = this.attributes();
-      for (const name of Object.keys(shown)) {
-        if (!(name in next)) element.removeAttribute(name);
-      }
-      for (const [name, value] of Object.entries(next)) {
-        if (shown[name] !== value) element.setAttribute(name, String(value));
-      }
-      shown = next;
-    });
-  }
-}
-
-/**
  * The scene, filling the item's frame: drawn upright in it, the frame turns it. Nothing until
  * the item has area (the 0×0 drawing at a press). The SVG and its viewBox stay proportional:
  * never clamp either one.
  */
 @Component({
   selector: 'epdf-annotation-scene',
-  imports: [EpdfSvgAttributes],
+  imports: [EpdfSvgShapes],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
@@ -100,31 +65,7 @@ export class EpdfSvgAttributes {
         [attr.viewBox]="viewBox"
         [style.opacity]="opacity()"
       >
-        @for (shape of shapes(); track $index) {
-          @switch (shape.tag) {
-            @case ('rect') {
-              <svg:rect [epdfSvgAttributes]="shape.attributes" [style.mix-blend-mode]="shape.blend ?? null"></svg:rect>
-            }
-            @case ('ellipse') {
-              <svg:ellipse [epdfSvgAttributes]="shape.attributes" [style.mix-blend-mode]="shape.blend ?? null"></svg:ellipse>
-            }
-            @case ('line') {
-              <svg:line [epdfSvgAttributes]="shape.attributes" [style.mix-blend-mode]="shape.blend ?? null"></svg:line>
-            }
-            @case ('path') {
-              <svg:path [epdfSvgAttributes]="shape.attributes" [style.mix-blend-mode]="shape.blend ?? null"></svg:path>
-            }
-            @case ('polygon') {
-              <svg:polygon [epdfSvgAttributes]="shape.attributes" [style.mix-blend-mode]="shape.blend ?? null"></svg:polygon>
-            }
-            @case ('polyline') {
-              <svg:polyline [epdfSvgAttributes]="shape.attributes" [style.mix-blend-mode]="shape.blend ?? null"></svg:polyline>
-            }
-            @case ('text') {
-              <svg:text [epdfSvgAttributes]="shape.attributes" [style.mix-blend-mode]="shape.blend ?? null">{{ shape.text }}</svg:text>
-            }
-          }
-        }
+        <svg:g [epdfSvgShapes]="shapes()"></svg:g>
       </svg>
     }
   `,
@@ -145,7 +86,8 @@ export class EpdfAnnotationScene {
 
 /**
  * An annotation's own drawing, filling its frame: the engine's picture where the core places it
- * (following a move as it happens), or its scene.
+ * (following a move as it happens), or its scene, as the layer's one rule picks (`shows`,
+ * `pictureOrPainting`).
  */
 @Component({
   selector: 'epdf-annotation-native',
@@ -153,33 +95,35 @@ export class EpdfAnnotationScene {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
-    @if (item().source === 'baked') {
-      @if (url() && raster(); as box) {
-        <!-- An explicit size, never clamped by a global img reset (a landscape stamp on a
-             turned page is wider than its containing block); the turn the engine took out
-             of the picture goes back on about its middle. -->
-        <img
-          alt=""
-          draggable="false"
-          style="position: absolute; max-width: none; max-height: none; pointer-events: none; transform-origin: center"
-          [attr.src]="url()"
-          [style.left]="box.left"
-          [style.top]="box.top"
-          [style.width]="box.width"
-          [style.height]="box.height"
-          [style.transform]="box.transform ?? null"
-        />
-      }
-    } @else {
+    @if (shows()?.kind === 'painting') {
       <epdf-annotation-scene [item]="item()" />
+    } @else if (picture() && raster(); as box) {
+      <!-- An explicit size, never clamped by a global img reset (a landscape stamp on a
+           turned page is wider than its containing block); the turn the engine took out
+           of the picture goes back on about its middle. -->
+      <img
+        alt=""
+        draggable="false"
+        style="position: absolute; max-width: none; max-height: none; pointer-events: none; transform-origin: center"
+        [attr.src]="picture()"
+        [style.left]="box.left"
+        [style.top]="box.top"
+        [style.width]="box.width"
+        [style.height]="box.height"
+        [style.transform]="box.transform ?? null"
+      />
     }
   `,
 })
 export class EpdfAnnotationNative {
   readonly item = input.required<RenderItem>();
-  /** The engine's picture of it, once loaded. */
-  readonly url = input<string | null>(null);
+  /** What it shows: the engine's picture, its scene, or nothing yet. */
+  readonly shows = input<PictureOrPainting<RenderItem>>(null);
 
+  protected readonly picture = computed(() => {
+    const shows = this.shows();
+    return shows?.kind === 'picture' ? shows.picture.url : null;
+  });
   protected readonly raster = computed(() => {
     const item = this.item();
     return item.raster ? rasterInFrame(item.raster, item.frame) : null;

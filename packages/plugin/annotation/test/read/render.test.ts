@@ -223,9 +223,9 @@ describe('a stamp before the engine wrote it', () => {
             });
         }),
     );
-    // The page's pictures as the engine drew them, before the stamp.
+    // The page has nothing the engine draws yet: the engine isn't asked.
     expect(await harness.capability.renderAppearances(PAGE, 2)).toEqual([]);
-    expect(harness.renderAppearances).toHaveBeenCalledTimes(1);
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(0);
     await harness.capability.stamps.arm({ source: png });
     expect(harness.capability.placeArmedStamp(PAGE, { x: 300, y: 400 })).toBe(true);
     await Promise.resolve();
@@ -234,13 +234,14 @@ describe('a stamp before the engine wrote it', () => {
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${id}@placed`);
     const [picture, ...rest] = await harness.capability.renderAppearances(PAGE, 2);
     expect(rest).toEqual([]);
-    // The engine's pictures didn't change: it isn't asked again, so nothing waits for it.
-    expect(harness.renderAppearances).toHaveBeenCalledTimes(1);
+    // The engine draws nothing new: it isn't asked, so nothing waits for it.
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(0);
     expect(picture).toMatchObject({
       ref: harness.model().byId[id!]!.annotation.ref,
       mode: 'normal',
       state: null,
       rect: harness.model().byId[id!]!.apBox,
+      version: 0,
     });
     const blob = await picture!.image.blob();
     expect(blob.type).toBe('image/png');
@@ -249,9 +250,9 @@ describe('a stamp before the engine wrote it', () => {
     // The engine's picture is there now: the page fetches it, and the placed one is gone.
     answer();
     await harness.ctx.changes.whenSettled();
-    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${id}@1:`);
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${id}@1`);
     expect(await harness.capability.renderAppearances(PAGE, 2)).toEqual([]);
-    expect(harness.renderAppearances).toHaveBeenCalledTimes(2);
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -282,7 +283,9 @@ describe('an annotation an undo brings back', () => {
       image: { objectUrl: () => null, blob: () => null },
     };
     harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
-    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([picture]);
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
 
     await harness.capability.delete(ref);
     const deleted = harness.applied.at(-1)!;
@@ -292,7 +295,9 @@ describe('an annotation an undo brings back', () => {
       shows: [{ type: 'annotations.restore', annotation: harness.read(stamp), index: 0 }],
     });
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('obj:30@kept');
-    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([picture]);
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
   });
 
   it('undone before the engine answered, the page shows the pictures it had, asking the engine for nothing', async () => {
@@ -322,7 +327,9 @@ describe('an annotation an undo brings back', () => {
     };
     harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
     const before = harness.capability.getAppearanceEpoch(PAGE);
-    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([picture]);
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
 
     // The delete stays on its way; the page without the stamp is drawn meanwhile.
     let answer!: () => void;
@@ -339,7 +346,9 @@ describe('an annotation an undo brings back', () => {
 
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(before);
     const asked = harness.renderAppearances.mock.calls.length;
-    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([picture]);
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
     expect(harness.renderAppearances.mock.calls.length).toBe(asked);
     answer();
     await deleting;

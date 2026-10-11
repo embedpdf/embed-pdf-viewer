@@ -25,6 +25,7 @@
 export * from '@embedpdf/plugin-annotation';
 import type { EventHook, PageRef } from '@embedpdf/core';
 import {
+  drawsLive,
   scene,
   MITER_LIMIT,
   type FieldValues,
@@ -56,6 +57,7 @@ import {
   previewBucket,
 } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
   annotationChromePaint,
   annotationDrawingOf,
@@ -73,11 +75,13 @@ import {
   loadObjectUrl,
   lookFrameOf,
   pickRequestedFile,
+  pictureOrPainting,
   rasterInFrame,
   rectInPixels,
   registerRendererBehaviors,
   sameAnnotationAnchor,
   sceneViewBox,
+  shownAppearance,
   svgShapesOf,
   textBoxEditorScaleOf,
   textBoxStyleOf,
@@ -116,6 +120,7 @@ import {
   useViewerSettings,
 } from './runtime';
 import type { PageContextValue, PageLayout } from './runtime';
+import { svgElements } from './svg-shapes';
 
 export { useAnnotationSettings, useAnnotationState } from './annotation-hooks';
 export {
@@ -308,15 +313,6 @@ function AnnotationFrame({
 }
 
 /** SVG attribute names as React props: `stroke-width` is `strokeWidth`. */
-function reactProps(attributes: Readonly<Record<string, string | number>>) {
-  return Object.fromEntries(
-    Object.entries(attributes).map(([name, value]) => [
-      name.replace(/-([a-z])/g, (_dash, letter: string) => letter.toUpperCase()),
-      value,
-    ]),
-  );
-}
-
 /**
  * The scene, filling the item's frame: drawn upright in it, the frame turns
  * it. The core computed the box and the painted scene; `@embedpdf/web`
@@ -342,19 +338,7 @@ function Shape({ item }: { item: RenderItem }) {
         ...(item.source === 'ghost' ? { opacity: ghostOpacity(item.ghostOpacity ?? 0.5) } : {}),
       }}
     >
-      {svgShapesOf(scene(item), { miterLimit: MITER_LIMIT }).map((shape, i) =>
-        React.createElement(
-          shape.tag,
-          {
-            key: i,
-            ...reactProps(shape.attributes),
-            ...(shape.blend
-              ? { style: { mixBlendMode: shape.blend as React.CSSProperties['mixBlendMode'] } }
-              : {}),
-          },
-          shape.text,
-        ),
-      )}
+      {svgElements(svgShapesOf(scene(item), { miterLimit: MITER_LIMIT }))}
     </svg>
   );
 }
@@ -807,7 +791,8 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
     (annotation) => annotation.listTextItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
     shallowArray,
   );
-  const [urls, setUrls] = useState<Record<string, AppearanceUrl>>({});
+  // `null` until the page's first pictures arrive.
+  const [urls, setUrls] = useState<Record<string, AppearanceUrl> | null>(null);
   // The pictures shown stay valid until the next ones are shown.
   const [shown] = useState(createShownUrls);
   useEffect(() => () => shown.release(), [shown]);
@@ -839,10 +824,13 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
   const bakedKey = useSelector(AnnotationHostToken, (annotation) =>
     annotation.getAppearanceEpoch(page.ref),
   );
-  // The bake scale follows the document's render policy: zoom ticks inside an
-  // appearance-lattice rung re-bake nothing; crossing 1→2 re-bakes once.
-  const bakeScale = useSelector(AnnotationHostToken, (annotation) =>
-    annotation.getBakeScale(page.transform.renderScale),
+  // The appearance scale follows the document's render policy: zoom ticks
+  // inside an appearance-lattice rung re-bake nothing; crossing 1→2 re-bakes
+  // once. Without the render plugin, only this session's pictures load.
+  const bakeScale = useOptionalSelector(
+    RenderToken,
+    (render) => render.getAppearanceScale(page.transform.renderScale),
+    page.transform.renderScale,
   );
 
   useEffect(
@@ -864,16 +852,24 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
       {items.map((item) => {
         // The default look, inside the item's frame: the engine's raster where
         // the core places it (following a move as it happens), or the scene.
-        const baked = urls[item.id];
+        const state = item.annotation?.appearanceState ?? null;
+        const shows = pictureOrPainting({
+          pending: item.source !== 'baked',
+          picture: urls && shownAppearance(urls, item.id, state),
+          version: item.pictureVersion ?? 0,
+          loaded: urls !== null,
+          paint: () =>
+            item.source !== 'baked' || (item.annotation && drawsLive(item.annotation))
+              ? item
+              : null,
+        });
         const native: React.ReactNode =
-          item.source === 'baked' ? (
-            baked && item.raster ? (
-              <BakedImage url={baked.url} box={rasterInFrame(item.raster, item.frame)} />
-            ) : null
-          ) : (
+          shows?.kind === 'painting' ? (
             // shapes, cloudy, markup: all painted via scene()
             <Shape item={item} />
-          );
+          ) : shows?.kind === 'picture' && item.raster ? (
+            <BakedImage url={shows.picture.url} box={rasterInFrame(item.raster, item.frame)} />
+          ) : null;
         const framed = (
           content: React.ReactNode,
           options?: { interactive?: boolean; inert?: boolean },
@@ -897,7 +893,7 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
               annotation={annotation}
               frame={lookFrameOf(pixels, scaled)}
               native={native}
-              appearance={bakedAppearanceOf(urls, item.id)}
+              appearance={urls && bakedAppearanceOf(urls, item.id, state)}
               hovered={item.hovered ?? false}
               selected={item.selected}
               interactive={interactive}

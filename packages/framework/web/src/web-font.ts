@@ -44,6 +44,62 @@ export async function mountWebFont(
   return () => release(holders, key);
 }
 
+/**
+ * A font program to mount: its CSS family, its style, and its bytes. The
+ * structural twin of `@embedpdf/core-fonts`' `FontProgram`, whose family is
+ * named by the program's hash, so it never shadows another font.
+ */
+export interface MountableFontProgram {
+  readonly family: string;
+  readonly weight: number;
+  readonly style: 'normal' | 'italic';
+  load(): Promise<Uint8Array>;
+}
+
+/**
+ * Mount a program under its own family, in its own weight and style, so CSS
+ * asking for that style takes it as it is and never fakes a bold or an
+ * italic. Refcounted per document like {@link mountWebFont}; resolves with
+ * the unmount.
+ */
+export async function mountFontProgram(
+  program: MountableFontProgram,
+  options: { document?: Document } = {},
+): Promise<() => void> {
+  const bytes = await program.load();
+  return mountWebFont(program.family, bytes, {
+    ...options,
+    weight: program.weight,
+    style: program.style,
+  });
+}
+
+/**
+ * The programs one layer has mounted: each mounted once, however often it's
+ * asked for, and all let go together when the layer goes (a program another
+ * layer holds stays, refcounted per document). A mount after the release
+ * holds again, for a layer that comes back (React's strict mode runs effects
+ * twice).
+ */
+export function createFontMounts(options: { document?: Document } = {}) {
+  const held = new Map<string, Promise<() => void>>();
+  return {
+    mount(programs: readonly MountableFontProgram[]): void {
+      for (const program of programs) {
+        if (held.has(program.family)) continue;
+        held.set(
+          program.family,
+          mountFontProgram(program, options).catch(() => () => {}),
+        );
+      }
+    },
+    release(): void {
+      for (const unmount of held.values()) void unmount.then((off) => off());
+      held.clear();
+    },
+  };
+}
+
 interface Holder {
   face: FontFace;
   doc: Document;

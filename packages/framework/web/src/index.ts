@@ -123,7 +123,13 @@ export type {
   RichTextEditorScript,
   RichTextEditorStyle,
 } from './rich-text-editor';
-export { mountWebFont } from './web-font';
+export {
+  createFontMounts,
+  mountFontProgram,
+  mountWebFont,
+  type MountableFontProgram,
+} from './web-font';
+export { pictureOrPainting, type LookState, type PictureOrPainting } from './picture-or-painting';
 export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
 export type { LineModel, WebFontMetrics } from './web-font-metrics';
 export { EPDF_VARIABLES, epdfThemeVariables, mixAccent, paint, paintDefault } from './theme';
@@ -211,15 +217,13 @@ export {
   bakedAppearanceOf,
   createShownUrls,
   loadAppearanceUrls,
-  loadFieldPictureUrls,
   loadObjectUrl,
   objectUrlOf,
-  shownFieldPicture,
+  shownAppearance,
 } from './object-urls';
 export type {
   AppearancePicture,
   AppearanceUrl,
-  FieldPicture,
   ObjectUrl,
   PictureBytes,
   ShownUrls,
@@ -264,6 +268,7 @@ export type {
   FormControlFill,
   FormFocusRingStyle,
   ListBoxControlStyle,
+  TextEditorLayout,
   TextFieldEditorStyle,
   WidgetBoxStyle,
 } from './form-styles';

@@ -18,6 +18,7 @@
   // appearances…): the same runtime token as the public one, typed wider.
   import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
   import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+  import { RenderToken } from '@embedpdf/plugin-render/contract/host';
   import {
     annotationDrawingOf,
     bakedAppearanceOf,
@@ -122,7 +123,8 @@
 
   // ── baked appearances ──────────────────────────────────────────────────────
 
-  let urls = $state.raw<Record<string, AppearanceUrl>>({});
+  // `null` until the page's first pictures arrive.
+  let urls = $state.raw<Record<string, AppearanceUrl> | null>(null);
   // The pictures shown stay valid until the next ones are shown.
   const shown = createShownUrls();
   $effect(() => () => shown.release());
@@ -135,12 +137,13 @@
     (host) => host.getAppearanceEpoch(page.ref),
     null,
   );
-  // The bake scale follows the document's render policy: zoom steps inside one rung of the
-  // appearance lattice bake nothing again.
+  // The appearance scale follows the document's render policy: zoom steps inside one rung of the
+  // appearance lattice bake nothing again. Without the render plugin, only this session's
+  // pictures load.
   const bakeScale = useOptionalSelector(
-    AnnotationHostToken,
-    (host) => host.getBakeScale(page.transform.renderScale),
-    0,
+    RenderToken,
+    (render) => render.getAppearanceScale(page.transform.renderScale),
+    page.transform.renderScale,
   );
   $effect(() => {
     const host = annotation.current;
@@ -188,15 +191,14 @@
 <div style="position: absolute; inset: 0; pointer-events: none">
   {#each items.current as item (item.id)}
     {@const drawing = drawingOf(item)}
-    {@const url = urls[item.id]?.url ?? null}
     <!-- The layer's own drawing, for a renderer to keep: `{@render native()}`. -->
     {#snippet native()}
-      <NativeDrawing {item} {url} />
+      <NativeDrawing {item} {urls} />
     {/snippet}
     <!-- The same in its frame, where the layer draws it: what a sibling plugin's renderer keeps. -->
     {#snippet framedNative()}
       <AnnotationFrame {item} {page}>
-        <NativeDrawing {item} {url} />
+        <NativeDrawing {item} {urls} />
       </AnnotationFrame>
     {/snippet}
     {#if drawing.kind === 'owned' && item.annotation}
@@ -218,7 +220,8 @@
           {item}
           {page}
           {native}
-          appearance={bakedAppearanceOf(urls, item.id)}
+          appearance={urls &&
+            bakedAppearanceOf(urls, item.id, item.annotation?.appearanceState ?? null)}
           interactive={drawing.interactive}
         />
       </AnnotationFrame>
@@ -226,7 +229,7 @@
       <!-- Inert when an engaged behavior has no renderer of yours: its plugin owns the input (a
            link's anchor takes the click), and the annotation keeps its own look. -->
       <AnnotationFrame {item} {page} inert={drawing.kind === 'native' && drawing.inert}>
-        <NativeDrawing {item} {url} />
+        <NativeDrawing {item} {urls} />
       </AnnotationFrame>
     {/if}
   {/each}

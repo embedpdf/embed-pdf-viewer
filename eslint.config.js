@@ -38,7 +38,15 @@ module.exports = [
   {
     // Framework samples are compiled by their dedicated tsconfig files in the
     // website check:samples script, not the root type-aware ESLint project.
-    ignores: ['node_modules', 'dist', 'build', '.turbo', 'website/src/samples/**'],
+    // The standard faces' data is generated (core-fonts' generate script).
+    ignores: [
+      'node_modules',
+      'dist',
+      'build',
+      '.turbo',
+      'website/src/samples/**',
+      'packages/core/fonts/src/standard/**/*.generated.ts',
+    ],
   },
   {
     plugins: {

@@ -97,7 +97,11 @@ async function boot(
     priority?: string;
   }> = [];
   const tasks: Array<ReturnType<typeof makeTask>> = [];
-  const appearanceCalls: Array<{ pageObjectNumber: number; options: Record<string, unknown> }> = [];
+  const appearanceCalls: Array<{
+    pageObjectNumber: number;
+    family: 'annotations' | 'widgets';
+    options: Record<string, unknown>;
+  }> = [];
   const appearanceTasks: Array<ReturnType<typeof makeTask>> = [];
   // The document as a call with these facts sees it.
   const documentWith = (facts: CallFacts): DocumentHandle =>
@@ -119,17 +123,23 @@ async function boot(
             return pending.task;
           },
         },
-        forms: {
-          renderAppearances: (appearanceOptions: Record<string, unknown>) => {
-            appearanceCalls.push({
-              pageObjectNumber: ref.objectNumber,
-              options: appearanceOptions,
-            });
-            const pending = makeTask();
-            appearanceTasks.push(pending);
-            return pending.task;
-          },
-        },
+        ...Object.fromEntries(
+          (['annotations', 'widgets'] as const).map((family) => [
+            family === 'widgets' ? 'forms' : 'annotations',
+            {
+              renderAppearances: (appearanceOptions: Record<string, unknown>) => {
+                appearanceCalls.push({
+                  pageObjectNumber: ref.objectNumber,
+                  family,
+                  options: appearanceOptions,
+                });
+                const pending = makeTask();
+                appearanceTasks.push(pending);
+                return pending.task;
+              },
+            },
+          ]),
+        ),
       }),
     }) as unknown as DocumentHandle;
   const shared = {
@@ -683,44 +693,121 @@ describe('what a picture draws', () => {
   });
 });
 
-describe('form field pictures', () => {
-  it('one fetch per page, scale and version, kept until a form fact on the page', async () => {
+describe('appearance pictures', () => {
+  const page = toPageRef(11);
+  const ref = (objectNumber: number) => ({ kind: 'objectNumber' as const, page, objectNumber });
+  /** The engine's picture of an item in a state. */
+  const drawn = (objectNumber: number, state: string | null) => ({
+    ref: ref(objectNumber),
+    mode: 'normal',
+    state,
+    rect: { x: 0, y: 0, width: 10, height: 10 },
+    image: `image ${objectNumber} ${state}`,
+  });
+
+  it('one fetch per page, family, scale and items; each picture tagged with its item’s version', async () => {
     const fixture = await boot();
-    const page = toPageRef(11);
-    const first = fixture.render.renderFieldAppearances(page, { scale: 2 });
-    const second = fixture.render.renderFieldAppearances(page, { scale: 2 });
+    const ask = (version: number) =>
+      fixture.render.renderAppearances(page, {
+        family: 'widgets',
+        scale: 2,
+        items: [{ ref: ref(5), version }],
+      });
+    const first = ask(2);
+    const second = ask(2);
     expect(fixture.appearanceCalls).toEqual([
       {
         pageObjectNumber: 11,
+        family: 'widgets',
         options: { viewport: { kind: 'scale', scale: 2 }, modes: ['normal'] },
       },
     ]);
-    fixture.appearanceTasks[0]!.resolve({ appearances: ['check-on', 'check-off'] });
-    expect(await first).toEqual(['check-on', 'check-off']);
-    expect(await second).toEqual(['check-on', 'check-off']);
-    await fixture.render.renderFieldAppearances(page, { scale: 2 });
+    // Every state is held; a picture of an item nobody asked for isn't.
+    fixture.appearanceTasks[0]!.resolve({
+      appearances: [drawn(5, 'Off'), drawn(5, 'Yes'), drawn(9, null)],
+    });
+    const tagged = [
+      { ...drawn(5, 'Off'), version: 2 },
+      { ...drawn(5, 'Yes'), version: 2 },
+    ];
+    expect(await first).toEqual(tagged);
+    expect(await second).toEqual(tagged);
+    await ask(2);
     expect(fixture.appearanceCalls).toHaveLength(1);
 
-    expect(fixture.render.getFieldAppearanceEpoch(page)).toBe(0);
-    fixture.emit(
-      documentEvent({
-        type: 'forms.widgetUpdated',
-        origin: { kind: 'local' },
-        meta: { changedWidgets: [{ page }] },
-      }),
-    );
-    expect(fixture.render.getFieldAppearanceEpoch(page)).toBe(1);
-    void fixture.render.renderFieldAppearances(page, { scale: 2 });
+    // The item was drawn again: the next ask fetches.
+    void ask(3).catch(() => undefined);
     expect(fixture.appearanceCalls).toHaveLength(2);
     await fixture.kernel.destroy();
   });
 
-  it('needs doc.forms.read', async () => {
-    const fixture = await boot({ allows: (capability) => capability !== 'doc.forms.read' });
-    await expect(
-      fixture.render.renderFieldAppearances(toPageRef(11), { scale: 1 }),
-    ).rejects.toMatchObject({ code: 'permission-denied' });
-    expect(fixture.appearanceCalls).toHaveLength(0);
+  it('keeps the last sets of a page, so an undo back to one asks for nothing', async () => {
+    const fixture = await boot();
+    const ask = (version: number) => {
+      const asked = fixture.render.renderAppearances(page, {
+        family: 'annotations',
+        scale: 1,
+        items: [{ ref: ref(7), version }],
+      });
+      fixture.appearanceTasks.at(-1)?.resolve({ appearances: [drawn(7, null)] });
+      return asked;
+    };
+    await ask(0);
+    await ask(1);
+    expect(fixture.appearanceCalls).toHaveLength(2);
+    expect(fixture.appearanceCalls.every((call) => call.family === 'annotations')).toBe(true);
+    // Undone: the page is back to its first set.
+    expect(await ask(0)).toEqual([{ ...drawn(7, null), version: 0 }]);
+    expect(fixture.appearanceCalls).toHaveLength(2);
+    // Four newer sets later, the first is gone.
+    for (const version of [2, 3, 4, 5]) await ask(version);
+    await ask(0);
+    expect(fixture.appearanceCalls).toHaveLength(7);
     await fixture.kernel.destroy();
+  });
+
+  it('keeps an item’s last pictures after it left its page, per family', async () => {
+    const fixture = await boot();
+    const asked = fixture.render.renderAppearances(page, {
+      family: 'widgets',
+      scale: 1,
+      items: [{ ref: ref(5), version: 1 }],
+    });
+    fixture.appearanceTasks[0]!.resolve({ appearances: [drawn(5, 'Off'), drawn(5, 'Yes')] });
+    await asked;
+    expect(fixture.render.keptAppearances('widgets', ref(5))).toEqual([
+      { ...drawn(5, 'Off'), version: 1 },
+      { ...drawn(5, 'Yes'), version: 1 },
+    ]);
+    expect(fixture.render.keptAppearances('annotations', ref(5))).toEqual([]);
+    await fixture.kernel.destroy();
+  });
+
+  it('a view that leaves doesn’t stop the fetch another view still waits for', async () => {
+    const fixture = await boot();
+    const options = { family: 'widgets' as const, scale: 1, items: [{ ref: ref(5), version: 0 }] };
+    const leaving = new AbortController();
+    const left = fixture.render.renderAppearances(page, { ...options, signal: leaving.signal });
+    const staying = fixture.render.renderAppearances(page, options);
+    leaving.abort();
+    await expect(left).rejects.toBeDefined();
+    expect(fixture.appearanceTasks[0]!.task.aborted).toBeUndefined();
+    fixture.appearanceTasks[0]!.resolve({ appearances: [drawn(5, null)] });
+    expect(await staying).toEqual([{ ...drawn(5, null), version: 0 }]);
+    await fixture.kernel.destroy();
+  });
+
+  it('needs doc.forms.read for widgets and doc.annotate.read for annotations', async () => {
+    for (const [family, scope] of [
+      ['widgets', 'doc.forms.read'],
+      ['annotations', 'doc.annotate.read'],
+    ] as const) {
+      const fixture = await boot({ allows: (capability) => capability !== scope });
+      await expect(
+        fixture.render.renderAppearances(page, { family, scale: 1, items: [] }),
+      ).rejects.toMatchObject({ code: 'permission-denied' });
+      expect(fixture.appearanceCalls).toHaveLength(0);
+      await fixture.kernel.destroy();
+    }
   });
 });

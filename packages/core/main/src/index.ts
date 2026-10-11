@@ -67,6 +67,7 @@ export {
 } from '@embedpdf/engine-core/runtime';
 export type {
   AnnotationAppearanceImage,
+  AnnotationRef,
   EngineRenderPolicy,
   PageLayerRights,
   PageRenderLayers,

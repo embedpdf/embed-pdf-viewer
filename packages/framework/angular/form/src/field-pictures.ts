@@ -1,8 +1,9 @@
 /**
- * `<epdf-field-pictures>`: the pictures of a page's fields, as the engine draws them, from the
- * render plugin's shared field pictures. The form layer puts it under its controls. Every state
- * is loaded, so a check box shows its new state as soon as its value changes; hidden widgets
- * aren't drawn.
+ * `<epdf-field-pictures>`: the page's fields as they look now, under the form layer's controls.
+ * Each widget shows its picture, as the engine draws it (the form plugin's, every state loaded, so
+ * a check box shows its new state at once), or the painter's drawing while its look is pending or
+ * its picture is of an older version (`pictureOrPainting`): a value, a calculation, a restyle
+ * shows at once. Hidden widgets aren't drawn.
  */
 import { isPlatformBrowser } from '@angular/common';
 import {
@@ -16,36 +17,76 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { CapabilityBinding, injectKernelHost, injectPage } from '@embedpdf/angular/runtime';
+import {
+  CapabilityBinding,
+  EpdfSvgShapes,
+  injectKernelHost,
+  injectPage,
+} from '@embedpdf/angular/runtime';
 import { annotationKey } from '@embedpdf/core';
-import { FormToken as FormHostToken, type ShownWidget } from '@embedpdf/plugin-form/contract/host';
+import { MITER_LIMIT } from '@embedpdf/core-annotation';
+import {
+  FormToken as FormHostToken,
+  type ShownWidget,
+  type WidgetPainting,
+} from '@embedpdf/plugin-form/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
+  createFontMounts,
   createShownUrls,
-  loadFieldPictureUrls,
+  loadAppearanceUrls,
+  pictureOrPainting,
   rectInPixels,
-  shownFieldPicture,
+  shownAppearance,
+  svgShapesOf,
   type AppearanceUrl,
+  type PixelRect,
+  type SvgShape,
 } from '@embedpdf/web';
 
 const NO_WIDGETS: readonly ShownWidget[] = Object.freeze([]);
 
+/** A widget as the template draws it: its picture, or the painter's shapes in its box. */
+type ShownLook = { key: string; frame: PixelRect } & (
+  | { kind: 'picture'; url: string }
+  | {
+      kind: 'painting';
+      programs: WidgetPainting['programs'];
+      viewBox: string;
+      shapes: SvgShape[];
+    }
+);
+
 @Component({
   selector: 'epdf-field-pictures',
+  imports: [EpdfSvgShapes],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // A global `img { max-width: 100% }` reset would clamp a picture: the sizes are explicit.
   template: `
-    @for (picture of pictures(); track picture.key) {
-      <img
-        alt=""
-        draggable="false"
-        style="position: absolute; max-width: none; max-height: none; pointer-events: none"
-        [attr.src]="picture.url"
-        [style.left.px]="picture.frame.left"
-        [style.top.px]="picture.frame.top"
-        [style.width.px]="picture.frame.width"
-        [style.height.px]="picture.frame.height"
-      />
+    @for (look of looks(); track look.key) {
+      @if (look.kind === 'picture') {
+        <img
+          alt=""
+          draggable="false"
+          style="position: absolute; max-width: none; max-height: none; pointer-events: none"
+          [attr.src]="look.url"
+          [style.left.px]="look.frame.left"
+          [style.top.px]="look.frame.top"
+          [style.width.px]="look.frame.width"
+          [style.height.px]="look.frame.height"
+        />
+      } @else {
+        <svg
+          style="position: absolute; overflow: visible; pointer-events: none"
+          [attr.viewBox]="look.viewBox"
+          [style.left.px]="look.frame.left"
+          [style.top.px]="look.frame.top"
+          [style.width.px]="look.frame.width"
+          [style.height.px]="look.frame.height"
+        >
+          <svg:g [epdfSvgShapes]="look.shapes"></svg:g>
+        </svg>
+      }
     }
   `,
 })
@@ -57,57 +98,94 @@ export class EpdfFieldPictures {
     () => RenderToken,
     () => this.page.documentId,
   );
-
-  /** The widgets the page shows: the same array while none of them changes. */
-  private readonly widgets = new CapabilityBinding(
+  private readonly form = new CapabilityBinding(
     this.host,
     () => FormHostToken,
     () => this.page.documentId,
-  ).select((form) => form.listShownWidgets(this.page.ref), NO_WIDGETS);
-  /** Loaded again when the page's fields change, and at appearance-scale crossings. */
-  private readonly epoch = this.render.select(
-    (render) => render.getFieldAppearanceEpoch(this.page.ref),
-    0,
   );
+
+  /** The widgets the page shows: the same array while none of them changes. */
+  private readonly widgets = this.form.select(
+    (form) => form.listShownWidgets(this.page.ref),
+    NO_WIDGETS,
+  );
+  /** Loaded again when one of the page's widgets is drawn again, and at appearance-scale crossings. */
+  private readonly epoch = this.form.select((form) => form.getAppearanceEpoch(this.page.ref), '');
   private readonly scale = this.render.select(
     (render) => render.getAppearanceScale(this.page.transform().renderScale),
     0,
   );
-  private readonly urls = signal<Record<string, AppearanceUrl>>({});
+  /** The pictures' URLs, by widget and state; `null` until the page's first ones arrive. */
+  private readonly urls = signal<Record<string, AppearanceUrl> | null>(null);
   /** The pictures shown stay valid until the next ones are shown. */
   private readonly shown = createShownUrls();
+  private readonly mounts = createFontMounts();
 
-  protected readonly pictures = computed(() => {
+  protected readonly looks = computed(() => {
     const urls = this.urls();
     const transform = this.page.transform();
-    return this.widgets().flatMap((widget) => {
+    const form = this.form.capability();
+    return this.widgets().flatMap((widget): ShownLook[] => {
       const key = annotationKey(widget.ref);
-      const picture = shownFieldPicture(urls, key, widget.appearanceState);
-      return picture
-        ? [{ key, url: picture.url, frame: rectInPixels(picture.box, transform) }]
-        : [];
+      const look = pictureOrPainting({
+        pending: widget.pending,
+        picture: urls && shownAppearance(urls, key, widget.appearanceState),
+        version: widget.pictureVersion,
+        loaded: urls !== null,
+        paint: () => form?.getWidgetPainting(widget.ref) ?? null,
+      });
+      if (!look) return [];
+      if (look.kind === 'picture') {
+        return [
+          {
+            kind: 'picture',
+            key,
+            url: look.picture.url,
+            frame: rectInPixels(look.picture.box, transform),
+          },
+        ];
+      }
+      const { x, y, width, height } = widget.rect;
+      return [
+        {
+          kind: 'painting',
+          key,
+          programs: look.painting.programs,
+          viewBox: `${x} ${y} ${width} ${height}`,
+          shapes: svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT }),
+          frame: rectInPixels(widget.rect, transform),
+        },
+      ];
     });
   });
 
   constructor() {
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
-    inject(DestroyRef).onDestroy(() => this.shown.release());
+    inject(DestroyRef).onDestroy(() => {
+      this.shown.release();
+      this.mounts.release();
+    });
     effect((onCleanup) => {
-      const render = this.render.capability();
+      const form = this.form.capability();
       const scale = this.scale();
       const ref = this.page.ref;
       this.epoch();
-      if (!render || !scale) return;
+      if (!form || !scale) return;
       onCleanup(
         untracked(() =>
-          loadFieldPictureUrls(
+          loadAppearanceUrls(
             this.shown,
-            (signal) => render.renderFieldAppearances(ref, { scale, signal }),
+            (signal) => form.renderAppearances(ref, scale, signal),
             annotationKey,
             (urls) => this.urls.set(urls),
           ),
         ),
       );
+    });
+    // The painted text in the engine's own faces.
+    effect(() => {
+      for (const look of this.looks())
+        if (look.kind === 'painting') this.mounts.mount(look.programs);
     });
   }
 }

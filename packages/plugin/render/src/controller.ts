@@ -1,4 +1,5 @@
 import {
+  annotationKey,
   CONTINUOUS_RENDER_POLICY,
   isPluginError,
   memo,
@@ -7,7 +8,6 @@ import {
   toPageRef,
   toPluginError,
   toPluginErrorInfo,
-  type AnnotationAppearanceImage,
   type BatchResult,
   type EventOrigin,
   type PluginContext,
@@ -22,7 +22,7 @@ import {
   type PluginErrorInfo,
 } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
-import { AppearanceStore } from './appearance-store';
+import { AppearanceStore, RecentPictures } from './appearance-store';
 import type {
   InvalidateOptions,
   InvalidateScope,
@@ -35,6 +35,8 @@ import type {
   RenderSettings,
 } from './contract';
 import type {
+  AppearancePicture,
+  AppearancesOptions,
   PaintSettings,
   RenderCompletedEvent,
   RenderFailedEvent,
@@ -43,13 +45,7 @@ import type {
   ViewDemand,
 } from './host-contract';
 import { pixelChangeOf } from './invalidation';
-import {
-  fieldEpochOf,
-  invalidatePages,
-  layersKeyOf,
-  renderEpochOf,
-  type RenderState,
-} from './model';
+import { invalidatePages, layersKeyOf, renderEpochOf, type RenderState } from './model';
 import {
   EMPTY_TILE_PLAN,
   resolveRenderOptions,
@@ -63,6 +59,7 @@ import { TileManager } from './tile-manager';
 
 const RENDER_SCOPE: DocCapability = 'doc.render';
 const FORMS_SCOPE: DocCapability = 'doc.forms.read';
+const ANNOTATIONS_SCOPE: DocCapability = 'doc.annotate.read';
 
 /** Every answer `getLayerRights()` gives, one object each, so the same rights are the same object. */
 const LAYER_RIGHTS: readonly (readonly PageLayerRights[])[] = [false, true].map((annotations) =>
@@ -113,7 +110,8 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     (current) => resolveRenderOptions(current),
   );
   const store = new RasterStore();
-  const appearances = new AppearanceStore();
+  const appearances = new AppearanceStore<AppearancePicture>();
+  const recentAppearances = new RecentPictures<AppearancePicture>();
   const invalidated = ctx.events.source<RenderInvalidatedEvent>();
   const renderCompleted = ctx.events.source<RenderCompletedEvent>();
   const renderFailed = ctx.events.source<RenderFailedEvent>();
@@ -371,30 +369,43 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     };
   }
 
-  // ── form field pictures: the form plane's, shared between its views ──
-  async function renderFieldAppearances(
+  // ── appearance pictures: the owners' items, shared between their views ──
+  async function renderAppearances(
     page: PageRef,
-    { scale, signal }: { scale: number; signal?: AbortSignal },
-  ): Promise<readonly AnnotationAppearanceImage[]> {
-    ctx.assertAllowed(FORMS_SCOPE, 'render.renderFieldAppearances');
+    { family, scale, items, signal }: AppearancesOptions,
+  ): Promise<readonly AppearancePicture[]> {
+    ctx.assertAllowed(
+      family === 'widgets' ? FORMS_SCOPE : ANNOTATIONS_SCOPE,
+      'render.renderAppearances',
+    );
     const pageObjectNumber = ctx.pageOf(page).ref.objectNumber;
-    const epoch = fieldEpochOf(ctx.state.get(), pageObjectNumber);
-    const key = `${pageObjectNumber}|s${scale}|e${epoch}`;
+    const versions = new Map(items.map((item) => [annotationKey(item.ref), item.version]));
+    const asked = [...versions].map(([item, version]) => `${item}@${version}`).sort();
+    const group = `${family}|${pageObjectNumber}`;
     const pictures = appearances.acquire(
-      pageObjectNumber,
-      key,
+      group,
+      `${group}|s${scale}|${asked.join(',')}`,
       async (fetchSignal) => {
         // The look at rest only, in every state: a check box keeps both its
         // pictures, and the looks under the pointer and pressed aren't drawn.
-        const task = ctx.doc
-          .page(toPageRef(pageObjectNumber))
-          .forms.renderAppearances({ viewport: { kind: 'scale', scale }, modes: ['normal'] });
+        const pageHandle = ctx.doc.page(toPageRef(pageObjectNumber));
+        const options = { viewport: { kind: 'scale' as const, scale }, modes: ['normal' as const] };
+        const task =
+          family === 'widgets'
+            ? pageHandle.forms.renderAppearances(options)
+            : pageHandle.annotations.renderAppearances(options);
         if (fetchSignal.aborted) task.abort(reasonOf(fetchSignal));
         else
           fetchSignal.addEventListener('abort', () => task.abort(reasonOf(fetchSignal)), {
             once: true,
           });
-        return (await task).appearances;
+        // The asked items' pictures, each tagged with the version it was asked at.
+        const drawn = (await task).appearances.flatMap((picture): AppearancePicture[] => {
+          const version = versions.get(annotationKey(picture.ref));
+          return version === undefined ? [] : [{ ...picture, version }];
+        });
+        recentAppearances.remember(family, drawn, (picture) => annotationKey(picture.ref));
+        return drawn;
       },
       signal,
     );
@@ -587,8 +598,8 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     getPaintSettings: paintSettings,
     getLayerRights: rights,
     createViewDemand,
-    renderFieldAppearances,
-    getFieldAppearanceEpoch: (page) => fieldEpochOf(ctx.state.get(), page.objectNumber),
+    renderAppearances,
+    keptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
     getAppearanceScale: (renderScale) => snapAppearanceScale(renderPolicy(), renderScale),
     onRenderCompleted: renderCompleted.on,
     onRenderFailed: renderFailed.on,

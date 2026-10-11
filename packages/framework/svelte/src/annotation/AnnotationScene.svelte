@@ -6,6 +6,7 @@
 <script lang="ts">
   import { MITER_LIMIT, scene, type RenderItem } from '@embedpdf/core-annotation';
   import { ghostOpacity, sceneViewBox, svgShapesOf } from '@embedpdf/web';
+  import SvgShapes from '../runtime/SvgShapes.svelte';
 
   let { item }: { item: RenderItem } = $props();
 
@@ -21,11 +22,6 @@
     style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none"
     style:opacity={item.source === 'ghost' ? ghostOpacity(item.ghostOpacity ?? 0.5) : undefined}
   >
-    {#each shapes as shape, index (index)}
-      <!-- An SVG element: Svelte takes the namespace from the `<svg>` around it. -->
-      <svelte:element this={shape.tag} {...shape.attributes} style:mix-blend-mode={shape.blend}>
-        {#if shape.text !== undefined}{shape.text}{/if}
-      </svelte:element>
-    {/each}
+    <SvgShapes {shapes} />
   </svg>
 {/if}
