@@ -243,7 +243,8 @@ export function pressToggle<Field>(
 /** The form plugin's draft calls for a text field (its host capability satisfies it). */
 export interface TextFieldDrafts<Field> {
   draftText(field: Field, text: string): void;
-  commitDraftText(field: Field): Promise<unknown>;
+  /** Resolves with how the write ended (`'rejected'`: the form's validation refused it), or `null`. */
+  commitDraftText(field: Field): Promise<{ readonly status: string } | null>;
   discardDraftText(field: Field): void;
 }
 
@@ -279,8 +280,11 @@ export interface TextFieldEditor {
 
 /**
  * The editing policy of one text field: typing drafts, blur or Enter
- * commits, Escape discards. A commit the form refuses puts the field's value
- * back.
+ * commits, Escape discards. A commit keeps the typed text until the field
+ * shows it (at once, as the form shows a fill before the engine answers), so
+ * a blur never shows the old value for a moment. A value the form's
+ * validation refuses stays typed, as in Acrobat; a write the engine refuses
+ * puts the field's value back.
  */
 export function createTextFieldEditor<Field>(
   form: TextFieldDrafts<Field>,
@@ -290,12 +294,26 @@ export function createTextFieldEditor<Field>(
   let state: TextFieldEditorState = { focused: false, draft: value };
   let fieldValue = value;
   let cancelled = false;
+  /** The text of the commit on its way, until the field shows it or the commit settles. */
+  let committing: string | null = null;
   const listeners = new Set<() => void>();
   const set = (patch: Partial<TextFieldEditorState>) => {
     const next = { ...state, ...patch };
     if (next.focused === state.focused && next.draft === state.draft) return;
     state = next;
     listeners.forEach((listener) => listener());
+  };
+  const commit = (typed: string) => {
+    committing = typed;
+    const settled = (keepTyped: boolean) => {
+      if (committing !== typed) return;
+      committing = null;
+      if (!state.focused) set({ draft: keepTyped ? typed : fieldValue });
+    };
+    form.commitDraftText(field).then(
+      (result) => settled(result?.status === 'rejected'),
+      () => settled(false),
+    );
   };
   return {
     getState: () => state,
@@ -305,8 +323,11 @@ export function createTextFieldEditor<Field>(
     },
     setValue(next) {
       fieldValue = next;
-      // Never mid-edit: what's typed stays until the edit ends.
-      if (!state.focused) set({ draft: next });
+      // Never mid-edit: what's typed stays until the edit ends. A commit's text stays until the
+      // field shows it; from then on the field's value is what shows.
+      if (state.focused || (committing !== null && next !== committing)) return;
+      committing = null;
+      set({ draft: next });
     },
     focus: () => set({ focused: true }),
     input(text) {
@@ -323,16 +344,14 @@ export function createTextFieldEditor<Field>(
     },
     blur() {
       const typed = state.draft;
-      if (cancelled) {
+      if (cancelled || typed === fieldValue) {
         cancelled = false;
         form.discardDraftText(field);
-      } else if (typed === fieldValue) {
-        form.discardDraftText(field);
-      } else {
-        void form.commitDraftText(field).catch(() => set({ draft: fieldValue }));
+        set({ focused: false, draft: fieldValue });
+        return;
       }
-      // At rest the editor shows the field's value; a commit brings the new one.
-      set({ focused: false, draft: fieldValue });
+      commit(typed);
+      set({ focused: false, draft: typed });
     },
   };
 }

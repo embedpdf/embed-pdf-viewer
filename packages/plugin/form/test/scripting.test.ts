@@ -22,7 +22,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { createSerialQueue } from '@embedpdf/core';
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const ref = (fieldObjectNumber: number) => ({
@@ -159,7 +159,7 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
     randomSeed: () => 7,
     sandboxFactory: factory,
   });
-  const controller = createFormScriptingController({
+  const controller = engineScripts({
     doc,
     document: documentMeta,
     transaction: realm.transaction,

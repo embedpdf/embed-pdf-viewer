@@ -1,9 +1,9 @@
 /**
  * The annotations an action can live on, of both read families: a page's
  * annotations (`doc.annotations`, `doc.annotate.read`) and its widgets, which
- * come with the form (`doc.forms.list()`, `doc.forms.read`). Each family is
- * read only when the session may read it, so a fill-only session still finds
- * its widgets' actions.
+ * come with the form (`ActionsForm`, `doc.forms.read`). Each family is read
+ * only when the session may read it, so a fill-only session still finds its
+ * widgets' actions.
  */
 import {
   annotationKey,
@@ -13,10 +13,12 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { ActionsContext } from './context';
+import type { ActionsForm } from './form';
 
 /** Every annotation of a page the session may read: its annotations, then its widgets. */
 export async function readPageAnnotations(
   ctx: ActionsContext,
+  form: ActionsForm,
   page: PageRef,
   read: <T>(task: Promise<T>) => Promise<T> = (task) => task,
 ): Promise<Annotation[]> {
@@ -25,9 +27,11 @@ export async function readPageAnnotations(
       ? read(ctx.doc.page(page).annotations.list()).then((list) => list.annotations)
       : Promise.resolve([]),
     ctx.allows('doc.forms.read')
-      ? read(ctx.doc.forms.list()).then((form) =>
-          form.widgets.filter((widget) => widget.page.objectNumber === page.objectNumber),
-        )
+      ? form
+          .read(read)
+          .then((snapshot) =>
+            snapshot.widgets.filter((widget) => widget.page.objectNumber === page.objectNumber),
+          )
       : Promise.resolve([]),
   ]);
   return [...annotations, ...widgets];
@@ -40,13 +44,14 @@ export async function readPageAnnotations(
  */
 export async function readAnnotation(
   ctx: ActionsContext,
+  form: ActionsForm,
   ref: AnnotationRef,
   read: <T>(task: Promise<T>) => Promise<T> = (task) => task,
 ): Promise<Annotation | null> {
   const key = annotationKey(ref);
   const matches = (candidate: Annotation) => annotationKey(candidate.ref) === key;
   if (ctx.allows('doc.forms.read')) {
-    const widget = (await read(ctx.doc.forms.list())).widgets.find(matches);
+    const widget = (await form.read(read)).widgets.find(matches);
     if (widget) return widget;
   }
   if (!ctx.allows('doc.annotate.read')) return null;

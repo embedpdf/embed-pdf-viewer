@@ -62,6 +62,11 @@ await form.setValue(toppings.ref, { selectedValues: ['cheese', 'olives'] }); // 
 It runs the same checks and scripts as typing does, and resolves with `{ field, status }`: `status`
 is `'applied'`, `'unchanged'`, or `'rejected'` when the form's own validation refused the value.
 
+The field shows the new value at once, before the engine answers, and the promise resolves once it
+has. What the form's scripts calculate from it goes with it, as one change: one request, and one
+step to undo. The field stays editable meanwhile; filling it in again is the next change. A value
+the engine refuses goes back to the one the field had.
+
 <Fw only="angular">
 
 Your own inputs can fill in fields too. `form.controlOf(ref)` gives you a field as an Angular
@@ -77,6 +82,10 @@ To fill many fields at once, such as from your backend, pass them by name:
 ```ts
 await form.importValues({ 'billing.name': 'Ada Lovelace', 'billing.country': 'NL', agree: true });
 ```
+
+`importValues()` and `setValues()` write every value as one change, with the calculations run once
+after them. Each field's own keystroke and validation scripts don't run, as when a script sets a
+field's `value` in Acrobat.
 
 <Example name="form/fill" />
 
@@ -103,8 +112,13 @@ Many forms add up totals, format dates and check values with scripts. With JavaS
 
 <Snippet name="forms/scripts" />
 
-When a script refuses a value, such as a date in the wrong format, the field keeps its old value and
+When a script refuses a value, such as a date in the wrong format, the field keeps its old value,
+the box keeps what was typed so it can be corrected, as in Acrobat, and
 <Fw only={['react', 'vue', 'svelte']}>`onValidationRejected`</Fw><Fw only="angular">`validationRejected$`</Fw> tells you why, so you can show a message.
+
+The scripts read the form as the user sees it, values still on their way included, so nothing is
+read from the engine for them. Their engine starts when the first field of a form with scripts takes
+focus, so the first value doesn't wait for it; a form without scripts never starts it.
 
 ## Reset the form
 
@@ -158,15 +172,15 @@ on [Building forms](forms/building#methods).
 | `listWidgets(page)`        | Each field box on a page, with its place, its control, its value and whether it can be filled. For drawing the fields yourself.                |
 | `getWidgetAt(page, point)` | The field box under a point on a page, with its field, or `null`                                                                               |
 | `setValue(ref, value)`     | Fills in a field with `{ value }`, `{ checked }` or `{ selectedValues }`, running the form's checks and scripts. Resolves `{ field, status }`. [Fill in a field](#fill-in-a-field) |
-| `setValues(entries)`       | Fills in several fields in order, each `{ ref, value }`; one that fails doesn't stop the rest. Resolves `{ applied, skipped, failed }`.        |
-| `importValues(values)`     | Fills in fields by full name from a plain object. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
+| `setValues(entries)`       | Fills in several fields, each `{ ref, value }`, as one change with one recalculation; a field you may not fill in, or a value it can't take, fails on its own. Resolves `{ applied, skipped, failed }`. |
+| `importValues(values)`     | Fills in fields by full name from a plain object, as one change with one recalculation. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
 | `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |
 | `export(selection?)`       | Whole fields with their boxes, values and scripts, as a bundle: every field, or `{ fields }` or `{ pages }`. [Move form data in and out](#move-form-data-in-and-out) |
 | `import(bundle, options?)` | Adds a bundle's fields, as one change. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
 | `reset(refs?)`             | Puts back each field's default, for every field the user may fill in or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
 | `validate()`               | Checks the required fields the user may fill in. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields) |
 | `activateWidget(widget)`   | Does what a click on a field box does, such as running a button's action                                                                       |
-| `getSnapshot()`            | Everything at once, as the engine's `list()` returns it: `fields`, `widgets`, `formKind`, `needsAppearances` and `calculationOrder`             |
+| `getSnapshot()`            | Everything at once, as the user sees it: what the engine's `list()` returns, with the values still on their way. `fields`, `widgets`, `formKind`, `needsAppearances` and `calculationOrder` |
 | `refresh()`                | Reads the whole form again, and <Fw only={['react', 'vue', 'svelte']}>`onResynced`</Fw><Fw only="angular">`resynced$`</Fw> fires. You rarely need it: the plugin follows every change, whoever made it.                      |
 | `canRead()`, `canFill(ref)` | Whether reading the form, and filling in a field, are allowed. [Permissions](#permissions)                                                   |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useFormSettings()`. [Settings](#settings) |
@@ -200,7 +214,8 @@ Set them when you register the plugin, and change them while the app runs with
 | `fields.background` | Inside a field that has no background of its own                           | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
 | `fields.color`      | The check mark and text of a field that has no color of its own            | `'#1f2a44'`                    | `--epdf-form-field-color`      |
 
-Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too.
+Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too,
+and a form with scripts logs a hint once.
 
 The colors are what the viewer draws around fields; a field's own colors are saved in the PDF (see
 [Building forms](forms/building)). A CSS variable wins over the setting: see

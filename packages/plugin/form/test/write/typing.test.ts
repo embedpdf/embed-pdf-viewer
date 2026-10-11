@@ -89,21 +89,30 @@ async function boot() {
     security: { allows: () => true, allowsField: () => true },
     forms: {
       list: () => Promise.resolve(snapshot),
-      setValue: (_ref: unknown, value: { value: string }) =>
-        new Promise((resolve) =>
-          writes.push(() => {
-            log.push(`write:${value.value}`);
-            const result = {
-              field: textField(value.value),
-              meta: { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] },
-            };
-            // Like both real engines: the event is published before the promise settles.
-            const event = { type: 'forms.valueSet', origin: { kind: 'local' }, ...result };
-            listeners.forEach((listener) => listener(event));
-            resolve(result);
-          }),
-        ),
     },
+    apply: (change: { ops: Array<{ value: { value: string } }> }, { opId }: { opId: string }) =>
+      new Promise((resolve) =>
+        writes.push(() => {
+          const { value } = change.ops[0]!.value;
+          log.push(`write:${value}`);
+          const meta = {
+            affectedPages: [],
+            cacheDelta: null,
+            changedFields: [],
+            changedWidgets: [],
+          };
+          // Like both real engines: the event is published before the promise settles.
+          const event = {
+            type: 'forms.valueSet',
+            origin: { kind: 'local', tx: { id: opId, index: 0, count: 1 } },
+            field: textField(value),
+            widgets: [],
+            meta,
+          };
+          listeners.forEach((listener) => listener(event));
+          resolve({ items: [], meta: { ...meta, opId, undoable: true } });
+        }),
+      ),
     download: vi.fn(async () => {
       log.push('download');
       return new Uint8Array([1]);

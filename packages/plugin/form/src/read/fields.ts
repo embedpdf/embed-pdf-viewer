@@ -111,7 +111,7 @@ export function createFieldReads(
   ctx: FormContext,
   { fields, rights, siblings }: Pick<FormServices, 'fields' | 'rights' | 'siblings'>,
 ) {
-  const all = (): readonly FormFieldDTO[] => fields.get().snapshot?.fields ?? NO_FIELDS;
+  const all = (): readonly FormFieldDTO[] => fields.view().snapshot?.fields ?? NO_FIELDS;
 
   const list = (filter?: FormFilter): readonly FormFieldDTO[] => {
     if (!filter) return all();
@@ -126,18 +126,24 @@ export function createFieldReads(
     );
   };
 
-  // One value object per field while the field stays the same, so a reader
-  // that compares by reference re-renders only when this field changes.
+  // One value object per field while its value stays the same, so a reader
+  // that compares by reference re-renders only when this field's value
+  // changes: a fill shows before the engine answers, and the answer brings the
+  // same value in a new field.
   const valueByKey = memoByKey(
-    (key: string) => [fieldByKey(fields.get(), key)],
-    (_key, field): FormFieldValue | null => (field ? valueOf(field) : null),
+    (key: string) => {
+      const field = fieldByKey(fields.view(), key);
+      return [field ? JSON.stringify(valueOf(field)) : null];
+    },
+    (_key, value): FormFieldValue | null =>
+      value === null ? null : (JSON.parse(value) as FormFieldValue | null),
     { maxEntries: 1024 },
   );
 
   // One array per field while its widgets' rows stay the same objects.
   const widgetsByKey = memoByKey(
     (key: string) => {
-      const index = fields.get();
+      const index = fields.view();
       const field = fieldByKey(index, key);
       return (field?.widgets ?? []).map((widget) => widgetRowOf(index, widget.objectNumber));
     },
@@ -147,7 +153,7 @@ export function createFieldReads(
   );
 
   const exportValues = memo(
-    () => [fields.get()],
+    () => [fields.view()],
     (index): Readonly<Record<string, FormPlainValue>> => {
       const values: Record<string, FormPlainValue> = {};
       for (const field of index.snapshot?.fields ?? []) {
@@ -160,7 +166,7 @@ export function createFieldReads(
 
   /** Where a field first shows: its page's index, then top to bottom, then left to right. */
   const placeOf = (field: FormFieldDTO): readonly [number, number, number] => {
-    const index = fields.get();
+    const index = fields.view();
     const row = field.widgets
       .map((widget) => widgetRowOf(index, widget.objectNumber))
       .find((candidate) => candidate !== null);
@@ -172,7 +178,7 @@ export function createFieldReads(
   // Only the fields the user may fill in count: another signer's empty field
   // isn't theirs to fill.
   const validate = memo(
-    () => [fields.get(), ctx.document(), rights.key()],
+    () => [fields.view(), ctx.document(), rights.key()],
     (index): FormValidation => {
       const missing = (index.snapshot?.fields ?? [])
         .filter((field) => field.required && isEmpty(field) && rights.mayFill(field))
@@ -191,7 +197,7 @@ export function createFieldReads(
   // The selection belongs to the annotation plugin: a widget is selected in
   // design mode, where widgets are boxes like any annotation.
   const getSelectedField = memo(
-    () => [fields.get(), siblings.annotation?.selection.list() ?? NOTHING_SELECTED],
+    () => [fields.view(), siblings.annotation?.selection.list() ?? NOTHING_SELECTED],
     (index, selected): FormFieldDTO | null => {
       const [annotation] = selected;
       if (selected.length !== 1 || !annotation?.subtype.startsWith('widget')) return null;
@@ -201,16 +207,16 @@ export function createFieldReads(
 
   return {
     api: {
-      getSnapshot: () => fields.get().snapshot,
+      getSnapshot: () => fields.view().snapshot,
       getStatus: fields.getStatus,
-      getFormKind: (): FormKind => fields.get().snapshot?.formKind ?? 'none',
+      getFormKind: (): FormKind => fields.view().snapshot?.formKind ?? 'none',
       refresh: (options) => ctx.cancellable(options?.signal, fields.refresh()),
-      get: (ref) => fieldByRef(fields.get(), ref),
-      getFieldForWidget: (widget) => fieldForWidget(fields.get(), widgetObjectOf(widget)),
-      getWidget: (widget) => widgetRowOf(fields.get(), widgetObjectOf(widget)),
-      getWidgets: (ref) => widgetsByKey(canonicalKey(fields.get(), ref)),
+      get: (ref) => fieldByRef(fields.view(), ref),
+      getFieldForWidget: (widget) => fieldForWidget(fields.view(), widgetObjectOf(widget)),
+      getWidget: (widget) => widgetRowOf(fields.view(), widgetObjectOf(widget)),
+      getWidgets: (ref) => widgetsByKey(canonicalKey(fields.view(), ref)),
       list,
-      getValue: (ref) => valueByKey(canonicalKey(fields.get(), ref)),
+      getValue: (ref) => valueByKey(canonicalKey(fields.view(), ref)),
       getSelectedField,
       validate,
       exportValues,

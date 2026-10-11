@@ -60,7 +60,7 @@ const annotationPagesOf = (event: DocumentEvent): readonly PageRef[] | 'all' | n
 
 export function createTriggers(
   ctx: ActionsContext,
-  { settings }: Pick<ActionsServices, 'settings'>,
+  { settings, form }: Pick<ActionsServices, 'settings' | 'form'>,
 ) {
   const triggerEnabled = (trigger: ActionTrigger): boolean => {
     const { triggers } = settings.get();
@@ -88,7 +88,7 @@ export function createTriggers(
     const key = page.objectNumber;
     const cached = lifecycleReads.get(key);
     if (cached) return cached;
-    const read = readPageAnnotations(ctx, page).then((annotations) =>
+    const read = readPageAnnotations(ctx, form, page).then((annotations) =>
       annotations
         .filter(
           (annotation) =>

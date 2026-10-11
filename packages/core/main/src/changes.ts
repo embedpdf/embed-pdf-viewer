@@ -31,6 +31,7 @@ import {
   type ChangeResult,
   type DocumentHandle,
   type FormFieldDTO,
+  type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 import { PluginError, toPluginError } from './errors';
@@ -42,7 +43,7 @@ export interface ChangeLabel {
   readonly [value: string]: string | number;
 }
 
-/** An op a view can predict: the engine's ops, and the two only an undo brings back. */
+/** An op a view can predict: the engine's ops, and the ones only an undo brings back. */
 export type PredictedOp =
   | ChangeOp
   | {
@@ -51,7 +52,19 @@ export type PredictedOp =
       /** Its place among the page's annotations. */
       readonly index: number;
     }
-  | { readonly type: 'forms.restore'; readonly field: FormFieldDTO };
+  | {
+      readonly type: 'forms.restore';
+      readonly field: FormFieldDTO;
+      /** The rows of its widgets, as they were. */
+      readonly widgets: readonly WidgetAnnotation[];
+    }
+  | {
+      readonly type: 'forms.restoreWidget';
+      /** The widget's row, as it was. */
+      readonly widget: WidgetAnnotation;
+      /** Its field as the restore leaves it, with the widget back; `null` when it had none. */
+      readonly field: FormFieldDTO | null;
+    };
 
 /** One user action, as a plugin stages it. */
 export type StagedChange =

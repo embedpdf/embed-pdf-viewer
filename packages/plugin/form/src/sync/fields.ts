@@ -1,12 +1,19 @@
 /**
  * The field tree, mirrored from the engine. It changes only by loads and by
  * confirmed form events, whoever caused them: the plugin's own writes, the
- * document's scripts, or another session. This is also the one place the
+ * document's scripts, or another session. Its view shows this session's
+ * pending changes on top (`predictFormOp`). This is also the one place the
  * value and field events fire.
  */
 import type { Mirror } from '@embedpdf/core';
 
-import { emptyFieldIndex, foldFormEvent, indexFields, type FieldIndex } from '../model';
+import {
+  emptyFieldIndex,
+  foldFormEvent,
+  indexFields,
+  predictFormOp,
+  type FieldIndex,
+} from '../model';
 import type { FormContext } from '../services/context';
 import type { FormEvents } from '../services/events';
 
@@ -19,6 +26,7 @@ export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror
     readable: () => ctx.allows('doc.forms.read'),
     load: async (doc) => ({ value: indexFields(await doc.forms.list()) }),
     fold: foldFormEvent,
+    predict: predictFormOp,
     changed: ({ cause, event, next }) => {
       if (cause === 'load') {
         if (next.snapshot) events.resynced.emit({ snapshot: next.snapshot });

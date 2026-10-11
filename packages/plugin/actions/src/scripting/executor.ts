@@ -30,7 +30,7 @@ const DEFAULT_SCRIPT_NODES_PER_DISPATCH = 16;
 
 export function registerScriptExecutor(
   ctx: ActionsContext,
-  services: Pick<ActionsServices, 'events' | 'ports' | 'queue'>,
+  services: Pick<ActionsServices, 'events' | 'ports' | 'queue' | 'form'>,
   environment: ActionsScriptEnvironment,
   { scriptHost }: Pick<ActionsRealm, 'scriptHost'>,
   { performSubmit }: ActionsSubmit,
@@ -41,7 +41,7 @@ export function registerScriptExecutor(
   const ports = services.ports.slots;
   const { budget } = services.queue;
   const { firePrintThroughAdapter } = documentEvents;
-  const { scriptWorldFor, scriptEventFor } = createScriptWorld(ctx);
+  const { scriptWorldFor, scriptEventFor } = createScriptWorld(ctx, services);
 
   /** Commit one run's document effects through the owner sinks in the
    *  declared order (form first, then annotations); the first failure skips

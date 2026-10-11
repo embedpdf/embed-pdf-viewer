@@ -4,20 +4,23 @@
  * - `FieldIndex` is the form as the engine confirmed it: the field tree and
  *   every widget row, indexed by field key and by widget. It is the value of
  *   the plugin's `fields` mirror and changes only through `foldFormEvent` and
- *   loads.
+ *   loads; `predictFormOp` shows this session's changes on top of it.
  * - `PageWidgets` is one page's widgets, where each is and how it looks,
  *   derived from the index's widget rows (`pageWidgetsOf`).
- * - `FormState` is the session state: which fields have a write in flight.
  *
  * The text being typed in a field is not here: it waits in `write/typing.ts`
  * until it is committed.
  */
-import { reload, type MirrorReload } from '@embedpdf/core';
+import { reload, type MirrorReload, type PredictedOp } from '@embedpdf/core';
 import {
   annotationKey,
+  fieldAfterReset,
+  fieldAfterValue,
   reorderPart,
+  widgetsAfterDisplay,
   type AnnotationRef,
   type DocumentEvent,
+  type FieldWithWidgets,
   type FormFieldDTO,
   type FormFieldRef,
   type FormSnapshot,
@@ -207,6 +210,157 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
   }
 }
 
+/** The rows of a field's widgets, in its widget order. */
+function rowsOfField(index: FieldIndex, field: FormFieldDTO): WidgetAnnotation[] {
+  return field.widgets.flatMap((widget) => {
+    const row = widgetRowOf(index, widget.objectNumber);
+    return row ? [row] : [];
+  });
+}
+
+/** A field and the rows of its widgets, as the index holds them. */
+const withRows = (index: FieldIndex, field: FormFieldDTO): FieldWithWidgets => ({
+  field,
+  widgets: rowsOfField(index, field),
+});
+
+/** Fields and their widget rows put into the index, all at once. */
+function withFields(index: FieldIndex, parts: readonly FieldWithWidgets[]): FieldIndex {
+  if (parts.length === 0) return index;
+  return upsertWidgets(
+    upsertFields(
+      index,
+      parts.map((part) => part.field),
+    ),
+    parts.flatMap((part) => part.widgets),
+  );
+}
+
+/** The fields a reset of the whole form puts back: the ones that hold a value. */
+const resetTargets = (index: FieldIndex): FormFieldDTO[] =>
+  (index.snapshot?.fields ?? []).filter((field) => RESET_FAMILIES.has(field.family));
+
+const RESET_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbox']);
+
+/**
+ * One op of a change this session staged, shown before the engine answers,
+ * by the engine's own rules (`fieldAfterValue`, `fieldAfterReset`,
+ * `widgetsAfterDisplay`): what the field and its widgets hold after it. An op
+ * the engine would refuse shows nothing; its refusal takes the change away.
+ * The design ops show once the engine answers.
+ *
+ * The view replays every pending change each time any change is staged; the
+ * same op over the same form gives the same form, so a field keeps its object
+ * while nothing about it changed.
+ */
+export function predictFormOp(index: FieldIndex, op: PredictedOp): FieldIndex {
+  let byOp = predictions.get(index);
+  const known = byOp?.get(op);
+  if (known) return known;
+  const next = predictOnce(index, op);
+  if (!byOp) predictions.set(index, (byOp = new WeakMap()));
+  byOp.set(op, next);
+  return next;
+}
+
+const predictions = new WeakMap<FieldIndex, WeakMap<PredictedOp, FieldIndex>>();
+
+function predictOnce(index: FieldIndex, op: PredictedOp): FieldIndex {
+  try {
+    switch (op.type) {
+      case 'forms.setValue': {
+        const field = fieldByRef(index, op.field);
+        return field
+          ? withFields(index, [fieldAfterValue(withRows(index, field), op.value)])
+          : index;
+      }
+      case 'forms.reset': {
+        const targets = op.fields
+          ? op.fields.flatMap((ref) => fieldByRef(index, ref) ?? [])
+          : resetTargets(index);
+        return withFields(
+          index,
+          targets.map((field) => fieldAfterReset(withRows(index, field))),
+        );
+      }
+      case 'forms.setDisplay': {
+        const field = fieldByRef(index, op.field);
+        if (!field) return index;
+        return upsertWidgets(index, widgetsAfterDisplay(rowsOfField(index, field), op.display));
+      }
+      case 'forms.restore':
+        return withFields(index, [op]);
+      case 'forms.restoreWidget': {
+        const restored = upsertWidgets(index, [op.widget]);
+        return op.field ? upsertFields(restored, [op.field]) : restored;
+      }
+      default:
+        return index;
+    }
+  } catch {
+    return index;
+  }
+}
+
+/** Whether any field has a keystroke, validate, calculate or format script. */
+export function formHasScripts(index: FieldIndex): boolean {
+  return (index.snapshot?.fields ?? []).some(
+    ({ actions }) =>
+      !!(actions?.keystroke || actions?.validate || actions?.calculate || actions?.format),
+  );
+}
+
+/** The fields a change's ops write a value or a look to, each once, in op order. */
+export function fieldsNamedBy(index: FieldIndex, ops: readonly PredictedOp[]): FormFieldDTO[] {
+  const named = new Map<FieldKey, FormFieldDTO>();
+  const add = (field: FormFieldDTO | null): void => {
+    if (field && !named.has(fieldKeyOf(field))) named.set(fieldKeyOf(field), field);
+  };
+  for (const op of ops) {
+    switch (op.type) {
+      case 'forms.setValue':
+      case 'forms.setDisplay':
+      case 'forms.setAppearanceText':
+        add(fieldByRef(index, op.field));
+        break;
+      case 'forms.reset':
+        for (const field of op.fields
+          ? op.fields.map((ref) => fieldByRef(index, ref))
+          : resetTargets(index)) {
+          add(field);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return [...named.values()];
+}
+
+/** `index` with these fields, and their widget rows, as `source` holds them. */
+export function withFieldsFrom(
+  index: FieldIndex,
+  source: FieldIndex,
+  fields: readonly FormFieldDTO[],
+): FieldIndex {
+  return withFields(
+    index,
+    fields.flatMap((field) => {
+      const held = fieldByKey(source, fieldKeyOf(field));
+      return held ? [withRows(source, held)] : [];
+    }),
+  );
+}
+
+/** What undoing a change of these ops looks like: each field they write, and its widgets, as `before` holds them. */
+export function restoresOf(before: FieldIndex, ops: readonly PredictedOp[]): PredictedOp[] {
+  return fieldsNamedBy(before, ops).map((field) => ({
+    type: 'forms.restore',
+    field,
+    widgets: rowsOfField(before, field),
+  }));
+}
+
 /** The index with the calculation order a write answered, when the write changed it. */
 function withCalculationOrder(index: FieldIndex, order: FormFieldRef[] | undefined): FieldIndex {
   if (!order || !index.snapshot) return index;
@@ -367,18 +521,7 @@ export function widgetAt(
 
 // ── session state ────────────────────────────────────────────────────────────
 
-export interface FormState {
-  /** Fields with an engine write in flight; their controls render disabled. */
-  readonly writing: Readonly<Record<FieldKey, true>>;
-}
+/** The plugin's session state: nothing yet; a write in flight shows in the mirror's view. */
+export type FormState = Readonly<Record<string, never>>;
 
-export const initialFormState = (): FormState => ({ writing: {} });
-
-export const beginWrite = (state: FormState, key: FieldKey): FormState =>
-  state.writing[key] ? state : { ...state, writing: { ...state.writing, [key]: true } };
-
-export function endWrite(state: FormState, key: FieldKey): FormState {
-  if (!state.writing[key]) return state;
-  const { [key]: _settled, ...writing } = state.writing;
-  return { ...state, writing };
-}
+export const initialFormState = (): FormState => ({});

@@ -19,7 +19,6 @@ import {
   type Box,
   type FieldIndex,
   type FieldKey,
-  type FormState,
   type FormWidgetLook,
   type PageWidget,
   type PageWidgets,
@@ -89,7 +88,6 @@ export type FormWidgetItem = FormWidgetItemBase &
 export function projectWidget(
   field: FormFieldDTO,
   annotObjectNumber: number,
-  writing: FormState['writing'],
   widget: PageWidget,
   fillable: boolean,
 ): FormWidgetItem | null {
@@ -102,7 +100,7 @@ export function projectWidget(
       field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber)?.ref ?? null,
     box: widget.box,
     look: widget.look,
-    disabled: field.readOnly || !fillable || writing[key] === true,
+    disabled: field.readOnly || !fillable,
     label: field.alternateName ?? field.name,
   };
   switch (field.family) {
@@ -179,7 +177,6 @@ export function fillItems(
   index: FieldIndex,
   pageObjectNumber: number,
   widgets: PageWidgets | undefined,
-  writing: FormState['writing'],
   mayFill: (field: FormFieldDTO) => boolean,
 ): FormWidgetItem[] {
   if (!index.snapshot || !widgets) return [];
@@ -189,7 +186,7 @@ export function fillItems(
       if (widget.page?.objectNumber !== pageObjectNumber) continue;
       const placed = widgets[widget.objectNumber];
       if (!placed) continue;
-      const item = projectWidget(field, widget.objectNumber, writing, placed, mayFill(field));
+      const item = projectWidget(field, widget.objectNumber, placed, mayFill(field));
       if (item) items.push(item);
     }
   }

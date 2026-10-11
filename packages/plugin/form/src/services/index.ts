@@ -26,8 +26,8 @@ export interface FormServices {
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
   /**
-   * Every durable write rides one serial queue, so a write driven by the
-   * actions plugin never interleaves with a user's in-flight commit.
+   * Every durable write takes its turn on one serial queue: a fill until it is
+   * sent (write/fill.ts), a design write until the engine answers.
    */
   readonly enqueue: SerialQueue;
   /** The key a field is known by, whichever ref names it (`toFieldRef(name)` too). */
@@ -45,6 +45,6 @@ export function createServices(ctx: FormContext): FormServices {
     siblings,
     scripting: createScriptingSeam(ctx, siblings),
     enqueue: ctx.serialQueue('writes'),
-    keyOf: (ref) => canonicalKey(fields.get(), ref),
+    keyOf: (ref) => canonicalKey(fields.view(), ref),
   };
 }

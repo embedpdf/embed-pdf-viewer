@@ -29,13 +29,14 @@ import type { ActionsDocumentEvents } from '../lifecycle/document-events';
 
 export function createRunner(
   ctx: ActionsContext,
-  services: Pick<ActionsServices, 'policy' | 'ports' | 'events'>,
+  services: Pick<ActionsServices, 'policy' | 'ports' | 'events' | 'form'>,
   { performSubmit }: ActionsSubmit,
   { firePrintThroughAdapter }: Pick<ActionsDocumentEvents, 'firePrintThroughAdapter'>,
 ) {
   const { decisionFor } = services.policy;
   const ports = services.ports.slots;
   const { reportDiagnostic } = services.events;
+  const { form } = services;
 
   async function run(
     tree: PdfActionTree,
@@ -106,7 +107,7 @@ export function createRunner(
         else names.push(target.name);
       }
       if (names.length || bareObjectNumbers.length) {
-        const snapshot = await ctx.doc.forms.list();
+        const snapshot = await form.read();
         for (const name of names) {
           const field = snapshot.fields.find((candidate) => candidate.name === name);
           if (!field) {

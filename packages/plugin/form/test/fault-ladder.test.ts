@@ -21,7 +21,7 @@ import {
   type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const ref = (fieldObjectNumber: number) => ({
@@ -150,7 +150,7 @@ function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbo
     randomSeed: () => 7,
     sandboxFactory: vi.fn(async () => sandbox),
   });
-  const controller = createFormScriptingController({
+  const controller = engineScripts({
     doc,
     document: documentMeta,
     transaction: realm.transaction,

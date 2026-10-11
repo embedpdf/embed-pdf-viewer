@@ -15,6 +15,7 @@ import { createWidgetReads } from './read/widgets';
 import { createServices, type FormContext } from './services';
 import { createActivation } from './write/activation';
 import { createFieldWrites } from './write/fields';
+import { createFill } from './write/fill';
 import { createInterchange } from './write/interchange';
 import { createResetWrites } from './write/reset';
 import { createScriptEffects } from './write/script-effects';
@@ -29,13 +30,14 @@ export function createFormController(ctx: FormContext) {
   const fields = createFieldReads(ctx, services);
   const widgets = createWidgetReads(ctx, services);
 
-  const values = createValueWrites(ctx, services);
+  const fills = createFill(ctx, services);
+  const values = createValueWrites(ctx, services, fills);
   const typing = createTyping(ctx, services, values.setText);
-  const resets = createResetWrites(ctx, services);
+  const resets = createResetWrites(ctx, services, fills);
   const design = createFieldWrites(ctx, services);
   const interchange = createInterchange(ctx, services);
-  const activation = createActivation(ctx, services);
-  const scripts = createScriptEffects(ctx);
+  const activation = createActivation(ctx, services, fills);
+  const scripts = createScriptEffects(ctx, services, fills);
 
   const api: FormHostCapability = composeApi('form', [
     settings.api,
@@ -51,7 +53,7 @@ export function createFormController(ctx: FormContext) {
     {
       canRead: () => ctx.allows('doc.forms.read'),
       canFill: (ref: FormFieldRef) => {
-        const field = fieldByRef(services.fields.get(), ref);
+        const field = fieldByRef(services.fields.view(), ref);
         return field !== null && rights.mayFill(field);
       },
       canDesign: () => ctx.allows('doc.forms.modify'),

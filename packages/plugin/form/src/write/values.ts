@@ -1,8 +1,7 @@
 /**
- * Value writes, all on the one write queue: one field through the form's
- * scripts (when the `validation` setting runs them), and the batch verbs
- * built on it. The fields mirror applies each confirmed write; these verbs
- * only mark the field as in flight while the engine works.
+ * Value writes, each one fill (write/fill.ts): one field through the form's scripts (when the
+ * `validation` setting runs them), and the batch verbs, whose plain values go as one change
+ * with one recalculation, as a script's `field.value` assignments do in Acrobat.
  */
 import {
   PluginError,
@@ -12,12 +11,18 @@ import {
   type OperationOptions,
   type PluginErrorInfo,
 } from '@embedpdf/core';
-import type { FormFieldRef, FormFieldValue } from '@embedpdf/engine-core/runtime';
+import {
+  fieldValueWriteOf,
+  type ChangeOp,
+  type FormFieldRef,
+  type FormFieldValue,
+} from '@embedpdf/engine-core/runtime';
 
-import type { FormCapability, FormCommitResult, FormSetValueResult } from '../contract';
-import { beginWrite, endWrite, fieldByRef } from '../model';
+import type { FormCapability, FormSetValueResult } from '../contract';
+import { fieldByRef } from '../model';
 import { writeOfPlainValue } from '../read/fields';
 import type { FormContext, FormServices } from '../services';
+import { failedFill, type Fills } from './fill';
 
 /** A batch that stops when its caller cancels it. */
 function throwIfCancelled(options?: OperationOptions): void {
@@ -28,145 +33,145 @@ function throwIfCancelled(options?: OperationOptions): void {
   }
 }
 
-/** Why the form refused a value, as a batch reports it. */
-const rejection = (result: FormSetValueResult): PluginErrorInfo => ({
-  code: 'invalid-input',
-  message: `the form refused the value of '${result.field.name}'`,
-  capability: 'form',
-  permission: null,
+const setValueOp = (field: FormFieldRef, value: FormFieldValue): ChangeOp => ({
+  type: 'forms.setValue',
+  field,
+  value,
 });
 
 export function createValueWrites(
-  ctx: FormContext,
-  services: Pick<FormServices, 'events' | 'scripting' | 'enqueue' | 'keyOf' | 'fields' | 'rights'>,
+  _ctx: FormContext,
+  services: Pick<FormServices, 'events' | 'fields' | 'rights'>,
+  { fill }: Fills,
 ) {
   const { validationRejected } = services.events;
-  const { enqueue, keyOf, fields, rights, scripting } = services;
-  // A download waits for the values on their way.
-  ctx.onSettle(() => enqueue.idle());
+  const { fields, rights } = services;
 
-  const commitValue = async (
-    ref: FormFieldRef,
-    value: FormFieldValue,
-  ): Promise<FormCommitResult> => {
-    const pipeline = scripting.controller();
-    if (pipeline) {
-      const result = await pipeline.commit(ref, value);
-      scripting.surface(result, 'user');
-      return result;
-    }
-    const result = await ctx.doc.forms.setValue(ref, value);
-    return {
-      status: result.meta.changedWidgets.length > 0 ? 'applied' : 'unchanged',
-      scripted: false,
-      uiEffects: [],
-      diagnostics: [],
-    };
-  };
-
-  /** One value write, already allowed: queued behind every write before it. */
-  const write = (
-    ref: FormFieldRef,
-    value: FormFieldValue,
-    options?: OperationOptions,
-  ): Promise<FormSetValueResult> => {
-    const key = keyOf(ref);
-    return enqueue(async () => {
-      ctx.state.update(beginWrite, key);
-      try {
-        const result = await ctx.cancellable(options?.signal, commitValue(ref, value));
-        if (result.status === 'failed') {
-          throw new PluginError(
-            'operation-failed',
-            'form',
-            result.error?.message ?? result.diagnostics[0]?.message ?? 'the write failed',
-          );
-        }
-        const field = fieldByRef(fields.get(), ref);
-        if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
-        if (result.status === 'rejected') {
-          validationRejected.emit({ field, issues: result.diagnostics });
-        }
-        return { field, status: result.status };
-      } catch (error) {
-        throw toPluginError('form', error);
-      } finally {
-        ctx.state.update(endWrite, key);
-      }
-    }, options);
-  };
-
-  /** One value write, once the session may fill the field in. */
-  const fill = (
+  /** One field's value through its scripts: shown at once, written as one change. */
+  const commit = async (
     ref: FormFieldRef,
     value: FormFieldValue,
     operation: string,
     options?: OperationOptions,
   ): Promise<FormSetValueResult> => {
-    const field = fieldByRef(fields.get(), ref);
+    const known = fieldByRef(fields.view(), ref);
     // A field the form doesn't show yet is the engine's to answer (`not-found`).
-    if (field) rights.assertMayFill(field, operation);
-    return write(ref, value, options);
+    if (known) rights.assertMayFill(known, operation);
+    const { result } = await fill(
+      {
+        ops: [setValueOp(ref, value)],
+        scripts: { kind: 'commit', field: ref, value },
+        origin: 'user',
+      },
+      options,
+    );
+    if (result.status === 'failed') throw failedFill(result);
+    const field = fieldByRef(fields.get(), ref);
+    if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
+    if (result.status === 'rejected') {
+      validationRejected.emit({ field, issues: result.diagnostics });
+      return { field, status: 'rejected' };
+    }
+    return { field, status: result.status };
   };
 
-  const setValues: FormCapability['setValues'] = async (entries, options) => {
-    const applied: FormFieldRef[] = [];
+  /**
+   * Plain values for several fields, as one change with one recalculation. A value its field
+   * can't take, or a field the session may not fill in, fails on its own; the rest go together,
+   * and fail together when the engine refuses them.
+   */
+  const fillPlain = async (
+    entries: readonly { readonly ref: FormFieldRef; readonly value: FormFieldValue }[],
+    options?: OperationOptions,
+  ): Promise<{
+    applied: FormFieldRef[];
+    failed: { ref: FormFieldRef; error: PluginErrorInfo }[];
+  }> => {
+    if (!fields.view().snapshot) await fields.settled();
+    const index = fields.view();
+    const accepted: { ref: FormFieldRef; value: FormFieldValue }[] = [];
     const failed: { ref: FormFieldRef; error: PluginErrorInfo }[] = [];
     for (const entry of entries) {
-      throwIfCancelled(options);
       try {
-        const result = await fill(entry.ref, entry.value, 'form.setValues', options);
-        if (result.status === 'rejected') failed.push({ ref: entry.ref, error: rejection(result) });
-        else applied.push(entry.ref);
+        const field = fieldByRef(index, entry.ref);
+        if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
+        rights.assertMayFill(field, 'form.setValues');
+        fieldValueWriteOf(field, entry.value);
+        accepted.push({ ref: field.ref, value: entry.value });
       } catch (error) {
         failed.push({ ref: entry.ref, error: toPluginErrorInfo(toPluginError('form', error)) });
       }
     }
+    if (accepted.length === 0) return { applied: [], failed };
+    throwIfCancelled(options);
+    try {
+      const { result } = await fill(
+        {
+          ops: accepted.map((entry) => setValueOp(entry.ref, entry.value)),
+          scripts: { kind: 'recalculate' },
+          origin: 'user',
+        },
+        options,
+      );
+      if (result.status === 'failed') throw failedFill(result);
+      return { applied: accepted.map((entry) => entry.ref), failed };
+    } catch (error) {
+      const info = toPluginErrorInfo(toPluginError('form', error));
+      return {
+        applied: [],
+        failed: [...failed, ...accepted.map(({ ref }) => ({ ref, error: info }))],
+      };
+    }
+  };
+
+  const setValues: FormCapability['setValues'] = async (entries, options) => {
+    throwIfCancelled(options);
+    const { applied, failed } = await fillPlain(entries, options);
     return { applied, skipped: [], failed };
   };
 
   const importValues: FormCapability['importValues'] = async (values, options) => {
-    const result: {
-      applied: FormFieldRef[];
-      skipped: { ref: string; reason: string }[];
-      failed: { ref: string; error: PluginErrorInfo }[];
-    } = { applied: [], skipped: [], failed: [] };
+    throwIfCancelled(options);
+    if (!fields.view().snapshot) await fields.settled();
+    const index = fields.view();
+    const skipped: { ref: string; reason: string }[] = [];
+    const entries: { ref: FormFieldRef; value: FormFieldValue }[] = [];
+    const names = new Map<string, string>();
     for (const [name, plain] of Object.entries(values)) {
-      throwIfCancelled(options);
-      const field = fieldByRef(fields.get(), { kind: 'fqn', name });
+      const field = fieldByRef(index, { kind: 'fqn', name });
       if (!field) {
-        result.skipped.push({ ref: name, reason: 'the form has no field with this name' });
+        skipped.push({ ref: name, reason: 'the form has no field with this name' });
         continue;
       }
       if (!rights.mayFill(field)) {
-        result.skipped.push({ ref: name, reason: 'you may not fill in this field' });
+        skipped.push({ ref: name, reason: 'you may not fill in this field' });
         continue;
       }
       const value = writeOfPlainValue(field, plain);
       if (!value) {
-        result.skipped.push({ ref: name, reason: `a ${field.family} field can't take this value` });
+        skipped.push({ ref: name, reason: `a ${field.family} field can't take this value` });
         continue;
       }
-      try {
-        const written = await write(field.ref, value, options);
-        if (written.status === 'rejected') {
-          result.failed.push({ ref: name, error: rejection(written) });
-        } else {
-          result.applied.push(field.ref);
-        }
-      } catch (error) {
-        result.failed.push({ ref: name, error: toPluginErrorInfo(toPluginError('form', error)) });
-      }
+      entries.push({ ref: field.ref, value });
+      names.set(JSON.stringify(field.ref), name);
     }
-    return result satisfies BatchResult<FormFieldRef, string>;
+    const { applied, failed } = await fillPlain(entries, options);
+    return {
+      applied,
+      skipped,
+      failed: failed.map(({ ref, error }) => ({
+        ref: names.get(JSON.stringify(ref)) ?? '',
+        error,
+      })),
+    } satisfies BatchResult<FormFieldRef, string>;
   };
 
   return {
     /** A text field's write, for the text being typed (write/typing.ts). */
-    setText: async (ref: FormFieldRef, text: string): Promise<FormSetValueResult> =>
-      fill(ref, { value: text }, 'form.setValue'),
+    setText: (ref: FormFieldRef, text: string): Promise<FormSetValueResult> =>
+      commit(ref, { value: text }, 'form.setValue'),
     api: {
-      setValue: async (ref, value, options) => fill(ref, value, 'form.setValue', options),
+      setValue: (ref, value, options) => commit(ref, value, 'form.setValue', options),
       setValues,
       importValues,
     } satisfies Partial<FormCapability>,

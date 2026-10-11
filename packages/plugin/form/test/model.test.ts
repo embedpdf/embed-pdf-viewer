@@ -11,16 +11,13 @@ import { reload } from '@embedpdf/core';
 import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
 
 import {
-  beginWrite,
   emptyFieldIndex,
-  endWrite,
   fieldByKey,
   fieldByRef,
   fieldForWidget,
   fieldKeyOf,
   foldFormEvent,
   indexFields,
-  initialFormState,
   pageWidgetsOf,
   removeWidgets,
   shownWidgetsOf,
@@ -73,7 +70,6 @@ const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
 
 const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
 const event = (value: object) => ({ origin, widgets: [], ...value }) as unknown as DocumentEvent;
-const NO_WRITES = {};
 /** A user who may fill in every field. */
 const ALWAYS = () => true;
 const LOOK: FormWidgetLook = {
@@ -237,21 +233,13 @@ describe('field index', () => {
       emptyFieldIndex(),
     );
   });
-
-  test('in-flight writes are tracked per field', () => {
-    let state = beginWrite(initialFormState(), 'obj:4');
-    expect(state.writing['obj:4']).toBe(true);
-    state = endWrite(state, 'obj:4');
-    expect(state.writing['obj:4']).toBeUndefined();
-    expect(endWrite(state, 'obj:4')).toBe(state);
-  });
 });
 
 describe('fill projection', () => {
   test('joins the field plane with widget geometry', () => {
     const index = indexFields(snapshot([text()]));
-    expect(fillItems(index, 3, undefined, NO_WRITES, ALWAYS)).toEqual([]);
-    const items = fillItems(index, 3, BOXES, NO_WRITES, ALWAYS);
+    expect(fillItems(index, 3, undefined, ALWAYS)).toEqual([]);
+    const items = fillItems(index, 3, BOXES, ALWAYS);
     expect(items.length).toBe(1);
     const item = items[0]!;
     expect(item.control).toBe('text');
@@ -261,18 +249,16 @@ describe('fill projection', () => {
       expect(item.value).toBe('abc');
       expect(item.maxLength).toBe(5);
     }
-    expect(fillItems(index, 99, BOXES, NO_WRITES, ALWAYS)).toEqual([]);
+    expect(fillItems(index, 99, BOXES, ALWAYS)).toEqual([]);
   });
 
-  test('read-only and in-flight fields project as disabled', () => {
+  test('read-only fields, and fields the user may not fill in, project as disabled', () => {
     const readOnly = text({ readOnly: true });
-    expect(
-      fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES, ALWAYS)[0]!.disabled,
-    ).toBe(true);
-    const writing = beginWrite(initialFormState(), 'obj:4').writing;
-    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, writing, ALWAYS)[0]!.disabled).toBe(
+    expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, ALWAYS)[0]!.disabled).toBe(true);
+    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, () => false)[0]!.disabled).toBe(
       true,
     );
+    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, ALWAYS)[0]!.disabled).toBe(false);
   });
 });
 
@@ -303,13 +289,13 @@ const signature = (
 
 describe('signature widgets', () => {
   test('an unsigned signature field projects a "signature" fill item', () => {
-    const item = projectWidget(signature(), 9, NO_WRITES, BOXES[4]!, true);
+    const item = projectWidget(signature(), 9, BOXES[4]!, true);
     expect(item).toMatchObject({ control: 'signature', signed: false, label: 'Sign here' });
   });
 
   test('a /V on the field marks the item signed', () => {
     const signed = signature({ valueEntry: { kind: 'unsupported' } });
-    expect(projectWidget(signed, 9, NO_WRITES, BOXES[4]!, true)).toMatchObject({
+    expect(projectWidget(signed, 9, BOXES[4]!, true)).toMatchObject({
       control: 'signature',
       signed: true,
     });

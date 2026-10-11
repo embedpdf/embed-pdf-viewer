@@ -31,7 +31,7 @@ export function createFillRights(ctx: FormContext, fields: Mirror<FieldIndex>): 
 
   /** The form's groups, `null` (no group) among them. */
   const groups = memo(
-    () => [fields.get()],
+    () => [fields.view()],
     (index) => [...new Set((index.snapshot?.fields ?? []).map((field) => field.groupId))],
   );
 

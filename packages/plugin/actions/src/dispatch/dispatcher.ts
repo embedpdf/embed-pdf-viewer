@@ -55,7 +55,7 @@ const cancelled = (operation: string, signal: AbortSignal | undefined) =>
 
 export function createDispatcher(
   ctx: ActionsContext,
-  services: Pick<ActionsServices, 'events' | 'policy' | 'queue' | 'catalog' | 'authority'>,
+  services: Pick<ActionsServices, 'events' | 'policy' | 'queue' | 'catalog' | 'authority' | 'form'>,
   { run }: ActionsRunner,
   { triggerEnabled, lifecycleAnnotationsOf, planPageSteps }: ActionsTriggers,
   openSequence: Pick<ActionsOpenSequence, 'noteUserActivity' | 'claim' | 'run'>,
@@ -66,6 +66,7 @@ export function createDispatcher(
   const { allowsPrint } = services.authority;
   const { enqueue, budget } = services.queue;
   const { readDocumentActions, DOC_EVENT_TREES } = services.catalog;
+  const { form } = services;
   const { noteUserActivity } = openSequence;
 
   /** Run one tree and announce it: the shared per-tree unit (queued by
@@ -147,7 +148,7 @@ export function createDispatcher(
         case 'activate':
         case 'annotation': {
           const event = trigger.scope === 'activate' ? 'activate' : trigger.event;
-          const annotation = await readAnnotation(ctx, trigger.ref, read);
+          const annotation = await readAnnotation(ctx, form, trigger.ref, read);
           // ISO 32000-2 Table 197: "the A entry, if present, takes precedence
           // over [the /AA U entry]"; a shadowed U tree is silently inert,
           // exactly like an absent one.
@@ -239,12 +240,12 @@ export function createDispatcher(
   const readActionTree = async (source: ActionTreeSource): Promise<PdfActionTree | null> => {
     switch (source.kind) {
       case 'annotation': {
-        const annotation = await readAnnotation(ctx, source.annotation);
+        const annotation = await readAnnotation(ctx, form, source.annotation);
         const tree = annotation?.actions?.[source.event ?? 'activate'];
         return tree ?? null;
       }
       case 'field': {
-        const { fields } = await ctx.doc.forms.list();
+        const { fields } = await form.read();
         const target = source.field;
         const field = fields.find((candidate) =>
           target.kind === 'objectNumber'

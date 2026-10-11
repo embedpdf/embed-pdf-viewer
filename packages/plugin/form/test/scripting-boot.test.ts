@@ -15,7 +15,7 @@ import {
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import type { ScriptInput, ScriptOutput } from '@embedpdf/core-acrojs';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const okEvent = (value: unknown = '') => ({
@@ -115,6 +115,7 @@ const snapshot = (): FormSnapshot =>
     needsAppearances: false,
     calculationOrder: [],
     fields: [textField(7, 'First_Name')],
+    widgets: [],
   }) as unknown as FormSnapshot;
 
 describe('FormScriptingController — boot failures degrade, never brick', () => {
@@ -124,7 +125,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     const realm = standaloneRealm(doc, () => null, {
       sandboxFactory: async () => failingBootSandbox(),
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document: () => null,
       transaction: realm.transaction,
@@ -168,7 +169,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     const realm = standaloneRealm(doc, () => null, {
       sandboxFactory: async () => failingBootSandbox(),
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document: () => null,
       transaction: realm.transaction,

@@ -1,6 +1,9 @@
 /**
- * The K/V/C/F transaction: keystroke, validate, calculate and format passes
- * over one overlay, committed to the engine inside the realm transaction.
+ * The K/V/C/F passes: keystroke, validate, calculate and format scripts over
+ * one working copy of the form (`overlay.ts`), inside one realm transaction.
+ * The controller reads the form it is given and returns what the scripts
+ * changed. Writing it is the caller's, inside the same transaction
+ * (`transaction`), so the next transaction reads the form with it.
  */
 import type { DocumentMeta } from '@embedpdf/core';
 import {
@@ -16,16 +19,15 @@ import {
   type ScriptValue,
   type ScriptWorldInput,
 } from '@embedpdf/core-acrojs';
-import {
-  formEffectOps,
-  type DocumentHandle,
-  type FormEffect,
-  type FormFieldRef,
-  type FormFieldValue,
-  type PdfActionTree,
+import type {
+  FormEffect,
+  FormFieldRef,
+  FormFieldValue,
+  FormSnapshot,
+  PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import type { FormCommitResult, FormUiEffect } from '../contract';
+import type { FormUiEffect } from '../contract';
 import {
   applyEffects,
   canonicalEffects,
@@ -48,25 +50,54 @@ import { pageNumberFor, scriptError, utf8Length } from './results';
  * here only fences further transactions.
  */
 export interface FormScriptingControllerOptions {
-  doc: DocumentHandle;
   /** What the scripts read of the document: its name, page count and pages. */
   document(): Pick<DocumentMeta, 'name' | 'pageCount' | 'pages'> | null;
-  /** The realm's transaction port ({@link ScriptTransaction}). The K/V/C/F
-   *  pipeline runs wholly inside one transaction: snapshot fetch, every
-   *  pass, and the engine commit — the commit-inside-the-boundary law. */
+  /** The realm's transaction port ({@link ScriptTransaction}): the realm runs one at a time. */
   transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
   /** The transaction aggregate (output bytes, wall-clock across passes);
    *  the realm owner hands over the same budget its runs enforce. */
   budget?: ScriptBudget;
 }
 
+/** What the form's scripts made of one write, before anything is written. */
+export interface FormScriptResult {
+  /**
+   * `accepted`: write `effects`. `rejected`: a keystroke or validate script refused the value,
+   * so only `bootEffects` are written. `failed`: the transaction broke (a budget, a script that
+   * couldn't run), so nothing is.
+   */
+  readonly status: 'accepted' | 'rejected' | 'failed';
+  /** What the scripts changed in the form, in the order to write it (`formEffectOps`). */
+  readonly effects: FormEffect[];
+  /** What the document's open scripts changed: written even when the value is refused. */
+  readonly bootEffects: FormEffect[];
+  readonly uiEffects: FormUiEffect[];
+  readonly diagnostics: ScriptDiagnostic[];
+  readonly error?: ScriptExecutionError;
+}
+
+/** The scripts one transaction can run, each against the form it is given. */
+export interface FormScripts {
+  /**
+   * A field's new value through its keystroke and validate scripts, then the calculations and
+   * the formats. `form` is the form without the value.
+   */
+  commit(form: FormSnapshot, ref: FormFieldRef, value: FormFieldValue): Promise<FormScriptResult>;
+  /** One widget's activation action (`/A`, with `/Next`). Only its scripts run here. */
+  activate(
+    form: FormSnapshot,
+    ref: FormFieldRef,
+    action: PdfActionTree<unknown>,
+  ): Promise<FormScriptResult>;
+  /** The document's open scripts (once per realm) and the calculations, without a field change. */
+  recalculate(form: FormSnapshot): Promise<FormScriptResult>;
+}
+
 export class FormScriptingController {
   private disposed = false;
-  private readonly transaction: <T>(body: (txn: ScriptTransaction) => Promise<T>) => Promise<T>;
   private readonly transactionBudget: ScriptBudget | undefined;
 
   constructor(private readonly options: FormScriptingControllerOptions) {
-    this.transaction = options.transaction.bind(options);
     this.transactionBudget = options.budget;
   }
 
@@ -76,63 +107,82 @@ export class FormScriptingController {
     this.disposed = true;
   }
 
-  async commit(ref: FormFieldRef, proposed: FormFieldValue): Promise<FormCommitResult> {
-    return this.transact(ref, proposed);
+  /**
+   * One realm transaction: `body` runs its scripts and writes what they changed before the
+   * next transaction starts, so that one reads the form with it.
+   */
+  transaction<T>(body: (scripts: FormScripts) => Promise<T>): Promise<T> {
+    if (this.disposed) return Promise.reject(new Error('Form scripting controller is disposed'));
+    return this.options.transaction((txn) =>
+      body({
+        commit: (form, ref, value) => this.run(txn, form, ref, value),
+        activate: (form, ref, action) => this.run(txn, form, ref, undefined, action),
+        recalculate: (form) => this.run(txn, form, undefined),
+      }),
+    );
   }
 
   /**
-   * Execute one originating widget's activation action (`/A`, including
-   * `/Next`). Only its scripts run here, so any kind of destination will do.
+   * Load the realm before the first write needs it: the scripts' engine starts, and the
+   * document's open scripts run, their effects kept for the first write as without warming.
+   * Nothing is written.
    */
-  async activate(ref: FormFieldRef, action: PdfActionTree<unknown>): Promise<FormCommitResult> {
-    return this.transact(ref, undefined, action);
+  async warm(form: FormSnapshot): Promise<void> {
+    if (this.disposed) return;
+    const budget = this.transactionBudget ?? DEFAULT_SCRIPT_BUDGET;
+    await this.options.transaction((txn) =>
+      txn.run(
+        '',
+        { fields: scriptFieldsFromSnapshot(form), event: { kind: 'name-tree-boot' } },
+        budget,
+      ),
+    );
   }
 
-  /** Run lazy document boot plus the `/CO` chain without a user field change.
-   *  The anchor field resolves inside the transaction (undefined ref). */
-  async recalculate(): Promise<FormCommitResult> {
-    return this.transact(undefined);
+  /** {@link FormScripts.commit} in a transaction of its own. */
+  commit(form: FormSnapshot, ref: FormFieldRef, value: FormFieldValue): Promise<FormScriptResult> {
+    return this.transaction((scripts) => scripts.commit(form, ref, value));
   }
 
-  private async transact(
-    refInput: FormFieldRef | undefined,
-    proposed?: FormFieldValue,
-    activation?: PdfActionTree<unknown>,
-  ): Promise<FormCommitResult> {
-    if (this.disposed) throw new Error('Form scripting controller is disposed');
-    // Everything inside the realm transaction — snapshot fetch, every pass,
-    // the engine commit — so the next transaction reads post-commit truth.
-    return this.transaction((txn) => this.transactBody(txn, refInput, proposed, activation));
+  /** {@link FormScripts.activate} in a transaction of its own. */
+  activate(
+    form: FormSnapshot,
+    ref: FormFieldRef,
+    action: PdfActionTree<unknown>,
+  ): Promise<FormScriptResult> {
+    return this.transaction((scripts) => scripts.activate(form, ref, action));
   }
 
-  private async transactBody(
+  /** {@link FormScripts.recalculate} in a transaction of its own. */
+  recalculate(form: FormSnapshot): Promise<FormScriptResult> {
+    return this.transaction((scripts) => scripts.recalculate(form));
+  }
+
+  private async run(
     txn: ScriptTransaction,
+    snapshot: FormSnapshot,
     refInput: FormFieldRef | undefined,
     proposed?: FormFieldValue,
     activation?: PdfActionTree<unknown>,
-  ): Promise<FormCommitResult> {
-    const snapshot = await this.options.doc.forms.list();
+  ): Promise<FormScriptResult> {
     // Recalculate's anchor resolves here (first live /CO field, else the
     // first field); a zero-field document is an honest no-op.
-    const ref =
+    const asked =
       refInput ??
       snapshot.calculationOrder.find(
         (candidate): candidate is FormFieldRef =>
           candidate !== null && snapshotField(snapshot, candidate) !== undefined,
       ) ??
       snapshot.fields[0]?.ref;
-    if (!ref) {
-      return {
-        status: 'unchanged',
-        scripted: true,
-        uiEffects: [],
-        diagnostics: [],
-      };
+    if (!asked) {
+      return { status: 'accepted', effects: [], bootEffects: [], uiEffects: [], diagnostics: [] };
     }
-    const target = snapshotField(snapshot, ref);
+    const target = snapshotField(snapshot, asked);
     if (!target) {
-      return this.failed([], [], scriptError(`Form field '${refKey(ref)}' no longer exists`));
+      return this.failed([], [], scriptError(`Form field '${refKey(asked)}' no longer exists`));
     }
+    // The scripts know the field by its own ref, whichever ref asked for it.
+    const ref = target.ref;
 
     const original = scriptFieldsFromSnapshot(snapshot);
     const overlay: Overlay = {
@@ -319,7 +369,7 @@ export class FormScriptingController {
           });
         } else {
           if (!typing.output!.event.rc) {
-            return this.finishRejected(bootEffects, uiEffects, diagnostics);
+            return this.rejected(bootEffects, uiEffects, diagnostics);
           }
           applyEffects(overlay, typing.output!.formEffects);
           const event = typing.output!.event;
@@ -352,7 +402,7 @@ export class FormScriptingController {
           });
         } else {
           if (!commit.output!.event.rc) {
-            return this.finishRejected(bootEffects, uiEffects, diagnostics);
+            return this.rejected(bootEffects, uiEffects, diagnostics);
           }
           applyEffects(overlay, commit.output!.formEffects);
           proposedValue = cloneValue(commit.output!.event.value);
@@ -398,7 +448,7 @@ export class FormScriptingController {
           });
         } else {
           if (!validation.output!.event.rc) {
-            return this.finishRejected(bootEffects, uiEffects, diagnostics);
+            return this.rejected(bootEffects, uiEffects, diagnostics);
           }
           targetInput.value = cloneValue(validation.output!.event.value);
           applyEffects(overlay, validation.output!.formEffects);
@@ -497,38 +547,24 @@ export class FormScriptingController {
         message: `Form script transaction exceeded ${budget.maxEffects} effects`,
       });
     }
-    if (effects.length === 0) {
-      return { status: 'unchanged', scripted: true, uiEffects, diagnostics };
-    }
-    // One change: every effect is written, or none is and the refusal throws.
-    // A change that wrote nothing has nothing to undo.
-    const written = await this.options.doc.apply({ ops: formEffectOps(effects) });
-    const status = written.meta.undoable ? 'applied' : 'unchanged';
-    return { status, scripted: true, uiEffects, diagnostics };
+    return { status: 'accepted', effects, bootEffects, uiEffects, diagnostics };
   }
 
   private failed(
     uiEffects: FormUiEffect[],
     diagnostics: ScriptDiagnostic[],
     error: ScriptExecutionError,
-  ): FormCommitResult {
-    return {
-      status: 'failed',
-      scripted: true,
-      uiEffects,
-      diagnostics,
-      error,
-    };
+  ): FormScriptResult {
+    return { status: 'failed', effects: [], bootEffects: [], uiEffects, diagnostics, error };
   }
 
-  private async finishRejected(
+  /** The value is refused; the open scripts' effects are still written. */
+  private rejected(
     bootEffects: FormEffect[],
     uiEffects: FormUiEffect[],
     diagnostics: ScriptDiagnostic[],
-  ): Promise<FormCommitResult> {
-    // The open scripts' effects are written even when the value is refused.
-    if (bootEffects.length > 0) await this.options.doc.apply({ ops: formEffectOps(bootEffects) });
-    return { status: 'rejected', scripted: true, uiEffects, diagnostics };
+  ): FormScriptResult {
+    return { status: 'rejected', effects: [], bootEffects, uiEffects, diagnostics };
   }
 }
 

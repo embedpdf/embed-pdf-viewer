@@ -56,13 +56,17 @@ export interface FormHostCapability extends FormCapability {
     exclude: boolean,
     origin?: ActionOrigin,
   ): Promise<FormCommitResult>;
-  /** The fields a SubmitForm action sends, read from the engine when it runs. */
+  /** The fields a SubmitForm action sends: the form as the user sees it, once every fill on its way is answered. */
   resolveSubmitDataset(
     intent: SubmitIntent,
     actionContext: ActionContext,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest>;
-  /** Write what a document script changed in the fields, as one change; never rejects, a refusal reports why. */
+  /**
+   * Write what a document script changed in the fields, with the calculations a value causes,
+   * as one change: shown at once, sent once the script's transaction ends. Never rejects; a
+   * change it can't stage reports why, and the engine's refusal comes through the change queue.
+   */
   commitScriptFormEffects(effects: FormEffect[]): Promise<FormCommitSinkResult>;
   /**
    * The text someone is typing in a field, before it's written (write/typing.ts): a keystroke

@@ -29,7 +29,7 @@ export function createWidgetReads(
   const loadWidgets = (_page: PageRef): Promise<void> => fields.settled();
 
   const widgetsOn = memoByKey(
-    (pageObjectNumber: number) => [fields.get()],
+    (pageObjectNumber: number) => [fields.view()],
     (pageObjectNumber, index) => pageWidgetsOf(index, pageObjectNumber),
   );
 
@@ -40,11 +40,11 @@ export function createWidgetReads(
   ): WidgetHit | null => {
     const page = ctx.getPage(pageArgument)?.ref;
     if (!page) return null;
-    return widgetAt(fields.get(), widgetsOn(page.objectNumber), point);
+    return widgetAt(fields.view(), widgetsOn(page.objectNumber), point);
   };
 
   const shownOn = memoByKey(
-    (pageObjectNumber: number) => [fields.get()],
+    (pageObjectNumber: number) => [fields.view()],
     (pageObjectNumber, index): readonly ShownWidget[] => shownWidgetsOf(index, pageObjectNumber),
   );
 
@@ -54,14 +54,9 @@ export function createWidgetReads(
   const mayWrite = (field: FormFieldDTO): boolean =>
     field.family === 'signature' ? rights.maySign(field) : rights.mayFill(field);
   const widgetsOfPage = memoByKey(
-    (pageObjectNumber: number) => [
-      fields.get(),
-      widgetsOn(pageObjectNumber),
-      ctx.state.get().writing,
-      rights.key(),
-    ],
-    (pageObjectNumber, index, widgets, writing): readonly FormWidgetItem[] =>
-      fillItems(index, pageObjectNumber, widgets, writing, mayWrite),
+    (pageObjectNumber: number) => [fields.view(), widgetsOn(pageObjectNumber), rights.key()],
+    (pageObjectNumber, index, widgets): readonly FormWidgetItem[] =>
+      fillItems(index, pageObjectNumber, widgets, mayWrite),
   );
 
   /** The page's content box (`{0, 0, width, height}`), for page-bound placement. */

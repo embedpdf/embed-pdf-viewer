@@ -75,8 +75,8 @@ const snapshotOf = (fields: readonly FormFieldDTO[]): FormSnapshot => ({
  */
 function harness(granted: readonly string[], fields: readonly FormFieldDTO[] = [field()]) {
   const list = vi.fn(async () => snapshotOf(fields));
-  const setValue = vi.fn(async () => ({ meta: { changedWidgets: [] } }));
-  const reset = vi.fn(async () => ({ fields: [] }));
+  // Every fill is one change: `doc.apply` gets its ops.
+  const apply = vi.fn(async () => ({ items: [], meta: { undoable: true } }));
   const allowsField = (action: 'fill' | 'sign', { groupId }: { groupId: string | null }) =>
     granted.includes(action === 'fill' ? 'doc.forms.fill' : 'doc.sign') ||
     (groupId !== null && granted.includes(`fields:${action}:group=${groupId}`));
@@ -93,11 +93,12 @@ function harness(granted: readonly string[], fields: readonly FormFieldDTO[] = [
     pages: [{ ref: toPageRef(1) }],
     capabilities: [[InteractionToken, interaction]],
     doc: {
-      forms: { list, setValue, create, reset },
+      forms: { list, create },
+      apply,
       security: { allows: (capability: string) => granted.includes(capability), allowsField },
     } as never,
   });
-  return { capability: ctx.connect(createFormController(ctx)), list, setValue, create, reset };
+  return { capability: ctx.connect(createFormController(ctx)), list, apply, create };
 }
 
 /** The harness with its form read. */
@@ -155,7 +156,7 @@ describe('form authority twins', () => {
       code: 'permission-denied',
       permission: 'doc.forms.fill',
     });
-    expect(fixture.setValue).not.toHaveBeenCalled();
+    expect(fixture.apply).not.toHaveBeenCalled();
   });
 
   it('refuses building the form without doc.forms.modify, before any engine call', async () => {
@@ -201,14 +202,21 @@ describe('form authority twins', () => {
         permission: 'fields:fill:group=seller',
       });
       await fixture.capability.setValue(byObjectNumber(5), { value: 'x' });
-      expect(fixture.setValue).toHaveBeenCalledTimes(1);
+      expect(fixture.apply).toHaveBeenCalledTimes(1);
+      expect(fixture.apply).toHaveBeenCalledWith(
+        { ops: [{ type: 'forms.setValue', field: byObjectNumber(5), value: { value: 'x' } }] },
+        expect.anything(),
+      );
     });
 
     it('validates only its own fields, and a reset puts back only those', async () => {
       const fixture = await loaded(BUYER, fields);
       expect(fixture.capability.validate().missing.map((each) => each.name)).toEqual(['name-5']);
       await fixture.capability.reset();
-      expect(fixture.reset).toHaveBeenCalledWith([byObjectNumber(5)]);
+      expect(fixture.apply).toHaveBeenCalledWith(
+        { ops: [{ type: 'forms.reset', fields: [byObjectNumber(5)] }] },
+        expect.anything(),
+      );
       await expect(fixture.capability.reset([byObjectNumber(6)])).rejects.toMatchObject({
         code: 'permission-denied',
       });

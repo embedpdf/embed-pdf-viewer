@@ -16,7 +16,7 @@ import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { DocumentHandle, Engine } from '@embedpdf/engine-core/runtime';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -37,7 +37,7 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
       // transaction): the same standalone realm the other integration suites use.
       const document = () => null;
       const realm = standaloneRealm(doc, document, { sandboxFactory: createQuickJsSandbox });
-      const controller = createFormScriptingController({
+      const controller = engineScripts({
         doc,
         document,
         transaction: realm.transaction,

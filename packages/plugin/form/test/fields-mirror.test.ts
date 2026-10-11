@@ -16,7 +16,8 @@ import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 /**
  * The field tree is a mirror: it is read once, then kept current from the
  * confirmed form events every write publishes, whoever made it. It is read
- * again only when the event stream cannot be trusted (a desync).
+ * again only when the event stream cannot be trusted (a desync). Its view
+ * shows this session's own writes before the engine answers them.
  */
 const page: PageLayout = {
   index: 0,
@@ -110,16 +111,21 @@ async function boot() {
     security: { allows: () => true, allowsField: () => true },
     forms: {
       list: () => new Promise<FormSnapshot>((resolve) => reads.push(resolve)),
-      setValue: (_ref: unknown, value: { value: string }) =>
-        new Promise((resolve) =>
-          writes.push(() => {
-            const result = { field: textField(value.value), widgets: [], meta: NOTHING_CHANGED };
-            // Like both real engines: the event is published before the promise settles.
-            emit({ type: 'forms.valueSet', origin: origin('local'), ...result });
-            resolve(result);
-          }),
-        ),
     },
+    apply: (change: { ops: Array<{ value: { value: string } }> }, { opId }: { opId: string }) =>
+      new Promise((resolve) =>
+        writes.push(() => {
+          const result = {
+            field: textField(change.ops[0]!.value.value),
+            widgets: [],
+            meta: NOTHING_CHANGED,
+          };
+          // Like both real engines: the event is published before the promise settles.
+          const tx = { id: opId, index: 0, count: 1 };
+          emit({ type: 'forms.valueSet', origin: { ...origin('local'), tx }, ...result });
+          resolve({ items: [], meta: { ...NOTHING_CHANGED, opId, undoable: true } });
+        }),
+      ),
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;
   const engine = {
@@ -165,7 +171,7 @@ describe('form fields mirror', () => {
     await harness.kernel.destroy();
   });
 
-  it('keeps a field disabled while its own write is in flight, even when other events land', async () => {
+  it('shows its own write at once and keeps the field editable, even when other events land', async () => {
     const harness = await boot();
     harness.reads[0]!(snapshot('initial'));
     await settle();
@@ -175,6 +181,7 @@ describe('form fields mirror', () => {
       { kind: 'objectNumber', objectNumber: 5 },
       { value: 'typed' },
     );
+    expect(nameValue(harness.form as never)).toEqual({ value: 'typed' });
     await settle();
     harness.emit({
       type: 'forms.valueSet',
@@ -183,9 +190,12 @@ describe('form fields mirror', () => {
       widgets: [],
       meta: NOTHING_CHANGED,
     });
-    expect(harness.form.listWidgets(0)[0]?.disabled).toBe(true);
+    // Its own change is still on its way: it shows over the other session's.
+    expect(nameValue(harness.form as never)).toEqual({ value: 'typed' });
+    expect(harness.form.listWidgets(0)[0]?.disabled).toBe(false);
     harness.writes[0]!();
     await written;
+    expect(nameValue(harness.form as never)).toEqual({ value: 'typed' });
     expect(harness.form.listWidgets(0)[0]?.disabled).toBe(false);
     await harness.kernel.destroy();
   });
