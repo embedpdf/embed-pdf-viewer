@@ -44,7 +44,8 @@ export function createSelectionWrites(
     authority,
     fonts,
     behaviors,
-  }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors'>,
+    lending,
+  }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors' | 'lending'>,
   annotations: Pick<AnnotationReads, 'selectedRecords' | 'listSelected'>,
   properties: Pick<PropertyReads, 'activeTextRange' | 'selectionPropertiesOf'>,
   chrome: Pick<ChromeReads, 'selectionAnchor' | 'rotationAnchor'>,
@@ -184,7 +185,8 @@ export function createSelectionWrites(
     group: async (options: OperationOptions = {}): Promise<void> => {
       const model = store.model();
       const members = annotations.selectedRecords();
-      if (members.length < 2) return;
+      // Lent records (form widgets) belong to their owner's structure, not a group.
+      if (members.length < 2 || members.some((record) => lending.owns(record.id))) return;
       const pageObjectNumber = members[0].annotation.page.objectNumber;
       if (members.some((record) => record.annotation.page.objectNumber !== pageObjectNumber))
         return; // groups are page-local
@@ -206,7 +208,7 @@ export function createSelectionWrites(
     canGroup: (): boolean => {
       const model = store.model();
       const members = annotations.selectedRecords();
-      if (members.length < 2) return false;
+      if (members.length < 2 || members.some((record) => lending.owns(record.id))) return false;
       if (
         members.some(
           (record) =>

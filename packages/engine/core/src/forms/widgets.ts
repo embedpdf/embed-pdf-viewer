@@ -7,6 +7,7 @@ import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
 import type { WidgetCheckStyle } from '../annotation/primitives';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import type { PageBox } from '../geometry/pageSpace';
 import type { Coordinates } from '../pageSpace/coordinates';
 import { applyAnnotationPatch } from '../pageSpace/helpers';
 
@@ -46,16 +47,40 @@ function fitToFamily<T extends Record<string, unknown>>(
 
 /**
  * `forms.updateWidget`: the row a widget patch leaves, as an annotation
- * patch leaves it (a move keeps the look, the engine works out the rect),
- * checked against the widget's family first.
+ * patch leaves it (a move keeps the look), checked against the widget's
+ * family first. A new box or turn moves where it stands (`standingRectOf`).
  */
 export function widgetAfterPatch<C extends Coordinates>(
   row: WidgetAnnotation<C>,
   patch: WidgetPatch,
 ): WidgetAnnotation<C> {
   const fitted = fitWidgetToFamily(row.fieldFamily, patch);
-  return applyAnnotationPatch(
+  const after = applyAnnotationPatch(
     row as never,
     { subtype: 'widget', ...fitted } as never,
   ) as unknown as WidgetAnnotation<C>;
+  const placed = ['box', 'rect', 'rotation'].some((key) => key in fitted);
+  if (!placed) return after;
+  // Rows are in page space here (a box is `{ x, y, width, height }`).
+  return { ...after, rect: standingRectOf(after.box as PageBox, after.rotation) as never };
+}
+
+/**
+ * Where a widget stands on the page: its box, with its sides swapped under a
+ * quarter turn (its contents turn, the frame keeps its place).
+ */
+export function standingRectOf<B extends { x: number; y: number; width: number; height: number }>(
+  box: B,
+  rotation: number | null | undefined,
+): B {
+  const turn = (((rotation ?? 0) % 360) + 360) % 360;
+  if (turn !== 90 && turn !== 270) return box;
+  const { x, y, width, height } = box;
+  return {
+    ...box,
+    x: x + (width - height) / 2,
+    y: y + (height - width) / 2,
+    width: height,
+    height: width,
+  };
 }

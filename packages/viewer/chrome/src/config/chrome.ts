@@ -152,6 +152,7 @@ const formBar: BarSchema = {
         importance: 4,
       }),
       group('choice-fields', ['form:add-select', 'form:add-listbox'], { importance: 2 }),
+      group('button-fields', ['form:add-button'], { importance: 2 }),
       group('signature-fields', ['form:add-signature'], { importance: 2 }),
       history,
     ],

@@ -77,6 +77,12 @@ const keysOf = (op: ChangeOp): string[] => {
       return [annotationKey(op.ref)];
     case 'annotations.reorder':
       return op.refs.map(annotationKey);
+    // A lent record's ops (form widgets).
+    case 'forms.updateWidget':
+    case 'forms.deleteWidget':
+      return [annotationKey(op.widget)];
+    case 'forms.reorderWidgets':
+      return op.widgets.map(annotationKey);
     default:
       return [];
   }
@@ -86,14 +92,16 @@ const keysOf = (op: ChangeOp): string[] => {
 export const idsOf = (ops: readonly ChangeOp[]): Id[] => [...new Set(ops.flatMap(keysOf))];
 
 /**
- * What a change is called, from what it does: one kind of op, or several.
+ * What a change is called, from what it does: one kind of op (`annotation.move`,
+ * or a lent record's own, `form.updateWidget`), or several (`annotation.change`).
  * History and refusals show it.
  */
 export const labelOf = (ops: readonly ChangeOp[]): ChangeLabel => {
   const kinds = new Set(ops.map((op) => op.type));
   const [only] = kinds;
-  const verb = kinds.size === 1 && only ? only.slice('annotations.'.length) : 'change';
-  return { key: `annotation.${verb}`, count: idsOf(ops).length };
+  const [plane, verb] = kinds.size === 1 && only ? only.split('.') : ['annotations', 'change'];
+  const owner = plane === 'annotations' ? 'annotation' : plane === 'forms' ? 'form' : plane;
+  return { key: `${owner}.${verb}`, count: idsOf(ops).length };
 };
 
 /**

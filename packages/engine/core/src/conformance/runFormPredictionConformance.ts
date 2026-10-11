@@ -448,6 +448,27 @@ const CASES: readonly PredictionCase[] = [
     before: [{ type: 'updateWidget', patch: { checkStyle: 'star' } }],
     op: { type: 'updateWidget', patch: { checkStyle: null } },
   },
+  {
+    name: 'widget: moved',
+    draft: text(),
+    op: { type: 'updateWidget', patch: { box: box(200, 300) } },
+  },
+  {
+    name: 'widget: resized',
+    draft: text(),
+    op: { type: 'updateWidget', patch: { box: box(72, 600, 200, 40) } },
+  },
+  {
+    name: 'widget: a quarter turn stands it on its side',
+    draft: text(),
+    op: { type: 'updateWidget', patch: { rotation: 90 } },
+  },
+  {
+    name: 'widget: moved while turned',
+    draft: text(),
+    before: [{ type: 'updateWidget', patch: { rotation: 270 } }],
+    op: { type: 'updateWidget', patch: { box: box(150, 400) } },
+  },
 ];
 
 /** A write the engine refuses: the prediction refuses it too, with the same code. */

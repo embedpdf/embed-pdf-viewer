@@ -38,6 +38,8 @@ function makeForm(over: Partial<FormHostCapability> = {}) {
     canDesign: () => true,
     getPageBox: () => PAGE,
     list: () => [{ name: 'text_1' }],
+    // The field shows once the engine answers, unless a test says it shows at once.
+    get: () => null,
     create: vi.fn(async (draft: FormFieldDraft) => {
       placed.push(draft);
       return { field: created };
@@ -244,6 +246,15 @@ describe('form place handler', () => {
     live = 'pointer';
     await flush();
     expect(second.selects).toHaveLength(0);
+  });
+
+  it('selects a field that shows at once in the same frame', () => {
+    const { form } = makeForm({ get: () => created });
+    const { annotation, selects } = makeAnnotation();
+    const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
+    handler.onDown(at('down', 100, 100));
+    handler.onUp?.(at('up', 100, 100));
+    expect(selects).toEqual([{ kind: 'objectNumber', objectNumber: 42, page: PAGE_REF }]);
   });
 
   it('follows the annotation afterCreate setting: no selection, back to the default tool', async () => {

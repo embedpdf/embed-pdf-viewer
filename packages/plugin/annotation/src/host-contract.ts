@@ -4,10 +4,12 @@
  * extension seams. Same runtime token as the public one, typed wider.
  */
 import { createHostToken } from '@embedpdf/core';
-import type { DocumentEvent, EventHook, Unsubscribe } from '@embedpdf/core';
+import type { DocumentEvent, EventHook, PredictedOp, Unsubscribe } from '@embedpdf/core';
 import type {
   ChromeNode,
+  Effect,
   Id,
+  Model,
   Rect,
   RenderItem,
   KindName,
@@ -19,7 +21,9 @@ import type {
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
+  AnnotationPosition,
   AnnotationRef,
+  ChangeOp,
   ImageSource,
   PageMeasurementViewport,
   PageRef,
@@ -63,6 +67,50 @@ export interface AnnotationAppearancePicture extends Pick<
   'ref' | 'mode' | 'state' | 'rect'
 > {
   readonly image: ImageSource;
+}
+
+/**
+ * A sibling plugin that lends this plugin records it owns (the form plugin's
+ * widgets), so they are selected, moved, resized, restyled and deleted with
+ * the annotation tools. This plugin never stores them: it shows them as the
+ * lender says, and an edit of one becomes the lender's ops, in the same change
+ * as the rest of the edit.
+ */
+export interface AnnotationLender {
+  /** Who owns the records, for a refusal that sends you there (`'form'`). */
+  readonly owner: string;
+  /**
+   * Its records as the engine confirmed them and as they show, each list the
+   * same object until it changes; `null` while it lends none.
+   */
+  records(): {
+    readonly confirmed: readonly Annotation[];
+    readonly shown: readonly Annotation[];
+  } | null;
+  /**
+   * The ops that write a message's effects on its records, all at once:
+   * `model` is the model the message left, `before` the one it started from
+   * (a record it deleted is there).
+   */
+  opsOf(effects: readonly Effect[], model: Model, before: Model): readonly ChangeOp[];
+  /** What undoing these ops looks like. */
+  undoOf(ops: readonly ChangeOp[]): readonly PredictedOp[];
+  /** The ops that move these records of one page to `position` in its drawing order. */
+  reorderOps(
+    page: PageRef,
+    refs: readonly AnnotationRef[],
+    position: AnnotationPosition,
+  ): readonly ChangeOp[];
+  /** Whether this session may change and delete the record. */
+  authority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
+  /** What its records' pictures on a page depend on: a new value means new pictures. */
+  pictureEpoch(page: PageRef): string;
+  /** Its records' pictures on a page, at rest, in every state. */
+  renderAppearances(
+    page: PageRef,
+    scale: number,
+    signal?: AbortSignal,
+  ): Promise<readonly AnnotationAppearanceImage[]>;
 }
 
 export interface RecalibrationReport {
@@ -278,6 +326,12 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   renderArmedStampPreview(devicePixelWidth?: number): Promise<ArmedStampPreview | null>;
 
   // ── extension ──
+  /**
+   * Show a sibling's records with the annotations and edit them with the same
+   * tools (see {@link AnnotationLender}). One lender at a time; returns the
+   * release.
+   */
+  lend(lender: AnnotationLender): Unsubscribe;
   listResolvedTools(): ResolvedTool[];
   getResolvedTool(id: string): ResolvedTool | null;
   getToolSubtype(id: string): KindName;

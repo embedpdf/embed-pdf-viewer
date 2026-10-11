@@ -7,13 +7,8 @@
  */
 import type { Mirror } from '@embedpdf/core';
 
-import {
-  emptyFieldIndex,
-  foldFormEvent,
-  indexFields,
-  predictFormOp,
-  type FieldIndex,
-} from '../model';
+import { emptyFieldIndex, foldFormEvent, indexFields, type FieldIndex } from '../model';
+import { predictFormOp } from './predict';
 import type { FormContext } from '../services/context';
 import type { FormEvents } from '../services/events';
 

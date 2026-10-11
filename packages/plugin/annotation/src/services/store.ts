@@ -17,6 +17,12 @@
  * are named by the object numbers they take, so a record keeps its key from
  * its first frame, and a later change to it is simply staged after its create.
  *
+ * A lent record (a form widget in design mode, services/lending.ts) is
+ * edited like any other, and its effects become its lender's ops in the same
+ * change: a drag of two fields and a stamp is one change. Changes stated in
+ * code keep to this plugin's own records, except a reorder, which reorders
+ * lent records through their lender in the same change.
+ *
  * The model it hands out is the view's (read/view.ts).
  */
 import {
@@ -41,6 +47,7 @@ import {
   type UpdateResult,
 } from '@embedpdf/core-annotation';
 import {
+  annotationKey,
   type Annotation,
   type AnnotationDraft,
   type AnnotationPatch,
@@ -54,6 +61,7 @@ import {
 
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
+import { ownReorder, refuseLent, type Lending } from './lending';
 import { createObjectNumbers } from './object-numbers';
 import { createSelectionHistory } from './selection-history';
 import {
@@ -222,6 +230,7 @@ export function createStore(
   view: View,
   records: Pick<Mirror<AnnotationRecords>, 'view'>,
   events: AnnotationEvents,
+  lending: Pick<Lending, 'lender' | 'owns'>,
 ): AnnotationStore {
   let followUp: FollowUp | null = null;
   // Keyed by effect type, so a builder only ever receives effects of its own kind.
@@ -243,9 +252,13 @@ export function createStore(
         ? [{ kind: 'objectNumber' as const, page: op.page, objectNumber: op.objectNumber }]
         : op.type === 'annotations.update' || op.type === 'annotations.delete'
           ? [op.ref]
-          : op.type === 'annotations.reorder'
-            ? [...op.refs]
-            : [],
+          : op.type === 'forms.updateWidget' || op.type === 'forms.deleteWidget'
+            ? [op.widget]
+            : op.type === 'annotations.reorder'
+              ? [...op.refs]
+              : op.type === 'forms.reorderWidgets'
+                ? [...op.widgets]
+                : [],
     );
     events.writeFailed.emit({ refs, error: toPluginErrorInfo(settled.error) });
   });
@@ -260,8 +273,21 @@ export function createStore(
       }),
     );
 
-  const stage = (ops: readonly ChangeOp[], before: AnnotationRecords): PendingChange => {
-    const change = ctx.changes.stage({ label: labelOf(ops), ops, undo: undoOf(before, ops) });
+  /**
+   * Stage this plugin's ops and its lender's as one change. Undoing it undoes
+   * the lent ops first: they come last.
+   */
+  const stage = (
+    ops: readonly ChangeOp[],
+    before: AnnotationRecords,
+    lent: readonly ChangeOp[] = [],
+  ): PendingChange => {
+    const all = [...ops, ...lent];
+    const undo = [
+      ...(lent.length ? (lending.lender()?.undoOf(lent) ?? []) : []),
+      ...undoOf(before, ops),
+    ];
+    const change = ctx.changes.stage({ label: labelOf(all), ops: all, undo });
     mine.add(change.opId);
     return change;
   };
@@ -309,18 +335,30 @@ export function createStore(
     if (options.adjust) result = options.adjust(result);
     const after = modelAfter(before, result);
     const shown = records.view();
+    // A lent record's effects are its lender's to write.
+    const lender = lending.lender();
+    const isLent = (effect: Effect): boolean =>
+      lender !== null && 'id' in effect && lending.owns(effect.id);
+    const lentEffects = result.effects.filter(isLent);
     const built = withFollowUps(
-      result.effects.flatMap((effect) => builders.get(effect.type)?.(effect, after, before) ?? []),
+      result.effects
+        .filter((effect) => !isLent(effect))
+        .flatMap((effect) => builders.get(effect.type)?.(effect, after, before) ?? []),
       followUp,
       after,
     );
+    const lent = lentEffects.length && lender ? lender.opsOf(lentEffects, after, before) : [];
     const named = numbers.named(built, result.session.objectNumbers);
     const ops = withoutCoveredDeletes(shown, named.ops);
     if (named.held !== result.session.objectNumbers) {
       result = { ...result, session: { ...result.session, objectNumbers: named.held } };
     }
     let written = Promise.resolve(NOTHING_WRITTEN);
-    if (ops.length) {
+    if (lent.length && !options.into) {
+      const change = stage(ops, shown, lent);
+      selections.remember(change.opId, before.selected, result.session.selected);
+      written = writtenOf(change, idsOf([...ops, ...lent]));
+    } else if (ops.length) {
       const into = options.into as Hold | undefined;
       if (into) {
         // Typing: the change keeps its place, its ops are the latest, and
@@ -374,13 +412,22 @@ export function createStore(
     const taken = creates ? numbers.take(creates) : [];
     if (!taken) throw noNumbers();
     const ops: ChangeOp[] = [];
+    /** Lent records reordered: their lender's ops, last in the change. */
+    const lent: ChangeOp[] = [];
     /** Where each change's op is among `ops`, or -1 for a change that writes nothing. */
     const opIndex: number[] = [];
     const ids: Id[] = [];
     const vector: Id[] = [];
     let current = shown;
     try {
-      for (const change of changes) {
+      for (const stated of changes) {
+        if (stated.type === 'update' || stated.type === 'delete') refuseLent(lending, stated.ref);
+        const change = stated.type === 'reorder' ? ownReorder(lending, stated, lent) : stated;
+        if (!change) {
+          ids.push(annotationKey((stated as Extract<StoreChange, { type: 'reorder' }>).refs[0]!));
+          opIndex.push(-1);
+          continue;
+        }
         const op = checkedOpOf(change, current, taken, (id) => model().byId[id]);
         ids.push(op.id);
         opIndex.push(op.op ? ops.length : -1);
@@ -392,7 +439,7 @@ export function createStore(
     } catch (error) {
       throw toPluginError('annotation', error);
     }
-    if (!ops.length) {
+    if (!ops.length && !lent.length) {
       return {
         ids,
         written: Promise.resolve({ ...NOTHING_WRITTEN, annotations: changes.map(() => null) }),
@@ -413,11 +460,11 @@ export function createStore(
       }));
     }
     const selected = model().selected;
-    const change = stage(withoutCoveredDeletes(shown, [...ops, ...following.ops]), shown);
+    const change = stage(withoutCoveredDeletes(shown, [...ops, ...following.ops]), shown, lent);
     selections.remember(change.opId, selected, options.select ? ids : selected);
     if (vector.length) ctx.state.update(withSession, ctx.state.get().session, vector);
     if (options.select) commit({ type: 'select', ids });
-    const written = writtenOf(change, idsOf(ops)).then(
+    const written = writtenOf(change, idsOf([...ops, ...lent])).then(
       (outcome): AppliedOutcome => ({
         ...outcome,
         annotations: opIndex.map((index) => {

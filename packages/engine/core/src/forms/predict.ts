@@ -16,6 +16,7 @@ import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget 
 import type { FormFieldPatch } from './patch';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
+import { standingRectOf } from './widgets';
 import { assertChoiceDefault, fieldValueWriteOf } from './write';
 import type { Annotation } from '../annotation/kinds';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
@@ -591,7 +592,7 @@ function widgetRowOfPlacement(
   const toggle = draft.family === 'checkbox' || draft.family === 'radio';
   return {
     ...row,
-    rect: standingRect(row),
+    rect: standingRectOf(row.box, row.rotation),
     field: { kind: 'objectNumber', objectNumber: at.field },
     fieldFamily: draft.family,
     // Attaching the widget prints it and draws its appearance (a signature
@@ -601,14 +602,6 @@ function widgetRowOfPlacement(
     appearanceState: toggle ? 'Off' : null,
     caption: draft.family === 'pushbutton' ? (placement.caption ?? null) : null,
   } as WidgetAnnotation;
-}
-
-/** Where a widget stands on the page: its box, with its sides swapped under a quarter turn. */
-function standingRect(row: WidgetAnnotation): WidgetAnnotation['rect'] {
-  const turn = (((row.rotation ?? 0) % 360) + 360) % 360;
-  if (turn !== 90 && turn !== 270) return row.rect;
-  const { x, y, width, height } = row.box;
-  return { x: x + (width - height) / 2, y: y + (height - width) / 2, width: height, height: width };
 }
 
 function toggleWidgetOf(widget: FormFieldWidget, exportValue: string): ToggleFieldWidget {

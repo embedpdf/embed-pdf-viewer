@@ -11,12 +11,14 @@ import { connectForm } from './connect';
 import type { FormHostCapability } from './host-contract';
 import { fieldByRef } from './model';
 import { createFieldReads } from './read/fields';
+import { createFieldSettings } from './read/settings';
 import { createWidgetReads } from './read/widgets';
 import { createServices, type FormContext } from './services';
 import { createActivation } from './write/activation';
 import { createFieldWrites } from './write/fields';
 import { createFill } from './write/fill';
 import { createInterchange } from './write/interchange';
+import { createWidgetLender } from './write/lending';
 import { createResetWrites } from './write/reset';
 import { createScriptEffects } from './write/script-effects';
 import { createTyping } from './write/typing';
@@ -29,6 +31,7 @@ export function createFormController(ctx: FormContext) {
 
   const fields = createFieldReads(ctx, services);
   const widgets = createWidgetReads(ctx, services);
+  const settingsReads = createFieldSettings(services);
 
   const fills = createFill(ctx, services);
   const values = createValueWrites(ctx, services, fills);
@@ -43,6 +46,7 @@ export function createFormController(ctx: FormContext) {
     settings.api,
     fields.api,
     widgets.api,
+    settingsReads.api,
     values.api,
     typing.api,
     resets.api,
@@ -70,6 +74,6 @@ export function createFormController(ctx: FormContext) {
 
   return {
     api,
-    connect: () => connectForm(ctx, api),
+    connect: () => connectForm(ctx, api, createWidgetLender(ctx, services)),
   };
 }

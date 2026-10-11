@@ -179,6 +179,10 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M6 15l-3 3l3 3',
     'M18 15l3 3l-3 3',
   ],
+  formButton: [
+    'M3 8a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-8',
+    'M8 12h8',
+  ],
   formCheckbox: [
     'M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14',
     'M9 12l2 2l4 -4',

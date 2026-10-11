@@ -179,6 +179,7 @@ export const TOOL_DEFAULT_FIELDS = {
   // maps them onto /MK //BS //DA //Q.
   'widget-text': WIDGET_TEXT_FIELDS,
   'widget-choice': WIDGET_TEXT_FIELDS,
+  'widget-button': WIDGET_TEXT_FIELDS,
   'widget-toggle': WIDGET_BOX_FIELDS,
   'widget-radio': WIDGET_BOX_FIELDS,
   // The bare box every other widget family ingests as (a signature field's

@@ -56,7 +56,8 @@
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/plugin-actions": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
-    "@embedpdf/plugin-interaction": "workspace:*"
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

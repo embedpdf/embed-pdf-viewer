@@ -23,7 +23,7 @@ const NOTHING_SHOWN: readonly ShownWidget[] = Object.freeze([]);
 
 export function createWidgetReads(
   ctx: FormContext,
-  { fields, rights }: Pick<FormServices, 'fields' | 'rights'>,
+  { fields, rights, design }: Pick<FormServices, 'fields' | 'rights' | 'design'>,
 ) {
   /** Every page's widgets come with the form: one read for the document. */
   const loadWidgets = (_page: PageRef): Promise<void> => fields.settled();
@@ -43,9 +43,11 @@ export function createWidgetReads(
     return widgetAt(fields.view(), widgetsOn(page.objectNumber), point);
   };
 
+  // In design mode the annotation layer draws the widgets it borrowed.
   const shownOn = memoByKey(
-    (pageObjectNumber: number) => [fields.view()],
-    (pageObjectNumber, index): readonly ShownWidget[] => shownWidgetsOf(index, pageObjectNumber),
+    (pageObjectNumber: number) => [fields.view(), design.lending()],
+    (pageObjectNumber, index, lent): readonly ShownWidget[] =>
+      lent ? NOTHING_SHOWN : shownWidgetsOf(index, pageObjectNumber),
   );
 
   // A field the user may not fill in (a signature field: sign) has its

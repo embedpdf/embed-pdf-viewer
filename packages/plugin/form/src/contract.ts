@@ -33,6 +33,7 @@ import type {
   FormWidget,
   PageRef,
   WidgetAnnotation,
+  WidgetPatch,
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions/contract';
 
@@ -146,6 +147,61 @@ export interface FormValidation {
 /** What `reset()` resolves: the fields it changed, as they are now. */
 export interface FormResetResult {
   readonly fields: readonly FormFieldDTO[];
+}
+
+/** A field setting that is on or off. */
+export type FormFieldFlagSetting =
+  | 'required'
+  | 'readOnly'
+  | 'noExport'
+  | 'multiline'
+  | 'password'
+  | 'comb'
+  | 'radiosInUnison'
+  | 'noToggleToOff'
+  | 'edit'
+  | 'multiSelect';
+
+/**
+ * One setting of a field, as a settings panel draws it: `key` names it in
+ * `update()`'s patch, and `control` says how it is edited. `text`: a line of
+ * text. `flag`: on or off. `number`: a whole number from `min`, or none
+ * (`null`). `choice`: one of `options`, or any text when `free`. `choices`:
+ * any of `options`. `options`: the field's options, each a label and a value.
+ */
+export type FormFieldSetting =
+  | { readonly key: 'name' | 'alternateName'; readonly control: 'text'; readonly label: string }
+  | { readonly key: FormFieldFlagSetting; readonly control: 'flag'; readonly label: string }
+  | {
+      readonly key: 'maxLength';
+      readonly control: 'number';
+      readonly label: string;
+      readonly min: number;
+    }
+  | { readonly key: 'defaultValue'; readonly control: 'text'; readonly label: string }
+  | {
+      readonly key: 'defaultValue';
+      readonly control: 'choice';
+      readonly label: string;
+      readonly options: readonly string[];
+      readonly free: boolean;
+    }
+  | {
+      readonly key: 'defaultValue';
+      readonly control: 'choices';
+      readonly label: string;
+      readonly options: readonly string[];
+    }
+  | { readonly key: 'options'; readonly control: 'options'; readonly label: string };
+
+/**
+ * What a settings panel shows for one field: its settings in display order,
+ * and each one's value by key. `name` is the field's own part of its dotted
+ * name, what `update({ name })` replaces.
+ */
+export interface FormFieldSettings {
+  readonly properties: readonly FormFieldSetting[];
+  readonly values: Readonly<Record<string, unknown>>;
 }
 
 /** What `create()`, `update()` and `removeWidget()` resolve: the field as it is now. */
@@ -290,6 +346,12 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
   getSelectedField(): FormFieldDTO | null;
   /**
+   * A field's settings, described for a settings panel, which writes them
+   * with `update()`; `null` for a field the form doesn't have. Every setting
+   * `update()` takes but scripts and `mappingName`.
+   */
+  getFieldSettings(field: FormFieldRef): FormFieldSettings | null;
+  /**
    * Check the required fields you may fill in: `missing` lists the empty ones
    * in page order. Another signer's fields are theirs to fill.
    */
@@ -392,6 +454,17 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     widget: AnnotationRef,
     options?: OperationOptions,
   ): Promise<FormFieldResult>;
+  /**
+   * Change one widget's place or look: pass only what changes. Its field
+   * keeps its value and settings. Rejects `permission-denied` without
+   * `doc.forms.modify`, `invalid-input` for what the widget doesn't take (a
+   * check style on a text field's widget).
+   */
+  updateWidget(
+    widget: AnnotationRef,
+    patch: WidgetPatch,
+    options?: OperationOptions,
+  ): Promise<{ readonly widget: WidgetAnnotation }>;
   /**
    * Delete a widget: it leaves its page, and its field when it has one, and
    * resolves that field as it is now (`null` for a widget in no field). Fires

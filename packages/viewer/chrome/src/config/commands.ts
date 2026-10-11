@@ -23,7 +23,7 @@ import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
-import { FormToken, type FormFieldRef } from '@embedpdf/react/form';
+import { FormToken } from '@embedpdf/react/form';
 import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
 import { SearchToken } from '@embedpdf/react/search';
@@ -544,6 +544,7 @@ export const defaultCommands: CommandDef[] = [
   tool('form:add-radio', 'form-radio', 'commands.form.radio', 'formRadio'),
   tool('form:add-select', 'form-combobox', 'commands.form.select', 'formSelect'),
   tool('form:add-listbox', 'form-listbox', 'commands.form.listbox', 'formListbox'),
+  tool('form:add-button', 'form-button', 'commands.form.button', 'formButton'),
   tool('form:add-signature', 'form-signature', 'commands.form.signature', 'signature'),
 
   // ── redaction (the toolbar arms the tool; the panel owns the destructive
@@ -621,29 +622,9 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.annotate.delete',
     icon: 'trash',
     categories: ['annotation'],
-    run: (commandContext) => {
-      const annotation = anno(commandContext);
-      if (!annotation) return;
-      const form = commandContext.tryGet(FormToken);
-      const dtos = annotation.selection.list();
-      const isWidget = (subtype: string) => subtype.startsWith('widget');
-      const widgets = form ? dtos.filter((annotation) => isWidget(annotation.subtype)) : [];
-      if (widgets.length === 0) {
-        void annotation.selection.delete();
-        return;
-      }
-      // Widgets are field-plane citizens: deleting one goes through doc.forms
-      // (the field and every widget of it cascade), never the raw annotation —
-      // otherwise the /AcroForm entry would be orphaned.
-      const fields = new Map<string, FormFieldRef>();
-      for (const annotation of widgets) {
-        const field = form!.getFieldForWidget(annotation.ref);
-        if (field) fields.set(field.name, field.ref);
-      }
-      for (const ref of fields.values()) void form!.delete(ref);
-      for (const dto of dtos) if (!isWidget(dto.subtype)) void annotation.delete(dto.ref);
-      annotation.selection.clear();
-    },
+    // One change for the whole selection: a form widget lent to the annotation
+    // plugin is deleted as the form says (its field, when every widget of it goes).
+    run: (commandContext) => void anno(commandContext)?.selection.delete(),
     visible: hasAnnotationSelection,
     // Mirrors the engine's own authorization: locked/unauthorized annotations
     // keep the button visible but disabled (the engine still enforces).

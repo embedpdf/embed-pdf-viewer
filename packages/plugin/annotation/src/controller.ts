@@ -110,6 +110,7 @@ export function createAnnotationController(ctx: AnnotationContext) {
       },
       tools: tools.tools,
       stamps: stamps.stamps,
+      lend: services.lending.lend,
       // Authority twins, the records mirror and the events are services, not areas.
       getStatus: records.getStatus,
       refresh: (options?: { signal?: AbortSignal }) =>

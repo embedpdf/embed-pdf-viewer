@@ -16,8 +16,8 @@
 import type { FormFieldFamily, WidgetAppearance } from '@embedpdf/engine-core/runtime';
 import type { ClickCreate } from '@embedpdf/plugin-annotation/contract';
 
-/** The families the palette places; a push button is made through `create()`. */
-export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unknown'>;
+/** The families the palette places. */
+export type AuthorableFormFamily = Exclude<FormFieldFamily, 'unknown'>;
 
 export interface FormToolDef {
   id: string;
@@ -25,7 +25,13 @@ export interface FormToolDef {
   family: AuthorableFormFamily;
   /** The client kind the annotation registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */
-  visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-radio' | 'widget-box';
+  visualKind:
+    | 'widget-text'
+    | 'widget-choice'
+    | 'widget-button'
+    | 'widget-toggle'
+    | 'widget-radio'
+    | 'widget-box';
   /** What a bare click places (box policies only — fields are boxes). */
   clickCreate: Extract<ClickCreate, { width: number }>;
   /** Seed drawing defaults, the widget's appearance fields: a placed field is
@@ -84,6 +90,15 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
     visualKind: 'widget-choice',
     clickCreate: { width: 140, height: 72 },
     defaults: { ...FIELD_CHROME, fontSize: 12 },
+    cursor: 'crosshair',
+  },
+  // A push button: its caption is its text; what it does is its actions.
+  {
+    id: 'form-button',
+    family: 'pushbutton',
+    visualKind: 'widget-button',
+    clickCreate: { width: 100, height: 28 },
+    defaults: { ...FIELD_CHROME, interiorColor: '#e5e7eb', fontSize: 12 },
     cursor: 'crosshair',
   },
   // A signature field: the bare widget box every non-text family ingests

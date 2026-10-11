@@ -41,7 +41,7 @@ const DRAWN_PER_PAGE = 4;
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc'>,
-  { view: { pageModel } }: Pick<AnnotationServices, 'view'>,
+  { view: { pageModel }, lending }: Pick<AnnotationServices, 'view' | 'lending'>,
   ghost: Pick<Ghost, 'itemsOn'>,
   stamps: Pick<Stamps, 'lookOf'>,
 ) {
@@ -165,8 +165,8 @@ export function createRenderReads(
     listTextItems: (page: PageRef, view?: ViewEnv) => textItemsOf(page, view),
     listLinkItems: (page: PageRef) => linkItemsOf(page.objectNumber),
     getAppearanceEpoch: (page: PageRef) => {
-      const { engine, placed } = epochOf(page);
-      return [engine, placed].filter(Boolean).join('|');
+      const { engine, placed, lent } = epochOf(page);
+      return [engine, placed, lent].filter(Boolean).join('|');
     },
     getBakeScale: (renderScale: number) =>
       // The render policy is a document fact off the kernel registry (like
@@ -197,10 +197,11 @@ export function createRenderReads(
             keep(pictures);
             return pictures;
           });
-      return Promise.all([engines, ownPictures(page, scale)]).then(([theirs, placed]) => [
-        ...theirs,
-        ...placed,
-      ]);
+      return Promise.all([
+        engines,
+        lentPictures(page, scale, signal),
+        ownPictures(page, scale),
+      ]).then(([theirs, lent, placed]) => [...theirs, ...lent, ...placed]);
     },
   };
 
@@ -212,12 +213,15 @@ export function createRenderReads(
    * hasn't written yet, which show the preview they were placed with.
    * Position and rotation are absent: the blit translates (`apBox`) and turns
    * (`apRot`) the same pixels, so a move or a spin costs no new picture.
+   * `lent`: the lender's epoch for its records' pictures, when the page shows
+   * any of them.
    */
-  const epochOf = (page: PageRef): { engine: string; placed: string } => {
+  const epochOf = (page: PageRef): { engine: string; placed: string; lent: string } => {
     const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
     const engine: string[] = [];
     const placed: string[] = [];
+    let lentShown = false;
     for (const id of model.order) {
       const record = model.byId[id];
       if (
@@ -234,9 +238,40 @@ export function createRenderReads(
         else if (kept.has(id)) placed.push(`${id}@kept`);
         continue;
       }
+      if (lending.owns(id)) {
+        lentShown = true;
+        continue;
+      }
       engine.push(`${id}@${record.apVersion ?? 0}:${record.annotation.appearanceState ?? ''}`);
     }
-    return { engine: engine.sort().join('|'), placed: placed.sort().join('|') };
+    const lender = lending.lender();
+    return {
+      engine: engine.sort().join('|'),
+      placed: placed.sort().join('|'),
+      lent: lentShown && lender ? `lent:${lender.pictureEpoch(page)}` : '',
+    };
+  };
+
+  /** The lender's pictures of its records on `page`, in the state each shows; kept like the engine's. */
+  const lentPictures = (
+    page: PageRef,
+    scale: number,
+    signal?: AbortSignal,
+  ): Promise<AnnotationAppearancePicture[]> => {
+    const lender = lending.lender();
+    const model = pageModel(page.objectNumber);
+    const lent = model.order
+      .filter((id) => lending.owns(id) && !model.byId[id]!.unconfirmed)
+      .map((id) => model.byId[id]!.annotation);
+    if (!lender || !lent.length) return Promise.resolve([]);
+    return lender.renderAppearances(page, scale, signal).then(
+      (images) => {
+        const pictures = shownAppearances([...images], lent);
+        keep(pictures);
+        return pictures;
+      },
+      () => [],
+    );
   };
 
   /**

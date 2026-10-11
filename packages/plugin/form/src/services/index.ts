@@ -11,6 +11,7 @@ import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 import { canonicalKey, type FieldIndex, type FieldKey } from '../model';
 import { createFieldsMirror } from '../sync/fields';
 import type { FormContext } from './context';
+import { createDesign, type FormDesign } from './design';
 import { createEvents, type FormEvents } from './events';
 import { createFillRights, type FillRights } from './fill-rights';
 import { createScriptingSeam, type FormScripting } from './scripting';
@@ -25,9 +26,11 @@ export interface FormServices {
   readonly events: FormEvents;
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
+  /** Whether the widgets are lent to the annotation plugin now (design mode). */
+  readonly design: FormDesign;
   /**
-   * Every durable write takes its turn on one serial queue: a fill until it is
-   * sent (write/fill.ts), a design write until the engine answers.
+   * Fills take turns on one serial queue until they are sent (write/fill.ts),
+   * and a repair until the engine answers.
    */
   readonly enqueue: SerialQueue;
   /** The key a field is known by, whichever ref names it (`toFieldRef(name)` too). */
@@ -44,6 +47,7 @@ export function createServices(ctx: FormContext): FormServices {
     events,
     siblings,
     scripting: createScriptingSeam(ctx, siblings),
+    design: createDesign(ctx, siblings),
     enqueue: ctx.serialQueue('writes'),
     keyOf: (ref) => canonicalKey(fields.view(), ref),
   };

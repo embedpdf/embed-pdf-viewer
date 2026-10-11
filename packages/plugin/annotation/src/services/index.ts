@@ -9,6 +9,7 @@ import type { AnnotationContext } from './context';
 import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';
 import { createPageLookup, type PageLookup } from './geometry';
+import { createLending, type Lending } from './lending';
 import { createStore, type AnnotationStore } from './store';
 import { createRecordsMirror, type AnnotationRecords } from '../sync/records';
 import { createBehaviors, type Behaviors } from '../tools/behaviors';
@@ -31,6 +32,8 @@ export interface AnnotationServices {
   readonly records: Mirror<AnnotationRecords>;
   /** The records as shown, each drawn as its pending change says, composed with the session. */
   readonly view: View;
+  /** A sibling's records shown and edited as annotations (the form plugin's widgets). */
+  readonly lending: Lending;
   /** The one door user actions go through. */
   readonly store: AnnotationStore;
   readonly geometry: PageLookup;
@@ -50,8 +53,9 @@ export function createServices(ctx: AnnotationContext): AnnotationServices {
   const events = createAnnotationEvents(ctx);
   const geometry = createPageLookup(ctx);
   const records = createRecordsMirror(ctx, events);
-  const view = createView(ctx, records);
-  const store = createStore(ctx, view, records, events);
+  const lending = createLending(() => ctx.notify());
+  const view = createView(ctx, records, lending);
+  const store = createStore(ctx, view, records, events, lending);
   // The tools a document has are read once, when it opens.
   const tools = createToolRegistry(ctx, settings.get().tools, store, events);
   return {
@@ -59,6 +63,7 @@ export function createServices(ctx: AnnotationContext): AnnotationServices {
     events,
     records,
     view,
+    lending,
     store,
     geometry,
     authority: createAuthority(ctx, store),

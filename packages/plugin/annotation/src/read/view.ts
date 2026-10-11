@@ -11,6 +11,9 @@
  * Every read and every gesture takes this `Model`. It is memoized, and each
  * record keeps its identity until its own inputs change, so a hover or a
  * change to one record does not recompute the others.
+ *
+ * A lender's records (services/lending.ts) come after the annotations, so on
+ * each page they paint above them, as form widgets do.
  */
 import { memo, type Mirror } from '@embedpdf/core';
 import {
@@ -24,12 +27,15 @@ import {
   sourceOfNew,
 } from '@embedpdf/core-annotation';
 import {
+  annotationKey,
   annotationPatchBetween,
   type Annotation,
   type AnnotationPatch,
 } from '@embedpdf/engine-core/runtime';
 
+import type { AnnotationLender } from '../host-contract';
 import type { AnnotationContext } from '../services/context';
+import type { Lending } from '../services/lending';
 import type { AnnotationRecord, AnnotationRecords } from '../sync/records';
 
 /**
@@ -56,6 +62,7 @@ export const authorityOf = (
 export function createView(
   ctx: Pick<AnnotationContext, 'state' | 'doc' | 'document'>,
   records: Mirror<AnnotationRecords>,
+  lending: Pick<Lending, 'lender' | 'records'>,
 ) {
   /** A confirmed record as the model has it, cached per stored version and render preference. */
   const confirmed = new WeakMap<AnnotationRecord, { vector: boolean; record: ModelAnnotation }>();
@@ -113,9 +120,71 @@ export function createView(
     return record;
   };
 
+  /** A lent record as the model has it, cached per shown row and the confirmed row it was made from. */
+  const lent = new WeakMap<
+    Annotation,
+    { truth: Annotation | undefined; record: ModelAnnotation }
+  >();
+  const lentRecord = (
+    shown: Annotation,
+    truth: Annotation | undefined,
+    lender: AnnotationLender,
+  ): ModelAnnotation => {
+    const cached = lent.get(shown);
+    if (cached && cached.truth === truth) return cached.record;
+    let record: ModelAnnotation;
+    if (!truth) {
+      // Only shown: one an undo brings back draws the picture it had (the
+      // render reads keep it); a new one (a field just placed) draws live, as
+      // the tool's ghost drew it, until the engine has its picture.
+      record = {
+        ...fromDTO(shown),
+        unconfirmed: true,
+        source: confirmedOnce.has(annotationKey(shown.ref)) ? 'baked' : 'vector',
+        authority: lender.authority(shown),
+      };
+    } else {
+      // The lender's picture is its drawing: it moves with a move, and is
+      // drawn where its shape is for the rest.
+      const base: ModelAnnotation = {
+        ...fromDTO(truth),
+        source: sourceOfConfirmed(truth, false),
+        apVersion: 0,
+        authority: lender.authority(truth),
+      };
+      const patch = { ...annotationPatchBetween(truth, shown), subtype: truth.subtype };
+      record =
+        shown === truth
+          ? base
+          : { ...base, annotation: shown, ...drawnAfter(base, patch as AnnotationPatch) };
+    }
+    lent.set(shown, { truth, record });
+    return record;
+  };
+
+  /** The confirmed lent rows by key, once per list; and every key ever confirmed. */
+  const confirmedLent = new WeakMap<readonly Annotation[], Map<Id, Annotation>>();
+  const confirmedOnce = new Set<Id>();
+  const confirmedByKey = (rows: readonly Annotation[]): Map<Id, Annotation> => {
+    let byKey = confirmedLent.get(rows);
+    if (!byKey) {
+      byKey = new Map(rows.map((row) => [annotationKey(row.ref), row]));
+      for (const key of byKey.keys()) confirmedOnce.add(key);
+      confirmedLent.set(rows, byKey);
+    }
+    return byKey;
+  };
+
   const view = memo(
-    () => [records.get(), records.view(), ctx.state.get().vector, ctx.document()] as const,
-    (truths, shown, vector): AnnotationView => {
+    () =>
+      [
+        records.get(),
+        records.view(),
+        ctx.state.get().vector,
+        ctx.document(),
+        lending.records(),
+      ] as const,
+    (truths, shown, vector, _document, lentRecords): AnnotationView => {
       const byId: Record<Id, ModelAnnotation> = {};
       for (const key of shown.order) {
         const stored = shown.byKey[key]!;
@@ -125,8 +194,19 @@ export function createView(
             ? confirmedRecord(stored, key in vector)
             : predictedRecord(stored, truth, key in vector);
       }
-      // The document's order, then the records this session created.
-      return { byId, order: [...shown.order] };
+      // The document's order, then the records this session created, then the lent ones.
+      const order = [...shown.order];
+      const lender = lending.lender();
+      if (lentRecords && lender) {
+        const confirmed = confirmedByKey(lentRecords.confirmed);
+        for (const row of lentRecords.shown) {
+          const key = annotationKey(row.ref);
+          if (key in byId) continue;
+          byId[key] = lentRecord(row, confirmed.get(key), lender);
+          order.push(key);
+        }
+      }
+      return { byId, order };
     },
   );
 

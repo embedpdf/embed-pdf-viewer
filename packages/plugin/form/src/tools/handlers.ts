@@ -58,6 +58,8 @@ export function toolDraft(
           { label: 'Option 2', value: 'Option 2' },
         ],
       };
+    case 'pushbutton':
+      return { family: 'pushbutton', name, widgets: [{ ...widget, caption: 'Button' }] };
     default:
       return { family: tool.family, name, widgets: [widget] };
   }
@@ -107,9 +109,11 @@ export function createPlaceHandler(
       annotation ? annotation.tools.getDefaults(tool.id) : tool.defaults,
     );
     const name = nextFieldName(tool.family, new Set(form.list().map((field) => field.name)));
-    const { field } = await form.create(toolDraft(tool, name, { page, rect, ...look }));
-    // `create()` resolves after the annotation plugin knows the new widget.
-    // Skip the follow-up when the tool changed while the write ran.
+    // The new field shows at once, when the document holds the numbers it
+    // takes: then it is selected in the same frame. Otherwise once it shows.
+    const created = form.create(toolDraft(tool, name, { page, rect, ...look }));
+    const field = form.get({ kind: 'fqn', name }) ?? (await created).field;
+    // Skip the follow-up when the tool changed meanwhile.
     if (!annotation || interaction.getActiveToolId() !== tool.id) return;
     const policy = annotation.getSettings().afterCreate;
     const widget = field.widgets.find(
@@ -117,6 +121,7 @@ export function createPlaceHandler(
     );
     if (policy.select && widget?.ref) annotation.selection.set([widget.ref]);
     if (policy.tool === 'default') interaction.activateDefaultTool();
+    await created;
   };
 
   return {

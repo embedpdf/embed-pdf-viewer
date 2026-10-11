@@ -15,11 +15,12 @@ import type { AnnotationContext, AnnotationServices } from '../services';
  * annotation a record in the view holds (the engine's read, with this
  * session's pending changes applied as the engine will apply them), so a read
  * is reference-stable until its annotation changes, and a new annotation
- * reads before the engine confirms it.
+ * reads before the engine confirms it. A lent record (a form widget in design
+ * mode) reads by its ref and in the selection, and lists with its owner's.
  */
 export function createAnnotationReads(
   ctx: Pick<AnnotationContext, 'getPage'>,
-  { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
+  { store, records, lending }: Pick<AnnotationServices, 'store' | 'records' | 'lending'>,
 ) {
   const get = (ref: AnnotationRef): Annotation | null =>
     store.model().byId[annotationKey(ref)]?.annotation ?? null;
@@ -52,6 +53,7 @@ export function createAnnotationReads(
       .filter((record): record is ModelAnnotation => record !== undefined)
       .filter(
         (record) =>
+          !lending.owns(record.id) &&
           (!pages || pages.has(record.annotation.page.objectNumber)) &&
           (!filter?.subtype || record.annotation.subtype === filter.subtype),
       );

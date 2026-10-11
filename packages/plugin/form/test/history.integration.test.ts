@@ -10,7 +10,7 @@
 import { createKernel, type DocumentHandle, type Engine } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, type FormFieldRef, type FormSnapshot } from '@embedpdf/engine-core/runtime';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
 import { historyPlugin, HistoryToken } from '@embedpdf/plugin-history';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
@@ -59,6 +59,32 @@ async function boot() {
   if (!doc) throw new Error('the document did not open');
 
   const view = () => Object.fromEntries(NAMES.map((name) => [name, valueOf(form.get(ref(name)))]));
+  /** The form's fields, their settings and widget places, and the calculation order. */
+  const shapeOf = (snapshot: FormSnapshot | null) => {
+    if (!snapshot) return null;
+    const rowOf = (objectNumber: number) =>
+      snapshot.widgets.find((row) => annotationKey(row.ref) === `obj:${objectNumber}`);
+    const round = (rect: { x: number; y: number; width: number; height: number } | undefined) =>
+      rect && [rect.x, rect.y, rect.width, rect.height].map((n) => Math.round(n * 100) / 100);
+    const named = (ref: FormFieldRef | null) =>
+      snapshot.fields.find((field) => JSON.stringify(field.ref) === JSON.stringify(ref))?.name;
+    return {
+      fields: snapshot.fields
+        .map((field) => ({
+          name: field.name,
+          family: field.family,
+          required: field.required,
+          readOnly: field.readOnly,
+          maxLength: 'maxLength' in field ? field.maxLength : null,
+          value: valueOf(field) ?? null,
+          widgets: field.widgets.map((widget) => round(rowOf(widget.objectNumber)?.rect)),
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name)),
+      calculationOrder: snapshot.calculationOrder.map(named),
+    };
+  };
+  const shape = () => shapeOf(form.getSnapshot());
+  const shapeTruth = async () => shapeOf(await doc.forms.list());
   const truth = async () => {
     const { fields } = await doc.forms.list();
     return Object.fromEntries(
@@ -87,12 +113,24 @@ async function boot() {
         }),
       ];
     });
+  /** Wait until the view shows the form's shape as the engine holds it. */
+  const shapeCaughtUp = async () => {
+    const expected = await shapeTruth();
+    for (let tries = 0; tries < 400; tries += 1) {
+      if (JSON.stringify(shape()) === JSON.stringify(expected)) return;
+      await new Promise((go) => setTimeout(go, 5));
+    }
+    expect(shape()).toEqual(expected);
+  };
   return {
     form,
     history,
     view,
     truth,
     caughtUp,
+    shape,
+    shapeTruth,
+    shapeCaughtUp,
     hold: () => {
       holding = true;
     },
@@ -227,6 +265,95 @@ describe('an undo pressed before the scripts finished', () => {
       await new Promise((go) => setTimeout(go, 50));
       await booted.caughtUp();
       expect(await booted.truth()).toEqual(before);
+    } finally {
+      await booted.destroy();
+    }
+  });
+});
+
+/** One design action: what it starts from (not part of the history), and the action itself. */
+interface Design {
+  readonly name: string;
+  readonly setup?: (form: FormHostCapability) => Promise<unknown>;
+  readonly act: (form: FormHostCapability) => Promise<unknown>;
+}
+
+const pageOf = (form: FormHostCapability) => form.get(ref('a'))!.widgets[0]!.page!;
+const place = (form: FormHostCapability, y: number) => ({
+  page: pageOf(form),
+  rect: { x: 160, y, width: 100, height: 20 },
+});
+
+const DESIGNS: Design[] = [
+  {
+    name: 'create a field',
+    act: (form) =>
+      form.create({ family: 'text', name: 'city', widgets: [place(form, 20), place(form, 60)] }),
+  },
+  {
+    name: 'change its settings',
+    act: (form) => form.update(ref('a'), { required: true, maxLength: 4, name: 'amount' }),
+  },
+  { name: 'delete a field', act: (form) => form.delete(ref('agree')) },
+  {
+    name: 'delete one widget of two',
+    setup: (form) =>
+      form.create({ family: 'text', name: 'twice', widgets: [place(form, 20), place(form, 60)] }),
+    act: (form) => form.deleteWidget(form.get(ref('twice'))!.widgets[1]!.ref!),
+  },
+];
+
+describe.each(DESIGNS)('design: $name', (design) => {
+  const start = async (booted: Booted) => {
+    await design.setup?.(booted.form);
+    await booted.shapeCaughtUp();
+    booted.history.clear();
+    return { before: await booted.shapeTruth(), shownBefore: booted.shape() };
+  };
+
+  it('undoes to the form before it and redoes to the form after it', async () => {
+    const booted = await boot();
+    try {
+      const { before } = await start(booted);
+      await design.act(booted.form);
+      await booted.shapeCaughtUp();
+      const after = await booted.shapeTruth();
+      expect(after).not.toEqual(before);
+
+      const undone = booted.answeredStep();
+      booted.history.undo();
+      await undone;
+      await booted.shapeCaughtUp();
+      expect(await booted.shapeTruth()).toEqual(before);
+      expect(booted.shape()).toEqual(before);
+
+      const redone = booted.answeredStep();
+      booted.history.redo();
+      await redone;
+      await booted.shapeCaughtUp();
+      expect(await booted.shapeTruth()).toEqual(after);
+      expect(booted.shape()).toEqual(after);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('shows the action at once, and the form before it at once when undone before the answer', async () => {
+    const booted = await boot();
+    try {
+      const { before, shownBefore } = await start(booted);
+      booted.hold();
+      const acted = design.act(booted.form).catch(() => {});
+      expect(booted.held).toHaveLength(1);
+      expect(booted.shape()).not.toEqual(shownBefore);
+      const answered = booted.answeredStep();
+      booted.history.undo();
+      expect(booted.shape()).toEqual(shownBefore);
+      await booted.release();
+      await acted;
+      await answered;
+      await booted.shapeCaughtUp();
+      expect(await booted.shapeTruth()).toEqual(before);
     } finally {
       await booted.destroy();
     }

@@ -39,7 +39,8 @@ export interface FormHostCapability extends FormCapability {
   ensureLoaded(page: PageRef): Promise<void>;
   /**
    * The widgets a page shows, in the order the page draws them, each with the appearance state it
-   * shows; hidden ones are left out. The form layer paints their pictures from it.
+   * shows; hidden ones are left out. The form layer paints their pictures from it. In design mode,
+   * while the widgets are lent to the annotation plugin, none: the annotation layer draws them.
    */
   listShownWidgets(page: PageRef): readonly ShownWidget[];
   /** The page box in page space, for keeping a placement on the page; `null` for a page that isn't there. */
