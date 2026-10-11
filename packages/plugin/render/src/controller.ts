@@ -92,7 +92,7 @@ export function createRenderController(
   config: RenderConfig = {},
 ) {
   const resolved: ResolvedRenderOptions = resolveRenderOptions(config);
-  const store = new RasterStore();
+  const store = new RasterStore(config.cacheBytes);
   const invalidated = ctx.events.source<RenderInvalidatedEvent>();
   const renderCompleted = ctx.events.source<RenderCompletedEvent>();
   const renderFailed = ctx.events.source<RenderFailedEvent>();

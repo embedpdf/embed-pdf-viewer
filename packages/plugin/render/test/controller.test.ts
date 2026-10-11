@@ -377,6 +377,19 @@ describe('the public door — exact sizes', () => {
     await h.kernel.destroy();
   });
 
+  it('cacheBytes bounds the raster store: past it, the least recently used raster renders again', async () => {
+    const h = await boot({ policy: LATTICE, config: { cacheBytes: 4 } }); // room for one 4-byte image
+    for (const pon of [11, 22]) {
+      const pending = h.render.renderPage(toPageRef(pon), { width: 640 });
+      h.tasks.at(-1)!.resolve(image(String(pon)));
+      await pending;
+    }
+    void h.render.renderPage(toPageRef(22), { width: 640 }).catch(() => {}); // still cached
+    void h.render.renderPage(toPageRef(11), { width: 640 }).catch(() => {}); // evicted
+    expect(h.imageCalls.map((c) => c.pon)).toEqual([11, 22, 11]);
+    await h.kernel.destroy();
+  });
+
   it('renderThumbnail is a width render; renderPages reports in input order with per-page failures', async () => {
     const h = await boot();
     void h.render.renderThumbnail(toPageRef(11), { maxWidth: 120 }).catch(() => {});

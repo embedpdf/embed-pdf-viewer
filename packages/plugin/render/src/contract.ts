@@ -50,6 +50,12 @@ export interface RenderConfig {
   quality?: number;
   /** Diagnostic logging of tile scheduling and fetch outcomes (console `debug`). */
   debug?: boolean;
+  /**
+   * Budget of the raster cache both planes share, in bytes: an entry costs its
+   * encoded size (its pixel count when only a URL is known). Least recently
+   * used rasters go first once it is spent. Default 128 MB.
+   */
+  cacheBytes?: number;
 }
 
 // ── the raster vocabulary ───────────────────────────────────────────────────
