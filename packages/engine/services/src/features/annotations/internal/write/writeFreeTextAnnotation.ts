@@ -5,6 +5,7 @@ import {
   type Color,
   type FreeTextDraft,
   type FreeTextPatch,
+  type RichTextBody,
   type RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -218,32 +219,19 @@ export function applyFreeTextPatch(
     setAnnotColor(fn, annotPtr, patch.fontColor, FPDFANNOT_COLORTYPE.TextColor);
   }
   {
-    if (patch.richText !== undefined) {
-      // Rich replacement: everything regenerated. (`contents`, if also
-      // given, was checked against its projection before the write.)
-      writeRichText(fn, annotPtr, patch.richText, ctx);
-    } else if (patch.contents !== undefined) {
-      // Plain-text replacement: body-style paragraphs, one per line break.
-      // Run formatting is lost by design — a plain-text client cannot
-      // preserve what it cannot see.
-      writeRichText(
-        fn,
-        annotPtr,
-        { paragraphs: richTextParagraphsFromPlainText(patch.contents ?? '') },
-        ctx,
-      );
-    } else if (
+    // Default-style change: the body moves; runs are deltas, so every run
+    // that did not override the property follows. Alignment is a body
+    // property too: the /RC body's text-align wins over /Q on
+    // regeneration, so /Q alone (set below) would not move a rich box.
+    let body: RichTextBody | undefined;
+    if (
       current &&
       (patch.fontFamily !== undefined ||
         patch.fontSize !== undefined ||
         patch.fontColor !== undefined ||
         patch.textAlign !== undefined)
     ) {
-      // Default-style change: the body moves; runs are deltas, so every run
-      // that did not override the property follows. Alignment is a body
-      // property too: the /RC body's text-align wins over /Q on
-      // regeneration, so /Q alone (set below) would not move a rich box.
-      const body = { ...current.body };
+      body = { ...current.body };
       if (patch.fontFamily !== undefined) {
         const face = faceForFreeTextFont(patch.fontFamily, ctx?.describeRegisteredFont);
         body.family = face.family;
@@ -253,6 +241,19 @@ export function applyFreeTextPatch(
       if (patch.fontSize !== undefined) body.size = patch.fontSize;
       if (patch.fontColor !== undefined) body.color = hexColor(patch.fontColor);
       if (patch.textAlign !== undefined) body.align = patch.textAlign;
+    }
+    if (patch.richText !== undefined) {
+      // Rich replacement: everything regenerated. (`contents`, if also
+      // given, was checked against its projection before the write.)
+      writeRichText(fn, annotPtr, patch.richText, ctx);
+    } else if (patch.contents !== undefined) {
+      // Plain-text replacement: body-style paragraphs, one per line break,
+      // in the restyled body when the patch moves it too. Run formatting is
+      // lost by design — a plain-text client cannot preserve what it cannot
+      // see.
+      const paragraphs = richTextParagraphsFromPlainText(patch.contents ?? '');
+      writeRichText(fn, annotPtr, body ? { body, paragraphs } : { paragraphs }, ctx);
+    } else if (current && body) {
       writeRichText(fn, annotPtr, { body, paragraphs: current.paragraphs }, ctx);
     }
   }

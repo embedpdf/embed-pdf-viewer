@@ -244,6 +244,33 @@ describe('rich text FreeText (local engine)', () => {
     await doc.close();
   });
 
+  test('patch table: contents with fontSize / fontColor writes the text in the new body style', async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    const doc = await engine.open({ kind: 'bytes', id: 'rt-contents-body', bytes: annotationsPdf });
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
+      subtype: 'free-text',
+      intent: 'free-text',
+      fontFamily: 'helvetica',
+      fontSize: 14,
+      textAlign: 'left',
+      contents: 'before',
+      rect: RECT,
+    });
+    const updated = await doc.page(toPageRef(PAGE)).annotations.update(created.created.ref, {
+      subtype: 'free-text',
+      contents: 'after',
+      fontSize: 20,
+      fontColor: { r: 255, g: 0, b: 0 },
+    });
+    const dto = updated.updated as FreeTextAnnotationDTO;
+    expect(dto.contents).toBe('after');
+    expect(dto.fontSize).toBe(20);
+    expect(dto.fontColor).toEqual({ r: 255, g: 0, b: 0 });
+    expect(dto.richText.body.color).toBe('#FF0000');
+    expect(dto.richText.body.size).toBe(20);
+    await doc.close();
+  });
+
   test('patch table: contents and richText that disagree are rejected', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-agree', bytes: annotationsPdf });
