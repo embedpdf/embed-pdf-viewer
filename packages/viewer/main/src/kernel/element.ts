@@ -5,29 +5,38 @@
  * rendered inside. Light-DOM children are reserved for the slot system
  * (children-as-slots), which lands with the framework wrappers.
  *
- * Config is init-only, like the chrome it delivers: set `.config` (or the
- * declarative attributes) before/at connection; changing either on a live
- * element re-creates the viewer from scratch — documents and all — which is
- * the honest semantic for a workspace-owning embed.
+ * Five keys follow their value while the viewer runs, from `.config`, their
+ * own properties (`.src`, `.theme`, `.locale`, `.disable`, `.readOnly`) or the
+ * attributes: `src` opens the new document in place of the old one, `theme`
+ * swaps the token sheet and the mode, and `locale`, `disable` and `readOnly`
+ * reach their plugins. Changing any other key re-creates the viewer from
+ * scratch — documents and all — which is the honest semantic for a
+ * workspace-owning embed.
  */
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import {
   FullViewer,
-  chromeHelpers,
-  defaultChrome,
-  defaultCommands,
   defaultIcons,
   themeConfigOf,
   themeTokenProperty,
-  validateChrome,
+  type FullViewerProps,
   type ThemeTokens,
   type Unsubscribe,
-  type ViewerHandle,
+  type Viewer,
 } from '@embedpdf/viewer-chrome';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 import chromeCss from '@embedpdf/viewer-chrome/styles.css?inline';
-import { configFromAttributes, initialDocumentsOf, type ElementConfig } from './config';
+import {
+  changedConfigKeys,
+  configFromAttributes,
+  documentFromSrc,
+  idOfSrc,
+  isLiveConfigKey,
+  mergeConfig,
+  type DocumentSrc,
+  type ElementConfig,
+} from './config';
 
 /**
  * Turns a config's `engine` field — that door's options bag, or nothing — into
@@ -154,15 +163,7 @@ function engineOf(config: ElementConfig): Engine | EngineFactory {
  */
 function warnInvalidConfig(config: ElementConfig): void {
   try {
-    const ids = new Set(defaultCommands.map((command) => command.id));
-    for (const command of config.commands ?? []) ids.add(command.id);
-    const chrome =
-      typeof config.chrome === 'function'
-        ? config.chrome(defaultChrome, chromeHelpers)
-        : (config.chrome ?? defaultChrome);
-    for (const problem of validateChrome(chrome, ids)) {
-      console.warn(`[embedpdf] chrome: ${problem}`);
-    }
+    // The layout is checked by the viewer, at every size it resolves at.
     for (const command of config.commands ?? []) {
       if (
         command.icon &&
@@ -189,6 +190,15 @@ function warnInvalidConfig(config: ElementConfig): void {
 const ElementBase: typeof HTMLElement =
   typeof HTMLElement === 'undefined' ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
+/** The properties a framework may set before the element is defined (see `connectedCallback`). */
+const PROPERTIES = ['config', 'src', 'theme', 'locale', 'disable', 'readOnly'] as const;
+
+/** The document a `src` opened: the id its tab was reserved under, and the id it asked for. */
+interface SrcDocument {
+  readonly reserved: string;
+  readonly id: string;
+}
+
 export class EmbedPdfViewerElement extends ElementBase {
   static observedAttributes = ['src', 'locale', 'theme'];
 
@@ -203,28 +213,88 @@ export class EmbedPdfViewerElement extends ElementBase {
   #config: ElementConfig | null = null;
   #wrapper: HTMLDivElement | null = null;
   #root: Root | null = null;
-  #viewer: ViewerHandle | null = null;
+  /** The config the running viewer shows, and the props it renders with. */
+  #shown: ElementConfig | null = null;
+  #props: FullViewerProps | null = null;
+  #viewer: Viewer | null = null;
   #disposers: Unsubscribe[] = [];
+  #srcDocument: SrcDocument | null = null;
+  /** The ids of `src` documents still closing, which a new one must not take. */
+  #closing = new Set<string>();
 
-  /** Full config — takes precedence over the declarative attributes. */
+  /**
+   * The config, over the declarative attributes. Set on a running viewer, the
+   * five live keys change in place and any other change builds a new viewer.
+   */
   set config(config: ElementConfig) {
     this.#config = config;
-    if (this.isConnected) this.#mount();
+    this.#update();
   }
   get config(): ElementConfig {
-    return this.#config ?? configFromAttributes(this);
+    return mergeConfig(configFromAttributes(this), this.#config);
   }
 
   /**
-   * The drive surface: public capability lenses (`viewer.get(AnnotationToken)`),
-   * one `watch` primitive, and the command trio. Null until `epdf:ready` fires
-   * (once per (re)mount); re-minted if the viewer is rebuilt by a config set.
+   * The document: a URL, a `File`, or bytes. Another one opens in its place, `null` closes it,
+   * and `undefined` goes back to the `src` attribute.
    */
-  get viewer(): ViewerHandle | null {
+  set src(src: DocumentSrc | null | undefined) {
+    this.#change({ src });
+  }
+  get src(): DocumentSrc | null {
+    return this.config.src ?? null;
+  }
+
+  /** `'light'`, `'dark'`, `'system'`, or the theme config. */
+  set theme(theme: ElementConfig['theme']) {
+    this.#change({ theme });
+  }
+  get theme(): ElementConfig['theme'] {
+    return this.config.theme;
+  }
+
+  /** `'auto'` or a language code. */
+  set locale(locale: ElementConfig['locale']) {
+    this.#change({ locale });
+  }
+  get locale(): ElementConfig['locale'] {
+    return this.config.locale;
+  }
+
+  /** The features and commands this viewer doesn't have. */
+  set disable(disable: ElementConfig['disable']) {
+    this.#change({ disable });
+  }
+  get disable(): ElementConfig['disable'] {
+    return this.config.disable;
+  }
+
+  /** Every feature that changes the document off, or all but `except`. */
+  set readOnly(readOnly: ElementConfig['readOnly']) {
+    this.#change({ readOnly });
+  }
+  get readOnly(): ElementConfig['readOnly'] {
+    return this.config.readOnly;
+  }
+
+  /**
+   * The viewer in code: `get(name)`, `documents`, `commands`, `watch`. Null
+   * until `epdf:ready` fires (once per mount); a new one after a config change
+   * builds a new viewer.
+   */
+  get viewer(): Viewer | null {
     return this.#viewer;
   }
 
   connectedCallback(): void {
+    // A property set before this element was defined sits on the instance, in front of the
+    // class's accessor: take it off and set it again through the accessor.
+    for (const property of PROPERTIES) {
+      if (!Object.prototype.hasOwnProperty.call(this, property)) continue;
+      const value: unknown = Reflect.get(this, property);
+      Reflect.deleteProperty(this, property);
+      Reflect.set(this, property, value);
+    }
     // Deferred one microtask: a framework wrapper inserts the element and
     // sets `.config` via ref/layout-effect in the same task — mounting eagerly
     // here would boot the whole viewer once with attribute config and again
@@ -240,23 +310,55 @@ export class EmbedPdfViewerElement extends ElementBase {
   }
 
   attributeChangedCallback(): void {
-    // Attributes only drive attribute-configured elements; an explicit
-    // `.config` object is authoritative and attribute churn is ignored.
-    if (this.isConnected && !this.#config) this.#mount();
+    // Before the first mount the attributes are simply read then; after it, they follow.
+    if (this.#root) this.#update();
+  }
+
+  #change(change: Partial<ElementConfig>): void {
+    this.config = { ...this.#config, ...change };
+  }
+
+  /** Show the current config: in place when only live keys changed, else on a new viewer. */
+  #update(): void {
+    if (!this.isConnected) return; // connecting mounts
+    const shown = this.#shown;
+    if (!this.#root || !shown) {
+      this.#mount();
+      return;
+    }
+    const next = this.config;
+    const changed = changedConfigKeys(shown, next);
+    if (changed.length === 0) return;
+    if (!changed.every(isLiveConfigKey)) {
+      this.#mount();
+      return;
+    }
+    this.#shown = next;
+    if (changed.includes('theme')) this.#adoptSheets(next.theme);
+    if (changed.some((key) => key !== 'src')) {
+      const { theme, locale, disable, readOnly } = next;
+      this.#props = { ...this.#props!, theme, locale, disable, readOnly };
+      this.#root.render(createElement(FullViewer, this.#props));
+    }
+    if (changed.includes('src')) this.#showSrc();
   }
 
   #unmount(): void {
     for (const dispose of this.#disposers) dispose();
     this.#disposers = [];
     this.#viewer = null;
+    this.#srcDocument = null;
+    this.#closing.clear();
+    this.#shown = null;
+    this.#props = null;
     this.#root?.unmount();
     this.#root = null;
   }
 
-  /** Handle arrival = the viewer is live. `epdf:ready` is the addEventListener
+  /** Viewer arrival = the viewer is live. `epdf:ready` is the addEventListener
    *  face of it; `epdf:documentchange` is sugar over `viewer.watch` — the one
-   *  reactivity primitive remains the handle itself. */
-  #onViewer = (viewer: ViewerHandle): void => {
+   *  reactivity primitive remains the viewer itself. */
+  #onViewer = (viewer: Viewer): void => {
     this.#viewer = viewer;
     this.#disposers.push(
       viewer.watch(
@@ -265,8 +367,57 @@ export class EmbedPdfViewerElement extends ElementBase {
           this.dispatchEvent(new CustomEvent('epdf:documentchange', { detail: { documentId } })),
       ),
     );
+    this.#showSrc();
     this.dispatchEvent(new CustomEvent('epdf:ready', { detail: { viewer } }));
   };
+
+  /**
+   * Open the document `src` names in the place of the one the previous `src` opened, which
+   * closes. `documents` takes over from `src` when the config has them.
+   */
+  #showSrc(): void {
+    const viewer = this.#viewer;
+    const config = this.#shown;
+    if (!viewer || !config || config.documents) return;
+    const { documents } = viewer;
+    const previous = this.#srcDocument;
+    this.#srcDocument = null;
+    // A tab's id changes once its source has said which document it is.
+    const previousId = previous && documents.has(previous.id) ? previous.id : previous?.reserved;
+    const position = previousId ? documents.getOrder().indexOf(previousId) : -1;
+    if (config.src != null) {
+      const id = this.#freeIdFor(config.src);
+      const [reserved] = documents.openAll([documentFromSrc(config.src, id)]);
+      if (reserved) {
+        this.#srcDocument = { reserved, id };
+        if (position >= 0) documents.move(reserved, position);
+      }
+    }
+    if (previous) {
+      this.#closing.add(previous.id);
+      const release = () => this.#closing.delete(previous.id);
+      Promise.all([documents.close(previous.reserved), documents.close(previous.id)]).then(
+        release,
+        release,
+      );
+    }
+  }
+
+  /** The id `src` asks for, or with a number after it while a document still has it. */
+  #freeIdFor(src: DocumentSrc): string {
+    const wanted = idOfSrc(src);
+    const taken = (id: string) => this.#closing.has(id) || Boolean(this.#viewer?.documents.has(id));
+    let id = wanted;
+    for (let index = 2; taken(id); index++) id = `${wanted}#${index}`;
+    return id;
+  }
+
+  /** The chrome's sheets, and the theme's tokens after them. */
+  #adoptSheets(theme: ElementConfig['theme']): void {
+    const { tokens, dark } = themeConfigOf(theme);
+    const tokenSheet = buildTokenSheet(tokens, dark);
+    this.shadowRoot!.adoptedStyleSheets = [...adoptSheets(), ...(tokenSheet ? [tokenSheet] : [])];
+  }
 
   #mount(): void {
     if (!this.shadowRoot) {
@@ -279,24 +430,25 @@ export class EmbedPdfViewerElement extends ElementBase {
 
     const config = this.config;
     warnInvalidConfig(config);
-    const { src: _src, documents: _documents, engine: _engine, theme, ...customization } = config;
-
-    // Sheets are per-mount: a config re-set may change the theme tokens.
-    const { tokens, dark } = themeConfigOf(theme);
-    const tokenSheet = buildTokenSheet(tokens, dark);
-    this.shadowRoot!.adoptedStyleSheets = [...adoptSheets(), ...(tokenSheet ? [tokenSheet] : [])];
-
+    const { src: _src, documents, engine: _engine, theme, ...customization } = config;
+    this.#adoptSheets(theme);
+    this.#shown = config;
+    this.#props = {
+      engine: engineOf(config),
+      initialDocuments: documents,
+      theme,
+      themeTarget: this.#wrapper,
+      onViewer: this.#onViewer,
+      ...customization,
+    };
     this.#root = createRoot(this.#wrapper!);
-    this.#root.render(
-      createElement(FullViewer, {
-        engine: engineOf(config),
-        initialDocuments: initialDocumentsOf(config),
-        theme,
-        themeTarget: this.#wrapper,
-        onViewer: this.#onViewer,
-        ...customization,
-      }),
-    );
+    this.#root.render(createElement(FullViewer, this.#props));
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'embedpdf-viewer': EmbedPdfViewerElement;
   }
 }
 

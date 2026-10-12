@@ -2,9 +2,13 @@
  * Dev harness — the vanilla one-liner plus one rung of each door, so
  * `pnpm dev` in this package always exercises the whole boundary:
  * init → element → preact chrome → engine worker, the config pass-through,
- * and the drive door (el.viewer from plain page script).
+ * and the viewer in code (el.viewer from plain page script).
  */
-import EmbedPDF, { AnnotationToken, indexedDbKeyStore, personalSigner } from './doors/local';
+import EmbedPDF, {
+  indexedDbKeyStore,
+  personalSigner,
+  type EmbedPdfViewerElement,
+} from './doors/local';
 
 // The signatures rung: one self-signed identity kept in this browser, trusted
 // by the viewer itself so its own signatures validate as 'valid'.
@@ -29,3 +33,18 @@ const element = EmbedPDF.init({
     ],
   },
 });
+
+// The code rung: plugins by name, and the live props from the console
+// (`viewerElement.theme = 'dark'`, `viewerElement.readOnly = true`).
+element.addEventListener('epdf:ready', () => {
+  element.viewer?.documents.onOpened(({ documentId }) => {
+    const pages = element.viewer?.get('documents').get(documentId)?.pageCount;
+    console.info(`[dev] opened ${documentId}: ${pages ?? '?'} pages`);
+  });
+});
+declare global {
+  interface Window {
+    viewerElement?: EmbedPdfViewerElement;
+  }
+}
+window.viewerElement = element;

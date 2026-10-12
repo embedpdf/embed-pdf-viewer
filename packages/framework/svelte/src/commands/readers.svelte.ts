@@ -7,7 +7,12 @@ import { untrack } from 'svelte';
 import type { EventHook } from '@embedpdf/core';
 import { formatShortcut as formatKeys } from '@embedpdf/core-ui';
 import { CommandsToken, boundCommandOf, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
-import type { BoundCommand, CommandsCapability } from '@embedpdf/plugin-commands';
+import type {
+  BoundCommand,
+  CommandId,
+  CommandRefusal,
+  CommandsCapability,
+} from '@embedpdf/plugin-commands';
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
 import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
 import { bindCommandShortcuts, isMacPlatform, standardCommandsBrowser } from '@embedpdf/web';
@@ -46,7 +51,10 @@ export function useCommandsEvent<T>(
   useCapabilityEvent(CommandsToken, select, handler);
 }
 
-/** The commands settings (`commands`, `disabledCategories`), with or without a document. Takes a selector. */
+/**
+ * The commands settings (`commands`, `disabledCategories`, `disabledCommands`, `notAllowed`),
+ * with or without a document. Takes a selector.
+ */
 export const useCommandsSettings = settingsReader(CommandsToken);
 
 /** A shortcut as a tooltip shows it, for this platform: `'⌘K'` on a Mac, `'Ctrl+K'` elsewhere. */
@@ -91,13 +99,16 @@ export interface CommandShortcutsOptions {
    * function (`() => area`, with `bind:this={area}`): the keys work once the element has mounted.
    */
   target?: MaybeGetter<HTMLElement | null | undefined>;
+  /** Called when a key's command is turned off or not allowed, with why: say so to the user. */
+  onRefused?: (commandId: CommandId, refusal: CommandRefusal) => void;
 }
 
 /**
  * Turn every command's shortcut into a working key, for the active document. Call it once, near
  * the top of your viewer. Keys typed into text fields are left alone, and so is a key whose
- * command can't run now. The keys work anywhere on the page; with `target`, only while focus is
- * inside that element. They stop when the component goes away.
+ * command can't run right now. A command that's turned off or not allowed still takes its key,
+ * and `onRefused` says why. The keys work anywhere on the page; with `target`, only while focus
+ * is inside that element. They stop when the component goes away.
  */
 export function useCommandShortcuts(options: CommandShortcutsOptions = {}): void {
   const commands = useCapability(CommandsHostToken);
@@ -107,6 +118,12 @@ export function useCommandShortcuts(options: CommandShortcutsOptions = {}): void
     const target = valueOf(options.target);
     // A target that hasn't mounted yet binds nothing; this runs again once it has.
     if (scoped && !target) return;
-    return untrack(() => bindCommandShortcuts(commands, { isMac, target: target ?? undefined }));
+    return untrack(() =>
+      bindCommandShortcuts(commands, {
+        isMac,
+        target: target ?? undefined,
+        onRefused: (commandId, refusal) => options.onRefused?.(commandId, refusal),
+      }),
+    );
   });
 }

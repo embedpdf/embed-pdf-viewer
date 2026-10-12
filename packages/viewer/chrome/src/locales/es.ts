@@ -138,6 +138,18 @@ export const es: Locale = {
       },
       undo: 'Deshacer',
       redo: 'Rehacer',
+      notAllowed: {
+        default: '{label} no está permitido',
+        'annotations-create': 'No está permitido añadir anotaciones',
+        'doc-annotate-modify': 'No está permitido cambiar anotaciones',
+        'doc-annotate-read': 'No está permitido ver anotaciones',
+        'doc-download': 'No está permitido descargar',
+        'doc-forms-modify': 'No está permitido editar campos de formulario',
+        'doc-print': 'No está permitido imprimir',
+        'doc-text-copy': 'No está permitido copiar',
+        'doc-text-search': 'No está permitido buscar',
+      },
+      turnedOff: '{label} no está disponible',
     },
     passwordPrompt: {
       title: 'Contraseña requerida',

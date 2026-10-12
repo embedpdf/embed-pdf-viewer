@@ -197,6 +197,9 @@ export function createStandardCommands(
       shortcut: 'Mod+C',
       categories: ['selection'],
       run: (context) => platform.copySelection(context.get(SelectionToken)),
+      // Not `requires: ['doc.text.copy']`: a refused command keeps its keys, and Mod+C with
+      // nothing selected in the viewer belongs to the page. The clipboard wiring says when
+      // a selection may not be copied.
       enabled: (context) => {
         const selection = context.tryGet(SelectionToken);
         return !!selection && selection.hasSelection() && selection.canCopy();
@@ -226,14 +229,14 @@ export function createStandardCommands(
       icon: 'download',
       shortcut: 'Mod+S',
       categories: ['document'],
+      requires: ['doc.download'],
       run: async (context) => {
         const documents = context.get(DocumentsToken);
         const id = context.documentId ?? undefined;
         const bytes = await documents.download(id, { signal: context.signal });
         platform.saveFile(bytes, fileNameOf(documents.get(id)?.name));
       },
-      enabled: (context) =>
-        context.documentId !== null && context.get(DocumentsToken).canDownload(context.documentId),
+      enabled: (context) => context.documentId !== null,
     },
     {
       id: 'document:print',
@@ -242,6 +245,7 @@ export function createStandardCommands(
       icon: 'print',
       shortcut: 'Mod+P',
       categories: ['document'],
+      requires: ['doc.print'],
       // The document's own print actions run around the dialog when the
       // actions plugin is there.
       run: (context) => {
@@ -249,8 +253,7 @@ export function createStandardCommands(
         if (actions) return actions.runDocumentVerb('print', () => platform.print());
         platform.print();
       },
-      enabled: (context) =>
-        context.documentId !== null && context.get(DocumentsToken).canPrint(context.documentId),
+      enabled: (context) => context.documentId !== null,
     },
   ];
 }

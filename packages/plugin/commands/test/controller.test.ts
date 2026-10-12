@@ -1,5 +1,6 @@
 import { createCapabilityToken } from '@embedpdf/core';
 import { createTestContext } from '@embedpdf/core/testing';
+import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -183,6 +184,217 @@ describe('category gating', () => {
     expect(commands.resolveCommand('highlight')?.visible).toBe(true);
     commands.setDisabledCategories(['annotate', 'forms']);
     expect(commands.getDisabledCategories()).toEqual(['annotate', 'forms']);
+  });
+});
+
+describe('turning features off', () => {
+  it('turns off every feature under a disabled one, on whole dotted parts', () => {
+    const { commands } = harness({
+      disabledCategories: ['annotations'],
+      commands: [
+        { id: 'tool:highlight', label: 'Highlight', categories: ['annotations.highlight'] },
+        { id: 'tool:note', label: 'Note', categories: ['annotations'] },
+        { id: 'acme:extra', label: 'Extra', categories: ['annotationsExtra'] },
+      ],
+    });
+    expect(commands.resolveCommand('tool:highlight')).toMatchObject({
+      visible: false,
+      enabled: false,
+    });
+    expect(commands.resolveCommand('tool:note')?.visible).toBe(false);
+    expect(commands.resolveCommand('acme:extra')?.visible).toBe(true);
+    expect(commands.isCategoryDisabled('annotations.highlight')).toBe(true);
+    expect(commands.isCategoryDisabled('annotationsExtra')).toBe(false);
+
+    // Turning off a part leaves the rest of its feature on.
+    commands.setDisabledCategories(['annotations.highlight']);
+    expect(commands.resolveCommand('tool:highlight')?.visible).toBe(false);
+    expect(commands.resolveCommand('tool:note')?.visible).toBe(true);
+    expect(commands.isCategoryDisabled('annotations')).toBe(false);
+  });
+});
+
+describe('turning single commands off', () => {
+  const definitions: CommandDef[] = [
+    { id: 'tool:highlight', label: 'Highlight', categories: ['annotations.highlight'] },
+    { id: 'tool:underline', label: 'Underline', categories: ['annotations.markup'] },
+  ];
+
+  it('hides and refuses a disabled command, and only that one', async () => {
+    const run = vi.fn();
+    const { commands } = harness({
+      disabledCommands: ['tool:highlight'],
+      commands: [{ ...definitions[0]!, run }, definitions[1]!],
+    });
+    expect(commands.getDisabledCommands()).toEqual(['tool:highlight']);
+    expect(commands.isCommandDisabled('tool:highlight')).toBe(true);
+    expect(commands.resolveCommand('tool:highlight')).toMatchObject({
+      visible: false,
+      enabled: false,
+    });
+    expect(commands.resolveCommand('tool:underline')?.visible).toBe(true);
+    expect(commands.canExecute('tool:highlight')).toBe(false);
+    await expect(commands.execute('tool:highlight')).resolves.toEqual({
+      status: 'rejected',
+      reason: 'hidden',
+    });
+    expect(run).not.toHaveBeenCalled();
+    expect(commands.searchCommands('').map((command) => command.id)).toEqual(['tool:underline']);
+  });
+
+  it('turns commands off and on through the setting, live', () => {
+    const { ctx, commands } = harness({ commands: definitions });
+    const changed: string[][] = [];
+    commands.onSettingsChanged((event) => changed.push([...event.changed]));
+    const wake = vi.fn();
+    ctx.subscribe(wake);
+
+    commands.disableCommand('tool:underline');
+    commands.disableCommand('tool:underline'); // already off: no change, no event
+    expect(commands.getSettings().disabledCommands).toEqual(['tool:underline']);
+    expect(commands.resolveCommand('tool:underline')?.visible).toBe(false);
+    expect(wake).toHaveBeenCalled();
+
+    commands.enableCommand('tool:underline');
+    expect(commands.resolveCommand('tool:underline')?.visible).toBe(true);
+    commands.setDisabledCommands(['tool:highlight', 'tool:underline']);
+    expect(commands.getDisabledCommands()).toEqual(['tool:highlight', 'tool:underline']);
+    expect(changed).toEqual([['disabledCommands'], ['disabledCommands'], ['disabledCommands']]);
+  });
+
+  it('says a command is disabled while one of its features is, whatever its own entry', () => {
+    const { commands } = harness({ disabledCategories: ['annotations'], commands: definitions });
+    expect(commands.isCommandDisabled('tool:highlight')).toBe(true);
+    commands.enableCommand('tool:highlight'); // not in the list: nothing to turn on
+    expect(commands.isCommandDisabled('tool:highlight')).toBe(true);
+    expect(commands.isCommandDisabled('acme:unknown')).toBe(false);
+  });
+});
+
+describe('permissions', () => {
+  /** A session that holds every permission but the ones listed, and may not create annotations. */
+  const securityWithout = (...missing: string[]) => ({
+    allows: (permission: string) => !missing.includes(permission),
+    allowsAnnotation: () => false,
+  });
+
+  /** The controller over a test context with an open document and an i18n stand-in. */
+  function harnessWith(
+    config: CommandsConfig,
+    security: ReturnType<typeof securityWithout> | null,
+    strings: Record<string, string> = {},
+  ) {
+    const i18n = {
+      t: (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
+        const text = strings[key] ?? options?.fallback ?? key;
+        return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
+      },
+    };
+    const ctx = createTestContext({
+      id: 'commands',
+      settings: { defaults: COMMANDS_DEFAULTS, registered: config },
+      doc: security ? { security: security as never } : null,
+      capabilities: [[I18nToken, i18n]],
+    });
+    return ctx.connect(createCommandsController(ctx));
+  }
+
+  const print: CommandDef = { id: 'document:print', label: 'Print', requires: ['doc.print'] };
+  const note: CommandDef = { id: 'tool:note', label: 'Note', requires: ['annotations:create'] };
+
+  it('hides a command whose permission the scope leaves out, and refuses it', async () => {
+    const commands = harnessWith({ commands: [print, note] }, securityWithout('doc.print'));
+    expect(commands.resolveCommand('document:print')).toMatchObject({
+      visible: false,
+      enabled: false,
+    });
+    expect(commands.resolveCommand('document:print')?.disabledReason).toBeUndefined();
+    // `annotations:create` is asked the way the annotation plugin asks it.
+    expect(commands.resolveCommand('tool:note')?.visible).toBe(false);
+    await expect(commands.execute('document:print')).resolves.toEqual({
+      status: 'rejected',
+      reason: 'hidden',
+    });
+  });
+
+  it("shows it disabled with the reason under notAllowed: 'disable'", async () => {
+    const commands = harnessWith(
+      { commands: [print, note], notAllowed: 'disable' },
+      securityWithout('doc.print'),
+      { 'commands.notAllowed.doc-print': "Printing isn't allowed" },
+    );
+    expect(commands.resolveCommand('document:print')).toMatchObject({
+      visible: true,
+      enabled: false,
+      disabledReason: "Printing isn't allowed",
+    });
+    // No sentence of its own: the general one, with the label.
+    expect(commands.resolveCommand('tool:note')?.disabledReason).toBe("Note isn't allowed");
+    await expect(commands.execute('document:print')).resolves.toEqual({
+      status: 'rejected',
+      reason: 'disabled',
+    });
+  });
+
+  it('keeps a turned-off command hidden, whatever notAllowed says', () => {
+    const commands = harnessWith(
+      { commands: [print], notAllowed: 'disable', disabledCommands: ['document:print'] },
+      securityWithout('doc.print'),
+    );
+    expect(commands.resolveCommand('document:print')).toMatchObject({ visible: false });
+    expect(commands.resolveCommand('document:print')?.disabledReason).toBeUndefined();
+  });
+
+  it('shows a command when the scope allows it, and when no document is open', () => {
+    expect(
+      harnessWith({ commands: [print] }, securityWithout()).resolveCommand('document:print'),
+    ).toMatchObject({ visible: true, enabled: true });
+    expect(harnessWith({ commands: [print] }, null).resolveCommand('document:print')).toMatchObject(
+      { visible: true, enabled: true },
+    );
+  });
+
+  it('reports why a shortcut is refused, and lets one that only cannot run now through', () => {
+    const stroke = (key: string) => ({
+      key,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+    });
+    const commands = harnessWith(
+      {
+        commands: [
+          { ...print, shortcut: 'Mod+P' },
+          { id: 'zoom:in', label: 'Zoom in', shortcut: 'Mod+=', enabled: () => false },
+          { id: 'acme:save', label: 'Save', shortcut: 'Mod+S', categories: ['acme.saving'] },
+          { id: 'acme:send', label: 'Send', shortcut: 'Mod+E', categories: ['acme'] },
+          { id: 'acme:mail', label: 'Mail', shortcut: 'Mod+E' },
+        ],
+        disabledCategories: ['acme'],
+      },
+      securityWithout('doc.print'),
+      { 'commands.notAllowed.doc-print': "Printing isn't allowed" },
+    );
+    const options = { isMac: false };
+    expect(commands.matchStroke(stroke('p'), options)).toEqual({
+      commandId: 'document:print',
+      refusal: { reason: 'not-allowed', message: "Printing isn't allowed" },
+    });
+    expect(commands.matchStroke(stroke('s'), options)).toEqual({
+      commandId: 'acme:save',
+      refusal: { reason: 'turned-off', message: "Save isn't available" },
+    });
+    expect(commands.matchStroke(stroke('='), options)).toEqual({
+      commandId: 'zoom:in',
+      refusal: null,
+    });
+    // Of two commands with the same keys, the one that isn't refused wins.
+    expect(commands.matchStroke(stroke('e'), options)).toEqual({
+      commandId: 'acme:mail',
+      refusal: null,
+    });
+    expect(commands.matchStroke(stroke('k'), options)).toBeNull();
   });
 });
 

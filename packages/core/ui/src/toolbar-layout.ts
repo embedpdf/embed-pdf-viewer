@@ -5,7 +5,8 @@
  * measurement layer, each with its command already resolved and its run
  * bound. `groupMenuView` is the menu a folded group or a group's trigger
  * opens, and `stripGroupsOf` is a bar resolved for a strip that doesn't fit
- * itself.
+ * itself. A bar runs either way: the fit counts lengths along its axis, and a
+ * vertical bar draws its commands as icons.
  *
  * The command is whatever the app's registry resolves (plugin-commands'
  * `ResolvedCommand`): this package reads only its `id` and `visible`, and
@@ -13,7 +14,7 @@
  * draw.
  */
 import type { NormalizedBar, NormalizedGroup, NormalizedUnit } from './schema';
-import { filterBar } from './schema';
+import { commandOfUnit, filterBar } from './schema';
 import type { FitMetrics, FitResult } from './solver';
 import { solve } from './solver';
 import type { OverflowSection, ResolveMenuTarget } from './projection';
@@ -66,15 +67,18 @@ export interface OverflowMenuView<Command extends ToolbarCommand = ToolbarComman
 export interface CustomSlotCtx {
   /** `'live'` in the visible row, `'measure'` in the hidden measurement layer. */
   layer: 'live' | 'measure';
-  /** Report the item's width yourself, for content the measurement layer can't hold. */
-  measure: (width: number) => void;
+  /**
+   * Report the item's length yourself (its width, or its height in a vertical
+   * bar), for content the measurement layer can't hold.
+   */
+  measure: (length: number) => void;
 }
 
 // ── the parts ────────────────────────────────────────────────────────────────
 
 /**
  * One thing in the toolbar. `key` is its identity in the live row, the same
- * at every variant; `measureKey` is the key its width is reported under,
+ * at every variant; `measureKey` is the key its length is reported under,
  * unique across the whole toolbar. A `custom` part is the app's to draw;
  * without a renderer for it, an adapter draws a native `<slot>` socket
  * measured where it renders, and leaves it out of the measurement layer: only
@@ -129,7 +133,7 @@ export interface ToolbarLayout<Command extends ToolbarCommand = ToolbarCommand> 
   /** Always the three sections, in order. */
   readonly sections: readonly LiveSection<Command>[];
   /**
-   * What the measurement layer draws, each reporting its width under its
+   * What the measurement layer draws, each reporting its length under its
    * `measureKey`: every unit in every variant, each collapsible group folded,
    * each shed group's trigger with the whole group behind it.
    */
@@ -139,7 +143,7 @@ export interface ToolbarLayout<Command extends ToolbarCommand = ToolbarCommand> 
   readonly overflow: readonly OverflowSection[];
 }
 
-/** The keys a measurement layer reports widths under; `@embedpdf/web`'s `toolbarMeasureKey` satisfies it. */
+/** The keys a measurement layer reports lengths under; `@embedpdf/web`'s `toolbarMeasureKey` satisfies it. */
 export interface ToolbarMeasureKeys {
   unit(unitKey: string, variant: string): string;
   group(groupId: string): string;
@@ -158,32 +162,59 @@ export interface ToolbarLayoutInput<Command extends ToolbarCommand> {
   readonly execute: (id: string) => void;
   /** Which menu a command opens, for the "More" menu's submenu rows. */
   readonly menuTarget: ResolveMenuTarget;
-  /** The measured widths. */
+  /** The measured lengths, along the toolbar's axis. */
   readonly metrics: FitMetrics;
-  /** The keys the measured widths are reported under. */
+  /** The keys the measured lengths are reported under. */
   readonly measureKey: ToolbarMeasureKeys;
-  /** The width the toolbar fills. */
-  readonly containerWidth: number;
+  /** The length the toolbar fills: its width, or its height when vertical. */
+  readonly containerLength: number;
+  /**
+   * Which way the toolbar runs. A vertical toolbar draws every command at
+   * `'icon'`, with no smaller step, and leaves its label to a tooltip. Default
+   * `'horizontal'`.
+   */
+  readonly orientation?: 'horizontal' | 'vertical';
 }
 
 const SECTIONS = ['start', 'center', 'end'] as const;
 
-const commandOf = (unit: NormalizedUnit): string =>
-  unit.kind === 'command' ? unit.command : unit.terminal;
+const ICON_ONLY: readonly string[] = ['icon'];
 
-/** Fit the bar into `containerWidth` and describe what to draw. */
+/** The bar as a vertical toolbar draws it: every command an icon; custom items keep their variants. */
+function iconsOnly(bar: NormalizedBar): NormalizedBar {
+  return {
+    ...bar,
+    sections: bar.sections.map((section) => ({
+      ...section,
+      groups: section.groups.map((group) => ({
+        ...group,
+        units: group.units.map((unit) =>
+          unit.kind === 'command' ? { ...unit, variants: ICON_ONLY } : unit,
+        ),
+      })),
+    })),
+  };
+}
+
+/** Fit the bar into `containerLength` and describe what to draw. */
 export function layoutToolbar<Command extends ToolbarCommand>(
   input: ToolbarLayoutInput<Command>,
 ): ToolbarLayout<Command> {
   const { resolve, execute, measureKey } = input;
+  /** A unit's command, resolved; null for a standalone item or an unregistered command. */
+  const resolveUnit = (unit: NormalizedUnit): Command | null => {
+    const command = commandOfUnit(unit);
+    return command === null ? null : resolve(command);
+  };
   // `=== true` and not `!== false`: an unregistered command resolves to null, and a unit the
   // registry can't name must not render or take room.
-  const bar = filterBar(input.bar, (unit) => resolve(commandOf(unit))?.visible === true);
-  const fit = solve(bar, input.metrics, input.containerWidth);
+  const visible = filterBar(input.bar, (unit) => resolveUnit(unit)?.visible === true);
+  const bar = input.orientation === 'vertical' ? iconsOnly(visible) : visible;
+  const fit = solve(bar, input.metrics, input.containerLength);
 
   const visibleCommands = (units: readonly NormalizedUnit[]): Command[] =>
     units
-      .map((unit) => resolve(commandOf(unit)))
+      .map(resolveUnit)
       .filter((command): command is Command => command !== null && command.visible);
 
   const parts: PartBuilders<Command> = {
@@ -195,8 +226,10 @@ export function layoutToolbar<Command extends ToolbarCommand>(
           measureKey: measureKey.unit(unit.key, variant),
           name: unit.slot,
           variant,
-          terminal: resolve(unit.terminal),
-          runTerminal: () => execute(unit.terminal),
+          terminal: resolveUnit(unit),
+          runTerminal: () => {
+            if (unit.terminal !== null) execute(unit.terminal);
+          },
         };
       }
       const command = resolve(unit.command);

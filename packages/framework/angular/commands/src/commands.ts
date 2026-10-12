@@ -20,6 +20,7 @@ import {
   inject,
   Injectable,
   input,
+  output,
   PLATFORM_ID,
   untracked,
   type Signal,
@@ -38,7 +39,13 @@ import {
   CommandsToken,
   resolvedCommandsEqual,
 } from '@embedpdf/plugin-commands';
-import type { BoundCommand, CommandsConfig, ExecuteResult } from '@embedpdf/plugin-commands';
+import type {
+  BoundCommand,
+  CommandId,
+  CommandRefusal,
+  CommandsConfig,
+  ExecuteResult,
+} from '@embedpdf/plugin-commands';
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
 import type { CommandsHostCapability } from '@embedpdf/plugin-commands/contract/host';
 import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
@@ -125,13 +132,23 @@ function shortcutCommands(host: EpdfKernelHost): Signal<CommandsHostCapability |
   ).capability;
 }
 
+/** A key whose command is turned off or not allowed, and why: what `(refused)` carries. */
+export interface RefusedShortcut {
+  readonly commandId: CommandId;
+  readonly refusal: CommandRefusal;
+}
+
 /**
  * Every command's shortcut as a working key, anywhere on the page, for the active document.
- * Keys typed into text fields are left alone, and so is a key whose command can't run now. Add
- * it next to `withCommands()`; for a page with more than one viewer, put `epdfCommandShortcuts`
- * on the element around each one instead.
+ * Keys typed into text fields are left alone, and so is a key whose command can't run right
+ * now. A command that's turned off or not allowed still takes its key, and `onRefused` says
+ * why. Add it next to `withCommands()`; for a page with more than one viewer, put
+ * `epdfCommandShortcuts` on the element around each one instead.
  */
-export function withCommandShortcuts(options?: { isMac?: boolean }): EmbedPdfFeature {
+export function withCommandShortcuts(options?: {
+  isMac?: boolean;
+  onRefused?: (commandId: CommandId, refusal: CommandRefusal) => void;
+}): EmbedPdfFeature {
   return {
     plugins: [],
     setup: () => {
@@ -139,7 +156,14 @@ export function withCommandShortcuts(options?: { isMac?: boolean }): EmbedPdfFea
       // The commands exist once the viewer's engine is there; the keys go with the viewer.
       effect((onCleanup) => {
         const current = commands();
-        if (current) onCleanup(bindCommandShortcuts(current, { isMac: options?.isMac }));
+        if (current) {
+          onCleanup(
+            bindCommandShortcuts(current, {
+              isMac: options?.isMac,
+              onRefused: options?.onRefused,
+            }),
+          );
+        }
       });
     },
   };
@@ -148,19 +172,29 @@ export function withCommandShortcuts(options?: { isMac?: boolean }): EmbedPdfFea
 /**
  * Every command's shortcut as a working key, while focus is inside this element: for a page
  * with more than one viewer, or keys that should leave the rest of the page alone. Give the
- * element a `tabindex` so a click on it gives it focus.
+ * element a `tabindex` so a click on it gives it focus. A key whose command is turned off or
+ * not allowed fires `(refused)`.
  *
- *   <div class="viewer" tabindex="0" epdfCommandShortcuts>
+ *   <div class="viewer" tabindex="0" epdfCommandShortcuts (refused)="say($event.refusal.message)">
  */
 @Directive({ selector: '[epdfCommandShortcuts]' })
 export class EpdfCommandShortcuts {
+  /** A key whose command is turned off or not allowed: say why. */
+  readonly refused = output<RefusedShortcut>();
+
   constructor() {
     const element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
     const commands = shortcutCommands(injectKernelHost('epdfCommandShortcuts'));
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
     effect((onCleanup) => {
       const current = commands();
-      if (current) onCleanup(bindCommandShortcuts(current, { target: element }));
+      if (!current) return;
+      onCleanup(
+        bindCommandShortcuts(current, {
+          target: element,
+          onRefused: (commandId, refusal) => this.refused.emit({ commandId, refusal }),
+        }),
+      );
     });
   }
 }

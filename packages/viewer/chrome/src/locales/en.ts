@@ -135,6 +135,20 @@ export const en: Locale = {
       },
       undo: 'Undo',
       redo: 'Redo',
+      // Why a command isn't there, by the permission the scope leaves out
+      // (dots and colons as dashes); `{label}` is the command's label.
+      notAllowed: {
+        default: "{label} isn't allowed",
+        'annotations-create': "Adding annotations isn't allowed",
+        'doc-annotate-modify': "Changing annotations isn't allowed",
+        'doc-annotate-read': "Viewing annotations isn't allowed",
+        'doc-download': "Downloading isn't allowed",
+        'doc-forms-modify': "Editing form fields isn't allowed",
+        'doc-print': "Printing isn't allowed",
+        'doc-text-copy': "Copying isn't allowed",
+        'doc-text-search': "Searching isn't allowed",
+      },
+      turnedOff: "{label} isn't available",
     },
     passwordPrompt: {
       title: 'Password required',

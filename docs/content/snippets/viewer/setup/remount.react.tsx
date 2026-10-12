@@ -1,12 +1,14 @@
-import { PDFViewer } from '@embedpdf/viewer-react';
+import { PDFViewer, type Layout } from '@embedpdf/viewer-react';
 
-export function Report({ readOnly }: { readOnly: boolean }) {
+const simpleLayout = (layout: Layout) => layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
+
+export function Report({ simple }: { simple: boolean }) {
   // A new key mounts a new viewer with the new config.
   return (
     <PDFViewer
-      key={readOnly ? 'read-only' : 'edit'}
+      key={simple ? 'simple' : 'full'}
       src="/report.pdf"
-      disable={readOnly ? ['annotations', 'forms'] : []}
+      layout={simple ? simpleLayout : undefined}
       style={{ height: '100vh' }}
     />
   );

@@ -11,7 +11,7 @@
  */
 export { EmbedPdfViewerElement, type DefaultEngineProvider } from './element';
 export { initViewer } from './init';
-export type { ElementConfig, ViewerConfigBase } from './config';
+export type { DocumentSrc, ElementConfig, LiveConfigKey, ViewerConfigBase } from './config';
 export type { MountTarget } from './init';
 
 // The engine seam's contract types, from the package that owns them — the
@@ -23,18 +23,10 @@ export type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 
 // The customization vocabulary, verbatim from the chrome (see its README).
 export {
-  addItem,
-  chromeHelpers,
-  custom,
-  defaultChrome,
+  createLayout,
   defaultCommands,
   defaultIcons,
-  defineChrome,
-  group,
-  item,
-  removeItems,
-  replaceItem,
-  validateChrome,
+  defaultLayout,
 } from '@embedpdf/viewer-chrome';
 
 // The drive door: `el.viewer` speaks these tokens (the public capability
@@ -81,32 +73,54 @@ export type {
 } from '@embedpdf/viewer-chrome';
 export type {
   CapabilityToken,
+  CommandsCapability,
   DocumentInfo,
   DocumentsCapability,
+  NotAllowedMode,
+  PluginName,
   ResolvedCommand,
-  ScopedViewerHandle,
+  ScopedViewer,
   Unsubscribe,
-  ViewerHandle,
+  Viewer,
+  ViewerPlugins,
 } from '@embedpdf/viewer-chrome';
 export type {
-  AddItemSpec,
-  BarChild,
-  BarGroup,
-  BarItem,
-  BarSchema,
-  BarSections,
-  ChromeHelpers,
-  ChromeSchema,
+  AddItemOptions,
+  BarEdge,
+  BarPlace,
   CommandDef,
-  CustomItem,
+  Feature,
+  FloatPosition,
   IconDef,
+  Identity,
   Importance,
   InitialDocument,
-  MenuSchema,
-  MenuSection,
+  Layout,
+  LayoutBar,
+  LayoutCommandItem,
+  LayoutCustomItem,
+  LayoutData,
+  LayoutEnv,
+  LayoutFunction,
+  LayoutGroup,
+  LayoutGroupObject,
+  LayoutItem,
+  LayoutMenu,
+  LayoutMenuSection,
+  LayoutOption,
+  LayoutPanel,
+  LayoutPanelPatch,
+  LayoutSection,
+  PanelPresentation,
   PathSpec,
+  ReadOnlyExceptions,
+  RemoveItemOptions,
+  SectionName,
+  SelectionTarget,
+  TabsVisibility,
   ThemeMode,
   ThemePreference,
   Variant,
   ViewerCustomization,
+  ViewerSize,
 } from '@embedpdf/viewer-chrome';

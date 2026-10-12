@@ -1,12 +1,16 @@
 /**
- * The fit solver — pure. Given a normalized bar, measured widths, and the
+ * The fit solver — pure. Given a normalized bar, measured lengths, and the
  * container budget, decide what every unit renders as: a variant, shed into
  * its group's disclosure, part of a collapsed group, or the overflow menu.
+ *
+ * A length is a size along the bar: a width in a horizontal bar, a height in
+ * a vertical one. The solver never knows which; the adapter measures the axis
+ * its bar runs along.
  *
  * Deterministic degradation policy, applied while over budget:
  *   1. among all available steps, take the one owned by the lowest-importance
  *      unit/group; ties prefer variant < shed < group-collapse < overflow;
- *      remaining ties degrade the rightmost first (end of bar yields first).
+ *      remaining ties degrade the one nearest the bar's end first.
  *   2. a unit's variant steps run out before it may shed or overflow.
  *   3. a `shed` group moves children (at the child's importance) into a
  *      group-local disclosure, but never below one visible child — the floor.
@@ -17,7 +21,7 @@
  *      `collapse` overflows whole at the floor instead.
  *   5. pinned (importance 5) units/groups may degrade variants but never
  *      shed, collapse away, or overflow. Everything else can always reach the
- *      overflow menu, so any bar fits any width whose pinned floor fits.
+ *      overflow menu, so any bar fits any length whose pinned floor fits.
  *
  * So the full group ladder mirrors the item ladder:
  *   items:  richest variant → … → smallest variant → (shed |) overflow
@@ -25,11 +29,11 @@
  *
  * The overflow trigger occupies space only when something overflowed: solve
  * once without it; if anything overflowed, solve again with the trigger's
- * width reserved (a smaller budget can only overflow more, so two passes
+ * length reserved (a smaller budget can only overflow more, so two passes
  * reach the fixpoint). A group's disclosure trigger is budgeted the same way,
  * inside `measure`, whenever that group has shed children.
  *
- * Missing measurements count as width 0 and are reported via `complete:
+ * Missing measurements count as length 0 and are reported via `complete:
  * false` — callers render the first frame from an incomplete solve and
  * re-solve when the ResizeObserver delivers real numbers.
  */
@@ -37,17 +41,17 @@ import type { NormalizedBar, NormalizedGroup, NormalizedUnit } from './schema';
 import { PINNED } from './schema';
 
 export interface FitMetrics {
-  /** Width of unit `key` rendered at `variant`; undefined = not yet measured. */
+  /** Length of unit `key` rendered at `variant`; undefined = not yet measured. */
   unit(key: string, variant: string): number | undefined;
-  /** Width of group `id` rendered in its collapsed form ('menu' | 'select'). */
+  /** Length of group `id` rendered in its collapsed form ('menu' | 'select'). */
   groupCollapsed(groupId: string): number | undefined;
-  /** Width of group `id`'s disclosure trigger (shed groups only). */
+  /** Length of group `id`'s disclosure trigger (shed groups only). */
   groupTrigger(groupId: string): number | undefined;
-  /** Width of the overflow trigger button. */
+  /** Length of the overflow trigger button. */
   readonly overflowTrigger: number;
   /** Gap between adjacent visible units. */
   readonly gap: number;
-  /** Width of a derived separator between adjacent visible groups (with its gaps). */
+  /** Length of a derived separator between adjacent visible groups (with its gaps). */
   readonly separator: number;
 }
 
@@ -70,8 +74,8 @@ export interface FitResult {
   readonly units: ReadonlyMap<string, UnitAssignment>;
   readonly groups: ReadonlyMap<string, GroupAssignment>;
   readonly hasOverflow: boolean;
-  /** Total visible width at this assignment (diagnostics + tests). */
-  readonly width: number;
+  /** Total visible length at this assignment (diagnostics + tests). */
+  readonly length: number;
   /** False when any consulted measurement was missing (treated as 0). */
   readonly complete: boolean;
 }
@@ -85,7 +89,7 @@ interface UnitState {
   variantIndex: number;
   shed: boolean;
   overflowed: boolean;
-  /** Position in bar order — rightmost-first tie-breaking. */
+  /** Position in bar order — end-first tie-breaking. */
   position: number;
 }
 
@@ -257,19 +261,19 @@ function applyStep(step: Step): void {
 }
 
 interface Measured {
-  width: number;
+  length: number;
   complete: boolean;
 }
 
 /**
- * Visible width of the current assignment: unit widths + gaps + derived
+ * Visible length of the current assignment: unit lengths + gaps + derived
  * separators. Gaps are counted between all adjacent visible units, including
  * across section boundaries — deliberately conservative: the adapter's layout
  * spaces sections with collapsing auto margins, so the cross-section gap
  * allowance (≤ 2×gap) is slack those margins absorb, never an overlap risk.
  */
 function measure(groups: GroupState[], metrics: FitMetrics, hasTrigger: boolean): Measured {
-  let width = 0;
+  let length = 0;
   let complete = true;
   let visibleUnits = 0;
 
@@ -279,9 +283,9 @@ function measure(groups: GroupState[], metrics: FitMetrics, hasTrigger: boolean)
   for (const gs of groups) {
     if (gs.overflowed) continue;
     if (gs.collapsed) {
-      const collapsedWidth = metrics.groupCollapsed(gs.group.id);
-      if (collapsedWidth === undefined) complete = false;
-      width += collapsedWidth ?? 0;
+      const collapsedLength = metrics.groupCollapsed(gs.group.id);
+      if (collapsedLength === undefined) complete = false;
+      length += collapsedLength ?? 0;
       visibleUnits += 1;
       visibleBySection.set(gs.section, (visibleBySection.get(gs.section) ?? 0) + 1);
       continue;
@@ -294,17 +298,17 @@ function measure(groups: GroupState[], metrics: FitMetrics, hasTrigger: boolean)
         shedCount += 1;
         continue;
       }
-      const unitWidth = metrics.unit(us.unit.key, us.unit.variants[us.variantIndex]);
-      if (unitWidth === undefined) complete = false;
-      width += unitWidth ?? 0;
+      const unitLength = metrics.unit(us.unit.key, us.unit.variants[us.variantIndex]);
+      if (unitLength === undefined) complete = false;
+      length += unitLength ?? 0;
       visibleUnits += 1;
       groupVisible = true;
     }
     if (shedCount > 0) {
       // The group's disclosure trigger takes real space, like any unit.
-      const triggerWidth = metrics.groupTrigger(gs.group.id);
-      if (triggerWidth === undefined) complete = false;
-      width += triggerWidth ?? 0;
+      const triggerLength = metrics.groupTrigger(gs.group.id);
+      if (triggerLength === undefined) complete = false;
+      length += triggerLength ?? 0;
       visibleUnits += 1;
       groupVisible = true;
     }
@@ -312,14 +316,14 @@ function measure(groups: GroupState[], metrics: FitMetrics, hasTrigger: boolean)
   }
 
   if (hasTrigger) {
-    width += metrics.overflowTrigger;
+    length += metrics.overflowTrigger;
     visibleUnits += 1;
   }
-  if (visibleUnits > 1) width += metrics.gap * (visibleUnits - 1);
+  if (visibleUnits > 1) length += metrics.gap * (visibleUnits - 1);
   for (const count of visibleBySection.values())
-    if (count > 1) width += metrics.separator * (count - 1);
+    if (count > 1) length += metrics.separator * (count - 1);
 
-  return { width, complete };
+  return { length, complete };
 }
 
 function anyOverflow(groups: GroupState[]): boolean {
@@ -334,7 +338,7 @@ function solvePass(
 ): { groups: GroupState[]; measured: Measured } {
   const groups = buildState(bar);
   let measured = measure(groups, metrics, hasTrigger);
-  while (measured.width > budget) {
+  while (measured.length > budget) {
     const step = nextStep(groups);
     if (!step) break; // pinned floor — nothing left to shed
     applyStep(step);
@@ -343,14 +347,15 @@ function solvePass(
   return { groups, measured };
 }
 
-export function solve(bar: NormalizedBar, metrics: FitMetrics, containerWidth: number): FitResult {
+/** Fit `bar` into `containerLength`, the room along its axis. */
+export function solve(bar: NormalizedBar, metrics: FitMetrics, containerLength: number): FitResult {
   // Pass 1: assume no trigger. If nothing overflows, done.
-  let pass = solvePass(bar, metrics, containerWidth, false);
+  let pass = solvePass(bar, metrics, containerLength, false);
   if (anyOverflow(pass.groups)) {
     // Pass 2: same budget, trigger now takes real space in `measure`. The step
     // sequence is budget-independent, so pass 2 degrades strictly further than
     // pass 1 — overflow can't disappear, and the trigger stays justified.
-    pass = solvePass(bar, metrics, containerWidth, true);
+    pass = solvePass(bar, metrics, containerLength, true);
   }
 
   const units = new Map<string, UnitAssignment>();
@@ -383,7 +388,7 @@ export function solve(bar: NormalizedBar, metrics: FitMetrics, containerWidth: n
     units,
     groups: groupAssignments,
     hasOverflow: anyOverflow(pass.groups),
-    width: pass.measured.width,
+    length: pass.measured.length,
     complete: pass.measured.complete,
   };
 }

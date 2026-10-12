@@ -47,7 +47,12 @@ const measureKey = {
   groupTrigger: (groupId: string) => `gt:${groupId}`,
 };
 
-function layout(schema: BarSchema, containerWidth: number, execute = vi.fn()) {
+function layout(
+  schema: BarSchema,
+  containerLength: number,
+  execute = vi.fn(),
+  orientation?: 'horizontal' | 'vertical',
+) {
   const input: ToolbarLayoutInput<Command> = {
     bar: normalizeBar(schema),
     resolve: (id) => registry[id] ?? null,
@@ -56,7 +61,8 @@ function layout(schema: BarSchema, containerWidth: number, execute = vi.fn()) {
     menuTarget: () => null,
     metrics,
     measureKey,
-    containerWidth,
+    containerLength,
+    orientation,
   };
   return layoutToolbar(input);
 }
@@ -220,6 +226,55 @@ describe('layoutToolbar', () => {
     expect(part.terminal?.id).toBe('page:go-to');
     part.runTerminal();
     expect(execute).toHaveBeenCalledWith('page:go-to');
+  });
+
+  it('draws and measures every command of a vertical toolbar as its icon; custom items keep their variants', () => {
+    const result = layout(
+      {
+        id: 'rail',
+        sections: {
+          start: [
+            group('zoom', [
+              item('zoom:in', { variants: ['icon+label', 'icon'] }),
+              item('zoom:out', { variants: ['label'] }),
+              custom('page-number', 'page:go-to', { variants: ['full', 'compact'] }),
+            ]),
+          ],
+        },
+      },
+      1000,
+      vi.fn(),
+      'vertical',
+    );
+    expect(result.sections[0]!.groups[0]!.parts.map(describePart)).toEqual([
+      'zoom:in@icon',
+      'zoom:out@icon',
+      'custom page-number@full',
+    ]);
+    expect(result.measured.map(describePart)).toEqual([
+      'zoom:in@icon',
+      'zoom:out@icon',
+      'custom page-number@full',
+      'custom page-number@compact',
+    ]);
+  });
+
+  it('fits a vertical toolbar into its length the way it fits a horizontal one', () => {
+    const schema: BarSchema = {
+      id: 'rail',
+      sections: { start: [group('zoom', ['zoom:out', 'zoom:in']), group('pages', ['page:next'])] },
+    };
+    const describeFit = (orientation: 'horizontal' | 'vertical') => {
+      const result = layout(schema, 100, vi.fn(), orientation);
+      return {
+        shown: result.sections.flatMap((section) =>
+          section.groups.flatMap((each) => each.parts.map(describePart)),
+        ),
+        overflow: result.overflow,
+      };
+    };
+    expect(describeFit('vertical')).toEqual(describeFit('horizontal'));
+    expect(describeFit('vertical').overflow).not.toEqual([]);
   });
 });
 

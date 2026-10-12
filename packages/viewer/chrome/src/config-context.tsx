@@ -1,15 +1,28 @@
 /**
- * The resolved customization, as React context. The chrome schema and the
- * user's extra icons are resolved once in <FullViewer> and read here by the
- * shell, menus, and strips — no component imports the default schema value
- * directly, so "the host replaced the chrome" is invisible below this line.
+ * The resolved customization, as React context. The `layout` option and the
+ * user's extra icons are resolved once in <FullViewer>; the layout at the
+ * viewer's current size is resolved by <LayoutRoot> (layout-root.tsx), and read
+ * here by the shell, menus and strips — no component imports the default
+ * layout directly, so "the host changed the layout" is invisible below this
+ * line.
  *
- * The default context value is the default config: components render correctly
- * in tests and stories without a provider.
+ * The default context values are the default config and the default layout:
+ * components render correctly in tests and stories without a provider.
  */
 import { createContext, useContext } from 'react';
-import type { BarSchema, ChromeSchema, MenuSchema } from '@embedpdf/react/toolbar';
-import { defaultChrome, getMenu, getModeBar, getStrip } from './config/chrome';
+import {
+  EXPANDED_MIN_WIDTH_PX,
+  barsAt,
+  compileBar,
+  menuOf,
+  type LayoutData,
+  type LayoutEnv,
+  type LayoutOption,
+  type MenuSection,
+  type SelectionTarget,
+} from '@embedpdf/core-ui';
+import type { BarGroup, BarSchema } from '@embedpdf/react/toolbar';
+import { DEFAULT_LAYOUT } from './config/chrome';
 import type { IconDef } from './ui/icons';
 import type { SignatureMode, SignerPort, TrustPort } from '@embedpdf/react/signature';
 import type { StampAssetEngine } from '@embedpdf/react/stamp';
@@ -78,7 +91,8 @@ export interface AnnotationsCustomization {
 }
 
 export interface ResolvedViewerConfig {
-  readonly chrome: ChromeSchema;
+  /** The `layout` option as given: the default without one. */
+  readonly layout?: LayoutOption;
   /** User-registered icons — additive over the built-in set. */
   readonly icons: Readonly<Record<string, IconDef>>;
   readonly stamps: StampsCustomization;
@@ -87,7 +101,6 @@ export interface ResolvedViewerConfig {
 }
 
 const DEFAULT_CONFIG: ResolvedViewerConfig = {
-  chrome: defaultChrome,
   icons: {},
   stamps: {},
   signatures: {},
@@ -98,20 +111,92 @@ const ViewerConfigContext = createContext<ResolvedViewerConfig>(DEFAULT_CONFIG);
 
 export const ViewerConfigProvider = ViewerConfigContext.Provider;
 
-export function useChromeSchema(): ChromeSchema {
-  return useContext(ViewerConfigContext).chrome;
+/** The `layout` option, for <LayoutRoot> to resolve at the viewer's size. */
+export function useLayoutOption(): LayoutOption | undefined {
+  return useContext(ViewerConfigContext).layout;
 }
 
-export function useMenuSchema(id: string): MenuSchema | undefined {
-  return getMenu(useContext(ViewerConfigContext).chrome, id);
+// ── the layout at the viewer's current size ──────────────────────────────────
+
+/** The layout as the viewer shows it now: at its env, with what shows nothing left out. */
+export interface ResolvedLayout {
+  /** The layout's data at this env. */
+  readonly data: LayoutData;
+  readonly env: LayoutEnv;
+  /** A bar as its toolbar fits it, or `null` for a bar the layout doesn't have. */
+  bar(id: string): BarSchema | null;
+  /** The bars over a selection of this kind, as one bar, or `null` when there is none. */
+  strip(target: SelectionTarget): BarSchema | null;
+  /** A menu's sections, or `null` for a menu the layout doesn't have. */
+  menu(id: string): readonly MenuSection[] | null;
 }
 
-export function useModeBarSchema(id: string): BarSchema | undefined {
-  return getModeBar(useContext(ViewerConfigContext).chrome, id);
+/** The env before the viewer is measured, and without a <LayoutRoot>. */
+export const DEFAULT_ENV: LayoutEnv = {
+  size: 'expanded',
+  width: EXPANDED_MIN_WIDTH_PX,
+  touch: false,
+  dir: 'ltr',
+};
+
+/**
+ * The bars over a selection of this kind as one bar, read through `bar`: one bar as it is, or
+ * several as one, their groups in bar order and named after their bar so the names stay unique.
+ */
+export function stripOf(
+  data: LayoutData,
+  target: SelectionTarget,
+  bar: (id: string) => BarSchema | null,
+): BarSchema | null {
+  const bars = barsAt(data, target)
+    .map(bar)
+    .filter((each): each is BarSchema => each !== null);
+  if (bars.length <= 1) return bars[0] ?? null;
+  const sections: { -readonly [Name in 'start' | 'center' | 'end']?: readonly BarGroup[] } = {};
+  for (const name of ['start', 'center', 'end'] as const) {
+    const groups = bars.flatMap((each) =>
+      (each.sections[name] ?? []).map((group) => ({ ...group, id: `${each.id}.${group.id}` })),
+    );
+    if (groups.length > 0) sections[name] = groups;
+  }
+  return { id: target, sections };
 }
 
-export function useStripSchema(id: string): BarSchema | undefined {
-  return getStrip(useContext(ViewerConfigContext).chrome, id);
+/** The layout as plain reads of its data: no bar leaves anything out. */
+export function staticResolvedLayout(data: LayoutData, env: LayoutEnv): ResolvedLayout {
+  const bar = (id: string) => compileBar(data, id);
+  return {
+    data,
+    env,
+    bar,
+    strip: (target) => stripOf(data, target, bar),
+    menu: (id) => menuOf(data, id),
+  };
+}
+
+const ResolvedLayoutContext = createContext<ResolvedLayout>(
+  staticResolvedLayout(DEFAULT_LAYOUT, DEFAULT_ENV),
+);
+
+export const ResolvedLayoutProvider = ResolvedLayoutContext.Provider;
+
+export function useResolvedLayout(): ResolvedLayout {
+  return useContext(ResolvedLayoutContext);
+}
+
+/** The viewer's env: its size, width, whether it's touched, and its direction. */
+export function useLayoutEnv(): LayoutEnv {
+  return useContext(ResolvedLayoutContext).env;
+}
+
+/** A menu's sections from the layout, or `null` for a menu it doesn't have. */
+export function useMenu(id: string): readonly MenuSection[] | null {
+  return useContext(ResolvedLayoutContext).menu(id);
+}
+
+/** The bars over a selection of this kind, as one bar; `undefined` when the layout has none. */
+export function useStripSchema(target: SelectionTarget): BarSchema | undefined {
+  return useContext(ResolvedLayoutContext).strip(target) ?? undefined;
 }
 
 export function useCustomIcons(): Readonly<Record<string, IconDef>> {

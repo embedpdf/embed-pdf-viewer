@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { PDFViewer } from '@embedpdf/viewer-vue';
+import { PDFViewer, type Layout } from '@embedpdf/viewer-vue';
 
-defineProps<{ readOnly: boolean }>();
+defineProps<{ simple: boolean }>();
+
+const simpleLayout = (layout: Layout) => layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
 </script>
 
 <template>
   <!-- A new key mounts a new viewer with the new config. -->
   <PDFViewer
-    :key="readOnly ? 'read-only' : 'edit'"
+    :key="simple ? 'simple' : 'full'"
     src="/report.pdf"
-    :disable="readOnly ? ['annotations', 'forms'] : []"
+    :layout="simple ? simpleLayout : undefined"
     style="height: 100vh"
   />
 </template>

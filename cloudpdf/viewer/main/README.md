@@ -26,7 +26,7 @@ engine (`embedpdf.wasm`, shipped in the same folder). Pass
 
 - `docToken` opens one document by its doc-scoped JWT.
 - `docId` opens by cloud document id (the engine-level `token` must authorize it).
-- Every customization option of the open-source viewer — chrome schema,
+- Every customization option of the open-source viewer — the layout,
   commands, icons, themes, locales — rides along verbatim; see the
   [EmbedPDF docs](https://www.embedpdf.com/docs) for the vocabulary.
 

@@ -1647,6 +1647,9 @@ importers:
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
+      happy-dom:
+        specifier: ^20.11.0
+        version: 20.11.0
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
@@ -2173,6 +2176,9 @@ importers:
 
   packages/viewer/chrome:
     dependencies:
+      '@embedpdf/core-ui':
+        specifier: workspace:*
+        version: link:../../core/ui
       '@embedpdf/default-stamps':
         specifier: workspace:*
         version: link:../../default-stamps

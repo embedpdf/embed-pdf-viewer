@@ -5,11 +5,23 @@
  * action a shortcut replaces. Structurally typed, so it needs no EmbedPDF
  * package (the commands host capability satisfies {@link ShortcutCommands}).
  */
+import { isFromTextField } from './text-field-event';
+
+/** Why a matched command won't run whatever the moment, as the commands plugin says it. */
+export interface ShortcutRefusal {
+  /** Turned off in this viewer, or not allowed by the scope. */
+  readonly reason: 'turned-off' | 'not-allowed';
+  /** A sentence for the user. */
+  readonly message: string;
+}
 
 /** The part of the commands capability shortcuts need. */
 export interface ShortcutCommands {
-  /** The command a keystroke's shortcut names, or `null`. */
-  matchStroke(stroke: KeyboardEvent, options: { isMac: boolean }): string | null;
+  /** The command a keystroke's shortcut names, with its refusal when it's refused, or `null`. */
+  matchStroke(
+    stroke: KeyboardEvent,
+    options: { isMac: boolean },
+  ): { readonly commandId: string; readonly refusal: ShortcutRefusal | null } | null;
   canExecute(id: string): boolean;
   execute(id: string): Promise<unknown>;
 }
@@ -19,27 +31,20 @@ export interface CommandShortcutOptions {
   isMac?: boolean;
   /** Where to listen. Default: `window`. */
   target?: Pick<Window, 'addEventListener' | 'removeEventListener'>;
+  /** Called when a key's command is turned off or not allowed, with why: say so to the user. */
+  onRefused?: (commandId: string, refusal: ShortcutRefusal) => void;
 }
 
 /** Whether this is an Apple platform, where `Mod` is Cmd and shortcuts show as `⌘K`. */
 export const isMacPlatform = (): boolean =>
   typeof navigator !== 'undefined' && /Mac|iP(hone|ad|od)/.test(navigator.platform);
 
-const isEditable = (target: EventTarget | null): boolean => {
-  const element = target as HTMLElement | null;
-  if (!element || !element.tagName) return false;
-  return (
-    element.tagName === 'INPUT' ||
-    element.tagName === 'TEXTAREA' ||
-    element.tagName === 'SELECT' ||
-    element.isContentEditable
-  );
-};
-
 /**
  * Run a command when its shortcut is pressed, and return the function that stops listening.
- * Keys typed into a text field are left alone, and so is a key whose command can't run now:
- * its browser default (Cmd+C copying the page, say) still happens.
+ * Keys typed into a text field are left alone. A command that's turned off or not allowed
+ * still takes its key, so the browser doesn't do something else with it (Cmd+P printing the
+ * page), and `onRefused` says why. A key whose command only can't run right now keeps its
+ * browser default.
  */
 export function bindCommandShortcuts(
   commands: ShortcutCommands,
@@ -49,12 +54,18 @@ export function bindCommandShortcuts(
   const target = options.target ?? window;
   const onKeyDown = (event: Event) => {
     const stroke = event as KeyboardEvent;
-    if (stroke.defaultPrevented || isEditable(stroke.target)) return;
-    const id = commands.matchStroke(stroke, { isMac });
-    if (!id || !commands.canExecute(id)) return;
+    if (stroke.defaultPrevented || isFromTextField(stroke)) return;
+    const match = commands.matchStroke(stroke, { isMac });
+    if (!match) return;
+    if (match.refusal) {
+      stroke.preventDefault();
+      options.onRefused?.(match.commandId, match.refusal);
+      return;
+    }
+    if (!commands.canExecute(match.commandId)) return;
     stroke.preventDefault();
     // A failing command reports itself through the capability's onExecutionFailed.
-    commands.execute(id).catch(() => {});
+    commands.execute(match.commandId).catch(() => {});
   };
   target.addEventListener('keydown', onKeyDown);
   return () => target.removeEventListener('keydown', onKeyDown);

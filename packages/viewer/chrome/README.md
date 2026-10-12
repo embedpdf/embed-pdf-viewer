@@ -32,18 +32,24 @@ Two kinds of surface, two deliberate semantics:
 - **Registries** (`commands`, `icons`, `strings`) are **additive**: your
   entries merge over the defaults by id; a colliding id overrides. Safe,
   order-independent, upgrade-friendly.
-- **Structure** (`chrome`) is a **value you own**: take the default, transform
-  it, or write your own. It is never merged — there is no patch grammar to
-  learn, because the schema is small enough to read.
+- **Structure** (`layout`) is a **value you own**: take the default, edit it,
+  or write your own. It is never merged — the edits are the layout's own
+  methods, and the layout is plain data small enough to read.
 
 ### Remove features
 
 ```tsx
-<FullViewer engine={engine} disabledCategories={['form', 'redaction']} />
+<FullViewer engine={engine} disable={['forms', 'redaction', 'tool:highlight']} />
+<FullViewer engine={engine} readOnly={{ except: ['forms.filling'] }} />
 ```
 
-A disabled category vanishes everywhere at once — toolbar, menus, overflow,
-shortcuts — because every surface is a projection of the same command registry.
+`disable` takes features (`annotations`, or a part such as
+`annotations.highlight`) and single commands (a name with a colon) in one list;
+`readOnly` turns off every feature that changes the document, minus `except`.
+What's off vanishes everywhere at once — toolbar, menus, overflow, shortcuts —
+because every surface is a projection of the same command registry. Both follow
+their props while the viewer runs, and both are only the interface: the
+plugins keep working for your code, and `scope` is what the engine enforces.
 
 ### Add a button
 
@@ -75,89 +81,87 @@ The 90% case, end to end — one command, one icon, one string, one placement:
       },
     },
   ]}
-  chrome={(base, h) =>
-    h.addItem(base, {
-      bar: 'main',
-      section: 'end',
-      group: 'panels',
-      item: 'acme:send',
-    })
-  }
+  layout={(layout) => layout.add('acme:send', { to: 'main', group: 'panels' })}
 />
 ```
 
 That one registration is a button that degrades responsively (`importance` is
 the only responsive knob — there are no breakpoints to edit), drops into the
 derived overflow menu on narrow screens, has a working keyboard shortcut, and
-is localized. Referencing an unknown command or icon logs a dev-mode warning
-naming the exact id.
+is localized. A layout that names an id the viewer doesn't have logs a warning
+with the id and the closest one that exists; an unknown icon logs a dev-mode
+warning naming it.
 
-`chrome` accepts the schema **value** or a **transform** of the default. The
-helpers come in as the second argument so simple edits need no imports:
+`layout` takes a layout, or a **function** that gets the default and the
+viewer's env (`size`, `width`, `touch`, `dir`, measured on the viewer itself)
+and returns yours. It runs again whenever the env changes. Every edit returns a
+new layout, so edits chain and need no imports:
 
 ```tsx
-chrome={(base, h) =>
-  h.removeItems(
-    h.replaceItem(base, 'panel:comment', { command: 'acme:chat', importance: 5 }),
-    ['annotation:add-squiggly'],
-  )
+layout={(layout, env) =>
+  layout
+    .replace('panel:comments', { command: 'acme:chat', importance: 5 })
+    .remove('tool:squiggly', { from: 'annotate' })
+    .place('main', env.size === 'compact' ? 'bottom' : 'top')
 }
 ```
 
-- `h.addItem(schema, { bar, section, group, item, at? })` — `bar` is a bar id
-  (`'main'`, a mode bar like `'annotate'`, or a strip); a new `group` id
-  creates that group at the end of the section.
-- `h.removeItems(schema, ids)` — purges the commands from every bar, mode bar,
-  strip, and menu; emptied groups disappear.
-- `h.replaceItem(schema, id, item)` — swaps a command in place, everywhere.
-- Plus the authoring sugar (`h.item`, `h.group`, `h.custom`, `h.defineChrome`)
-  for building bigger pieces inline.
+- `place(bar, place)` — an edge (`'top'`, `'bottom'`, `'start'`, `'end'`, or
+  `{ edge, before | after }`), `{ float }`, `{ with: bar }` (along another bar,
+  as the mode bars ride `main`) or `{ at: 'selection' | 'annotation' }`.
+- `addBar(id, bar)` / `removeBar(id)` — a bar with a `mode` adds that mode's
+  tab and its `mode:<id>` command; removing it removes the tab.
+- `add(item, { to, section, group, before, after })` — `to` is a bar or a menu;
+  without a position the item starts a new group at the end of `end`.
+- `remove(ids, { from })` — always one place; to leave something out
+  everywhere, use `disable`. A group with nothing left disappears.
+- `replace(id, item)` — swaps an item in place, in every bar and menu.
+- `addMenu(id, sections)`, `addPanel(id, panel)`, `panel(id, changes)`,
+  `removePanel(id)`, `tabs('always' | 'multiple' | 'never')`, and `toJSON()`
+  for the data.
 
 ### Own the structure
 
 For real restructuring, don't patch — write the value. It is the complete
-structural definition of the viewer, and it is small:
+structural definition of the viewer, as plain data, and it is small: groups
+are arrays, items are command ids or small objects.
 
 ```tsx
-import {
-  FullViewer,
-  defineChrome,
-  group,
-  custom,
-  defaultChrome,
-} from '@embedpdf/viewer-chrome';
+import { FullViewer, defaultLayout } from '@embedpdf/viewer-chrome';
 
 // A minimal "reading room": zoom, search, download. Nothing else.
-const chrome = defineChrome({
+const layout = {
   bars: {
     main: {
-      id: 'main',
-      sections: {
-        start: [
-          group('zoom', [
-            custom('zoom-controls', {
-              variants: ['inline', 'button'],
-              terminal: 'zoom:menu',
-            }),
-          ]),
+      place: 'top',
+      start: [
+        [
+          {
+            custom: 'zoom',
+            command: 'menu:zoom',
+            variants: ['inline', 'button'],
+          },
         ],
-        end: [group('actions', ['panel:search', 'document:download'])],
-      },
+      ],
+      end: [['panel:search', 'document:download']],
     },
   },
-  menus: { zoom: defaultChrome.menus.zoom },
-});
+  menus: { zoom: defaultLayout.toJSON().menus!.zoom },
+};
 
-<FullViewer engine={engine} chrome={chrome} />;
+<FullViewer engine={engine} layout={layout} />;
 ```
 
-Adding an entry under `chrome.modeBars` adds a whole mode: the mode tab strip
-is derived from `modeBars` keys, so a custom review workflow is one command
-(the mode surface) plus one bar schema — not a special case.
+A bar with a `mode` adds a whole mode: the mode tabs list every bar with a
+mode, so a custom review workflow is one bar (`{ place: { with: 'main' },
+mode: 'review', title: 'Review', center: [...] }`) — its tab and its
+`mode:review` command come with it. A mode whose bars show nothing has no tab,
+and a bar with nothing visible draws nothing.
 
-Your stability, your choice: pass no `chrome` and you track our default (new
-features appear on upgrade); own the value and your toolbar never moves — new
-EmbedPDF features arrive as new command ids you opt into by adding a line.
+Your stability, your choice: pass no `layout`, or a function of the default,
+and you track our default (new features appear on upgrade); own the value and
+your toolbar never moves — new EmbedPDF features arrive as new command ids you
+opt into by adding a line.
 
 ### Locale
 
@@ -172,22 +176,20 @@ falls back to English for everything you didn't provide.
 
 ### Slots — your component inside the measured toolbar
 
-Reserve a socket in the chrome (`custom()` with a `terminal` command), then —
-through `<embedpdf-viewer>` or any wrapper — supply a child with the matching
-`slot` attribute:
+Reserve a socket in the layout (`{ custom, command }`), then — through
+`<embedpdf-viewer>` or any wrapper — supply a child with the matching `slot`
+attribute:
 
 ```tsx
 // @embedpdf/viewer-react
 <PDFViewer
   src="/report.pdf"
   commands={[{ id: 'acme:status', labelKey: 'acme.status', run: () => {} }]}
-  chrome={(base, h) =>
-    h.addItem(base, {
-      bar: 'main',
-      section: 'start',
-      group: 'workspace',
-      item: h.custom('doc-status', { terminal: 'acme:status' }),
-    })
+  layout={(layout) =>
+    layout.add(
+      { custom: 'doc-status', command: 'acme:status' },
+      { to: 'main', group: 'view' },
+    )
   }
 >
   <DocStatus slot="doc-status" />
@@ -196,27 +198,24 @@ through `<embedpdf-viewer>` or any wrapper — supply a child with the matching
 
 The child stays in YOUR world — light DOM, your framework's tree, your page
 CSS — while the browser projects it into the toolbar. The socket is measured
-live, so the solver budgets its true width; when it no longer fits, the
-`terminal` command represents it in the derived overflow menu. An unfilled
-socket displays its terminal command as native slot fallback, so the same
-chrome works with and without the child (and outside shadow DOM entirely —
-this package's own React consumers see the fallback).
+live, so the solver budgets its true width; when it no longer fits, its
+`command` represents it in the derived overflow menu (without one, it never
+leaves the bar). An unfilled socket displays that command as native slot
+fallback, so the same layout works with and without the child (and outside
+shadow DOM entirely — this package's own React consumers see the fallback).
 
-Slot names must be unique across the chrome (one `<slot name>` per shadow
+Slot names must be unique across the layout (one `<slot name>` per shadow
 tree wins projection).
 
 ### The frame — regions: arrangement, visibility, replacement
 
-Regions are a FIXED vocabulary (`header`, `tabs`, the toolbar band — each
-carries semantics the shell owns: measurement physics, the document gate,
-aria). Three independent knobs on each:
+Regions are a FIXED vocabulary (`header`, `tabs`, the bars — each carries
+semantics the shell owns: measurement physics, the document gate, aria). Three
+independent knobs on each:
 
 ```tsx
-// 1. ARRANGE + HIDE — part of the chrome value, because it is structure:
-chrome={(base) => ({
-  ...base,
-  frame: { toolbar: 'bottom', tabs: 'multiple', header: false },
-})}
+// 1. ARRANGE + HIDE — part of the layout, because it is structure:
+layout={(layout) => layout.place('main', 'bottom').tabs('multiple')}
 
 // 2. REPLACE — regions are sockets; the built-in is the slot fallback:
 <PDFViewer documents={docs} onReady={setViewer}>
@@ -234,30 +233,30 @@ not to the PDF. The socket is there so yours can sit inside the frame:
 </PDFViewer>
 ```
 
-Left unfilled it renders nothing, and `frame: { header: false }` drops the
-socket entirely. Theme and locale stay under your control as props —
+Left unfilled it renders nothing. Theme and locale stay under your control as props —
 `theme={{ preference, tokens }}` and `locale` (`'auto'` negotiates from the
 browser) — so a switch in your own header is a state change on your side.
 
 A replacement region is fully functional through the handle — the kernel's
 document registry IS the tab model (`viewer.documents.list()/activeId()/
-setActive()/close()` + `viewer.watch`). A region hidden by the frame hides
-its socket too: visibility outranks slotted content. The mode band rides the
-main toolbar's content side (below a top bar, above a bottom bar).
+setActive()/close()` + `viewer.watch`). A region the layout hides (`tabs('never')`)
+hides its socket too: visibility outranks slotted content. The mode bars ride
+the main toolbar's content side (below a top bar, above a bottom bar).
 
 ### Drive — control the viewer from code
 
-The handle (`el.viewer` on the custom element, `onReady` on the wrappers) is a
-thin skin over the kernel: `get(Token)` returns each plugin's **public
-capability lens** verbatim — the same documented API the chrome's own buttons
-use — plus ONE reactivity primitive and the command trio:
+The `viewer` (`el.viewer` on the custom element, `onReady` on the wrappers) is
+a thin skin over the kernel: `get(name)` (or `get(Token)`) returns each plugin's
+**public capability lens** verbatim — the same documented API the chrome's own
+buttons use — `documents` and `commands` are two of them, plus ONE reactivity
+primitive:
 
 ```ts
 el.addEventListener('epdf:ready', () => {
   const viewer = el.viewer;
 
-  viewer.execute('zoom:in'); // commands: UI verbs
-  const annotation = viewer.get(AnnotationToken); // capabilities: the API
+  await viewer.commands.execute('zoom:in'); // commands: UI verbs
+  const annotation = viewer.get('annotation'); // capabilities: the API
   await annotation.create(pon, draft);
 
   viewer.watch(
@@ -270,7 +269,8 @@ el.addEventListener('epdf:ready', () => {
 ```
 
 Rule of thumb: **buttons speak commands; code speaks capabilities.** The
-token re-export list in `index.ts` is the public-API act — host lenses
+plugin names (`VIEWER_PLUGINS` in `handle.ts`) and the token re-export list in
+`index.ts` are the public-API act — host lenses
 (`/contract/host` entries) are structurally absent from delivery bundles. Coarse
 DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 

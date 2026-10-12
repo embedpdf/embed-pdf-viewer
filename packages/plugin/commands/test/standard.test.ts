@@ -141,12 +141,13 @@ describe('standard commands', () => {
     const documents = {
       download: vi.fn(async () => bytes),
       get: () => ({ name: 'contract' }),
-      canDownload: () => true,
-      canPrint: () => false,
     };
     const context = contextWith(new Map([[DocumentsToken, documents]]));
+    // The scope's say is `requires`: the commands plugin hides them without it.
+    expect(command('document:download').requires).toEqual(['doc.download']);
+    expect(command('document:print').requires).toEqual(['doc.print']);
     expect(command('document:download').enabled?.(context)).toBe(true);
-    expect(command('document:print').enabled?.(context)).toBe(false);
+    expect(command('document:print').enabled?.({ ...context, documentId: null })).toBe(false);
     await command('document:download').run?.(context);
     expect(documents.download).toHaveBeenCalledWith('doc', { signal: undefined });
     expect(platform.saveFile).toHaveBeenCalledWith(bytes, 'contract.pdf');

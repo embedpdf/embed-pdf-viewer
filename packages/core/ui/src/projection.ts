@@ -16,6 +16,7 @@
  * projected here rather than hand-written — same information, one source.
  */
 import type { NormalizedBar, NormalizedGroup, NormalizedUnit } from './schema';
+import { commandOfUnit } from './schema';
 import type { FitResult } from './solver';
 
 export type OverflowRow =
@@ -39,11 +40,12 @@ export interface OverflowSection {
  */
 export type ResolveMenuTarget = (commandId: string) => { menu?: string } | null;
 
-function projectUnit(unit: NormalizedUnit, resolve: ResolveMenuTarget): OverflowRow {
-  // A custom item's menu form is its terminal command's form.
-  const command = unit.kind === 'custom' ? unit.terminal : unit.command;
+/** A unit's menu form; a custom item's is its terminal command's. A standalone item has none. */
+function projectUnit(unit: NormalizedUnit, resolve: ResolveMenuTarget): OverflowRow[] {
+  const command = commandOfUnit(unit);
+  if (command === null) return [];
   const menu = resolve(command)?.menu;
-  return menu ? { type: 'submenu', command, menu } : { type: 'command', command };
+  return [menu ? { type: 'submenu', command, menu } : { type: 'command', command }];
 }
 
 export function projectOverflow(
@@ -58,7 +60,7 @@ export function projectOverflow(
       // disclosure trigger (projectShed). Only true overflow leaves the group.
       const rows = group.units
         .filter((unit) => fit.units.get(unit.key)?.kind === 'overflow')
-        .map((unit) => projectUnit(unit, resolve));
+        .flatMap((unit) => projectUnit(unit, resolve));
       if (rows.length === 0) continue;
       sections.push({
         labelKey: group.labelKey,
@@ -81,7 +83,7 @@ export function projectShed(
 ): OverflowRow[] {
   return group.units
     .filter((unit) => fit.units.get(unit.key)?.kind === 'shed')
-    .map((unit) => projectUnit(unit, resolve));
+    .flatMap((unit) => projectUnit(unit, resolve));
 }
 
 /** One strip group: a separator boundary, its visible commands in bar order. */
@@ -109,8 +111,8 @@ export function projectStrip(
   for (const section of bar.sections) {
     for (const group of section.groups) {
       const commands = group.units
-        .map((unit) => (unit.kind === 'custom' ? unit.terminal : unit.command))
-        .filter(visible);
+        .map(commandOfUnit)
+        .filter((command): command is string => command !== null && visible(command));
       if (commands.length === 0) continue;
       groups.push({ id: group.id, labelKey: group.labelKey, commands });
     }

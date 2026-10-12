@@ -50,8 +50,8 @@ copy its folder. See [Self-hosting](../self-hosting).
 
 ## Builds that use `blob:` workers
 
-Most bundlers (Vite, webpack, Rspack, Parcel) emit the workers as files of your build, so
-`worker-src 'self'` covers them. Two builds can't, and start the workers from `blob:` URLs, so they
+Most bundlers (Vite, webpack, Rspack, Parcel, Next.js) emit the workers as files of your build,
+so `worker-src 'self'` covers them. Two builds can't, and start the workers from `blob:` URLs, so they
 need `worker-src blob:`:
 
 - **Angular**, which loads the engine's portable build;
@@ -59,6 +59,19 @@ need `worker-src blob:`:
 
 To keep `worker-src 'self'` there, copy the two worker files to your site and point the viewer at
 them: see [Self-hosting](../self-hosting#workers-and-content-security-policy).
+
+## Your bundler's Trusted Types policy
+
+With `require-trusted-types-for 'script'`, the browser also checks how your bundler loads the rest
+of your app's code. Vite, esbuild and Angular need nothing more. The others load it through a
+Trusted Types policy of their own, which `trusted-types` names next to `embedpdf`:
+
+| Build | What to add |
+| :-- | :-- |
+| webpack 5 | `output: { trustedTypes: 'webpack' }` in your config, and `trusted-types embedpdf webpack;` |
+| Rspack | `output: { trustedTypes: 'rspack' }` in your config, and `trusted-types embedpdf rspack;` |
+| Next.js (webpack) | `trusted-types embedpdf nextjs#bundler;`. Next.js's own inline scripts need its nonce setup. |
+| Next.js (Turbopack) | Turbopack can't run with `require-trusted-types-for 'script'` yet: leave that line out. |
 
 ## A PDF you can't trust
 

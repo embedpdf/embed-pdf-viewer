@@ -95,7 +95,10 @@ button:
 <Snippet name="text/clipboard" />
 
 It reads the text as soon as a selection settles, so the browser's copy can answer at once. Set
-`prefetch` to `false` to read text only when someone copies.
+`prefetch` to `false` to read text only when someone copies. A selection the user [may not
+copy](../concepts/permissions) isn't copied by the keys or by the browser's Copy menu, and
+<Fw only={['react', 'svelte']}>`onRefused` is called</Fw><Fw only="vue">it emits `refused`</Fw><Fw only="angular">`(refused)` fires</Fw>,
+so you can say so.
 
 <Example name="selection/copy" />
 

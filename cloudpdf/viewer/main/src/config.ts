@@ -19,7 +19,12 @@ import {
   type OpenInputShare,
   type TokenSource,
 } from '@cloudpdf/engine';
-import type { EngineFactory, InitialDocument, StampsCustomization } from '@embedpdf/viewer/core';
+import type {
+  EngineFactory,
+  InitialDocument,
+  StampsCustomization,
+  ViewerConfig as EngineViewerConfig,
+} from '@embedpdf/viewer/core';
 
 /**
  * @deprecated `{ kind: 'share' }` is a standard `OpenInput` kind now
@@ -64,6 +69,16 @@ export interface CloudSource extends CloudEngineOptions {
    *  `assetEngine` defaults to a local engine loaded on first use. */
   stamps?: StampsCustomization;
 }
+
+/**
+ * The cloud viewer's config: every key of the viewer's, with the engine and the documents named
+ * in the cloud's words. The document's token says who the user is and what they may do, so
+ * there is no `scope` or `identity` here.
+ */
+export interface ViewerConfig
+  extends
+    Omit<EngineViewerConfig, 'engine' | 'src' | 'documents' | 'scope' | 'identity'>,
+    CloudSource {}
 
 /**
  * The engine stamp libraries and signature marks open in. The cloud engine

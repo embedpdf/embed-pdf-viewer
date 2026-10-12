@@ -361,21 +361,28 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   );
 }
 
-export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'>;
+export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'>;
 
 /**
  * Mount once per viewer to wire clipboard copy: prefetches the selected text
  * when the selection settles, answers the native `copy` event synchronously,
  * and falls back to the async Clipboard API for ctrl/cmd+C when the page has
- * no DOM selection. Renders nothing, and wires nothing until a document is
- * ready. For a toolbar Copy button, call `copySelection(useSelection())` from
- * its click handler instead.
+ * no DOM selection. A selection the user may not copy isn't copied, and
+ * `onRefused` is called. Renders nothing, and wires nothing until a document
+ * is ready. For a toolbar Copy button, call `copySelection(useSelection())`
+ * from its click handler instead.
  */
-export function SelectionClipboard({ prefetch }: SelectionClipboardProps = {}) {
+export function SelectionClipboard({ prefetch, onRefused }: SelectionClipboardProps = {}) {
   const selection = useOptionalCapability(SelectionToken);
+  // The latest callback, so a new function each render doesn't wire the clipboard again.
+  const refused = useRef(onRefused);
+  refused.current = onRefused;
   useEffect(() => {
     if (!selection) return;
-    return wireSelectionClipboard(selection, prefetch === undefined ? {} : { prefetch });
+    return wireSelectionClipboard(selection, {
+      ...(prefetch === undefined ? {} : { prefetch }),
+      onRefused: () => refused.current?.(),
+    });
   }, [selection, prefetch]);
   return null;
 }

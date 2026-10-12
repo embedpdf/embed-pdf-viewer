@@ -5,34 +5,16 @@
  * strip that doesn't fit itself; and the schema a bar is written in.
  */
 
-// The toolbar's vocabulary: the schema a bar is written in, and the helpers that change one.
-export {
-  DEFAULT_IMPORTANCE,
-  PINNED,
-  addItem,
-  chromeHelpers,
-  custom,
-  defineChrome,
-  group,
-  item,
-  removeItems,
-  replaceItem,
-  validateChrome,
-} from '@embedpdf/core-ui';
+// The toolbar's vocabulary: the schema a bar is written in.
+export { DEFAULT_IMPORTANCE, PINNED, custom, group, item } from '@embedpdf/core-ui';
 export type {
-  AddItemSpec,
   BarChild,
   BarGroup,
   BarItem,
   BarSchema,
   BarSections,
-  ChromeHelpers,
-  ChromeSchema,
   CustomItem,
-  FrameSchema,
   Importance,
-  MenuSchema,
-  MenuSection,
   OverflowRow,
   OverflowSection,
   Variant,

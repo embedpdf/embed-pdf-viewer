@@ -1,14 +1,13 @@
 <script lang="ts">
-  import { PDFViewer } from '@embedpdf/viewer-svelte';
+  import { PDFViewer, type Layout } from '@embedpdf/viewer-svelte';
 
-  let { readOnly }: { readOnly: boolean } = $props();
+  let { simple }: { simple: boolean } = $props();
+
+  const simpleLayout = (layout: Layout) =>
+    layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
 </script>
 
 <!-- A new key mounts a new viewer with the new config. -->
-{#key readOnly}
-  <PDFViewer
-    src="/report.pdf"
-    disable={readOnly ? ['annotations', 'forms'] : []}
-    style="height: 100vh"
-  />
+{#key simple}
+  <PDFViewer src="/report.pdf" layout={simple ? simpleLayout : undefined} style="height: 100vh" />
 {/key}

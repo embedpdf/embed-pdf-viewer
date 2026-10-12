@@ -1,12 +1,14 @@
 /**
- * @embedpdf/core-ui — the structure-only schema vocabulary.
+ * @embedpdf/core-ui — the structure-only bar vocabulary.
  *
- * The schema contains only what a designer decides and the runtime cannot
+ * A bar contains only what a designer decides and the runtime cannot
  * compute: order, grouping, importance, and each item's degradation ladder.
  * Everything the runtime can compute is banned from it by construction:
  * no breakpoints, no show/hide lists, no locale overrides, no dividers, no
  * spacers, no hand-written overflow menus. Fit is measured and solved at
  * runtime (see solver.ts); the overflow menu is derived (see projection.ts).
+ * Where bars go, and the menus and panels around them, is the viewer's
+ * layout (see layout.ts).
  */
 
 /** Presentation ladder for a command button, richest first. */
@@ -30,16 +32,17 @@ export interface BarItem {
 
 /**
  * An app-rendered slot (e.g. the inline zoom strip). Each named variant is
- * measured like any command button. The ladder must terminate in a command
- * (`terminal`) so the item always has a menu form when it overflows — this
- * is what makes the overflow projection total.
+ * measured like any command button. Its `terminal` command is its menu form,
+ * what it becomes when it overflows; an item without one never leaves the bar
+ * (it is pinned, and so is its group), which keeps the overflow projection
+ * total.
  */
 export interface CustomItem {
   readonly slot: string;
   /** Named presentation variants, richest first. Default: ['default']. */
   readonly variants?: readonly string[];
   /** The command that stands in for this slot in menus (its last resort). */
-  readonly terminal: string;
+  readonly terminal?: string;
   readonly importance?: Importance;
 }
 
@@ -95,55 +98,6 @@ export interface BarSchema {
   readonly sections: BarSections;
 }
 
-/** A run of command rows; separators derive between sections. */
-export interface MenuSection {
-  /** Optional section heading (i18n key). */
-  readonly labelKey?: string;
-  readonly items: readonly string[];
-}
-
-export interface MenuSchema {
-  readonly id: string;
-  readonly sections: readonly MenuSection[];
-}
-
-/**
- * The shell frame — region arrangement and visibility. Regions are a fixed
- * vocabulary (each carries semantics the shell must own: the toolbar's
- * measurement physics, the document gate, aria landmarks); what's yours is
- * where they sit, whether they show, and — through the region slots — what
- * fills them. Part of the chrome value because it is structure: owned, never
- * merged. Free-form layout is deliberately not offered — wanting a different
- * frame architecture is what headless is for.
- */
-export interface FrameSchema {
-  /** Where the main bar lives. Its mode band rides the content side (below a
-   *  top bar, above a bottom bar). Default: 'top'. */
-  readonly toolbar?: 'top' | 'bottom';
-  /** Document tab strip: 'multiple' shows it only with >1 tab. A hidden
-   *  region hides its slot too — visibility outranks slotted content.
-   *  Default: 'always'. */
-  readonly tabs?: 'always' | 'multiple' | 'never';
-  /** The header row — a socket only: the chrome ships no header of its own,
-   *  so it renders nothing until a `slot="header"` child fills it. `false`
-   *  removes the socket, keeping a slotted header out. Default: true. */
-  readonly header?: boolean;
-}
-
-export interface ChromeSchema {
-  /** Standalone bars (e.g. the main toolbar). */
-  readonly bars: Readonly<Record<string, BarSchema>>;
-  /** Secondary bars keyed by tool mode — which one shows is derived from the
-   *  interaction hub's active tool, never stored. */
-  readonly modeBars?: Readonly<Record<string, BarSchema>>;
-  /** Named dropdown menus referenced by commands' `menu:` targets. */
-  readonly menus?: Readonly<Record<string, MenuSchema>>;
-  /** Contextual strips (selection menus) — same BarSchema, same fit engine. */
-  readonly strips?: Readonly<Record<string, BarSchema>>;
-  /** Region arrangement & visibility. Omitted = the default frame. */
-  readonly frame?: FrameSchema;
-}
-
 // ── authoring sugar ───────────────────────────────────────────────────────────
 
 /** A command button: `item('zoom:in', { variants: ['icon+label', 'icon'] })`. */
@@ -153,14 +107,15 @@ export function item(command: string, options?: Omit<BarItem, 'command'>): BarIt
 
 /**
  * An item you draw yourself, by its slot name, and the command it becomes in the "More" menu:
- * `custom('page-number', 'page:go-to', { variants: ['full', 'compact'] })`.
+ * `custom('page-number', 'page:go-to', { variants: ['full', 'compact'] })`. Without a command,
+ * the item never leaves the bar.
  */
 export function custom(
   slot: string,
-  terminal: string,
+  terminal?: string,
   options?: Omit<CustomItem, 'slot' | 'terminal'>,
 ): CustomItem {
-  return { slot, terminal, ...options };
+  return terminal === undefined ? { slot, ...options } : { slot, terminal, ...options };
 }
 
 /** A group of items, with a separator between groups: `group('zoom', ['zoom:out', 'zoom:in'])`. */
@@ -188,7 +143,11 @@ export type NormalizedUnit =
       readonly key: string;
       readonly slot: string;
       readonly variants: readonly string[];
-      readonly terminal: string;
+      /**
+       * The command it becomes in menus, or null for an item without one, which
+       * {@link filterBar} keeps, pinned.
+       */
+      readonly terminal: string | null;
       readonly importance: Importance;
     };
 
@@ -216,6 +175,14 @@ export const DEFAULT_IMPORTANCE: Importance = 3;
 const DEFAULT_COMMAND_VARIANTS: readonly Variant[] = ['icon'];
 const DEFAULT_CUSTOM_VARIANTS: readonly string[] = ['default'];
 
+/** Whether a unit is a custom item with no command to become in menus: it never leaves the bar. */
+export const isStandaloneUnit = (unit: NormalizedUnit): boolean =>
+  unit.kind === 'custom' && unit.terminal === null;
+
+/** The command a unit runs: its own, or a custom item's `terminal`; null for a standalone item. */
+export const commandOfUnit = (unit: NormalizedUnit): string | null =>
+  unit.kind === 'command' ? unit.command : unit.terminal;
+
 function normalizeChild(groupId: string, child: BarChild, seen: Set<string>): NormalizedUnit {
   const asItem: BarItem | CustomItem = typeof child === 'string' ? { command: child } : child;
   const unit: NormalizedUnit =
@@ -225,8 +192,9 @@ function normalizeChild(groupId: string, child: BarChild, seen: Set<string>): No
           key: `${groupId}:${asItem.slot}`,
           slot: asItem.slot,
           variants: asItem.variants ?? DEFAULT_CUSTOM_VARIANTS,
-          terminal: asItem.terminal,
-          importance: asItem.importance ?? DEFAULT_IMPORTANCE,
+          terminal: asItem.terminal ?? null,
+          importance:
+            asItem.terminal === undefined ? PINNED : (asItem.importance ?? DEFAULT_IMPORTANCE),
         }
       : {
           kind: 'command',
@@ -241,7 +209,11 @@ function normalizeChild(groupId: string, child: BarChild, seen: Set<string>): No
   return unit;
 }
 
-/** Resolve shorthands + defaults; validate uniqueness. Solver/projection input. */
+/**
+ * Resolve shorthands + defaults; validate uniqueness. Solver/projection input.
+ * A group holding a custom item without a command is pinned with it: it never
+ * collapses or overflows whole, so the item stays in the bar.
+ */
 export function normalizeBar(bar: BarSchema): NormalizedBar {
   const seen = new Set<string>();
   const groupIds = new Set<string>();
@@ -255,14 +227,17 @@ export function normalizeBar(bar: BarSchema): NormalizedBar {
         if (groupIds.has(group.id))
           throw new Error(`[ui-core] duplicate group in bar: ${group.id}`);
         groupIds.add(group.id);
+        const units = group.items.map((child) => normalizeChild(group.id, child, seen));
         return {
           id: group.id,
           labelKey: group.labelKey,
           role: group.role ?? 'buttons',
           shed: group.shed ?? false,
           collapse: group.collapse,
-          importance: group.importance ?? DEFAULT_IMPORTANCE,
-          units: group.items.map((child) => normalizeChild(group.id, child, seen)),
+          importance: units.some(isStandaloneUnit)
+            ? PINNED
+            : (group.importance ?? DEFAULT_IMPORTANCE),
+          units,
         };
       }),
     });
@@ -274,7 +249,8 @@ export function normalizeBar(bar: BarSchema): NormalizedBar {
  * Drop units whose command is currently invisible (permissions, disabled
  * categories, contextual visibility) before solving — an invisible unit must
  * not consume budget or appear in the overflow. Groups that empty out vanish
- * naturally in the solver's separator math and in the projection.
+ * naturally in the solver's separator math and in the projection. A custom
+ * item without a command has nothing to ask `keep` about, and stays.
  */
 export function filterBar(
   bar: NormalizedBar,
@@ -284,42 +260,22 @@ export function filterBar(
     id: bar.id,
     sections: bar.sections.map((section) => ({
       name: section.name,
-      groups: section.groups.map((group) => ({ ...group, units: group.units.filter(keep) })),
+      groups: section.groups.map((group) => ({
+        ...group,
+        units: group.units.filter((unit) => isStandaloneUnit(unit) || keep(unit)),
+      })),
     })),
   };
 }
 
-/**
- * Identity + validation. Checks what is checkable without a command registry:
- * bars normalize cleanly, and every `menu` a strip/bar could reference exists
- * is left to `validateChrome` (which also takes the known command ids).
- */
-export function defineChrome<T extends ChromeSchema>(chrome: T): T {
-  for (const bar of Object.values(chrome.bars)) normalizeBar(bar);
-  for (const bar of Object.values(chrome.modeBars ?? {})) normalizeBar(bar);
-  for (const strip of Object.values(chrome.strips ?? {})) normalizeBar(strip);
-  return chrome;
-}
-
-/** Dev-time cross-check: every command referenced by the chrome exists. */
-export function validateChrome(chrome: ChromeSchema, knownCommands: ReadonlySet<string>): string[] {
-  const problems: string[] = [];
-  const checkBar = (bar: BarSchema, where: string) => {
-    for (const section of normalizeBar(bar).sections)
-      for (const group of section.groups)
-        for (const unit of group.units) {
-          const refs = unit.kind === 'command' ? [unit.command] : [unit.terminal];
-          for (const command of refs)
-            if (!knownCommands.has(command))
-              problems.push(`${where}: unknown command "${command}"`);
-        }
-  };
-  for (const [id, bar] of Object.entries(chrome.bars)) checkBar(bar, `bars.${id}`);
-  for (const [id, bar] of Object.entries(chrome.modeBars ?? {})) checkBar(bar, `modeBars.${id}`);
-  for (const [id, strip] of Object.entries(chrome.strips ?? {})) checkBar(strip, `strips.${id}`);
-  for (const [id, menu] of Object.entries(chrome.menus ?? {}))
-    for (const section of menu.sections)
-      for (const command of section.items)
-        if (!knownCommands.has(command)) problems.push(`menus.${id}: unknown command "${command}"`);
-  return problems;
+/** Whether anything in the bar is left once `keep` (as for {@link filterBar}) has had its say. */
+export function hasVisibleUnits(
+  bar: NormalizedBar,
+  keep: (unit: NormalizedUnit) => boolean,
+): boolean {
+  return bar.sections.some((section) =>
+    section.groups.some((group) =>
+      group.units.some((unit) => isStandaloneUnit(unit) || keep(unit)),
+    ),
+  );
 }

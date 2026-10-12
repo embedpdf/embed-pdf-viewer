@@ -1,134 +1,192 @@
 /**
- * The viewer handle — `el.viewer`, the drive door of the customization model.
+ * The `viewer`: how an app reaches the viewer from code (`element.viewer`, `onReady`).
  *
- * Deliberately a thin skin over the kernel: `get()` returns each plugin's
- * public capability lens exactly as the plugin defined it (the internal/public
- * two-lens split in the plugins is the curation — this file adds no facade,
- * no second vocabulary, no second write path). `watch()` is the kernel's one
- * change stream, selector-shaped — `useSelector` without React. The command
- * trio is the UI altitude of the same system, for anything button-shaped.
+ * A thin skin over the kernel: `get()` returns each plugin's public capability exactly as the
+ * plugin defines it, by the plugin's name or its token, and adds no facade, no second vocabulary
+ * and no second write path. `documents` and `commands` are two of those capabilities, with their
+ * own events. `watch()` is the kernel's one change stream, selector-shaped: `useSelector` without
+ * a framework.
  *
- * Rule of thumb (docs): buttons speak commands; code speaks capabilities.
- *
- * The chrome itself runs on these exact primitives (customer #1), so parity
- * between "what our UI can do" and "what el.viewer can do" is structural.
+ * The chrome runs on these same capabilities, so what the viewer's own buttons can do and what
+ * an app's code can do are the same by construction.
  */
+import { ActionsToken, type ActionsCapability } from '@embedpdf/react/actions';
+import { AnnotationToken, type AnnotationCapability } from '@embedpdf/react/annotation';
+import { CommandsToken, type CommandsCapability } from '@embedpdf/react/commands';
+import { FormToken, type FormCapability } from '@embedpdf/react/form';
+import { I18nToken, type I18nCapability } from '@embedpdf/react/i18n';
+import { InteractionToken, type InteractionCapability } from '@embedpdf/react/interaction';
+import { LinkToken, type LinkCapability } from '@embedpdf/react/link';
+import { MeasurementToken, type MeasurementCapability } from '@embedpdf/react/measurement';
+import { PageEditToken, type PageEditCapability } from '@embedpdf/react/page-edit';
+import { RedactionToken, type RedactionCapability } from '@embedpdf/react/redaction';
+import { RenderToken, type RenderCapability } from '@embedpdf/react/render';
+import { DocumentsToken } from '@embedpdf/react/runtime';
 import type {
-  DocumentActiveChangedEvent,
   CapabilityToken,
-  DocumentClosedEvent,
-  DocumentLockedEvent,
-  DocumentOpenedEvent,
-  DocumentOpenFailedEvent,
-  DocumentPagesChangedEvent,
   DocumentsCapability,
-  EventHook,
   Kernel,
   Unsubscribe,
 } from '@embedpdf/react/runtime';
+import { SearchToken, type SearchCapability } from '@embedpdf/react/search';
+import { SelectionToken, type SelectionCapability } from '@embedpdf/react/selection';
+import { ShellToken, type ShellCapability } from '@embedpdf/react/shell';
+import { SignatureToken, type SignatureCapability } from '@embedpdf/react/signature';
+import { StageToken, type StageCapability } from '@embedpdf/react/stage';
+import { StampToken, type StampCapability } from '@embedpdf/react/stamp';
 
-/** The document lifecycle events `viewer.on(event, listener)` subscribes, by
- *  short name — the same hooks as `viewer.documents.on*`. */
-export interface ViewerEvents {
-  opened: DocumentOpenedEvent;
-  openFailed: DocumentOpenFailedEvent;
-  locked: DocumentLockedEvent;
-  closed: DocumentClosedEvent;
-  activeChanged: DocumentActiveChangedEvent;
-  pagesChanged: DocumentPagesChangedEvent;
-}
-import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/react/commands';
-import type { ResolvedCommand } from '@embedpdf/react/commands';
-
-/** `get`/`tryGet` bound to one document (see {@link ViewerHandle.forDocument}). */
-export interface ScopedViewerHandle {
-  get<T>(token: CapabilityToken<T>): T;
-  tryGet<T>(token: CapabilityToken<T>): T | null;
-}
-
-export interface ViewerHandle extends ScopedViewerHandle {
-  /** The document registry — the tab model: list/open/close/setActive/…. */
+/** Each plugin's API, by the plugin's name: what `viewer.get(name)` returns. */
+export interface ViewerPlugins {
+  readonly stage: StageCapability;
+  readonly render: RenderCapability;
+  readonly link: LinkCapability;
+  readonly selection: SelectionCapability;
+  readonly search: SearchCapability;
+  readonly annotation: AnnotationCapability;
+  readonly stamp: StampCapability;
+  readonly measurement: MeasurementCapability;
+  readonly redaction: RedactionCapability;
+  readonly form: FormCapability;
+  readonly signature: SignatureCapability;
+  readonly pageEdit: PageEditCapability;
+  readonly actions: ActionsCapability;
   readonly documents: DocumentsCapability;
+  readonly interaction: InteractionCapability;
+  readonly commands: CommandsCapability;
+  readonly shell: ShellCapability;
+  readonly i18n: I18nCapability;
+}
 
-  /** `get`/`tryGet` with document-scoped tokens bound to `documentId`
-   *  instead of the active document. */
-  forDocument(documentId: string): ScopedViewerHandle;
+/** A plugin's name, as `viewer.get()` and the `plugins` config take it. */
+export type PluginName = keyof ViewerPlugins;
+
+/**
+ * The viewer's plugins by name: the names `get()` takes, the same as the `plugins` config's.
+ * Only plugins the viewer registers are here, so every name resolves.
+ */
+export const VIEWER_PLUGINS: {
+  readonly [Name in PluginName]: CapabilityToken<ViewerPlugins[Name]>;
+} = {
+  stage: StageToken,
+  render: RenderToken,
+  link: LinkToken,
+  selection: SelectionToken,
+  search: SearchToken,
+  annotation: AnnotationToken,
+  stamp: StampToken,
+  measurement: MeasurementToken,
+  redaction: RedactionToken,
+  form: FormToken,
+  signature: SignatureToken,
+  pageEdit: PageEditToken,
+  actions: ActionsToken,
+  documents: DocumentsToken,
+  interaction: InteractionToken,
+  commands: CommandsToken,
+  shell: ShellToken,
+  i18n: I18nToken,
+};
+
+/** `get`/`tryGet` bound to one document (see {@link Viewer.forDocument}). */
+export interface ScopedViewer {
+  /**
+   * A plugin's API, by its name (`'search'`) or its token (`SearchToken`). Throws when the
+   * viewer has no such plugin, or when the plugin belongs to a document and none is open.
+   */
+  get<Name extends PluginName>(name: Name): ViewerPlugins[Name];
+  get<Capability>(token: CapabilityToken<Capability>): Capability;
+  /**
+   * Like `get`, but `null` when the plugin isn't available: none by that name, no document, or
+   * one still opening.
+   */
+  tryGet<Name extends PluginName>(name: Name): ViewerPlugins[Name] | null;
+  tryGet<Capability>(token: CapabilityToken<Capability>): Capability | null;
+}
+
+/** The viewer, from code: `element.viewer`, and what `onReady` gets. */
+export interface Viewer extends ScopedViewer {
+  /** The documents: open, close, switch, download, and their events. `get('documents')`. */
+  readonly documents: DocumentsCapability;
+  /** The commands: run one, read one, turn features on and off, and their events. `get('commands')`. */
+  readonly commands: CommandsCapability;
+
+  /** `get`/`tryGet` for one document, whether it's the active one or not. */
+  forDocument(documentId: string): ScopedViewer;
 
   /**
-   * Re-run `select` on every kernel change; call `cb` when the selected value
-   * really changed (`isEqual`, default `Object.is` — capability getters return
-   * stable references between model changes, so identity works). Returns the
-   * unsubscribe. This is the only reactivity primitive; DOM events on the
-   * element are sugar over it.
+   * Run `read` on every change in the viewer, and call `onChange` when what it returns changed
+   * (`isEqual`, default `Object.is`: capability getters return the same object until their value
+   * changes, so identity works). Returns a function that stops it.
    */
   watch<T>(
-    select: () => T,
-    callback: (value: T, previous: T) => void,
+    read: () => T,
+    onChange: (value: T, previous: T) => void,
     isEqual?: (left: T, right: T) => boolean,
   ): Unsubscribe;
-
-  /** Subscribe to one document lifecycle event (`'opened'`, `'closed'`,
-   *  `'activeChanged'`, …) — occurrences, never state; read state with `watch`. */
-  on<K extends keyof ViewerEvents>(
-    event: K,
-    listener: (event: ViewerEvents[K]) => void,
-  ): Unsubscribe;
-
-  // ── commands: the UI vocabulary layered on the same capabilities ──────────
-  execute(id: string, documentId?: string): void;
-  resolve(id: string, documentId?: string): ResolvedCommand | null;
-  /** `watch` sugar for one command's resolved state (label/icon/enabled/active). */
-  watchCommand(id: string, callback: (cmd: ResolvedCommand | null) => void): Unsubscribe;
 }
 
-/** The key of the kernel on a {@link ViewerHandle}, for the framework wrappers only. */
+/** The key of the kernel on a {@link Viewer}, for the framework wrappers only. */
 export const VIEWER_KERNEL: unique symbol = Symbol.for('@embedpdf/viewer/kernel');
 
-export function createViewerHandle(kernel: Kernel): ViewerHandle {
+/** The plugins a viewer resolves by name: {@link VIEWER_PLUGINS}, or more. */
+export type PluginTokens = Readonly<Record<string, CapabilityToken<unknown>>>;
+
+/** Make the `viewer` from a live kernel; `plugins` are the names its `get()` takes. */
+export function createViewer(kernel: Kernel, plugins: PluginTokens): Viewer {
+  const tokenNamed = (name: string): CapabilityToken<unknown> | null =>
+    Object.prototype.hasOwnProperty.call(plugins, name) ? (plugins[name] ?? null) : null;
+  const tokenOf = (plugin: string | CapabilityToken<unknown>): CapabilityToken<unknown> => {
+    if (typeof plugin !== 'string') return plugin;
+    const token = tokenNamed(plugin);
+    if (!token) {
+      throw new Error(
+        `[embedpdf] the viewer has no plugin named "${plugin}". Its plugins: ` +
+          `${Object.keys(plugins).join(', ')}.`,
+      );
+    }
+    return token;
+  };
+
+  const scopedTo = (documentId: string | undefined): ScopedViewer => {
+    function get<Name extends PluginName>(name: Name): ViewerPlugins[Name];
+    function get<Capability>(token: CapabilityToken<Capability>): Capability;
+    function get(plugin: string | CapabilityToken<unknown>): unknown {
+      return kernel.capability(tokenOf(plugin), documentId);
+    }
+    function tryGet<Name extends PluginName>(name: Name): ViewerPlugins[Name] | null;
+    function tryGet<Capability>(token: CapabilityToken<Capability>): Capability | null;
+    function tryGet(plugin: string | CapabilityToken<unknown>): unknown {
+      const token = typeof plugin === 'string' ? tokenNamed(plugin) : plugin;
+      return token ? kernel.tryCapability(token, documentId) : null;
+    }
+    return { get, tryGet };
+  };
+
   const watch = <T>(
-    select: () => T,
-    callback: (value: T, previous: T) => void,
+    read: () => T,
+    onChange: (value: T, previous: T) => void,
     isEqual: (left: T, right: T) => boolean = Object.is,
   ): Unsubscribe => {
-    let previous = select();
+    let previous = read();
     return kernel.subscribe(() => {
-      const next = select();
+      const next = read();
       if (isEqual(previous, next)) return;
       const before = previous;
       previous = next;
-      callback(next, before);
+      onChange(next, before);
     });
   };
 
-  const commands = () => kernel.capability(CommandsToken);
-  const hooks: { [K in keyof ViewerEvents]: EventHook<ViewerEvents[K]> } = {
-    opened: kernel.documents.onOpened,
-    openFailed: kernel.documents.onOpenFailed,
-    locked: kernel.documents.onLocked,
-    closed: kernel.documents.onClosed,
-    activeChanged: kernel.documents.onActiveChanged,
-    pagesChanged: kernel.documents.onPagesChanged,
-  };
-
-  const handle: ViewerHandle = {
+  const viewer: Viewer = {
+    ...scopedTo(undefined),
     documents: kernel.documents,
-    get: (token) => kernel.capability(token),
-    tryGet: (token) => kernel.tryCapability(token),
-    forDocument: (documentId) => ({
-      get: (token) => kernel.capability(token, documentId),
-      tryGet: (token) => kernel.tryCapability(token, documentId),
-    }),
+    commands: kernel.capability(CommandsToken),
+    forDocument: scopedTo,
     watch,
-    on: (event, listener) =>
-      hooks[event](listener as (payload: ViewerEvents[typeof event]) => void),
-    execute: (id, documentId) => void commands().execute(id, { documentId }),
-    resolve: (id, documentId) => commands().resolveCommand(id, documentId) ?? null,
-    watchCommand: (id, callback) =>
-      watch(() => commands().resolveCommand(id) ?? null, callback, resolvedCommandsEqual),
   };
-  // Not part of the handle's API: the framework wrappers read it to give the components they
+  // Not part of the viewer's API: the framework wrappers read it to give the components they
   // slot into the viewer this kernel, so headless hooks work there. Non-enumerable, and keyed
   // by a registered symbol so a wrapper reads it without importing this package.
-  Object.defineProperty(handle, VIEWER_KERNEL, { value: kernel });
-  return handle;
+  Object.defineProperty(viewer, VIEWER_KERNEL, { value: kernel });
+  return viewer;
 }

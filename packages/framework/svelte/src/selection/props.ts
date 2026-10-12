@@ -18,4 +18,4 @@ export interface SelectionHandlesProps {
 }
 
 /** The props of `<SelectionClipboard>`. */
-export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'>;
+export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'>;

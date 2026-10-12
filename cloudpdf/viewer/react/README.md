@@ -34,7 +34,7 @@ This package is a thin **door** over
 [`@embedpdf/viewer-react`](https://www.npmjs.com/package/@embedpdf/viewer-react):
 it renders that project's `<PDFViewer>` from its engine-agnostic entry and
 injects the CloudPDF engine. Everything the open viewer accepts works here
-unchanged — `chrome`, `commands`, `icons`, `strings`, `theme`,
+unchanged — `layout`, `commands`, `icons`, `strings`, `theme`,
 children-as-slots, `onReady` — and its documentation applies verbatim.
 
 ```tsx

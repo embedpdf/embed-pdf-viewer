@@ -7,20 +7,22 @@
  * Two semantics, on purpose:
  *  - registries (commands / icons / strings) merge additively over the
  *    defaults by id; a colliding id overrides.
- *  - structure (chrome) is an owned value: the default, a transform of it,
- *    or the host's own schema — never merged.
+ *  - structure (layout) is an owned value: the default, edits of it (a
+ *    function of the default and the viewer's env), or the host's own
+ *    layout — never merged.
  *
  * The engine stays a prop — choosing local-wasm vs cloud is the host's
  * decision, and each delivery wires its own. The chrome — toolbars,
  * translations, theme — renders at t≈0; only the pages wait on the engine.
- * Customization is mount-time: changing these props on a mounted viewer does
- * not rebuild the workspace.
+ * Customization is mount-time, except `theme`, `locale`, `disable` and
+ * `readOnly`, which follow their props (see {@link FollowProps}); changing any
+ * other prop on a mounted viewer does not rebuild the workspace.
  */
 // One import line per feature: each subpath carries the
 // plugin and its UI; delete a line and the feature leaves the bundle.
-import { useEffect, useState, type ReactNode } from 'react';
-import { Viewer, useKernel } from '@embedpdf/react/runtime';
-import type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Viewer as HeadlessViewer, useKernel } from '@embedpdf/react/runtime';
+import type { Engine, EngineFactory, Identity, InitialDocument } from '@embedpdf/react/runtime';
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
@@ -35,16 +37,14 @@ import { formPlugin } from '@embedpdf/react/form';
 import { signaturePlugin } from '@embedpdf/react/signature';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
-import { i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
+import { I18nToken, i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
 import type { Locale, TranslationDictionary } from '@embedpdf/react/i18n';
-import { commandsPlugin } from '@embedpdf/react/commands';
-import type { CommandDef } from '@embedpdf/react/commands';
+import { CommandsToken, commandsPlugin } from '@embedpdf/react/commands';
+import type { CommandDef, NotAllowedMode } from '@embedpdf/react/commands';
 import { shellPlugin } from '@embedpdf/react/shell';
-import { chromeHelpers, validateChrome } from '@embedpdf/react/toolbar';
-import type { ChromeHelpers, ChromeSchema } from '@embedpdf/react/toolbar';
+import type { LayoutOption } from '@embedpdf/core-ui';
 import { EPDF_VARIABLES } from '@embedpdf/web';
 import { ThumbsStageToken } from './config/stage';
-import { defaultChrome } from './config/chrome';
 import { defaultCommands } from './config/commands';
 import { en } from './locales/en';
 import {
@@ -53,7 +53,13 @@ import {
   type StampsCustomization,
 } from './config-context';
 import type { AnnotationsCustomization, SignaturesCustomization } from './config-context';
-import { createViewerHandle, type ViewerHandle } from './handle';
+import {
+  disabledSettingsOf,
+  type DisabledSettings,
+  type Feature,
+  type ReadOnlyExceptions,
+} from './features';
+import { VIEWER_PLUGINS, createViewer, type Viewer } from './handle';
 import { ICON_PATHS, type IconDef } from './ui/icons';
 import { ThemeProvider, type ThemePreference } from './ui/theme';
 import { Shell } from './Shell';
@@ -62,6 +68,16 @@ import { Shell } from './Shell';
 const BUILTIN_LOADERS: Record<string, () => Promise<Locale>> = {
   es: () => import('./locales/es').then((module) => module.es),
 };
+
+/**
+ * The language a `locale` value shows, among the viewer's: the browser's languages for
+ * `'auto'`, else the closest to the one asked for (`'es-MX'` shows `'es'`), else English.
+ */
+const localeCodeOf = (locale: string, codes: readonly string[]): string =>
+  negotiateLocale(
+    codes,
+    locale !== 'auto' ? [locale] : typeof navigator !== 'undefined' ? navigator.languages : [],
+  ) ?? 'en';
 
 const isDict = (value: unknown): value is TranslationDictionary =>
   typeof value === 'object' && value !== null;
@@ -110,13 +126,34 @@ export interface ViewerCustomization {
   /** Per-locale translation overrides/additions; dotted keys expand. A code
    *  with no built-in pack becomes a new locale (falls back to English). */
   strings?: Readonly<Record<string, TranslationDictionary>>;
-  /** 'auto' (default) negotiates from the browser languages. */
+  /** 'auto' (default) negotiates from the browser languages. Follows its prop. */
   locale?: 'auto' | (string & {});
-  /** Feature gating: a disabled category vanishes from every surface. */
-  disabledCategories?: readonly string[];
-  /** The structure — a value you own: the default (pass nothing), a transform
-   *  of it, or your own schema. Never merged. */
-  chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
+  /**
+   * What this viewer doesn't have, everywhere at once: features (`'annotations'`), their parts
+   * (`'annotations.highlight'`) and single commands (`'tool:highlight'`: a name with a colon).
+   * Follows its prop.
+   */
+  disable?: readonly (Feature | (string & {}))[];
+  /**
+   * Every feature that changes the document off, or all of them but `except`, on top of
+   * `disable`. Only the interface: plugins keep working for your code. Follows its prop.
+   */
+  readOnly?: boolean | ReadOnlyExceptions;
+  /**
+   * What the user may do: the permissions the engine checks on every call, from a button or
+   * from code. Left out, they may do everything. Documents opened after a change use the new one.
+   */
+  scope?: readonly string[];
+  /** Who the user is: the author of what they write. */
+  identity?: Identity;
+  /** What the scope doesn't allow: `'hide'` it (default), or `'disable'` it with the reason. */
+  notAllowed?: NotAllowedMode;
+  /**
+   * Where every toolbar, button, menu and panel goes: a layout of your own, or a function that
+   * gets the default layout and the viewer's env (`size`, `width`, `touch`, `dir`) and returns
+   * yours. The function runs again when the env changes. Never merged.
+   */
+  layout?: LayoutOption;
   /** Stamps. `defaultLibrary` is the sidebar's built-in library: `false` for
    *  none (air-gapped, no request), or a URL template with a `{locale}` slot
    *  for a self-hosted copy of `@embedpdf/default-stamps`. Default: the copy
@@ -134,7 +171,7 @@ export interface ViewerCustomization {
   /** Light/dark preference (string shorthand), or the full theme config with
    *  token overrides. Tokens are applied by the delivery (the custom element
    *  adopts them into its shadow root); direct consumers of this package set
-   *  the variables in their own CSS instead. */
+   *  the variables in their own CSS instead. Follows its prop. */
   theme?: ThemePreference | ThemeConfig;
 }
 
@@ -173,22 +210,69 @@ export interface FullViewerProps extends ViewerCustomization {
    *  config: the custom element passes its shadow wrapper so theming never
    *  touches the host page. Default: document.documentElement. */
   themeTarget?: HTMLElement | null;
-  /** Called once the workspace kernel is live, with the viewer handle — the
-   *  Drive surface (`el.viewer` on the custom element, `onReady` on the
-   *  wrappers). Capabilities resolve from the moment this fires; document-
-   *  scoped calls simply await their document. */
-  onViewer?: (viewer: ViewerHandle) => void;
+  /** Called once the workspace kernel is live, with the `viewer` (`el.viewer`
+   *  on the custom element, `onReady` on the wrappers). Capabilities resolve
+   *  from the moment this fires; document-scoped calls simply await their
+   *  document. */
+  onViewer?: (viewer: Viewer) => void;
 }
 
-/** Inside <Viewer>: mints the handle from the live kernel, reports it up. */
-function HandleBridge({ onViewer }: { onViewer: (viewer: ViewerHandle) => void }) {
+/** Inside <HeadlessViewer>: makes the `viewer` from the live kernel, reports it up. */
+function HandleBridge({ onViewer }: { onViewer: (viewer: Viewer) => void }) {
   const kernel = useKernel();
-  useEffect(() => {
-    onViewer(createViewerHandle(kernel));
+  // Before the first paint, so what the delivery opens on arrival (the element's `src`) is a
+  // tab by the time the shell first shows.
+  useLayoutEffect(() => {
+    onViewer(createViewer(kernel, VIEWER_PLUGINS));
     // Init-only like everything else: re-fires only if the kernel changes
     // (a remount), never because the callback prop identity churned.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kernel]);
+  return null;
+}
+
+const sameList = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((name, index) => name === right[index]);
+
+/**
+ * Inside <HeadlessViewer>: the props that follow their value while the viewer runs. `registered`
+ * is what the plugins were registered with, when the props were first read; a value that differs
+ * from the last one goes to the plugin that owns it, so a theme change never undoes what the
+ * app's code turned off.
+ */
+function FollowProps({
+  registered,
+  locale,
+  disable,
+  readOnly,
+}: {
+  registered: { readonly locale: string; readonly disabled: DisabledSettings };
+  locale: string;
+  disable: ViewerCustomization['disable'];
+  readOnly: ViewerCustomization['readOnly'];
+}) {
+  const kernel = useKernel();
+  // The kernel starts after the first render, so a prop may have changed before this mounts.
+  const applied = useRef(registered);
+  // In the render that brought the change, so the plugin has it when the prop's setter returns.
+  useLayoutEffect(() => {
+    const disabled = disabledSettingsOf(disable, readOnly);
+    const previous = applied.current;
+    applied.current = { locale, disabled };
+    if (
+      !sameList(previous.disabled.disabledCategories, disabled.disabledCategories) ||
+      !sameList(previous.disabled.disabledCommands, disabled.disabledCommands)
+    ) {
+      kernel.capability(CommandsToken).updateSettings(disabled);
+    }
+    if (previous.locale !== locale) {
+      // A newer switch cancels this one, which rejects; the newer one shows.
+      kernel
+        .capability(I18nToken)
+        .setLocale(locale)
+        .catch(() => {});
+    }
+  });
   return null;
 }
 
@@ -209,8 +293,12 @@ export function FullViewer({
   icons,
   strings,
   locale = 'auto',
-  disabledCategories,
-  chrome,
+  disable,
+  readOnly,
+  scope,
+  identity,
+  notAllowed,
+  layout,
   stamps,
   signatures,
   annotations,
@@ -221,18 +309,13 @@ export function FullViewer({
   // Customization is init-only, like the Viewer's own engine/plugins
   // contract: the whole config resolves once from the mount-time props, so
   // inline literals — the idiomatic way to pass it — never churn plugin
-  // identities. Later prop changes are ignored.
+  // identities. Later prop changes are ignored, except the ones FollowProps
+  // and ThemeProvider follow.
   const [resolved] = useState(() => {
     // ── registries: additive, user wins by id ───────────────────────────────
     const byId = new Map(defaultCommands.map((command) => [command.id, command]));
     for (const command of commands ?? []) byId.set(command.id, command);
     const resolvedCommands = [...byId.values()];
-
-    // ── structure: an owned value (default | transform | replacement) ───────
-    const resolvedChrome =
-      typeof chrome === 'function'
-        ? chrome(defaultChrome, chromeHelpers)
-        : (chrome ?? defaultChrome);
 
     // ── locale packs: overrides merge into built-ins; unknown codes become
     //    new locales that fall back to English ──────────────────────────────
@@ -248,31 +331,24 @@ export function FullViewer({
       locales.push({ code, name: code, translations: mergeTranslations({}, over) });
     }
     const codes = [...new Set(['en', ...Object.keys(BUILTIN_LOADERS), ...Object.keys(overrides)])];
-    const initial =
-      locale === 'auto'
-        ? (negotiateLocale(codes, typeof navigator !== 'undefined' ? navigator.languages : []) ??
-          'en')
-        : locale;
 
     return {
       commands: resolvedCommands,
-      chrome: resolvedChrome,
+      // Structure: resolved at the viewer's env by the shell's layout root.
+      layout,
       icons: icons ?? {},
       stamps: stamps ?? {},
       signatures: signatures ?? {},
       annotations: annotations ?? {},
-      i18n: { locales, loaders, initial },
+      i18n: { locales, loaders, codes, initial: localeCodeOf(locale, codes) },
+      disabled: disabledSettingsOf(disable, readOnly),
     };
   });
 
-  // Dev guardrail: every id the chrome references must exist; every icon a
-  // command names must resolve. Warnings name the exact id (README promise).
+  // Dev guardrail: every icon a command names must resolve. Warnings name the
+  // exact id (README promise); the layout's ids are checked where it resolves.
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
-    const ids = new Set(resolved.commands.map((command) => command.id));
-    for (const problem of validateChrome(resolved.chrome, ids)) {
-      console.warn(`[embedpdf] chrome: ${problem}`);
-    }
     for (const command of resolved.commands) {
       if (command.icon && !(command.icon in ICON_PATHS) && !(command.icon in resolved.icons)) {
         console.warn(`[embedpdf] command "${command.id}": unknown icon "${command.icon}"`);
@@ -381,7 +457,8 @@ export function FullViewer({
     }),
     commandsPlugin({
       commands: resolved.commands,
-      disabledCategories: disabledCategories ? [...disabledCategories] : undefined,
+      ...resolved.disabled,
+      ...(notAllowed ? { notAllowed } : {}),
     }),
     shellPlugin(),
   ]);
@@ -391,17 +468,25 @@ export function FullViewer({
 
   return (
     <ThemeProvider preference={themeConfigOf(theme).preference} target={themeTarget}>
-      <Viewer
+      <HeadlessViewer
         engine={engine}
         plugins={plugins}
         initialDocuments={initialDocuments}
+        scope={scope}
+        identity={identity}
         fallback={fallback ?? <Booting />}
       >
         <ViewerConfigProvider value={config}>
+          <FollowProps
+            registered={{ locale: resolved.i18n.initial, disabled: resolved.disabled }}
+            locale={localeCodeOf(locale, resolved.i18n.codes)}
+            disable={disable}
+            readOnly={readOnly}
+          />
           {onViewer && <HandleBridge onViewer={onViewer} />}
           <Shell />
         </ViewerConfigProvider>
-      </Viewer>
+      </HeadlessViewer>
     </ThemeProvider>
   );
 }

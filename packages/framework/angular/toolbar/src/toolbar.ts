@@ -5,7 +5,7 @@
  *   1. a hidden measurement layer draws every item in every variant (plus folded groups and the
  *      "More" button), each watched by `@embedpdf/web`'s `observeWidth`, so a new language, a
  *      font loading, browser zoom and your CSS all re-measure on their own; the widths become
- *      fit metrics (`createToolbarWidths`);
+ *      fit metrics (`createToolbarLengths`);
  *   2. core-ui's `solve()` gives each item a variant, a folded group or the "More" menu, and
  *      `layoutToolbar` turns that fit into the parts to draw;
  *   3. the live row draws them; the "More" menu is derived (`projectOverflow`) from what
@@ -47,7 +47,7 @@ import { unregisteredCommand, type ResolvedCommand } from '@embedpdf/plugin-comm
 // The "More" menu asks which menu a command opens, a host fact, so the host lens is bound here.
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
 import {
-  createToolbarWidths,
+  createToolbarLengths,
   observeContentWidth,
   observeWidth,
   toolbarMeasureKey,
@@ -366,7 +366,7 @@ export class EpdfToolbar implements ToolbarWidthSink {
     injectDocumentScope(),
   ).capability;
 
-  private readonly widths = createToolbarWidths();
+  private readonly lengths = createToolbarLengths();
   /** Goes up whenever a measured width changed by more than half a pixel. */
   private readonly measureVersion = signal(0);
   private readonly containerWidth = signal(0);
@@ -390,9 +390,9 @@ export class EpdfToolbar implements ToolbarWidthSink {
         unregistered: unregisteredCommand,
         execute: (id) => this.execute(id),
         menuTarget: (id) => registry.getMenuTarget(id),
-        metrics: this.widths.metrics(this.gap(), this.separatorWidth()),
+        metrics: this.lengths.metrics('horizontal', this.gap(), this.separatorWidth()),
         measureKey: toolbarMeasureKey,
-        containerWidth: this.containerWidth(),
+        containerLength: this.containerWidth(),
       });
     },
     () => EMPTY_LAYOUT,
@@ -464,7 +464,9 @@ export class EpdfToolbar implements ToolbarWidthSink {
 
   /** A measured element's width; a change solves again. For the measurement layer. */
   reportWidth(key: string, width: number): void {
-    if (this.widths.report(key, width)) this.measureVersion.update((version) => version + 1);
+    if (this.lengths.report('horizontal', key, width)) {
+      this.measureVersion.update((version) => version + 1);
+    }
   }
 
   // ── building the entries ────────────────────────────────────────────────────

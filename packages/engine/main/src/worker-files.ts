@@ -28,16 +28,22 @@ export function findEncoderWorkerFile(): string | null {
   return startableFile(() => new URL('../workers/encoder-worker.js?no-inline', import.meta.url));
 }
 
-function startableFile(resolve: () => URL): string | null {
+/**
+ * The file's absolute URL when a worker can start from it, otherwise null. Exported for its tests.
+ *
+ * Next.js (webpack and Turbopack) rewrites the expression to a URL relative to the page, whose
+ * `origin` is '': it becomes a real URL by resolving its text against the page's own.
+ */
+export function startableFile(resolve: () => URL): string | null {
+  if (typeof location === 'undefined') return null;
   let file: URL;
   try {
-    file = resolve();
+    file = new URL(String(resolve()), location.href);
   } catch {
     return null;
   }
-  const pageOrigin = typeof location === 'undefined' ? null : location.origin;
   // An opaque origin ('null': a data: or sandboxed page) is never the same as another one.
-  if (pageOrigin === null || pageOrigin === 'null' || file.origin !== pageOrigin) return null;
+  if (location.origin === 'null' || file.origin !== location.origin) return null;
   allowWorkerUrl(file.href);
   return file.href;
 }

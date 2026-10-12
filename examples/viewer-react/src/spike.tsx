@@ -7,7 +7,7 @@
  */
 import { SearchToken, useSearch, useSearchState } from '@embedpdf/react/search';
 import { PDFViewer, SearchToken as ViewerSearchToken } from '@embedpdf/viewer-react';
-import type { ChromeHelpers, ChromeSchema, ViewerHandle } from '@embedpdf/viewer-react';
+import type { LayoutFunction, Viewer } from '@embedpdf/viewer-react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 
@@ -31,17 +31,15 @@ function SpikeSearch(props: { slot?: string }) {
   );
 }
 
-const chrome = (base: ChromeSchema, h: ChromeHelpers): ChromeSchema =>
-  h.addItem(base, {
-    bar: 'main',
-    section: 'start',
-    group: 'spike',
-    item: h.custom('spike-search', 'panel:search', { importance: 5 }),
-  });
+const layout: LayoutFunction = (base) =>
+  base.add(
+    { custom: 'spike-search', command: 'panel:search', importance: 5 },
+    { to: 'main', section: 'start', group: 'spike' },
+  );
 
 declare global {
   interface Window {
-    spike?: { viewer: ViewerHandle; sameToken: boolean; SearchToken: typeof SearchToken };
+    spike?: { viewer: Viewer; sameToken: boolean; SearchToken: typeof SearchToken };
   }
 }
 
@@ -49,7 +47,7 @@ function App() {
   return (
     <PDFViewer
       src="/testlab.pdf"
-      chrome={chrome}
+      layout={layout}
       style={{ height: '100vh', display: 'block' }}
       onReady={(viewer) => {
         window.spike = { viewer, sameToken: SearchToken === ViewerSearchToken, SearchToken };

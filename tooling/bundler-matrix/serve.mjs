@@ -13,7 +13,12 @@ const TYPES = {
   '.pdf': 'application/pdf',
 };
 
-export function serve(root) {
+/**
+ * Serve `root` statically on a free loopback port. `headers` go on every answer with a body:
+ * the matrix sends the page's Content-Security-Policy there, and a worker started from one of
+ * these files runs under the policy of its own response, as it would on a real site.
+ */
+export function serve(root, { headers = {} } = {}) {
   // Snapshot the build output before accepting requests. URLs only select
   // in-memory assets; they never reach a filesystem operation.
   const assets = new Map();
@@ -56,6 +61,7 @@ export function serve(root) {
       return;
     }
     res.writeHead(200, {
+      ...headers,
       'content-type': asset.contentType,
       'content-length': asset.body.length,
     });

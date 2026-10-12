@@ -4,7 +4,7 @@
     1. A hidden measurement layer renders every unit in every variant (and the
        folded groups and the "More" button), each watched with `observeWidth`
        from @embedpdf/web, so a new language, a font loading, browser zoom and
-       your CSS all re-measure on their own (`createToolbarWidths`).
+       your CSS all re-measure on their own (`createToolbarLengths`).
     2. core-ui's `solve()` gives each unit a variant, a folded group or the
        "More" menu (`layoutToolbar` turns that into parts).
     3. The live row draws the parts; the "More" menu is derived from what
@@ -23,7 +23,7 @@ import type { BarSchema, LiveSection } from '@embedpdf/core-ui';
 import { CommandsToken } from '@embedpdf/plugin-commands/contract/host';
 import { unregisteredCommand } from '@embedpdf/plugin-commands/contract';
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
-import { createToolbarWidths, observeContentWidth, toolbarMeasureKey } from '@embedpdf/web';
+import { createToolbarLengths, observeContentWidth, toolbarMeasureKey } from '@embedpdf/web';
 import { useCapability } from '../runtime/capabilities';
 import { useDocumentId, useViewerBinding } from '../runtime/kernel';
 import DefaultOverflowMenu from './DefaultOverflowMenu.vue';
@@ -92,10 +92,10 @@ watch(
 );
 
 // A width that changed by more than half a pixel fits (and draws) again.
-const widths = createToolbarWidths();
+const lengths = createToolbarLengths();
 const measured = ref(0);
 function onWidth(key: string, width: number) {
-  if (widths.report(key, width)) measured.value += 1;
+  if (lengths.report('horizontal', key, width)) measured.value += 1;
 }
 
 // ── the fit ──────────────────────────────────────────────────────────────────
@@ -119,9 +119,9 @@ const layout = computed(() => {
     unregistered: unregisteredCommand,
     execute,
     menuTarget: (id) => commands.getMenuTarget(id),
-    metrics: widths.metrics(props.gap, props.separatorWidth),
+    metrics: lengths.metrics('horizontal', props.gap, props.separatorWidth),
     measureKey: toolbarMeasureKey,
-    containerWidth: containerWidth.value,
+    containerLength: containerWidth.value,
   });
 });
 

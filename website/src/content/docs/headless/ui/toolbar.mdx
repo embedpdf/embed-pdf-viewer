@@ -42,6 +42,15 @@ group('annotate', ['tool:note', 'tool:ink'], { importance: 2 });
 `start`, `center` and `end` are the toolbar's left, middle and right. The center stays centered in the
 space the other two leave. In a right-to-left language, `start` and `end` swap sides.
 
+<Fw only="react">
+
+`orientation="vertical"` stands the toolbar on its side, for a rail beside the pages: `start`,
+`center` and `end` become its top, middle and bottom, and it fits the height you give it, so give it
+one (`style={{ height: '100%' }}`). Every command draws at `'icon'`, so put its label in a tooltip.
+Groups fold and items move into "More" the same way.
+
+</Fw>
+
 ## Your own items
 
 Not everything is a command: a page number input, a search box. Put a custom item in the bar and draw
@@ -59,6 +68,9 @@ the item becomes in the "More" menu when there's no room for it. `variants` lets
 `renderCustom` has one renderer per item name. A renderer that returns `undefined` draws the item's
 command as a button instead. An item with no renderer is a native `<slot name>` element with that
 button inside: in a web component, the host's children for that slot show there.
+
+The first element in your item that takes focus is where the toolbar's arrow keys stop. The rest of
+its controls are your item's own, and a text field keeps Left and Right for its caret.
 
 </Fw>
 
@@ -104,7 +116,13 @@ children for that slot show there.
 Every prop you leave out has a plain default, so you can start with `renderCommand` and add the rest as
 you style them. `renderCollapsed` and `renderGroupTrigger` can return `undefined` for a group to leave
 it to the default. `gap` and `separatorWidth` set the spacing, and `className` and `style` go on the
-toolbar itself.
+toolbar itself. `orientation` stands it on its side ([Sections](#sections)), and `aria-label` names
+it for a screen reader when the page has more than one toolbar.
+
+Whatever you draw, the toolbar is one stop for the Tab key. The arrow keys along it move between its
+items, past disabled ones, and Home and End go to its ends. The default menus open on their first
+row: the arrow keys move, typing a letter jumps to the row that starts with it, Enter picks, and
+Escape closes the menu and puts focus back on its button.
 
 </Fw>
 

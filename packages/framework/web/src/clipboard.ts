@@ -7,6 +7,7 @@
  * stays a pure DOM utility with no EmbedPDF dependencies (the selection
  * capability satisfies {@link ClipboardSelectionSource} as-is).
  */
+import { isFromTextField } from './text-field-event';
 
 /** The slice of the selection capability clipboard wiring needs. */
 export interface ClipboardSelectionSource {
@@ -29,6 +30,11 @@ export interface SelectionClipboardOptions {
   prefetch?: boolean;
   /** Event target to listen on. Defaults to `document`. */
   target?: Document;
+  /**
+   * Called when Ctrl/Cmd+C or a copy (Edit → Copy) meets a selection the user may not copy.
+   * The browser's own copy is prevented either way; this is where to say so.
+   */
+  onRefused?: () => void;
 }
 
 const PREFETCH_DEBOUNCE_MS = 150;
@@ -38,12 +44,15 @@ const PREFETCH_DEBOUNCE_MS = 150;
  * prefetched text:
  *
  *   - the native `copy` event (menu Edit→Copy, or ctrl/cmd+C while the page
- *     has a DOM selection or focused editable — e.g. the viewer shell's
- *     focus sink): answered synchronously from the cache;
+ *     has a DOM selection): answered synchronously from the cache;
  *   - ctrl/cmd+C with no DOM selection (canvas-rendered viewers usually
  *     have none, and browsers don't dispatch `copy` then): a keydown
  *     fallback writes via the async Clipboard API inside the keystroke's
  *     user-activation window.
+ *
+ * A selection the user may not copy is never copied by either path, nor by
+ * the browser: the key and the copy are prevented, and `onRefused` says so.
+ * Keys and copies in a text field are the field's, and left alone.
  *
  * Returns the unwire function. Mount once per document view (not per page).
  */
@@ -83,7 +92,17 @@ export function wireSelectionClipboard(
     timer = setTimeout(refresh, PREFETCH_DEBOUNCE_MS);
   });
 
+  /** Whether there is a selection the user may not copy: the copy is then refused. */
+  const isRefused = (): boolean => selection.hasSelection() && !selection.canCopy();
+  const refuse = (event: Event): void => {
+    event.preventDefault();
+    options.onRefused?.();
+  };
+
+  // A copy or a key in a text field (the search box, a comment) is the field's own.
   const onCopy = (event: ClipboardEvent): void => {
+    if (isFromTextField(event)) return;
+    if (isRefused()) return refuse(event);
     if (cached == null || cached === '' || !selection.hasSelection()) return;
     event.clipboardData?.setData('text/plain', cached);
     event.preventDefault();
@@ -94,10 +113,15 @@ export function wireSelectionClipboard(
       !(event.metaKey || event.ctrlKey) ||
       event.key.toLowerCase() !== 'c' ||
       event.shiftKey ||
-      event.altKey
+      event.altKey ||
+      // A command shortcut for the same key took it already.
+      event.defaultPrevented ||
+      isFromTextField(event)
     ) {
       return;
     }
+    // Preventing the key also keeps the browser from dispatching `copy` for it.
+    if (isRefused()) return refuse(event);
     if (!selection.hasSelection() || !selection.canCopy()) return;
     // A live DOM selection means the browser will dispatch `copy` itself and
     // our synchronous handler answers — don't double-write.

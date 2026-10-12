@@ -62,8 +62,11 @@ of your viewer:</Fw><Fw only="angular">Add it to `provideEmbedPdf()`, next to `w
 
 <Snippet name="ui/command-shortcuts" />
 
-It ignores keys typed into text fields, runs commands for the active document, and does nothing for a
-command that's disabled. <Fw only={['react', 'vue', 'svelte']}>With more than one viewer on a page, pass `target`, a ref to the element
+It ignores keys typed into text fields, runs commands for the active document, and leaves a key alone
+when its command can't run right now. A command that's [turned off](#turn-features-off) or [not
+allowed](#commands-and-permissions) still takes its key, so the browser doesn't do something else with
+it (`Mod+P` printing the page), and `onRefused(commandId, refusal)` tells you why: `refusal.message`
+is a sentence to show. <Fw only={['react', 'vue', 'svelte']}>With more than one viewer on a page, pass `target`, a ref to the element
 around one: its keys then work only while focus is inside it.</Fw><Fw only="angular">With more than one viewer on a page, leave
 `withCommandShortcuts()` out and put the `epdfCommandShortcuts` directive on the element around one
 (`<div tabindex="0" epdfCommandShortcuts>`): its keys then work only while focus is inside it.</Fw> `Mod` means Cmd on a Mac and Ctrl elsewhere. A help sheet lists
@@ -106,7 +109,7 @@ A disabled command is still in the results, so show it greyed out.
 | `visible`     | When it shows at all                                                             |
 | `run`         | What it does                                                                     |
 | `requires`    | The [permissions](../concepts/permissions) it needs, such as `'doc.annotate.modify'`. Without them, it's hidden. |
-| `categories`  | Groups you can turn off together                                                 |
+| `categories`  | The features it belongs to, so you can [turn them off](#turn-features-off) together, such as `['annotations.highlight']` |
 | `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
 
 `enabled`, `active` and `visible` get the viewer's state through `get(Token)`, and are asked again
@@ -114,14 +117,18 @@ whenever anything changes, so a button is always right without events or effects
 
 ## Turn features off
 
-Put commands in categories, and turn a whole category off: its commands are hidden and disabled,
-wherever they appear. The `disabledCategories` [setting](#settings) turns categories off from the start,
-and while the app runs:
+Put commands in categories, and turn a whole category off: its commands are hidden and refused,
+wherever they appear. A category turns off every category under it, on whole dotted parts:
+`annotations` also turns off `annotations.highlight`. The `disabledCategories` [setting](#settings)
+turns categories off from the start, and while the app runs:
 
 ```ts
-commands.disableCategory('annotate');
-commands.enableCategory('annotate');
+commands.disableCategory('annotations');
+commands.enableCategory('annotations');
 ```
+
+Turn off one command the same way, with `disableCommand(id)` and the `disabledCommands` setting. A
+command that's turned off is refused by `execute()` too, and its shortcut does nothing.
 
 A command of your own, a category switch, and a command run from code when the document opens:
 
@@ -142,9 +149,12 @@ Everything `useCommands()` gives you.
 | `registerCommand(command, { replace? })`, `registerCommands(commands, { replace? })` | Adds one command, or several, while the app runs, and returns a function that removes them. An id that's taken is refused unless you pass `replace: true`. [Define a command](#define-a-command) |
 | `getCommand(id)`, `hasCommand(id)`                                       | A command as you defined it, or `null`; whether it's registered                                                                                      |
 | `listCommandIds()`                                                       | Every command's id, in the order they were added                                                                                                     |
-| `disableCategory(category)`, `enableCategory(category)`                  | Turns a category off, or on again. [Turn features off](#turn-features-off)                                                                          |
+| `disableCategory(category)`, `enableCategory(category)`                  | Turns a category off, with every category under it, or on again. [Turn features off](#turn-features-off)                                            |
 | `setDisabledCategories(categories)`                                      | Replaces the list of categories that are off                                                                                                         |
-| `getDisabledCategories()`, `isCategoryDisabled(category)`                | The categories that are off; whether one is                                                                                                          |
+| `getDisabledCategories()`, `isCategoryDisabled(category)`                | The categories that are off; whether one is, itself or through a category it's under                                                                |
+| `disableCommand(id)`, `enableCommand(id)`                                | Turns one command off, or on again. [Turn features off](#turn-features-off)                                                                         |
+| `setDisabledCommands(ids)`                                               | Replaces the list of commands that are off one by one                                                                                                |
+| `getDisabledCommands()`, `isCommandDisabled(id)`                         | The commands that are off one by one; whether a command is off, by its id or through one of its categories                                          |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useCommandsSettings()`. [Settings](#settings) |
 
 Leave out `documentId`, and a command runs and resolves for the document in scope: the one a
@@ -161,7 +171,9 @@ Set them when you register the plugin, and change them while the app runs with
 | Setting              | What it does                                          | Default |
 | :------------------- | :---------------------------------------------------- | :------ |
 | `commands`           | The commands your viewer has                          | none    |
-| `disabledCategories` | Categories that start turned off                      | none    |
+| `disabledCategories` | Categories that start turned off, with every category under them | none    |
+| `disabledCommands`   | Commands that start turned off, by id                 | none    |
+| `notAllowed`         | What a command the scope doesn't allow does: `'hide'` leaves it out, `'disable'` shows it disabled with `disabledReason` | `'hide'` |
 
 ## Events
 
@@ -179,5 +191,9 @@ Set them when you register the plugin, and change them while the app runs with
 
 A command that needs a permission says so with `requires: ['doc.annotate.modify']`. When the user
 doesn't have it, the command isn't visible, so its buttons and menu rows are gone, and its shortcut
-does nothing. Keep `enabled` for what can't run right now, such as **Copy** with nothing selected.
-The standard commands already say what they need.
+does nothing. With the `notAllowed: 'disable'` setting it shows disabled instead, and the resolved
+command's `disabledReason` says why, for its tooltip: the i18n string for
+`commands.notAllowed.<permission>` (dots and colons as dashes, such as
+`commands.notAllowed.doc-print`), else `commands.notAllowed.default`. Keep `enabled` for what can't
+run right now, such as **Copy** with nothing selected. The standard commands already say what they
+need.

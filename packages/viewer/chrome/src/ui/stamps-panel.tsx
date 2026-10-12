@@ -8,7 +8,7 @@
  *   exact placement → each click on a page places one.
  *
  * Deliberately not a file dialog: picking arbitrary image bytes is the Image
- * tool's job (a click-then-pick tool, `insert:add-image`). The stamp button
+ * tool's job (a click-then-pick tool, `tool:image`). The stamp button
  * opens a library; a library is a set of reusable, named assets — the two
  * gestures are different, so they are different controls.
  *

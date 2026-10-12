@@ -23,8 +23,8 @@ available through the `engine` prop — see the docs.
 
 ## Children as slots
 
-Children with a `slot` attribute project into the chrome's matching
-`custom()` socket while staying in **your** React tree — your context, your
+Children with a `slot` attribute project into the layout's matching
+`{ custom }` item while staying in **your** React tree — your context, your
 state, your CSS:
 
 ```tsx
@@ -36,11 +36,19 @@ state, your CSS:
 ## Driving the viewer
 
 ```tsx
-<PDFViewer src="/report.pdf" onReady={(viewer) => viewer.execute('zoom:in')} />
+<PDFViewer
+  src="/report.pdf"
+  onReady={(viewer) => viewer.commands.execute('zoom:in')}
+/>
 ```
 
-`onReady` hands you the viewer handle: capability lenses via
-`viewer.get(Token)`, the `watch` reactivity primitive, and the command trio.
+`onReady` hands you the `viewer`: each plugin's API by its name
+(`viewer.get('search')`, or its token), `viewer.documents`, `viewer.commands`
+and the `watch` reactivity primitive.
+
+`src`, `theme`, `locale`, `disable` and `readOnly` follow their props while the
+viewer runs; every other prop is read once, so give the viewer a new `key` to
+start over with a changed one.
 
 ## Documentation
 

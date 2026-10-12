@@ -4,48 +4,33 @@
  *
  *   1. a hidden measurement layer renders every unit in every variant (plus
  *      folded groups and the "More" button), each watched by
- *      `@embedpdf/web`'s `observeWidth`, so a new language, a font loading,
- *      browser zoom and your CSS all re-measure on their own; the widths
- *      become fit metrics (`createToolbarWidths`);
+ *      `@embedpdf/web`'s `observeLength` along the toolbar (widths, or
+ *      heights when it is vertical), so a new language, a font loading,
+ *      browser zoom and your CSS all re-measure on their own; the lengths
+ *      become fit metrics (`createToolbarLengths`);
  *   2. core-ui's `solve()` gives each unit a variant, a folded group or the
  *      "More" menu, and `layoutToolbar` turns that fit into the parts to
  *      draw: pure and tested on their own;
  *   3. the live row renders that; the "More" menu is derived (`projectOverflow`)
  *      from what didn't fit, never written by hand.
  *
- * Every part is a render prop with a plain default: the app owns the pixels,
- * this component owns the fitting. The defaults' colors come from the
+ * The toolbar is one tab stop with arrow keys along it (`attachToolbarFocus`),
+ * and its default menus take the menu keys (`attachMenuKeys`). Every part is a
+ * render prop with a plain default: the app owns the pixels, this component
+ * owns the fitting and the keyboard. The defaults' colors come from the
  * `--epdf-toolbar-*` CSS variables only.
  */
 
-// The toolbar's vocabulary: the schema a bar is written in, and the helpers that change one.
-export {
-  DEFAULT_IMPORTANCE,
-  PINNED,
-  addItem,
-  chromeHelpers,
-  custom,
-  defineChrome,
-  group,
-  item,
-  removeItems,
-  replaceItem,
-  validateChrome,
-} from '@embedpdf/core-ui';
+// The toolbar's vocabulary: the schema a bar is written in.
+export { DEFAULT_IMPORTANCE, PINNED, custom, group, item } from '@embedpdf/core-ui';
 export type {
-  AddItemSpec,
   BarChild,
   BarGroup,
   BarItem,
   BarSchema,
   BarSections,
-  ChromeHelpers,
-  ChromeSchema,
   CustomItem,
-  FrameSchema,
   Importance,
-  MenuSchema,
-  MenuSection,
   OverflowRow,
   OverflowSection,
   Variant,
@@ -75,13 +60,19 @@ import { resolvedCommandsEqual, unregisteredCommand } from '@embedpdf/plugin-com
 import { CommandsToken } from '@embedpdf/plugin-commands/contract/host';
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
 import {
-  createToolbarWidths,
-  observeContentWidth,
+  TOOLBAR_ITEM_ATTRIBUTE,
+  attachMenuKeys,
+  attachToolbarFocus,
+  createToolbarLengths,
+  focusablesIn,
+  observeContentLength,
+  observeLength,
   observeOutsidePress,
-  observeWidth,
   paintDefault,
   toolbarMeasureKey,
 } from '@embedpdf/web';
+import type { Orientation, RovingFocus } from '@embedpdf/web';
+import { INERT } from './inert';
 import { useCapability, useDocumentId, useKernel, useKernelValue } from './runtime';
 
 // ── public render-prop contracts ─────────────────────────────────────────────
@@ -121,7 +112,7 @@ const NO_STRIP_GROUPS: readonly StripViewGroup[] = [];
 
 /**
  * The live projection of a bar through the command registry — <Toolbar>'s
- * un-measured sibling, for contextual strips (ChromeSchema.strips). The schema
+ * un-measured sibling, for contextual strips (a bar over a selection). The schema
  * declares what could appear; each command's `visible` derivation decides what
  * does; null means nothing currently applies, so `if (!view) return null` is
  * the caller's entire show/hide logic. `execute` is pre-bound to this
@@ -154,10 +145,22 @@ export function useStripView(bar: BarSchema | undefined): StripView | null {
 
 export interface ToolbarProps {
   bar: BarSchema;
+  /**
+   * Which way the toolbar runs. A vertical toolbar fits the height it's given,
+   * so give it one; it stacks its sections top, middle and bottom, and draws
+   * every command at `'icon'`, with the label for a tooltip. Default
+   * `'horizontal'`.
+   */
+  orientation?: 'horizontal' | 'vertical';
   /** Px between adjacent items (CSS flex gap; the solver budgets the same number). */
   gap?: number;
-  /** Width of the separator element your renderSeparator draws. Default 1. */
+  /**
+   * The thickness of the separator your renderSeparator draws: its width
+   * across a horizontal toolbar, its height in a vertical one. Default 1.
+   */
   separatorWidth?: number;
+  /** The toolbar's name for screen readers, for a page with more than one toolbar. */
+  'aria-label'?: string;
   className?: string;
   style?: React.CSSProperties;
   /** A command button at a given variant. Default: a plain <button> with the command's label. */
@@ -173,7 +176,8 @@ export interface ToolbarProps {
    * contract. Sockets are measured live (they can't be duplicated into the
    * measurement layer: only the first same-named slot in tree order gets the
    * projected nodes). `ctx.measure` is a new function on every render;
-   * capture it in a ref to use it in an effect.
+   * capture it in a ref to use it in an effect. The first element of an item
+   * that takes focus is the item's stop in the toolbar's arrow-key order.
    */
   renderCustom?: Record<string, (variant: string, ctx: CustomSlotCtx) => React.ReactNode>;
   /**
@@ -185,7 +189,7 @@ export interface ToolbarProps {
    *  open state). Default: a chevron button opening a radio menu; `undefined`
    *  leaves it to the default too. */
   renderGroupTrigger?: (view: GroupDisclosureView) => React.ReactNode;
-  /** Derived separator between adjacent visible groups. Default: a 1px line. */
+  /** Derived separator between adjacent visible groups. Default: a 1px line across the toolbar. */
   renderSeparator?: () => React.ReactNode;
   /** The "More" button. Default: a plain ⋯ button. */
   renderOverflowTrigger?: (isOpen: boolean, toggle: () => void) => React.ReactNode;
@@ -195,20 +199,25 @@ export interface ToolbarProps {
 
 // ── measurement ───────────────────────────────────────────────────────────────
 
-/** Report this node's border-box width under `k`, live. */
+/** Report this node's border-box length along the toolbar under `k`, live. */
 function Measured({
   k,
-  onWidth,
+  orientation,
+  onLength,
   children,
 }: {
   k: string;
-  onWidth: (key: string, width: number) => void;
+  orientation: Orientation;
+  onLength: (key: string, length: number) => void;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   useLayoutEffect(
-    () => (ref.current ? observeWidth(ref.current, (width) => onWidth(k, width)) : undefined),
-    [k, onWidth],
+    () =>
+      ref.current
+        ? observeLength(ref.current, orientation, (length) => onLength(k, length))
+        : undefined,
+    [k, orientation, onLength],
   );
   return (
     <span ref={ref} style={{ display: 'inline-flex', flexShrink: 0 }}>
@@ -222,25 +231,30 @@ function Measured({
  * the <embedpdf-viewer> shadow root the browser projects same-named light-DOM
  * children into it; anywhere else it just displays its fallback (the terminal
  * command). Measured live — the projected content lives in the host's world,
- * so its width can only be observed where it actually renders.
+ * so its length can only be observed where it actually renders.
  */
 function NativeSlotSocket({
   name,
   k,
-  onWidth,
+  orientation,
+  onLength,
   children,
 }: {
   name: string;
   k: string;
-  onWidth: (key: string, width: number) => void;
+  orientation: Orientation;
+  onLength: (key: string, length: number) => void;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLSlotElement>(null);
   // Projection changes (a child slotted in/out) resize the socket's
   // inline-flex box, so one observer covers both content and assignment.
   useLayoutEffect(
-    () => (ref.current ? observeWidth(ref.current, (width) => onWidth(k, width)) : undefined),
-    [k, onWidth],
+    () =>
+      ref.current
+        ? observeLength(ref.current, orientation, (length) => onLength(k, length))
+        : undefined,
+    [k, orientation, onLength],
   );
   return (
     <slot
@@ -253,7 +267,13 @@ function NativeSlotSocket({
   );
 }
 
-const measureLayerStyle: React.CSSProperties = {
+/**
+ * The hidden measurement layer: a row for a horizontal toolbar, a column for a
+ * vertical one, and no height either way, so it never adds to the page. A
+ * column keeps each item at its own width, so no text wraps and changes the
+ * heights it reports.
+ */
+const measureLayerStyle = (orientation: Orientation): React.CSSProperties => ({
   position: 'absolute',
   left: 0,
   top: 0,
@@ -263,7 +283,14 @@ const measureLayerStyle: React.CSSProperties = {
   pointerEvents: 'none',
   display: 'flex',
   whiteSpace: 'nowrap',
-};
+  ...(orientation === 'vertical' ? { flexDirection: 'column', alignItems: 'flex-start' } : null),
+});
+
+/** Marks the element around each item of the live row: its first focusable element is a stop. */
+const TOOLBAR_ITEM = { [TOOLBAR_ITEM_ATTRIBUTE]: '' } as Record<string, string>;
+
+/** The element around an item adds no box, so the item lays out as the section's own child. */
+const ITEM_STYLE: React.CSSProperties = { display: 'contents' };
 
 // ── defaults: plain, and meant to be replaced ────────────────────────────────
 
@@ -303,9 +330,15 @@ const defaultRenderCommand = (
   </button>
 );
 
-const defaultRenderSeparator = (): React.ReactNode => (
-  <span style={{ width: 1, alignSelf: 'stretch', background: 'currentColor', opacity: 0.2 }} />
-);
+/** A 1px line across the toolbar: upright in a horizontal one, flat in a vertical one. */
+function DefaultSeparator({ orientation }: { orientation: Orientation }) {
+  const thickness = orientation === 'vertical' ? { height: 1 } : { width: 1 };
+  return (
+    <span
+      style={{ ...thickness, alignSelf: 'stretch', background: 'currentColor', opacity: 0.2 }}
+    />
+  );
+}
 
 const defaultRenderOverflowTrigger = (isOpen: boolean, toggle: () => void): React.ReactNode => (
   <button
@@ -330,16 +363,39 @@ const defaultRenderOverflowTrigger = (isOpen: boolean, toggle: () => void): Reac
   </button>
 );
 
-function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
+/** Where a default menu opens: under a horizontal toolbar's button, beside a vertical one's. */
+const menuPlacement = (orientation: Orientation): React.CSSProperties =>
+  orientation === 'vertical'
+    ? { top: 0, insetInlineStart: '100%' }
+    : { top: '100%', insetInlineEnd: 0 };
+
+/**
+ * The default menu, opened by the button beside it in the same parent: it
+ * closes on a press outside that parent, and takes the menu keys while open.
+ */
+function DefaultOverflowMenu({
+  view,
+  orientation,
+}: {
+  view: OverflowMenuView;
+  orientation: Orientation;
+}) {
   const menu = useRef<HTMLDivElement>(null);
   const close = useRef(view.close);
   close.current = view.close;
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const element = menu.current;
+    if (!view.isOpen || !element) return;
     // The menu's parent holds its button too: a press on it is the button's own toggle.
-    const container = menu.current?.parentElement ?? menu.current;
-    return view.isOpen && container
-      ? observeOutsidePress(container, () => close.current())
-      : undefined;
+    const container = element.parentElement ?? element;
+    const trigger =
+      focusablesIn(container).find((candidate) => !element.contains(candidate)) ?? null;
+    const stopOutside = observeOutsidePress(container, () => close.current());
+    const detachKeys = attachMenuKeys(element, { trigger, close: () => close.current() });
+    return () => {
+      stopOutside();
+      detachKeys();
+    };
   }, [view.isOpen]);
   if (!view.isOpen) return null;
   return (
@@ -348,8 +404,7 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
       role="menu"
       style={{
         position: 'absolute',
-        right: 0,
-        top: '100%',
+        ...menuPlacement(orientation),
         zIndex: 41,
         minWidth: 200,
         padding: 4,
@@ -373,6 +428,7 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
                 role={section.role === 'radio' ? 'menuitemradio' : 'menuitem'}
                 aria-checked={section.role === 'radio' ? cmd.active : undefined}
                 disabled={!cmd.enabled}
+                tabIndex={-1}
                 onClick={() => {
                   view.execute(row.command);
                   if (!isSubmenu) view.close();
@@ -407,7 +463,13 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
   );
 }
 
-function DefaultCollapsed({ view }: { view: CollapsedGroupView }) {
+function DefaultCollapsed({
+  view,
+  orientation,
+}: {
+  view: CollapsedGroupView;
+  orientation: Orientation;
+}) {
   if (view.collapse === 'select') {
     const active = view.commands.find((command) => command.active);
     return (
@@ -431,22 +493,37 @@ function DefaultCollapsed({ view }: { view: CollapsedGroupView }) {
     );
   }
   // 'menu': reuse the overflow popover, scoped to this group's commands.
-  return <CollapsedMenuButton view={view} />;
+  return <CollapsedMenuButton view={view} orientation={orientation} />;
 }
 
-function CollapsedMenuButton({ view }: { view: CollapsedGroupView }) {
+function CollapsedMenuButton({
+  view,
+  orientation,
+}: {
+  view: CollapsedGroupView;
+  orientation: Orientation;
+}) {
   const [isOpen, setOpen] = useState(false);
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
       {defaultRenderOverflowTrigger(isOpen, () => setOpen((previous) => !previous))}
-      <DefaultOverflowMenu view={groupMenuView(view, isOpen, () => setOpen(false))} />
+      <DefaultOverflowMenu
+        view={groupMenuView(view, isOpen, () => setOpen(false))}
+        orientation={orientation}
+      />
     </span>
   );
 }
 
 /** Default shed-group disclosure: a chevron opening a radio menu of the
  *  hidden children. */
-function DefaultGroupTrigger({ view }: { view: GroupDisclosureView }) {
+function DefaultGroupTrigger({
+  view,
+  orientation,
+}: {
+  view: GroupDisclosureView;
+  orientation: Orientation;
+}) {
   const [isOpen, setOpen] = useState(false);
   const someActive = view.commands.some((command) => command.active);
   return (
@@ -472,7 +549,10 @@ function DefaultGroupTrigger({ view }: { view: GroupDisclosureView }) {
       >
         ▾
       </button>
-      <DefaultOverflowMenu view={groupMenuView(view, isOpen, () => setOpen(false))} />
+      <DefaultOverflowMenu
+        view={groupMenuView(view, isOpen, () => setOpen(false))}
+        orientation={orientation}
+      />
     </span>
   );
 }
@@ -481,21 +561,24 @@ function DefaultGroupTrigger({ view }: { view: GroupDisclosureView }) {
 
 export function Toolbar({
   bar,
+  orientation = 'horizontal',
   gap = 8,
   separatorWidth = 1,
+  'aria-label': ariaLabel,
   className,
   style,
   renderCommand = defaultRenderCommand,
   renderCustom,
   renderCollapsed,
   renderGroupTrigger,
-  renderSeparator = defaultRenderSeparator,
+  renderSeparator,
   renderOverflowTrigger = defaultRenderOverflowTrigger,
   renderOverflowMenu,
 }: ToolbarProps) {
   const kernel = useKernel();
   const commands = useCapability(CommandsToken);
   const documentId = useDocumentId();
+  const vertical = orientation === 'vertical';
 
   // Command state is derived-on-read; re-render on the kernel's change stream
   // so labels/active/visible (and thus the hidden layer's measurements) stay
@@ -505,24 +588,39 @@ export function Toolbar({
   useEffect(() => kernel.subscribe(force), [kernel]);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerLength, setContainerLength] = useState(0);
   useLayoutEffect(
     () =>
       containerRef.current
-        ? observeContentWidth(containerRef.current, setContainerWidth)
+        ? observeContentLength(containerRef.current, orientation, setContainerLength)
         : undefined,
-    [],
+    [orientation],
   );
 
-  // A width that changed renders (and solves) again.
-  const [widths] = useState(createToolbarWidths);
-  const [, bumpMeasureVersion] = useReducer((x: number) => x + 1, 0);
-  const onWidth = useMemo(
-    () => (key: string, width: number) => {
-      if (widths.report(key, width)) bumpMeasureVersion();
+  // A length that changed renders (and solves) again.
+  const [lengths] = useState(createToolbarLengths);
+  const [, bumpMeasureVersion] = useReducer((version: number) => version + 1, 0);
+  const onLength = useMemo(
+    () => (key: string, length: number) => {
+      if (lengths.report(orientation, key, length)) bumpMeasureVersion();
     },
-    [widths],
+    [lengths, orientation],
   );
+
+  // The keyboard: one tab stop, and arrow keys along the toolbar.
+  const roving = useRef<RovingFocus | null>(null);
+  useLayoutEffect(() => {
+    const toolbar = containerRef.current;
+    if (!toolbar) return;
+    const focus = attachToolbarFocus(toolbar, orientation);
+    roving.current = focus;
+    return () => {
+      focus.detach();
+      roving.current = null;
+    };
+  }, [orientation]);
+  // Any render can add, remove or disable an item, so the tab stop is checked after each one.
+  useLayoutEffect(() => roving.current?.refresh());
 
   const resolveCmd = (id: string): ResolvedCommand | null =>
     commands.resolveCommand(id, documentId ?? undefined);
@@ -538,9 +636,10 @@ export function Toolbar({
     unregistered: unregisteredCommand,
     execute: executeCmd,
     menuTarget: (id) => commands.getMenuTarget(id),
-    metrics: widths.metrics(gap, separatorWidth),
+    metrics: lengths.metrics(orientation, gap, separatorWidth),
     measureKey: toolbarMeasureKey,
-    containerWidth,
+    containerLength,
+    orientation,
   });
 
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -571,24 +670,37 @@ export function Toolbar({
         if (registered) {
           const custom = registered(part.variant, {
             layer,
-            measure: (width) => onWidth(part.measureKey, width),
+            measure: (length) => onLength(part.measureKey, length),
           });
           return custom === undefined ? terminal() : custom;
         }
         if (layer === 'measure') return null;
         return (
-          <NativeSlotSocket name={part.name} k={part.measureKey} onWidth={onWidth}>
+          <NativeSlotSocket
+            name={part.name}
+            k={part.measureKey}
+            orientation={orientation}
+            onLength={onLength}
+          >
             {terminal()}
           </NativeSlotSocket>
         );
       }
       case 'collapsed': {
         const drawn = renderCollapsed?.(part.view);
-        return drawn === undefined ? <DefaultCollapsed view={part.view} /> : drawn;
+        return drawn === undefined ? (
+          <DefaultCollapsed view={part.view} orientation={orientation} />
+        ) : (
+          drawn
+        );
       }
       case 'disclosure': {
         const drawn = renderGroupTrigger?.(part.view);
-        return drawn === undefined ? <DefaultGroupTrigger view={part.view} /> : drawn;
+        return drawn === undefined ? (
+          <DefaultGroupTrigger view={part.view} orientation={orientation} />
+        ) : (
+          drawn
+        );
       }
     }
   };
@@ -596,30 +708,38 @@ export function Toolbar({
   const renderLiveSection = (section: LiveSection<ResolvedCommand>): React.ReactNode =>
     section.groups.map((group, i) => (
       <React.Fragment key={group.id}>
-        {i > 0 && renderSeparator()}
+        {i > 0 &&
+          (renderSeparator ? renderSeparator() : <DefaultSeparator orientation={orientation} />)}
         {group.parts.map((part) => (
-          <React.Fragment key={part.key}>{renderPart(part, 'live')}</React.Fragment>
+          <span key={part.key} {...TOOLBAR_ITEM} style={ITEM_STYLE}>
+            {renderPart(part, 'live')}
+          </span>
         ))}
       </React.Fragment>
     ));
 
   /**
-   * Segment layout. The center segment carries auto margins: it balances in
-   * the leftover space (true center when the flanks are symmetric) and yields
-   * when they aren't, collapsing to zero
-   * before anything can overlap. The container itself has no gap — segments
-   * space themselves — so the solver's global budget (sum of unit widths +
-   * per-unit gaps) is exactly the layout's minimum width: what the solver
+   * Segment layout, along the toolbar's axis. The center segment carries auto
+   * margins: it balances in the leftover space (true center when the flanks
+   * are symmetric) and yields when they aren't, collapsing to zero before
+   * anything can overlap. The container itself has no gap — segments space
+   * themselves — so the solver's global budget (sum of unit lengths +
+   * per-unit gaps) is exactly the layout's minimum length: what the solver
    * says fits, fits. Its cross-segment gap allowance (≤ 2×gap) becomes slack
    * the auto margins absorb, keeping ≥ gap between segments at the floor.
    * Segments never grow or shrink: fit is the solver's job, not flexbox's.
    */
   const sectionStyle = (position: 'start' | 'center' | 'end'): React.CSSProperties => ({
     display: 'flex',
+    flexDirection: vertical ? 'column' : 'row',
     alignItems: 'center',
     gap,
     flex: '0 0 auto',
-    ...(position === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : null),
+    ...(position !== 'center'
+      ? null
+      : vertical
+        ? { marginTop: 'auto', marginBottom: 'auto' }
+        : { marginLeft: 'auto', marginRight: 'auto' }),
   });
 
   const overflowView: OverflowMenuView = {
@@ -633,19 +753,28 @@ export function Toolbar({
   return (
     <div
       ref={containerRef}
+      role="toolbar"
+      aria-orientation={orientation}
+      aria-label={ariaLabel}
       className={className}
-      style={{ position: 'relative', display: 'flex', alignItems: 'center', ...style }}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: vertical ? 'column' : 'row',
+        alignItems: 'center',
+        ...style,
+      }}
     >
       {layout.sections.map((section) => (
         <div key={section.name} style={sectionStyle(section.name)}>
           {renderLiveSection(section)}
           {section.name === 'end' && layout.hasOverflow && (
-            <span style={{ position: 'relative', display: 'inline-flex' }}>
+            <span {...TOOLBAR_ITEM} style={{ position: 'relative', display: 'inline-flex' }}>
               {renderOverflowTrigger(overflowOpen, () => setOverflowOpen((previous) => !previous))}
               {renderOverflowMenu ? (
                 renderOverflowMenu(overflowView)
               ) : (
-                <DefaultOverflowMenu view={overflowView} />
+                <DefaultOverflowMenu view={overflowView} orientation={orientation} />
               )}
             </span>
           )}
@@ -657,15 +786,24 @@ export function Toolbar({
           (locale, fonts, zoom) fires the observers; no change-handling code.
           External sockets are excluded: they are live-measured, and a
           duplicate <slot> here would steal the projection from the row. */}
-      <div aria-hidden style={measureLayerStyle}>
+      <div aria-hidden {...INERT} style={measureLayerStyle(orientation)}>
         {layout.measured
           .filter((part) => !isExternalSlot(part))
           .map((part) => (
-            <Measured key={part.measureKey} k={part.measureKey} onWidth={onWidth}>
+            <Measured
+              key={part.measureKey}
+              k={part.measureKey}
+              orientation={orientation}
+              onLength={onLength}
+            >
               {renderPart(part, 'measure')}
             </Measured>
           ))}
-        <Measured k={toolbarMeasureKey.overflowTrigger} onWidth={onWidth}>
+        <Measured
+          k={toolbarMeasureKey.overflowTrigger}
+          orientation={orientation}
+          onLength={onLength}
+        >
           {renderOverflowTrigger(false, () => {})}
         </Measured>
       </div>

@@ -30,8 +30,10 @@
  * the viewer is ready, inside its kernel, so the headless hooks of
  * `@embedpdf/react` in them read this viewer.
  *
- * Config is init-only (the element's contract). Later prop changes are
- * ignored; remount with a `key` to rebuild the viewer.
+ * `src`, `theme`, `locale`, `disable` and `readOnly` follow their props: the
+ * element changes them in place. Every other prop is read once, when the
+ * viewer starts; a later change is ignored (development warns), and a new
+ * `key` mounts a new viewer with it.
  */
 // The headless runtime carries no engine: it gives the children the viewer's kernel.
 import { KernelProvider, type Kernel } from '@embedpdf/react/runtime';
@@ -40,7 +42,12 @@ import { KernelProvider, type Kernel } from '@embedpdf/react/runtime';
 // each entry re-types it narrower by plain assignment (parameter types are
 // contravariant, so this direction needs no cast). Every import from the
 // viewer is type-only, which is what keeps this module engine-blind.
-import type { ElementConfig, EmbedPdfViewerElement, ViewerHandle } from '@embedpdf/viewer/core';
+import type {
+  ElementConfig,
+  EmbedPdfViewerElement,
+  LiveConfigKey,
+  Viewer,
+} from '@embedpdf/viewer/core';
 import {
   createElement,
   useLayoutEffect,
@@ -60,33 +67,45 @@ export interface PDFViewerExtras {
   children?: ReactNode;
   /** The underlying element, if you need the imperative surface. */
   elementRef?: Ref<EmbedPdfViewerElement>;
-  /** The drive surface, once the viewer is live: capabilities via
-   *  `viewer.get(Token)`, `watch`, and the command trio. */
-  onReady?: (viewer: ViewerHandle) => void;
+  /** The viewer in code, once it's live: `get(name)`, `documents`,
+   *  `commands`, `watch`. */
+  onReady?: (viewer: Viewer) => void;
   /** The active document changed (a tab switch, an open, the last close) —
    *  the React face of the element's `epdf:documentchange` event. */
   onDocumentChange?: (documentId: string | null) => void;
 }
 
-/** Where the viewer handle keeps its kernel (`createViewerHandle` in `@embedpdf/viewer-chrome`). */
+/** Where the viewer keeps its kernel (`createViewer` in `@embedpdf/viewer-chrome`). */
 const VIEWER_KERNEL = Symbol.for('@embedpdf/viewer/kernel');
-const kernelOf = (viewer: ViewerHandle): Kernel | null =>
+const kernelOf = (viewer: Viewer): Kernel | null =>
   (viewer as unknown as Partial<Record<symbol, Kernel>>)[VIEWER_KERNEL] ?? null;
 
-/** Init-only config: after mount, a changed prop is ignored. Dev warns once. */
-const warnConfigChange = (initial: ElementConfig, next: ElementConfig): void => {
+/** The props the element follows while it runs; the wrapper hands their changes on. */
+const LIVE_PROPS: Readonly<Record<LiveConfigKey, true>> = {
+  src: true,
+  theme: true,
+  locale: true,
+  disable: true,
+  readOnly: true,
+};
+
+/** Every other prop is read once: a changed one is ignored, and development warns once. */
+const warnConfigChange = (initial: ElementConfig, next: ElementConfig): boolean => {
   const keys = new Set([...Object.keys(initial), ...Object.keys(next)]);
   for (const key of keys) {
+    if (key in LIVE_PROPS) continue;
     if (
       !Object.is((initial as Record<string, unknown>)[key], (next as Record<string, unknown>)[key])
     ) {
       console.warn(
-        `[embedpdf] <PDFViewer> config is init-only: the changed \`${key}\` prop is ignored. ` +
-          'Pass stable references (module scope, useState, useMemo), or remount with a `key` to rebuild the viewer.',
+        `[embedpdf] <PDFViewer>: \`${key}\` is read once, when the viewer starts, so the change is ` +
+          'ignored. Pass a stable value (module scope, useState, useMemo), or give the viewer a new ' +
+          '`key` to mount a new one with it.',
       );
-      return;
+      return true;
     }
   }
+  return false;
 };
 
 /**
@@ -115,17 +134,15 @@ export function PDFViewer({
   onReadyRef.current = onReady;
   const onDocumentChangeRef = useRef(onDocumentChange);
   onDocumentChangeRef.current = onDocumentChange;
-  // Init-only, like <Viewer engine/plugins>: the element boots once with the
-  // first config. A later change cannot mean "rebuild" without dropping every
-  // open document, so it is ignored — loudly, in development.
+  // Read once, like <Viewer engine/plugins>: the element boots once with the
+  // first config. A later change to anything but the live props cannot mean
+  // "rebuild" without dropping every open document, so it is ignored — loudly,
+  // in development.
   const initialConfig = useRef<ElementConfig | null>(null);
   const warned = useRef(false);
   if (process.env.NODE_ENV !== 'production') {
     if (initialConfig.current === null) initialConfig.current = config;
-    else if (!warned.current) {
-      warned.current = true;
-      warnConfigChange(initialConfig.current, config);
-    }
+    else if (!warned.current) warned.current = warnConfigChange(initialConfig.current, config);
   }
 
   // Layout effects run in the insertion task, before the element's deferred
@@ -155,6 +172,18 @@ export function PDFViewer({
       element.removeEventListener('epdf:documentchange', onDocumentChangeEvent);
     };
   }, []);
+
+  // The live props, after every render: the element compares them by value, so an unchanged
+  // one (an inline `disable={['forms']}` too) changes nothing.
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    element.src = config.src;
+    element.theme = config.theme;
+    element.locale = config.locale;
+    element.disable = config.disable;
+    element.readOnly = config.readOnly;
+  });
 
   return createElement(
     'embedpdf-viewer',

@@ -1,12 +1,13 @@
 /**
- * The viewer shell — the snippet's layout, driven entirely by the commands +
- * measured-toolbar system.
+ * The viewer shell — the layout's bars around the pages, driven entirely by
+ * the commands + measured-toolbar system.
  *
  *   ── header socket (empty unless a child fills it) ─────────
- *   ── main toolbar (measured; auto-overflows) ───────────────
- *   ── mode band (derived from the shell's open mode surface) ─
+ *   ── document tabs ─────────────────────────────────────────
+ *   ── the top edge's bars, outside in (main, its mode bar) ──
  *   left sidebar │        Stage (pages)        │ right sidebar
  *   ──────────── page-controls overlay ──────────────────────
+ *   ── the bottom edge's bars, outside in from the bottom ────
  *
  * The workspace/document split is structural: header + toolbars are
  * workspace-scoped and render at t≈0 (translated, measured) while the wasm
@@ -14,15 +15,18 @@
  * whose fallback is the empty-workspace state, shown under a live toolbar
  * rather than replacing the whole app.
  *
- * Which mode band shows is not stored anywhere: it's a projection of
- * plugin-shell's exclusive 'mode' surface, read null-safely so the band simply
- * doesn't exist without a document.
+ * Which mode bar shows is not stored anywhere: it's a projection of
+ * plugin-shell's exclusive 'mode' surface, read null-safely so the bar simply
+ * doesn't exist without a document. Bars at the start and end edges and
+ * floating bars are in the layout but not drawn here yet; the page number is
+ * <PageControls>.
  */
 import { useMemo, type ReactNode } from 'react';
 import {
   DocumentGate,
   useDocument,
   useDocumentId,
+  useKernelValue,
   useOptionalSelector,
 } from '@embedpdf/react/runtime';
 import { Scrollbar, Stage } from '@embedpdf/react/stage';
@@ -33,11 +37,21 @@ import { LinkLayer } from '@embedpdf/react/link';
 import { useActionsUiAdapter } from '@embedpdf/react/actions';
 import { FormLayer } from '@embedpdf/react/form';
 import { SearchLayer } from '@embedpdf/react/search';
-import { useCommandShortcuts } from '@embedpdf/react/commands';
+import { useCommandShortcuts, useCommands } from '@embedpdf/react/commands';
 import { ShellToken } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
-import { getModeBar } from './config/chrome';
-import { useChromeSchema } from './config-context';
+import {
+  commandOfUnit,
+  edgeStackOf,
+  hasVisibleUnits,
+  hostOf,
+  modeCommandOf,
+  normalizeBar,
+  type BarSchema,
+} from '@embedpdf/core-ui';
+import { openModeSurfaceOf } from './config/modes';
+import { useResolvedLayout } from './config-context';
+import { LayoutRoot } from './layout-root';
 import { AppToolbar } from './ui/toolbar';
 import { AnnotationFontsProvider } from './ui/annotation-fonts';
 import { AnnotationStrip } from './ui/annotation-strip';
@@ -54,28 +68,73 @@ import { SignatureInspector } from './ui/signature-inspector';
 import { SignatureMakerModal } from './ui/signature-maker';
 import { StampLibraryStore } from './ui/stamp-store';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
+import { useRefusalNotice } from './ui/refusal-notice';
 
-function ModeBand({ edge }: { edge: 'top' | 'bottom' }) {
-  const schema = useChromeSchema();
-  // The mode list is derived from the chrome's modeBars keys — adding a custom
-  // mode is one command + one bar schema in config, not a shell change.
-  const modeSurfaces = useMemo(() => Object.keys(schema.modeBars ?? {}), [schema]);
-  const activeMode = useOptionalSelector(
-    ShellToken,
-    (shell) => modeSurfaces.find((surface) => shell.isOpen(surface)) ?? null,
-    null,
+/** Whether anything in the bar is visible now: a bar with nothing visible draws nothing. */
+function useBarShows(bar: BarSchema | null): boolean {
+  const commands = useCommands();
+  const documentId = useDocumentId() ?? undefined;
+  const normalized = useMemo(() => (bar ? normalizeBar(bar) : null), [bar]);
+  return useKernelValue(
+    () =>
+      normalized !== null &&
+      hasVisibleUnits(normalized, (unit) => {
+        const command = commandOfUnit(unit);
+        return command !== null && commands.resolveCommand(command, documentId)?.visible === true;
+      }),
   );
-  if (!activeMode) return null;
-  const bar = getModeBar(schema, activeMode);
-  if (!bar) return null;
+}
+
+/** One bar along an edge: its toolbar in a band, or nothing when nothing in it is visible. */
+function BarBand({ id, edge, rides }: { id: string; edge: 'top' | 'bottom'; rides: boolean }) {
+  const bar = useResolvedLayout().bar(id);
+  const shows = useBarShows(bar);
+  if (!bar || !shows) return null;
   return (
     <div
-      className={`border-border bg-surface-alt flex shrink-0 items-center px-4 py-2 ${
-        edge === 'top' ? 'border-b' : 'border-t'
-      }`}
+      // `toolbar` is the main bar's part name, which page CSS reaches.
+      part={id === 'main' ? 'toolbar' : undefined}
+      data-bar={id}
+      className={`border-border flex shrink-0 items-center px-4 py-2 ${
+        rides ? 'bg-surface-alt' : 'bg-surface'
+      } ${edge === 'top' ? 'border-b' : 'border-t'}`}
     >
       <AppToolbar bar={bar} className="w-full" />
     </div>
+  );
+}
+
+/**
+ * The bars along the top or the bottom edge, from the outside in, each followed by the bars
+ * riding along it on the side of the pages. A bar with a mode shows while that mode is open.
+ */
+function EdgeBars({ edge }: { edge: 'top' | 'bottom' }) {
+  const { data } = useResolvedLayout();
+  const openMode = useOptionalSelector(ShellToken, openModeSurfaceOf, null);
+  const stack = useMemo(() => edgeStackOf(data, edge), [data, edge]);
+  const shown = stack.filter((id) => {
+    const mode = data.bars?.[id]?.mode;
+    return mode === undefined || openMode === modeCommandOf(mode);
+  });
+  // From the outside in is top to bottom on the top edge, and bottom to top on the bottom one.
+  const ordered = edge === 'top' ? shown : [...shown].reverse();
+  return (
+    <>
+      {ordered.map((id) => (
+        <BarBand key={id} id={id} edge={edge} rides={hostOf(data.bars?.[id]?.place) !== null} />
+      ))}
+    </>
+  );
+}
+
+/** The document tabs, as the layout says: always, while more than one document is open, or never. */
+function DocumentTabs() {
+  const visibility = useResolvedLayout().data.tabs ?? 'always';
+  if (visibility === 'never') return null;
+  return (
+    <slot name="tabs">
+      <TabBar visibility={visibility} />
+    </slot>
   );
 }
 
@@ -108,7 +167,9 @@ function DocumentArea({ children }: { children: ReactNode }) {
 }
 
 export function Shell() {
-  useCommandShortcuts();
+  // A shortcut or Copy that's refused says why in a notice.
+  const refusals = useRefusalNotice();
+  useCommandShortcuts({ onRefused: refusals.onShortcutRefused });
   // Click-then-pick tools (stamp, file attachment) → click a page → file dialog
   // opens → the file lands where you clicked. One line: the default provider is
   // the built-in file picker honouring each tool's `accept` filter (swap it for
@@ -118,59 +179,31 @@ export function Shell() {
   // sanitized URI opens, Named `Print`, script alerts (boot/lifecycle nags
   // suppressed by default), and script page navigation.
   useActionsUiAdapter();
-  const schema = useChromeSchema();
 
-  // The frame: region arrangement & visibility from the chrome value (see
-  // FrameSchema). Regions render as named <slot> sockets with the built-ins
-  // as fallback — light-DOM children of <embedpdf-viewer> replace them; in
-  // plain light DOM a slot just displays its fallback (UA display:contents),
-  // so this package's direct React consumers see no difference. A region
-  // hidden by the frame hides its socket too: visibility outranks content.
-  const frame = schema.frame ?? {};
-  const toolbarEdge = frame.toolbar ?? 'top';
-
-  // main toolbar — measured; degrades + overflows with zero config.
-  // Deliberately outside the gate: chrome renders before any document.
-  // Bar id 'main' is the shell's one structural expectation — an owned
-  // chrome without it simply has no main toolbar. Its mode band rides the
-  // content side, whichever edge the frame picked.
-  const toolbarBand = schema.bars.main && (
-    <div
-      part="toolbar"
-      className={`border-border bg-surface flex shrink-0 items-center px-4 py-2 ${
-        toolbarEdge === 'top' ? 'border-b' : 'border-t'
-      }`}
-    >
-      <AppToolbar bar={schema.bars.main} className="w-full" />
-    </div>
-  );
-
+  // Regions render as named <slot> sockets with the built-ins as fallback —
+  // light-DOM children of <embedpdf-viewer> replace them; in plain light DOM a
+  // slot just displays its fallback (UA display:contents), so this package's
+  // direct React consumers see no difference. The bars are measured and fit
+  // with zero config, and sit outside the gate: they render before any
+  // document. The root measures the viewer for the layout (layout-root.tsx).
   return (
     <AnnotationFontsProvider>
-      <div className="bg-app text-fg flex h-full flex-col">
+      <LayoutRoot className="bg-app text-fg flex h-full flex-col">
         {/* the user's stamp + signature libraries: restored once, persisted for
           the workspace's lifetime (workspace-scoped, like the stamp plugin) */}
         <StampLibraryStore />
         {/* The header socket. The chrome ships NO header of its own — branding,
           locale pickers and theme switches are the embedder's chrome, not the
           viewer's — so this renders nothing until a child fills the slot. */}
-        {(frame.header ?? true) && <slot name="header" />}
+        <slot name="header" />
 
-        {/* the v2 document tab bar — the kernel's document registry IS the tab model */}
-        {(frame.tabs ?? 'always') !== 'never' && (
-          <slot name="tabs">
-            <TabBar visibility={frame.tabs ?? 'always'} />
-          </slot>
-        )}
+        {/* the document tab bar — the kernel's document registry IS the tab model */}
+        <DocumentTabs />
 
-        {toolbarEdge === 'top' && (
-          <>
-            {toolbarBand}
-            <ModeBand edge="top" />
-          </>
-        )}
+        <EdgeBars edge="top" />
 
         <div className="relative flex min-h-0 flex-1">
+          {refusals.element}
           <DocumentArea>
             <LeftSidebar />
             <div className="relative min-w-0 flex-1">
@@ -180,7 +213,7 @@ export function Shell() {
               {/* ctrl/cmd+C and native Edit→Copy for the text selection —
                 prefetches on commit so the copy event answers synchronously.
                 Renders nothing; mount ONCE per document view. */}
-              <SelectionClipboard />
+              <SelectionClipboard onRefused={refusals.onCopyRefused} />
               <Stage
                 overlay={
                   <>
@@ -239,13 +272,8 @@ export function Shell() {
           </DocumentArea>
         </div>
 
-        {toolbarEdge === 'bottom' && (
-          <>
-            <ModeBand edge="bottom" />
-            {toolbarBand}
-          </>
-        )}
-      </div>
+        <EdgeBars edge="bottom" />
+      </LayoutRoot>
     </AnnotationFontsProvider>
   );
 }

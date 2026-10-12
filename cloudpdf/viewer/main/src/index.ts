@@ -22,9 +22,9 @@
  */
 import { cloudEngine } from '@cloudpdf/engine';
 import EmbedPDF from '@embedpdf/viewer/core';
-import type { EmbedPdfViewerElement, InitOptions } from '@embedpdf/viewer/core';
+import type { EmbedPdfViewerElement, MountTarget } from '@embedpdf/viewer/core';
 
-import { resolveCloudConfig, type CloudSource } from './config';
+import { resolveCloudConfig, type ViewerConfig } from './config';
 
 // The whole customization vocabulary rides along, so cloud snippet users
 // import one file — same ladder as the open snippet.
@@ -36,14 +36,11 @@ export type { CloudEngineOptions } from '@cloudpdf/engine';
 export { exchangeShareToken, shareSessionSource, ShareExchangeError } from '@cloudpdf/engine';
 export type { ShareSession, ShareExchangeOptions } from '@cloudpdf/engine';
 export { resolveCloudConfig } from './config';
-export type { CloudSource, CloudShareSource, CloudInitialDocument } from './config';
+// The cloud's `ViewerConfig`, in place of the engine-agnostic one `export *` brings: one name
+// per door (docs/conventions/viewer-doors.md).
+export type { CloudSource, CloudShareSource, CloudInitialDocument, ViewerConfig } from './config';
 
-// `documents` is omitted from the base so CloudSource's list (same
-// InitialDocument type — `{ kind: 'share' }` is a standard OpenInput
-// kind now) governs without a conflicting redeclaration.
-export interface CloudInitOptions
-  extends Omit<InitOptions, 'engine' | 'src' | 'documents'>,
-    CloudSource {}
+export interface CloudInitOptions extends ViewerConfig, MountTarget {}
 
 /** Create an <embedpdf-viewer> backed by the cloud engine and mount it. */
 function init(options: CloudInitOptions): EmbedPdfViewerElement {

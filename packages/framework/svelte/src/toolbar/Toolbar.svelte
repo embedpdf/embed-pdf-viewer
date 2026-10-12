@@ -4,7 +4,7 @@
     1. A hidden measurement layer renders every unit in every variant (and the folded groups and
        the "More" button), each watched with `observeWidth` from @embedpdf/web, so a new
        language, a font loading, browser zoom and your CSS all re-measure on their own
-       (`createToolbarWidths`).
+       (`createToolbarLengths`).
     2. core-ui's `solve()` gives each unit a variant, a folded group or the "More" menu
        (`layoutToolbar` turns that into parts).
     3. The live row draws the parts; the "More" menu is derived from what didn't fit
@@ -21,7 +21,7 @@
   import { CommandsToken } from '@embedpdf/plugin-commands/contract/host';
   import { unregisteredCommand } from '@embedpdf/plugin-commands/contract';
   import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
-  import { createToolbarWidths, observeContentWidth, toolbarMeasureKey } from '@embedpdf/web';
+  import { createToolbarLengths, observeContentWidth, toolbarMeasureKey } from '@embedpdf/web';
   import { useKernelBinding } from '../runtime/binding.svelte';
   import { useCapability, useDocumentId } from '../runtime/readers.svelte';
   import DefaultCollapsed from './DefaultCollapsed.svelte';
@@ -65,10 +65,10 @@
 
   // A width that changed by more than half a pixel fits (and draws) again. Untracked: a report
   // can come from an effect, which must not run again because the count moved.
-  const widths = createToolbarWidths();
+  const lengths = createToolbarLengths();
   let measured = $state(0);
   function report(key: string, width: number) {
-    if (widths.report(key, width)) untrack(() => (measured += 1));
+    if (lengths.report('horizontal', key, width)) untrack(() => (measured += 1));
   }
 
   // ── the fit ────────────────────────────────────────────────────────────────
@@ -92,9 +92,9 @@
       unregistered: unregisteredCommand,
       execute,
       menuTarget: (id) => commands.getMenuTarget(id),
-      metrics: widths.metrics(gap, separatorWidth),
+      metrics: lengths.metrics('horizontal', gap, separatorWidth),
       measureKey: toolbarMeasureKey,
-      containerWidth,
+      containerLength: containerWidth,
     });
   });
 

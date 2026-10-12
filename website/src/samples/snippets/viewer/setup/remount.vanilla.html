@@ -1,6 +1,9 @@
 <script type="module">
   const element = document.querySelector('embedpdf-viewer');
 
-  // Setting the config again builds a new viewer, with the documents opened again.
-  element.config = { ...element.config, disable: ['forms', 'annotations'] };
+  // A key that's read once builds a new viewer, with the documents opened again.
+  element.config = {
+    ...element.config,
+    layout: (layout) => layout.remove(['tool:pan', 'menu:view'], { from: 'main' }),
+  };
 </script>

@@ -5,6 +5,7 @@
  */
 import { MeasurementScaleButton } from './measurement';
 import { useEffect, useState } from 'react';
+import { VIEW_MODE_COMMAND } from '@embedpdf/core-ui';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { Toolbar } from '@embedpdf/react/toolbar';
 import type {
@@ -63,7 +64,8 @@ function CommandButton({
       aria-pressed={cmd.active || undefined}
       aria-haspopup={cmd.menu ? 'menu' : undefined}
       aria-label={cmd.label}
-      title={cmd.label}
+      // A command the scope doesn't allow, shown under `notAllowed: 'disable'`, says why.
+      title={cmd.disabledReason ?? cmd.label}
       // Shadow parts — the restyle door: page CSS reaches these via
       // `embedpdf-viewer::part(toolbar-button)` etc. Part names are public
       // API; the vocabulary is deliberately small (see README).
@@ -270,7 +272,7 @@ function CollapsedModes({ view }: { view: CollapsedGroupView }) {
   const [open, setOpen] = useState(false);
   const active = view.commands.find((command) => command.active) ?? view.commands[0];
   // The control highlights whenever a non-default mode is active.
-  const isActive = Boolean(active?.active && active.id !== 'mode:view');
+  const isActive = Boolean(active?.active && active.id !== VIEW_MODE_COMMAND);
   return (
     <div style={{ width: 100 }} className="relative">
       <button
@@ -397,7 +399,7 @@ export function AppToolbar({ bar, className }: { bar: BarSchema; className?: str
       renderCommand={(cmd, variant, run) => <CommandButton cmd={cmd} variant={variant} run={run} />}
       renderCustom={{
         'measurement-scale': () => <MeasurementScaleButton />,
-        'zoom-controls': (variant) => (variant === 'inline' ? <ZoomControls /> : <ZoomButton />),
+        zoom: (variant) => (variant === 'inline' ? <ZoomControls /> : <ZoomButton />),
         'quick-stamps': () => <QuickStamps />,
       }}
       renderCollapsed={(view) => (view.id === 'modes' ? <CollapsedModes view={view} /> : undefined)}

@@ -1,4 +1,6 @@
 {
   "toolchain": "Next 15 (Turbopack)",
+  "workerSrc": "'self'",
+  "enforceTrustedTypes": false,
   "dist": "out"
 }

@@ -148,7 +148,7 @@ try {
   check('active hit shared', active.app === active.viewer && active.app >= 0, active);
 
   // The viewer's own search panel shows the same count.
-  await page.evaluate(() => window.spike.viewer.execute('panel:search'));
+  await page.evaluate(() => window.spike.viewer.commands.execute('panel:search'));
   const panelText = await page
     .waitForFunction(
       () => {
