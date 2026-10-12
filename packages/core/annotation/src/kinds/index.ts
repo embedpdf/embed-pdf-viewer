@@ -75,8 +75,10 @@ export const KINDS: Readonly<Record<string, AnnotationKind>> = {
 };
 
 /**
- * A kind the viewer shows but doesn't edit (a popup, an annotation type it
- * doesn't model): drawn from the engine's raster, with nothing to do to it.
+ * A kind the viewer shows but doesn't edit (an annotation type it doesn't
+ * model): drawn from the engine's raster, with nothing to do to it. Without
+ * an appearance in the file it draws nothing: it has no fields the viewer
+ * could draw it from.
  */
 const shownOnly = new Map<string, AnnotationKind>();
 
@@ -86,7 +88,13 @@ export function kindNamed(name: string): AnnotationKind {
   if (kind) return kind;
   let shown = shownOnly.get(name);
   if (!shown) {
-    shown = { name, family: boxFamily, style: plainStyle, caps: NO_CAPS, properties: [] };
+    shown = {
+      name,
+      family: boxFamily,
+      style: plainStyle,
+      caps: { ...NO_CAPS, rasterOnly: true },
+      properties: [],
+    };
     shownOnly.set(name, shown);
   }
   return shown;
