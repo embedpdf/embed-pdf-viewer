@@ -2336,6 +2336,9 @@ importers:
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../../plugin/history
       '@embedpdf/plugin-i18n':
         specifier: workspace:*
         version: link:../../plugin/i18n

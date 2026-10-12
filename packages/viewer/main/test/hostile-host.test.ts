@@ -220,7 +220,13 @@ describe('the viewer on a hostile page', () => {
     const families = await hostile.page.evaluate(() =>
       [...document.fonts].map((face) => face.family.replace(/"/g, '')).sort(),
     );
-    expect(families).toEqual(['brand-sans', 'epdf-brand-sans']);
+    // The page's own face stays as it is; the registered key is mounted under its namespaced
+    // family, and every face the viewer adds (its standard fonts too) is in that namespace.
+    expect(families).toContain('brand-sans');
+    expect(families).toContain('epdf-brand-sans');
+    expect(
+      families.filter((family) => family !== 'brand-sans' && !family.startsWith('epdf-')),
+    ).toEqual([]);
   });
 
   it('takes --epdf-accent from the page', async () => {
