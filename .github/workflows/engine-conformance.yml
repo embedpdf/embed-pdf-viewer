@@ -80,6 +80,11 @@ jobs:
           pnpm --filter @cloudpdf/server build
           pnpm --filter @cloudpdf/engine build
 
+      # Output size and WASM memory of redacting scanned pages: the same on
+      # every run of a build, so they are checked; times are only reported.
+      - name: Redaction on scans budgets (WASM)
+        run: pnpm --filter @embedpdf/engine-runtime test:redaction-perf
+
       - name: engine-local conformance (WASM)
         run: pnpm --filter @embedpdf/engine test
 

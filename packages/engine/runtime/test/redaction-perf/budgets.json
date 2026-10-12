@@ -1,0 +1,17 @@
+{
+  "about": "Redacting scanned pages: the saved file's size against the input's, and the peak WASM memory, with headroom over what the runtime needs. Lower a budget when a change makes redaction smaller; never raise one to let a regression pass.",
+  "pages": 6,
+  "marks": 20,
+  "budgets": {
+    "bw-ccitt/page": { "maxOutputRatio": 3.1, "maxPeakMiB": 200 },
+    "gray-jpeg/page": { "maxOutputRatio": 6.3, "maxPeakMiB": 370 },
+    "color-jpeg/page": { "maxOutputRatio": 6.2, "maxPeakMiB": 365 },
+    "gray-jpx/page": { "maxOutputRatio": 14.1, "maxPeakMiB": 350 },
+    "color-jpx/page": { "maxOutputRatio": 5.3, "maxPeakMiB": 330 },
+    "bw-ccitt/each": { "maxOutputRatio": 3.1, "maxPeakMiB": 620 },
+    "gray-jpeg/each": { "maxOutputRatio": 6.3, "maxPeakMiB": 695 },
+    "color-jpeg/each": { "maxOutputRatio": 6.2, "maxPeakMiB": 710 },
+    "gray-jpx/each": { "maxOutputRatio": 14.1, "maxPeakMiB": 800 },
+    "color-jpx/each": { "maxOutputRatio": 5.3, "maxPeakMiB": 810 }
+  }
+}
