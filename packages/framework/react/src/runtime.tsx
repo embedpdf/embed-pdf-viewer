@@ -64,6 +64,8 @@ import type { PageViewDemand } from '@embedpdf/plugin-render/contract';
 import { browserClock } from '@embedpdf/web';
 import type { PageContext } from '@embedpdf/web';
 
+import { isDev } from './dev';
+
 const KernelCtx = createContext<Kernel | null>(null);
 /** The document a subtree is bound to. null => use the active document. */
 const DocumentScopeCtx = createContext<string | null>(null);
@@ -480,7 +482,7 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
   const latestSettings = useRef(settings);
   latestSettings.current = settings;
   const warned = useRef(false);
-  if (process.env.NODE_ENV !== 'production' && !warned.current) {
+  if (isDev() && !warned.current) {
     if (initial.current.engine !== engine || initial.current.plugins !== plugins) {
       warned.current = true;
       console.warn(

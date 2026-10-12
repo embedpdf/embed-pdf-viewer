@@ -65,7 +65,13 @@
       "@embedpdf/viewer-react",
       "@embedpdf/vue",
       "@embedpdf/web",
-      "@embedpdf/plugin-measurement"
+      "@embedpdf/plugin-measurement",
+      "@cloudpdf/viewer-vue",
+      "@cloudpdf/viewer-svelte",
+      "@cloudpdf/viewer-angular",
+      "@embedpdf/viewer-vue",
+      "@embedpdf/viewer-svelte",
+      "@embedpdf/viewer-angular"
     ]
   ],
   "linked": [],

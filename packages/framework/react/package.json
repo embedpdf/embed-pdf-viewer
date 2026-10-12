@@ -195,7 +195,8 @@
     "happy-dom": "^20.11.0",
     "typescript": "^5.0.0",
     "vitest": "^2.1.9",
-    "@embedpdf/tooling-build": "workspace:*"
+    "@embedpdf/tooling-build": "workspace:*",
+    "vite": "^6.3.5"
   },
   "license": "Apache-2.0",
   "repository": {

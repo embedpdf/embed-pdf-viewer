@@ -83,8 +83,8 @@ try {
     ),
   );
   check(
-    'the server renders the empty element with its size, and no children before the viewer',
-    html === '<embedpdf-viewer style="height:100vh"></embedpdf-viewer>',
+    'the server renders the empty element with its size and the wrapper mark, and no children before the viewer',
+    html === '<embedpdf-viewer style="height:100vh" data-epdf-wrapped=""></embedpdf-viewer>',
     html,
   );
   const coreHtml = renderToString(
@@ -92,7 +92,7 @@ try {
   );
   check(
     'the core door renders the empty element too',
-    coreHtml === '<embedpdf-viewer class="viewer"></embedpdf-viewer>',
+    coreHtml === '<embedpdf-viewer class="viewer" data-epdf-wrapped=""></embedpdf-viewer>',
     coreHtml,
   );
 

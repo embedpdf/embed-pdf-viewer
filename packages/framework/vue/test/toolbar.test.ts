@@ -1,4 +1,4 @@
-import { h, ref } from 'vue';
+import { defineComponent, h, onMounted, ref } from 'vue';
 import type { VNodeChild } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { enableAutoUnmount } from '@vue/test-utils';
@@ -159,6 +159,37 @@ describe('<Toolbar>', () => {
     );
     expect(live(wrapper, '.page-number').map((found) => found.text())).toEqual(['Page (default)']);
     expect(live(wrapper, 'button.cmd').map((button) => button.text())).toEqual(['One']);
+  });
+
+  it('measures a custom item that draws nothing in the measurement layer where it renders, by measure', async () => {
+    room = 200;
+    const schema: BarSchema = {
+      id: 'main',
+      sections: { center: [group('g', ['three', custom('wide', 'one')])] },
+    };
+    const Wide = defineComponent({
+      props: { measure: { type: Function, required: true } },
+      setup(props) {
+        onMounted(() => props.measure(500));
+        return () => h('span', { class: 'wide' }, 'Wide');
+      },
+    });
+    const { wrapper } = await mountToolbar(
+      {
+        command: commandSlot,
+        custom: ({ layer, measure }: { layer: string; measure: (length: number) => void }) =>
+          layer === 'measure' ? null : h(Wide, { measure }),
+      },
+      schema,
+    );
+    // The measurement layer holds nothing for it, not even its command: only `measure` says how
+    // long it is.
+    const layer = wrapper.find('[aria-hidden="true"]');
+    expect(layer.text()).not.toContain('One');
+    // 500px don't fit in 200: the item goes into "More", as its command.
+    expect(wrapper.findAll('.wide')).toHaveLength(0);
+    await live(wrapper, 'button[title="More"]')[0].trigger('click');
+    expect(live(wrapper, '[role="menu"] button').map((button) => button.text())).toContain('One');
   });
 
   it('without #custom, a custom item is a native slot holding its command, measured live', async () => {

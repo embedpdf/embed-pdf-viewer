@@ -148,13 +148,24 @@ interface ToolbarLengthSink {
 
 const TOOLBAR_LENGTHS = new InjectionToken<ToolbarLengthSink>('TOOLBAR_LENGTHS');
 
+/** Whether `element` draws anything: an element, or some text, among its children. */
+const drawsSomething = (element: Element): boolean =>
+  [...element.childNodes].some(
+    (node) =>
+      node.nodeType === Node.ELEMENT_NODE ||
+      (node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim())),
+  );
+
 /**
  * Reports its element's border-box length along the toolbar (its width, or its height in a
- * vertical one) to the toolbar, under its key, now and on resize.
+ * vertical one) to the toolbar, under its key, now and on resize. With `ifDrawn`, only while the
+ * element draws something: an item of your own whose template draws nothing in the measurement
+ * layer reports its length itself, with `measure`, from where it renders.
  */
 @Directive({ selector: '[epdfToolbarLength]' })
 export class EpdfToolbarLength {
   readonly key = input.required<string>({ alias: 'epdfToolbarLength' });
+  readonly ifDrawn = input(false);
 
   constructor() {
     const element = inject<ElementRef<Element>>(ElementRef).nativeElement;
@@ -165,7 +176,10 @@ export class EpdfToolbarLength {
       const orientation = sink.orientation();
       onCleanup(
         untracked(() =>
-          observeLength(element, orientation, (length) => sink.reportLength(key, length)),
+          observeLength(element, orientation, (length) => {
+            if (this.ifDrawn() && !drawsSomething(element)) return;
+            sink.reportLength(key, length);
+          }),
         ),
       );
     });
@@ -253,11 +267,15 @@ export class EpdfToolbarLength {
     <!--
       The measurement layer: every item in every variant, every folded group and the "More"
       button, hidden, inert and observed. Text reflow (a language, fonts, zoom) re-measures by
-      itself.
+      itself. An item of your own whose template draws nothing here is measured where it renders.
     -->
     <div aria-hidden="true" inert [style]="measureLayerStyle()">
       @for (item of measured(); track item.key) {
-        <span [epdfToolbarLength]="item.key" style="display: inline-flex; flex-shrink: 0">
+        <span
+          [epdfToolbarLength]="item.key"
+          [ifDrawn]="item.entry.kind === 'custom'"
+          style="display: inline-flex; flex-shrink: 0"
+        >
           <ng-container *ngTemplateOutlet="drawn; context: { $implicit: item.entry }" />
         </span>
       }

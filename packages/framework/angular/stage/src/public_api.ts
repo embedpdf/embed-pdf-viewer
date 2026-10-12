@@ -3,6 +3,7 @@
  *
  *   withStage(options)                       the plugin, for provideEmbedPdf()
  *   <epdf-stage #stage="epdfStage">          the pages, and the Stage's API
+ *   inject(EpdfStageRef)                     the Stage's API, from inside a Stage or anywhere
  *   <ng-template epdfPage>, epdfPageChrome   what each page draws, and around it
  *   <epdf-scrollbar>                         a scrollbar you style yourself
  */
@@ -11,5 +12,6 @@
 export * from '@embedpdf/plugin-stage';
 export * from './feature';
 export * from './templates';
+export * from './stage-ref';
 export * from './stage';
 export * from './scrollbar';

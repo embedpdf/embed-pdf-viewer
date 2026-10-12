@@ -199,6 +199,15 @@ const ElementBase: typeof HTMLElement =
 /** The properties a framework may set before the element is defined (see `connectedCallback`). */
 const PROPERTIES = ['config', 'src', 'theme', 'locale', 'disable', 'readOnly'] as const;
 
+/**
+ * What a framework wrapper puts on the element it renders: it sets `.config` itself, so the
+ * element waits for it instead of mounting from its attributes. Without it, an element the server
+ * rendered upgrades as soon as the viewer's code loads, before hydration gives it its config, and
+ * starts a viewer the config then replaces (on the engine-agnostic door, one with no engine).
+ * The wrappers write the attribute themselves, to keep their imports from the viewer type-only.
+ */
+const WRAPPED_ATTRIBUTE = 'data-epdf-wrapped';
+
 /** The document a `src` opened: the id its tab was reserved under, and the id it asked for. */
 interface SrcDocument {
   readonly reserved: string;
@@ -300,11 +309,12 @@ export class EmbedPdfViewerElement extends ElementBase {
       Reflect.deleteProperty(this, property);
       Reflect.set(this, property, value);
     }
-    // Deferred one microtask: a framework wrapper inserts the element and
-    // sets `.config` via ref/layout-effect in the same task — mounting eagerly
-    // here would boot the whole viewer once with attribute config and again
-    // with the real one. The config setter mounts synchronously; this only
-    // covers the purely-declarative path.
+    // A wrapper's element mounts when the wrapper sets `.config` (the setter mounts), also when
+    // it upgrades over the server's HTML before hydration runs.
+    if (this.hasAttribute(WRAPPED_ATTRIBUTE) && this.#config === null) return;
+    // Deferred one microtask: a wrapper that doesn't mark its element inserts it and sets
+    // `.config` in the same task, and mounting eagerly here would boot the whole viewer once
+    // with the attributes and again with the real config. This covers plain HTML.
     queueMicrotask(() => {
       if (this.isConnected && !this.#root) this.#mount();
     });

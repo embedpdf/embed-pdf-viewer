@@ -18,7 +18,7 @@
   defaults' colors come from the `--epdf-toolbar-*` CSS variables only.
 -->
 <script setup lang="ts">
-import { computed, onUpdated, ref, watch } from 'vue';
+import { Comment, Fragment, computed, isVNode, onUpdated, ref, watch } from 'vue';
 import { layoutToolbar, normalizeBar } from '@embedpdf/core-ui';
 import type { BarSchema, LiveSection } from '@embedpdf/core-ui';
 // The "More" menu asks which menu a command opens, a host fact, so the host lens is bound here.
@@ -39,7 +39,12 @@ import DefaultOverflowMenu from './DefaultOverflowMenu.vue';
 import DefaultOverflowTrigger from './DefaultOverflowTrigger.vue';
 import Measured from './Measured.vue';
 import ToolbarPart from './ToolbarPart.vue';
-import type { CollapsedGroupView, GroupDisclosureView, OverflowMenuView } from './views';
+import type {
+  CollapsedGroupView,
+  GroupDisclosureView,
+  OverflowMenuView,
+  ToolbarPart as Part,
+} from './views';
 
 const props = withDefaults(
   defineProps<{
@@ -64,7 +69,7 @@ const props = withDefaults(
   { orientation: 'horizontal', gap: 8, separatorWidth: 1 },
 );
 
-defineSlots<{
+const slots = defineSlots<{
   /** A command's button at a variant. Default: a plain `<button>` with the command's label. */
   command?(props: { command: ResolvedCommand; variant: string; run: () => void }): unknown;
   /**
@@ -81,7 +86,9 @@ defineSlots<{
     layer: 'live' | 'measure';
     /**
      * Report the item's length yourself (its width, or its height in a
-     * vertical toolbar), for content the measurement layer can't hold.
+     * vertical toolbar), for content the measurement layer can't hold. An
+     * item the slot draws nothing for in the `'measure'` layer, but draws in
+     * the `'live'` one, is measured only this way, where it renders.
      */
     measure: (length: number) => void;
   }): unknown;
@@ -235,6 +242,34 @@ const TOOLBAR_ITEM = { [TOOLBAR_ITEM_ATTRIBUTE]: '' };
 /** The element around an item adds no box, so the item lays out as the section's own child. */
 const ITEM_STYLE = { display: 'contents' } as const;
 
+/** Whether slot content draws anything: more than comments (a false `v-if`) and empty fragments. */
+function draws(content: unknown): boolean {
+  return (Array.isArray(content) ? content : [content]).some((node: unknown) => {
+    if (node === null || node === undefined || typeof node === 'boolean') return false;
+    if (!isVNode(node)) return true;
+    if (node.type === Comment) return false;
+    if (node.type === Fragment) return draws(node.children);
+    return true;
+  });
+}
+
+/**
+ * Whether the measurement layer holds a part. A custom item without a
+ * `#custom` slot is a socket, measured where it renders: a second <slot> of its
+ * name here would take the projected children from the row. One the slot
+ * draws nothing for here but draws in the row is measured there too, by
+ * `measure`; one it draws in neither is its command's button, measured here.
+ */
+function measuredHere(part: Part): boolean {
+  if (part.kind !== 'custom') return true;
+  const custom = slots.custom;
+  if (!custom) return false;
+  const scope = { name: part.name, variant: part.variant, measure: noop };
+  return (
+    draws(custom({ ...scope, layer: 'measure' })) || !draws(custom({ ...scope, layer: 'live' }))
+  );
+}
+
 /**
  * The hidden measurement layer: a row for a horizontal toolbar, a column for
  * a vertical one, and no height either way, so it never adds to the page. A
@@ -308,10 +343,8 @@ const measureLayerStyle = computed(() => ({
          browser zoom) fires the observers; no code handles it. -->
     <div aria-hidden="true" inert :style="measureLayerStyle">
       <template v-for="part in layout.measured" :key="part.measureKey">
-        <!-- A custom item without a #custom slot is a socket, measured where it renders: a second
-             <slot> of its name here would take the projected children from the row. -->
         <Measured
-          v-if="part.kind !== 'custom' || $slots.custom"
+          v-if="measuredHere(part)"
           :measure-key="part.measureKey"
           :orientation="orientation"
           @length="onLength"

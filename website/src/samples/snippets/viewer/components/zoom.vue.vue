@@ -11,8 +11,8 @@ const fitWidth = useCommand('zoom:fit-width');
     <Button command="zoom:out" />
     <span>{{ Math.round(zoomLevel * 100) }}%</span>
     <Button command="zoom:in" />
-    <button class="chip" :aria-pressed="fitWidth?.active" @click="fitWidth?.run()">
-      {{ fitWidth?.label }}
+    <button class="chip" :aria-pressed="fitWidth.active" @click="fitWidth.run()">
+      {{ fitWidth.label }}
     </button>
   </div>
 </template>

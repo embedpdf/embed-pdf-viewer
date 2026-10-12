@@ -2,14 +2,15 @@
  * The viewer behind `provideEmbedPdf()`: one per injector that provides it. In the browser it
  * creates the kernel as soon as the engine is there (at once for an engine instance, later for a
  * factory that loads one), starts it, opens the initial documents, runs the features' `setup`,
- * and destroys it all with the injector.
+ * and destroys it all with the injector. Given a kernel (`provideEmbedPdf({ kernel })`), it uses
+ * that one as it is, and leaves starting and destroying it to whoever made it.
  *
  * The kernel has one change stream; the host turns each change into a write of `revision`, and
  * every signal in the adapter is a `computed()` over it (`read()`), which keeps its value, and
  * wakes nothing, while what it reads is unchanged.
  *
- * On the server the kernel never exists: every read gives its empty value and a call that needs
- * the engine throws EPDF-105, so the page around the viewer still renders.
+ * On the server the host creates no kernel: every read gives its empty value and a call that
+ * needs the engine throws EPDF-105, so the page around the viewer still renders.
  */
 import { isPlatformBrowser } from '@angular/common';
 import {
@@ -41,23 +42,50 @@ import type {
   Engine,
   EventHook,
   Kernel,
+  KernelStatus,
   SettingsApi,
   SettingsDeclaration,
   ViewerSettings,
 } from '@embedpdf/core';
 import { browserClock } from '@embedpdf/web';
 import { Observable } from 'rxjs';
-import type { EmbedPdfConfig, EpdfViewerStatus } from './config';
+import type { EmbedPdfConfig, EmbedPdfKernelConfig, EpdfViewerStatus } from './config';
 import { onServerError } from './errors';
 import { SettingsBeforeStart } from './settings-before-start';
 import { EPDF_SETUP } from './tokens';
 
 /**
  * The viewer's settings as the config gives them (a setting left out is its default), the same
- * way every framework's viewer reads its props; what `resetSettings()` goes back to.
+ * way every framework's viewer reads its props; what `resetSettings()` goes back to. A kernel
+ * given has its own.
  */
-const registeredViewerSettings = (config: EmbedPdfConfig): ViewerSettings =>
-  viewerSettingsOf(config);
+const registeredViewerSettings = (config: EmbedPdfConfig | EmbedPdfKernelConfig): ViewerSettings =>
+  viewerSettingsOf('kernel' in config ? {} : config);
+
+/**
+ * Whether `kernel` has a plugin that provides `token`. A document plugin's token has its scope
+ * (any other token reads as a workspace one), and a workspace plugin's capability is there from
+ * the moment the kernel is created.
+ */
+const kernelProvides = (kernel: Kernel, token: CapabilityToken<unknown>): boolean =>
+  kernel.scopeOf(token) === 'document' || kernel.tryCapability(token) !== null;
+
+/** The settings of the plugin that provides `token` in `kernel`, or null when it has none. */
+function kernelSettingsOf<T extends object>(
+  kernel: Kernel,
+  token: CapabilityToken<unknown>,
+): SettingsApi<T> | null {
+  try {
+    return kernel.settingsOf(token) as unknown as SettingsApi<T>;
+  } catch {
+    // The kernel's answer for a token no plugin provides, or a plugin without settings.
+    return null;
+  }
+}
+
+/** What the viewer is doing, as a kernel someone else started says it. */
+const statusOfKernel = (status: KernelStatus): EpdfViewerStatus =>
+  status === 'started' ? 'ready' : status === 'failed' ? 'error' : 'starting';
 
 /** A plugin's settings, readable and changeable before the kernel exists and after. */
 export interface PluginSettingsBinding<T> {
@@ -73,12 +101,15 @@ const isPromiseLike = <T>(value: T | Promise<T>): value is Promise<T> =>
 export class EpdfKernelHost {
   private readonly setup = inject(EPDF_SETUP);
   private readonly injector = inject(Injector);
-  /** Whether this is a browser. On the server the kernel is never created. */
+  /** Whether this is a browser. On the server the host creates no kernel. */
   readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
-  /** Every plugin the features register, in their order. */
-  readonly plugins: readonly AnyPlugin[] = this.setup.features.flatMap(
-    (feature) => feature.plugins,
-  );
+  /** The kernel `provideEmbedPdf({ kernel })` was given: someone else's, used as it is. */
+  private readonly given: Kernel | null =
+    'kernel' in this.setup.config ? this.setup.config.kernel : null;
+  /** Every plugin the features register, in their order: none for a kernel given, which has its own. */
+  readonly plugins: readonly AnyPlugin[] = this.given
+    ? []
+    : this.setup.features.flatMap((feature) => feature.plugins);
 
   private readonly kernelState = signal<Kernel | null>(null);
   private readonly revisionState = signal(0);
@@ -90,18 +121,30 @@ export class EpdfKernelHost {
     registered: registeredViewerSettings(this.setup.config),
     whole: VIEWER_WHOLE_SETTINGS,
   });
-  private readonly pluginSettings = new Map<AnyPlugin, PluginSettingsBinding<object>>();
+  private readonly pluginSettings = new Map<
+    CapabilityToken<unknown>,
+    PluginSettingsBinding<object>
+  >();
   private readonly pluginSettingsBeforeStart = new Map<AnyPlugin, SettingsBeforeStart<object>>();
   private engine: Engine | null = null;
   private ownsEngine = false;
   private stopListening: (() => void) | null = null;
   private destroyed = false;
 
-  /** The kernel, once it exists: null while a lazily loaded engine is on its way, and on the server. */
+  /**
+   * The kernel, once it exists: null while a lazily loaded engine is on its way, and on the
+   * server, where only a kernel given is there.
+   */
   readonly kernel: Signal<Kernel | null> = this.kernelState.asReadonly();
   /** Goes up on every change of the kernel's state. */
   readonly revision: Signal<number> = this.revisionState.asReadonly();
-  readonly status: Signal<EpdfViewerStatus> = this.statusState.asReadonly();
+  /** A kernel given says it itself: someone else starts it. */
+  readonly status: Signal<EpdfViewerStatus> = this.given
+    ? this.read(
+        (kernel) => statusOfKernel(kernel.status()),
+        () => 'starting',
+      )
+    : this.statusState.asReadonly();
   /** Why the viewer failed to start, when `status()` is `'error'`. */
   readonly error: Signal<unknown> = this.errorState.asReadonly();
   /** The viewer's own settings, before the kernel exists and after. */
@@ -113,8 +156,11 @@ export class EpdfKernelHost {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.destroy());
+    const { config } = this.setup;
+    // A kernel given is the kernel, wherever it was made.
+    if ('kernel' in config) this.adopt(config.kernel);
     if (!this.browser) return;
-    this.start();
+    if (!('kernel' in config)) this.start(config);
     // After construction, because a feature's setup injects services, and they inject this host.
     queueMicrotask(() => this.runFeatureSetups());
   }
@@ -169,7 +215,15 @@ export class EpdfKernelHost {
 
   /** Whether a plugin of this viewer provides `token` (the documents are always there). */
   provides(token: CapabilityToken<unknown>): boolean {
-    return token === DocumentsToken || this.pluginFor(token) !== null;
+    if (token === DocumentsToken) return true;
+    return this.given ? kernelProvides(this.given, token) : this.pluginFor(token) !== null;
+  }
+
+  /** Whether the plugin of this viewer that provides `token` has settings. */
+  hasSettings(token: CapabilityToken<unknown>): boolean {
+    return this.given
+      ? kernelSettingsOf(this.given, token) !== null
+      : Boolean(this.pluginFor(token)?.settings);
   }
 
   /**
@@ -200,18 +254,29 @@ export class EpdfKernelHost {
    * the plugin as the app registered it. One binding per plugin, shared by every service.
    */
   settingsOf<T extends object>(token: CapabilityToken<unknown>): PluginSettingsBinding<T> {
+    const known = this.pluginSettings.get(token);
+    if (known) return known as PluginSettingsBinding<T>;
+    const binding = this.given
+      ? this.givenSettingsOf<T>(this.given, token)
+      : this.registeredSettingsOf<T>(token);
+    this.pluginSettings.set(token, binding as PluginSettingsBinding<object>);
+    return binding;
+  }
+
+  /** A registered plugin's settings, kept from before the kernel exists. */
+  private registeredSettingsOf<T extends object>(
+    token: CapabilityToken<unknown>,
+  ): PluginSettingsBinding<T> {
     const plugin = this.pluginFor(token);
     const declaration = plugin?.settings as SettingsDeclaration<T> | undefined;
     if (!plugin || !declaration) {
       throw new PluginError('unsupported', token.name, 'this plugin has no settings');
     }
-    const known = this.pluginSettings.get(plugin);
-    if (known) return known as PluginSettingsBinding<T>;
 
     const before = new SettingsBeforeStart<T>(declaration);
     this.pluginSettingsBeforeStart.set(plugin, before as SettingsBeforeStart<object>);
     const store = (kernel: Kernel) => kernel.settingsOf(token) as unknown as SettingsApi<T>;
-    const binding: PluginSettingsBinding<T> = {
+    return {
       current: this.read(
         (kernel) => store(kernel).getSettings(),
         () => before.current(),
@@ -228,8 +293,21 @@ export class EpdfKernelHost {
         else before.reset();
       },
     };
-    this.pluginSettings.set(plugin, binding as PluginSettingsBinding<object>);
-    return binding;
+  }
+
+  /** A plugin's settings in a kernel given, which is there from the start. */
+  private givenSettingsOf<T extends object>(
+    kernel: Kernel,
+    token: CapabilityToken<unknown>,
+  ): PluginSettingsBinding<T> {
+    const store = kernelSettingsOf<T>(kernel, token);
+    if (!store) throw new PluginError('unsupported', token.name, 'this plugin has no settings');
+    const current = () => store.getSettings();
+    return {
+      current: this.read(current, current, shallowEqual),
+      update: (change) => store.updateSettings(change),
+      reset: () => store.resetSettings(),
+    };
   }
 
   private pluginFor(token: CapabilityToken<unknown>): AnyPlugin | null {
@@ -238,8 +316,15 @@ export class EpdfKernelHost {
 
   // ── lifetime ────────────────────────────────────────────────────────────────
 
-  private start(): void {
-    const source = this.setup.config.engine;
+  /** Follow a kernel someone else made: its changes, and nothing of its lifetime. */
+  private adopt(kernel: Kernel): void {
+    this.stopListening = kernel.subscribe(() => this.changed());
+    this.kernelState.set(kernel);
+    this.changed();
+  }
+
+  private start(config: EmbedPdfConfig): void {
+    const source = config.engine;
     const owned = typeof source === 'function';
     let made: Engine | Promise<Engine>;
     try {
@@ -250,16 +335,16 @@ export class EpdfKernelHost {
     }
     if (isPromiseLike(made)) {
       made.then(
-        (engine) => this.attach(engine, owned),
+        (engine) => this.attach(config, engine, owned),
         (error: unknown) => this.fail(error),
       );
     } else {
-      this.attach(made, owned);
+      this.attach(config, made, owned);
     }
   }
 
   /** Create and start the kernel over `engine`. An engine this viewer made is destroyed with it. */
-  private attach(engine: Engine, owned: boolean): void {
+  private attach(config: EmbedPdfConfig, engine: Engine, owned: boolean): void {
     if (this.destroyed) {
       if (owned) void engine.destroy();
       return;
@@ -271,7 +356,7 @@ export class EpdfKernelHost {
       kernel = createKernel({
         engine,
         plugins: [...this.plugins],
-        settings: registeredViewerSettings(this.setup.config),
+        settings: registeredViewerSettings(config),
         clock: browserClock(),
       });
     } catch (error) {
@@ -293,7 +378,7 @@ export class EpdfKernelHost {
         if (this.destroyed) return;
         this.statusState.set('ready');
         // Every tab appears at once, in order; a document that fails shows it in its own tab.
-        kernel.documents.openAll(this.setup.config.initialDocuments ?? []);
+        kernel.documents.openAll(config.initialDocuments ?? []);
       },
       (error: unknown) => {
         if (!this.destroyed) this.fail(error);
@@ -324,6 +409,8 @@ export class EpdfKernelHost {
     this.destroyed = true;
     this.stopListening?.();
     this.listeners.clear();
+    // A kernel given is its maker's to destroy.
+    if (this.given) return;
     const kernel = this.kernelState();
     const engine = this.engine;
     const owned = this.ownsEngine;

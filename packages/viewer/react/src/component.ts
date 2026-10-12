@@ -222,6 +222,8 @@ export function PDFViewer({
       // as an attribute of that name, in the browser and on the server.
       ...(className === undefined ? {} : { class: className }),
       style,
+      // The element waits for the config this sets, also over the server's HTML before hydration.
+      'data-epdf-wrapped': '',
     },
     viewer ? inViewer(viewer, children) : null,
   );

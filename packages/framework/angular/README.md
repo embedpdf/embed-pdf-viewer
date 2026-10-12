@@ -97,9 +97,10 @@ have yet.
   other method tracks nothing. Without a document a method refuses with `not-ready`: one that
   returns a promise (`form.setValue`, `signature.placeMark`) rejects, so `.catch()` sees it, and
   the others throw. Which methods return a promise comes from the plugin's token (`promises`).
-- **Components** have signal inputs and outputs; the Stage is its own API (`#stage="epdfStage"`,
-  `viewChild(EpdfStage)`, `inject(EpdfStage)` inside it). **Templates** replace React's render
-  functions: `<ng-template epdfPage let-page>`.
+- **Components** have signal inputs and outputs; the Stage is its own API, reached from around it
+  with `#stage="epdfStage"` or `viewChild(EpdfStage)`, and from inside it with
+  `inject(EpdfStageRef)`, which anywhere else drives the main view of the document in scope.
+  **Templates** replace React's render functions: `<ng-template epdfPage let-page>`.
 - **Errors** a developer can make while setting up have a number and the fix:
   `EPDF-101` (no viewer), `EPDF-102` (a plugin's service without its feature), `EPDF-103` (page UI
   outside a page), `EPDF-104` (Stage UI outside a Stage), `EPDF-105` (an engine call on the

@@ -7,6 +7,7 @@ import { CounterToken, bytesInput, counterPlugin } from '../fixtures/counter-plu
 import Probes from '../fixtures/Probes.svelte';
 import ToolbarHarness from '../fixtures/ToolbarHarness.svelte';
 import { latest, viewerWith } from '../fixtures/viewer';
+import { wide } from '../fixtures/Wide.svelte';
 
 /**
  * `useStripView(bar)`: the bar's visible commands, grouped, or null while none applies.
@@ -16,7 +17,10 @@ import { latest, viewerWith } from '../fixtures/viewer';
  * is whatever the test gives `clientWidth`.
  */
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 const withWidth = (width: number) =>
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
@@ -39,6 +43,35 @@ const commands = (run = vi.fn()) => [
     ],
   }),
 ];
+
+/**
+ * Resize observers that report when the test says, the way a browser reports them after a layout:
+ * `fire()` calls every observer with no entries, so each measured element reads its box again.
+ */
+const observedResizes = () => {
+  const observers = new Set<ResizeObserverCallback>();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      readonly #callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.#callback = callback;
+      }
+      observe() {
+        observers.add(this.#callback);
+      }
+      unobserve() {}
+      disconnect() {
+        observers.delete(this.#callback);
+      }
+    },
+  );
+  return {
+    fire: () => {
+      for (const callback of [...observers]) callback([], {} as ResizeObserver);
+    },
+  };
+};
 
 /** What a selector finds in the live row, and in the hidden measurement layer. */
 const split = (root: HTMLElement, selector: string) => {
@@ -136,6 +169,34 @@ describe('Toolbar', () => {
       ['full', 'live'],
     ]);
     expect(items.measured.map((element) => element.dataset.variant)).toEqual(['full', 'compact']);
+  });
+
+  it('measures a custom item that draws nothing in the measurement layer where it renders, by ctx.measure', async () => {
+    withWidth(200);
+    const resizes = observedResizes();
+    wide.mounts = 0;
+    const wideBar: BarSchema = {
+      id: 'main',
+      sections: { center: [group('pages', ['zoom:in', custom('wide', 'page:go-to')])] },
+    };
+    const { view } = await viewerWith(commands(), ToolbarHarness, {
+      bar: wideBar,
+      drawCustom: 'measured',
+    });
+    flushSync();
+    // 500px don't fit in 200: the item goes into "More", as its command.
+    expect(view.container.querySelectorAll('.wide')).toHaveLength(0);
+    expect(wide.mounts).toBe(1);
+
+    // A resize in the measurement layer (a font loading) reports nothing for it, so it never
+    // comes back to the row as 0px wide.
+    resizes.fire();
+    flushSync();
+    expect(wide.mounts).toBe(1);
+    await fireEvent.click(split(view.container, 'button[title="More"]').live[0]!);
+    expect(view.getAllByRole('menuitem').map((row) => row.textContent?.trim())).toContain(
+      'Go to page',
+    );
   });
 
   it('without a custom snippet, a custom item is a native slot holding its command', async () => {

@@ -42,7 +42,8 @@ export interface EpdfToolbarCustomContext {
   /**
    * Report the item's length yourself (its width, or its height in a vertical toolbar), for
    * content the hidden layer can't draw. The toolbar measures what the template draws without
-   * it.
+   * it; a template that draws nothing in the hidden layer (`layer === 'measure'`) is measured
+   * where it renders, by what it reports here.
    */
   measure: (length: number) => void;
 }

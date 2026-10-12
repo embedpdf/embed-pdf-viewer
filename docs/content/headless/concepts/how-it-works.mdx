@@ -90,8 +90,9 @@ Every plugin gives your components one service, `inject(EpdfSearch)` for search,
 
 Search is the example; every plugin follows the pattern: `inject(EpdfAnnotation)`,
 `inject(EpdfSelection)`, and so on. A plugin without settings has no `settings()`, and one without
-events has no streams. The Stage is the one exception: it's a component, so you reach its API
-through a template reference, `<epdf-stage #stage="epdfStage">`, or `viewChild(EpdfStage)`.
+events has no streams. The Stage follows it too, with `inject(EpdfStageRef)`: inside a Stage it's
+that Stage, and anywhere else the main Stage of the document in scope. From around a Stage, a
+template reference, `<epdf-stage #stage="epdfStage">`, or `viewChild(EpdfStage)` reaches it.
 
 </Fw>
 

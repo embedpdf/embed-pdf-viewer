@@ -1,0 +1,69 @@
+{
+  "name": "@cloudpdf/viewer-svelte",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Svelte wrapper for the full viewer wired to CloudPDF: the CloudPDFViewer component. A thin cloud door over @embedpdf/viewer-svelte/core: rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS, and the local engine loads only when stamps need it.",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "svelte-package --input src --output dist && node ../../../tooling/build/src/fully-specify-imports.mjs",
+    "clean": "rimraf dist",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json --threshold error"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/viewer/svelte"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "viewer",
+    "svelte",
+    "cloud"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@cloudpdf/viewer": "workspace:*",
+    "@embedpdf/viewer-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5.29.0"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "rimraf": "^5.0.0",
+    "typescript": "~5.8.3",
+    "svelte": "^5.39.5",
+    "@sveltejs/package": "^2.5.0",
+    "svelte-check": "^4.3.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "svelte": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

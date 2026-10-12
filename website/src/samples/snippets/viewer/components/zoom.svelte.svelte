@@ -10,7 +10,7 @@
   <Button command="zoom:out" />
   <span>{Math.round(stage.zoomLevel * 100)}%</span>
   <Button command="zoom:in" />
-  <button class="chip" aria-pressed={fitWidth.current?.active} onclick={fitWidth.current?.run}>
-    {fitWidth.current?.label}
+  <button class="chip" aria-pressed={fitWidth.current.active} onclick={fitWidth.current.run}>
+    {fitWidth.current.label}
   </button>
 </div>

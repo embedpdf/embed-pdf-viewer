@@ -292,9 +292,14 @@
   <div aria-hidden="true" inert style={measureLayerStyle}>
     {#each layout.measured as measuredPart (measuredPart.measureKey)}
       <!-- A custom item without a `custom` snippet is a socket, measured where it renders: a
-           second <slot> of its name here would take the projected children from the row. -->
+           second <slot> of its name here would take the projected children from the row. One
+           whose snippet draws nothing here is measured where it renders too, by `ctx.measure`. -->
       {#if measuredPart.kind !== 'custom' || custom}
-        <Measured {orientation} onLength={(length) => report(measuredPart.measureKey, length)}>
+        <Measured
+          {orientation}
+          onlyWhenDrawn={measuredPart.kind === 'custom'}
+          onLength={(length) => report(measuredPart.measureKey, length)}
+        >
           {@render part(measuredPart, 'measure')}
         </Measured>
       {/if}

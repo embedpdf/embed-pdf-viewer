@@ -1,7 +1,7 @@
 import { PercentPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { EpdfCommand } from '@embedpdf/angular/commands';
-import { EpdfStage } from '@embedpdf/angular/stage';
+import { EpdfStageRef } from '@embedpdf/angular/stage';
 import { EpdfButton } from '@embedpdf/viewer-angular';
 
 @Component({
@@ -17,5 +17,5 @@ import { EpdfButton } from '@embedpdf/viewer-angular';
   `,
 })
 export class ZoomPill {
-  protected readonly stage = inject(EpdfStage);
+  protected readonly stage = inject(EpdfStageRef);
 }

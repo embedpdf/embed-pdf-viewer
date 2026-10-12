@@ -1,4 +1,7 @@
-/** The props of the runtime's components: `<Viewer>`, `<DocumentGate>` and `<DocumentScope>`. */
+/**
+ * The props of the runtime's components: `<Viewer>`, `<KernelProvider>`, `<DocumentGate>` and
+ * `<DocumentScope>`.
+ */
 import type { Snippet } from 'svelte';
 import type {
   AnyPlugin,
@@ -48,6 +51,12 @@ export interface ViewerProps {
   fallback?: Snippet;
   /** Shown when the viewer couldn't start, with why. Without it, a failed start shows nothing. */
   error?: Snippet<[error: unknown]>;
+  children?: Snippet;
+}
+
+export interface KernelProviderProps {
+  /** The kernel everything inside reads. Read once: a new kernel takes a new provider. */
+  kernel: Kernel;
   children?: Snippet;
 }
 

@@ -169,7 +169,7 @@ export function pluginService<
       // Settings belong to the plugin as the app registered it, not to a document: they work
       // with no document open, and before the kernel exists.
       const host = binding.host;
-      if (host.plugins.some((plugin) => plugin.token === spec.token && plugin.settings)) {
+      if (host.hasSettings(spec.token)) {
         const settings = host.settingsOf<object>(spec.token);
         members['settings'] = settings.current;
         // A read, like every `get*` method: a template or an effect that calls it follows it.

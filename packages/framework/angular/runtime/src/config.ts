@@ -1,7 +1,7 @@
 /**
  * What `provideEmbedPdf(config, ...features)` takes: the config (the engine, the documents to
- * open, the viewer's settings) and one feature per plugin (`withStage()`, `withSearch()`).
- * Both are read once, when the viewer starts.
+ * open, the viewer's settings, or a kernel someone else made) and one feature per plugin
+ * (`withStage()`, `withSearch()`). Both are read once, when the viewer starts.
  */
 import type { Provider, Type } from '@angular/core';
 import type {
@@ -9,6 +9,7 @@ import type {
   Engine,
   Identity,
   InitialDocument,
+  Kernel,
   ViewerPageSettings,
 } from '@embedpdf/core';
 
@@ -47,6 +48,17 @@ export interface EmbedPdfConfig {
   readonly accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
   readonly page?: Partial<ViewerPageSettings>;
+}
+
+/**
+ * A kernel someone else created and owns, for `provideEmbedPdf({ kernel })`: every service,
+ * component and directive under that injector works against it, and the injector neither starts
+ * nor destroys it. The full viewer's Angular wrapper gives the templates you put in it one of
+ * these, with the viewer's kernel. Its plugins are the kernel's: a feature's `plugins` are not
+ * registered again, while its services, providers and `setup` work as with a kernel of its own.
+ */
+export interface EmbedPdfKernelConfig {
+  readonly kernel: Kernel;
 }
 
 /**

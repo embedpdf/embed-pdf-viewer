@@ -2,20 +2,23 @@
  * `<epdf-stage>` as Angular code uses it: its State table as signals through a template
  * reference, read empty without a document; a second view through `[token]`; its settings;
  * each visible page drawn with the page and chrome templates; `inject(EpdfStage)` inside it;
- * `[(page)]` both ways; `[document]` opening and closing; and its events as streams.
+ * `[(page)]` both ways; `[document]` opening and closing; and its events as streams. And
+ * `inject(EpdfStageRef)`: inside a Stage that Stage, anywhere else the main view of the document
+ * in scope.
  */
 import { Component, inject, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createCapabilityToken } from '@embedpdf/core';
-import { injectPage, type EpdfPageContext } from '@embedpdf/angular/runtime';
+import { EpdfDocumentScope, injectPage, type EpdfPageContext } from '@embedpdf/angular/runtime';
 import {
   DEFAULT_SETTINGS,
   EpdfPageChrome,
   EpdfPageTemplate,
   EpdfScrollbar,
   EpdfStage,
+  EpdfStageRef,
   StageToken,
   withStage,
   type StageCapability,
@@ -300,5 +303,85 @@ describe('<epdf-scrollbar>', () => {
       ),
     ).rejects.toThrow('EPDF-104');
     quiet.mockRestore();
+  });
+});
+
+describe('inject(EpdfStageRef)', () => {
+  /** What injects it: a component that keeps what it got. */
+  const injected: EpdfStageRef[] = [];
+  @Component({ selector: 'test-stage-ref', template: '' })
+  class StageRefProbe {
+    constructor() {
+      injected.push(inject(EpdfStageRef));
+    }
+  }
+
+  it('outside a Stage drives the main view of the document in scope, else the active one', async () => {
+    injected.length = 0;
+    const fixture = await mount(
+      viewerHost({
+        imports: [StageRefProbe, EpdfDocumentScope],
+        config: { engine: fakeEngine(3).engine },
+        features,
+        template: `
+          <test-stage-ref />
+          <div [epdfDocumentScope]="'a'"><test-stage-ref /></div>
+        `,
+      }),
+    );
+    const [active, scoped] = injected;
+    const kernel = kernelOf(fixture);
+    await kernel.documents.open(bytesInput('a'));
+    await kernel.documents.open(bytesInput('b'));
+    await settle(fixture);
+    expect(kernel.documents.getActiveId()).toBe('b');
+
+    scoped!.setViewRotation(90);
+    active!.setViewRotation(180);
+    await settle(fixture);
+    expect(kernel.capability(StageToken, 'a').getViewRotation()).toBe(90);
+    expect(kernel.capability(StageToken, 'b').getViewRotation()).toBe(180);
+    // The main view: the second one keeps its own.
+    expect(kernel.capability(ThumbsToken, 'a').getViewRotation()).toBe(0);
+    expect([scoped!.viewRotation(), active!.viewRotation()]).toEqual([90, 180]);
+    expect(scoped!.pageCount()).toBe(3);
+  });
+
+  it('inside <epdf-stage [token]> is that Stage, driving its view', async () => {
+    injected.length = 0;
+    @Component({
+      selector: 'test-thumbs-stage',
+      imports: [EpdfStage, StageRefProbe],
+      template: '<epdf-stage [token]="thumbs"><test-stage-ref /></epdf-stage>',
+    })
+    class ThumbsStage {
+      readonly thumbs = ThumbsToken;
+    }
+    const fixture = await mount(
+      viewerHost({ imports: [ThumbsStage], features, template: '<test-thumbs-stage />' }),
+    );
+    const kernel = kernelOf(fixture);
+    await kernel.documents.open(bytesInput('a'));
+    await settle(fixture);
+    const stage = fixture.debugElement.query(By.directive(EpdfStage)).componentInstance;
+    // Compared by identity: a component is too big to print when it isn't the one.
+    expect(injected.length).toBe(1);
+    expect(injected[0] === stage).toBe(true);
+    injected[0]!.setViewRotation(270);
+    expect(kernel.capability(ThumbsToken).getViewRotation()).toBe(270);
+    expect(kernel.capability(StageToken).getViewRotation()).toBe(0);
+  });
+
+  it('reads empty values with no document, and its methods refuse with not-ready', async () => {
+    injected.length = 0;
+    await mount(viewerHost({ imports: [StageRefProbe], features, template: '<test-stage-ref />' }));
+    const [stage] = injected;
+    expect([stage!.currentPageIndex(), stage!.pageCount(), stage!.currentPage()]).toEqual([
+      0,
+      0,
+      null,
+    ]);
+    expect(stage!.settings()).toBe(DEFAULT_SETTINGS);
+    expect(() => stage!.zoomIn()).toThrow('no document is open');
   });
 });

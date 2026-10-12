@@ -34,9 +34,10 @@ it a <Word of="renderFunction" /> that draws one page:
 
 <Fw only="angular">
 
-The Stage is a component, and a template reference gives you both: `stage.zoomLevel()`, a signal,
-to show, and `stage.zoomIn()` and the other calls to change it. In code, `viewChild(EpdfStage)`
-reaches it, and what you put inside `<epdf-stage>` uses `inject(EpdfStage)`:
+A template reference to the Stage gives you both: `stage.zoomLevel()`, a signal, to show, and
+`stage.zoomIn()` and the other calls to change it. From around the Stage, that reference or
+`viewChild(EpdfStage)` reaches it. From inside it, `inject(EpdfStageRef)` gives you the same Stage;
+anywhere else in the viewer, it gives you the main Stage of the document in scope:
 
 </Fw>
 
@@ -392,8 +393,8 @@ Everything `useStage()` gives you.
 
 <Fw only="angular">
 
-Everything the Stage component has: `stage.zoomIn()` through `#stage="epdfStage"`,
-`viewChild(EpdfStage)`, or `inject(EpdfStage)` inside it.
+Everything the Stage has: `stage.zoomIn()` through `#stage="epdfStage"` or `viewChild(EpdfStage)`
+from around it, or through `inject(EpdfStageRef)` from inside it.
 
 </Fw>
 
@@ -506,8 +507,8 @@ Set once, when you register the plugin:
 <Fw only="angular">
 
 `(pageChange)` is the output half of `[(page)]`: the new page's index. Every event below is a stream
-on the Stage component, such as `stage.pageChanged$`, for code that holds it through
-`viewChild(EpdfStage)` or `inject(EpdfStage)`.
+on the Stage, such as `stage.pageChanged$`, for code that holds it through `viewChild(EpdfStage)` or
+`inject(EpdfStageRef)`.
 
 </Fw>
 

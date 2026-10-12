@@ -3,7 +3,7 @@
  * them and the ones that read them never import each other.
  */
 import { InjectionToken, type Signal } from '@angular/core';
-import type { EmbedPdfConfig, EmbedPdfFeature } from './config';
+import type { EmbedPdfConfig, EmbedPdfFeature, EmbedPdfKernelConfig } from './config';
 
 /**
  * The document a part of the template talks to: `[epdfDocumentScope]`, or a Stage that opened
@@ -17,7 +17,7 @@ export const EPDF_DOCUMENT_SCOPE = new InjectionToken<EpdfDocumentScopeRef>('EPD
 
 /** What `provideEmbedPdf()` was given, for the viewer it creates. */
 export interface EmbedPdfSetup {
-  readonly config: EmbedPdfConfig;
+  readonly config: EmbedPdfConfig | EmbedPdfKernelConfig;
   readonly features: readonly EmbedPdfFeature[];
 }
 

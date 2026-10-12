@@ -1,0 +1,77 @@
+{
+  "name": "@cloudpdf/viewer-angular",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Angular wrapper for the full viewer wired to CloudPDF: a thin cloud door over @embedpdf/viewer-angular's engine-agnostic entry.",
+  "type": "module",
+  "module": "./dist/fesm2022/cloudpdf-viewer-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/cloudpdf-viewer-angular.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json && rimraf dist/package.json",
+    "clean": "rimraf dist",
+    "typecheck": "ngc -p tsconfig.json"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/viewer/angular"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "viewer",
+    "angular",
+    "cloud"
+  ],
+  "dependencies": {
+    "@cloudpdf/viewer": "workspace:*",
+    "@embedpdf/viewer-angular": "workspace:*"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=20.2.0 <23.0.0",
+    "@angular/core": ">=20.2.0 <23.0.0",
+    "@angular/forms": ">=20.2.0 <23.0.0"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "rimraf": "^5.0.0",
+    "typescript": "~5.8.3",
+    "@angular/common": "~20.2.0",
+    "@angular/compiler": "~20.2.0",
+    "@angular/compiler-cli": "~20.2.0",
+    "@angular/core": "~20.2.0",
+    "ng-packagr": "~20.2.0",
+    "rxjs": "^7.8.0",
+    "tslib": "^2.6.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/fesm2022/cloudpdf-viewer-angular.mjs"
+      }
+    }
+  },
+  "epdf": {
+    "devExports": "development"
+  }
+}

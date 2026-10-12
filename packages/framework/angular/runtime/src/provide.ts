@@ -7,10 +7,11 @@
  * It works in a component's `providers` (that component and everything in its template share
  * one viewer, and the component can inject its services itself), in a route's `providers`, and
  * in the app config. Each injector that provides it gets its own viewer, created in the browser
- * and destroyed with the injector.
+ * and destroyed with the injector. `provideEmbedPdf({ kernel })` gives the injector a kernel
+ * someone else made instead, which it neither starts nor destroys.
  */
 import type { Provider, Type } from '@angular/core';
-import type { EmbedPdfConfig, EmbedPdfFeature } from './config';
+import type { EmbedPdfConfig, EmbedPdfFeature, EmbedPdfKernelConfig } from './config';
 import { EpdfKernelHost } from './kernel-host';
 import { EpdfDocument, EpdfDocuments, EpdfViewer } from './services';
 import { EPDF_SETUP, type EmbedPdfSetup } from './tokens';
@@ -29,9 +30,9 @@ const scopedServices: Type<unknown>[] = [EpdfDocuments, EpdfDocument];
  */
 export const EPDF_SCOPED_SERVICES: Provider[] = scopedServices;
 
-/** The viewer, with the plugins its features register. */
+/** The viewer, with the plugins its features register; or the viewer of a kernel given. */
 export function provideEmbedPdf(
-  config: EmbedPdfConfig,
+  config: EmbedPdfConfig | EmbedPdfKernelConfig,
   ...features: EmbedPdfFeature[]
 ): Provider[] {
   for (const feature of features) {

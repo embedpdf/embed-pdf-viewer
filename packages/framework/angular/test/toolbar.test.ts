@@ -10,7 +10,7 @@
  * a fixed length for every measured element (a width across, a height down) and the room the
  * test gives the toolbar along the way it runs.
  */
-import { ChangeDetectionStrategy, Component, type Type } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, type OnInit, type Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withCommands } from '@embedpdf/angular/commands';
@@ -35,6 +35,8 @@ const layout = vi.hoisted(() => ({
   room: { horizontal: 1000, vertical: 1000 } as Record<'horizontal' | 'vertical', number>,
   /** Sets the room the toolbar has to fill, along the way it runs now. */
   setContainer: (_length: number) => {},
+  /** Every measured element's report, as a resize would send it again. */
+  reports: new Set<() => void>(),
 }));
 
 vi.mock('@embedpdf/web', async (importOriginal) => {
@@ -51,8 +53,10 @@ vi.mock('@embedpdf/web', async (importOriginal) => {
       return () => {};
     },
     observeLength: (_element: Element, orientation: Way, onLength: (length: number) => void) => {
-      onLength(layout.item[orientation]);
-      return () => {};
+      const report = () => onLength(layout.item[orientation]);
+      layout.reports.add(report);
+      report();
+      return () => layout.reports.delete(report);
     },
   };
 });
@@ -139,6 +143,44 @@ class CustomToolbar {
         ]),
       ],
     },
+  };
+}
+
+/** How many times the live copy of the item below was drawn. */
+let wideDrawn = 0;
+
+/** An item of your own that only its live copy can measure: it reports 500px itself. */
+@Component({ selector: 'test-wide', template: '<span class="wide">Wide</span>' })
+class Wide implements OnInit {
+  readonly measure = input.required<(length: number) => void>();
+
+  ngOnInit(): void {
+    wideDrawn += 1;
+    this.measure()(500);
+  }
+}
+
+@Component({
+  selector: 'test-measured-live-toolbar',
+  imports: [EpdfToolbar, EpdfToolbarCommandTemplate, EpdfToolbarCustomTemplate, Wide],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <epdf-toolbar [bar]="bar">
+      <ng-template epdfToolbarCommand let-command let-run="run">
+        <button class="cmd" (click)="run()">{{ command.label }}</button>
+      </ng-template>
+      <ng-template epdfToolbarCustom="wide" let-layer="layer" let-measure="measure">
+        @if (layer === 'live') {
+          <test-wide [measure]="measure" />
+        }
+      </ng-template>
+    </epdf-toolbar>
+  `,
+})
+class MeasuredLiveToolbar {
+  readonly bar: BarSchema = {
+    id: 'measured-live',
+    sections: { center: [group('g', ['test:out', custom('wide', 'test:next')])] },
   };
 }
 
@@ -277,6 +319,36 @@ describe('<epdf-toolbar>', () => {
     expect(slot?.textContent?.trim()).toBe('PREVIOUS');
     // Only one slot of a name: the measurement layer leaves it out.
     expect(measured().querySelector('slot')).toBeNull();
+  });
+
+  it('measures an item of your own that draws nothing in the measurement layer where it renders, by measure', async () => {
+    layout.room = { horizontal: 200, vertical: 200 };
+    wideDrawn = 0;
+    const { fixture, toolbar, measured } = await toolbarWith(
+      MeasuredLiveToolbar,
+      'test-measured-live-toolbar',
+    );
+    // 500px don't fit in 200: the item goes into "More", as its command.
+    const live = () => toolbar.querySelectorAll(':scope > div:not([aria-hidden]) .wide');
+    expect(live()).toHaveLength(0);
+    expect(wideDrawn).toBe(1);
+    // The measurement layer draws nothing for it, so a resize there doesn't report it as the
+    // 60px every other element measures, which would fit and draw it in the row again.
+    expect(measured().querySelector('.wide')).toBeNull();
+    for (const report of layout.reports) report();
+    await fixture.whenStable();
+    expect(wideDrawn).toBe(1);
+    expect(live()).toHaveLength(0);
+    const more = toolbar.querySelector(
+      ':scope > div:not([aria-hidden]) button[title="More"]',
+    ) as HTMLButtonElement;
+    more.click();
+    await fixture.whenStable();
+    expect(
+      [...toolbar.querySelectorAll('[role="menu"] [role="menuitem"]')].map((row) =>
+        row.textContent?.trim(),
+      ),
+    ).toContain('NEXT');
   });
 
   it('folds a group into its plain <select> when it doesn’t fit, which runs the one picked', async () => {

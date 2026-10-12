@@ -17,7 +17,6 @@ export const VIEWER_PENDING = {
     P2: 'theme.accent, disable and layout in the config',
     T1: 'the accent color',
     K1: 'a command with a label of its own',
-    C4: 'ToolbarItem in Vue, Svelte and Angular, whose wrappers do not exist yet',
     A1: 'your button reachable with the keyboard',
   },
   setup: {
@@ -46,19 +45,14 @@ export const VIEWER_PENDING = {
   'customize/menus': {
     L1: 'highlight, underline and strike out in the bar over selected text: it has Copy only',
     L14: 'the bar over a selection sits above it: today it sits below',
-    C3: 'Menu and MenuItem in Vue, Svelte and Angular, whose wrappers do not exist yet',
   },
   'customize/panels': {
     N4: 'the outline and attachments panels: the engine reads no outline, and no plugin lists the attached files',
     P7: 'Ctrl/Cmd+F for the search panel, once shortcuts reach only the viewer that has focus',
   },
   'customize/components': {
-    C2: 'where an item sits in Vue, Svelte and Angular: React has useToolbarItem() and HTML the data-* attributes',
-    C3: 'Button, Menu and MenuItem in Vue, Svelte and Angular: React and plain HTML have them',
-    C4: 'ToolbarItem, Panel and Region in Vue, Svelte and Angular: React has them',
     K1: 'a command run that gets get, viewer and documentId, as the selected-text example writes it',
     T1: 'the viewer colors as --epdf-surface, --epdf-text and --epdf-border for your styles',
-    P3: 'the components exported from every framework package',
   },
   'customize/small-screens': {
     L7: 'the mode tabs as one dropdown on a phone: they shed behind a chevron instead',
@@ -86,9 +80,6 @@ export const VIEWER_PENDING = {
     F4: 'plugins.signature.kinds and fonts, and the default handwriting fonts',
     F5: 'the Form mode bar is form, and removing it keeps filling in',
     F6: 'form scripts with no network or window access, checked',
-  },
-  'code/viewer': {
-    P2: 'onReady and onDocumentChange on the Vue, Svelte and Angular wrappers, which do not exist yet',
   },
   'code/plugins': {
     F4: 'viewer-only settings next to the plugin settings',

@@ -118,6 +118,8 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     baseUrl,
     token,
     fetch: fetchFn,
+    docAffinityHeader,
+    onRetry,
     docToken,
     docId,
     shareToken,
@@ -127,7 +129,16 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     ...rest
   } = options;
 
-  const engine: EngineFactory = () => cloudEngine({ baseUrl, token, fetch: fetchFn });
+  // Every engine option, so none falls through to the viewer, where nothing reads it: an option
+  // the engine adds and this leaves out is a type error here.
+  const engineOptions = {
+    baseUrl,
+    token,
+    fetch: fetchFn,
+    docAffinityHeader,
+    onRetry,
+  } satisfies CloudEngineOptions & Record<keyof CloudEngineOptions, unknown>;
+  const engine: EngineFactory = () => cloudEngine(engineOptions);
 
   const initialDocuments: InitialDocument[] = documents ?? [
     ...(docToken !== undefined ? [{ source: { kind: 'token' as const, token: docToken } }] : []),

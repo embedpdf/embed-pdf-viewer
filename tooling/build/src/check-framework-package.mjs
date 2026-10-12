@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * The publish check of a framework package (Vue, Svelte): what a user who installs it from npm
- * gets, proven on the packed tarball. In the workspace its `exports` point at the source, so the
- * tests and type checks never see the build; this does. Its `build` script ends with it, the way
- * the tsdown preset's builds end with publint and attw.
+ * The publish check of a framework package (the Vue and Svelte adapters and viewer wrappers):
+ * what a user who installs it from npm gets, proven on the packed tarball. In the workspace its
+ * `exports` point at the source, so the tests and type checks never see the build; this does. Its
+ * `build` script ends with it, the way the tsdown preset's builds end with publint and attw.
  *
  * 1. Pack it with pnpm, which applies `publishConfig` and rewrites `workspace:` ranges.
  * 2. Read the manifest: every field and export names a shipped file, every JavaScript entry has
@@ -195,15 +195,16 @@ for (const [kind, places] of problems) {
 
 // ── 4. a consumer app ───────────────────────────────────────────────────────
 
-// The package's dependencies, its peer (the framework) and the engine the app starts it with, as
-// the workspace has them linked for the package itself.
+// The package's dependencies, its peer (the framework) and, for a headless package, the engine
+// the app starts it with (its dev dependency), as the workspace has them linked for the package
+// itself. A viewer wrapper brings its engine with its dependencies.
 const link = (name) => {
   const at = path.join(app, 'node_modules', name);
   fs.mkdirSync(path.dirname(at), { recursive: true });
   fs.symlinkSync(fs.realpathSync(path.join(packageDir, 'node_modules', name)), at);
 };
 for (const name of Object.keys({ ...packed.dependencies, ...packed.peerDependencies })) link(name);
-link('@embedpdf/engine');
+if (manifest.devDependencies?.['@embedpdf/engine']) link('@embedpdf/engine');
 
 const source = path.join(app, 'src');
 fs.cpSync(path.join(packageDir, 'consumer'), source, { recursive: true });

@@ -28,9 +28,12 @@ export interface ToolbarProps {
   command?: Snippet<[command: ResolvedCommand, variant: string, run: () => void]>;
   /**
    * Your own items, by `name` (from `custom(name, command)`): it draws every custom item in the
-   * bar. Without it, each item is a native `<slot name>` element with its command's button
-   * inside, for a custom element's children to fill. The first element of an item that takes
-   * focus is the item's stop in the toolbar's arrow-key order.
+   * bar, in the live row and in the hidden measurement layer (`ctx.layer`). Without it, each item
+   * is a native `<slot name>` element with its command's button inside, for a custom element's
+   * children to fill. An item the snippet draws nothing for in the measurement layer
+   * (`ctx.layer === 'measure'`) is measured where it renders instead: report its length with
+   * `ctx.measure`. The first element of an item that takes focus is the item's stop in the
+   * toolbar's arrow-key order.
    */
   custom?: Snippet<[name: string, variant: string, ctx: CustomSlotCtx]>;
   /** A folded group: its button and its menu. Default: a `<select>` for `'select'`, a menu button for `'menu'`. */
