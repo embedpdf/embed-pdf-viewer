@@ -17,9 +17,10 @@
  *   form tools                             → real form plugin palette (draw-to-place)
  *   insert tools                           → real stamp and signature panels +
  *                                            image/attachment click-then-pick
- *   history undo/redo                      → disabled (there is no history plugin)
+ *   history undo/redo                      → real History
  */
 import type { CommandDef, IconAccent } from '@embedpdf/react/commands';
+import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
 import { StageToken, ZoomMode } from '@embedpdf/react/stage';
 import type { SpreadMode } from '@embedpdf/react/stage';
@@ -27,7 +28,6 @@ import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
-import { FormToken, type FormFieldRef } from '@embedpdf/react/form';
 import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
 import { MeasurementToken } from '@embedpdf/react/measurement';
@@ -595,6 +595,10 @@ export const defaultCommands: CommandDef[] = [
     feature: 'forms.building',
     requires: DESIGNS_FORMS,
   }),
+  tool('tool:button', 'form-button', 'commands.form.button', 'formButton', {
+    feature: 'forms.building',
+    requires: DESIGNS_FORMS,
+  }),
   tool('tool:signature-field', 'form-signature', 'commands.form.signature', 'signature', {
     feature: 'forms.building',
     requires: DESIGNS_FORMS,
@@ -681,29 +685,9 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.annotate.delete',
     icon: 'trash',
     categories: ['annotations'],
-    run: (commandContext) => {
-      const annotation = anno(commandContext);
-      if (!annotation) return;
-      const form = commandContext.tryGet(FormToken);
-      const dtos = annotation.selection.list();
-      const isWidget = (subtype: string) => subtype.startsWith('widget');
-      const widgets = form ? dtos.filter((annotation) => isWidget(annotation.subtype)) : [];
-      if (widgets.length === 0) {
-        void annotation.selection.delete();
-        return;
-      }
-      // Widgets are field-plane citizens: deleting one goes through doc.forms
-      // (the field and every widget of it cascade), never the raw annotation —
-      // otherwise the /AcroForm entry would be orphaned.
-      const fields = new Map<string, FormFieldRef>();
-      for (const annotation of widgets) {
-        const field = form!.getFieldForWidget(annotation.ref);
-        if (field) fields.set(field.name, field.ref);
-      }
-      for (const ref of fields.values()) void form!.delete(ref);
-      for (const dto of dtos) if (!isWidget(dto.subtype)) void annotation.delete(dto.ref);
-      annotation.selection.clear();
-    },
+    // One change for the whole selection: a form widget lent to the annotation
+    // plugin is deleted as the form says (its field, when every widget of it goes).
+    run: (commandContext) => void anno(commandContext)?.selection.delete(),
     visible: hasAnnotationSelection,
     // Mirrors the engine's own authorization, which is per annotation (whose
     // it is), not the scope's: locked/unauthorized annotations keep the button
@@ -877,20 +861,23 @@ export const defaultCommands: CommandDef[] = [
     visible: (commandContext) => selectionLink(commandContext) != null,
   },
 
-  // ── history (no plugin yet → disabled, shows the disabled styling) ──────
+  // ── history ──────────────────────────────────────────────────────────────
+  // Focus in a text field keeps its own undo: shortcuts skip text fields.
   {
     id: 'history:undo',
     labelKey: 'commands.undo',
     icon: 'arrowBackUp',
-    run: () => {},
-    enabled: () => false,
+    shortcut: 'Mod+z',
+    run: (commandContext) => commandContext.tryGet(HistoryToken)?.undo(),
+    enabled: (commandContext) => commandContext.tryGet(HistoryToken)?.canUndo() ?? false,
   },
   {
     id: 'history:redo',
     labelKey: 'commands.redo',
     icon: 'arrowForwardUp',
-    run: () => {},
-    enabled: () => false,
+    shortcut: ['Shift+Mod+z', 'Mod+y'],
+    run: (commandContext) => commandContext.tryGet(HistoryToken)?.redo(),
+    enabled: (commandContext) => commandContext.tryGet(HistoryToken)?.canRedo() ?? false,
   },
 ];
 

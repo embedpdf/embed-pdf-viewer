@@ -4,7 +4,12 @@ import type { Annotation } from './kinds';
 import type { AnnotationSubtype } from './subtype';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import { normalizePdfRect } from '../geometry/convert';
+import {
+  normalizePdfRect,
+  pdfQuarterTurnBox,
+  pdfRectTurnedBounds,
+  quarterTurnOf,
+} from '../geometry/convert';
 import type { PdfPoint, PdfQuad, PdfRect } from '../geometry/primitives';
 import type { PdfCoordinates } from '../pageSpace/coordinates';
 
@@ -23,6 +28,7 @@ export const DRAWN_RECT_KINDS: ReadonlySet<AnnotationSubtype> = new Set([
   'free-text',
   'stamp',
   'caret',
+  'widget',
   'line',
   'polyline',
   'polygon',
@@ -57,17 +63,18 @@ export function shapeFieldsOf(subtype: AnnotationSubtype): string[] {
  * `shapeForRect` runs it on page-space values.
  *
  * - A kind whose shape is its rect (note, file attachment, link, popup,
- *   widget, redaction) takes `rect` as it is.
+ *   redaction) takes `rect` as it is.
  * - A drawn kind has every place it holds mapped from its current `rect` onto
  *   `rect`, each axis on its own, as Acrobat does when a script sets
  *   `annot.rect`: a rect of the same size moves the shape, a bigger one
  *   stretches it. The engine then works out the rect from the shape, so it
- *   can differ a little from `rect` (a stroke keeps its width).
+ *   can differ a little from `rect` (a stroke keeps its width). A box at a
+ *   quarter turn stretches along its own sides, as it stands on the page.
  *
- * A drawn kind refuses a rect that would squash it to no width or height, and
- * a rect of another size when it's turned (it can only move) or when its own
- * rect has no width or height to stretch. Each refusal is `InvalidArg` on
- * `rect`.
+ * A drawn kind refuses a rect that would squash it to no width or height, a
+ * rect of another size when it's turned (it can only move) unless it is a
+ * box at a quarter turn, and one when its own rect has no width or height to
+ * stretch. Each refusal is `InvalidArg` on `rect`.
  */
 export function pdfShapeForRect<A extends Annotation<PdfCoordinates>>(
   annotation: A,
@@ -87,8 +94,11 @@ export function pdfShapeForRect<A extends Annotation<PdfCoordinates>>(
   if ((!sameWidth && toWidth <= 0) || (!sameHeight && toHeight <= 0)) {
     throw refused(subtype, 'a rect needs a width and a height');
   }
-  const rotation = (annotation as { rotation?: number | null }).rotation;
-  if (rotation && !semanticEqual(((rotation % 360) + 360) % 360, 0)) {
+  const rotation = (annotation as { rotation?: number | null }).rotation ?? 0;
+  const spaces = ANNOTATION_FIELD_SPACES[subtype];
+  // A box at a quarter turn stands upright on the page: a rect pins it down.
+  const quarterTurn = spaces.box === 'box' ? quarterTurnOf(rotation) : null;
+  if (!semanticEqual(((rotation % 360) + 360) % 360, 0) && quarterTurn === null) {
     if (!sameWidth || !sameHeight) {
       throw refused(subtype, "a turned drawing's rect can only move; resize its shape instead");
     }
@@ -103,17 +113,22 @@ export function pdfShapeForRect<A extends Annotation<PdfCoordinates>>(
     x: to.left + (p.x - from.left) * scaleX,
     y: to.bottom + (p.y - from.bottom) * scaleY,
   });
+  const placeRect = (rect: PdfRect): PdfRect => {
+    const corner = point({ x: rect.left, y: rect.bottom });
+    const opposite = point({ x: rect.right, y: rect.top });
+    return normalizePdfRect({
+      left: corner.x,
+      bottom: corner.y,
+      right: opposite.x,
+      top: opposite.y,
+    });
+  };
   const place: Partial<Record<MeasuredFieldSpace, (value: never) => unknown>> = {
-    box: (box: PdfRect) => {
-      const corner = point({ x: box.left, y: box.bottom });
-      const opposite = point({ x: box.right, y: box.top });
-      return normalizePdfRect({
-        left: corner.x,
-        bottom: corner.y,
-        right: opposite.x,
-        top: opposite.y,
-      });
-    },
+    // A quarter-turned box is placed as it stands on the page, then turned back.
+    box: (box: PdfRect) =>
+      quarterTurn === null || quarterTurn === 0 || quarterTurn === 180
+        ? placeRect(box)
+        : pdfQuarterTurnBox(placeRect(pdfRectTurnedBounds(box, quarterTurn)), quarterTurn),
     point,
     points: (points: PdfPoint[]) => points.map(point),
     strokes: (strokes: PdfPoint[][]) => strokes.map((stroke) => stroke.map(point)),
@@ -131,7 +146,6 @@ export function pdfShapeForRect<A extends Annotation<PdfCoordinates>>(
     calloutLine: (points: PdfPoint[]) => points.map(point),
   };
 
-  const spaces = ANNOTATION_FIELD_SPACES[subtype];
   const shape: Record<string, unknown> = {};
   for (const name of shapeFieldsOf(subtype)) {
     const value = (annotation as unknown as Record<string, unknown>)[name];

@@ -60,7 +60,7 @@
     <AddRectangle />
     <ChromeControls bind:own />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer
         handle={own ? handle : undefined}
         rotationHandle={own ? rotationHandle : undefined}

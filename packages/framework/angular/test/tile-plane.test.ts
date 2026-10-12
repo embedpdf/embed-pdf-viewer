@@ -84,6 +84,7 @@ function fakeRender() {
     Object.assign(Promise.resolve(value), { abortWith: () => Promise.resolve(value) });
   const api = {
     getPaintSettings: () => paint,
+    getLayerRights: () => ({ annotations: true, formFields: true }),
     getSourceKey: (page: PageRef) => `page-${page.objectNumber}`,
     renderSource: (page: PageRef) =>
       Promise.resolve({

@@ -17,7 +17,7 @@ const allText = computed(() => selected.value.every((a) => a.subtype === 'free-t
 <template>
   <Stage>
     <template #page>
-      <RenderLayer :annotations="false" />
+      <RenderLayer />
       <AnnotationLayer />
     </template>
 

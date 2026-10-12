@@ -28,7 +28,6 @@ const WORKING_COPY_EDITS: ReadonlySet<DocumentEvent['type']> = new Set([
   'annotations.reordered',
   'forms.valueSet',
   'forms.updated',
-  'forms.effectsApplied',
 ]);
 
 const sameProtection = (

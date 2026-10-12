@@ -1,6 +1,6 @@
 ---
 title: Creating form fields
-description: Add text fields, checkboxes, radio groups, dropdowns, lists and signature fields to a PDF, change or delete them, and repair a broken form.
+description: Add text fields, checkboxes, radio groups, dropdowns, lists, buttons and signature fields to a PDF, change or delete them, and repair a broken form.
 ---
 
 # Creating form fields
@@ -37,31 +37,33 @@ field can have widgets on several pages that all show the same value.
 pages, one entry per place it shows; leave it out to create a field that isn't on any page yet,
 and [add a widget](#add-a-widget) later.
 
-| Field           | What it is                                                                                                                               | Default    |
-| :-------------- | :--------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
-| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'` or `'signature'`                                                            |            |
-| `name`          | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                        |            |
-| `widgets`       | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look). | not placed |
-| `readOnly`      | PDF apps don't let the user change it.                                                                                                   | `false`    |
-| `required`      | PDF apps ask for a value before the form is submitted.                                                                                   | `false`    |
-| `noExport`      | Left out when the form is submitted.                                                                                                     | `false`    |
-| `alternateName` | The tooltip PDF apps show, also read by screen readers.                                                                                  | none       |
-| `mappingName`   | A second name, for other apps that export the form's data.                                                                               | none       |
+| Field           | What it is                                                                                                                                                | Default    |
+| :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
+| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                                             |            |
+| `name`          | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                                         |            |
+| `widgets`       | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look).                  | not placed |
+| `readOnly`      | PDF apps don't let the user change it.                                                                                                                    | `false`    |
+| `required`      | PDF apps ask for a value before the form is submitted.                                                                                                    | `false`    |
+| `noExport`      | Left out when the form is submitted.                                                                                                                      | `false`    |
+| `alternateName` | The tooltip PDF apps show, also read by screen readers.                                                                                                   | none       |
+| `mappingName`   | A second name, for other apps that export the form's data.                                                                                                | none       |
+| `groupId`       | The group it goes in: who fills it in. Another group than your own takes `fields:set-group` for it (see [Signers and groups](/docs/engine/forms/groups)). | your own   |
 
 `create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
-with `InvalidArg` too. Push buttons can't be created.
+with `InvalidArg` too.
 
 Each family adds its own settings:
 
-| Family      | Settings                                                                                               |
-| :---------- | :----------------------------------------------------------------------------------------------------- |
-| `text`      | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`) |
-| `checkbox`  | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
-| `radio`     | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
-| `combobox`  | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
-| `listbox`   | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)            |
-| `signature` | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
+| Family       | Settings                                                                                               |
+| :----------- | :----------------------------------------------------------------------------------------------------- |
+| `text`       | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`) |
+| `checkbox`   | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
+| `radio`      | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
+| `combobox`   | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
+| `listbox`    | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)            |
+| `pushbutton` | Only widgets, each with its `caption`. See [A push button](#a-push-button).                            |
+| `signature`  | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
 
 ### A radio group
 
@@ -103,21 +105,50 @@ await doc.forms.create({
 });
 ```
 
+### A push button
+
+A push button holds no value: it does something when it's clicked. Give each widget its
+`caption` and what a click does, in `actions` (see [Widget actions](#widget-actions)):
+
+```ts
+await doc.forms.create({
+  family: 'pushbutton',
+  name: 'clear',
+  widgets: [
+    {
+      page: page.ref,
+      rect: { x: 400, y: 700, width: 120, height: 28 },
+      caption: 'Clear form',
+      interiorColor: '#f6f8fa',
+      actions: { activate: { type: 'reset-form', fields: null, exclude: false } },
+    },
+  ],
+});
+```
+
+The engine draws the button: its background, its border, and the caption centred in the widget's
+font. `setValue()` refuses a push button with `InvalidArg`. A button that only goes to a page,
+resets the form or shows and hides fields needs `doc.forms.modify` alone; one that runs a script,
+submits the form or opens a web address needs `doc.forms.script` too.
+
 ### The widget's look
 
 Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
 fields you change later with `doc.forms.updateWidget()`:
 
-| Field           | What it is                                                          |
-| :-------------- | :------------------------------------------------------------------ |
-| `color`         | Border color, `'#rrggbb'`                                           |
-| `interiorColor` | Background color                                                    |
-| `strokeWidth`   | Border width in points                                              |
-| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'` or `'inset'`                     |
-| `fontFamily`    | One of the standard PDF fonts, such as `'helvetica'` or `'courier'` |
-| `fontSize`      | Text size in points                                                 |
-| `fontColor`     | Text color                                                          |
-| `textAlign`     | `'left'`, `'center'` or `'right'`                                   |
+| Field           | What it is                                                                                       |
+| :-------------- | :----------------------------------------------------------------------------------------------- |
+| `color`         | Border color, `'#rrggbb'`                                                                        |
+| `interiorColor` | Background color                                                                                 |
+| `strokeWidth`   | Border width in points                                                                           |
+| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field)          |
+| `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                               |
+| `fontFamily`    | A standard PDF font, such as `'helvetica'` or `'courier'`, or the `key` of a font you registered |
+| `fontSize`      | Text size in points                                                                              |
+| `fontColor`     | Text color                                                                                       |
+| `textAlign`     | `'left'`, `'center'` or `'right'`                                                                |
+| `caption`       | A push button's caption; other widgets take none                                                 |
+| `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                                     |
 
 ```ts
 widgets: [
@@ -131,8 +162,17 @@ widgets: [
 ],
 ```
 
+A mark is `'check'`, `'cross'`, `'star'`, `'circle'`, `'square'` or `'diamond'`. With
+`checkStyle: null`, a checkbox draws a check and a radio button a circle.
+
+A font the document already has, and that you didn't register, reads as its family name, such as
+`'Roboto'`. Changing a widget's color or size keeps its font; to change the font, name a standard
+font or a registered one.
+
 To change the look later, update the widget with the same fields (see
-[Move and style widgets](#move-and-style-widgets)).
+[Move and style widgets](#move-and-style-widgets)). An entry also takes what the widget does when
+it's clicked, in `actions` (see [Widget actions](#widget-actions)), and a quarter turn of its
+contents, in `rotation` (see [Turned widgets](#turned-widgets)).
 
 ## Change a field
 
@@ -155,6 +195,51 @@ Also:
   field can't move to another group.
 - `options` replaces the whole list of a dropdown or list.
 - `maxLength` fails with `InvalidArg` when the current text is longer.
+
+## Scripts and calculations
+
+A field can run scripts: while the user types (`keystroke`), to show the value (`format`), to
+check it (`validate`) and to work it out from other fields (`calculate`). `create()` and `update()`
+take them in `actions`:
+
+```ts
+const { field: total } = await doc.forms.create({
+  family: 'text',
+  name: 'total',
+  readOnly: true,
+  actions: {
+    calculate: {
+      type: 'javascript',
+      script: 'event.value = this.getField("subtotal").value * 1.21;',
+    },
+    format: { type: 'javascript', script: 'AFNumber_Format(2, 0, 0, 0, "€ ", true);' },
+  },
+});
+
+await doc.forms.update(total.ref, { actions: { format: null } }); // remove one script
+```
+
+A script sets that event's, `null` removes it, and an event you leave out keeps its script. A
+field's events take JavaScript only: any other action fails with `InvalidArg`. A script can name
+more scripts to run after it, in `next`.
+
+The engine stores the scripts; it doesn't run them. The viewer's form plugin runs them while the
+user fills the form in (see
+[Calculations, formatting and validation](/docs/engine/forms#calculations-formatting-and-validation)).
+
+### The calculation order
+
+Calculate scripts run in the form's calculation order, which `doc.forms.list()` returns as
+`calculationOrder`. A field joins it at the end when it gets a calculate script, and leaves it when
+the script is removed or the field is deleted. `reorderCalculations()` moves fields in it, the way
+`reorderWidgets()` restacks widgets:
+
+```ts
+const { calculationOrder } = await doc.forms.reorderCalculations([tax.ref], { before: total.ref });
+```
+
+A field must be in the order to move it (`NotFound` otherwise). A result of `create()`, `update()`
+or `delete()` that changed the order carries the new one as `calculationOrder`.
 
 ## Delete a field
 
@@ -221,6 +306,39 @@ field's `readOnly`: PDF apps ignore a widget annotation's own `readOnly`.
 
 A widget is the form's, so `page.annotations.update()` refuses one with `InvalidArg`.
 
+### Turned widgets
+
+A widget's contents can turn a quarter, so that a field on a turned page reads upright, or a label
+runs up the page. A widget then reads like every shape that turns: its `box` is the frame its
+contents are laid out in, its `rotation` the turn (0, 90, 180 or 270, clockwise; `null` upright),
+and its `rect` where it stands on the page, the box turned. A placement takes the turn, and either
+the `rect` or the `box`, as a create of any shape that turns does:
+
+```ts
+await doc.forms.create({
+  family: 'text',
+  name: 'side',
+  // 24 wide and 160 tall: the text runs up the page
+  widgets: [{ page: page.ref, rect: { x: 20, y: 120, width: 24, height: 160 }, rotation: 270 }],
+});
+
+// The same widget, by the frame its text runs in
+widgets: [{ page: page.ref, box: { x: -48, y: 188, width: 160, height: 24 }, rotation: 270 }];
+```
+
+A placement with both takes the `box`; one with neither fails with `InvalidArg`.
+
+An update turns a widget as it turns any shape:
+
+- `{ rotation }` turns the whole widget about its middle, so it stands the other way;
+- `{ rotation, box }` turns its contents and keeps it where it is, as Acrobat's Orientation does.
+  The new `box` is the `rect` with its sides swapped;
+- `{ rect }` moves and resizes it, and keeps its turn.
+
+Another angle fails with `InvalidArg`. The turn is the widget's `/MK /R`, which every PDF app
+reads. The file holds it counterclockwise, so Acrobat's Orientation of 90° reads as
+`rotation: 270`.
+
 ### Stacking order
 
 Widgets are drawn above every annotation, later ones over earlier ones. `reorderWidgets()`
@@ -235,6 +353,38 @@ const { order } = await doc.forms.reorderWidgets([widget.ref], { after: other.re
 order of its widgets, this changes the tab order too. An annotation is never a neighbour here:
 `reorderWidgets()` refuses one with `InvalidArg`; restack annotations with
 [`page.annotations.reorder()`](/docs/engine/annotations#delete-and-reorder).
+
+## Widget actions
+
+A widget can do something when the user clicks it (`activate`), and on its other events: the
+pointer entering or leaving it (`cursorEnter`, `cursorExit`), the mouse button going down and up
+(`mouseDown`, `mouseUp`), getting and losing focus (`focus`, `blur`), and its page opening,
+closing, coming into view or leaving it (`pageOpen`, `pageClose`, `pageVisible`,
+`pageInvisible`). `updateWidget()` takes them in `actions`, and so does each entry of `widgets` in
+`create()` and `addWidget()`:
+
+```ts
+await doc.forms.updateWidget(widget.ref, {
+  actions: {
+    activate: { type: 'reset-form', fields: null, exclude: false },
+    focus: { type: 'javascript', script: 'app.alert("Your name as on your passport");' },
+  },
+});
+
+await doc.forms.updateWidget(widget.ref, { actions: { focus: null } }); // remove one
+```
+
+An action sets that event's, `null` removes it, and an event you leave out keeps its action;
+`actions: null` removes them all. An action runs a script (`javascript`), goes to a page (`goto`,
+with a destination as for [links](/docs/engine/annotations/links#link-to-a-page)), opens a web
+address (`uri`), runs a viewer command (`named`), shows or hides fields (`hide`), or resets or
+submits the form (`reset-form`, `submit-form`). More actions to run after it go in `next`.
+
+The widget's row in `doc.forms.list()` reads them back in `actions`, by event, each as the full
+action. A row's `actions` passed back unchanged keeps them; to change one, pass it as above.
+
+On a field stored in one object with its widget (see [Good to know](#good-to-know)), the widget's
+actions and the field's scripts stay apart: writing one leaves the other as it is.
 
 ## Repair a broken form
 
@@ -276,6 +426,7 @@ repair can't be undone, and it ends undo for every change made before it; see
 | `forms.widgetDeleted`                      | `deleteWidget()`                           |
 | `forms.widgetUpdated`                      | `updateWidget()`                           |
 | `forms.widgetsReordered`                   | `reorderWidgets()`                         |
+| `forms.calculationsReordered`              | `reorderCalculations()`                    |
 | `forms.repaired`                           | `repair()`                                 |
 
 Each event carries what the call returned, with the rows of the widgets it changed (`widgets`). See
@@ -285,8 +436,11 @@ Each event carries what the call returned, with the rows of the widgets it chang
 
 Creating, changing and deleting fields, adding, moving, restacking and removing widgets and
 repairing the form need `doc.forms.modify`, which includes `doc.forms.fill` and `doc.forms.read`.
-See
-[Permissions](/docs/engine/concepts/permissions).
+Writing a script, or a widget action that submits the form or opens a web address, also needs
+`doc.forms.script`: it runs for everyone who fills the form in (see
+[Scripts in forms](/docs/engine/concepts/permissions#scripts-in-forms)). Removing one doesn't, and
+widget actions that go to a page, reset the form or show and hide fields need `doc.forms.modify`
+alone. See [Permissions](/docs/engine/concepts/permissions).
 
 A certified document doesn't allow changes to its fields: these calls fail with
 `ProtectedDocument`. See
@@ -306,4 +460,5 @@ A certified document doesn't allow changes to its fields: these calls fail with
   look in the file is in
   [Checkboxes with several widgets](/docs/engine/forms#checkboxes-with-several-widgets).
 - **Names and groups.** `billing.name` and `billing.email` are two fields in a group `billing`.
-  `list()` returns the two fields, not the group; XFDF nests them under it.
+  `list()` returns the two fields, not the group, and an import makes the group again from the
+  names.

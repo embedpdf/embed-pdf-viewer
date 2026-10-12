@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ghostOpacity, sceneViewBox, svgShapesOf } from '../src/annotation-scene';
+import { fontProgramsOf, ghostOpacity, sceneViewBox, svgShapesOf } from '../src/annotation-scene';
 
 const options = { miterLimit: 10 };
 
@@ -118,6 +118,57 @@ describe('svgShapesOf', () => {
         'font-family': 'Helvetica',
       },
     });
+  });
+
+  it('places painted glyphs one by one, leaves spaces out, and clips a node to its box', () => {
+    const program = {
+      family: 'epdf-0123456789abcdef',
+      weight: 700,
+      style: 'italic' as const,
+      load: async () => new Uint8Array(),
+    };
+    const [clipped] = svgShapesOf(
+      [
+        {
+          kind: 'glyphs',
+          at: { x: 10, y: 20 },
+          text: 'H i',
+          offsets: [0, 7.22, 10],
+          fontSize: 10,
+          fontFamily: '"epdf-0123456789abcdef", Helvetica, Arial, sans-serif',
+          fontWeight: 700,
+          fontStyle: 'italic',
+          rotation: 90,
+          program,
+          paint: { fill: '#ff0000' },
+          clip: { x: 5, y: 6, width: 90, height: 18 },
+        },
+      ],
+      options,
+    );
+    expect(clipped).toMatchObject({
+      tag: 'svg',
+      attributes: { x: 5, y: 6, width: 90, height: 18, viewBox: '5 6 90 18', overflow: 'hidden' },
+    });
+    expect(clipped!.children).toEqual([
+      {
+        tag: 'text',
+        text: 'Hi',
+        attributes: expect.objectContaining({
+          x: '10 20',
+          y: 20,
+          transform: 'rotate(90 10 20)',
+          'font-size': 10,
+          'font-family': '"epdf-0123456789abcdef", Helvetica, Arial, sans-serif',
+          'font-weight': 700,
+          'font-style': 'italic',
+          fill: '#ff0000',
+        }),
+        program,
+      },
+    ]);
+    // The face the text draws in, for the renderer to mount.
+    expect(fontProgramsOf([clipped!, clipped!])).toEqual([program]);
   });
 });
 

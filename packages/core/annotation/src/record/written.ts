@@ -74,11 +74,11 @@ function drawnBoundsOf(annotation: Annotation): Rect {
 /**
  * The annotation `draft` creates, as the engine reads it back: the draft's
  * fields as the engine states them, and a drawn kind's `rect` the box around
- * its drawing. `at` says where it will sit: its ref and its place on the page.
+ * its drawing. `at` names the ref it will have.
  */
 export function annotationOfNew(
   draft: AnnotationDraft,
-  at: { readonly ref: AnnotationRef; readonly index: number },
+  at: { readonly ref: AnnotationRef },
 ): Annotation {
   const annotation = annotationOfDraft(draft, at);
   return rectFollowsDrawing(annotation)

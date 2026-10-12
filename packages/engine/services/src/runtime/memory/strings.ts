@@ -70,6 +70,16 @@ export function writeUtf16String(
   }
 }
 
+/** A UTF-16 copy of `value` in runtime memory (an `FPDF_WIDESTRING`) for the duration of `fn`. */
+export function withUtf16String<T>(mem: PdfRuntimeMemory, value: string, fn: (ptr: Ptr) => T): T {
+  const ptr = mem.writeU16String(value);
+  try {
+    return fn(ptr);
+  } finally {
+    mem.free(ptr);
+  }
+}
+
 /**
  * A NUL-terminated UTF-8 copy of `value` in runtime memory for the duration
  * of `fn` (a `FPDF_STRING` parameter: a file system path, say).

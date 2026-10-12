@@ -71,4 +71,35 @@ describe('scriptFieldsFromSnapshot', () => {
       defaultValue: null,
     });
   });
+
+  it('shows a field as its first widget shows', () => {
+    const field = {
+      ref: { kind: 'objectNumber', objectNumber: 8 },
+      name: 'vip',
+      family: 'text',
+      valueEntry: { kind: 'none' },
+      defaultValueEntry: { kind: 'none' },
+      readOnly: false,
+      required: false,
+      widgets: [{ objectNumber: 9 }, { objectNumber: 10 }],
+    } as unknown as FormFieldDTO;
+    const row = (objectNumber: number, flags: object) => ({
+      ref: { kind: 'objectNumber', objectNumber },
+      hidden: false,
+      noView: false,
+      print: true,
+      ...flags,
+    });
+    const displayWith = (flags: object) =>
+      scriptFieldsFromSnapshot({
+        ...snapshotWith(field),
+        widgets: [row(9, flags), row(10, {})] as unknown as FormSnapshot['widgets'],
+      })[0]!.display;
+
+    expect(displayWith({})).toBe('visible');
+    expect(displayWith({ hidden: true })).toBe('hidden');
+    expect(displayWith({ print: false })).toBe('noPrint');
+    expect(displayWith({ noView: true })).toBe('noView');
+    expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]!.display).toBe('visible');
+  });
 });

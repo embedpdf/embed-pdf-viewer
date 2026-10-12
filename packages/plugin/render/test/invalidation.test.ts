@@ -22,7 +22,8 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
     'annotations.created',
     'annotations.updated',
     'annotations.deleted',
-    'annotations.moved',
+    'annotations.restored',
+    'annotations.reordered',
   ])('%s repaints its page’s annotations', (type) => {
     expect(changeOf({ type, page: toPageRef(22) })).toEqual({
       pages: [22],
@@ -30,41 +31,60 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
     });
   });
 
-  it.each(['forms.valueSet', 'forms.effectsApplied'])(
-    '%s repaints every page a changed widget lives on',
-    (type) => {
-      expect(changeOf({ type, meta: { changedWidgets: [widget(11), widget(33)] } })).toEqual({
-        pages: [11, 33],
-        scope: 'annotations',
-      });
-    },
-  );
-
-  it('forms.deleted repaints the removed widgets’ pages', () => {
-    expect(changeOf({ type: 'forms.deleted', meta: { changedWidgets: [widget(22)] } })).toEqual({
-      pages: [22],
-      scope: 'annotations',
+  it.each([
+    'forms.valueSet',
+    'forms.created',
+    'forms.updated',
+    'forms.deleted',
+    'forms.restored',
+    'forms.widgetAdded',
+    'forms.widgetRemoved',
+    'forms.widgetRestored',
+    'forms.widgetUpdated',
+  ])('%s repaints the form fields of every page a changed widget lives on', (type) => {
+    expect(
+      changeOf({ type, meta: { changedWidgets: [widget(11), widget(33), widget(11)] } }),
+    ).toEqual({
+      pages: [11, 33],
+      scope: 'fields',
     });
   });
 
-  it.each(['forms.created', 'forms.updated', 'forms.widgetAdded', 'forms.widgetRemoved'])(
-    '%s repaints the field’s widget pages',
-    (type) => {
-      expect(changeOf({ type, field: { widgets: [widget(11), widget(22)] } })).toEqual({
-        pages: [11, 22],
-        scope: 'annotations',
-      });
-    },
-  );
+  it('a form fact counts the widget rows it carries and a deleted widget’s page', () => {
+    expect(
+      changeOf({
+        type: 'forms.widgetDeleted',
+        page: toPageRef(22),
+        meta: { changedWidgets: [] },
+      }),
+    ).toEqual({ pages: [22], scope: 'fields' });
+    expect(
+      changeOf({
+        type: 'forms.widgetAdded',
+        widgets: [widget(33)],
+        meta: { changedWidgets: [widget(11)] },
+      }),
+    ).toEqual({ pages: [11, 33], scope: 'fields' });
+    expect(
+      changeOf({
+        type: 'forms.widgetsReordered',
+        page: toPageRef(11),
+        meta: { changedWidgets: [] },
+      }),
+    ).toEqual({ pages: [11], scope: 'fields' });
+  });
 
-  it.each(['forms.imported', 'forms.repaired'])('%s (coarse result) repaints all pages', (type) => {
-    expect(changeOf({ type })).toEqual({ pages: PAGE_OBJECT_NUMBERS, scope: 'annotations' });
+  it('forms.repaired (coarse result) repaints the form fields of all pages', () => {
+    expect(changeOf({ type: 'forms.repaired' })).toEqual({
+      pages: PAGE_OBJECT_NUMBERS,
+      scope: 'fields',
+    });
   });
 
   it('signatures.completed repaints the sealed widget’s page', () => {
     expect(changeOf({ type: 'signatures.completed', signature: { widget: widget(33) } })).toEqual({
       pages: [33],
-      scope: 'annotations',
+      scope: 'fields',
     });
   });
 
@@ -103,11 +123,12 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
 
   it.each([
     'pages.rotated',
-    'pages.moved',
+    'pages.reordered',
     'pages.deleted',
     'metadata.updated',
     'document.versioned',
-  ])('%s repaints nothing (registry, metadata or version, not pixels)', (type) => {
+    'forms.calculationsReordered',
+  ])('%s repaints nothing (registry, metadata, version or order, not pixels)', (type) => {
     expect(changeOf({ type })).toBeNull();
   });
 });

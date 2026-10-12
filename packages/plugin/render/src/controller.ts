@@ -1,7 +1,10 @@
 import {
+  annotationKey,
   CONTINUOUS_RENDER_POLICY,
   isPluginError,
   memo,
+  resolvePageLayers,
+  snapAppearanceScale,
   toPageRef,
   toPluginError,
   toPluginErrorInfo,
@@ -11,15 +14,19 @@ import {
   type DocCapability,
   type EngineRenderPolicy,
   type PageImageHandle,
+  type PageLayerRights,
   type PageObjectNumber,
   type PageRef,
+  type PageRenderLayers,
   type PageRenderViewport,
   type PluginErrorInfo,
 } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
+import { AppearanceStore, RecentPictures } from './appearance-store';
 import type {
   InvalidateOptions,
   InvalidateScope,
+  PageLayerOptions,
   PageRender,
   RenderFormat,
   RenderInvalidatedEvent,
@@ -28,6 +35,8 @@ import type {
   RenderSettings,
 } from './contract';
 import type {
+  AppearancePicture,
+  AppearancesOptions,
   PaintSettings,
   RenderCompletedEvent,
   RenderFailedEvent,
@@ -36,7 +45,7 @@ import type {
   ViewDemand,
 } from './host-contract';
 import { pixelChangeOf } from './invalidation';
-import { invalidatePages, renderEpochOf, type RenderState } from './model';
+import { invalidatePages, layersKeyOf, renderEpochOf, type RenderState } from './model';
 import {
   EMPTY_TILE_PLAN,
   resolveRenderOptions,
@@ -49,6 +58,13 @@ import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy
 import { TileManager } from './tile-manager';
 
 const RENDER_SCOPE: DocCapability = 'doc.render';
+const FORMS_SCOPE: DocCapability = 'doc.forms.read';
+const ANNOTATIONS_SCOPE: DocCapability = 'doc.annotate.read';
+
+/** Every answer `getLayerRights()` gives, one object each, so the same rights are the same object. */
+const LAYER_RIGHTS: readonly (readonly PageLayerRights[])[] = [false, true].map((annotations) =>
+  [false, true].map((formFields) => Object.freeze({ annotations, formFields })),
+);
 /** An abort reason the engine task accepts (signals carry `unknown`). */
 const reasonOf = (signal: AbortSignal): string | undefined =>
   typeof signal.reason === 'string' ? signal.reason : undefined;
@@ -57,7 +73,7 @@ const DEFAULT_BATCH_CONCURRENCY = 4;
 /** A view's live demand for one page, as last set through its handle. */
 interface PageDemand {
   demand: PageViewDemand;
-  includeAnnotations: boolean;
+  layers: PageRenderLayers;
   plan: TilePaintPlan;
 }
 
@@ -94,11 +110,42 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     (current) => resolveRenderOptions(current),
   );
   const store = new RasterStore();
+  const appearances = new AppearanceStore<AppearancePicture>();
+  const recentAppearances = new RecentPictures<AppearancePicture>();
   const invalidated = ctx.events.source<RenderInvalidatedEvent>();
   const renderCompleted = ctx.events.source<RenderCompletedEvent>();
   const renderFailed = ctx.events.source<RenderFailedEvent>();
 
   const canRender = (): boolean => ctx.allows(RENDER_SCOPE);
+
+  // ── what a picture draws ──
+  // The engine's rule (`resolvePageLayers`): each option as given, and one
+  // left out draws what the session may read. The doors refuse an explicit
+  // `true` the session may not read, as the engine would; reads (keys,
+  // epochs, plans) never throw, and count such an option as left out.
+  const rights = (): PageLayerRights =>
+    LAYER_RIGHTS[ctx.allows('doc.annotate.read') ? 1 : 0]![ctx.allows('doc.forms.read') ? 1 : 0]!;
+  const layersOf = (options: PageLayerOptions): PageRenderLayers => {
+    const may = rights();
+    return resolvePageLayers(
+      {
+        ...(options.includeAnnotations !== undefined &&
+        (may.annotations || !options.includeAnnotations)
+          ? { includeAnnotations: options.includeAnnotations }
+          : {}),
+        ...(options.includeFormFields !== undefined &&
+        (may.formFields || !options.includeFormFields)
+          ? { includeFormFields: options.includeFormFields }
+          : {}),
+      },
+      may,
+    );
+  };
+  const pictureLayers = (options: PageLayerOptions, operation: string): PageRenderLayers => {
+    if (options.includeAnnotations === true) ctx.assertAllowed('doc.annotate.read', operation);
+    if (options.includeFormFields === true) ctx.assertAllowed(FORMS_SCOPE, operation);
+    return layersOf(options);
+  };
 
   // One-shot developer hints: misconfigurations, not errors.
   let warnedFormat = false;
@@ -152,8 +199,8 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     return { kind: 'width', width };
   };
 
-  const epochOf = (pageObjectNumber: PageObjectNumber, includeAnnotations: boolean): number =>
-    renderEpochOf(ctx.state.get(), pageObjectNumber, includeAnnotations);
+  const epochOf = (pageObjectNumber: PageObjectNumber, layers: PageRenderLayers): number =>
+    renderEpochOf(ctx.state.get(), pageObjectNumber, layers);
 
   // A raster's identity includes its encode format: the cloud policy arrives
   // asynchronously after open, so the resolved format can change under a
@@ -162,11 +209,11 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   const rasterKey = (
     pageObjectNumber: PageObjectNumber,
     width: number,
-    annotations: boolean,
+    layers: PageRenderLayers,
     format: RenderFormat | undefined,
     quality: number | undefined,
   ): string =>
-    `${pageObjectNumber}|w${width}|a${annotations ? 1 : 0}|e${epochOf(pageObjectNumber, annotations)}` +
+    `${pageObjectNumber}|w${width}|${layersKeyOf(layers)}|e${epochOf(pageObjectNumber, layers)}` +
     `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
 
   // ── the raster store door (shared by both render doors and the tiles) ──
@@ -175,7 +222,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     key: string,
     request: {
       viewport: PageRenderViewport;
-      includeAnnotations: boolean;
+      layers: PageRenderLayers;
       format: RenderFormat | undefined;
       quality: number | undefined;
       /** The view whose picture it is, so the engine ranks it by where the page is there. */
@@ -192,7 +239,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         });
         const task = doc.page(page).render.image({
           viewport: request.viewport,
-          includeAnnotations: request.includeAnnotations,
+          ...request.layers,
           ...(request.format !== undefined ? { format: request.format } : {}),
           ...(request.quality !== undefined ? { quality: request.quality } : {}),
         });
@@ -226,16 +273,16 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   /** The host door: conformed to the render points. Async so refusals reject. */
   async function renderSource(
     page: PageRef,
-    { scale, includeAnnotations, view, signal }: RenderSourceOptions & { signal?: AbortSignal },
+    { scale, view, signal, ...options }: RenderSourceOptions & { signal?: AbortSignal },
   ): Promise<PageImageHandle> {
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderSource');
-    const annotations = includeAnnotations ?? true;
+    const layers = pictureLayers(options, 'render.renderSource');
     const viewport = conformViewport(page, scale);
     const strategy = currentStrategy();
     const key = rasterKey(
       page.objectNumber,
       viewport.kind === 'width' ? viewport.width : 0,
-      annotations,
+      layers,
       strategy.format,
       undefined,
     );
@@ -244,7 +291,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       key,
       {
         viewport,
-        includeAnnotations: annotations,
+        layers,
         format: strategy.format,
         quality: strategy.quality,
         view,
@@ -261,14 +308,14 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderPage');
     const { ref: page, size } = ctx.pageOf(pageArgument);
     const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * size.width));
-    const annotations = options.includeAnnotations ?? true;
+    const layers = pictureLayers(options, 'render.renderPage');
     const strategy = currentStrategy();
     const format = options.format ?? strategy.format;
     const quality = options.quality ?? strategy.quality;
     // Exact-size renders share the store with the conformed door: a width
     // that matches a conformed raster (same format, default quality) is the
     // same key, so the cached image serves it.
-    const key = rasterKey(page.objectNumber, width, annotations, format, options.quality);
+    const key = rasterKey(page.objectNumber, width, layers, format, options.quality);
     return ctx.cancellable(
       options.signal,
       acquireRaster(
@@ -276,7 +323,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         key,
         {
           viewport: { kind: 'width', width },
-          includeAnnotations: annotations,
+          layers,
           format,
           quality,
           view: undefined,
@@ -320,6 +367,54 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       skipped: [],
       failed: failed.sort(byInput).map(({ ref, error }) => ({ ref, error })),
     };
+  }
+
+  // ── appearance pictures: the owners' items, shared between their views ──
+  async function renderAppearances(
+    page: PageRef,
+    { family, scale, items, signal }: AppearancesOptions,
+  ): Promise<readonly AppearancePicture[]> {
+    ctx.assertAllowed(
+      family === 'widgets' ? FORMS_SCOPE : ANNOTATIONS_SCOPE,
+      'render.renderAppearances',
+    );
+    const pageObjectNumber = ctx.pageOf(page).ref.objectNumber;
+    const versions = new Map(items.map((item) => [annotationKey(item.ref), item.version]));
+    const asked = [...versions].map(([item, version]) => `${item}@${version}`).sort();
+    const group = `${family}|${pageObjectNumber}`;
+    const pictures = appearances.acquire(
+      group,
+      `${group}|s${scale}|${asked.join(',')}`,
+      async (fetchSignal) => {
+        // The look at rest only, in every state: a check box keeps both its
+        // pictures, and the looks under the pointer and pressed aren't drawn.
+        const pageHandle = ctx.doc.page(toPageRef(pageObjectNumber));
+        const options = { viewport: { kind: 'scale' as const, scale }, modes: ['normal' as const] };
+        const task =
+          family === 'widgets'
+            ? pageHandle.forms.renderAppearances(options)
+            : pageHandle.annotations.renderAppearances(options);
+        if (fetchSignal.aborted) task.abort(reasonOf(fetchSignal));
+        else
+          fetchSignal.addEventListener('abort', () => task.abort(reasonOf(fetchSignal)), {
+            once: true,
+          });
+        // The asked items' pictures, each tagged with the version it was asked at.
+        const drawn = (await task).appearances.flatMap((picture): AppearancePicture[] => {
+          const version = versions.get(annotationKey(picture.ref));
+          return version === undefined ? [] : [{ ...picture, version }];
+        });
+        recentAppearances.remember(family, drawn, (picture) => annotationKey(picture.ref));
+        return drawn;
+      },
+      signal,
+    );
+    return ctx.cancellable(
+      signal,
+      pictures.catch((error: unknown) => {
+        throw toPluginError('render', error);
+      }),
+    );
   }
 
   // ── invalidation: the one place the ledger bumps and onInvalidated fires ──
@@ -369,7 +464,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     getPageSize: (pageObjectNumber) => ctx.getPage(toPageRef(pageObjectNumber))?.size,
     getEpoch: epochOf,
     after: ctx.clock.after,
-    fetchTile: async (view, pageObjectNumber, rect: Rect, scale, includeAnnotations, signal) => {
+    fetchTile: async (view, pageObjectNumber, rect: Rect, scale, layers, signal) => {
       // The same refusal the engine would send, without the round trip: a
       // denied session's viewport would otherwise be refused once per tile.
       ctx.assertAllowed(RENDER_SCOPE, 'render.tile');
@@ -381,7 +476,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         .render.image({
           target: { kind: 'rect', rect },
           viewport: { kind: 'scale', scale },
-          includeAnnotations,
+          ...layers,
           ...(strategy.format !== undefined ? { format: strategy.format } : {}),
           ...(strategy.quality !== undefined ? { quality: strategy.quality } : {}),
         });
@@ -408,7 +503,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     for (const [viewId, view] of views) {
       const entry = view.pages.get(pageObjectNumber);
       if (!entry) continue;
-      const plan = tiles.plan(viewId, pageObjectNumber, entry.demand, entry.includeAnnotations);
+      const plan = tiles.plan(viewId, pageObjectNumber, entry.demand, entry.layers);
       if (plan !== entry.plan) {
         entry.plan = plan;
         changed = true;
@@ -427,10 +522,10 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const handle: ViewDemand = {
       setDemand: (page, demand, options) => {
         const pageObjectNumber = page.objectNumber;
-        const includeAnnotations = options?.includeAnnotations ?? true;
+        const layers = layersOf(options ?? {});
         const previous = pages.get(pageObjectNumber);
-        const plan = tiles.plan(viewId, pageObjectNumber, demand, includeAnnotations);
-        pages.set(pageObjectNumber, { demand, includeAnnotations, plan });
+        const plan = tiles.plan(viewId, pageObjectNumber, demand, layers);
+        pages.set(pageObjectNumber, { demand, layers, plan });
         if (plan !== previous?.plan) ctx.notify();
       },
       getPlan: (page) => pages.get(page.objectNumber)?.plan ?? EMPTY_TILE_PLAN,
@@ -476,32 +571,36 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     ...settings.api,
     canRender,
     renderPage,
-    renderThumbnail: (page, { maxWidth, includeAnnotations, signal }) =>
-      renderPage(page, { width: maxWidth, includeAnnotations, signal }),
+    renderThumbnail: (page, { maxWidth, ...options }) =>
+      renderPage(page, { width: maxWidth, ...options }),
     renderPages,
     getRenderPolicy: renderPolicy,
-    getRenderEpoch: (page, includeAnnotations = true) => {
+    getRenderEpoch: (page, layers = {}) => {
       const info = ctx.getPage(page);
-      return info ? epochOf(info.ref.objectNumber, includeAnnotations) : 0;
+      return info ? epochOf(info.ref.objectNumber, layersOf(layers)) : 0;
     },
     invalidate,
     onInvalidated: invalidated.on,
 
     // ── host lens ──
     renderSource,
-    getSourceKey: (page, { scale, includeAnnotations }) => {
+    getSourceKey: (page, { scale, view: _view, ...options }) => {
       const viewport = conformViewport(page, scale);
       return rasterKey(
         page.objectNumber,
         viewport.kind === 'width' ? viewport.width : 0,
-        includeAnnotations ?? true,
+        layersOf(options),
         currentStrategy().format,
         undefined,
       );
     },
     conformViewport,
     getPaintSettings: paintSettings,
+    getLayerRights: rights,
     createViewDemand,
+    renderAppearances,
+    keptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
+    getAppearanceScale: (renderScale) => snapAppearanceScale(renderPolicy(), renderScale),
     onRenderCompleted: renderCompleted.on,
     onRenderFailed: renderFailed.on,
   };

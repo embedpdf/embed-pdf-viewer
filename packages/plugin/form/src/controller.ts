@@ -5,15 +5,20 @@
  * verb and read has a home in `read/`, `write/` or `sync/`.
  */
 import { composeApi } from '@embedpdf/core';
+import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
 import { connectForm } from './connect';
 import type { FormHostCapability } from './host-contract';
+import { fieldByRef } from './model';
 import { createFieldReads } from './read/fields';
+import { createFieldSettings } from './read/settings';
 import { createWidgetReads } from './read/widgets';
 import { createServices, type FormContext } from './services';
 import { createActivation } from './write/activation';
 import { createFieldWrites } from './write/fields';
+import { createFill } from './write/fill';
 import { createInterchange } from './write/interchange';
+import { createWidgetLender } from './write/lending';
 import { createResetWrites } from './write/reset';
 import { createScriptEffects } from './write/script-effects';
 import { createTyping } from './write/typing';
@@ -21,24 +26,27 @@ import { createValueWrites } from './write/values';
 
 export function createFormController(ctx: FormContext) {
   const services = createServices(ctx);
-  const { events } = services;
+  const { events, rights } = services;
   const settings = ctx.settings();
 
   const fields = createFieldReads(ctx, services);
   const widgets = createWidgetReads(ctx, services);
+  const settingsReads = createFieldSettings(services);
 
-  const values = createValueWrites(ctx, services);
+  const fills = createFill(ctx, services);
+  const values = createValueWrites(ctx, services, fills);
   const typing = createTyping(ctx, services, values.setText);
-  const resets = createResetWrites(ctx, services);
+  const resets = createResetWrites(ctx, services, fills);
   const design = createFieldWrites(ctx, services);
   const interchange = createInterchange(ctx, services);
-  const activation = createActivation(ctx, services);
-  const scripts = createScriptEffects(ctx);
+  const activation = createActivation(ctx, services, fills);
+  const scripts = createScriptEffects(ctx, services, fills);
 
   const api: FormHostCapability = composeApi('form', [
     settings.api,
     fields.api,
     widgets.api,
+    settingsReads.api,
     values.api,
     typing.api,
     resets.api,
@@ -48,7 +56,10 @@ export function createFormController(ctx: FormContext) {
     scripts.api,
     {
       canRead: () => ctx.allows('doc.forms.read'),
-      canFill: () => ctx.allows('doc.forms.fill'),
+      canFill: (ref: FormFieldRef) => {
+        const field = fieldByRef(services.fields.view(), ref);
+        return field !== null && rights.mayFill(field);
+      },
       canDesign: () => ctx.allows('doc.forms.modify'),
       canRestoreAttribution: () => ctx.allows('doc.forms.import'),
       canWriteScripts: () => ctx.allows('doc.forms.script'),
@@ -63,6 +74,6 @@ export function createFormController(ctx: FormContext) {
 
   return {
     api,
-    connect: () => connectForm(ctx, api),
+    connect: () => connectForm(ctx, api, createWidgetLender(ctx, services)),
   };
 }

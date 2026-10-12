@@ -9,6 +9,7 @@ import {
   AnnotationsAllTokenSchema,
   AnnotationsExportTokenSchema,
   ActionsTokenSchema,
+  FormExportTokenSchema,
   AttachmentsTokenSchema,
   ContentTokenSchema,
   DocTokenSchema,
@@ -22,8 +23,10 @@ import {
 } from './tokenSchemas';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import { decodeAnnotKey, encodeAnnotKey } from '../identity/AnnotationRef';
+import { decodeFieldRefKey, encodeFieldRefKey } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
+import type { FormExportSelection } from '../transfer/formExport';
 import type { ModificationLevel } from '../signature/types';
 import type { SearchLimit, SearchQuery } from '../search/types';
 
@@ -207,6 +210,65 @@ export const decodeAnnotationsExportToken = (raw: string): AnnotationsExportToke
   }
   return {
     annotationsVersion: decodePositiveInteger(query.annotationsVersion, 'annotationsVersion'),
+    layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
+    selection,
+  };
+};
+
+/** What a `doc.forms.export` leaf is: two pins and a selection. */
+export interface FormExportToken {
+  formsVersion: number;
+  layoutVersion: number;
+  selection: FormExportSelection;
+}
+
+/** A form selection as the token holds it: pages by object number, fields by key (`obj:12`, `fqn:a.b`). */
+interface FormTokenSelection {
+  p?: number[];
+  f?: string[];
+}
+
+export const encodeFormExportToken = (token: FormExportToken): string => {
+  const { selection } = token;
+  const wire: FormTokenSelection = {};
+  if (selection.pages) {
+    wire.p = [...new Set(selection.pages.map((page) => page.objectNumber))].sort(
+      (left, right) => left - right,
+    );
+  }
+  if (selection.fields) wire.f = [...new Set(selection.fields.map(encodeFieldRefKey))].sort();
+  return encodeToken(FormExportTokenSchema, {
+    formsVersion: token.formsVersion,
+    layoutVersion: token.layoutVersion,
+    selection: wire.p || wire.f ? encodeTokenText(JSON.stringify(wire)) : undefined,
+  });
+};
+
+export const decodeFormExportToken = (raw: string): FormExportToken => {
+  const query = decodeToken(FormExportTokenSchema, raw);
+  const selection: { -readonly [K in keyof FormExportSelection]: FormExportSelection[K] } = {};
+  if (query.selection !== undefined) {
+    const wire = JSON.parse(decodeTokenText(query.selection)) as FormTokenSelection;
+    if (typeof wire !== 'object' || wire === null) throw new Error('malformed export selection');
+    if (wire.p !== undefined) {
+      const isNumber = (value: unknown): value is number =>
+        Number.isInteger(value) && (value as number) > 0;
+      if (!Array.isArray(wire.p) || !wire.p.every(isNumber)) {
+        throw new Error('malformed export pages');
+      }
+      selection.pages = wire.p.map((pageObjectNumber) => toPageRef(pageObjectNumber));
+    }
+    if (wire.f !== undefined) {
+      if (!Array.isArray(wire.f)) throw new Error('malformed export fields');
+      selection.fields = wire.f.map((key) => {
+        const ref = typeof key === 'string' ? decodeFieldRefKey(key) : null;
+        if (!ref) throw new Error('malformed export field');
+        return ref;
+      });
+    }
+  }
+  return {
+    formsVersion: decodePositiveInteger(query.formsVersion, 'formsVersion'),
     layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
     selection,
   };

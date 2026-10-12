@@ -171,7 +171,7 @@ export class ScaleToolbar {
       <demo-scale-toolbar />
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

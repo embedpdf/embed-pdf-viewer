@@ -13,12 +13,12 @@ import type {
   PdfFieldActions,
   ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
-import { formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
+import { formWidget, toPageRef, topRowOf } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
-import { readFieldAttribution } from './fieldAttribution';
+import { readFieldAttribution, readFieldGroup } from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 export const FAMILY_BY_CODE: Record<number, FormFieldFamily> = {
@@ -168,6 +168,7 @@ export function readFieldAt(
     valueEntry,
     defaultValueEntry,
     ...(actions ? { actions } : {}),
+    groupId: readFieldGroup(runtime, model, fieldIndex),
     ...readFieldAttribution(runtime, model, fieldIndex),
     widgets: [],
   };
@@ -230,6 +231,7 @@ export function readFieldAt(
         defaultValue: entryValues(defaultValueEntry),
         multiSelect: (rawFlags & FF_MULTI_SELECT) !== 0,
         options,
+        topIndex: topRowOf(fn.EPDFForm_GetFieldTopIndex(model, fieldIndex), options),
         widgets: readPlainWidgets(runtime, model, fieldIndex),
       };
     }

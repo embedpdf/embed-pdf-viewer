@@ -184,3 +184,173 @@ describe('the frame a painter draws into', () => {
     expect(frameAt(harness, 2).scale).toBe(1);
   });
 });
+
+/** The first bytes of a PNG `width` × `height`: as much as a sniff reads. */
+const pngOf = (width: number, height: number): Uint8Array => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return bytes;
+};
+
+describe('a stamp before the engine wrote it', () => {
+  it('shows the picture it was placed with at once, and the engine’s once that exists', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    const png = pngOf(200, 100);
+    let answer!: () => void;
+    harness.create.mockImplementationOnce(
+      (draft: { box: { x: number; y: number; width: number; height: number } }) =>
+        new Promise((resolve) => {
+          const { x, y, width, height } = draft.box;
+          const rect = { left: x, bottom: 800 - y - height, right: x + width, top: 800 - y };
+          answer = () =>
+            resolve({
+              annotation: {
+                ref: { kind: 'objectNumber', page: PAGE, objectNumber: 1 },
+                page: PAGE,
+                subtype: 'stamp',
+                rect,
+                box: rect,
+                rotation: null,
+                fit: 'contain',
+                name: null,
+                opacity: 1,
+                hasAppearance: true,
+              } as unknown as FileAnnotation,
+            });
+        }),
+    );
+    // The page has nothing the engine draws yet: the engine isn't asked.
+    expect(await harness.capability.renderAppearances(PAGE, 2)).toEqual([]);
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(0);
+    await harness.capability.stamps.arm({ source: png });
+    expect(harness.capability.placeArmedStamp(PAGE, { x: 300, y: 400 })).toBe(true);
+    await Promise.resolve();
+
+    const [id] = harness.model().order;
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${id}@placed`);
+    const [picture, ...rest] = await harness.capability.renderAppearances(PAGE, 2);
+    expect(rest).toEqual([]);
+    // The engine draws nothing new: it isn't asked, so nothing waits for it.
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(0);
+    expect(picture).toMatchObject({
+      ref: harness.model().byId[id!]!.annotation.ref,
+      mode: 'normal',
+      state: null,
+      rect: harness.model().byId[id!]!.apBox,
+      version: 0,
+    });
+    const blob = await picture!.image.blob();
+    expect(blob.type).toBe('image/png');
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+
+    // The engine's picture is there now: the page fetches it, and the placed one is gone.
+    answer();
+    await harness.ctx.changes.whenSettled();
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(`${id}@1`);
+    expect(await harness.capability.renderAppearances(PAGE, 2)).toEqual([]);
+    expect(harness.renderAppearances).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('an annotation an undo brings back', () => {
+  it('shows the picture the engine drew of it at once, until the engine draws it again', async () => {
+    const harness = annotationHarness();
+    const rect = { left: 100, bottom: 600, right: 200, top: 660 };
+    const stamp = {
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: 30 },
+      page: PAGE,
+      subtype: 'stamp',
+      rect,
+      box: rect,
+      rotation: null,
+      fit: 'contain',
+      name: null,
+      opacity: 1,
+      hasAppearance: true,
+      appearanceState: null,
+    } as unknown as FileAnnotation;
+    await harness.load([stamp]);
+    const ref = harness.read(stamp).ref;
+    const picture = {
+      ref,
+      mode: 'normal',
+      state: null,
+      rect: { x: 100, y: 140, width: 100, height: 60 },
+      image: { objectUrl: () => null, blob: () => null },
+    };
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
+
+    await harness.capability.delete(ref);
+    const deleted = harness.applied.at(-1)!;
+    harness.ctx.changes.stage({
+      label: { key: 'history.undo' },
+      undoOf: deleted.opId,
+      shows: [{ type: 'annotations.restore', annotation: harness.read(stamp), index: 0 }],
+    });
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('obj:30@kept');
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
+  });
+
+  it('undone before the engine answered, the page shows the pictures it had, asking the engine for nothing', async () => {
+    const harness = annotationHarness();
+    const rect = { left: 100, bottom: 600, right: 200, top: 660 };
+    const stamp = {
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: 30 },
+      page: PAGE,
+      subtype: 'stamp',
+      rect,
+      box: rect,
+      rotation: null,
+      fit: 'contain',
+      name: null,
+      opacity: 1,
+      hasAppearance: true,
+      appearanceState: null,
+    } as unknown as FileAnnotation;
+    await harness.load([stamp]);
+    const ref = harness.read(stamp).ref;
+    const picture = {
+      ref,
+      mode: 'normal',
+      state: null,
+      rect: { x: 100, y: 140, width: 100, height: 60 },
+      image: { objectUrl: () => null, blob: () => null },
+    };
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [picture] });
+    const before = harness.capability.getAppearanceEpoch(PAGE);
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
+
+    // The delete stays on its way; the page without the stamp is drawn meanwhile.
+    let answer!: () => void;
+    harness.remove.mockReturnValueOnce(new Promise((done) => (answer = () => done({}))));
+    const deleting = harness.capability.delete(ref);
+    harness.renderAppearances.mockResolvedValueOnce({ appearances: [] });
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([]);
+    const deleted = harness.ctx.changes.pending().at(-1)!;
+    harness.ctx.changes.stage({
+      label: { key: 'history.undo' },
+      undoOf: deleted.opId,
+      shows: [{ type: 'annotations.restore', annotation: harness.read(stamp), index: 0 }],
+    });
+
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe(before);
+    const asked = harness.renderAppearances.mock.calls.length;
+    expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([
+      { ...picture, version: 0 },
+    ]);
+    expect(harness.renderAppearances.mock.calls.length).toBe(asked);
+    answer();
+    await deleting;
+  });
+});

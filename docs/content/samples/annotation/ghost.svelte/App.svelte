@@ -43,7 +43,7 @@
     {/snippet}
     <Toolbar bind:opacity />
     <Stage class="stage" style={opacity === null ? undefined : `--epdf-ghost-opacity: ${opacity}`}>
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
     </Stage>
   </DocumentGate>

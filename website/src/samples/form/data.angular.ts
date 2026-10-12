@@ -14,7 +14,8 @@ import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
-import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
+import { EpdfForm, EpdfFormLayer, FormTransfer, withForm } from '@embedpdf/angular/form';
+import type { FormBundle } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
 const ebook = async (): Promise<OpenInput> => {
@@ -44,8 +45,8 @@ const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontS
     <ng-container *epdfDocumentGate="let document; fallback: loading">
       <div class="toolbar">
         <button type="button" class="button" (click)="export()">Export</button>
-        <button type="button" class="button" (click)="clear()">Clear</button>
-        <button type="button" class="button" [disabled]="!xfdf()" (click)="import()">Import</button>
+        <button type="button" class="button" (click)="remove()">Remove</button>
+        <button type="button" class="button" [disabled]="!bundle()" (click)="import()">Import</button>
         @if (result()) {
           <output class="readout">{{ result() }}</output>
         }
@@ -69,7 +70,7 @@ export class App {
   private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
   private added = false;
-  protected readonly xfdf = signal<Uint8Array | null>(null);
+  protected readonly bundle = signal<FormBundle | null>(null);
   protected readonly result = signal('');
 
   /** The values as plain data, keyed by full name: what you'd send to your backend. */
@@ -91,21 +92,23 @@ export class App {
   }
 
   protected async export() {
-    const { bytes } = await this.form.export(); // XFDF; form.export('fdf') for FDF
-    this.xfdf.set(bytes);
-    this.result.set(`Exported ${bytes.byteLength} bytes of XFDF`);
+    const exported = await this.form.export();
+    // One JSON text: what you'd store, and read back with FormTransfer.parse().
+    const text = FormTransfer.stringify(exported);
+    this.bundle.set(exported);
+    this.result.set(`Exported ${exported.fields.length} fields, ${text.length} characters of JSON`);
   }
 
-  protected async clear() {
-    await this.form.reset();
-    this.result.set('The form is empty');
+  protected async remove() {
+    for (const field of this.form.list()) await this.form.delete(field.ref);
+    this.result.set('The form is gone');
   }
 
   protected async import() {
-    const xfdf = this.xfdf();
-    if (!xfdf) return;
-    const { applied } = await this.form.import(xfdf);
-    this.result.set(`Imported ${applied} values`);
+    const bundle = this.bundle();
+    if (!bundle) return;
+    const { fields, dropped } = await this.form.import(bundle);
+    this.result.set(`Imported ${fields.length} fields, left out ${dropped.length}`);
   }
 
   private async addSignUpForm(page: PageRef, stage: EpdfStage) {

@@ -14,6 +14,16 @@ export { reload } from './mirror';
 export type { Mirror, MirrorChange, MirrorReload, MirrorSpec } from './mirror';
 export type { PageMirror, PageMirrorChange, PageMirrorSpec } from './page-mirror';
 export type {
+  ChangeLabel,
+  ChangeQueue,
+  HeldChange,
+  HoldOptions,
+  PendingChange,
+  PredictedOp,
+  SettledChange,
+  StagedChange,
+} from './changes';
+export type {
   DeepPartial,
   NoSettings,
   Settings,
@@ -41,6 +51,9 @@ export {
   // The refusal shape of the permissions convention (permissions.md): a
   // plugin's optimistic gate rejects with the same error the engine throws.
   PermissionDenied,
+  // What a page picture draws, as the engine decides it (left-out options
+  // draw what the user may read).
+  resolvePageLayers,
   snapAppearanceScale,
   snapFullPageViewport,
   snapTileScale,
@@ -53,7 +66,11 @@ export {
   isLocalEngine,
 } from '@embedpdf/engine-core/runtime';
 export type {
+  AnnotationAppearanceImage,
+  AnnotationRef,
   EngineRenderPolicy,
+  PageLayerRights,
+  PageRenderLayers,
   PageRef,
   PageHandle,
   PageRaster,

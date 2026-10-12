@@ -17,7 +17,7 @@ import type { FastifyInstance } from 'fastify';
 import type { z } from 'zod';
 
 import { abortSignalOf, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { assertEveryPartNamed, readMutationEnvelope } from './_mutationEnvelope';
 import { requireLayerChangeWrite, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { RequestedChange } from '../services/layerChanges';
@@ -66,12 +66,17 @@ export async function registerChangeRoutes(
       envelope.body,
       'request body',
     );
+    const named = new Set<string>();
     const changes = request.changes.map(
       (entry): RequestedChange => ({
         opId: entry.opId,
-        change: 'undoOf' in entry ? { undoOf: entry.undoOf } : opsOf(entry.ops, envelope.resources),
+        change:
+          'undoOf' in entry
+            ? { undoOf: entry.undoOf }
+            : opsOf(entry.ops, envelope.resources, named),
       }),
     );
+    assertEveryPartNamed(envelope, named);
     setNoStore(reply);
     const answers = await layerService.applyChanges(
       ctx,
@@ -82,10 +87,14 @@ export async function registerChangeRoutes(
   });
 }
 
-/** A change's ops, each with the bytes its parts carry in place of their keys. */
+/**
+ * A change's ops, each with the bytes its parts carry in place of the keys
+ * its `resources` name; each key used is added to `named`.
+ */
 function opsOf(
   ops: readonly ChangeOpWire[],
   parts: WireResourceMap | undefined,
+  named: Set<string>,
 ): Change<PageCoordinates, WireAnnotationResources> {
   if (ops.length > CHANGE_REQUEST_LIMITS.ops) {
     throw new EngineError(
@@ -97,6 +106,7 @@ function opsOf(
   const bytesOf = (key: string): ArrayBuffer => {
     const part = parts?.[key];
     if (!part) throw new EngineError(EngineErrorCode.InvalidArg, `no part 'resource:${key}'`);
+    named.add(key);
     return part.bytes;
   };
   return {
@@ -110,8 +120,10 @@ function opsOf(
           if (op.resources.file) resources.file = bytesOf(op.resources.file);
           return { ...op, resources } as ChangeOp<PageCoordinates, WireAnnotationResources>;
         }
-        case 'forms.setSignatureAppearance':
-          return { ...op, appearance: { pdf: new Uint8Array(bytesOf(op.appearance.pdf)) } };
+        case 'forms.setSignatureAppearance': {
+          const { resources, ...rest } = op;
+          return { ...rest, appearance: { pdf: new Uint8Array(bytesOf(resources.appearance)) } };
+        }
         default:
           return op as ChangeOp<PageCoordinates, WireAnnotationResources>;
       }

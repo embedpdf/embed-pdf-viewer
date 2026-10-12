@@ -85,7 +85,7 @@ export default function App() {
         <Stage className="stage" overlay={<HoverCard />}>
           {() => (
             <>
-              <RenderLayer annotations={false} />
+              <RenderLayer />
               <AnnotationLayer />
             </>
           )}

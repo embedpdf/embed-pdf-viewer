@@ -9,10 +9,13 @@ import {
   decodeRenderToken,
   encodeRenderToken,
   flatten,
-  PageRenderQuerySchema,
+  PageRenderQuerySchemas,
   renderImageOptionsToWire,
   unflatten,
 } from '@embedpdf/engine-core/wire';
+
+// The picture family these stale cases were written against.
+const PageRenderQuerySchema = PageRenderQuerySchemas.annotations;
 
 /**
  * Design-proof tests. They exercise the full round trip:

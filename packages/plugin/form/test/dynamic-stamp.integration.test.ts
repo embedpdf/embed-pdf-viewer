@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { DocumentMeta } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -46,7 +46,7 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       randomSeed: () => 7,
       sandboxFactory: createQuickJsSandbox,
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document,
       transaction: realm.transaction,
@@ -58,12 +58,6 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       const result = await controller.recalculate();
 
       expect(result.status).toBe('applied');
-      expect(result.effectsResult?.results.map(({ status }) => status)).toEqual([
-        'applied',
-        'applied',
-        'applied',
-        'applied',
-      ]);
       const reread = await doc.forms.list();
       expect(
         Object.fromEntries(reread.fields.map((field) => [field.name, field.valueEntry])),

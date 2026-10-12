@@ -1,26 +1,41 @@
 /**
- * The view: what the user sees, as one pure function of the three layers.
+ * The view: what the user sees, as one pure function of the records and the
+ * session.
  *
- *   records (confirmed)  +  pending (unconfirmed changes)  →  AnnotationView
- *   AnnotationView       +  session                        →  Model
+ *   records.get()   what the engine confirmed
+ *   records.view()  that, with this session's pending changes on top (the
+ *                   mirror replays them: `predictRecords`)
+ *   →  AnnotationView, each record drawn as the change on it says
+ *   AnnotationView  +  session  →  Model
  *
  * Every read and every gesture takes this `Model`. It is memoized, and each
  * record keeps its identity until its own inputs change, so a hover or a
  * change to one record does not recompute the others.
+ *
+ * A lender's records (services/lending.ts) come after the annotations, so on
+ * each page they paint above them, as form widgets do.
  */
 import { memo, type Mirror } from '@embedpdf/core';
 import {
   type AnnotationView,
+  drawnAfter,
+  fromDTO,
   type Id,
   type Model,
   type ModelAnnotation,
   sourceOfConfirmed,
+  sourceOfNew,
 } from '@embedpdf/core-annotation';
-import type { Annotation } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  annotationPatchBetween,
+  type Annotation,
+  type AnnotationPatch,
+} from '@embedpdf/engine-core/runtime';
 
-import { reorderInOrder, withPendingEdit, type PendingChange } from '../model';
-import { fromDTO } from '@embedpdf/core-annotation';
+import type { AnnotationLender } from '../host-contract';
 import type { AnnotationContext } from '../services/context';
+import type { Lending } from '../services/lending';
 import type { AnnotationRecord, AnnotationRecords } from '../sync/records';
 
 /**
@@ -44,11 +59,10 @@ export const authorityOf = (
   };
 };
 
-const NO_CHANGES: readonly PendingChange[] = [];
-
 export function createView(
   ctx: Pick<AnnotationContext, 'state' | 'doc' | 'document'>,
   records: Mirror<AnnotationRecords>,
+  lending: Pick<Lending, 'lender' | 'records'>,
 ) {
   /** A confirmed record as the model has it, cached per stored version and render preference. */
   const confirmed = new WeakMap<AnnotationRecord, { vector: boolean; record: ModelAnnotation }>();
@@ -59,7 +73,7 @@ export function createView(
     const record: ModelAnnotation = {
       ...projected,
       source: sourceOfConfirmed(projected.annotation, vector),
-      apVersion: stored.apVersion,
+      pictureVersion: stored.pictureVersion,
       authority: authorityOf(ctx, stored.dto),
     };
     confirmed.set(stored, { vector, record });
@@ -67,94 +81,146 @@ export function createView(
   };
 
   /**
-   * A record with its pending edits laid over it, oldest first
-   * (`withPendingEdit`). Over a confirmed record it keeps the confirmed
-   * appearance version and authority: those are the engine's, and may have
-   * moved on since the changes were made.
-   * Cached per record while its base and changes stay the same.
+   * A record a pending change made or changed, cached per shown version, the
+   * confirmed one it was made from and the render preference.
    */
-  const layered = new Map<
-    Id,
-    { base: ModelAnnotation; changes: readonly PendingChange[]; record: ModelAnnotation }
+  const predicted = new WeakMap<
+    AnnotationRecord,
+    { truth: AnnotationRecord | undefined; vector: boolean; record: ModelAnnotation }
   >();
-  const withChanges = (
-    id: Id,
-    base: ModelAnnotation,
-    changes: readonly PendingChange[],
-    confirmed: boolean,
+
+  /**
+   * How a record shows while a pending change is on it:
+   *   - one this session creates: drawn as a new record is, with no raster
+   *     from the engine yet;
+   *   - a confirmed one: its predicted annotation, drawn as the change says
+   *     (core `drawnAfter`, the engine's verdict on it): as before, its raster
+   *     moved, or live. Its appearance version and authority stay the
+   *     engine's.
+   */
+  const predictedRecord = (
+    shown: AnnotationRecord,
+    truth: AnnotationRecord | undefined,
+    vector: boolean,
   ): ModelAnnotation => {
-    const cached = layered.get(id);
-    if (
-      cached &&
-      cached.base === base &&
-      cached.changes.length === changes.length &&
-      cached.changes.every((change, index) => change === changes[index])
-    ) {
-      return cached.record;
+    const cached = predicted.get(shown);
+    if (cached && cached.truth === truth && cached.vector === vector) return cached.record;
+    let record: ModelAnnotation;
+    if (!truth) {
+      record = { ...fromDTO(shown.dto), unconfirmed: true, source: sourceOfNew(shown.dto) };
+    } else {
+      const base = confirmedRecord(truth, vector);
+      const patch = {
+        ...annotationPatchBetween(truth.dto, shown.dto),
+        subtype: truth.dto.subtype,
+      } as AnnotationPatch;
+      record = { ...base, annotation: shown.dto, ...drawnAfter(base, patch) };
     }
-    let record = base;
-    for (const { change } of changes) {
-      if (change.kind === 'edit') record = withPendingEdit(record, change);
-    }
-    if (confirmed) {
-      record = { ...record, apVersion: base.apVersion, authority: base.authority };
-    }
-    layered.set(id, { base, changes, record });
+    predicted.set(shown, { truth, vector, record });
     return record;
+  };
+
+  /** The lender's live drawing of a record it shows, when it draws one. */
+  const painterOf = (
+    shown: Annotation,
+    lender: AnnotationLender,
+  ): Pick<ModelAnnotation, 'painter'> => {
+    const painter = lender.painter(shown);
+    return painter ? { painter } : {};
+  };
+
+  /** A lent record as the model has it, cached per shown row and the confirmed row it was made from. */
+  const lent = new WeakMap<
+    Annotation,
+    { truth: Annotation | undefined; record: ModelAnnotation }
+  >();
+  const lentRecord = (
+    shown: Annotation,
+    truth: Annotation | undefined,
+    lender: AnnotationLender,
+  ): ModelAnnotation => {
+    const cached = lent.get(shown);
+    if (cached && cached.truth === truth) return cached.record;
+    let record: ModelAnnotation;
+    if (!truth) {
+      // Only shown: one an undo brings back draws the picture it had (the
+      // render reads keep it); a new one (a field just placed) draws live, as
+      // the tool's ghost drew it, until the engine has its picture.
+      record = {
+        ...fromDTO(shown),
+        unconfirmed: true,
+        source: confirmedOnce.has(annotationKey(shown.ref)) ? 'baked' : 'vector',
+        pictureVersion: lender.pictureVersion(shown.ref),
+        authority: lender.authority(shown),
+        ...painterOf(shown, lender),
+      };
+    } else {
+      // The lender's picture is drawn where its shape is; its painter draws it live while a
+      // gesture or a change reshapes or restyles it, as a square is drawn.
+      const base: ModelAnnotation = {
+        ...fromDTO(truth),
+        source: sourceOfConfirmed(truth, false),
+        pictureVersion: lender.pictureVersion(truth.ref),
+        authority: lender.authority(truth),
+        ...painterOf(shown, lender),
+      };
+      const patch = { ...annotationPatchBetween(truth, shown), subtype: truth.subtype };
+      record =
+        shown === truth
+          ? base
+          : { ...base, annotation: shown, ...drawnAfter(base, patch as AnnotationPatch) };
+      // A new look the lender made itself (a setting, a value): drawn live until its picture is there.
+      if (lender.pending(shown.ref)) record = { ...record, source: 'vector' };
+    }
+    lent.set(shown, { truth, record });
+    return record;
+  };
+
+  /** The confirmed lent rows by key, once per list; and every key ever confirmed. */
+  const confirmedLent = new WeakMap<readonly Annotation[], Map<Id, Annotation>>();
+  const confirmedOnce = new Set<Id>();
+  const confirmedByKey = (rows: readonly Annotation[]): Map<Id, Annotation> => {
+    let byKey = confirmedLent.get(rows);
+    if (!byKey) {
+      byKey = new Map(rows.map((row) => [annotationKey(row.ref), row]));
+      for (const key of byKey.keys()) confirmedOnce.add(key);
+      confirmedLent.set(rows, byKey);
+    }
+    return byKey;
   };
 
   const view = memo(
     () =>
       [
         records.get(),
-        ctx.state.get().pending,
+        records.view(),
         ctx.state.get().vector,
-        ctx.state.get().reorders,
         ctx.document(),
+        lending.records(),
       ] as const,
-    (confirmedRecords, pending, vector, reorders): AnnotationView => {
-      const changesOf = new Map<Id, PendingChange[]>();
-      for (const change of pending) {
-        const list = changesOf.get(change.id);
-        if (list) list.push(change);
-        else changesOf.set(change.id, [change]);
-      }
-      const deleted = (changes: readonly PendingChange[]) =>
-        changes.some(({ change }) => change.kind === 'delete');
-
+    (truths, shown, vector, _document, lentRecords): AnnotationView => {
       const byId: Record<Id, ModelAnnotation> = {};
-      const order: Id[] = [];
-      for (const key of confirmedRecords.order) {
-        const changes = changesOf.get(key) ?? NO_CHANGES;
-        if (deleted(changes)) continue;
-        const base = confirmedRecord(confirmedRecords.byKey[key]!, key in vector);
-        if (!base) continue;
-        byId[key] = changes.length ? withChanges(key, base, changes, true) : base;
-        order.push(key);
+      for (const key of shown.order) {
+        const stored = shown.byKey[key]!;
+        const truth = truths.byKey[key];
+        byId[key] =
+          stored === truth
+            ? confirmedRecord(stored, key in vector)
+            : predictedRecord(stored, truth, key in vector);
       }
-      // Records created in this session that the engine has not confirmed
-      // yet. Changes to any other record show only while the engine still has
-      // it: an edit never brings back a record deleted elsewhere.
-      for (const [id, changes] of changesOf) {
-        const created = changes.find(({ change }) => change.kind === 'create');
-        if (!created || created.change.kind !== 'create' || id in byId || deleted(changes)) {
-          continue;
+      // The document's order, then the records this session created, then the lent ones.
+      const order = [...shown.order];
+      const lender = lending.lender();
+      if (lentRecords && lender) {
+        const confirmed = confirmedByKey(lentRecords.confirmed);
+        for (const row of lentRecords.shown) {
+          const key = annotationKey(row.ref);
+          if (key in byId) continue;
+          byId[key] = lentRecord(row, confirmed.get(key), lender);
+          order.push(key);
         }
-        byId[id] = withChanges(id, created.change.record, changes, false);
-        order.push(id);
       }
-      for (const id of layered.keys()) if (!(id in byId)) layered.delete(id);
-      // Drawing-order changes the engine hasn't confirmed yet, in the order they were made.
-      let shown: Id[] = order;
-      for (const reorder of reorders) {
-        shown = reorderInOrder(
-          shown,
-          (id) => byId[id]?.annotation.page.objectNumber === reorder.page,
-          reorder.ids,
-          reorder.position,
-        );
-      }
-      return { byId, order: shown };
+      return { byId, order };
     },
   );
 

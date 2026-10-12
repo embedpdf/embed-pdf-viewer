@@ -6,8 +6,9 @@
  * write, whether the pipeline runs; this plugin owns only the pipeline.
  */
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
+import type { ScriptCommitSurface } from '@embedpdf/plugin-actions/contract/host';
 
-import type { FormCommitResult } from '../contract';
+import { formHasScripts, type FieldIndex } from '../model';
 import {
   createFormScriptingController,
   type FormScriptingController,
@@ -20,7 +21,6 @@ export function createScriptingSeam(ctx: FormContext, siblings: FormSiblings) {
   const realm = actionsHost?.scriptRealm ?? null;
   const pipeline = realm
     ? createFormScriptingController({
-        doc: ctx.doc,
         document: () => ctx.document(),
         transaction: realm.transaction.bind(realm),
         budget: realm.budget,
@@ -28,13 +28,43 @@ export function createScriptingSeam(ctx: FormContext, siblings: FormSiblings) {
     : null;
   if (pipeline) ctx.cleanup(() => pipeline.dispose());
   const settings = ctx.settings();
+  const controller = (): FormScriptingController | null =>
+    settings.get().validation === 'scripts' ? pipeline : null;
+
+  // A one-shot developer hint: a form with scripts and no realm fills without them.
+  let warnedNoRealm = false;
+  const scriptsFor = (form: FieldIndex): FormScriptingController | null => {
+    if (!formHasScripts(form)) return null;
+    if (!realm && !warnedNoRealm && settings.get().validation === 'scripts') {
+      warnedNoRealm = true;
+      console.warn(
+        "[form] this form has scripts, but they don't run: add the actions plugin with " +
+          'JavaScript on (`actionsPlugin({ javascript: { enabled: true, sandboxFactory } })`), ' +
+          "or set the form's `validation` to 'none' to fill it in without them.",
+      );
+    }
+    return controller();
+  };
+
+  let warmed = false;
   return {
-    /** The script pipeline when the document's scripts run for this write, else `null`. */
-    controller: (): FormScriptingController | null =>
-      settings.get().validation === 'scripts' ? pipeline : null,
+    /** The script pipeline when the document's scripts run, else `null`. */
+    controller,
+    /** The script pipeline for a write to this form: `null` too when no field has a script. */
+    scriptsFor,
+    /** Start the realm before the first write needs it, once, when the form has scripts. */
+    warm(form: FieldIndex): void {
+      if (warmed || !form.snapshot) return;
+      const scripts = scriptsFor(form);
+      if (!scripts) return;
+      warmed = true;
+      void scripts.warm(form.snapshot).catch(() => {
+        /* the first write starts the realm, and reports why it can't */
+      });
+    },
     /** Script results (UI effects, diagnostics, errors) are surfaced through the
      *  actions plugin, with the origin that caused them. */
-    surface: (result: FormCommitResult, origin: ActionOrigin): void => {
+    surface: (result: ScriptCommitSurface, origin: ActionOrigin): void => {
       actionsHost?.surfaceScriptCommit(result, { origin, realm: 'document' });
     },
   };

@@ -1,6 +1,6 @@
 /**
- * Script world building (a page-scoped prefetch: the forms snapshot plus the
- * annotations of the page the action runs on) and the event bridge between
+ * Script world building (a page-scoped prefetch: the form as the user sees it
+ * plus the annotations of the page the action runs on) and the event bridge between
  * two standards: the /AA keys are ISO 32000-2 Table 200; the event names
  * live in the JavaScript API layer (ISO 21757-1, Acrobat).
  */
@@ -15,9 +15,9 @@ import { pdfRectOf, rgbOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FormSnapshot, PageObjectNumber } from '@embedpdf/engine-core/runtime';
 
 import type { ActionContext } from '../contract';
-import type { ActionsContext } from '../services';
+import type { ActionsContext, ActionsServices } from '../services';
 
-export function createScriptWorld(ctx: ActionsContext) {
+export function createScriptWorld(ctx: ActionsContext, { form }: Pick<ActionsServices, 'form'>) {
   // Acrobat's JavaScript keeps colors as color arrays, so they convert here, at its edge.
   const engineColorToArray = (color: string | null | undefined): ScriptColorArray => {
     if (!color) return ['T'];
@@ -29,7 +29,7 @@ export function createScriptWorld(ctx: ActionsContext) {
     pageObjectNumber: PageObjectNumber,
   ): Promise<{ snapshot: FormSnapshot; world: Omit<ScriptWorldInput, 'event'> }> => {
     const page = toPageRef(pageObjectNumber);
-    const snapshot = await ctx.doc.forms.list();
+    const snapshot = await form.read();
     const layout = ctx.getPage(page);
     const pageIndex = Math.max(0, layout?.index ?? -1);
     const { annotations } = await ctx.doc.page(page).annotations.list();

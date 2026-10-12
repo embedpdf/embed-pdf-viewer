@@ -26,17 +26,16 @@ import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
-import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
-import type { FormDataFormat, FormFieldValue } from '../forms/value';
+import type { FormFieldValue } from '../forms/value';
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { ObjectNumberRange } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
-import type { Change, ChangeResult } from '../mutation/Change';
+import type { Change, ChangeResult, RecordedChange } from '../mutation/Change';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -52,12 +51,12 @@ import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
-  FormImportResult,
   FormRepairResult,
   FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
   FormWidgetsReorderResult,
+  FormCalculationsReorderResult,
   FormWidgetUpdateResult,
   FormWidgetDeleteResult,
 } from '../mutation/FormMutationResults';
@@ -65,7 +64,7 @@ import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { AnnotationPosition, PagePosition } from '../mutation/ListPosition';
+import type { AnnotationPosition, FieldPosition, PagePosition } from '../mutation/ListPosition';
 import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
@@ -90,8 +89,12 @@ import type {
   SignedDocumentPolicy,
 } from '../signature/types';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
-import type { AnnotationImportPages, AnnotationImportResult } from '../transfer/annotationImport';
-import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
+import type { AnnotationImportResult } from '../transfer/annotationImport';
+import type { BundleImportPages } from '../transfer/bundle';
+import type { WireFormBundle } from '../transfer/FormBundle';
+import type { FormExportSelection } from '../transfer/formExport';
+import type { FormImportResult, FormValuesImportResult } from '../transfer/formImport';
+import type { BundleLimits } from '../transfer/bundleLimits';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 
 /**
@@ -310,6 +313,8 @@ export interface SignaturesPrepareWorkerRequest {
   docId: string;
   layerName?: string;
   input: SignaturePrepareInput;
+  /** Who signs and their grants: the field must be theirs to sign. */
+  authority: ChangeAuthority;
 }
 
 export interface SignaturesCompleteWorkerRequest extends WriteJobFields {
@@ -320,6 +325,8 @@ export interface SignaturesCompleteWorkerRequest extends WriteJobFields {
   layerName?: string;
   input: SignatureCompleteInput;
   artifactPath?: string;
+  /** Who signs and their grants: the field must still be theirs to sign. */
+  authority: ChangeAuthority;
 }
 
 export interface SignaturesCancelWorkerRequest {
@@ -529,7 +536,8 @@ export interface ChangeRecordPayload {
 /** One change of a server request (see `DocumentApplyChangesWorkerRequest`). */
 export interface ServerChange<C extends Coordinates = PageCoordinates> {
   opId: string;
-  change: Change<C, WireAnnotationResources>;
+  /** Its ops (a single-verb route's one op, an import's among them), or an undo. */
+  change: RecordedChange<C, WireAnnotationResources>;
   /** Who the change acts for (see `DocumentApplyWorkerRequest.authority`). */
   authority: ChangeAuthority;
   /**
@@ -621,7 +629,7 @@ export interface AnnotationsExportWorkerRequest {
   layerName?: string;
   selection: AnnotationExportSelection;
   /** The limits the bundle must stay within; the defaults otherwise. */
-  limits?: AnnotationBundleLimits;
+  limits?: BundleLimits;
 }
 
 /**
@@ -637,7 +645,7 @@ export interface AnnotationsImportWorkerRequest extends WriteJobFields {
   docId: string;
   layerName?: string;
   bundle: WireAnnotationBundle;
-  pages?: AnnotationImportPages;
+  pages?: BundleImportPages;
   attribution: 'restore' | 'stamp';
   /**
    * The session: who `'stamp'` attributes each annotation to, as on create,
@@ -645,7 +653,7 @@ export interface AnnotationsImportWorkerRequest extends WriteJobFields {
    */
   actor?: AnnotationActor;
   /** The limits the bundle must stay within; the defaults otherwise. */
-  limits?: AnnotationBundleLimits;
+  limits?: BundleLimits;
   artifactPath?: string;
 }
 
@@ -697,8 +705,11 @@ export interface FormsSetValueWorkerRequest extends WriteJobFields {
   ref: FormFieldRef;
   value: FormFieldValue;
   artifactPath?: string;
-  /** Who fills the field in, stamped as its filler when the value changes; absent when anonymous. */
-  actor?: AnnotationActor;
+  /**
+   * Who the write acts for (stamped as its filler or creator) and their
+   * grants, checked field by field inside the write.
+   */
+  authority: ChangeAuthority;
 }
 
 export interface FormsResetWorkerRequest extends WriteJobFields {
@@ -710,39 +721,64 @@ export interface FormsResetWorkerRequest extends WriteJobFields {
   /** The fields to reset; absent resets the whole form. */
   refs?: FormFieldRef[];
   artifactPath?: string;
+  /**
+   * Who the write acts for (stamped as its filler or creator) and their
+   * grants, checked field by field inside the write.
+   */
+  authority: ChangeAuthority;
 }
 
-export interface FormsApplyEffectsWorkerRequest extends WriteJobFields {
-  kind: 'forms.applyEffects';
-  effect: 'write';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  effects: FormEffect[];
-  artifactPath?: string;
-  /** The user whose fill ran the scripts, stamped as the filler of each value they change. */
-  actor?: AnnotationActor;
-}
-
+/** `doc.forms.export`: the fields a selection takes, as a bundle. A snapshot read. */
 export interface FormsExportWorkerRequest {
   kind: 'forms.export';
   effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  format: FormDataFormat;
+  selection: FormExportSelection;
+  /** The limits the bundle must stay within; the defaults otherwise. */
+  limits?: BundleLimits;
 }
 
+/** `doc.forms.import`: a bundle's design, as one change (see `FormImportOp`). */
 export interface FormsImportWorkerRequest extends WriteJobFields {
   kind: 'forms.import';
   effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  /** FDF or XFDF payload; goes on the wirePack transfer list (zero-copy). */
-  data: ArrayBuffer;
-  /** Sniffed from the bytes when omitted. */
-  format?: FormDataFormat;
+  /** Page space; each resource on the transfer list. */
+  bundle: WireFormBundle;
+  pages?: BundleImportPages;
+  attribution: 'restore' | 'stamp';
+  values: boolean;
+  /**
+   * Who imports and their grants: whom `'stamp'` makes the creator and
+   * filler, whose user `'restore'` records as `importedBy`, and who may put
+   * the fields in which groups.
+   */
+  authority: ChangeAuthority;
+  limits?: BundleLimits;
+  /** Whether the caller holds `doc.forms.script`: without it, scripts, submits and links are left out. */
+  mayScript: boolean;
+  artifactPath?: string;
+}
+
+/** `doc.forms.importValues`: a bundle's values, as one change (see `FormImportOp`). */
+export interface FormsImportValuesWorkerRequest extends WriteJobFields {
+  kind: 'forms.importValues';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  bundle: WireFormBundle;
+  attribution: 'restore' | 'stamp';
+  /**
+   * Who imports and their grants: whom `'stamp'` makes the filler, whose
+   * user `'restore'` records as `importedBy`, and which fields they may fill.
+   */
+  authority: ChangeAuthority;
+  limits?: BundleLimits;
   artifactPath?: string;
 }
 
@@ -770,8 +806,11 @@ export interface FormsCreateFieldWorkerRequest<
   /** Its widgets' object numbers, in `draft.widgets` order; the next free ones when absent. */
   widgetObjectNumbers?: number[];
   artifactPath?: string;
-  /** Who creates the field, stamped as its creator; absent when anonymous. */
-  actor?: AnnotationActor;
+  /**
+   * Who creates the field (stamped as its creator, and whose group it goes
+   * in by default) and their grants: which groups they may put it in.
+   */
+  authority: ChangeAuthority;
 }
 
 export interface FormsUpdateFieldWorkerRequest extends WriteJobFields {
@@ -783,6 +822,8 @@ export interface FormsUpdateFieldWorkerRequest extends WriteJobFields {
   ref: FormFieldRef;
   patch: FormFieldPatch;
   artifactPath?: string;
+  /** Who changes the field and their grants: which group they may move it to. */
+  authority: ChangeAuthority;
 }
 
 /** Draw a PDF page into every widget of an unsigned signature field (the visual fill). */
@@ -795,6 +836,8 @@ export interface FormsSetSignatureAppearanceWorkerRequest extends WriteJobFields
   ref: FormFieldRef;
   pdf: ArrayBuffer;
   artifactPath?: string;
+  /** Who draws the look and their grants: the field must be theirs to sign. */
+  authority: ChangeAuthority;
 }
 
 export interface FormsDeleteFieldWorkerRequest extends WriteJobFields {
@@ -843,6 +886,18 @@ export interface FormsDeleteWidgetWorkerRequest extends WriteJobFields {
   docId: string;
   layerName?: string;
   widget: AnnotationRef;
+  artifactPath?: string;
+}
+
+/** The form's calculation order: `fields` go together to `position`. */
+export interface FormsReorderCalculationsWorkerRequest extends WriteJobFields {
+  kind: 'forms.reorderCalculations';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  fields: FormFieldRef[];
+  position: FieldPosition;
   artifactPath?: string;
 }
 
@@ -1171,7 +1226,7 @@ export interface AttachmentsCreateWorkerRequest extends WriteJobFields {
   docId: string;
   layerName?: string;
   file: WireAttachmentFile;
-  /** Binary payload referenced by `file.resource` — transfer-list bytes. */
+  /** Binary payload referenced by `file.resources.file` — transfer-list bytes. */
   resources?: WireResourceMap;
   artifactPath?: string;
 }
@@ -1538,9 +1593,9 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsListWorkerRequest
   | FormsSetValueWorkerRequest
   | FormsResetWorkerRequest
-  | FormsApplyEffectsWorkerRequest
   | FormsExportWorkerRequest
   | FormsImportWorkerRequest
+  | FormsImportValuesWorkerRequest
   | FormsRepairWorkerRequest
   | FormsCreateFieldWorkerRequest<C>
   | FormsUpdateFieldWorkerRequest
@@ -1550,6 +1605,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsDetachWidgetWorkerRequest
   | FormsDeleteWidgetWorkerRequest
   | FormsReorderWidgetsWorkerRequest
+  | FormsReorderCalculationsWorkerRequest
   | FormsUpdateWidgetWorkerRequest<C>
   | PagesListWorkerRequest
   | PagesReorderWorkerRequest
@@ -1772,18 +1828,16 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | {
-      tag: 'forms.applyEffects';
-      result: FormEffectsResult<C>;
-      /** False when the batch wrote nothing: no artifact, event, or version bump. */
-      wrote: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | { tag: 'forms.export'; format: FormDataFormat; bytes: ArrayBuffer }
+  | { tag: 'forms.export'; bundle: WireFormBundle }
   | {
       tag: 'forms.import';
       result: FormImportResult<C>;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.importValues';
+      result: FormValuesImportResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1832,6 +1886,12 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'forms.reorderWidgets';
       result: FormWidgetsReorderResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.reorderCalculations';
+      result: FormCalculationsReorderResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

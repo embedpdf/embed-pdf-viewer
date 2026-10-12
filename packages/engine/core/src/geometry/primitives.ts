@@ -95,7 +95,8 @@ export interface PdfQuad {
 }
 
 /**
- * A page's rotation in degrees clockwise — the `/Rotate` values PDF permits.
- * Presentation metadata only; normalized content coordinates stay y-up.
+ * A quarter turn in degrees clockwise: a page's rotation (the `/Rotate`
+ * values PDF permits, presentation metadata only; normalized content
+ * coordinates stay y-up), or a widget's turn.
  */
 export type PdfRotation = 0 | 90 | 180 | 270;

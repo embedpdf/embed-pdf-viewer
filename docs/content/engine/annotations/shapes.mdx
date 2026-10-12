@@ -225,6 +225,22 @@ turned shape, which is what a PDF app uses to find it. To move or resize a turne
 its `box`; to straighten it where it is, set `rotation: null`. Free text boxes, carets and stamps
 turn the same way.
 
+At a quarter turn (90, 180 or 270), you can create a shape by where it stands instead: its `rect`
+and `rotation`. The engine works out the `box`, which is the `rect` with its sides swapped under
+90 and 270:
+
+```ts
+// A 160 × 40 box, standing 40 wide and 160 tall
+await page.annotations.create({
+  subtype: 'square',
+  rect: { x: 100, y: 100, width: 40, height: 160 },
+  rotation: 90,
+});
+```
+
+At any other angle, give the `box`: many boxes stand in the same `rect`, so a create by `rect`
+fails with `InvalidArg`. A create with both takes the `box`, as when you pass a read back.
+
 Lines, polylines, polygons and ink turn the same way too. Give their points upright, and the angle
 as `rotation`; they turn about the middle of the box around the points:
 

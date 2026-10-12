@@ -1,11 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import type { Annotation } from '../../src/annotation/kinds';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
-import {
-  assertAnnotationBundle,
-  resourceIdOf,
-  type AnnotationBundle,
-} from '../../src/transfer/AnnotationBundle';
+import { assertAnnotationBundle, type AnnotationBundle } from '../../src/transfer/AnnotationBundle';
+import { resourceIdOf } from '../../src/transfer/bundle';
 
 const page = { kind: 'objectNumber', objectNumber: 3 } as const;
 const size = { width: 612, height: 792 };

@@ -160,23 +160,23 @@ const doc = await engine.open(
 );
 ```
 
-`identity` is who the user is. The engine writes three of its fields into every annotation the
-user creates or changes:
+`identity` is who the user is. The engine writes three of its fields into what the user creates or
+changes:
 
-| Field         | What the engine does with it                                                                   |
-| :------------ | :--------------------------------------------------------------------------------------------- |
-| `displayName` | Becomes the annotation's `author`, the name PDF apps show.                                     |
-| `userId`      | Becomes the annotation's `userId`, `createdBy` and `modifiedBy`.                               |
-| `groupId`     | Becomes the annotation's `groupId`: the group new annotations belong to.                       |
-| `groups`      | Not written. The groups the user is in, for permissions like `annotations:update:group=legal`. |
+| Field         | What the engine does with it                                                                                    |
+| :------------ | :-------------------------------------------------------------------------------------------------------------- |
+| `displayName` | Becomes the annotation's `author`, the name PDF apps show, and a form field's `filledByName`.                   |
+| `userId`      | Becomes the annotation's `userId`, `createdBy` and `modifiedBy`, and a form field's `createdBy` and `filledBy`. |
+| `groupId`     | The group new annotations and form fields go in (`groupId`).                                                    |
 
 The other fields (`email`, `title`, `organization`, `organizationalUnit`) never go into the PDF.
 The viewer uses them in stamps and signature appearances.
 
 `scope` is what the user may do, as a list of permissions. Leave it out and the user may do
 everything; the engine logs a reminder once, so you notice before you ship. Permissions that
-name the user's own annotations or group (`:self`, `:group`) need an `identity` to check them
-against: without one, `open()` fails with `InvalidArg`.
+name the user's own annotations (`:self`) need an `identity` with a `userId` to check them
+against: without one, `open()` fails with `InvalidArg`. A `:group=<id>` permission names its
+group itself, so it needs no identity.
 
 Read both back from `doc.security`:
 

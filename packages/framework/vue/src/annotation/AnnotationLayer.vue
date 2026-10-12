@@ -1,8 +1,8 @@
 <!--
   <AnnotationLayer>: a page's annotations, the selection's outline and
   handles, the tool's preview and the text boxes being typed in. Put it in the
-  Stage's #page slot above the rendered page, with the render layer leaving
-  annotations out (`<RenderLayer :annotations="false" />`).
+  Stage's #page slot above the rendered page: while it's there, the render
+  layer leaves the annotations out of the page's picture.
 
   Pure paint: it reads the plugin's per-page render items and chrome and draws
   them. Pointer events reach the plugin through the interaction hub (the
@@ -12,7 +12,7 @@
   The `#handle` and `#rotation-handle` slots draw the handles your way.
 -->
 <script setup lang="ts">
-import { computed, h, markRaw, shallowRef, toRaw, watch } from 'vue';
+import { computed, h, markRaw, onUnmounted, shallowRef, toRaw, watch } from 'vue';
 import type { Component } from 'vue';
 import { annotationKey, shallowEqual } from '@embedpdf/core';
 import type { RenderItem } from '@embedpdf/core-annotation';
@@ -21,9 +21,11 @@ import type { Annotation, TextItem } from '@embedpdf/plugin-annotation';
 // chrome, appearances…): the same runtime token as the public one, typed wider.
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
   annotationDrawingOf,
   bakedAppearanceOf,
+  createShownUrls,
   editingTextKeyOf,
   layerTextBoxesOf,
   loadAppearanceUrls,
@@ -31,7 +33,7 @@ import {
 } from '@embedpdf/web';
 import type { AnnotationDrawing, AppearanceUrl } from '@embedpdf/web';
 import { devWarn } from '../dev';
-import { usePageLayerFact } from '../dev-registry';
+import { usePaintsPagePart } from '../page-layers';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
 import { usePage } from '../runtime/page';
 import AnnotationChrome from './AnnotationChrome.vue';
@@ -63,6 +65,11 @@ const NO_ITEMS: readonly RenderItem[] = Object.freeze([]);
 const NO_TEXTS: readonly TextItem[] = Object.freeze([]);
 
 const page = usePage();
+// While it's here, the page's picture leaves the annotations to it.
+usePaintsPagePart(
+  computed(() => page.value.ref),
+  'annotations',
+);
 const annotation = useOptionalCapability(AnnotationHostToken);
 const interaction = useOptionalCapability(InteractionToken);
 // The active tool decides which interactive renderers take the pointer, so a
@@ -97,8 +104,6 @@ const texts = useOptionalSelector(
 
 // ── your renderers ───────────────────────────────────────────────────────────
 
-usePageLayerFact(page, 'annotationRenderers', () => props.renderers ?? null);
-
 /** Bumped when the renderers' behaviors register again, so the drawings are read again. */
 const registrations = shallowRef(0);
 // An `interactive` renderer takes the pointer through a behavior the plugin
@@ -130,7 +135,11 @@ watch(
 
 // ── baked appearances ────────────────────────────────────────────────────────
 
-const urls = shallowRef<Record<string, AppearanceUrl>>({});
+// `null` until the page's first pictures arrive.
+const urls = shallowRef<Record<string, AppearanceUrl> | null>(null);
+// The pictures shown stay valid until the next ones are shown.
+const shown = createShownUrls();
+onUnmounted(() => shown.release());
 // Baked annotations draw from engine rasters: load them again when the page's
 // baked set or an appearance version changes (a stamp just placed, a resize
 // whose new appearance arrived), and when the bake scale does. A move or a
@@ -141,12 +150,13 @@ const bakedKey = useOptionalSelector(
   (host) => host.getAppearanceEpoch(page.value.ref),
   '',
 );
-// The bake scale follows the document's render policy: zoom steps inside one
-// rung of the appearance lattice bake nothing again.
+// The appearance scale follows the document's render policy: zoom steps inside
+// one rung of the appearance lattice bake nothing again. Without the render
+// plugin, only this session's pictures load.
 const bakeScale = useOptionalSelector(
-  AnnotationHostToken,
-  (host) => host.getBakeScale(page.value.transform.renderScale),
-  0,
+  RenderToken,
+  (render) => render.getAppearanceScale(page.value.transform.renderScale),
+  page.value.transform.renderScale,
 );
 watch(
   [annotation, () => page.value.ref, bakeScale, bakedKey],
@@ -154,6 +164,7 @@ watch(
     if (!host || !scale) return;
     onCleanup(
       loadAppearanceUrls(
+        shown,
         (signal) => host.renderAppearances(pageRef, scale, signal),
         annotationKey,
         (loaded) => (urls.value = loaded),
@@ -211,7 +222,7 @@ function nativeOf(id: string): Component {
   if (!native) {
     native = markRaw(() => {
       const item = itemsById.value.get(id);
-      return item ? h(NativeDrawing, { item, url: urls.value[id]?.url ?? null }) : null;
+      return item ? h(NativeDrawing, { item, urls: urls.value }) : null;
     });
     natives.set(id, native);
   }
@@ -269,7 +280,9 @@ const componentOf = (component: Component): Component => toRaw(component);
           :item="item"
           :page="page"
           :native="nativeOf(item.id)"
-          :appearance="bakedAppearanceOf(urls, item.id)"
+          :appearance="
+            urls && bakedAppearanceOf(urls, item.id, item.annotation?.appearanceState ?? null)
+          "
           :interactive="drawing.interactive"
         />
       </AnnotationFrame>
@@ -282,7 +295,7 @@ const componentOf = (component: Component): Component => toRaw(component);
         :page="page"
         :inert="drawing.kind === 'native' && drawing.inert"
       >
-        <NativeDrawing :item="item" :url="urls[item.id]?.url ?? null" />
+        <NativeDrawing :item="item" :urls="urls" />
       </AnnotationFrame>
     </template>
     <FreeTextBox v-for="text in ownTexts" :key="text.id" :item="text" :page="page" />

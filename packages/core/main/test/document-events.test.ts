@@ -31,6 +31,7 @@ function page(pageObjectNumber: number, index: number, rotation: PdfRotation = 0
     size: { width: 600, height: 800 },
     rotation,
     userUnit: 1,
+    tabOrder: null,
     boxes: pageSpaceBoxesOf({
       media: { ...box },
       crop: { ...box },
@@ -112,7 +113,7 @@ function rotatedEvent(
     pages: pageObjectNumbers.map((pageObjectNumber) => toPageRef(pageObjectNumber)),
     rotation,
     layout: { pageCount: pages.length, pages, namedPages: [] },
-    meta: { affectedPages: [], cacheDelta: null },
+    meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: true },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
   };
 }
@@ -149,7 +150,7 @@ describe('kernel: document events → page registry', () => {
       type: 'pages.deleted',
       pages: [toPageRef(2)],
       layout: { pageCount: 2, pages: [page(1, 0), page(3, 1)], namedPages: [] },
-      meta: { affectedPages: [], cacheDelta: null },
+      meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: true },
       origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
     } as DocumentEvent);
 
@@ -187,7 +188,8 @@ describe('kernel: document events → page registry', () => {
       id: 'doc-1',
       bytes: new Uint8Array(),
     });
-    expect(events.subscriberCount).toBe(1);
+    // The kernel listens first and last: one change's events land as one store update.
+    expect(events.subscriberCount).toBe(2);
 
     await kernel.documents.close(docId);
     expect(events.subscriberCount).toBe(0); // teardown ran

@@ -14,6 +14,7 @@ const BASE = {
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
   createdBy: null,
   createdAt: null,
   filledBy: null,
@@ -75,6 +76,7 @@ const LISTBOX: FormFieldDTO = {
     { label: 'Banana', value: 'Banana', selected: false },
     { label: 'Cherry', value: 'Cherry', selected: true },
   ],
+  topIndex: 0,
   widgets: [
     {
       ref: {

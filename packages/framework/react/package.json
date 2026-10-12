@@ -15,6 +15,7 @@
     "./annotation": "./src/annotation.tsx",
     "./commands": "./src/commands.ts",
     "./form": "./src/form.tsx",
+    "./history": "./src/history.ts",
     "./i18n": "./src/i18n.ts",
     "./interaction": "./src/interaction.tsx",
     "./link": "./src/link.tsx",
@@ -63,6 +64,10 @@
       "./form": {
         "import": "./dist/form.js",
         "require": "./dist/form.cjs"
+      },
+      "./history": {
+        "import": "./dist/history.js",
+        "require": "./dist/history.cjs"
       },
       "./i18n": {
         "import": "./dist/i18n.js",
@@ -159,6 +164,7 @@
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",

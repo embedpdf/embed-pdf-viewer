@@ -1,10 +1,10 @@
 /**
  * The store's second door: a change stated in code (`store.apply`) shows at
- * once and is written, settled and refused exactly like a gesture's. The
- * write carries the pending change's own patch, as given.
+ * once and is sent, answered and refused exactly like a gesture's. One call
+ * is one change, its ops the changes as given.
  */
 import { annotationKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { annotationHarness, PAGE, type FileAnnotation, dataOf } from './harness';
 
@@ -93,7 +93,7 @@ function held() {
 }
 
 describe('store.apply', () => {
-  it('an update shows at once, and its write is the pending change’s own patch', async () => {
+  it('an update shows at once, and the change sent is its patch, as given', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     const write = held();
@@ -102,16 +102,15 @@ describe('store.apply', () => {
     const patch = { subtype: 'square', color: '#00ff00' } as const;
     const done = harness.capability.update(refOf(20), patch);
     expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
-    const [pending] = harness.state().pending;
-    expect(pending!.change).toMatchObject({ kind: 'edit', patch });
+    const [pending] = harness.pending();
+    expect(pending!.shows).toEqual([{ type: 'annotations.update', ref: refOf(20), patch }]);
+    expect(pending!.label).toEqual({ key: 'annotation.update', count: 1 });
     expect(harness.update).toHaveBeenCalledWith(refOf(20), patch);
-    expect(harness.update.mock.calls[0]![1]).toBe(
-      pending!.change.kind === 'edit' && pending!.change.patch,
-    );
+    expect(harness.update.mock.calls[0]![1]).toBe(patch);
 
     write.resolve({ annotation: square(20, '#00ff00') });
     await done;
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
     expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
   });
 
@@ -209,12 +208,11 @@ describe('store.apply', () => {
     expect(dataOf(harness.capability.get(refOf(20))).box).toEqual({ ...box, x: box.x + 250 });
   });
 
-  it('a create and then its edit in one apply: the edit is laid over the new record', async () => {
+  it('one apply is one change, however many records it names', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     harness.create.mockReturnValue(held().promise);
     harness.update.mockReturnValue(held().promise);
-    const ref: AnnotationRef = { kind: 'nm', page: PAGE, nm: 'new-square' };
 
     const applied = harness.apply([
       {
@@ -222,16 +220,19 @@ describe('store.apply', () => {
         page: PAGE,
         draft: {
           subtype: 'square',
-          nm: 'new-square',
           box: { x: 10, y: 10, width: 50, height: 40 },
           color: '#000000',
           strokeWidth: 2,
         },
       },
-      { type: 'update', ref, patch: { subtype: 'square', color: '#00ff00' } },
+      { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#00ff00' } },
     ]);
-    expect(applied.ids[1]).toBe(applied.ids[0]);
-    expect(dataOf(harness.capability.get(ref)).color).toBe('#00ff00');
+    expect(applied.ids[1]).toBe('obj:20');
+    expect(harness.model().byId[applied.ids[0]!]).toMatchObject({ unconfirmed: true });
+    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
+    expect(harness.pending()).toHaveLength(1);
+    expect(harness.applied).toHaveLength(1);
+    expect(harness.pending()[0]!.label).toEqual({ key: 'annotation.change', count: 2 });
   });
 
   it('a line created in code shows with the rect around its drawing', async () => {
@@ -260,7 +261,7 @@ describe('store.apply', () => {
     });
   });
 
-  it('two changes to one record in one apply each settle with their own write', async () => {
+  it('two changes to one record in one apply: one change, each op answered in turn', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     harness.update
@@ -270,15 +271,16 @@ describe('store.apply', () => {
       { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#00ff00' } },
       { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#0000ff' } },
     ]);
-    expect(harness.state().pending).toHaveLength(2);
+    expect(harness.pending()).toHaveLength(1);
+    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#0000ff');
     const outcome = await applied.written;
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
     expect(outcome.annotations.map((annotation) => annotation && dataOf(annotation).color)).toEqual(
       ['#00ff00', '#0000ff'],
     );
   });
 
-  it('repeated writes to one record where one fails: the right changes settle, each with its own answer', async () => {
+  it('one refused op refuses the whole change: the view shows the engine’s record as it was', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     harness.update
@@ -288,12 +290,10 @@ describe('store.apply', () => {
       { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#00ff00' } },
       { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#0000ff' } },
     ]).written;
-    expect(harness.state().pending).toEqual([]);
-    expect(outcome.failed).toHaveLength(1);
-    expect(outcome.annotations[0] && dataOf(outcome.annotations[0]).color).toBe('#00ff00');
-    expect(outcome.annotations[1]).toBeNull();
-    // The view shows the engine's record: the change it accepted.
-    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
+    expect(harness.pending()).toEqual([]);
+    expect(outcome.failed).toMatchObject([{ ids: ['obj:20'] }]);
+    expect(outcome.annotations).toEqual([null, null]);
+    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#000000');
   });
 
   it('an update resolves with its own write’s answer, never another change still on its way', async () => {
@@ -345,7 +345,7 @@ describe('store.apply', () => {
     await expect(
       harness.capability.update(refOf(20), { subtype: 'square', ...conflict }),
     ).rejects.toMatchObject({ code: 'invalid-input' });
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
     expect(harness.update).not.toHaveBeenCalled();
   });
 
@@ -375,7 +375,7 @@ describe('store.apply', () => {
     const done = harness.capability.update(refOf(20), { subtype: 'square', color: '#00ff00' });
     write.reject(new Error('refused'));
     await expect(done).rejects.toThrow();
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
     expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#000000');
   });
 
@@ -395,7 +395,7 @@ describe('store.apply', () => {
       { type: 'update', ref: refOf(20), patch: { subtype: 'square' } },
     ]);
     expect(applied.ids).toEqual(['obj:20']);
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
     expect(harness.update).not.toHaveBeenCalled();
   });
 
@@ -413,28 +413,26 @@ describe('store.apply', () => {
     const accepted = held();
     harness.update.mockReturnValueOnce(accepted.promise);
     const first = harness.apply([change]);
-    expect(harness.state().pending).toHaveLength(1);
+    expect(harness.pending()).toHaveLength(1);
     expect(harness.update).toHaveBeenCalledWith(
       refOf(30),
       { subtype: 'stamp' },
-      {
-        appearance: drawing,
-      },
+      { resources: { appearance: drawing } },
     );
     accepted.resolve({ annotation: stamp(30) });
     expect((await first.written).failed).toEqual([]);
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
 
     const refused = held();
     harness.update.mockReturnValueOnce(refused.promise);
     const second = harness.apply([change]);
-    expect(harness.state().pending).toHaveLength(1);
+    expect(harness.pending()).toHaveLength(1);
     refused.reject(new Error('refused'));
     expect((await second.written).failed).toMatchObject([{ ids: ['obj:30'] }]);
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
   });
 
-  it('a create shows at once under its name, and follows the engine’s ref', async () => {
+  it('a create shows at once under the number it takes, and stays under it', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     const write = held();
@@ -451,17 +449,17 @@ describe('store.apply', () => {
         },
       },
     ]);
-    const nm = harness.create.mock.calls[0]![0].nm as string;
     const [id] = applied.ids;
-    expect(id).toBe(annotationKey({ kind: 'nm', page: PAGE, nm }));
+    const { change } = harness.applied[0]!;
+    const [op] = ('ops' in change ? change.ops : []) as { objectNumber: number }[];
+    expect(id).toBe(annotationKey(refOf(op!.objectNumber)));
     expect(harness.model().byId[id!]).toMatchObject({
       unconfirmed: true,
-      annotation: { subtype: 'text', nm, contents: 'Check' },
+      annotation: { subtype: 'text', contents: 'Check' },
     });
 
     const confirmed = {
       ...base(31),
-      nm,
       subtype: 'text',
       rect: { left: 10, bottom: 770, right: 30, top: 790 },
       contents: 'Check',
@@ -474,9 +472,9 @@ describe('store.apply', () => {
     } as unknown as FileAnnotation;
     write.resolve({ annotation: confirmed });
     const outcome = await applied.written;
-    expect(outcome.created[id!]).toEqual(refOf(31));
-    expect(harness.model().byId['obj:31']).toBeDefined();
-    expect(harness.model().byId[id!]).toBeUndefined();
+    expect(outcome.annotations[0]!.ref).toEqual(refOf(op!.objectNumber));
+    expect(harness.model().order).toEqual(['obj:20', id]);
+    expect(harness.model().byId[id!]!.unconfirmed).toBeUndefined();
   });
 
   it('a delete hides the record at once; a refused one brings it back', async () => {
@@ -503,7 +501,7 @@ describe('store.apply', () => {
     expect(() =>
       harness.apply([{ type: 'update', ref: refOf(99), patch: { subtype: 'square' } }]),
     ).toThrow(/no annotation/);
-    expect(harness.state().pending).toEqual([]);
+    expect(harness.pending()).toEqual([]);
     expect(harness.update).not.toHaveBeenCalled();
   });
 
@@ -523,7 +521,9 @@ describe('store.apply', () => {
       subtype: 'square',
       box: { x: 300, y: 140, width: 100, height: 60 },
     });
-    await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(2));
+    // One change: the parent, then its child.
+    expect(harness.applied).toHaveLength(1);
+    expect(harness.update).toHaveBeenCalledTimes(2);
     expect(harness.update.mock.calls[1]![0]).toEqual(refOf(21));
     expect(harness.update.mock.calls[1]![1]).toMatchObject({ subtype: 'link' });
   });

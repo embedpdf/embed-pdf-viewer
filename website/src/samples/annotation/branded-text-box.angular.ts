@@ -85,7 +85,7 @@ export class FormatButtons {
       <demo-format-buttons />
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer>
             <!-- Your own text box: the element is the editor, in your app's look. It fills
                  its frame, which the layer places and turns like the text box. -->

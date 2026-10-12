@@ -190,16 +190,15 @@ export interface AnnotationAppearanceImagesResult<C extends Coordinates = PageCo
 }
 
 /**
- * One entry in the `multipart/form-data` manifest the cloud appearance
- * endpoint returns. Identifies which multipart part (`part`) carries the
- * encoded bitmap for this annotation, plus the metadata the client needs to
- * place and identify it without a second round-trip. The client addresses the
- * image by `part` and identifies the annotation by `ref`, so every annotation
- * with an appearance stream is emitted.
+ * One appearance in the cloud appearance endpoint's `body` part: which part
+ * carries its image (`resources.image`, the key of a `resource:<key>` part),
+ * plus what the client needs to place and identify it without a second
+ * round-trip. The client finds the image by its key and the annotation by
+ * `ref`, so every annotation with an appearance stream is listed.
  */
-export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageCoordinates> {
-  /** `name` of the multipart part carrying this appearance's image bytes. */
-  part: string;
+export interface AnnotationAppearanceBatchEntry<C extends Coordinates = PageCoordinates> {
+  /** The image's key: its bytes are the part `resource:<key>`. */
+  resources: { image: string };
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
   state: string | null;
@@ -211,12 +210,12 @@ export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageC
 }
 
 /**
- * The JSON part (`name="manifest"`) of the appearance multipart response. The
- * remaining parts are the encoded images, one per `appearances[i].part`.
+ * The `body` part of the appearance multipart response. The other parts are
+ * the encoded images, one per `appearances[i].resources.image`.
  */
-export interface AnnotationAppearanceManifest<C extends Coordinates = PageCoordinates> {
+export interface AnnotationAppearanceBatch<C extends Coordinates = PageCoordinates> {
   page: PageRef;
-  appearances: AnnotationAppearanceManifestEntry<C>[];
+  appearances: AnnotationAppearanceBatchEntry<C>[];
 }
 
 /**

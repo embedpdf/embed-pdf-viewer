@@ -17,6 +17,7 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.FormsAddWidget
     | CloudPDF.ChangeOp.FormsRemoveWidget
     | CloudPDF.ChangeOp.FormsDeleteWidget
+    | CloudPDF.ChangeOp.FormsReorderCalculations
     | CloudPDF.ChangeOp.FormsReorderWidgets
     | CloudPDF.ChangeOp.FormsUpdateWidget
     | CloudPDF.ChangeOp.FormsSetSignatureAppearance
@@ -78,7 +79,6 @@ export namespace ChangeOp {
         type: "forms.setDisplay";
         field: CloudPDF.FormFieldRef;
         display: ChangeOpFormsSetDisplay.Display;
-        expect?: ChangeOpFormsSetDisplay.Expect | undefined;
     }
 
     export namespace ChangeOpFormsSetDisplay {
@@ -89,13 +89,6 @@ export namespace ChangeOp {
             NoView: "noView",
         } as const;
         export type Display = (typeof Display)[keyof typeof Display];
-        export const Expect = {
-            Visible: "visible",
-            Hidden: "hidden",
-            NoPrint: "noPrint",
-            NoView: "noView",
-        } as const;
-        export type Expect = (typeof Expect)[keyof typeof Expect];
     }
 
     export interface FormsSetAppearanceText {
@@ -149,6 +142,12 @@ export namespace ChangeOp {
         expect?: CloudPDF.WidgetPatch | undefined;
     }
 
+    export interface FormsReorderCalculations {
+        type: "forms.reorderCalculations";
+        fields: CloudPDF.FormFieldRef[];
+        position: CloudPDF.FieldPosition;
+    }
+
     export interface FormsReorderWidgets {
         type: "forms.reorderWidgets";
         page: CloudPDF.PageRef;
@@ -166,12 +165,12 @@ export namespace ChangeOp {
     export interface FormsSetSignatureAppearance {
         type: "forms.setSignatureAppearance";
         field: CloudPDF.FormFieldRef;
-        appearance: ChangeOpFormsSetSignatureAppearance.Appearance;
+        resources: ChangeOpFormsSetSignatureAppearance.Resources;
     }
 
     export namespace ChangeOpFormsSetSignatureAppearance {
-        export interface Appearance {
-            pdf: string;
+        export interface Resources {
+            appearance: string;
         }
     }
 

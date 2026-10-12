@@ -6,7 +6,12 @@ import type {
   PdfCoordinates,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, normalizePdfRect } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  normalizePdfRect,
+  resolvePageLayers,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FPDF_REVERSE_BYTE_ORDER, rasterizeAsync, readPageBox } from './deviceRaster';
@@ -14,8 +19,9 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { Slices } from '../../shared/slices';
 
+/** `FPDF_ANNOT`: the annotations, form fields' widgets excepted. */
 const FPDF_RENDER_ANNOT = 0x01;
-/** `EPDF_RENDER_WIDGETS`: with annotations, the form fields too. */
+/** `EPDF_RENDER_WIDGETS`: the form fields' widgets. */
 const EPDF_RENDER_WIDGETS = 0x8000;
 const FPDF_RENDER_TOBECONTINUED = 1;
 const FPDF_RENDER_DONE = 2;
@@ -51,10 +57,12 @@ export class PageRenderReader {
       const rotation = options.rotation ?? 0;
       const viewport = options.viewport ?? { kind: 'scale', scale: 1 };
 
+      // The worker draws what it's asked: who may see what is checked
+      // before a render gets here, so a left-out option draws everything.
+      const layers = resolvePageLayers(options, { annotations: true, formFields: true });
       let flags = FPDF_REVERSE_BYTE_ORDER;
-      const includeAnnotations = options.includeAnnotations ?? true;
-      if (includeAnnotations) flags |= FPDF_RENDER_ANNOT;
-      if (includeAnnotations && (options.includeFormFields ?? true)) flags |= EPDF_RENDER_WIDGETS;
+      if (layers.includeAnnotations) flags |= FPDF_RENDER_ANNOT;
+      if (layers.includeFormFields) flags |= EPDF_RENDER_WIDGETS;
 
       const raster = await rasterizeAsync(this.runtime, {
         rect: target,

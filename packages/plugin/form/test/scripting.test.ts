@@ -14,7 +14,7 @@ import {
   formWidget,
   toPageRef,
   type DocumentHandle,
-  type FormEffect,
+  type ChangeOp,
   type FormFieldDTO,
   type FormSnapshot,
   type PageLayout,
@@ -22,7 +22,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { createSerialQueue } from '@embedpdf/core';
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const ref = (fieldObjectNumber: number) => ({
@@ -52,6 +52,13 @@ const text = (
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'scalar', value },
   defaultValueEntry: { kind: 'scalar', value: '' },
   value,
@@ -74,6 +81,13 @@ const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
@@ -119,18 +133,10 @@ const documentMeta = (): DocumentMeta => ({
 });
 
 function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
-  const batches: FormEffect[][] = [];
-  const applyEffects = vi.fn(async (effects: FormEffect[]) => {
-    batches.push(effects);
-    return {
-      results: effects.map((_, index) => ({
-        index,
-        status: 'applied' as const,
-        fields: [],
-        changedWidgets: [],
-      })),
-      meta: {} as never,
-    };
+  const batches: ChangeOp[][] = [];
+  const apply = vi.fn(async ({ ops }: { ops: ChangeOp[] }) => {
+    batches.push(ops);
+    return { items: [], meta: { undoable: true } as never };
   });
   const readActions = vi.fn(async () => ({
     nameTreeScripts: nameTreeScript ? [{ name: 'library', action: action(nameTreeScript) }] : [],
@@ -138,7 +144,8 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
   }));
   const doc = {
     id: 'form-doc',
-    forms: { list: async () => snapshot, applyEffects },
+    apply,
+    forms: { list: async () => snapshot },
     actions: { get: readActions },
     security: {
       identity: { userId: 'alex', displayName: 'Alex Morgan', organization: 'EmbedPDF' },
@@ -152,13 +159,13 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
     randomSeed: () => 7,
     sandboxFactory: factory,
   });
-  const controller = createFormScriptingController({
+  const controller = engineScripts({
     doc,
     document: documentMeta,
     transaction: realm.transaction,
     budget: realm.budget,
   });
-  return { controller, batches, applyEffects, readActions, factory, sandbox, snapshot };
+  return { controller, batches, apply, readActions, factory, sandbox, snapshot };
 }
 
 describe('form scripting transaction', () => {
@@ -188,12 +195,39 @@ describe('form scripting transaction', () => {
     expect(fx.factory).toHaveBeenCalledTimes(1);
     expect(fx.batches).toEqual([
       [
-        { kind: 'setValue', ref: ref(1), value: { value: 'initialized' } },
-        { kind: 'setValue', ref: ref(2), value: { value: '3' } },
-        { kind: 'setValue', ref: ref(3), value: { value: '6' } },
-        { kind: 'setAppearanceText', ref: ref(3), text: '$6' },
+        { type: 'forms.setValue', field: ref(1), value: { value: 'initialized' } },
+        { type: 'forms.setValue', field: ref(2), value: { value: '3' } },
+        { type: 'forms.setValue', field: ref(3), value: { value: '6' } },
+        { type: 'forms.setAppearanceText', field: ref(3), text: '$6' },
       ],
     ]);
+  });
+
+  it('runs a calculate script added through update from the next fill on', async () => {
+    const snapshot: FormSnapshot = {
+      formKind: 'acroform',
+      needsAppearances: false,
+      widgets: [],
+      fields: [text(2, 'amount', '1'), text(3, 'total', '')],
+      calculationOrder: [],
+    };
+    const fx = harness(snapshot);
+    await fx.controller.commit(ref(2), { value: '3' });
+    expect(fx.batches[0]).toEqual([
+      { type: 'forms.setValue', field: ref(2), value: { value: '3' } },
+    ]);
+
+    // What the update's event brings the form's mirror: the script, and the order it joined.
+    snapshot.fields[1] = text(3, 'total', '', {
+      calculate: action(`event.value = Number(getField('amount').value) * 2;`),
+    });
+    snapshot.calculationOrder = [ref(3)];
+    await fx.controller.commit(ref(2), { value: '4' });
+    expect(fx.batches[1]).toContainEqual({
+      type: 'forms.setValue',
+      field: ref(3),
+      value: { value: '8' },
+    });
   });
 
   it('surfaces validation rejection without sending the proposed value', async () => {
@@ -220,7 +254,7 @@ describe('form scripting transaction', () => {
     expect(result.uiEffects).toEqual([
       { kind: 'alert', message: 'Invalid email', icon: 0, phase: 'user' },
     ]);
-    expect(fx.applyEffects).not.toHaveBeenCalled();
+    expect(fx.apply).not.toHaveBeenCalled();
   });
 
   it('uses a keystroke script to transform a full replacement commit', async () => {
@@ -239,7 +273,9 @@ describe('form scripting transaction', () => {
 
     await fx.controller.commit(ref(2), { value: 'abc' });
 
-    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: 'ABC' } }]);
+    expect(fx.batches[0]).toEqual([
+      { type: 'forms.setValue', field: ref(2), value: { value: 'ABC' } },
+    ]);
   });
 
   it('executes widget activation in the same isolated transaction and surfaces UI effects', async () => {
@@ -269,8 +305,8 @@ describe('form scripting transaction', () => {
     expect(fx.batches).toEqual([
       [
         {
-          kind: 'setValue',
-          ref: ref(1),
+          type: 'forms.setValue',
+          field: ref(1),
           value: { value: 'Mouse Up:Field' },
         },
       ],
@@ -305,7 +341,7 @@ describe('form scripting transaction', () => {
     expect(second.status).toBe('applied');
     expect(second.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(false);
     expect(fx.readActions).toHaveBeenCalledTimes(1); // boot never retried
-    expect(fx.applyEffects).toHaveBeenCalledTimes(2); // both user values landed
+    expect(fx.apply).toHaveBeenCalledTimes(2); // both user values landed
   });
 });
 

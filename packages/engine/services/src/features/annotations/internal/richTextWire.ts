@@ -1,14 +1,11 @@
 import {
   faceForFreeTextFont,
-  STANDARD_FACES,
   type FontIdentityInfo,
-  type FreeTextFont,
   type RichTextBody,
   type RichTextDocument,
   type RichTextDocumentInput,
   type RichTextParagraph,
   type RichTextRunStyle,
-  type StandardFont,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -22,63 +19,6 @@ import { readUtf8String } from '../../../runtime/memory/strings';
  * font's `key`, a standard font's kebab name); the engine names it the way
  * a PDF does (family, weight, italic). Both directions map here.
  */
-
-/** Family names compare without case, spaces, hyphens and underscores
- *  (the engine's own rule): "Noto Sans" == "NotoSans" == "noto-sans". */
-export function familyKey(family: string): string {
-  return family.toLowerCase().replace(/[\s\-_'"]/g, '');
-}
-
-const STANDARD_FAMILY_KEYS: Record<string, (typeof STANDARD_FACES)[StandardFont]['family']> = {
-  helvetica: 'Helvetica',
-  arial: 'Helvetica',
-  arialmt: 'Helvetica',
-  sansserif: 'Helvetica',
-  times: 'Times',
-  timesroman: 'Times',
-  timesnewroman: 'Times',
-  timesnewromanpsmt: 'Times',
-  serif: 'Times',
-  courier: 'Courier',
-  couriernew: 'Courier',
-  couriernewpsmt: 'Courier',
-  monospace: 'Courier',
-  symbol: 'Symbol',
-  zapfdingbats: 'ZapfDingbats',
-  dingbats: 'ZapfDingbats',
-};
-
-/**
- * The DTO `fontFamily` for a body face: the registered `key` whose identity
- * matches, else the standard font's kebab name, else the family itself.
- */
-export function freeTextFontForFace(
-  face: { family: string; weight: number; italic: boolean },
-  keyForFace?: (family: string, weight: number, italic: boolean) => string | undefined,
-): FreeTextFont {
-  const key = keyForFace?.(face.family, face.weight, face.italic);
-  if (key !== undefined) return key;
-  const standard = STANDARD_FAMILY_KEYS[familyKey(face.family)];
-  if (standard) {
-    const bold = face.weight >= 600;
-    for (const [name, spec] of Object.entries(STANDARD_FACES) as [
-      StandardFont,
-      (typeof STANDARD_FACES)[StandardFont],
-    ][]) {
-      if (spec.family === standard && spec.weight >= 600 === bold && spec.italic === face.italic) {
-        return name;
-      }
-    }
-    // Symbol / ZapfDingbats have no bold or italic faces.
-    for (const [name, spec] of Object.entries(STANDARD_FACES) as [
-      StandardFont,
-      (typeof STANDARD_FACES)[StandardFont],
-    ][]) {
-      if (spec.family === standard) return name;
-    }
-  }
-  return face.family;
-}
 
 /** A run style or body with its `family` (and the weight/italic a key or
  *  standard name implies) rewritten to what the engine resolves by. */

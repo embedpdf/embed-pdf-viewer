@@ -44,6 +44,12 @@ export interface Store {
   setCore(patch: Partial<CoreState>): void;
   /** Wake every subscriber without a state change: a resource read through a capability changed. */
   notify(): void;
+  /**
+   * Hold the change stream until the returned release is called: state still
+   * changes at once, and subscribers hear of everything held in one pass at
+   * the last release. One change's events land as one update this way.
+   */
+  hold(): () => void;
   subscribe(listener: () => void): Unsubscribe;
   /** Kernel-destroy teardown: reset core, drop every slice and listener.
    *  Reads stay legal afterwards (empty state); writes become no-ops. */
@@ -71,7 +77,13 @@ export function createStore(report: (error: unknown) => void = console.error): S
 
   let emitting = false;
   let pending = false;
+  let holds = 0;
+  let missed = false;
   const emitChange = () => {
+    if (holds > 0) {
+      missed = true;
+      return;
+    }
     if (emitting) {
       pending = true;
       return;
@@ -138,6 +150,18 @@ export function createStore(report: (error: unknown) => void = console.error): S
       emitChange();
     },
     notify: () => emitChange(),
+    hold() {
+      holds += 1;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        holds -= 1;
+        if (holds > 0 || !missed) return;
+        missed = false;
+        emitChange();
+      };
+    },
     subscribe(listener) {
       changeListeners.add(listener);
       return () => void changeListeners.delete(listener);

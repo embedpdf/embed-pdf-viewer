@@ -24,7 +24,7 @@
     <AddStamps />
     <p class="hint">Sign a stamp off, then move it: its status goes with it.</p>
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
       {#snippet overlay()}
         <Approvals />

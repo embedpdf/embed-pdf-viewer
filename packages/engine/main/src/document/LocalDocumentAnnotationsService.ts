@@ -15,6 +15,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
+import { ownedResources, transferableResources } from './bundleResources';
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
 import type { JobQueue } from '../worker/WorkerQueue';
@@ -69,12 +70,8 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       if (payload.tag !== 'annotations.export') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      // The worker transferred each resource's buffer: the bundle owns it now.
       const { bundle } = payload;
-      const resources: AnnotationBundle['resources'] = Object.fromEntries(
-        Object.entries(bundle.resources).map(([id, bytes]) => [id, new Uint8Array(bytes)]),
-      );
-      return { ...bundle, resources };
+      return { ...bundle, resources: ownedResources(bundle.resources) };
     });
   }
 
@@ -106,14 +103,7 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     const actor = this.guard.actorForCreate();
     const docId = this.docId;
     return AbortablePromise.run<AnnotationImportResult>(async (signal) => {
-      // A private copy of each resource rides the transfer list, once
-      // however many items name it; the caller's bytes stay intact.
-      const resources = Object.fromEntries(
-        Object.entries(bundle.resources).map(([id, bytes]) => [
-          id,
-          new Uint8Array(bytes).buffer as ArrayBuffer,
-        ]),
-      );
+      const resources = transferableResources(bundle.resources);
       const submission = this.queue.enqueue<WorkerResultPayload>({
         buildPack: (jobId: JobId) =>
           wirePack(

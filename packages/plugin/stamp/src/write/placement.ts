@@ -13,7 +13,7 @@ import {
   type PageRef,
 } from '@embedpdf/core';
 import { javaScriptProgramFromActionTree } from '@embedpdf/core-acrojs';
-import type { Annotation } from '@embedpdf/engine-core/runtime';
+import { formEffectOps, type Annotation } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import { AnnotationToken, type StampPlacement } from '@embedpdf/plugin-annotation/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
@@ -158,12 +158,19 @@ export function createPlacement(
         },
       });
       scripting = createFormScriptingController({
-        doc,
         document: () => targetDocument,
         transaction: realm.transaction.bind(realm),
         budget: realm.budget,
       });
-      const result = await scripting.recalculate();
+      // The copy is the stamp's own: what its scripts calculate is written to it, in the same
+      // transaction, before it is flattened.
+      const result = await scripting.transaction(async (scripts) => {
+        const calculated = await scripts.recalculate(snapshot);
+        if (calculated.status === 'accepted' && calculated.effects.length > 0) {
+          await doc.apply({ ops: formEffectOps(calculated.effects) });
+        }
+        return calculated;
+      });
       actions.surfaceScriptCommit(result, { origin: 'user', realm: 'detached' });
       if (result.status === 'failed') {
         throw stampError(
@@ -173,16 +180,8 @@ export function createPlacement(
       }
 
       const page = selectedPage.ref;
-      const flattened = await doc.pages.flatten([page], { usage: 'display' });
-      const failed = flattened.results.find(
-        ({ status }) => status === 'failed' || status === 'skipped',
-      );
-      if (failed) {
-        throw stampError(
-          'operation-failed',
-          `dynamic stamp flatten failed for page ${failed.page.objectNumber}`,
-        );
-      }
+      // All or nothing: a page that fails to flatten throws.
+      await doc.pages.flatten([page], { usage: 'display' });
 
       const bytes = await doc.pages.extract([page]);
       const image = await doc.page(page).render.image({

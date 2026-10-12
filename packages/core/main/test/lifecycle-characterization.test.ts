@@ -19,6 +19,7 @@ const page = (pageObjectNumber: number, index: number): PageLayout => ({
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
+  tabOrder: null,
   boxes: pageSpaceBoxesOf({
     media: { ...box },
     crop: { ...box },

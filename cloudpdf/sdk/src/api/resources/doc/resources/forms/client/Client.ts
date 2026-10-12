@@ -96,79 +96,7 @@ export class FormsClient {
     }
 
     /**
-     * @throws {@link CloudPDF.NotFoundError}
-     * @throws {@link errors.CloudPDFError}
-     * @throws {@link errors.CloudPDFTimeoutError}
-     */
-    public exportData(
-        request: CloudPDF.doc.ExportDataFormsRequest,
-        requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<core.BinaryResponse> {
-        return core.HttpResponsePromise.fromPromise(this.__exportData(request, requestOptions));
-    }
-
-    private async __exportData(
-        request: CloudPDF.doc.ExportDataFormsRequest,
-        requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, format, "X-Document-Password": documentPassword } = request;
-        const _queryParams: Record<string, unknown> = {
-            format: format != null ? format : undefined,
-        };
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher<core.BinaryResponse>({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/data`,
-            ),
-            method: "GET",
-            headers: _headers,
-            queryString: core.url
-                .queryBuilder()
-                .addMany(_queryParams)
-                .mergeAdditional(requestOptions?.queryParams)
-                .build(),
-            responseType: "binary-response",
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.CloudPDFError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(
-            _response.error,
-            _response.rawResponse,
-            "GET",
-            "/v1/docs/{docId}/layers/{layerName}/form/data",
-        );
-    }
-
-    /**
-     * @param {CloudPDF.doc.ImportDataFormsRequest} request
+     * @param {CloudPDF.doc.DocFormsReorderCalculationsRequest} request
      * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.BadRequestError}
@@ -177,31 +105,33 @@ export class FormsClient {
      * @throws {@link errors.CloudPDFTimeoutError}
      *
      * @example
-     *     await client.doc.forms.importData({
+     *     await client.doc.forms.reorderCalculations({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         body: {
-     *             "key": "value"
-     *         }
+     *         fields: [{
+     *                 kind: "objectNumber",
+     *                 objectNumber: 1
+     *             }],
+     *         position: "start"
      *     })
      */
-    public importData(
-        request: CloudPDF.doc.ImportDataFormsRequest,
+    public reorderCalculations(
+        request: CloudPDF.doc.DocFormsReorderCalculationsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsImportData200Response> {
-        return core.HttpResponsePromise.fromPromise(this.__importData(request, requestOptions));
+    ): core.HttpResponsePromise<CloudPDF.DocFormsReorderCalculations200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__reorderCalculations(request, requestOptions));
     }
 
-    private async __importData(
-        request: CloudPDF.doc.ImportDataFormsRequest,
+    private async __reorderCalculations(
+        request: CloudPDF.doc.DocFormsReorderCalculationsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsImportData200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReorderCalculations200Response>> {
         const {
             docId,
             layerName,
             "X-Document-Password": documentPassword,
             "Idempotency-Key": idempotencyKey,
-            body: _body,
+            ..._body
         } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -214,7 +144,7 @@ export class FormsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/data`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/calculations/reorder`,
             ),
             method: "POST",
             headers: _headers,
@@ -230,7 +160,7 @@ export class FormsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocFormsImportData200Response,
+                data: _response.body as CloudPDF.DocFormsReorderCalculations200Response,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -254,7 +184,7 @@ export class FormsClient {
             _response.error,
             _response.rawResponse,
             "POST",
-            "/v1/docs/{docId}/layers/{layerName}/form/data",
+            "/v1/docs/{docId}/layers/{layerName}/form/calculations/reorder",
         );
     }
 

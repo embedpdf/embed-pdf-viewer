@@ -69,7 +69,7 @@ const ebook = async (): Promise<OpenInput> => {
       </div>
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer />
           <epdf-form-layer />
         </ng-template>

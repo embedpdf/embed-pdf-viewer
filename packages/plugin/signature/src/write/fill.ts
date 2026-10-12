@@ -10,7 +10,12 @@ import { verb } from '../services/errors';
 
 export function createFills(
   ctx: SignatureContext,
-  { events, store, marks }: Pick<SignatureServices, 'events' | 'store' | 'marks'>,
+  {
+    events,
+    store,
+    marks,
+    authority,
+  }: Pick<SignatureServices, 'events' | 'store' | 'marks' | 'authority'>,
   { getSignature }: Pick<SignatureReads, 'getSignature'>,
   target: { clearIfTarget(field: FormFieldRef): void },
 ) {
@@ -43,7 +48,7 @@ export function createFills(
     mark: Mark,
     options?: OperationOptions,
   ): Promise<void> => {
-    ctx.assertAllowed('doc.forms.fill', 'signature.fillField');
+    authority.assertAllowedField('fill', field, 'signature.fillField');
     return withBusy(async () => {
       await setAppearance(field, await markBytes(mark), options);
       target.clearIfTarget(field);
@@ -52,7 +57,7 @@ export function createFills(
   };
 
   const clearField = async (field: FormFieldRef, options?: OperationOptions): Promise<void> => {
-    ctx.assertAllowed('doc.forms.fill', 'signature.clearField');
+    authority.assertAllowedField('fill', field, 'signature.clearField');
     return withBusy(async () => {
       await setAppearance(field, blankPagePdf(), options);
       cleared.emit({ field });

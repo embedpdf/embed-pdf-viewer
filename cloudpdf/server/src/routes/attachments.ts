@@ -17,7 +17,7 @@ import {
   setImmutableCache,
   setNoStore,
 } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import { refFromKey } from './annotation-route-helpers';
 import {
   requireLayerCapability,
@@ -277,14 +277,9 @@ export async function registerAttachmentRoutes(
     );
     // Attachments accept any binary format — that is the point of the
     // kind — so every resource part rides the 'any' policy.
-    const { body, resources } = await readMutationEnvelope(req, () => 'any');
-    const file = parseOrInvalidArg(WireAttachmentFileSchema, body, 'request body');
-    if (!resources?.[file.resource]) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `body references resource '${file.resource}' but no such multipart part arrived`,
-      );
-    }
+    const envelope = await readMutationEnvelope(req, () => 'any');
+    const file = parseOrInvalidArg(WireAttachmentFileSchema, envelope.body, 'request body');
+    const resources = { [file.resources.file]: resourcesByRole(envelope, file.resources).file! };
     setNoStore(reply);
     return layerService.createAttachment(
       ctx,

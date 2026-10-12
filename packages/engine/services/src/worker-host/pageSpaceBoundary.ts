@@ -22,6 +22,8 @@ import {
   type Change,
   type ChangeItem,
   type ChangeOp,
+  type RecordedChange,
+  type RecordedOp,
   type ChangeResult,
   type PageRef,
   type WireAnnotationResources,
@@ -127,17 +129,18 @@ export function resultInPageSpace(
     case 'forms.import':
       return {
         ...payload,
-        result: { ...payload.result, form: pageFormSnapshotOf(payload.result.form, boxOf) },
+        result: {
+          ...payload.result,
+          fields: payload.result.fields.map((field) => pageFormFieldOf(field, boxOf)),
+          widgets: widgets(payload.result.widgets),
+        },
       };
-    case 'forms.applyEffects':
+    case 'forms.importValues':
       return {
         ...payload,
         result: {
           ...payload.result,
-          results: payload.result.results.map((effect) => ({
-            ...effect,
-            fields: effect.fields.map((field) => pageFormFieldOf(field, boxOf)),
-          })),
+          fields: payload.result.fields.map((field) => pageFormFieldOf(field, boxOf)),
           widgets: widgets(payload.result.widgets),
         },
       };
@@ -260,16 +263,29 @@ export function renderOptionsInFileSpace(
 function changeInFileSpace(
   change: Change<PageCoordinates, WireAnnotationResources>,
   boxOf: VisibleBoxOf,
-): Change<PdfCoordinates, WireAnnotationResources> {
+): Change<PdfCoordinates, WireAnnotationResources>;
+function changeInFileSpace(
+  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
+  boxOf: VisibleBoxOf,
+): RecordedChange<PdfCoordinates, WireAnnotationResources>;
+function changeInFileSpace(
+  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
+  boxOf: VisibleBoxOf,
+): RecordedChange<PdfCoordinates, WireAnnotationResources> {
   if ('undoOf' in change) return change;
   return { ops: change.ops.map((op) => opInFileSpace(op, boxOf)) };
 }
 
 function opInFileSpace(
-  op: ChangeOp<PageCoordinates, WireAnnotationResources>,
+  op: RecordedOp<PageCoordinates, WireAnnotationResources>,
   boxOf: VisibleBoxOf,
-): ChangeOp<PdfCoordinates, WireAnnotationResources> {
+): RecordedOp<PdfCoordinates, WireAnnotationResources> {
   switch (op.type) {
+    // A bundle is page space: the import converts each create on its page.
+    case 'annotations.import':
+    case 'forms.import':
+    case 'forms.importValues':
+      return op;
     case 'annotations.create':
       return { ...op, data: pdfAnnotationDraftOf(op.data, boxOf(op.page), boxOf) };
     case 'annotations.update': {
@@ -333,6 +349,8 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
       return { ...item, annotation: annotation(item.annotation) } as ChangeItem;
     case 'annotations.restore':
       return { ...item, annotations: item.annotations.map(annotation) } as ChangeItem;
+    case 'annotations.import':
+      return { ...item, annotations: item.annotations.map(annotation) };
     case 'forms.setValue':
     case 'forms.setDisplay':
     case 'forms.setAppearanceText':
@@ -348,11 +366,13 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
         widgets: widgets(item.widgets),
       } as ChangeItem;
     case 'forms.reset':
+    case 'forms.import':
+    case 'forms.importValues':
       return {
         ...item,
         fields: item.fields.map((field) => pageFormFieldOf(field, boxOf)),
         widgets: widgets(item.widgets),
-      };
+      } as ChangeItem;
     case 'forms.updateWidget':
       return { ...item, widget: pageWidgetOf(item.widget, boxOf) };
     case 'forms.deleteWidget':

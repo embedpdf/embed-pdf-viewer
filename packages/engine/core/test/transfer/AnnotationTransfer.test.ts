@@ -2,15 +2,12 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { Annotation } from '../../src/annotation/kinds';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import { toBase64 } from '../../src/resource/base64';
-import {
-  resourceIdOf,
-  type AnnotationBundle,
-  type ResourceId,
-} from '../../src/transfer/AnnotationBundle';
+import type { AnnotationBundle } from '../../src/transfer/AnnotationBundle';
+import { resourceIdOf, type ResourceId } from '../../src/transfer/bundle';
 import { AnnotationTransfer } from '../../src/transfer/AnnotationTransfer';
 import {
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
-  type AnnotationBundleLimits,
+  DEFAULT_BUNDLE_LIMITS,
+  type BundleLimits,
 } from '../../src/transfer/bundleLimits';
 
 const page = { kind: 'objectNumber', objectNumber: 3 } as const;
@@ -56,8 +53,8 @@ function edited(bundle: AnnotationBundle, change: (json: Record<string, unknown>
   return JSON.stringify(json);
 }
 
-const limitsWith = (overrides: Partial<AnnotationBundleLimits>): AnnotationBundleLimits => ({
-  ...DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+const limitsWith = (overrides: Partial<BundleLimits>): BundleLimits => ({
+  ...DEFAULT_BUNDLE_LIMITS,
   ...overrides,
 });
 

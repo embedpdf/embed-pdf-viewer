@@ -9,7 +9,7 @@ import {
 import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
 import { withScratch } from '../../../../runtime/memory/scratch';
 import { F32_BYTES } from '../../../../runtime/memory/structs';
-import { sha256Hex } from '../digest';
+import { sha256Hex } from '../../../../runtime/digest';
 
 const FPDF_NO_INCREMENTAL = 1 << 1;
 /** Room for an `unsigned long` out-parameter: 8 bytes on 64-bit native. */

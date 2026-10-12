@@ -3,7 +3,7 @@ import type {
   MeasureSetScaleWorkerRequest,
 } from '@embedpdf/engine-core/runtime';
 import {
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   AbortError,
   EMPTY_TRANSFER,
   EngineError,
@@ -13,6 +13,7 @@ import {
   isKeptRefusal,
   isSkippedItem,
   isUndoChange,
+  itemWrote,
   EngineErrorCode,
   serializeError,
   wirePack,
@@ -30,9 +31,11 @@ import {
   type FormsDeleteWidgetWorkerRequest,
   type FormsDetachWidgetWorkerRequest,
   type FormsReorderWidgetsWorkerRequest,
+  type FormsReorderCalculationsWorkerRequest,
   type FormsUpdateWidgetWorkerRequest,
   type FormsExportWorkerRequest,
   type FormsImportWorkerRequest,
+  type FormsImportValuesWorkerRequest,
   type FormsListWorkerRequest,
   type FormsRepairWorkerRequest,
   type FormsUpdateFieldWorkerRequest,
@@ -103,7 +106,6 @@ import {
   type RenderEncode,
   type PagesTextWorkerRequest,
   type SearchQueryWorkerRequest,
-  type FormsApplyEffectsWorkerRequest,
   type PageRef,
   type PagesWorkingSetWorkerRequest,
   type RequestEffect,
@@ -123,7 +125,8 @@ import {
   type ServerChangeOutcome,
   type AnnotationActor,
   type ChangeAuthority,
-  type ChangeOp,
+  type Change,
+  type RecordedOp,
   type WireAnnotationResources,
   type VisibleBoxOf,
   type LayerArtifactFileWorkerPayload,
@@ -150,7 +153,6 @@ import { DocumentActionsReader } from '../features/actions';
 import {
   AnnotationAppearanceReader,
   AnnotationExporter,
-  AnnotationImporter,
   AnnotationFlattener,
   RawAnnotationReader,
 } from '../features/annotations';
@@ -163,7 +165,7 @@ import {
   type ChangeRecord,
 } from '../features/changes';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
-import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
+import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
 import { MetadataReader } from '../features/metadata';
@@ -586,14 +588,14 @@ export class WorkerHost {
         case 'forms.reset':
           resultPack = this.handleFormsReset(msg, ctrl.signal);
           break;
-        case 'forms.applyEffects':
-          resultPack = this.handleFormsApplyEffects(msg, ctrl.signal);
-          break;
         case 'forms.export':
           resultPack = this.handleFormsExport(msg, ctrl.signal);
           break;
         case 'forms.import':
           resultPack = this.handleFormsImport(msg, ctrl.signal);
+          break;
+        case 'forms.importValues':
+          resultPack = this.handleFormsImportValues(msg, ctrl.signal);
           break;
         case 'forms.repair':
           resultPack = this.handleFormsRepair(msg, ctrl.signal);
@@ -624,6 +626,9 @@ export class WorkerHost {
           break;
         case 'forms.reorderWidgets':
           resultPack = this.handleFormsReorderWidgets(msg, ctrl.signal);
+          break;
+        case 'forms.reorderCalculations':
+          resultPack = this.handleFormsReorderCalculations(msg, ctrl.signal);
           break;
         case 'pages.list':
           resultPack = this.handlePagesList(msg, ctrl.signal);
@@ -985,7 +990,7 @@ export class WorkerHost {
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).prepare(req.input);
+    ).prepare(req.input, req.authority);
     return wirePack({ tag: 'signatures.prepare', result });
   }
 
@@ -998,7 +1003,7 @@ export class WorkerHost {
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).complete(req.input, req.opId);
+    ).complete(req.input, req.opId, req.authority);
     if (result.status === 'already-completed') {
       return wirePack({ tag: 'signatures.complete', result });
     }
@@ -1274,19 +1279,33 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const bundle = new AnnotationExporter(this.runtime, session, this.fonts).export(
       req.selection,
-      req.limits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+      req.limits ?? DEFAULT_BUNDLE_LIMITS,
       signal,
     );
     return wirePack({ tag: 'annotations.export', bundle }, Object.values(bundle.resources));
   }
 
+  /**
+   * An import, as a one-op change: kept under its `opId` with the record
+   * that undoes it, and a retry under it gets the first answer.
+   */
   private handleAnnotationsImport(
     req: AnnotationsImportWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const result = new AnnotationImporter(this.runtime, session, this.fonts).import(
-      { ...req, limits: req.limits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS },
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'annotations.import',
+        bundle: req.bundle,
+        ...(req.pages !== undefined ? { pages: req.pages } : {}),
+        attribution: req.attribution,
+        ...(req.actor ? { actor: req.actor } : {}),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      },
+      checkedAuthority(req.actor),
       signal,
     );
     // Everything left out: nothing was written.
@@ -1342,6 +1361,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
+    assertNoImport(req.change);
     const fingerprint = changeFingerprint(req.change);
     const prior = changeLedgerOf(session).outcome(req.opId);
     if (prior) {
@@ -1353,7 +1373,7 @@ export class WorkerHost {
     );
     const payload = { tag: 'document.apply' as const, result, replayed: false };
     // A change that wrote nothing needs no save.
-    if (result.items.every(isSkippedItem)) return wirePack(payload);
+    if (!result.items.some(itemWrote)) return wirePack(payload);
     return this.finishMutation(session, payload, req.artifactPath);
   }
 
@@ -1363,13 +1383,13 @@ export class WorkerHost {
    * answer. What the handle may do was checked before the job; `authority`
    * carries who the write acts for, and what it checks per annotation.
    */
-  private applyOne<T extends ChangeOp['type']>(
+  private applyOne<Op extends RecordedOp<PdfCoordinates, WireAnnotationResources>>(
     session: DocumentSession,
     opId: string,
-    op: Extract<ChangeOp<PdfCoordinates, WireAnnotationResources>, { type: T }>,
+    op: Op,
     authority: ChangeAuthority,
     signal: AbortSignal,
-  ): Extract<ChangeItem<PdfCoordinates>, { type: T }> {
+  ): Extract<ChangeItem<PdfCoordinates>, { type: Op['type'] }> {
     const change = { ops: [op] };
     const ledger = changeLedgerOf(session);
     const fingerprint = changeFingerprint(change);
@@ -1386,7 +1406,7 @@ export class WorkerHost {
     if (!item || isSkippedItem(item)) {
       throw new EngineError(EngineErrorCode.Unknown, `${op.type} wrote nothing`);
     }
-    return item as Extract<ChangeItem<PdfCoordinates>, { type: T }>;
+    return item as Extract<ChangeItem<PdfCoordinates>, { type: Op['type'] }>;
   }
 
   /** A change's answer the first time, kept under its `opId`; a retry's checks. */
@@ -1467,7 +1487,7 @@ export class WorkerHost {
     }
     const payload = { tag: 'document.applyChanges' as const, outcomes };
     const wrote = outcomes.some(
-      (outcome) => outcome.status === 'applied' && !outcome.result.items.every(isSkippedItem),
+      (outcome) => outcome.status === 'applied' && outcome.result.items.some(itemWrote),
     );
     if (!wrote) return wirePack(payload);
     return this.finishMutation(session, payload, req.artifactPath);
@@ -2355,7 +2375,7 @@ export class WorkerHost {
       session,
       req.opId,
       { type: 'forms.setValue', field: req.ref, value: req.value },
-      checkedAuthority(req.actor),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.setValue', result }, req.artifactPath);
@@ -2374,27 +2394,10 @@ export class WorkerHost {
       session,
       req.opId,
       { type: 'forms.reset', ...(req.refs ? { fields: req.refs } : {}) },
-      checkedAuthority(),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
-  }
-
-  private handleFormsApplyEffects(
-    req: FormsApplyEffectsWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    const session = this.requireSession(req);
-    const { result, wrote } = new FormsEffectsApplier(this.runtime, session, req.actor ?? {}).apply(
-      req.effects,
-      signal,
-    );
-    if (!wrote) return wirePack({ tag: 'forms.applyEffects', result, wrote });
-    return this.finishMutation(
-      session,
-      { tag: 'forms.applyEffects', result, wrote },
-      req.artifactPath,
-    );
   }
 
   private handleFormsExport(
@@ -2402,21 +2405,66 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const reader = new FormReader(this.runtime, session);
-    const exported = reader.exportData(req.format, signal);
-    return wirePack({ tag: 'forms.export', format: exported.format, bytes: exported.bytes }, [
-      exported.bytes,
-    ]);
+    const bundle = new FormExporter(this.runtime, session, this.fonts).export(
+      req.selection,
+      req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      signal,
+    );
+    return wirePack({ tag: 'forms.export', bundle }, Object.values(bundle.resources));
   }
 
+  /**
+   * A design import, as a one-op change: kept under its `opId` with the
+   * record that undoes it, and a retry under it gets the first answer.
+   */
   private handleFormsImport(
     req: FormsImportWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.importData(req.data, req.format, signal);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.import',
+        bundle: req.bundle,
+        ...(req.pages !== undefined ? { pages: req.pages } : {}),
+        attribution: req.attribution,
+        values: req.values,
+        actor: actorOf(req.authority),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+        mayScript: req.mayScript,
+      },
+      req.authority,
+      signal,
+    );
+    // Everything left out: nothing was written.
+    if (result.fields.length === 0) return wirePack({ tag: 'forms.import', result });
     return this.finishMutation(session, { tag: 'forms.import', result }, req.artifactPath);
+  }
+
+  /** A values import, as a one-op change (see {@link handleFormsImport}). */
+  private handleFormsImportValues(
+    req: FormsImportValuesWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.importValues',
+        bundle: req.bundle,
+        attribution: req.attribution,
+        actor: actorOf(req.authority),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      },
+      req.authority,
+      signal,
+    );
+    // Nothing filled: nothing was written.
+    if (result.fields.length === 0) return wirePack({ tag: 'forms.importValues', result });
+    return this.finishMutation(session, { tag: 'forms.importValues', result }, req.artifactPath);
   }
 
   private handleFormsRepair(
@@ -2443,7 +2491,7 @@ export class WorkerHost {
         ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
         ...(req.widgetObjectNumbers ? { widgetObjectNumbers: req.widgetObjectNumbers } : {}),
       },
-      checkedAuthority(req.actor),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.createField', result }, req.artifactPath);
@@ -2462,7 +2510,7 @@ export class WorkerHost {
       session,
       req.opId,
       { type: 'forms.update', field: req.ref, patch: req.patch },
-      checkedAuthority(),
+      req.authority,
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.updateField', result }, req.artifactPath);
@@ -2481,7 +2529,7 @@ export class WorkerHost {
         field: req.ref,
         appearance: { pdf: new Uint8Array(req.pdf) },
       },
-      checkedAuthority(),
+      req.authority,
       signal,
     );
     return this.finishMutation(
@@ -2576,6 +2624,25 @@ export class WorkerHost {
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.deleteWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsReorderCalculations(
+    req: FormsReorderCalculationsWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.reorderCalculations', fields: req.fields, position: req.position },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(
+      session,
+      { tag: 'forms.reorderCalculations', result },
+      req.artifactPath,
+    );
   }
 
   private handleFormsReorderWidgets(
@@ -2695,6 +2762,15 @@ function pageEffectOf(job: PageSpaceJob): PageEffect {
  */
 function checkedAuthority(actor?: AnnotationActor): ChangeAuthority {
   return { identity: actor ?? {}, grants: null, protection: null };
+}
+
+/** Who an authority acts for, as the actor an op stamps. */
+function actorOf({ identity }: ChangeAuthority): AnnotationActor {
+  return {
+    ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
+    ...(identity.groupId !== undefined ? { groupId: identity.groupId } : {}),
+    ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
+  };
 }
 
 /**
@@ -2821,4 +2897,24 @@ function passwordRequiredProbe() {
     pdfOpenedAs: null,
     securityProbedAt: Date.now(),
   };
+}
+
+/**
+ * `doc.apply` takes no import: an import runs through its own verb, which
+ * alone may write restored attribution.
+ */
+function assertNoImport(change: Change<PdfCoordinates, WireAnnotationResources>): void {
+  if (isUndoChange(change)) return;
+  const verbs: Record<string, string> = {
+    'annotations.import': 'doc.annotations.import',
+    'forms.import': 'doc.forms.import',
+    'forms.importValues': 'doc.forms.importValues',
+  };
+  const op = (change.ops as readonly { type: string }[]).find(({ type }) => type in verbs);
+  if (op) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `doc.apply takes no import: import a bundle with ${verbs[op.type]}`,
+    );
+  }
 }

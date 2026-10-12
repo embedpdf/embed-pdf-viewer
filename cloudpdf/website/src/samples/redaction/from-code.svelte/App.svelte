@@ -34,7 +34,7 @@
     {/snippet}
     <MarkFromCode />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <SelectionLayer />
       <AnnotationLayer />
     </Stage>

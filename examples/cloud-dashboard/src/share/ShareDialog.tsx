@@ -39,7 +39,6 @@ export function ShareDialog({
   const [identity, setIdentity] = useState<Identity>({
     userId: 'alice',
     groupId: 'legal',
-    groups: ['legal'],
     displayName: 'Alice',
   });
   const [sharedLayer, setSharedLayer] = useState(false);
@@ -167,22 +166,10 @@ export function ShareDialog({
                   className={INPUT}
                 />
               </Field>
-              <Field label="Group" hint="Acts as, and is a member of">
+              <Field label="Group" hint="What they create goes in this group">
                 <input
                   value={identity.groupId ?? ''}
-                  onChange={(e) => {
-                    // Two different fields, one input: `groupId` is the group
-                    // this person WRITES as, `groups` is the membership that
-                    // grants authority over the group's rows. A group grant
-                    // checks BOTH (see `filterMatches`), so setting only
-                    // `groupId` produces a role that can't edit anything.
-                    const group = e.target.value.trim();
-                    setIdentity({
-                      ...identity,
-                      groupId: group,
-                      ...(group ? { groups: [group] } : { groups: [] }),
-                    });
-                  }}
+                  onChange={(e) => setIdentity({ ...identity, groupId: e.target.value.trim() })}
                   className={INPUT}
                 />
               </Field>

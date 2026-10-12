@@ -326,7 +326,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   private patchMutation(
     write: CloudWrite,
     path: string,
-    body: unknown,
+    body: object,
     resources: WireAnnotationResources,
     signal: AbortSignal,
   ): Promise<AnnotationUpdateResult> {

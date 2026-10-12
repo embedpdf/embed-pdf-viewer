@@ -1,4 +1,5 @@
 import type { FormFieldOptionInput } from './draft';
+import type { FieldActionsPatch } from '../dto/PdfAction';
 
 /**
  * Patch-field semantics follow the annotation patches: `undefined` leaves
@@ -18,6 +19,19 @@ interface FormFieldPatchBase {
   noExport?: boolean;
   alternateName?: string | null;
   mappingName?: string | null;
+  /**
+   * Move the field to another group: the session's own, or one it has
+   * `fields:set-group` for. A group can be changed, never removed.
+   */
+  groupId?: string;
+  /**
+   * The field's scripts, by event (JavaScript only): a script sets one,
+   * `null` removes it, an event left out keeps what it has. Adding a
+   * `calculate` script puts the field at the end of the calculation order;
+   * removing it takes the field out. Writing a script takes
+   * `doc.forms.script` too; removing one doesn't.
+   */
+  actions?: FieldActionsPatch;
 }
 
 export interface TextFieldPatch extends FormFieldPatchBase {
@@ -59,6 +73,11 @@ export interface ListBoxFieldPatch extends FormFieldPatchBase {
   defaultValue?: string[] | null;
 }
 
+/** A push button: only the settings every field has. Its captions are its widgets'. */
+export interface PushButtonFieldPatch extends FormFieldPatchBase {
+  family?: 'pushbutton';
+}
+
 /** A signature field: only the settings every field has. Signing is `doc.signatures`'. */
 export interface SignatureFieldPatch extends FormFieldPatchBase {
   family?: 'signature';
@@ -71,4 +90,5 @@ export type FormFieldPatch =
   | RadioFieldPatch
   | ComboBoxFieldPatch
   | ListBoxFieldPatch
+  | PushButtonFieldPatch
   | SignatureFieldPatch;

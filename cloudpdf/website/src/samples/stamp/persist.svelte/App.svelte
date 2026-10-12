@@ -31,7 +31,7 @@ import { localEngine } from '@embedpdf/engine';
     {/snippet}
     <Libraries />
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
     </Stage>
   </DocumentGate>

@@ -120,12 +120,16 @@ describe('the editor document', () => {
     expect(item.css.padding).toBe(2);
   });
 
-  it('never re-ingests the commit echo (it may be behind the keyboard)', async () => {
+  it('never takes in the echo of a commit the keyboard is ahead of', async () => {
     const harness = await loaded(freeTextDTO('hello'));
-    harness.update.mockResolvedValue({
-      annotation: freeTextDTO('stale'),
-      appearance: { changed: true },
-    });
+    let answer!: () => void;
+    harness.update.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answer = () =>
+            resolve({ annotation: freeTextDTO('hello'), appearance: { changed: true } });
+        }),
+    );
     harness.capability.text.begin(REF);
     const paragraphs = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
     harness.capability.draftRichText(REF, { paragraphs });
@@ -134,8 +138,11 @@ describe('the editor document', () => {
       subtype: 'free-text',
       richText: { paragraphs },
     });
-    await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
-    expect(harness.data().contents).toBe('hello');
+    // Typing goes on while the first commit is on its way; then its echo lands.
+    harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'hello!' }] }] });
+    answer();
+    await harness.ctx.changes.whenSettled();
+    expect(harness.data().contents).toBe('hello!');
   });
 
   it('flushes the pending write and drops the selection on text.end', async () => {
@@ -205,6 +212,7 @@ describe('the property surface while editing', () => {
     expect(textOf(harness.model().byId[harness.id]!.annotation)!.bold).toBe(true);
     expect(harness.capability.selection.getProperties().values.bold).toBe(true);
     expect(harness.capability.listTextItems(PAGE)[0]!.css.fontWeight).toBe(700);
+    await harness.ctx.changes.whenSettled();
     const bodyWrite = harness.update.mock.calls.find((call) => call[1].richText?.body);
     // The complete body rides along: a partial one would mean engine
     // defaults and reset the size, face and colour.
@@ -224,6 +232,7 @@ describe('the property surface while editing', () => {
     harness.capability.text.toggleFormat('underline');
     harness.capability.selection.update({ opacity: 0.5 });
     expect(styleOf(harness.model().byId[harness.id]!.annotation).opacity).toBe(0.5);
+    await harness.ctx.changes.whenSettled();
     // order: the (flushed) text write, then the opacity write
     expect(harness.update.mock.calls.map((call) => Object.keys(call[1]).sort().join(','))).toEqual([
       'richText,subtype',

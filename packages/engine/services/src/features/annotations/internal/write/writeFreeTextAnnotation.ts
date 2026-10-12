@@ -7,6 +7,7 @@ import {
   type RichTextDocumentInput,
   type PdfCoordinates,
   type VerticalAlignment,
+  type PlacedDraft,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -14,7 +15,7 @@ import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentToName } from '../freeTextIntent';
 import { readDefaultAppearance } from '../read/annotationReadPrimitives';
 import { engineRichTextJson } from '../richTextWire';
-import { standardFontFromCode } from '../standardFont';
+import { KEEP_FONT_CODE } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import { VERTICAL_ALIGNMENT_KEY, verticalAlignmentToCode } from '../verticalAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
@@ -25,6 +26,7 @@ import {
   setAnnotOpacity,
   setBorderEffect,
   setCalloutLine,
+  setDefaultAppearance,
   setIntent,
   setLineEndings,
   setTextAlignment,
@@ -87,7 +89,7 @@ export function applyFreeTextDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: FreeTextDraft<PdfCoordinates>,
+  draft: PlacedDraft<FreeTextDraft<PdfCoordinates>>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
@@ -172,15 +174,26 @@ export function applyFreeTextPatch(
   }
 
   if (patch.color !== undefined) {
+    // A border colour change keeps the font `/DA` names and its size.
     const cur = readDefaultAppearance(fn, mem, annotPtr);
-    applyDefaultAppearance(
-      fn,
-      annotPtr,
-      cur ? standardFontFromCode(cur.fontCode) : DEFAULTS.fontFamily,
-      cur && cur.fontSize > 0 ? cur.fontSize : DEFAULTS.fontSize,
-      patch.color,
-      ctx,
-    );
+    if (cur) {
+      setDefaultAppearance(
+        fn,
+        annotPtr,
+        KEEP_FONT_CODE,
+        cur.fontSize > 0 ? cur.fontSize : DEFAULTS.fontSize,
+        patch.color,
+      );
+    } else {
+      applyDefaultAppearance(
+        fn,
+        annotPtr,
+        DEFAULTS.fontFamily,
+        DEFAULTS.fontSize,
+        patch.color,
+        ctx,
+      );
+    }
   }
   if (patch.richText !== undefined) {
     // Everything regenerated: /RC, /DS, /DA, /Contents and the appearance.

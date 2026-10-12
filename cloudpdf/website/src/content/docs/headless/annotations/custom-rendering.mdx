@@ -159,8 +159,8 @@ before it closes and a `pointerenter` on the card that cancels it.
 
 ### Form fields
 
-Form fields are annotations too. The `<FormLayer>` draws the fields it handles, and always wins over
-your renderers for them; see [Forms and annotations](../forms#forms-and-annotations).
+A form field's widgets aren't annotations: they're the form's, and the `<FormLayer>` draws them, so
+your renderers never get them. See [Forms and annotations](../forms#forms-and-annotations).
 
 ### Other layers
 

@@ -13,6 +13,7 @@ import type {
   ActionsHostCapability,
   AnnotCommitSink,
   FormCommitSink,
+  FormReader,
   SubmitResolver,
 } from '../host-contract';
 import type { ActionsEvents } from './events';
@@ -21,6 +22,8 @@ export interface ActionPorts {
   readonly executors: Map<PdfActionType, ActionExecutor>;
   annotCommitSink: AnnotCommitSink | null;
   formCommitSink: FormCommitSink | null;
+  /** The form plugin's form, as the user sees it. */
+  formReader: FormReader | null;
   uiAdapter: ActionUiAdapter | null;
   /** Sink 1 of the submit chain (consent = installation). */
   submitHandler: ActionSubmitHandler | null;
@@ -33,6 +36,7 @@ export function createPorts({ reportDiagnostic }: Pick<ActionsEvents, 'reportDia
     executors: new Map(),
     annotCommitSink: null,
     formCommitSink: null,
+    formReader: null,
     uiAdapter: null,
     submitHandler: null,
     submitResolver: null,
@@ -60,6 +64,12 @@ export function createPorts({ reportDiagnostic }: Pick<ActionsEvents, 'reportDia
       ports.formCommitSink = sink;
       return () => {
         if (ports.formCommitSink === sink) ports.formCommitSink = null;
+      };
+    },
+    registerFormReader: (reader): Unsubscribe => {
+      ports.formReader = reader;
+      return () => {
+        if (ports.formReader === reader) ports.formReader = null;
       };
     },
     setSubmitHandler: (handler): Unsubscribe => {

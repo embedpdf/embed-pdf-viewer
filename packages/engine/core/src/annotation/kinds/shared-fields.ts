@@ -8,7 +8,12 @@ import {
   PdfMeasureWriteSchema,
 } from '../../dto/Measure.schema';
 import { FileAnnotationActionsSchema } from '../../dto/PdfAction.schema';
-import { PdfPointSchema, PdfQuadSchema, PdfRectSchema } from '../../geometry/schemas';
+import {
+  PdfPointSchema,
+  PdfQuadSchema,
+  PdfRectSchema,
+  PdfRotationSchema,
+} from '../../geometry/schemas';
 import { PageRefSchema } from '../../identity/PageRef.schema';
 import {
   AnnotationBorderStyleSchema,
@@ -140,13 +145,32 @@ export const pointsTurnFields = {
  * and caret. The caller gives the box and the turn; `rect` takes in the
  * turned box and what the drawing adds around it (a cloudy border's bumps, a
  * callout's line and arrow).
+ *
+ * A create gives `box`, or `rect` with a quarter turn: where the turned box
+ * stands on the page, which pins the box down (`pdfQuarterTurnBox`). At any
+ * other angle many boxes share one rect, so a create by `rect` is refused.
  */
 export const boxFields = {
   ...drawnRectFields,
   /** The shape's own box, before any turn: a callout's text box. */
-  box: field.data(PdfRectSchema).space('box'),
+  box: field.data(PdfRectSchema).space('box').optional(),
   /** Degrees clockwise, about the middle of `box`. */
   rotation: field.data(z.number()).nullable().optional(),
+};
+
+/**
+ * A widget's frame and its turn: the box its contents are laid out in, and
+ * a quarter turn (`/MK /R`, which the file holds counterclockwise), so every
+ * viewer can lay an upright editor over it. `rect` is where the widget
+ * stands on the page, the box turned. A create gives `box` or `rect`, as a
+ * box kind's does.
+ */
+export const widgetBoxFields = {
+  ...drawnRectFields,
+  /** The box the contents are laid out in, before the turn: `rect` with its sides swapped under 90 and 270. */
+  box: field.data(PdfRectSchema).space('box').optional(),
+  /** Degrees clockwise, a quarter turn, about the middle of `box`; `null` upright. */
+  rotation: field.data(PdfRotationSchema).nullable().optional(),
 };
 
 // ── families ──

@@ -9,12 +9,16 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { RenderToken, type ViewDemand } from '@embedpdf/plugin-render/contract/host';
+  import {
+    RenderToken,
+    type PageLayerOptions,
+    type ViewDemand,
+  } from '@embedpdf/plugin-render/contract/host';
   import { usePage } from '../runtime/page';
   import { useKernelValue, useOptionalCapability } from '../runtime/readers.svelte';
   import TileImage from './TileImage.svelte';
 
-  let { annotations }: { annotations: boolean } = $props();
+  let { layers }: { layers: PageLayerOptions } = $props();
 
   const page = usePage();
   const render = useOptionalCapability(RenderToken);
@@ -46,8 +50,8 @@
     if (!surface) return;
     const demand = page.getViewDemand?.() ?? { desiredDeviceWidth: page.transform.deviceWidth };
     const ref = pageRef;
-    const includeAnnotations = annotations;
-    untrack(() => surface.setDemand(ref, demand, { includeAnnotations }));
+    const drawn = layers;
+    untrack(() => surface.setDemand(ref, demand, drawn));
   });
 
   // The same object until the demand, an epoch or an arriving tile changes it.

@@ -9,4 +9,5 @@ export interface FormMutationMeta {
     undoable: boolean;
     changedFields: CloudPDF.FormFieldRef[];
     changedWidgets: CloudPDF.FormWidget[];
+    redrawnWidgets: CloudPDF.FormWidget[];
 }

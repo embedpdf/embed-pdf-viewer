@@ -19,13 +19,14 @@ import {
   CustomMetadataSchema,
   DocumentMetadataSchema,
   EngineErrorPayloadSchema,
-  FormImportResultSchema,
   FormResetBodySchema,
   FormWidgetDeleteResultSchema,
   FormWidgetUpdateBodySchema,
   FormWidgetUpdateResultSchema,
   FormWidgetsReorderBodySchema,
   FormWidgetsReorderResultSchema,
+  FormCalculationsReorderBodySchema,
+  FormCalculationsReorderResultSchema,
   FormResetResultSchema,
   FormSetValueResultSchema,
   FormSnapshotSchema,
@@ -1536,8 +1537,8 @@ export const docOperations = {
       409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) ' +
-      "and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) " +
+      'Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance ' +
+      "PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) " +
       'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). ' +
       'A layer behind the document head cannot sign (StaleBase).',
   },
@@ -1803,7 +1804,8 @@ export const docOperations = {
       'or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own ' +
       'capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure ' +
       "`doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's " +
-      'artwork) travel as multipart `resource:<key>` parts beside a JSON `body` part that names them by key. ' +
+      "artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
+      'and each file as the part `resource:<key>`. ' +
       'At most 64 changes per request and 512 ops per change.',
     responses: {
       200: { contentType: 'application/json', schema: ChangeResponseSchema },
@@ -2034,6 +2036,25 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
+  'doc.forms.reorderCalculations': {
+    operationId: 'doc.forms.reorderCalculations',
+    title: 'Reorder form calculations',
+    summary:
+      "Change the form's calculation order, the order its fields' calculate scripts run in: the fields go together, in the order given, next to a neighbour field or to the start (`'start'`) or end (`'end'`). Every field named must have a calculate script, which puts it in the order. Returns the whole new order.",
+    method: 'POST',
+    path: wireTemplates.layerFormCalculationsReorder,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.forms.modify'],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
+    params: DocLayerParamsSchema,
+    body: { contentType: 'application/json', schema: FormCalculationsReorderBodySchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FormCalculationsReorderResultSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
   'doc.forms.reset': {
     operationId: 'doc.forms.reset',
     title: 'Reset form',
@@ -2049,41 +2070,6 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: FormResetBodySchema },
     responses: {
       200: { contentType: 'application/json', schema: FormResetResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
-  'doc.forms.exportData': {
-    operationId: 'doc.forms.exportData',
-    title: 'Export form data',
-    summary: 'Export form data as FDF or XFDF.',
-    method: 'GET',
-    path: wireTemplates.layerFormData,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.forms.read'],
-    requestHeaders: [documentPasswordHeader],
-    params: DocLayerParamsSchema,
-    query: z.object({ format: z.enum(['fdf', 'xfdf']).optional() }),
-    responses: {
-      200: { contentType: ['application/vnd.adobe.xfdf', 'application/vnd.fdf'] },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
-  'doc.forms.importData': {
-    operationId: 'doc.forms.importData',
-    title: 'Import form data',
-    summary: 'Import form data (FDF/XFDF), filling matching fields.',
-    method: 'POST',
-    path: wireTemplates.layerFormData,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.forms.fill'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson },
-    responses: {
-      200: { contentType: 'application/json', schema: FormImportResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
@@ -2253,7 +2239,7 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'Multipart mutation envelope: a `body` field holding `{"position"?: PagePosition}` (omitted → the end) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.',
+      'Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.',
   },
   'doc.pages.insertBlank': {
     operationId: 'doc.pages.insertBlank',

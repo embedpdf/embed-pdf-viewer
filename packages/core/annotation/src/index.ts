@@ -8,6 +8,7 @@
  */
 export {
   update,
+  newRecordsAtMost,
   initialModel,
   initialSession,
   sameSession,
@@ -216,7 +217,7 @@ export * from './measurement-shape';
 // How an annotation is drawn: the engine's raster, or live (see appearance.ts).
 export { drawnAfter, sourceOfConfirmed, sourceOfNew, type DrawState } from './appearance';
 export { annotationSelectionFrame, type SelectionFrame } from './selection';
-export { scene } from './scene';
+export { hasLiveDrawing, scene } from './scene';
 export { straightenInkStroke } from './ink';
 export type { BlendMode } from '@embedpdf/engine-core/runtime';
 export type {
@@ -251,6 +252,7 @@ export type {
   UpdateResult,
   RenderItem,
   RenderNode,
+  SceneFontProgram,
   SceneNode,
   SnapSettings,
   Stroke,

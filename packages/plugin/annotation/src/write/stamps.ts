@@ -1,5 +1,11 @@
 import { PluginError, type OperationOptions } from '@embedpdf/core';
-import { fitStampBox, type Id, type Rect, type Point } from '@embedpdf/core-annotation';
+import {
+  fitStampBox,
+  type Id,
+  type ModelAnnotation,
+  type Rect,
+  type Point,
+} from '@embedpdf/core-annotation';
 import {
   resolveBinarySource,
   sniffBinaryMetadata,
@@ -37,17 +43,16 @@ const notAPicture = (): PluginError =>
  * PDF-point placement size (derived from the sniffed intrinsic aspect).
  * Transient tool state — deliberately not in the model: it is never
  * rendered, never synced, and dies with the tool. `preview` is the
- * browser-paintable render for the hover ghost.
+ * browser-paintable render for the hover ghost, and the look of each stamp
+ * it places until the engine's picture of it exists.
  */
 interface ArmedStamp {
   source: BinarySource;
   /** The desired placement size (PDF points, pre page-clamp). */
   width: number;
   height: number;
-  /** Resolution-aware ghost source; null = no ghost. */
+  /** Resolution-aware ghost source, one render per bucket for this arm; null = no ghost. */
   preview: StampPreviewProvider | null;
-  /** One render per bucket for this arm; dropped on disarm/re-arm. */
-  previewCache: Map<number, Promise<ArmedStampPreview | null>>;
   name?: string;
   subject?: string;
 }
@@ -61,6 +66,44 @@ const fixedPreview = (bytes: Uint8Array, mimeType?: string): StampPreviewProvide
   const preview: ArmedStampPreview = { bytes, ...(mimeType ? { mimeType } : {}) };
   return async () => preview;
 };
+
+/**
+ * `provider`, asked once per size bucket (`previewBucket`): a zoom asks for
+ * no new render inside a bucket. A render that fails is logged, and is none.
+ */
+const cachedPreview = (provider: StampPreviewProvider): StampPreviewProvider => {
+  const renders = new Map<number, Promise<ArmedStampPreview | null>>();
+  return (devicePixelWidth) => {
+    const bucket = previewBucket(devicePixelWidth);
+    let render = renders.get(bucket);
+    if (!render) {
+      render = provider(bucket).catch((error) => {
+        console.error('[annotation] stamp preview failed:', error);
+        return null;
+      });
+      renders.set(bucket, render);
+    }
+    return render;
+  };
+};
+
+/**
+ * What a stamp source looks like on this device, before the engine draws
+ * it: an explicit `preview` (the only way for PDF sources: browsers can't
+ * paint those), else a raster source's own bytes. `null`: no look.
+ */
+async function previewOf(
+  input: Pick<StampInput, 'preview'>,
+  bytes: ArrayBuffer,
+  mimeType: string,
+): Promise<StampPreviewProvider | null> {
+  if (typeof input.preview === 'function') return cachedPreview(input.preview);
+  if (input.preview) {
+    const resolved = await resolveBinarySource(input.preview);
+    return fixedPreview(new Uint8Array(resolved.bytes), resolved.mimeType);
+  }
+  return mimeType === 'application/pdf' ? null : fixedPreview(new Uint8Array(bytes), mimeType);
+}
 
 /**
  * The desired stamp size (PDF points) from sniffed bytes: the image's
@@ -104,6 +147,19 @@ export function createStamps(
   }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools' | 'filePicker' | 'afterCreate'>,
 ) {
   let armed: ArmedStamp | null = null;
+  /**
+   * The look of each stamp this session placed whose create the engine
+   * hasn't answered: the preview it was placed with. The engine's picture
+   * replaces it (read/render.ts).
+   */
+  const looks = new Map<Id, StampPreviewProvider>();
+
+  /** What a stamp looks like before the engine's picture of it exists; `null` once it does. */
+  const lookOf = (record: ModelAnnotation): StampPreviewProvider | null => {
+    if (record.unconfirmed) return looks.get(record.id) ?? null;
+    looks.delete(record.id);
+    return null;
+  };
   /** The public face of the armed payload: a new object on every arm, null when disarmed. */
   let armedInfo: ArmedStampInfo | null = null;
   /** A new or dropped payload invalidates the ghost drawn for the old one, and wakes readers. */
@@ -119,23 +175,11 @@ export function createStamps(
     const resolved = await ctx.cancellable(options.signal, resolveBinarySource(input.source));
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (!meta) throw notAPicture();
-    // Ghost preview: an explicit `preview` wins (the only way for PDF sources —
-    // browsers can't paint those); a provider renders per size bucket; raster
-    // sources default to their own bytes.
-    let preview: StampPreviewProvider | null = null;
-    if (typeof input.preview === 'function') {
-      preview = input.preview;
-    } else if (input.preview) {
-      const resolvedPreview = await resolveBinarySource(input.preview);
-      preview = fixedPreview(new Uint8Array(resolvedPreview.bytes), resolvedPreview.mimeType);
-    } else if (meta.mimeType !== 'application/pdf') {
-      preview = fixedPreview(new Uint8Array(resolved.bytes), meta.mimeType);
-    }
+    const preview = await previewOf(input, resolved.bytes, meta.mimeType);
     armed = {
       source: input.source,
       ...desiredStampSize(meta, input.targetWidth, input.intrinsicSize),
       preview,
-      previewCache: new Map(),
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.subject !== undefined ? { subject: input.subject } : {}),
     };
@@ -163,36 +207,50 @@ export function createStamps(
    *  the edge. `rotCW` (the tool's upright counter-rotation, CW content degrees)
    *  becomes the box's `rotation` — the engine bakes the tilted
    *  /AP exactly as an interactively rotated stamp round-trips, and the fit uses
-   *  the rotated footprint. Returns null when the page/document isn't ready. */
+   *  the rotated footprint. Shown at once, unless the document is out of
+   *  object numbers for a moment. Returns null when the page/document isn't ready. */
   const createStampAt = (
     pageObjectNumber: number,
     point: Point,
     source: BinarySource,
     desired: { width: number; height: number },
+    look: StampPreviewProvider | null,
     rotCW = 0,
     identity: { name?: string; subject?: string } = {},
-  ): Applied | null => {
+    select = false,
+  ): Promise<Applied> | null => {
     const doc = ctx.doc;
     const page = geometry.sizeOf(pageObjectNumber);
     if (!doc || !page) return null;
     const box: Rect = fitStampBox(point, desired, page, rotCW);
-    const applied = store.apply([
-      {
-        type: 'create',
-        page: toPageRef(pageObjectNumber),
-        draft: {
-          subtype: 'stamp',
-          // Its box before any turn, and the turn (`null` upright, so none is kept).
-          box,
-          rotation: rotCW || null,
-          fit: 'contain',
-          ...(identity.name !== undefined ? { name: identity.name } : {}),
-          ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
+    const placed = store.applyWhenNumbered(
+      [
+        {
+          type: 'create',
+          page: toPageRef(pageObjectNumber),
+          draft: {
+            subtype: 'stamp',
+            // Its box before any turn, and the turn (`null` upright, so none is kept).
+            box,
+            rotation: rotCW || null,
+            fit: 'contain',
+            ...(identity.name !== undefined ? { name: identity.name } : {}),
+            ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
+          },
+          resources: { appearance: bytesOf(source) },
         },
-        resources: { appearance: bytesOf(source) },
-      },
-    ]);
-    return applied;
+      ],
+      { select },
+    );
+    // It shows its drawing at once: the preview it was placed with.
+    if (look) {
+      void placed.then(({ ids: [id] }) => {
+        if (id === undefined) return;
+        looks.set(id, look);
+        ctx.notify();
+      });
+    }
+    return placed;
   };
 
   /**
@@ -205,15 +263,19 @@ export function createStamps(
     point: Point,
     source: BinarySource,
     desired: { width: number; height: number },
+    look: StampPreviewProvider | null,
     rotCW = 0,
     identity: { name?: string; subject?: string } = {},
   ): boolean => {
-    const placed = createStampAt(pageObjectNumber, point, source, desired, rotCW, identity);
+    const placed = createStampAt(pageObjectNumber, point, source, desired, look, rotCW, identity);
     if (!placed) return false;
-    afterCreate.placed(tools.activeTool()?.id, placed.ids as Id[]);
-    appliedAnnotationOf(placed).catch((error) =>
-      console.error('[annotation] stamp placement failed:', error),
-    );
+    const toolId = tools.activeTool()?.id;
+    placed
+      .then((applied) => {
+        afterCreate.placed(toolId, applied.ids as Id[]);
+        return appliedAnnotationOf(applied);
+      })
+      .catch((error) => console.error('[annotation] stamp placement failed:', error));
     return true;
   };
 
@@ -228,16 +290,22 @@ export function createStamps(
     const resolved = await ctx.cancellable(options.signal, resolveBinarySource(input.source));
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (!meta) throw notAPicture();
+    const look = await ctx.cancellable(
+      options.signal,
+      previewOf(input, resolved.bytes, meta.mimeType),
+    );
     const placed = createStampAt(
       page.objectNumber,
       placement.center,
       input.source,
       desiredStampSize(meta, placement.targetWidth ?? input.targetWidth, input.intrinsicSize),
+      look,
       placement.rotation ?? 0,
       {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.subject !== undefined ? { subject: input.subject } : {}),
       },
+      placement.select ?? false,
     );
     if (!placed) {
       throw new PluginError(
@@ -246,8 +314,10 @@ export function createStamps(
         `page ${page.objectNumber} isn't laid out yet`,
       );
     }
-    if (placement.select) store.commit({ type: 'select', ids: [...placed.ids] });
-    const annotation = await ctx.cancellable(options.signal, appliedAnnotationOf(placed));
+    const annotation = await ctx.cancellable(
+      options.signal,
+      placed.then((applied) => appliedAnnotationOf(applied)),
+    );
     if (!annotation) {
       throw new PluginError('operation-failed', 'annotation', 'the stamp could not be placed');
     }
@@ -266,6 +336,7 @@ export function createStamps(
       point,
       payload.source,
       { width: payload.width, height: payload.height },
+      payload.preview,
       tools.uprightRotFor(displayRotation),
       {
         ...(payload.name !== undefined ? { name: payload.name } : {}),
@@ -290,7 +361,8 @@ export function createStamps(
       console.error('[annotation]', notAPicture().message);
       return;
     }
-    stageStampAt(pageObjectNumber, point, source, desiredStampSize(meta, targetWidth), rotCW);
+    const look = await previewOf({}, resolved.bytes, meta.mimeType);
+    stageStampAt(pageObjectNumber, point, source, desiredStampSize(meta, targetWidth), look, rotCW);
   };
 
   /**
@@ -344,23 +416,11 @@ export function createStamps(
     requestStampAt: (page: PageRef, point: Point, displayRotation?: number) =>
       requestStampAt(page.objectNumber, point, displayRotation),
     getArmedStamp: () => armedInfo,
-    renderArmedStampPreview: (devicePixelWidth?: number) => {
-      const payload = armed;
-      if (!payload?.preview) return Promise.resolve(null);
-      const bucket = previewBucket(devicePixelWidth ?? 0);
-      let pending = payload.previewCache.get(bucket);
-      if (!pending) {
-        pending = payload.preview(bucket).catch((error) => {
-          console.error('[annotation] stamp ghost preview failed:', error);
-          return null;
-        });
-        payload.previewCache.set(bucket, pending);
-      }
-      return pending;
-    },
+    renderArmedStampPreview: (devicePixelWidth?: number) =>
+      armed?.preview?.(devicePixelWidth ?? 0) ?? Promise.resolve(null),
   };
 
-  return { armed: () => armed, placeArmedStamp, requestStampAt, stamps, api };
+  return { armed: () => armed, lookOf, placeArmedStamp, requestStampAt, stamps, api };
 }
 
 export type Stamps = ReturnType<typeof createStamps>;

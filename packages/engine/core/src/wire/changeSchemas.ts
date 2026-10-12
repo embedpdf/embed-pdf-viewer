@@ -10,6 +10,8 @@ import {
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
   EngineErrorPayloadSchema,
+  FieldPositionSchema,
+  FormCalculationsReorderResultSchema,
   FormFieldCreateResultSchema,
   FormFieldDeleteResultSchema,
   FormFieldUpdateResultSchema,
@@ -42,6 +44,7 @@ import {
 import { FormFieldRefSchema } from '../identity/FormFieldRef.schema';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import type { ChangeItemType } from '../mutation/Change';
+import { AnnotationResourceKeysSchema, AppearanceResourceKeysSchema } from './resourceKeys';
 
 /**
  * `POST /v1/docs/{docId}/layers/{layerName}/changes`: a request's changes and
@@ -53,12 +56,6 @@ import type { ChangeItemType } from '../mutation/Change';
 /** An op's id for its change: 1 to 255 visible ASCII characters, as `opId` always is. */
 const OpIdSchema = z.string().regex(/^[\x21-\x7e]{1,255}$/);
 
-/** Bytes beside an op, by role, each the key of its multipart part. */
-const ResourcePartsSchema = z.object({
-  appearance: z.string().min(1).optional(),
-  file: z.string().min(1).optional(),
-});
-
 const FormFieldDisplaySchema = z.enum(['visible', 'hidden', 'noPrint', 'noView']);
 
 /** One op of a change, as the request sends it. */
@@ -68,13 +65,13 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     page: PageRefSchema,
     data: AnnotationDraftSchema,
     objectNumber: z.number().int().positive().optional(),
-    resources: ResourcePartsSchema.optional(),
+    resources: AnnotationResourceKeysSchema.optional(),
   }),
   z.object({
     type: z.literal('annotations.update'),
     ref: AnnotationRefSchema,
     patch: AnnotationPatchSchema,
-    resources: ResourcePartsSchema.optional(),
+    resources: AnnotationResourceKeysSchema.optional(),
     expect: AnnotationPatchSchema.optional(),
   }),
   z.object({
@@ -98,7 +95,6 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     type: z.literal('forms.setDisplay'),
     field: FormFieldRefSchema,
     display: FormFieldDisplaySchema,
-    expect: FormFieldDisplaySchema.optional(),
   }),
   z.object({
     type: z.literal('forms.setAppearanceText'),
@@ -144,6 +140,11 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     expect: WidgetPatchSchema.optional(),
   }),
   z.object({
+    type: z.literal('forms.reorderCalculations'),
+    fields: z.array(FormFieldRefSchema).min(1),
+    position: FieldPositionSchema,
+  }),
+  z.object({
     type: z.literal('forms.reorderWidgets'),
     page: PageRefSchema,
     widgets: z.array(AnnotationRefSchema).min(1),
@@ -159,7 +160,7 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     type: z.literal('forms.setSignatureAppearance'),
     field: FormFieldRefSchema,
     /** The one-page PDF drawn in, as the key of its multipart part. */
-    appearance: z.object({ pdf: z.string().min(1) }),
+    resources: AppearanceResourceKeysSchema,
   }),
   z.object({
     type: z.literal('metadata.update'),
@@ -263,6 +264,7 @@ export const ChangeItemSchema = z.union([
   itemOf('forms.deleteWidget', FormWidgetDeleteResultSchema),
   itemOf('forms.restoreWidget', FormWidgetRestoreResultSchema),
   itemOf('forms.reorderWidgets', FormWidgetsReorderResultSchema),
+  itemOf('forms.reorderCalculations', FormCalculationsReorderResultSchema),
   itemOf('forms.updateWidget', FormWidgetUpdateResultSchema, { skipped: SkippedFieldsSchema }),
   itemOf('metadata.update', MetadataUpdateResultSchema, { skipped: SkippedFieldsSchema }),
   itemOf('metadata.updateCustom', CustomMetadataUpdateResultSchema, {

@@ -13,8 +13,7 @@ const PAGE = toPageRef(1);
 /** The annotation `draft` creates, as the engine writes it. */
 const created = (draft: Record<string, unknown>): Annotation =>
   annotationOfNew(draft as unknown as AnnotationDraft, {
-    ref: { kind: 'nm', page: PAGE, nm: 'a' },
-    index: 0,
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: 1 },
   });
 
 const LINE = {

@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
-  import { useForm, useFormState } from '@embedpdf/svelte/form';
+  import { FormTransfer, useForm, useFormState, type FormBundle } from '@embedpdf/svelte/form';
 
   // How the new fields look: part of the PDF, like the rest of the page.
   const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
@@ -11,7 +11,7 @@
   const stage = useStage();
   const status = useFormState((formState) => formState.status);
   const pages = usePageList();
-  let xfdf = $state.raw<Uint8Array | null>(null);
+  let bundle = $state.raw<FormBundle | null>(null);
   let result = $state('');
 
   // The ebook has no form, so this adds one to its last page, fills it in, and goes there.
@@ -36,27 +36,29 @@
     });
   });
 
-  async function exportData() {
-    const { bytes } = await form.export(); // XFDF; form.export('fdf') for FDF
-    xfdf = bytes;
-    result = `Exported ${bytes.byteLength} bytes of XFDF`;
+  async function exportFields() {
+    const exported = await form.export();
+    // One JSON text: what you'd store, and read back with FormTransfer.parse().
+    const text = FormTransfer.stringify(exported);
+    bundle = exported;
+    result = `Exported ${exported.fields.length} fields, ${text.length} characters of JSON`;
   }
 
-  async function clear() {
-    await form.reset();
-    result = 'The form is empty';
+  async function remove() {
+    for (const field of form.list()) await form.delete(field.ref);
+    result = 'The form is gone';
   }
 
-  async function importData() {
-    if (!xfdf) return;
-    const { applied } = await form.import(xfdf);
-    result = `Imported ${applied} values`;
+  async function importFields() {
+    if (!bundle) return;
+    const { fields, dropped } = await form.import(bundle);
+    result = `Imported ${fields.length} fields, left out ${dropped.length}`;
   }
 </script>
 
 <div class="toolbar">
-  <button type="button" class="button" onclick={exportData}>Export</button>
-  <button type="button" class="button" onclick={clear}>Clear</button>
-  <button type="button" class="button" disabled={!xfdf} onclick={importData}>Import</button>
+  <button type="button" class="button" onclick={exportFields}>Export</button>
+  <button type="button" class="button" onclick={remove}>Remove</button>
+  <button type="button" class="button" disabled={!bundle} onclick={importFields}>Import</button>
   {#if result}<output class="readout">{result}</output>{/if}
 </div>

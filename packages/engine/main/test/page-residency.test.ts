@@ -170,11 +170,49 @@ describe('PageResidency', () => {
     expect(pool.isHeld(pon(1))).toBe(true);
 
     pool.release(pon(1));
+    pool.release(pon(2));
+    // The big page stays: it is the one room was made for. The small page fits
+    // in the budget beside it.
+    expect(calls.closes).toEqual([]);
+    expect(residency.size).toBe(2);
+  });
+
+  test('keeps a page bigger than the budget between jobs, with the pages that fit beside it', () => {
+    const { runtime, calls } = createFakeRuntime({
+      1: { bytes: 20 * MB, slices: 1 },
+      2: { bytes: 2 * MB, slices: 1 },
+      3: { bytes: 2 * MB, slices: 1 },
+    });
+    const residency = new PageResidency(runtime, { budgetBytes: 10 * MB, idleMs: 0 });
+    const pool = new PagePtrPool(runtime, DOC, residency);
+    pool.setWorkingSet('stage', [shown(1, 'visible', 1_000_000)]);
+    pool.setWorkingSet('rail', [shown(2, 'visible', 30_000), shown(3, 'visible', 30_000)]);
+
+    // Every job on the big page uses one parse of it, though it is over the
+    // budget alone; the rail's small pages load and stay beside it.
+    for (const page of [1, 1, 2, 3, 1, 2, 3, 1]) use(pool, page);
+    expect(calls.loads).toEqual([1, 2, 3]);
+    expect(calls.closes).toEqual([]);
+  });
+
+  test('closes the big page kept over the budget when a held page needs the room', async () => {
+    const { runtime, calls } = createFakeRuntime({
+      1: { bytes: 20 * MB, slices: 1 },
+      2: { bytes: 30 * MB, slices: 4 },
+    });
+    const residency = new PageResidency(runtime, { budgetBytes: 10 * MB, idleMs: 0 });
+    const pool = new PagePtrPool(runtime, DOC, residency);
+    pool.setWorkingSet('stage', [shown(1, 'visible', 1_000_000), shown(2, 'near')]);
+
+    use(pool, 1);
+    expect(calls.closes).toEqual([]);
+    // Page 2 grows past the budget while its job holds it: only one page may
+    // be over the budget, and page 2 can't close, so page 1 does.
+    await pool.acquireInSlices(pon(2), new AbortController().signal, slices);
     expect(calls.closes).toEqual([1]);
     pool.release(pon(2));
-    // The big page stays: it is the one room was made for, and nothing else is kept.
-    expect(calls.closes).toEqual([1, 2]);
-    expect(residency.size).toBe(0);
+    expect(residency.size).toBe(1);
+    expect(pool.isKept(pon(2))).toBe(true);
   });
 
   test('makes room before a load for the size the page had when it was last open', () => {

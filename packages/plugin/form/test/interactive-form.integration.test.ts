@@ -13,7 +13,7 @@ import type {
   PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -106,7 +106,7 @@ describe('interactive form JavaScript acceptance', () => {
       randomSeed: () => 7,
       sandboxFactory: createQuickJsSandbox,
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document,
       transaction: realm.transaction,
@@ -141,7 +141,6 @@ describe('interactive form JavaScript acceptance', () => {
 
       expect(printResult).toMatchObject({
         status: 'unchanged',
-        effectsResult: null,
         uiEffects: [{ kind: 'print', phase: 'user' }],
       });
 

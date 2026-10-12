@@ -8,6 +8,7 @@ export type FormFieldDraft =
     | CloudPDF.FormFieldDraft.Radio
     | CloudPDF.FormFieldDraft.Combobox
     | CloudPDF.FormFieldDraft.Listbox
+    | CloudPDF.FormFieldDraft.Pushbutton
     | CloudPDF.FormFieldDraft.Signature;
 
 export namespace FormFieldDraft {
@@ -19,6 +20,8 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        groupId?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         defaultValue?: string | undefined;
         maxLength?: number | undefined;
@@ -35,6 +38,8 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        groupId?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
 
@@ -46,6 +51,8 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        groupId?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         radiosInUnison?: boolean | undefined;
         noToggleToOff?: boolean | undefined;
@@ -59,6 +66,8 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        groupId?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         edit?: boolean | undefined;
         options?: FormFieldDraftCombobox.Options.Item[] | undefined;
@@ -84,6 +93,8 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        groupId?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
         multiSelect?: boolean | undefined;
         options?: FormFieldDraftListbox.Options.Item[] | undefined;
@@ -101,6 +112,19 @@ export namespace FormFieldDraft {
         }
     }
 
+    export interface Pushbutton {
+        family: "pushbutton";
+        name: string;
+        readOnly?: boolean | undefined;
+        required?: boolean | undefined;
+        noExport?: boolean | undefined;
+        alternateName?: string | undefined;
+        mappingName?: string | undefined;
+        groupId?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
+        widgets?: CloudPDF.WidgetPlacement[] | undefined;
+    }
+
     export interface Signature {
         family: "signature";
         name: string;
@@ -109,6 +133,8 @@ export namespace FormFieldDraft {
         noExport?: boolean | undefined;
         alternateName?: string | undefined;
         mappingName?: string | undefined;
+        groupId?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
         widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
 }

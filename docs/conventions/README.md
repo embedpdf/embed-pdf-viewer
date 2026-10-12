@@ -15,12 +15,12 @@ verbs that do work, and events. A plugin talks to the engine only through
 
 ### Four kinds of state
 
-| Kind     | What it is                                                 | Home                                                    | How it changes                                                      |
-| -------- | ---------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------- |
-| Mirror   | A local copy of data the engine owns                       | `ctx.mirror(spec)`, `ctx.pageMirror(spec)`              | Only by folding confirmed engine events (every origin) and by loads |
-| Overlay  | A local change the engine has not confirmed yet            | session state, keyed by what its confirmation carries   | Added by a verb or gesture; dropped on confirmation or failure      |
-| Session  | State the client owns that is not in the PDF               | `ctx.state`                                             | Only through named pure transitions in `model.ts`                   |
-| Resource | Handles, rasters, workers, registries of functions, caches | closures, owned through `ctx.cleanup` and `ctx.acquire` | Any way; readers are woken with `ctx.notify()`                      |
+| Kind           | What it is                                                   | Home                                                                    | How it changes                                                                   |
+| -------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Mirror         | A local copy of data the engine owns                         | `ctx.mirror(spec)`, `ctx.pageMirror(spec)`                              | Only by folding confirmed engine events (every origin) and by loads              |
+| Pending change | A change this session staged that the engine hasn't answered | the document's change queue (`ctx.changes`), shown by mirrors' `view()` | Staged by a verb or gesture; leaves the views once answered and held, or refused |
+| Session        | State the client owns that is not in the PDF                 | `ctx.state`                                                             | Only through named pure transitions in `model.ts`                                |
+| Resource       | Handles, rasters, workers, registries of functions, caches   | closures, owned through `ctx.cleanup` and `ctx.acquire`                 | Any way; readers are woken with `ctx.notify()`                                   |
 
 ### Three kinds of events
 
@@ -34,8 +34,8 @@ verbs that do work, and events. A plugin talks to the engine only through
 
 1. A capability is a plugin's only public surface. Other plugins and adapters
    read through it, never through a plugin's state.
-2. Every piece of state has one kind and one home: mirror, overlay, session
-   or resource. State is plain data; everything else is a resource.
+2. Every piece of state has one kind and one home: mirror, pending change,
+   session or resource. State is plain data; everything else is a resource.
 3. A mirror changes only by its fold and by loads. Its fold is pure and the
    same for every origin. Verbs never write it.
 4. Session state changes only through named pure transitions applied with
@@ -63,7 +63,7 @@ verbs that do work, and events. A plugin talks to the engine only through
 | File                                                     | Covers                                                                                                                                   |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | [`architecture.md`](./architecture.md)                   | Layers, scopes and bring-up, the four kinds of state, data flow, reads, reactions, pure cores, plugin anatomy                            |
-| [`state-and-sync.md`](./state-and-sync.md)               | `ctx.state`, `notify`, `watch`, `waitFor`, mirrors, page mirrors, overlays, resources, reactions, the sync rules                         |
+| [`state-and-sync.md`](./state-and-sync.md)               | `ctx.state`, `notify`, `watch`, `waitFor`, mirrors, page mirrors, pending changes, resources, reactions, the sync rules                  |
 | [`events.md`](./events.md)                               | Fact, state-change and occurrence events, event sources, naming, `EventOrigin`, `onResynced`, subscribing                                |
 | [`plugins.md`](./plugins.md)                             | Plugin files, manifest, tokens and contracts, package entries, controller, `connect`, dependencies, lifetime, errors, a complete example |
 | [`testing.md`](./testing.md)                             | Where tests live, the test context, fake engines, mirror tests, kernel tests, conformance suites, type tests                             |

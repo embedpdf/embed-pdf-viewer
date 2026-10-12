@@ -29,7 +29,7 @@
     <AddNotes />
     <div class="viewer">
       <Stage class="stage">
-        <RenderLayer annotations={false} />
+        <RenderLayer />
         <AnnotationLayer />
       </Stage>
       <Reviews />

@@ -16,7 +16,7 @@ export interface AnnotationHoverFeed {
  * through `hoverAt`, so an effect-induced hover loss can never masquerade as
  * a cursor exit. This module only decides who is hoverable here:
  *
- * - Drafts (no engine ref) can't carry /AA — skipped.
+ * - A record the engine hasn't written yet has no /AA it could run there — skipped.
  * - Widgets and links belong to their own event planes (fill controls /
  *   LinkLayer anchors own their pixels). When they are hit-testable on this
  *   plane, an authoring tool owns them — firing hover actions while editing
@@ -34,7 +34,7 @@ export function createAnnotationHoverFeed(
     if (!id) return null;
     const record = annotOf(id);
     const ref = record ? refOf(record) : null;
-    if (!record || !ref) return null;
+    if (!record || !ref || record.unconfirmed) return null;
     const kind = kindOf(record.annotation).name;
     if (kind.startsWith('widget') || kind === 'link') return null;
     const enter = Boolean(record.annotation.actions?.cursorEnter?.root);

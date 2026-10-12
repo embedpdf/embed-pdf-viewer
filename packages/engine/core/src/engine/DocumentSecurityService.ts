@@ -1,9 +1,9 @@
 import type { Identity } from '../auth/scope/types';
-import type { DocCapability, PdfBits } from '../auth/scope';
+import type { DocCapability, FieldRights, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { DocumentProtection } from '../signature/types';
 import type { EditSessionAccess } from '../identity/ObjectNumbers';
-import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
+import type { BundleLimits } from '../transfer/bundleLimits';
 
 export type DocumentOpenMode = 'none' | 'user' | 'owner';
 export type DocumentEncryptionState = 'unknown' | 'none' | 'encrypted' | 'unsupported';
@@ -16,10 +16,9 @@ export type DocumentAccessReason = 'password' | 'cdn' | 'permissions-unknown';
  * not the raw bit names — so docs can render "Print: disabled" without
  * the reader needing to know PDF bit positions.
  *
- * Computed from {@link PdfBits} via the strict ISO 32000 rules:
- *   bit 12 only meaningful when bit 3 is also set
- *   form modification requires both bit 6 and bit 4
- *   form fill is satisfied by bit 6 or bit 9
+ * Computed from {@link PdfBits} as `pdf.permissions` reads them, which
+ * is what Acrobat allows on the file: for example, form fill comes with
+ * bit 4, 6 or 9, and form modification needs both bit 4 and bit 6.
  */
 export interface PdfPermissionAdvisory {
   readonly canPrint: boolean;
@@ -170,7 +169,7 @@ export interface DocumentAccessInfo {
    * The deployment's limits for an annotation import: the cloud client
    * checks a bundle against these before its bytes move.
    */
-  readonly annotationBundleLimits: AnnotationBundleLimits;
+  readonly bundleLimits: BundleLimits;
   /**
    * The caller's editing session and the object numbers handed to it,
    * present when the caller may create objects and named its session
@@ -262,6 +261,30 @@ export interface DocumentSecurityService {
   allowsAnnotation(action: 'create'): boolean;
   allowsAnnotation(action: 'update' | 'delete', annotation: AnnotationOwner): boolean;
   allowsAnnotation(action: 'set-group', target: { groupId: string }): boolean;
+
+  /**
+   * Per-field form authorization, mirroring what the engine checks on every
+   * fill, signing and form design write:
+   *   - `fill`/`sign` take the field (its `groupId`): a `fields:fill` /
+   *     `fields:sign` scope for its group, or, without one, `doc.forms.fill`
+   *     / `doc.sign` for every field;
+   *   - `set-group` takes the destination group (`fields:set-group:` ladder;
+   *     the caller's own default group is always assignable).
+   *
+   * A courtesy for UI gating, like {@link allowsAnnotation}: the engine
+   * enforces every write with the same predicates.
+   */
+  allowsField(action: 'fill' | 'sign', field: { groupId: string | null }): boolean;
+  allowsField(action: 'set-group', target: { groupId: string }): boolean;
+
+  /**
+   * The same rules as {@link allowsField}, as lists: for filling in, signing
+   * and putting a field in a group, every field (`{ all: true }`) or the
+   * groups the session's scope names. A form designer offers exactly these
+   * groups, and a filler sees whose fields are theirs. A courtesy for UI,
+   * like `allowsField`.
+   */
+  fieldRights(): FieldRights;
 
   /**
    * Who the session acts for: from the document token's `identity` claim on

@@ -1,22 +1,27 @@
 import {
-  EngineError,
-  EngineErrorCode,
-  protectedCapabilities,
-  type DocumentProtection,
-  PermissionDenied,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
+  type AnnotationActor,
+  type AnnotationAuthority,
+  type ChangeAuthority,
   checkAnyCapability,
   checkCapability,
   checkCollab,
   checkSetGroup,
-  decodePdfBits,
-  describeProtection,
-  expandRawScope,
-  type AnnotationActor,
-  type AnnotationAuthority,
-  type ChangeAuthority,
   type CollabAction,
   type CollabTarget,
+  decodePdfBits,
+  describeProtection,
   type DocCapability,
+  type DocumentProtection,
+  EngineError,
+  EngineErrorCode,
+  expandRawScope,
+  type FieldRights,
+  fieldRightsOf,
+  type FieldWriteAction,
+  PermissionDenied,
+  protectedCapabilities,
 } from '@embedpdf/engine-core/runtime';
 
 import type { HandleScopeContext } from './HandleScopeContext';
@@ -148,7 +153,36 @@ export class ScopeGuard {
 
   /** Non-throwing destination-group check — see `assertSetGroup`. */
   canSetGroup(newGroupId: string): boolean {
-    return checkSetGroup(newGroupId, this.ctx.identity.groupId, this.ctx.scope, this.ctx.pdfBits);
+    return checkSetGroup('annotations', newGroupId, this.ctx.identity.groupId, this.ctx.scope);
+  }
+
+  /** Whether the handle may put a form field in `groupId`. */
+  canSetFieldGroup(groupId: string): boolean {
+    return checkSetGroup('fields', groupId, this.ctx.identity.groupId, this.ctx.scope);
+  }
+
+  /** The fields the handle may fill in and sign, and the groups it may put them in, as lists. */
+  fieldRights(): FieldRights {
+    return fieldRightsOf(
+      this.ctx.scope,
+      this.ctx.pdfBits,
+      this.protection,
+      this.ctx.identity.groupId,
+    );
+  }
+
+  /** Whether the handle may `action` (fill in, or sign) the field in `groupId`. */
+  canFieldWrite(groupId: string | null, action: FieldWriteAction): boolean {
+    return allowsFieldWrite(this.changeAuthority(), groupId, action);
+  }
+
+  /**
+   * Throws unless the handle may `action` some field: what a form write
+   * checks before the job, which checks each field it writes.
+   */
+  assertSomeFieldWrite(action: FieldWriteAction): void {
+    if (allowsSomeFieldWrite(this.changeAuthority(), action)) return;
+    this.assertCapability(action === 'fill' ? 'doc.forms.fill' : 'doc.sign');
   }
 
   assertCollab(action: CollabAction, target: CollabTarget): void {

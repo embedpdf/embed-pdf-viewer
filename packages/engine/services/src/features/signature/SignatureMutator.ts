@@ -8,7 +8,14 @@ import type {
   SignaturePrepareInput,
   SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  authorizeFieldWrite,
+  EngineError,
+  EngineErrorCode,
+  toPageRef,
+  type ChangeAuthority,
+  type FieldLockSpec,
+} from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -32,6 +39,7 @@ import {
 import { withScratch } from '../../runtime/memory/scratch';
 import { formatPdfDate } from '../../shared/pdf-date';
 import { generateUuid } from '../../shared/uuid';
+import { groupLockFields, groupOfField } from '../forms/internal/fieldGroups';
 import { disposeFormModel } from '../forms/internal/formModelCache';
 import { withWideStringArray } from '../forms/internal/wideStringArray';
 import { DocumentSaver } from '../save/DocumentSaver';
@@ -126,7 +134,13 @@ export class SignatureMutator {
     private readonly candidatePath?: (basePath: string, signingId: string) => string,
   ) {}
 
-  prepare(input: SignaturePrepareInput): SignaturePrepared {
+  /**
+   * Prepare a signing of `input.field`, which `authority` must be allowed to
+   * sign (its group, `fields:sign`). A field in a group, signed without a
+   * `lock`, locks the rest of its group: nobody changes the buyer's fields
+   * once the buyer signed.
+   */
+  prepare(input: SignaturePrepareInput, authority: ChangeAuthority): SignaturePrepared {
     if (this.session.pendingSigning) {
       throw new EngineError(
         EngineErrorCode.SigningPending,
@@ -135,6 +149,16 @@ export class SignatureMutator {
     }
     const reader = new SignatureReader(this.runtime, this.session);
     const field = reader.resolveField(input.field);
+    const groupId = groupOfField(this.runtime, this.session, field.fieldObjectNumber);
+    authorizeFieldWrite(authority, groupId, 'sign');
+    const lock: FieldLockSpec | undefined =
+      input.lock ??
+      (groupId !== null
+        ? {
+            action: 'include',
+            fields: groupLockFields(this.runtime, this.session, groupId),
+          }
+        : undefined);
     if (field.signed) {
       throw new EngineError(
         EngineErrorCode.SignatureRefused,
@@ -193,9 +217,9 @@ export class SignatureMutator {
         contactInfo: signer?.contactInfo ?? null,
         signingTime: signer?.signedAt !== undefined ? formatPdfDate(signer.signedAt) : null,
         docmdpPermission: input.certify?.permission ?? 0,
-        fieldmdpAction: input.lock ? FIELD_ACTION_CODE[input.lock.action] : 0,
-        fieldmdpFields: input.lock?.action === 'all' ? [] : (input.lock?.fields ?? []),
-        lockPermission: input.lock?.permission ?? 0,
+        fieldmdpAction: lock ? FIELD_ACTION_CODE[lock.action] : 0,
+        fieldmdpFields: lock?.action === 'all' ? [] : (lock?.fields ?? []),
+        lockPermission: lock?.permission ?? 0,
       });
       if (valueObjNum === 0) {
         throw new EngineError(
@@ -244,9 +268,11 @@ export class SignatureMutator {
    * replaces the document's bytes), so it takes its id here, and it is final:
    * never undoable.
    */
+  /** Complete the pending signing; `authority` must still be allowed to sign its field. */
   complete(
     input: SignatureCompleteInput,
     opId: string,
+    authority: ChangeAuthority,
   ): SignatureCompleteResult {
     const pending = this.session.pendingSigning;
     if (!pending || pending.prepared.signingId !== input.signingId) {
@@ -262,6 +288,11 @@ export class SignatureMutator {
       }
       throw new EngineError(EngineErrorCode.NotFound, `no pending signing '${input.signingId}'`);
     }
+    authorizeFieldWrite(
+      authority,
+      groupOfField(this.runtime, this.session, pending.fieldObjectNumber),
+      'sign',
+    );
     if (!sameVersion(pending.prepared.expectedVersion, input.expectedVersion)) {
       throw new EngineError(
         EngineErrorCode.SigningVersionMismatch,

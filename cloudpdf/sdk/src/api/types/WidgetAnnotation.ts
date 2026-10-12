@@ -34,14 +34,19 @@ export interface WidgetAnnotation {
     modifiedBy: string | null;
     importedBy: string | null;
     actions: CloudPDF.PdfAnnotationActions | null;
+    box: WidgetAnnotation.Box;
+    rotation: number | null;
     color: string | null;
     interiorColor: string | null;
     strokeWidth: number;
     borderStyle: WidgetAnnotation.BorderStyle;
-    fontFamily: WidgetAnnotation.FontFamily | null;
+    dashArray: number[] | null;
+    fontFamily: string | null;
     fontSize: number | null;
     fontColor: string | null;
     textAlign: WidgetAnnotation.TextAlign;
+    caption: string | null;
+    checkStyle: WidgetAnnotation.CheckStyle | null;
     field: CloudPDF.FormFieldRef | null;
     fieldFamily: WidgetAnnotation.FieldFamily;
 }
@@ -92,36 +97,36 @@ export namespace WidgetAnnotation {
         export type Type = (typeof Type)[keyof typeof Type];
     }
 
+    export interface Box {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }
+
     export const BorderStyle = {
         Solid: "solid",
         Dashed: "dashed",
         Beveled: "beveled",
         Inset: "inset",
+        Underline: "underline",
     } as const;
     export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-    export const FontFamily = {
-        Courier: "courier",
-        CourierBold: "courier-bold",
-        CourierBoldOblique: "courier-bold-oblique",
-        CourierOblique: "courier-oblique",
-        Helvetica: "helvetica",
-        HelveticaBold: "helvetica-bold",
-        HelveticaBoldOblique: "helvetica-bold-oblique",
-        HelveticaOblique: "helvetica-oblique",
-        TimesRoman: "times-roman",
-        TimesBold: "times-bold",
-        TimesBoldItalic: "times-bold-italic",
-        TimesItalic: "times-italic",
-        Symbol: "symbol",
-        ZapfDingbats: "zapf-dingbats",
-    } as const;
-    export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
     export const TextAlign = {
         Left: "left",
         Center: "center",
         Right: "right",
     } as const;
     export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+    export const CheckStyle = {
+        Check: "check",
+        Cross: "cross",
+        Star: "star",
+        Circle: "circle",
+        Square: "square",
+        Diamond: "diamond",
+    } as const;
+    export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
     export const FieldFamily = {
         Text: "text",
         Checkbox: "checkbox",

@@ -6,43 +6,41 @@ import {
   type AnnotationAppearanceImagesResult,
   type PageImageResult,
 } from '@embedpdf/engine-core/runtime';
-import { AnnotationAppearanceManifestSchema } from '@embedpdf/engine-core/wire';
+import { AnnotationAppearanceBatchSchema } from '@embedpdf/engine-core/wire';
 
 /**
  * Parse the appearance `multipart/form-data` response into the same
  * `AnnotationAppearanceImagesResult` shape the local engine produces. The
- * `manifest` part is validated against the wire schema; each image part is
- * wrapped in a `PageImageHandle` backed by the in-memory blob we already
- * downloaded.
+ * `body` part is validated against the wire schema; each image (the part
+ * `resource:<key>` its entry names) is wrapped in a `PageImageHandle`
+ * backed by the in-memory blob we already downloaded.
  */
 export async function parseAppearanceForm(
   form: FormData,
 ): Promise<AnnotationAppearanceImagesResult> {
-  const manifestRaw = form.get('manifest');
-  if (typeof manifestRaw !== 'string') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      'appearance response missing JSON manifest part',
-    );
+  const raw = form.get('body');
+  if (typeof raw !== 'string') {
+    throw new EngineError(EngineErrorCode.WireFormat, 'appearance response missing its body part');
   }
   let parsedJson: unknown;
   try {
-    parsedJson = JSON.parse(manifestRaw);
+    parsedJson = JSON.parse(raw);
   } catch (err) {
     throw new EngineError(
       EngineErrorCode.WireFormat,
-      `appearance manifest is not valid JSON: ${(err as Error)?.message ?? err}`,
+      `appearance body is not valid JSON: ${(err as Error)?.message ?? err}`,
     );
   }
-  const manifest = AnnotationAppearanceManifestSchema.parse(parsedJson);
+  const body = AnnotationAppearanceBatchSchema.parse(parsedJson);
 
   const appearances: AnnotationAppearanceImage[] = await Promise.all(
-    manifest.appearances.map(async (entry) => {
-      const partValue = form.get(entry.part);
+    body.appearances.map(async (entry) => {
+      const name = `resource:${entry.resources.image}`;
+      const partValue = form.get(name);
       if (partValue === null || typeof partValue === 'string') {
         throw new EngineError(
           EngineErrorCode.WireFormat,
-          `appearance response missing image part "${entry.part}"`,
+          `appearance response missing image part "${name}"`,
         );
       }
       const blob = partValue as Blob;
@@ -69,5 +67,5 @@ export async function parseAppearanceForm(
     }),
   );
 
-  return { page: manifest.page, appearances };
+  return { page: body.page, appearances };
 }

@@ -6,11 +6,11 @@
   puts the value back: `@embedpdf/web`'s `createTextFieldEditor`.
 -->
 <script setup lang="ts">
-import { computed, onUnmounted, shallowRef, watch } from 'vue';
+import { computed, onUnmounted, shallowRef, watch, watchEffect } from 'vue';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 // The draft calls are the host lens's.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { createTextFieldEditor, textFieldEditorStyleOf } from '@embedpdf/web';
+import { createFontMounts, createTextFieldEditor, textFieldEditorStyleOf } from '@embedpdf/web';
 import type { FormColors } from '@embedpdf/web';
 import { useCapability } from '../runtime/capabilities';
 import { useWidgetActivation } from './composables';
@@ -40,8 +40,20 @@ watch(
   (value) => editor.setValue(value),
 );
 
+// The text being typed, where the engine will draw it, in its face.
+const layout = computed(() =>
+  props.item.annotationRef
+    ? form.getTextEditorLayout(props.item.annotationRef, state.value.draft)
+    : null,
+);
+const mounts = createFontMounts();
+onUnmounted(() => mounts.release());
+watchEffect(() => {
+  if (layout.value) mounts.mount([layout.value.program]);
+});
+
 const editorStyle = computed(() =>
-  textFieldEditorStyleOf(props.item, frame.value, props.colors, state.value.focused),
+  textFieldEditorStyleOf(props.item, frame.value, props.colors, state.value.focused, layout.value),
 );
 
 const onInput = (event: Event) =>

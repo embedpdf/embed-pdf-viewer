@@ -4,12 +4,13 @@ import {
   PermissionDenied,
   isSkippedItem,
   isUndoChange,
+  itemWrote,
   objectNumbersNamedBy,
   type AnnotationActor,
   type CacheDelta,
   type ChangeAnswer,
   type ChangeAuthority,
-  type Change,
+  type RecordedChange,
   type ChangeItem,
   type ChangeResult,
   type PageCoordinates,
@@ -31,7 +32,8 @@ import type { ChangeOutcomeRow } from '../db/repos/change_outcomes.repo';
 /** One change of a request, as the route read it. */
 export interface RequestedChange {
   readonly opId: string;
-  readonly change: Change<PageCoordinates, WireAnnotationResources>;
+  /** Its ops (a single-verb route's one op, an import's among them), or an undo. */
+  readonly change: RecordedChange<PageCoordinates, WireAnnotationResources>;
 }
 
 /** How long a change's answer, reverse and capture are kept: 30 days unless configured. */
@@ -107,9 +109,12 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
   };
 }
 
-/** Whether any item of a result wrote: a change left alone entirely wrote nothing. */
+/**
+ * Whether any item of a result wrote: a change left alone entirely, or an
+ * import that left every item out, wrote nothing.
+ */
 export function wrote(result: ChangeResult): boolean {
-  return result.items.some((item) => !isSkippedItem(item));
+  return result.items.some(itemWrote);
 }
 
 /**

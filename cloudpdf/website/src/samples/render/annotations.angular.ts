@@ -70,7 +70,7 @@ type Painter = 'picture' | 'layer';
           @if (painter() === 'picture') {
             <epdf-render-layer />
           } @else {
-            <epdf-render-layer [annotations]="false" />
+            <epdf-render-layer />
             <epdf-annotation-layer />
           }
         </ng-template>

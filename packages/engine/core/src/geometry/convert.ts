@@ -7,7 +7,7 @@
  * model), never here.
  */
 
-import type { PdfPoint, PdfQuad, PdfRect, PdfSize } from './primitives';
+import type { PdfPoint, PdfQuad, PdfRect, PdfRotation, PdfSize } from './primitives';
 
 /** Origin + size form of a `PdfRect`, still y-up (origin = bottom-left). */
 export interface PdfOriginSize {
@@ -155,9 +155,11 @@ export function normalizePdfQuad(points: PdfQuadPoints): PdfQuad {
 
 /**
  * The upright box around `rect` turned by `degrees` about its middle, either
- * way: the `/Rect` of a turned box.
+ * way: the `/Rect` of a turned box. A quarter turn is exact: the sides swap.
  */
 export function pdfRectTurnedBounds(rect: PdfRect, degrees: number): PdfRect {
+  const quarterTurn = quarterTurnOf(degrees);
+  if (quarterTurn !== null) return pdfQuarterTurnBox(rect, quarterTurn);
   const radians = (degrees * Math.PI) / 180;
   const cos = Math.abs(Math.cos(radians));
   const sin = Math.abs(Math.sin(radians));
@@ -168,6 +170,30 @@ export function pdfRectTurnedBounds(rect: PdfRect, degrees: number): PdfRect {
   const x = (rect.left + rect.right) / 2;
   const y = (rect.bottom + rect.top) / 2;
   return { left: x - halfAcross, bottom: y - halfUp, right: x + halfAcross, top: y + halfUp };
+}
+
+/**
+ * `degrees` as a quarter turn (clockwise, 0 to 270), or `null` when it isn't
+ * one. A negative turn, or one past a whole turn, is the same turn.
+ */
+export function quarterTurnOf(degrees: number): PdfRotation | null {
+  const turn = ((degrees % 360) + 360) % 360;
+  return turn % 90 === 0 ? (turn as PdfRotation) : null;
+}
+
+/**
+ * The box that, turned `rotation` about its middle, stands upright in
+ * `rect`: `rect` itself, its sides swapped under 90 and 270. The inverse of
+ * {@link pdfRectTurnedBounds} for a quarter turn, which is the one turn a
+ * rect pins a box down for.
+ */
+export function pdfQuarterTurnBox(rect: PdfRect, rotation: PdfRotation): PdfRect {
+  if (rotation === 0 || rotation === 180) return rect;
+  const x = (rect.left + rect.right) / 2;
+  const y = (rect.bottom + rect.top) / 2;
+  const halfWidth = (rect.top - rect.bottom) / 2;
+  const halfHeight = (rect.right - rect.left) / 2;
+  return { left: x - halfWidth, bottom: y - halfHeight, right: x + halfWidth, top: y + halfHeight };
 }
 
 /**

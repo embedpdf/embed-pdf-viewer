@@ -7,6 +7,7 @@ import type { DocumentSession } from '../../../../document-session/DocumentSessi
 // mutations. No module cycle: the cache imports nothing from annotations.
 import { acquireFormModel } from '../../../forms/internal/formModelCache';
 import { FAMILY_BY_CODE } from '../../../forms/internal/readFormSnapshot';
+import { checkStyleOfCaption } from '../../../forms/internal/widgetCaption';
 
 /**
  * Resolve the owning field's object number for a widget annotation, or 0
@@ -26,7 +27,11 @@ export function resolveWidgetFieldObjectNumber(
   return runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
 }
 
-/** Stamp the field ref and family onto every widget DTO in a freshly read list. */
+/**
+ * Stamp the field ref and family onto every widget DTO in a freshly read
+ * list. `/MK /CA` is a push button's caption, and a checkbox's or radio
+ * button's symbol (`checkStyle`); another widget's reads as neither.
+ */
 export function joinWidgetFieldNumbers(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
@@ -34,7 +39,10 @@ export function joinWidgetFieldNumbers(
 ): void {
   for (const annotation of annotations) {
     if (annotation.subtype !== 'widget') continue;
-    if (annotation.ref.kind !== 'objectNumber') continue;
+    if (annotation.ref.kind !== 'objectNumber') {
+      annotation.caption = null;
+      continue;
+    }
     const model = acquireFormModel(runtime, session);
     const fieldIndex = runtime.fn.EPDFForm_GetFieldIndexForWidget(
       model,
@@ -46,10 +54,15 @@ export function joinWidgetFieldNumbers(
       // In no field, or in one stored inline, which no ref can address.
       annotation.field = null;
       annotation.fieldFamily = 'unknown';
+      annotation.caption = null;
       continue;
     }
     annotation.field = { kind: 'objectNumber', objectNumber: fieldObjectNumber };
     annotation.fieldFamily =
       FAMILY_BY_CODE[runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
+    if (annotation.fieldFamily === 'checkbox' || annotation.fieldFamily === 'radio') {
+      annotation.checkStyle = checkStyleOfCaption(annotation.caption ?? null);
+    }
+    if (annotation.fieldFamily !== 'pushbutton') annotation.caption = null;
   }
 }

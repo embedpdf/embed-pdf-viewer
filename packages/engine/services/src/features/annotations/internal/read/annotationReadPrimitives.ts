@@ -326,6 +326,28 @@ export function readDefaultAppearance(
 }
 
 /**
+ * The face of the font `/DA` names (`EPDFAnnot_GetDefaultAppearanceFontFace`):
+ * its family, weight and italic, as the font's dictionary says. `null` when
+ * `/DA` names no font.
+ */
+export function readDefaultAppearanceFace(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+): { family: string; weight: number; italic: boolean } | null {
+  return withScratchN(mem, [I32_BYTES, I32_BYTES], ([weight, italic]) => {
+    const family = readUtf16String(
+      mem,
+      (buf, capacity) =>
+        fn.EPDFAnnot_GetDefaultAppearanceFontFace(annotPtr, buf, capacity, weight, italic),
+      null,
+    );
+    if (!family) return null;
+    return { family, weight: readI32(mem, weight), italic: readI32(mem, italic) !== 0 };
+  });
+}
+
+/**
  * Read the `/Q` text alignment quadding code of a free-text annotation via
  * `EPDFAnnot_GetTextAlignment`. The code<->string mapping lives in
  * `textAlignment.ts`; an absent `/Q` reads back as `0` (left).

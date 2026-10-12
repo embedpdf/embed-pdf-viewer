@@ -14,14 +14,14 @@ import {
   formWidget,
   toPageRef,
   type DocumentHandle,
-  type FormEffect,
+  type ChangeOp,
   type FormFieldDTO,
   type FormSnapshot,
   type PageLayout,
   type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const ref = (fieldObjectNumber: number) => ({
@@ -51,6 +51,13 @@ const text = (
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'scalar', value },
   defaultValueEntry: { kind: 'scalar', value: '' },
   value,
@@ -123,22 +130,15 @@ const documentMeta = (): DocumentMeta => ({
 });
 
 function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbox()) {
-  const batches: FormEffect[][] = [];
-  const applyEffects = vi.fn(async (effects: FormEffect[]) => {
-    batches.push(effects);
-    return {
-      results: effects.map((_, index) => ({
-        index,
-        status: 'applied' as const,
-        fields: [],
-        changedWidgets: [],
-      })),
-      meta: {} as never,
-    };
+  const batches: ChangeOp[][] = [];
+  const apply = vi.fn(async ({ ops }: { ops: ChangeOp[] }) => {
+    batches.push(ops);
+    return { items: [], meta: { undoable: true } as never };
   });
   const doc = {
     id: 'form-doc',
-    forms: { list: async () => snapshot, applyEffects },
+    apply,
+    forms: { list: async () => snapshot },
     actions: { get: async () => ({ nameTreeScripts: [], openAction: null }) },
     security: {
       identity: { userId: 'alex', displayName: 'Alex Morgan', organization: 'EmbedPDF' },
@@ -150,7 +150,7 @@ function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbo
     randomSeed: () => 7,
     sandboxFactory: vi.fn(async () => sandbox),
   });
-  const controller = createFormScriptingController({
+  const controller = engineScripts({
     doc,
     document: documentMeta,
     transaction: realm.transaction,
@@ -173,7 +173,9 @@ describe('script fault ladder', () => {
     const result = await fx.controller.commit(ref(2), { value: '42' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '42' } }]);
+    expect(fx.batches[0]).toEqual([
+      { type: 'forms.setValue', field: ref(2), value: { value: '42' } },
+    ]);
     expect(
       result.diagnostics.filter(
         ({ code, message }) => code === 'script-error' && message.includes('Keystroke'),
@@ -209,7 +211,7 @@ describe('script fault ladder', () => {
     });
     expect(accepted.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { value: '1,234.56' } },
+      { type: 'forms.setValue', field: ref(2), value: { value: '1,234.56' } },
     ]);
   });
 
@@ -226,7 +228,9 @@ describe('script fault ladder', () => {
     const result = await fx.controller.commit(ref(2), { value: '7' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '7' } }]);
+    expect(fx.batches[0]).toEqual([
+      { type: 'forms.setValue', field: ref(2), value: { value: '7' } },
+    ]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
 
@@ -250,8 +254,8 @@ describe('script fault ladder', () => {
 
     expect(result.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { value: '5' } },
-      { kind: 'setValue', ref: ref(4), value: { value: '10' } },
+      { type: 'forms.setValue', field: ref(2), value: { value: '5' } },
+      { type: 'forms.setValue', field: ref(4), value: { value: '10' } },
     ]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
@@ -269,7 +273,9 @@ describe('script fault ladder', () => {
     const result = await fx.controller.commit(ref(2), { value: '7' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '7' } }]);
+    expect(fx.batches[0]).toEqual([
+      { type: 'forms.setValue', field: ref(2), value: { value: '7' } },
+    ]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
 

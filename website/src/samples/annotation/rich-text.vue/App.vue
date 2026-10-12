@@ -28,7 +28,7 @@ const ebook = async (): Promise<OpenInput> => {
       <RichTextToolbar />
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
         </template>
       </Stage>

@@ -29,7 +29,7 @@ export function createSigning(
   signatures: Pick<SignaturesMirror, 'disown'>,
 ) {
   const { withBusy, requireSignatures } = store;
-  const { resolveKey } = authority;
+  const { resolveKey, assertAllowedField } = authority;
   const { bytesOf, markBytes } = marks;
 
   /** Two-phase signings this session prepared: the version each one must complete against. */
@@ -61,9 +61,15 @@ export function createSigning(
     } as unknown as DocumentHandle;
   };
 
-  /** Refused before anything starts: `doc.sign`, and `doc.sign.certify` for a certification. */
-  const assertMaySign = (input: { certify?: unknown }, operation: string): void => {
-    ctx.assertAllowed('doc.sign', operation);
+  /**
+   * Refused before anything starts: signing the field (`doc.sign`, or
+   * `fields:sign` for its group), and `doc.sign.certify` for a certification.
+   */
+  const assertMaySign = (
+    input: { field: FormFieldRef; certify?: unknown },
+    operation: string,
+  ): void => {
+    assertAllowedField('sign', input.field, operation);
     if (input.certify) ctx.assertAllowed('doc.sign.certify', operation);
   };
 
@@ -134,7 +140,7 @@ export function createSigning(
     cms: Uint8Array,
     options?: OperationOptions,
   ): Promise<SignatureCompleteResult> => {
-    ctx.assertAllowed('doc.sign', 'signature.completeSignature');
+    // Its field was checked when it was prepared; the engine checks it again.
     if (options?.signal?.aborted) throw cancelled(options.signal);
     return withBusy(async () => {
       const signatures = requireSignatures();
@@ -158,9 +164,9 @@ export function createSigning(
   };
 
   const cancelPending = async (options?: OperationOptions): Promise<void> => {
-    ctx.assertAllowed('doc.sign', 'signature.cancelPending');
     const pending = reads.getPending();
     if (!pending) return;
+    assertAllowedField('sign', pending.field, 'signature.cancelPending');
     const { status } = await ctx.cancellable(
       options?.signal,
       requireSignatures().cancel(pending.signingId),

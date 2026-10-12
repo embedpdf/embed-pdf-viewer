@@ -127,9 +127,23 @@ export {
   type PermissionToken,
 } from './conformance/runPermissionConformance';
 export {
+  runFormScriptConformance,
+  type FormScriptConformanceOptions,
+} from './conformance/runFormScriptConformance';
+export {
   runFormAttributionConformance,
   type FormAttributionConformanceOptions,
 } from './conformance/runFormAttributionConformance';
+export {
+  runFormTransferConformance,
+  TWO_PAGES_PDF,
+  type FormTransferConformanceOptions,
+} from './conformance/runFormTransferConformance';
+export {
+  runWidgetRotationConformance,
+  TURNED_FIELDS_PDF,
+  type WidgetRotationConformanceOptions,
+} from './conformance/runWidgetRotationConformance';
 export {
   WIDGET_FINDING_CASES,
   runWidgetFindingConformance,
@@ -177,3 +191,14 @@ export {
   runAnnotationPredictionConformance,
   type AnnotationPredictionConformanceOptions,
 } from './conformance/runAnnotationPredictionConformance';
+export {
+  runFormPredictionConformance,
+  type FormPredictionConformanceOptions,
+} from './conformance/runFormPredictionConformance';
+export {
+  FIELD_GROUP_TOKENS,
+  FIELD_GROUPS_PDF,
+  runFieldGroupsConformance,
+  type FieldGroupToken,
+  type FieldGroupsConformanceOptions,
+} from './conformance/runFieldGroupsConformance';

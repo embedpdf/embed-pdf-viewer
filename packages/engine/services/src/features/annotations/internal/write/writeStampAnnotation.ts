@@ -8,6 +8,7 @@ import {
   type StampPatch,
   type WireAnnotationResources,
   type PdfCoordinates,
+  type PlacedDraft,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -72,7 +73,7 @@ export function applyStampDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: StampDraft<PdfCoordinates>,
+  draft: PlacedDraft<StampDraft<PdfCoordinates>>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);

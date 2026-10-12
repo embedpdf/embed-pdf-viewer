@@ -38,6 +38,8 @@ import { pageRefsEqual, subscribeToType } from '@embedpdf/engine-core/runtime';
  *  `isLocalEngine` and `isLocalDocument` accept it. */
 export { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
 
+import { createBurstGate } from './bursts';
+import { createDocumentChanges } from './changes';
 import { instanceClock, timerClock, type Cancel, type HostClock } from './clock';
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
@@ -48,7 +50,7 @@ import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
 import { findPage, pageOf } from './page-of';
 import { readWrapped, type DownloadWrap } from './context';
-import { permissionDenied, sessionAllows } from './permissions';
+import { fieldPermissionDenied, permissionDenied, sessionAllows } from './permissions';
 import { createSettingsStore, type NoSettings, type SettingsDeclaration } from './settings';
 import { settle, type SettleFlush } from './settle';
 import { createStore } from './store';
@@ -137,6 +139,7 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
     size,
     rotation: page.rotation ?? 0,
     userUnit: page.userUnit ?? 1,
+    tabOrder: null,
     boxes: {
       media: { ...visible },
       crop: { ...visible },
@@ -232,16 +235,23 @@ export function createTestContext<S = void, T extends object = NoSettings>(
                 subscribeToType(documentEvents.on, type, listener),
               lastServerId: () => null,
             },
-            security: { allows: () => true, allowsAnnotation: () => true },
+            security: { allows: () => true, allowsAnnotation: () => true, allowsField: () => true },
             ...options.doc,
           });
   const requireDoc = (): DocumentHandle => {
     if (!doc) throw new PluginError('not-ready', id, 'the test context has no document');
     return doc;
   };
+  // The document's change queue, as the kernel keeps one: `doc.apply` sends its changes.
+  const changes = createDocumentChanges({ handle: () => doc, notify: store.notify, report });
+  settleFlushes.add(() => changes.settle());
+  cleanups.push(() => changes.close());
+  const bursts = createBurstGate(store);
   const mirrors: MirrorController<unknown>[] = [];
   const mirrorEnvironment = (): MirrorEnvironment => ({
     doc: requireDoc(),
+    changes,
+    notify: store.notify,
     lifetime: lifetime.signal,
     cell(name, initial) {
       const cell = store.lease(`${id}/${name}`, initial, instanceId);
@@ -327,6 +337,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       return controller.mirror;
     },
     pageMirror: (spec) => createPageMirror(spec, mirrorEnvironment()),
+    changes: changes.forPlugin(id),
     document: () => meta,
     get: require,
     tryGet: resolve,
@@ -411,6 +422,13 @@ export function createTestContext<S = void, T extends object = NoSettings>(
         throw permissionDenied(id, permission, operation);
       }
     },
+    allowsField: (action, field) =>
+      requireDoc().security.allowsField(action, { groupId: field.groupId }),
+    assertAllowedField: (action, field, operation) => {
+      if (!requireDoc().security.allowsField(action, { groupId: field.groupId })) {
+        throw fieldPermissionDenied(id, action, field, operation);
+      }
+    },
     cancellable: (signal, task) => cancellable(id, signal, task),
     capabilities,
     connect: (instance) => {
@@ -418,7 +436,11 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       for (const mirror of mirrors.splice(0)) mirror.start();
       return instance.api;
     },
-    emitDocumentEvent: (event) => documentEvents.emit(event),
+    emitDocumentEvent: (event) => {
+      bursts.first(event);
+      documentEvents.emit(event);
+      bursts.last(event);
+    },
     settle: (signal) => settle(settleFlushes, [signal, lifetime.signal], report),
     download: (read) => readWrapped(downloadWraps, read),
     dispose: async () => {

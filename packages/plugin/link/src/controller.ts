@@ -45,12 +45,8 @@ function pagesChangedBy(event: DocumentEvent): readonly PageRef[] | null {
     case 'annotations.updated':
       return [event.annotation.page];
     case 'annotations.deleted':
+    case 'annotations.reordered':
       return [event.page];
-    case 'annotations.moved': {
-      const pages = new Map<number, PageRef>();
-      for (const dto of event.annotations) pages.set(dto.page.objectNumber, dto.page);
-      return [...pages.values()];
-    }
     // These can remove annotations, links included, from the pages they applied to.
     case 'redaction.applied':
     case 'pages.flattened':

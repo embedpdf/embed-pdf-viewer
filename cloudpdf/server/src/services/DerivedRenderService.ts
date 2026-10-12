@@ -13,8 +13,11 @@ import {
 import {
   encodeRenderToken,
   flatten,
+  PAGE_RENDER_FAMILIES,
   pageRenderOptionsFromImageOptions,
+  type PageRenderFamily,
   type RenderPolicy,
+  type RenderVersions,
 } from '@embedpdf/engine-core/wire';
 
 import type { DocumentsRepo } from '../db/repos/documents.repo';
@@ -178,15 +181,14 @@ export class DerivedRenderService {
     imageOptions: PageImageOptions;
     format: PageNetworkRenderFormat;
     /**
-     * The render family the request arrived on (token/path law):
-     * annotatedness is path-expressed, so the route supplies it — the
-     * token cannot. Drives whether `annotationVersion` belongs in the
-     * canonical token (annotation churn stays out of the free family's
-     * keys by construction).
+     * The picture family the request arrived on: it's in the path, so the
+     * route supplies it. Its pins, and only those, go into the canonical
+     * token, so an annotation edit never moves the key of a picture that
+     * doesn't draw annotations.
      */
-    annotated: boolean;
-    contentVersion?: number;
-    annotationVersion?: number;
+    family: PageRenderFamily;
+    /** The request's pins; unpinned (no `contentVersion`) is never stored. */
+    pins: RenderVersions | Partial<RenderVersions>;
   }): LatticeClassification {
     const o = input.imageOptions;
     const viewport = o.viewport;
@@ -201,14 +203,15 @@ export class DerivedRenderService {
       (o.rotation === undefined || o.rotation === 0) &&
       o.quality === undefined;
 
-    if (!onLattice || input.contentVersion === undefined) {
+    if (!onLattice || input.pins.contentVersion === undefined) {
       return { onLattice, fullPage };
     }
 
+    const pins: Partial<RenderVersions> = {};
+    for (const pin of PAGE_RENDER_FAMILIES[input.family].pins) pins[pin] = input.pins[pin];
     const canonicalToken = encodeRenderToken(
       flatten({
-        contentVersion: input.contentVersion,
-        ...(input.annotated ? { annotationVersion: input.annotationVersion } : {}),
+        ...pins,
         background: 'white',
         format: 'webp',
         viewport: { kind: 'width', width },
@@ -264,9 +267,9 @@ export class DerivedRenderService {
     baseSha: string,
     pageObjectNumber: number,
     token: string,
-    annotated = false,
+    family: PageRenderFamily,
   ): string {
-    return StorageKeys.derivedRenderBase(tenantId, baseSha, pageObjectNumber, token, annotated);
+    return StorageKeys.derivedRenderBase(tenantId, baseSha, pageObjectNumber, token, family);
   }
 
   layerKey(
@@ -275,7 +278,7 @@ export class DerivedRenderService {
     layerName: string,
     pageObjectNumber: number,
     token: string,
-    annotated = false,
+    family: PageRenderFamily,
   ): string {
     return StorageKeys.derivedRenderLayer(
       tenantId,
@@ -283,7 +286,7 @@ export class DerivedRenderService {
       layerName,
       pageObjectNumber,
       token,
-      annotated,
+      family,
     );
   }
 
@@ -397,13 +400,13 @@ export class DerivedRenderService {
         format: 'webp',
         background: 'white',
       };
-      // Base view, annotation-free family: content pins are the immutable
+      // Base view, the page-only picture: content pins are the immutable
       // base epoch.
       const classification = this.classify({
         imageOptions,
         format: 'webp',
-        annotated: false,
-        contentVersion: 1,
+        family: 'pages',
+        pins: { contentVersion: 1 },
       });
       if (!classification.canonicalToken) return;
       const token = classification.canonicalToken;
@@ -416,7 +419,7 @@ export class DerivedRenderService {
         // (same acceptance as cross-replica duplicates); the store and the
         // per-key flight converge on one artifact either way.
         const renderOptions = {
-          ...pageRenderOptionsFromImageOptions(imageOptions, false),
+          ...pageRenderOptionsFromImageOptions(imageOptions),
           maxOutputPixels: this.maxPixels,
         };
         // With in-engine encoding (the default), render and encode use one worker op — the
@@ -474,7 +477,13 @@ export class DerivedRenderService {
           encoded = await encoder.encodeToBuffer(payload.raster, { format: 'webp' });
           pageObjectNumber = payload.page.objectNumber;
         }
-        const finalKey = this.baseKey(input.tenantId, input.baseSha, pageObjectNumber, token);
+        const finalKey = this.baseKey(
+          input.tenantId,
+          input.baseSha,
+          pageObjectNumber,
+          token,
+          'pages',
+        );
         await this.getOrRender(finalKey, async () => ({
           bytes: encoded.bytes,
           contentType: encoded.contentType,

@@ -2,7 +2,7 @@
  * The controls `<epdf-form-layer>` puts over a page's fields, one per widget. Each is a
  * component whose host element is the widget's box (`widget-box.ts`), with a real HTML control
  * inside. The field's own picture (the engine's drawing of its value, borders and fonts) is
- * drawn below, by the render layer or the annotation layer; the controls add what people work
+ * drawn below, by the form layer's `<epdf-field-pictures>`; the controls add what people work
  * with on top of it:
  *
  *   text       the picture at rest; focus shows an editor in the field's own font (the plugin
@@ -20,14 +20,18 @@
  * The text-editing, toggle and list policies, the field looks, the controls' styles and the
  * colors are `@embedpdf/web`'s, the same for every framework.
  */
+import { isPlatformBrowser } from '@angular/common';
 import {
   afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
+  inject,
   input,
+  PLATFORM_ID,
   signal,
   untracked,
   viewChild,
@@ -35,6 +39,7 @@ import {
 import { CapabilityBinding, injectKernelHost } from '@embedpdf/angular/runtime';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  createFontMounts,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
   formFocusRingStyleOf,
@@ -122,12 +127,33 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
 
   protected readonly state = signal<TextFieldEditorState>({ focused: false, draft: '' });
 
+  /** The text being typed, where the engine will draw it, in its face. */
+  private readonly layout = computed(() => {
+    const form = this.form();
+    const widget = this.item().annotationRef;
+    return form && widget ? form.getTextEditorLayout(widget, this.state().draft) : null;
+  });
+
   protected readonly editorStyle = computed(() =>
-    textFieldEditorStyleOf(this.item(), this.frame(), this.colors(), this.state().focused),
+    textFieldEditorStyleOf(
+      this.item(),
+      this.frame(),
+      this.colors(),
+      this.state().focused,
+      this.layout(),
+    ),
   );
 
   constructor() {
     super();
+    if (isPlatformBrowser(inject(PLATFORM_ID))) {
+      const mounts = createFontMounts();
+      inject(DestroyRef).onDestroy(() => mounts.release());
+      effect(() => {
+        const layout = this.layout();
+        if (layout) mounts.mount([layout.program]);
+      });
+    }
     effect((onCleanup) => {
       const editor = this.editor();
       if (!editor) return;

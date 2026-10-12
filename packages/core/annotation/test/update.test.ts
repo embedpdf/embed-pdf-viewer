@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { modelWith, RecordInput, recordOf, restyle, step, STYLE, withAnnotation } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import type { Message, Model, ModelAnnotation, Point } from '../src/types';
-import { EMPTY_CHANGE, update } from '../src/update';
+import { EMPTY_CHANGE, newRecordsAtMost, update } from '../src/update';
 import { refOf, shapeOf } from '../src/record';
 
 const PAGE = toPageRef(1);
@@ -114,19 +114,52 @@ describe('update', () => {
     expect(result.session.selected).toEqual([]);
   });
 
-  it('a new record is keyed by the name it is written under', () => {
-    const result = drawSquare(modelWith([]), { x: 0, y: 0 }, { x: 10, y: 10 });
-    // `<namePrefix><seq + 1>` on its page, keyed as the engine keys an `nm` ref.
-    expect(result.change.put.map((record) => record.id)).toEqual(['nm:1:new-1']);
-    expect(result.session.seq).toBe(1);
-    // Written from the draft it was read from, under the same name.
+  it('a new record is keyed by the object number it takes, for life', () => {
+    const result = drawSquare(
+      modelWith([], { objectNumbers: [42, 43] }),
+      { x: 0, y: 0 },
+      { x: 10, y: 10 },
+    );
+    // The first number the session holds, keyed as the engine keys it.
+    expect(result.change.put.map((record) => record.id)).toEqual(['obj:42']);
+    expect(result.change.put[0]!.annotation.ref).toEqual({
+      kind: 'objectNumber',
+      page: PAGE,
+      objectNumber: 42,
+    });
+    expect(result.session.objectNumbers).toEqual([43]);
+    // Written from the draft it was read from; its /NM is the engine's to write.
     expect(result.effects).toEqual([
       {
         type: 'create',
-        id: 'nm:1:new-1',
-        draft: expect.objectContaining({ subtype: 'square', nm: 'new-1', print: true }),
+        id: 'obj:42',
+        draft: expect.objectContaining({ subtype: 'square', print: true }),
       },
     ]);
+    const [effect] = result.effects;
+    expect(effect?.type === 'create' && effect.draft).not.toHaveProperty('nm');
+  });
+
+  it('a message that may create needs the numbers it may use; a move needs none', () => {
+    const pointer = (phase: 'down' | 'move' | 'up', point: Point = { x: 0, y: 0 }): Message => ({
+      type: 'createPointer',
+      phase,
+      subtype: 'square',
+      in: { page: PAGE, point, shift: false },
+    });
+    expect(newRecordsAtMost(pointer('down'))).toBe(1);
+    expect(newRecordsAtMost(pointer('move'))).toBe(0);
+    expect(newRecordsAtMost(pointer('up'))).toBe(1);
+    const quads = [quadFromRect({ x: 0, y: 0, width: 10, height: 10 })];
+    const anchor = { glyphQuad: quads[0]!, advance: 1 as const };
+    expect(newRecordsAtMost({ type: 'createReplaceText', page: PAGE, quads, anchor })).toBe(2);
+    expect(newRecordsAtMost({ type: 'delete' })).toBe(0);
+    // Without the numbers, the core refuses to make a record it can't name.
+    const to = { x: 50, y: 50 };
+    const [dragging] = step(step(modelWith([]), pointer('down'))[0], pointer('move', to));
+    expect(() => update({ ...dragging, objectNumbers: [] }, pointer('up', to))).toThrow(
+      /no object number/,
+    );
   });
 
   it('a drawing reads as the draft it is written from', () => {
@@ -142,14 +175,13 @@ describe('update', () => {
       strokeWidth: 3,
       box,
     });
-    expect(effect.draft).toMatchObject({ print: true, nm: 'new-1' });
+    expect(effect.draft).toMatchObject({ print: true });
     expect(effect.draft).not.toHaveProperty('fontSize'); // a square has no text
     // The view shows what that draft reads back as.
     expect(result.change.put[0]!.annotation).toMatchObject({
       color: '#ff0000',
       strokeWidth: 3,
       box,
-      nm: 'new-1',
     });
   });
 
@@ -306,32 +338,33 @@ describe('which fields a write may change', () => {
 });
 
 describe('every record holds its annotation', () => {
-  const created = (namePrefix: string) =>
+  const created = (objectNumbers: readonly number[]) =>
     drawSquare(
       modelWith([square('obj:1', 400)], {
-        namePrefix,
+        objectNumbers,
         defaults: { square: { color: '#123456', strokeWidth: 3 } },
       }),
       { x: 10, y: 20 },
       { x: 40, y: 60 },
     ).change.put[0]!;
 
-  it('a new record holds the annotation its create writes, named with the session’s prefix', () => {
-    const record = created('session-a-');
-    expect(refOf(record)).toBeNull();
+  it('a new record holds the annotation its create writes, under the number it takes', () => {
+    const record = created([7]);
+    const ref = { kind: 'objectNumber', page: PAGE, objectNumber: 7 };
+    // Its ref is final from the start: writes to it name it at once.
+    expect(refOf(record)).toEqual(ref);
+    expect(record.unconfirmed).toBe(true);
     expect(record.annotation).toMatchObject({
       subtype: 'square',
-      ref: { kind: 'nm', page: PAGE, nm: 'session-a-1' },
-      nm: 'session-a-1',
-      index: 1,
+      ref,
       box: { x: 10, y: 20, width: 30, height: 40 },
       rotation: null,
       color: '#123456',
       strokeWidth: 3,
       print: true,
     });
-    // The engine is asked to write that same name.
-    expect(created('session-b-').annotation.nm).toBe('session-b-1');
+    // Another session holds other numbers, so its record is another one.
+    expect(created([8]).id).toBe('obj:8');
   });
 
   it('an edit brings the annotation up to date with the fields it changed', () => {
@@ -365,7 +398,7 @@ describe('every record holds its annotation', () => {
     expect(click.effects).toEqual([]);
   });
 
-  it('a replace-text strikeout replies to its caret by the caret’s name', () => {
+  it('a replace-text strikeout replies to its caret by the caret’s number', () => {
     const rect = { x: 20, y: 40, width: 80, height: 20 };
     const [model] = step(modelWith([]), {
       type: 'createReplaceText',
@@ -374,10 +407,14 @@ describe('every record holds its annotation', () => {
       anchor: { glyphQuad: quadFromRect(rect), advance: 1 },
     });
     const [caret, strikeout] = model.order.map((id) => model.byId[id]!);
-    expect(caret!.annotation).toMatchObject({ subtype: 'caret', intent: 'replace', nm: 'new-1' });
+    expect(caret!.annotation).toMatchObject({
+      subtype: 'caret',
+      intent: 'replace',
+      ref: { kind: 'objectNumber', objectNumber: 100 },
+    });
     expect(strikeout!.annotation).toMatchObject({
       subtype: 'strikeout',
-      nm: 'new-2',
+      ref: { kind: 'objectNumber', objectNumber: 101 },
       reply: { to: caret!.annotation.ref, type: 'group' },
     });
   });

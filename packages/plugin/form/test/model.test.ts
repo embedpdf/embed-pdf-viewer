@@ -11,17 +11,18 @@ import { reload } from '@embedpdf/core';
 import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
 
 import {
-  beginWrite,
   emptyFieldIndex,
-  endWrite,
   fieldByKey,
   fieldByRef,
   fieldForWidget,
   fieldKeyOf,
   foldFormEvent,
   indexFields,
-  initialFormState,
+  indexLoadedFields,
+  pageWidgetsOf,
+  pictureVersionOf,
   removeWidgets,
+  shownWidgetsOf,
   upsertWidgets,
   widgetAt,
   widgetRowOf,
@@ -41,6 +42,13 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   noExport: false,
   alternateName: null,
   mappingName: null,
+  groupId: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'scalar', value: over.value ?? 'abc' },
   defaultValueEntry: { kind: 'scalar', value: '' },
   widgets: [formWidget(4, toPageRef(3))],
@@ -64,7 +72,8 @@ const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
 
 const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
 const event = (value: object) => ({ origin, widgets: [], ...value }) as unknown as DocumentEvent;
-const NO_WRITES = {};
+/** A user who may fill in every field. */
+const ALWAYS = () => true;
 const LOOK: FormWidgetLook = {
   border: '#6b7280',
   borderWidth: 1,
@@ -119,6 +128,32 @@ describe('field index', () => {
     expect(widgetRowOf(index, 9)?.rect.x).toBe(60);
   });
 
+  test("a page's widgets leave out the hidden ones, and say the state each shows", () => {
+    const row = (objectNumber: number, flags: object, appearanceState: string | null = null) =>
+      ({
+        subtype: 'widget',
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber },
+        page: toPageRef(3),
+        rect: { x: 0, y: 0, width: 10, height: 10 },
+        hidden: false,
+        noView: false,
+        appearanceState,
+        ...flags,
+      }) as unknown as WidgetAnnotation;
+    const index = indexFields({
+      ...snapshot([text()]),
+      widgets: [row(4, {}, 'Off'), row(5, { hidden: true }), row(6, { noView: true }), row(7, {})],
+    });
+    expect(shownWidgetsOf(index, 3).map((widget) => widget.appearanceState)).toEqual(['Off', null]);
+    expect(
+      shownWidgetsOf(index, 3).map(
+        (widget) => (widget.ref as { objectNumber: number }).objectNumber,
+      ),
+    ).toEqual([4, 7]);
+    expect(Object.keys(pageWidgetsOf(index, 3))).toEqual(['4', '7']);
+    expect(shownWidgetsOf(index, 99)).toEqual([]);
+  });
+
   test('folds value, structural and batch events from their data', () => {
     let index: FieldIndex = indexFields(snapshot([text()]));
     index = foldFormEvent(
@@ -142,18 +177,6 @@ describe('field index', () => {
     index = foldFormEvent(
       index,
       event({
-        type: 'forms.effectsApplied',
-        results: [
-          { index: 0, status: 'applied', fields: [text({ value: 'script' })], changedWidgets: [] },
-        ],
-        meta: { changedFields: [], changedWidgets: [] },
-      }),
-    ) as FieldIndex;
-    expect((fieldByKey(index, 'obj:4') as { value: string }).value).toBe('script');
-
-    index = foldFormEvent(
-      index,
-      event({
         type: 'forms.deleted',
         deleted: { kind: 'objectNumber', objectNumber: 7 },
         meta: {
@@ -163,6 +186,74 @@ describe('field index', () => {
       }),
     ) as FieldIndex;
     expect(fieldForWidget(index, 8)).toBeNull();
+  });
+
+  test('moves a widget’s picture version when the engine draws it again, and only then', () => {
+    const page = toPageRef(3);
+    const row = (objectNumber: number) =>
+      ({
+        subtype: 'widget',
+        ref: { kind: 'objectNumber', page, objectNumber },
+        page,
+        rect: { x: 0, y: 0, width: 10, height: 10 },
+      }) as unknown as WidgetAnnotation;
+    let index: FieldIndex = indexFields({ ...snapshot([text()]), widgets: [row(4), row(7)] });
+    const valueSet = (meta: object) =>
+      foldFormEvent(index, event({ type: 'forms.valueSet', field: text(), meta })) as FieldIndex;
+    // A checkbox that only switched state: nothing drawn, nothing to fetch.
+    index = valueSet({ changedWidgets: [{ page, objectNumber: 4 }], redrawnWidgets: [] });
+    expect([pictureVersionOf(index, 4), pictureVersionOf(index, 7)]).toEqual([0, 0]);
+    // A text value: the engine drew its widget again.
+    index = valueSet({
+      changedWidgets: [{ page, objectNumber: 4 }],
+      redrawnWidgets: [{ page, objectNumber: 4 }],
+    });
+    expect([pictureVersionOf(index, 4), pictureVersionOf(index, 7)]).toEqual([1, 0]);
+    // A fact that doesn't say what it drew drew what it changed; one naming only a page, all of it.
+    index = valueSet({ changedWidgets: [{ page, objectNumber: 7 }] });
+    index = valueSet({ changedWidgets: [{ page }] });
+    expect([pictureVersionOf(index, 4), pictureVersionOf(index, 7)]).toEqual([2, 2]);
+    // A signing draws the signed widget.
+    index = foldFormEvent(
+      index,
+      event({ type: 'signatures.completed', signature: { widget: { page, objectNumber: 7 } } }),
+    ) as FieldIndex;
+    expect(pictureVersionOf(index, 7)).toBe(3);
+    // A widget that went keeps its version, and a load moves every one past the one it had.
+    index = removeWidgets(index, [formWidget(4, page)]);
+    expect(pictureVersionOf(index, 4)).toBe(2);
+    index = indexLoadedFields(index, { ...snapshot([text()]), widgets: [row(7), row(9)] });
+    expect([4, 7, 9].map((number) => pictureVersionOf(index, number))).toEqual([3, 4, 0]);
+  });
+
+  test('takes the calculation order from a write that changed it, and from a reorder', () => {
+    const total = { kind: 'objectNumber', objectNumber: 4 } as const;
+    const other = { kind: 'objectNumber', objectNumber: 7 } as const;
+    let index: FieldIndex = indexFields(snapshot([text()]));
+    // A write that left the order alone carries none, and keeps the mirror's.
+    index = foldFormEvent(index, event({ type: 'forms.updated', field: text() })) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([]);
+
+    index = foldFormEvent(
+      index,
+      event({ type: 'forms.updated', field: text(), calculationOrder: [total] }),
+    ) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([total]);
+    index = foldFormEvent(
+      index,
+      event({ type: 'forms.calculationsReordered', calculationOrder: [other, total], meta: {} }),
+    ) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([other, total]);
+    index = foldFormEvent(
+      index,
+      event({
+        type: 'forms.deleted',
+        deleted: other,
+        calculationOrder: [total],
+        meta: { changedFields: [other], changedWidgets: [] },
+      }),
+    ) as FieldIndex;
+    expect(index.snapshot?.calculationOrder).toEqual([total]);
   });
 
   test('the first field of a document without a form creates an AcroForm', () => {
@@ -182,21 +273,13 @@ describe('field index', () => {
       emptyFieldIndex(),
     );
   });
-
-  test('in-flight writes are tracked per field', () => {
-    let state = beginWrite(initialFormState(), 'obj:4');
-    expect(state.writing['obj:4']).toBe(true);
-    state = endWrite(state, 'obj:4');
-    expect(state.writing['obj:4']).toBeUndefined();
-    expect(endWrite(state, 'obj:4')).toBe(state);
-  });
 });
 
 describe('fill projection', () => {
   test('joins the field plane with widget geometry', () => {
     const index = indexFields(snapshot([text()]));
-    expect(fillItems(index, 3, undefined, NO_WRITES)).toEqual([]);
-    const items = fillItems(index, 3, BOXES, NO_WRITES);
+    expect(fillItems(index, 3, undefined, ALWAYS)).toEqual([]);
+    const items = fillItems(index, 3, BOXES, ALWAYS);
     expect(items.length).toBe(1);
     const item = items[0]!;
     expect(item.control).toBe('text');
@@ -206,16 +289,16 @@ describe('fill projection', () => {
       expect(item.value).toBe('abc');
       expect(item.maxLength).toBe(5);
     }
-    expect(fillItems(index, 99, BOXES, NO_WRITES)).toEqual([]);
+    expect(fillItems(index, 99, BOXES, ALWAYS)).toEqual([]);
   });
 
-  test('read-only and in-flight fields project as disabled', () => {
+  test('read-only fields, and fields the user may not fill in, project as disabled', () => {
     const readOnly = text({ readOnly: true });
-    expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES)[0]!.disabled).toBe(
+    expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, ALWAYS)[0]!.disabled).toBe(true);
+    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, () => false)[0]!.disabled).toBe(
       true,
     );
-    const writing = beginWrite(initialFormState(), 'obj:4').writing;
-    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, writing)[0]!.disabled).toBe(true);
+    expect(fillItems(indexFields(snapshot([text()])), 3, BOXES, ALWAYS)[0]!.disabled).toBe(false);
   });
 });
 
@@ -231,6 +314,13 @@ const signature = (
   noExport: false,
   alternateName: 'Sign here',
   mappingName: null,
+  groupId: null,
+  createdBy: null,
+  createdAt: null,
+  filledBy: null,
+  filledByName: null,
+  filledAt: null,
+  importedBy: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(9, toPageRef(3))],
@@ -239,13 +329,13 @@ const signature = (
 
 describe('signature widgets', () => {
   test('an unsigned signature field projects a "signature" fill item', () => {
-    const item = projectWidget(signature(), 9, NO_WRITES, BOXES[4]!);
+    const item = projectWidget(signature(), 9, BOXES[4]!, true);
     expect(item).toMatchObject({ control: 'signature', signed: false, label: 'Sign here' });
   });
 
   test('a /V on the field marks the item signed', () => {
     const signed = signature({ valueEntry: { kind: 'unsupported' } });
-    expect(projectWidget(signed, 9, NO_WRITES, BOXES[4]!)).toMatchObject({
+    expect(projectWidget(signed, 9, BOXES[4]!, true)).toMatchObject({
       control: 'signature',
       signed: true,
     });

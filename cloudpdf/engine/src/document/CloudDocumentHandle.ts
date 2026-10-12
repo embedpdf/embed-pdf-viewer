@@ -1,6 +1,6 @@
 import {
   AbortablePromise,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
@@ -259,6 +259,10 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
       this.writes,
     );
+    // The deployment's import limits ride /v1/access, as the render lattice does.
+    const importLimits = async () =>
+      (security.currentAccess ?? (await security.establishAccess()).access)?.bundleLimits ??
+      DEFAULT_BUNDLE_LIMITS;
     this.annotations = new CloudDocumentAnnotationsService(
       http,
       id,
@@ -267,10 +271,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
       this.publisher,
       this.writes,
-      // The deployment's import limits ride /v1/access, as the render lattice does.
-      async () =>
-        (security.currentAccess ?? (await security.establishAccess()).access)
-          ?.annotationBundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+      importLimits,
     );
     this.actions = new CloudDocumentActionsService(
       http,
@@ -305,6 +306,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
       this.publisher,
       this.writes,
+      importLimits,
     );
     this.search = new CloudDocumentSearchService(
       http,
@@ -741,7 +743,6 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.absorbMutation(event.meta, ['attachments']);
         return;
       case 'forms.valueSet':
-      case 'forms.imported':
       case 'forms.repaired':
       case 'forms.created':
       case 'forms.updated':
@@ -753,7 +754,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'forms.widgetDeleted':
       case 'forms.widgetRestored':
       case 'forms.widgetsReordered':
-      case 'forms.effectsApplied':
+      case 'forms.calculationsReordered':
         // Form writes move the form's pins: the affected pages are the
         // ones whose widgets changed.
         this.absorbMutation(event.meta, ['forms']);

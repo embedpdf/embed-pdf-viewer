@@ -57,7 +57,7 @@ const resultOf = (scope: RedactionApplyScope): RedactionApplyResult => ({
   scope,
   results: [],
   removedAnnotationCount: 0,
-  meta: { affectedPages: [], cacheDelta: null },
+  meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: false },
 });
 
 /** The annotation plugin's host lens, reduced to what redaction reads; lists stay stable until `setRaws`. */

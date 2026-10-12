@@ -4,7 +4,14 @@ import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import { FormLayer, formPlugin, useForm, useFormState } from '@embedpdf/react/form';
+import {
+  FormLayer,
+  FormTransfer,
+  formPlugin,
+  useForm,
+  useFormState,
+  type FormBundle,
+} from '@embedpdf/react/form';
 import { localEngine } from '@embedpdf/engine';
 
 import './data.css';
@@ -51,7 +58,7 @@ function useSignUpForm() {
 function DataToolbar() {
   useSignUpForm();
   const form = useForm();
-  const [xfdf, setXfdf] = useState<Uint8Array | null>(null);
+  const [bundle, setBundle] = useState<FormBundle | null>(null);
   const [result, setResult] = useState('');
 
   return (
@@ -60,9 +67,11 @@ function DataToolbar() {
         type="button"
         className="button"
         onClick={async () => {
-          const { bytes } = await form.export(); // XFDF; form.export('fdf') for FDF
-          setXfdf(bytes);
-          setResult(`Exported ${bytes.byteLength} bytes of XFDF`);
+          const exported = await form.export();
+          // One JSON text: what you'd store, and read back with FormTransfer.parse().
+          const text = FormTransfer.stringify(exported);
+          setBundle(exported);
+          setResult(`Exported ${exported.fields.length} fields, ${text.length} characters of JSON`);
         }}
       >
         Export
@@ -71,20 +80,20 @@ function DataToolbar() {
         type="button"
         className="button"
         onClick={async () => {
-          await form.reset();
-          setResult('The form is empty');
+          for (const field of form.list()) await form.delete(field.ref);
+          setResult('The form is gone');
         }}
       >
-        Clear
+        Remove
       </button>
       <button
         type="button"
         className="button"
-        disabled={!xfdf}
+        disabled={!bundle}
         onClick={async () => {
-          if (!xfdf) return;
-          const { applied } = await form.import(xfdf);
-          setResult(`Imported ${applied} values`);
+          if (!bundle) return;
+          const { fields, dropped } = await form.import(bundle);
+          setResult(`Imported ${fields.length} fields, left out ${dropped.length}`);
         }}
       >
         Import

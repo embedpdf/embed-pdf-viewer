@@ -608,7 +608,7 @@ const IDENTITY_STRING_FIELDS = [
   'groupId',
 ] as const;
 
-/** The request's `identity` object: its known string fields and `groups`, blanks dropped. */
+/** The request's `identity` object: its known string fields, blanks dropped. */
 function readIdentityFromBody(body: unknown): Identity {
   const value =
     body && typeof body === 'object' ? (body as Record<string, unknown>)['identity'] : null;
@@ -618,8 +618,6 @@ function readIdentityFromBody(body: unknown): Identity {
     const field = (value as Record<string, unknown>)[key];
     if (typeof field === 'string' && field.trim()) identity[key] = field.trim();
   }
-  const groups = readStringArray(value, 'groups');
-  if (groups.length > 0) identity.groups = groups;
   return identity;
 }
 

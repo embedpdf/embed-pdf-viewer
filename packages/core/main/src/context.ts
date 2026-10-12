@@ -1,5 +1,6 @@
 import { pageRefsEqual, type DocumentHandle, type PageRef } from '@embedpdf/engine-core/runtime';
 
+import type { ChangeQueue, DocumentChanges } from './changes';
 import { instanceClock, type HostClock } from './clock';
 import { isDev } from './env';
 import { PluginError } from './errors';
@@ -12,7 +13,7 @@ import type { Scope } from './scope';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
 import { findPage, pageOf } from './page-of';
-import { permissionDenied, sessionAllows } from './permissions';
+import { fieldPermissionDenied, permissionDenied, sessionAllows } from './permissions';
 import type { Settings, SettingsStore } from './settings';
 import type { SettleFlush } from './settle';
 import type { SliceLease, Store } from './store';
@@ -52,6 +53,8 @@ export interface SessionRef {
   readonly settleFlushes: Set<SettleFlush>;
   /** What runs around each read of the document's file, first registered outermost. */
   readonly downloadWraps: DownloadWrap[];
+  /** The document's change queue, shared by its plugins (`ctx.changes`). */
+  readonly changes: DocumentChanges;
 }
 
 /** Something of the document's own that runs around a download: it gets the read and returns its bytes. */
@@ -188,12 +191,17 @@ export function createPluginContext(
   const queues = new Map<string, SerialQueue>();
   const lanes = new Map<string, LatestLane>();
   let instanceSettings: Settings<object> | null = null;
+  let changeQueue: ChangeQueue | null = null;
 
   // Mirrors hold their values in store cells of their own, revoked with the
   // instance; their first load waits until the plugin is connected.
   const pendingStarts: (() => void)[] = [];
   const mirrorEnvironment = (): MirrorEnvironment => ({
     doc: doc(),
+    changes: session!.changes,
+    notify: () => {
+      if (lease.live) store.notify();
+    },
     lifetime,
     cell(name, initial) {
       const cell = store.lease(`${sliceKey(plugin.id, session?.id)}/${name}`, initial, instanceId);
@@ -240,6 +248,12 @@ export function createPluginContext(
     assertAllowed: (permission, operation) => {
       if (!sessionAllows(doc().security, permission)) {
         throw permissionDenied(capability, permission, operation);
+      }
+    },
+    allowsField: (action, field) => doc().security.allowsField(action, { groupId: field.groupId }),
+    assertAllowedField: (action, field, operation) => {
+      if (!doc().security.allowsField(action, { groupId: field.groupId })) {
+        throw fieldPermissionDenied(capability, action, field, operation);
       }
     },
 
@@ -353,6 +367,14 @@ export function createPluginContext(
       scope.defer(off);
     },
 
+    get changes() {
+      if (!session) {
+        throw new Error(
+          `[kernel] workspace plugin "${plugin.id}" has no document to change; ctx.changes is for document-scoped plugins.`,
+        );
+      }
+      return (changeQueue ??= session.changes.forPlugin(plugin.id));
+    },
     cleanup: (teardown) => scope.defer(teardown),
     clock: instanceClock(services.clock, lifetime),
     onSettle(flush) {

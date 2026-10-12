@@ -9,8 +9,7 @@ const BOX = { x: 100, y: 200, width: 80, height: 40 };
 /** The annotation the engine reads back after creating `draft`. */
 const created = (draft: Record<string, unknown>) =>
   annotationOfDraft(draft as unknown as AnnotationDraft, {
-    ref: { kind: 'nm', page: PAGE, nm: 'test' },
-    index: 0,
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: 1 },
     rect: BOX,
   });
 

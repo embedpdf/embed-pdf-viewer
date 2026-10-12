@@ -5,7 +5,7 @@ import { uprightRotation } from '../geometry';
 import { gesturePlacement } from '../placement';
 import { calloutShape } from '../shapes/text-box';
 import type { ClickCreate, Draft, Effect, Model, Placement, PointerInput, Rect } from '../types';
-import { draftOf, newRecord } from './changes';
+import { draftOf, newRecord, numbersLeft } from './changes';
 import { defaultsFor, toolAnnotation } from './session';
 
 /** A callout's text box on a click (no box drag): hanging down-right of the press, as a free text's does. */
@@ -124,7 +124,7 @@ export function calloutPointer(
   return [
     {
       ...model,
-      seq: model.seq + 1,
+      objectNumbers: numbersLeft(model, 1),
       byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],

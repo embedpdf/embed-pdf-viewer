@@ -7,6 +7,7 @@
  * The kernel adds *document scope*: plugins declare a scope and the kernel
  * multiplexes document-scoped plugins per document.
  */
+import type { ChangeQueue } from './changes';
 import type { PluginClock } from './clock';
 import type { EventHook } from './event-hook';
 import type { Mirror, MirrorSpec } from './mirror';
@@ -316,6 +317,22 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * `error.permission` set. Document-scoped plugins only, like `allows`.
    */
   assertAllowed(permission: Permission, operation: string): void;
+  /**
+   * Whether the session may fill in (`fill`) or sign (`sign`) this form
+   * field: a `fields:<action>` permission for its group, or `doc.forms.fill`
+   * (`doc.sign`) for every field. The same answer the engine enforces with.
+   * Document-scoped plugins only, like `allows`.
+   */
+  allowsField(action: 'fill' | 'sign', field: { readonly groupId: string | null }): boolean;
+  /**
+   * Refuse a write to a field the session may not fill in or sign: throws
+   * `permission-denied` naming what it would take (`fields:fill:group=buyer`).
+   */
+  assertAllowedField(
+    action: 'fill' | 'sign',
+    field: { readonly groupId: string | null },
+    operation: string,
+  ): void;
 
   // ── capabilities ──
   get<T>(token: CapabilityToken<T>): T;
@@ -370,6 +387,12 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
   mirror<V>(spec: MirrorSpec<V>): Mirror<V>;
   /** Like `mirror`, for data loaded page by page on demand. */
   pageMirror<V>(spec: PageMirrorSpec<V>): PageMirror<V>;
+  /**
+   * The document's change queue, shared by its plugins: a user action is one change, staged
+   * here, shown by every mirror's `view()` at once, and sent after everything staged before it.
+   * Document-scoped plugins only. The rules are in `docs/conventions/state-and-sync.md`.
+   */
+  readonly changes: ChangeQueue;
 
   // ── events ──
   /** Mint a capability event; disposed with the instance. Expose only `.on`. */

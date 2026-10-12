@@ -25,6 +25,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
+                    groupId: "groupId",
                     createdBy: "createdBy",
                     createdAt: "2024-01-15T09:30:00Z",
                     filledBy: "filledBy",
@@ -76,14 +77,19 @@ describe("FormsClient", () => {
                     modifiedBy: "modifiedBy",
                     importedBy: "importedBy",
                     actions: {},
+                    box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    rotation: 1.1,
                     color: "color",
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
                     borderStyle: "solid",
-                    fontFamily: "courier",
+                    dashArray: [1.1],
+                    fontFamily: "fontFamily",
                     fontSize: 1.1,
                     fontColor: "fontColor",
                     textAlign: "left",
+                    caption: "caption",
+                    checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
                 },
@@ -128,91 +134,12 @@ describe("FormsClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
-    test("importData (1)", async () => {
+    test("reorderCalculations (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { key: "value" };
+        const rawRequestBody = { fields: [{ kind: "objectNumber", objectNumber: 1 }], position: "start" };
         const rawResponseBody = {
-            form: {
-                formKind: "none",
-                needsAppearances: true,
-                fields: [
-                    {
-                        family: "text",
-                        ref: { kind: "objectNumber", objectNumber: 1 },
-                        name: "name",
-                        origin: "acroform",
-                        readOnly: true,
-                        required: true,
-                        noExport: true,
-                        alternateName: null,
-                        mappingName: null,
-                        valueEntry: { kind: "none" },
-                        defaultValueEntry: { kind: "none" },
-                        createdBy: null,
-                        createdAt: null,
-                        filledBy: null,
-                        filledByName: null,
-                        filledAt: null,
-                        importedBy: null,
-                        widgets: [{ ref: null, objectNumber: 1, page: null }],
-                        value: "value",
-                        defaultValue: "defaultValue",
-                        maxLength: null,
-                        multiline: true,
-                        password: true,
-                        comb: true,
-                    },
-                ],
-                widgets: [
-                    {
-                        subtype: "widget",
-                        ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        hasAppearance: true,
-                        appearanceState: null,
-                        nm: null,
-                        rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                        contents: null,
-                        subject: null,
-                        blendMode: "normal",
-                        invisible: true,
-                        hidden: true,
-                        print: true,
-                        noZoom: true,
-                        noRotate: true,
-                        noView: true,
-                        readOnly: true,
-                        locked: true,
-                        toggleNoView: true,
-                        lockedContents: true,
-                        reply: null,
-                        popup: null,
-                        groupId: null,
-                        author: null,
-                        createdAt: null,
-                        modifiedAt: null,
-                        userId: null,
-                        createdBy: null,
-                        modifiedBy: null,
-                        importedBy: null,
-                        actions: null,
-                        color: null,
-                        interiorColor: null,
-                        strokeWidth: 1.1,
-                        borderStyle: "solid",
-                        fontFamily: null,
-                        fontSize: null,
-                        fontColor: null,
-                        textAlign: "left",
-                        field: null,
-                        fieldFamily: "text",
-                    },
-                ],
-                calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
-            },
-            applied: 1,
-            skipped: 1,
+            calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
             meta: {
                 affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
@@ -234,37 +161,50 @@ describe("FormsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/data")
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.doc.forms.importData({
+        const response = await client.doc.forms.reorderCalculations({
             docId: "docId",
             layerName: "layerName",
-            body: {
-                key: "value",
-            },
+            fields: [
+                {
+                    kind: "objectNumber",
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
         });
         expect(response).toEqual(rawResponseBody);
     });
 
-    test("importData (2)", async () => {
+    test("reorderCalculations (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
+        const rawRequestBody = {
+            fields: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
         const rawResponseBody = { key: "value" };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/data")
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -272,27 +212,39 @@ describe("FormsClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.forms.importData({
+            return await client.doc.forms.reorderCalculations({
                 docId: "docId",
                 layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
+                fields: [
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
                     },
-                },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
     });
 
-    test("importData (3)", async () => {
+    test("reorderCalculations (3)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
+        const rawRequestBody = {
+            fields: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
         const rawResponseBody = { key: "value" };
 
         server
             .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/data")
+            .post("/v1/docs/docId/layers/layerName/form/calculations/reorder")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -300,14 +252,20 @@ describe("FormsClient", () => {
             .build();
 
         await expect(async () => {
-            return await client.doc.forms.importData({
+            return await client.doc.forms.reorderCalculations({
                 docId: "docId",
                 layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
+                fields: [
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
                     },
-                },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -335,6 +293,7 @@ describe("FormsClient", () => {
                     validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
+                groupId: "groupId",
                 createdBy: "createdBy",
                 createdAt: "2024-01-15T09:30:00Z",
                 filledBy: "filledBy",
@@ -385,14 +344,19 @@ describe("FormsClient", () => {
                     modifiedBy: "modifiedBy",
                     importedBy: "importedBy",
                     actions: {},
+                    box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    rotation: 1.1,
                     color: "color",
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
                     borderStyle: "solid",
-                    fontFamily: "courier",
+                    dashArray: [1.1],
+                    fontFamily: "fontFamily",
                     fontSize: 1.1,
                     fontColor: "fontColor",
                     textAlign: "left",
+                    caption: "caption",
+                    checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
                 },
@@ -420,6 +384,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -519,6 +484,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
+                    groupId: "groupId",
                     createdBy: "createdBy",
                     createdAt: "2024-01-15T09:30:00Z",
                     filledBy: "filledBy",
@@ -570,14 +536,19 @@ describe("FormsClient", () => {
                     modifiedBy: "modifiedBy",
                     importedBy: "importedBy",
                     actions: {},
+                    box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    rotation: 1.1,
                     color: "color",
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
                     borderStyle: "solid",
-                    fontFamily: "courier",
+                    dashArray: [1.1],
+                    fontFamily: "fontFamily",
                     fontSize: 1.1,
                     fontColor: "fontColor",
                     textAlign: "left",
+                    caption: "caption",
+                    checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
                 },
@@ -605,6 +576,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -695,6 +667,7 @@ describe("FormsClient", () => {
                     validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
+                groupId: "groupId",
                 createdBy: "createdBy",
                 createdAt: "2024-01-15T09:30:00Z",
                 filledBy: "filledBy",
@@ -732,6 +705,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -852,14 +826,19 @@ describe("FormsClient", () => {
                     pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
+                box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                rotation: 1.1,
                 color: "color",
                 interiorColor: "interiorColor",
                 strokeWidth: 1.1,
                 borderStyle: "solid",
-                fontFamily: "courier",
+                dashArray: [1.1],
+                fontFamily: "fontFamily",
                 fontSize: 1.1,
                 fontColor: "fontColor",
                 textAlign: "left",
+                caption: "caption",
+                checkStyle: "check",
                 field: { kind: "objectNumber", objectNumber: 1 },
                 fieldFamily: "text",
             },
@@ -887,6 +866,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 
@@ -994,6 +974,7 @@ describe("FormsClient", () => {
                 undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+                redrawnWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
         };
 

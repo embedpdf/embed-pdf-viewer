@@ -50,8 +50,11 @@ export function fieldByRef<T extends { ref: FormFieldRef }>(
   return fields.find((field) => sameRef(field.ref, ref));
 }
 
+/** The field a ref names: by its own ref, or by full name for `toFieldRef(name)`. */
 export function snapshotField(snapshot: FormSnapshot, ref: FormFieldRef): FormFieldDTO | undefined {
-  return snapshot.fields.find((field) => sameRef(field.ref, ref));
+  return snapshot.fields.find(
+    (field) => sameRef(field.ref, ref) || (ref.kind === 'fqn' && field.name === ref.name),
+  );
 }
 
 /** A written value as scripts see it: a toggle's export value (`'Off'` when clear). */

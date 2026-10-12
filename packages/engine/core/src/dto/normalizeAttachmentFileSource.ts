@@ -28,7 +28,7 @@ export async function normalizeAttachmentFileSource(
   const mimeType = file.mimeType ?? resolved.mimeType;
   return {
     wireFile: {
-      resource: key,
+      resources: { file: key },
       name,
       ...(mimeType !== undefined ? { mimeType } : {}),
       ...(file.description !== undefined ? { description: file.description } : {}),

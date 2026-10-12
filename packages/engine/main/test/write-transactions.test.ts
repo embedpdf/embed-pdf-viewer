@@ -21,6 +21,8 @@ import {
   measureFromKnownLength,
   type AnnotationRef,
   type AttachmentRef,
+  type FormBundle,
+  type FormFieldDTO,
   type FormFieldRef,
   type PageRef,
 } from '@embedpdf/engine-core';
@@ -71,6 +73,11 @@ function comparable(bytes: Uint8Array): string {
 }
 
 const fqn = (name: string): FormFieldRef => ({ kind: 'fqn', name });
+/** `bundle` with `change` made to each of its fields. */
+const withFields = (bundle: FormBundle, change: Partial<FormFieldDTO>): FormBundle => ({
+  ...bundle,
+  fields: bundle.fields.map(({ data }) => ({ data: { ...data, ...change } as FormFieldDTO })),
+});
 const rect = (x: number) => ({ x, y: 40, width: 40, height: 30 });
 
 describe.each(['wasm', 'native'] as const)(
@@ -102,6 +109,7 @@ describe.each(['wasm', 'native'] as const)(
       let widget: AnnotationRef | null = null;
       let attachment: AttachmentRef | null = null;
       let blank: PageRef | null = null;
+      let probe: FormBundle | null = null;
       const circle = async (x: number) =>
         (await page.annotations.create({ subtype: 'circle', box: rect(x) })).annotation.ref;
 
@@ -157,22 +165,31 @@ describe.each(['wasm', 'native'] as const)(
           write: () => doc.forms.setValue(fqn('probe'), { value: `value ${++n}` }),
         },
         {
-          what: 'forms.applyEffects',
+          what: 'apply',
           write: () =>
-            doc.forms.applyEffects([
-              { kind: 'setValue', ref: fqn('probe'), value: { value: `effect ${++n}` } },
-            ]),
+            doc.apply({
+              ops: [
+                { type: 'forms.setValue', field: fqn('probe'), value: { value: `apply ${++n}` } },
+                { type: 'forms.setDisplay', field: fqn('probe'), display: 'noPrint' },
+              ],
+            }),
         },
         { what: 'forms.reset', write: () => doc.forms.reset(fqn('probe')) },
         {
           what: 'forms.import',
-          write: () =>
-            doc.forms.import(
-              new TextEncoder().encode(
-                `<?xml version="1.0"?><xfdf xmlns="http://ns.adobe.com/xfdf/"><fields><field name="probe"><value>imported ${++n}</value></field></fields></xfdf>`,
-              ),
-              'xfdf',
-            ),
+          setup: async () => {
+            probe = await doc.forms.export({ fields: [fqn('probe')] });
+          },
+          write: () => doc.forms.import(withFields(probe!, { name: `copy${++n}` })),
+        },
+        {
+          what: 'forms.importValues',
+          write: () => {
+            const value = `imported ${++n}`;
+            return doc.forms.importValues(
+              withFields(probe!, { value, valueEntry: { kind: 'scalar', value } }),
+            );
+          },
         },
         {
           what: 'forms.update',

@@ -1,13 +1,15 @@
-import type { WireAnnotationResources, WireResourceMap } from '@embedpdf/engine-core/runtime';
+import type {
+  WireAnnotationResources,
+  WireResource,
+  WireResourceMap,
+} from '@embedpdf/engine-core/runtime';
 
 /**
- * Multipart envelope for mutations that carry binaries: part `body` holds
- * the exact JSON the plain request would have been, plus one
- * `resource:{key}` file part per binary payload. Mirrors the appearance
- * response protocol (`manifest` part + named image parts) in reverse.
- * Shared by the annotation mutations (see {@link buildAnnotationMutationForm})
- * and the document-level `attachments.create` — one envelope, one parser on
- * the server side.
+ * The multipart envelope of a write that carries files, in the shape every
+ * multipart message has: the `body` part holds the JSON the plain request
+ * would have been, which names each file by role
+ * (`resources: { <role>: <key> }`), and each file is the part
+ * `resource:<key>`.
  */
 export function buildMutationForm(body: unknown, resources: WireResourceMap): FormData {
   const form = new FormData();
@@ -23,16 +25,35 @@ export function buildMutationForm(body: unknown, resources: WireResourceMap): Fo
 }
 
 /**
- * The same envelope for an annotation write: its resources travel as the
- * parts `resource:appearance` and `resource:file`.
+ * The envelope of a write with at most one file per role (an annotation's
+ * drawing or attached file, a page insert's source PDF, a signature's
+ * mark): each file's key is its role's name, and the body names it so,
+ * `resources: { <role>: '<role>' }`.
  */
-export function buildAnnotationMutationForm(
-  body: unknown,
-  resources: WireAnnotationResources,
+export function buildRoleMutationForm(
+  body: object,
+  files: Readonly<Record<string, WireResource | undefined>>,
 ): FormData {
   const parts: WireResourceMap = {};
-  for (const [role, bytes] of Object.entries(resources)) {
-    if (bytes !== undefined) parts[role] = { bytes };
+  const resources: Record<string, string> = {};
+  for (const [role, file] of Object.entries(files)) {
+    if (!file) continue;
+    parts[role] = file;
+    resources[role] = role;
   }
-  return buildMutationForm(body, parts);
+  return buildMutationForm(
+    Object.keys(resources).length > 0 ? { ...body, resources } : body,
+    parts,
+  );
+}
+
+/** An annotation write's envelope: its drawing and attached file, by role. */
+export function buildAnnotationMutationForm(
+  body: object,
+  resources: WireAnnotationResources,
+): FormData {
+  return buildRoleMutationForm(body, {
+    appearance: resources.appearance && { bytes: resources.appearance },
+    file: resources.file && { bytes: resources.file },
+  });
 }

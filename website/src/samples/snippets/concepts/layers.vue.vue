@@ -9,7 +9,7 @@ import { Stage } from '@embedpdf/vue/stage';
 <template>
   <Stage>
     <template #page>
-      <RenderLayer :annotations="false" />
+      <RenderLayer />
       <SearchLayer />
       <SelectionLayer />
       <AnnotationLayer />

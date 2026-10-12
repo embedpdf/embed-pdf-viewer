@@ -1,55 +1,71 @@
 import type {
-  FormDataFormat,
+  FieldPosition,
+  FieldScriptWrite,
+  FormFieldDisplay,
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
-  FormFieldOptionInput,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
-  FormImportResult,
   FormRepairResult,
   FormResetResult,
   FormSetValueResult,
   FormWidget,
+  ListPosition,
   MutationMeta,
   PdfCoordinates,
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, formWidget } from '@embedpdf/engine-core/runtime';
-import type { AnnotationActor, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import {
+  defaultEntryOfDraft,
+  EngineError,
+  EngineErrorCode,
+  fieldAfterReset,
+  fieldAfterValue,
+  fitWidgetToFamily,
+  formFieldAfter,
+  formWidget,
+  isAtDefault,
+  placedWidgetOf,
+  reorderedList,
+  valueEntriesEqual,
+  type FormValueEntry,
+  type ToggleFieldWidget,
+} from '@embedpdf/engine-core/runtime';
+import type { AnnotationActor, AnnotationRef, PlacedWidget } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
-import { withScratch, withScratchN } from '../../runtime/memory/scratch';
+import { withI32Array, withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
-import {
-  assertFieldNotLocked,
-  lockedFieldObjectNumbers,
-  readFieldLocks,
-} from './internal/signatureLocks';
-import { formMutationMeta } from './internal/formMutationMeta';
+import { assertFieldNotLocked, readFieldLocks } from './internal/signatureLocks';
+import { formMutationMeta, redrawnByValue } from './internal/formMutationMeta';
 import { bakeWidgetAppearance } from '../signature/internal/appearance';
 import {
   readSignaturesFromModel,
   withSignatureModel,
 } from '../signature/internal/readSignatureModel';
-import { clearFieldFill, stampFieldCreation, stampFieldFill } from './internal/fieldAttribution';
 import {
-  applyNativeWrite,
-  isAtDefault,
-  isNoOpWrite,
-  nativeWriteOf,
-  valueEntriesEqual,
-  type NativeFieldWrite,
-} from './internal/fieldValues';
+  readCalculationOrder,
+  sameOrder,
+  writeCalculationOrder,
+  type OrderChange,
+} from './internal/calculationOrder';
+import {
+  clearFieldFill,
+  stampFieldCreation,
+  stampFieldFill,
+  writeFieldGroup,
+} from './internal/fieldAttribution';
+import { writeFieldScripts } from './internal/fieldScripts';
+import { writeFieldEntry, writeSelectedIndices } from './internal/fieldValues';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt } from './internal/readFormSnapshot';
-import { readForm } from './internal/widgetRows';
 import {
   fieldObjectNumberOf,
   resolveFieldRef,
@@ -57,10 +73,11 @@ import {
 } from './internal/resolveFieldRef';
 import { AnnotationMutator } from '../annotations/AnnotationMutator';
 import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
-import { readUtf16String } from '../../runtime/memory/strings';
+import { readUtf16String, withUtf16String } from '../../runtime/memory/strings';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 const FAMILY_CODE = {
+  pushbutton: 1,
   checkbox: 2,
   radio: 3,
   text: 4,
@@ -70,6 +87,8 @@ const FAMILY_CODE = {
 } as const;
 
 /** Widgets a single value write can touch; far above any real form. */
+/** `EPDF_FORM_DISPLAY_*`: Acrobat's `Field.display` values. */
+const DISPLAY_CODE = { visible: 0, hidden: 1, noPrint: 2, noView: 3 } as const;
 const CHANGED_WIDGETS_CAPACITY = 256;
 
 // Mirrors EPDF_FORM_REPAIR_* in public/epdf_form.h.
@@ -103,9 +122,10 @@ export class FormMutator {
   ) {}
 
   /**
-   * Set a field's value, as `actor` filled it in. A write that changes the
-   * value names who filled the field in; one that leaves it as it was only
-   * repaints.
+   * Set a field's value, as `actor` filled it in: what engine-core's rules
+   * (`fieldAfterValue`) leave the field holding. A write that changes the
+   * field names who filled it in; one that leaves it as it was writes
+   * nothing.
    */
   setValue(
     ref: FormFieldRef,
@@ -120,11 +140,83 @@ export class FormMutator {
 
     const docPtr = this.session.requireDocPtr();
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    const write = nativeWriteOf(before, value);
-    const fills = !isNoOpWrite(before, write);
-    const changed = this.applyWrite(resolved.fieldObjectNumber, write);
-    if (fills) stampFieldFill(this.runtime, docPtr, resolved.fieldObjectNumber, actor);
-    return this.readBack(resolved.fieldObjectNumber, changed);
+    const after = fieldAfterValue({ field: before, widgets: [] }, value).field;
+    const changed = this.writeFieldAfter(resolved.fieldObjectNumber, before, after);
+    if (changed) stampFieldFill(this.runtime, docPtr, resolved.fieldObjectNumber, actor);
+    return this.readBack(resolved.fieldObjectNumber, changed ?? []);
+  }
+
+  /**
+   * Show, hide or keep from printing every widget of a field, as a script's
+   * `Field.display` does: only the four flags it names change.
+   */
+  setDisplay(
+    ref: FormFieldRef,
+    display: FormFieldDisplay,
+    signal: AbortSignal,
+  ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
+    throwIfAborted(signal);
+    const resolved = resolveFieldRef(
+      this.runtime,
+      acquireFormModel(this.runtime, this.session),
+      ref,
+    );
+    this.assertWritable(resolved);
+    const docPtr = this.session.requireDocPtr();
+    const changed = this.withChangedWidgets((buf, cap, countPtr) =>
+      this.runtime.fn.EPDFForm_SetFieldDisplay(
+        docPtr,
+        resolved.fieldObjectNumber,
+        DISPLAY_CODE[display],
+        buf,
+        cap,
+        countPtr,
+      ),
+    );
+    if (changed === null) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the field could not be shown or hidden');
+    }
+    // Flags draw nothing: no picture changes.
+    return this.readBack(resolved.fieldObjectNumber, changed, false);
+  }
+
+  /**
+   * Draw a text field's or dropdown's widgets with `text` (a format script's
+   * result) without changing its value.
+   */
+  setAppearanceText(
+    ref: FormFieldRef,
+    text: string,
+    signal: AbortSignal,
+  ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
+    throwIfAborted(signal);
+    const model = acquireFormModel(this.runtime, this.session);
+    const resolved = resolveFieldRef(this.runtime, model, ref);
+    this.assertWritable(resolved);
+    const docPtr = this.session.requireDocPtr();
+    const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    if (field.family !== 'text' && field.family !== 'combobox') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `appearance text does not apply to a ${field.family} field`,
+      );
+    }
+    const changed = withUtf16String(this.runtime.mem, text, (textPtr) =>
+      this.withChangedWidgets((buf, cap, countPtr) =>
+        this.runtime.fn.EPDFForm_SetFieldAppearanceText(
+          docPtr,
+          resolved.fieldObjectNumber,
+          textPtr,
+          buf,
+          cap,
+          countPtr,
+        ),
+      ),
+    );
+    if (changed === null) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the appearance text could not be drawn');
+    }
+    return this.readBack(resolved.fieldObjectNumber, changed, true);
   }
 
   /**
@@ -147,41 +239,39 @@ export class FormMutator {
     signal: AbortSignal,
   ): FieldWriteResult<FormResetResult<PdfCoordinates>> {
     throwIfAborted(signal);
-    const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
     const targets =
       refs === undefined ? this.wholeFormTargets(model) : this.namedTargets(model, refs);
     throwIfAborted(signal);
 
-    // A field already at its default is left alone: a reset would only repaint it.
+    // Each field as engine-core's rules (`fieldAfterReset`) put it back; one
+    // already at its default is left alone.
     const written = targets
       .filter((field) => !isAtDefault(field))
-      .map((before) => {
-        const changed = this.withChangedWidgets((buf, cap, countPtr) =>
-          fn.EPDFForm_ResetField(docPtr, fieldObjectNumberOf(before), buf, cap, countPtr),
-        );
-        if (changed === null) {
-          throw new EngineError(EngineErrorCode.Unknown, `'${before.name}' could not be reset`);
-        }
+      .flatMap((before) => {
+        const after = fieldAfterReset({ field: before, widgets: [] }).field;
+        const changed = this.writeFieldAfter(fieldObjectNumberOf(before), before, after);
+        if (!changed) return [];
         // Back at its default, the value was filled in by nobody.
         clearFieldFill(this.runtime, docPtr, fieldObjectNumberOf(before));
-        return { before, changed };
+        return [{ before, changed }];
       });
     if (written.length > 0) this.session.invalidateDerived();
 
     const fields: FormFieldDTO<PdfCoordinates>[] = [];
     const changedWidgets: FormWidget[] = [];
+    const redrawnWidgets: FormWidget[] = [];
     for (const { before, changed } of written) {
       const after = this.readBackField(fieldObjectNumberOf(before));
       if (changed.length === 0 && valueEntriesEqual(before.valueEntry, after.valueEntry)) continue;
       fields.push(after);
       const changedSet = new Set(changed);
-      for (const widget of after.widgets) {
-        if (changedSet.has(widget.objectNumber)) {
-          changedWidgets.push(formWidget(widget.objectNumber, widget.page));
-        }
-      }
+      const fieldWidgets = after.widgets
+        .filter((widget) => changedSet.has(widget.objectNumber))
+        .map((widget) => formWidget(widget.objectNumber, widget.page));
+      changedWidgets.push(...fieldWidgets);
+      redrawnWidgets.push(...redrawnByValue(after.family, fieldWidgets));
     }
     return {
       fields,
@@ -189,6 +279,7 @@ export class FormMutator {
         this.session.writeStamp(),
         fields.map((field) => field.ref),
         changedWidgets,
+        redrawnWidgets,
       ),
     };
   }
@@ -222,53 +313,6 @@ export class FormMutator {
       targets.push(field);
     }
     return targets;
-  }
-
-  importData(
-    data: ArrayBuffer,
-    format: FormDataFormat | undefined,
-    signal: AbortSignal,
-  ): FormImportResult<PdfCoordinates> {
-    throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
-    const bytes = new Uint8Array(data);
-    if (bytes.byteLength === 0) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'empty form data payload');
-    }
-    const resolvedFormat = format ?? sniffFormat(bytes);
-    const call = resolvedFormat === 'fdf' ? fn.EPDFForm_ImportFDF : fn.EPDFForm_ImportXFDF;
-    const docPtr = this.session.requireDocPtr();
-
-    // A field a signature locked is never written: the import skips it.
-    const locked = lockedFieldObjectNumbers(this.runtime, this.session);
-    const scratch = [bytes.byteLength, 16, Math.max(locked.length, 1) * 4];
-    const counts = withScratchN(mem, scratch, ([dataPtr, resultPtr, skipPtr]) => {
-      mem.writeBytes(dataPtr, bytes);
-      locked.forEach((objectNumber, at) => mem.poke(skipPtr, 'i32', objectNumber, at * 4));
-      const ok = call(docPtr, dataPtr, bytes.byteLength, skipPtr, locked.length, resultPtr);
-      if (!ok) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `payload is not valid ${resolvedFormat.toUpperCase()}`,
-        );
-      }
-      // The report also counts all fields (offset 0) and changed widgets (12).
-      return {
-        applied: Number(mem.peek(resultPtr, 'i32', 4)),
-        skipped: Number(mem.peek(resultPtr, 'i32', 8)),
-      };
-    });
-
-    this.session.invalidateDerived();
-    const form = readForm(this.runtime, this.session, signal);
-    // The import names no widgets, so every page with a widget may have repainted.
-    const widgets = counts.applied > 0 ? form.fields.flatMap((field) => field.widgets) : [];
-    const { affectedPages, cacheDelta, opId, undoable } = formMutationMeta(
-      this.session.writeStamp(),
-      [],
-      widgets,
-    );
-    return { form, ...counts, meta: { affectedPages, cacheDelta, opId, undoable } };
   }
 
   repair(bakeAppearances: boolean, signal: AbortSignal): FormRepairResult {
@@ -313,17 +357,18 @@ export class FormMutator {
       /** Its widgets', in `draft.widgets` order; the next free ones when absent. */
       readonly widgetObjectNumbers?: readonly number[];
     } = {},
-  ): { field: FormFieldDTO<PdfCoordinates> } {
+  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
-    const placements = draft.widgets ?? [];
+    const placements = (draft.widgets ?? []).map((placement) =>
+      placedWidgetOf(fitWidgetToFamily(draft.family, placement)),
+    );
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     const onStates = placements.map((placement) => onStateOf(draft.family, placement));
-    if (draft.family === 'listbox' && draft.defaultValue !== undefined) {
-      assertListDefault(draft.defaultValue, draft.options ?? [], draft.multiSelect ?? false);
-    }
+    // The default is checked against the draft before anything is written.
+    defaultEntryOfDraft(draft);
     if ('maxLength' in draft && draft.maxLength !== undefined) {
       if (!Number.isInteger(draft.maxLength) || draft.maxLength <= 0) {
         throw new EngineError(
@@ -350,6 +395,9 @@ export class FormMutator {
     const fieldObjectNumber = this.createFieldNode(draft, objectNumber);
     this.configureNewField(draft, fieldObjectNumber);
     stampFieldCreation(this.runtime, docPtr, fieldObjectNumber, actor);
+    if (draft.groupId !== undefined) {
+      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, draft.groupId);
+    }
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
         this.runtime,
@@ -365,8 +413,12 @@ export class FormMutator {
         throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
       }
     });
+    const calculationOrder = this.followCalculateScript(
+      fieldObjectNumber,
+      draft.actions?.calculate,
+    );
     this.session.invalidateDerived();
-    return { field: this.readBackField(fieldObjectNumber) };
+    return { field: this.readBackField(fieldObjectNumber), calculationOrder };
   }
 
   /** EPDFForm_DeleteField: unlink the field and detach its kid widgets. */
@@ -386,7 +438,7 @@ export class FormMutator {
   }
 
   /** Check a widget placement before anything is written; returns its page index. */
-  private preflightPlacement(placement: WidgetPlacement<PdfCoordinates>): number {
+  private preflightPlacement(placement: PlacedWidget): number {
     const record = this.session.resolvePageRef(placement.page);
     const { left, bottom, right, top } = placement.rect;
     if (![left, bottom, right, top].every(Number.isFinite)) {
@@ -441,10 +493,7 @@ export class FormMutator {
     if ('options' in draft && draft.options) {
       this.applyOptions(fieldObjectNumber, draft.options);
     }
-    if ('defaultValue' in draft && draft.defaultValue !== undefined) {
-      const values = Array.isArray(draft.defaultValue) ? draft.defaultValue : [draft.defaultValue];
-      if (values.length > 0) this.applyDefaultValues(fieldObjectNumber, values);
-    }
+    this.writeDefault(fieldObjectNumber, { kind: 'none' }, defaultEntryOfDraft(draft));
     if ('maxLength' in draft && draft.maxLength !== undefined) {
       if (!fn.EPDFForm_SetFieldMaxLen(docPtr, fieldObjectNumber, draft.maxLength)) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'maxLength rejected');
@@ -465,6 +514,9 @@ export class FormMutator {
         draft.mappingName,
         'mapping name rejected',
       );
+    }
+    if (draft.actions) {
+      writeFieldScripts(this.runtime, docPtr, fieldObjectNumber, undefined, draft.actions);
     }
   }
 
@@ -522,7 +574,7 @@ export class FormMutator {
     ref: FormFieldRef,
     patch: FormFieldPatch,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates> } {
+  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -536,12 +588,9 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     assertPatchFitsFamily(patch, before.family);
-    const listDefault = 'defaultValue' in patch ? patch.defaultValue : undefined;
-    if (before.family === 'listbox' && Array.isArray(listDefault)) {
-      const multiSelect =
-        ('multiSelect' in patch ? patch.multiSelect : undefined) ?? before.multiSelect;
-      const options = ('options' in patch ? patch.options : undefined) ?? before.options;
-      assertListDefault(listDefault, options, multiSelect);
+    // Checked against the field as the patch leaves it, before anything is written.
+    if ('defaultValue' in patch && patch.defaultValue !== undefined) {
+      formFieldAfter({ field: before, widgets: [] }, patch);
     }
     const fieldObjectNumber = resolved.fieldObjectNumber;
 
@@ -569,21 +618,6 @@ export class FormMutator {
         );
       }
     }
-    if ('defaultValue' in patch && patch.defaultValue !== undefined) {
-      const values =
-        patch.defaultValue === null
-          ? []
-          : Array.isArray(patch.defaultValue)
-            ? patch.defaultValue
-            : [patch.defaultValue];
-      if (values.length === 0) {
-        if (!fn.EPDFForm_RemoveFieldDefaultValue(docPtr, fieldObjectNumber)) {
-          throw new EngineError(EngineErrorCode.InvalidArg, 'default value removal rejected');
-        }
-      } else {
-        this.applyDefaultValues(fieldObjectNumber, values);
-      }
-    }
     if (patch.alternateName !== undefined) {
       this.applyWideSetter(
         fn.EPDFForm_SetFieldAlternateName,
@@ -600,12 +634,83 @@ export class FormMutator {
         'mapping name rejected',
       );
     }
-    if ('options' in patch && patch.options) {
-      this.applyOptions(fieldObjectNumber, patch.options);
+    if (patch.groupId !== undefined && patch.groupId !== before.groupId) {
+      writeFieldGroup(this.runtime, docPtr, fieldObjectNumber, patch.groupId);
     }
+    // New options and a new default, and the selection that goes with them,
+    // as engine-core's rules (`formFieldAfter`) work them out.
+    const newOptions = 'options' in patch && patch.options !== undefined;
+    const newDefault = 'defaultValue' in patch && patch.defaultValue !== undefined;
+    if (newOptions || newDefault) {
+      const after = formFieldAfter({ field: before, widgets: [] }, patch).field;
+      if ('options' in patch && patch.options) this.applyOptions(fieldObjectNumber, patch.options);
+      this.writeDefault(fieldObjectNumber, before.defaultValueEntry, after.defaultValueEntry);
+      if (newOptions) this.writeFieldAfter(fieldObjectNumber, before, after, true);
+    }
+    if (patch.actions) {
+      writeFieldScripts(this.runtime, docPtr, fieldObjectNumber, before.actions, patch.actions);
+    }
+    const calculationOrder = this.followCalculateScript(
+      fieldObjectNumber,
+      patch.actions?.calculate,
+    );
 
     this.session.invalidateDerived();
-    return { field: this.readBackField(fieldObjectNumber) };
+    return { field: this.readBackField(fieldObjectNumber), calculationOrder };
+  }
+
+  /**
+   * Move fields in the calculation order: they go together, in the order
+   * given, to `position`. Every field named must be in the order.
+   */
+  reorderCalculations(
+    fields: readonly FormFieldRef[],
+    position: FieldPosition,
+    signal: AbortSignal,
+  ): OrderChange & { moved: number[] } {
+    throwIfAborted(signal);
+    const model = acquireFormModel(this.runtime, this.session);
+    const numberOf = (ref: FormFieldRef) =>
+      resolveFieldRef(this.runtime, model, ref).fieldObjectNumber;
+    const before = readCalculationOrder(this.runtime, model);
+    const moved = fields.map(numberOf);
+    const at: ListPosition<number> =
+      position === 'start' || position === 'end'
+        ? position
+        : 'before' in position
+          ? { before: numberOf(position.before) }
+          : { after: numberOf(position.after) };
+    const after = reorderedList(before, moved, at, String);
+    throwIfAborted(signal);
+    if (!sameOrder(before, after)) {
+      writeCalculationOrder(this.runtime, this.session.requireDocPtr(), after);
+      this.session.invalidateDerived();
+    }
+    return { before, after, moved };
+  }
+
+  /**
+   * Keep the calculation order in step with a field's calculate script, as
+   * a write left it: a script puts the field at the end when it isn't in the
+   * order, removing the script takes the field out. Returns the order before
+   * and after, when it changed.
+   */
+  private followCalculateScript(
+    fieldObjectNumber: number,
+    calculate: FieldScriptWrite | null | undefined,
+  ): OrderChange | null {
+    if (calculate === undefined) return null;
+    const before = readCalculationOrder(this.runtime, acquireFormModel(this.runtime, this.session));
+    const listed = before.includes(fieldObjectNumber);
+    const after =
+      calculate === null
+        ? before.filter((objectNumber) => objectNumber !== fieldObjectNumber)
+        : listed
+          ? before
+          : [...before, fieldObjectNumber];
+    if (sameOrder(before, after)) return null;
+    writeCalculationOrder(this.runtime, this.session.requireDocPtr(), after);
+    return { before, after };
   }
 
   /**
@@ -619,7 +724,11 @@ export class FormMutator {
   deleteField(
     ref: FormFieldRef,
     signal: AbortSignal,
-  ): { deleted: FormFieldRef; removedWidgets: FormWidget[] } {
+  ): {
+    deleted: FormFieldRef;
+    removedWidgets: FormWidget[];
+    calculationOrder: OrderChange | null;
+  } {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
@@ -636,6 +745,9 @@ export class FormMutator {
     // refusal leaves the document untouched; nothing after it may throw for
     // caller input or cancellation.
     throwIfAborted(signal);
+    // A deleted field's calculate script runs no more: it leaves the order
+    // first, while the order can still name it.
+    const calculationOrder = this.followCalculateScript(resolved.fieldObjectNumber, null);
     if (!this.nativeDeleteField(resolved.fieldObjectNumber)) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'field cannot be deleted');
     }
@@ -650,7 +762,7 @@ export class FormMutator {
     // The cascade edited /Annots after the bump above; bump again so the
     // form model rebuilds.
     this.session.invalidateDerived();
-    return { deleted: before.ref, removedWidgets };
+    return { deleted: before.ref, removedWidgets, calculationOrder };
   }
 
   /**
@@ -676,8 +788,9 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    const pageIndex = this.preflightPlacement(placement);
-    const onState = onStateOf(before.family, placement);
+    const fitted = placedWidgetOf(fitWidgetToFamily(before.family, placement));
+    const pageIndex = this.preflightPlacement(fitted);
+    const onState = onStateOf(before.family, fitted);
     // A merged field/widget splits: its widget half becomes a new widget, at
     // a new number in the same place in that page's /Annots.
     const mergedPage =
@@ -694,7 +807,7 @@ export class FormMutator {
       this.runtime,
       docPtr,
       pageIndex,
-      placement,
+      fitted,
       numbers.objectNumber,
     );
     if (
@@ -791,13 +904,15 @@ export class FormMutator {
     }
   }
 
-  private applyDefaultValues(fieldObjectNumber: number, values: readonly string[]): void {
-    const { fn } = this.runtime;
+  /** Write a field's default (`/DV`) when it changes. */
+  private writeDefault(
+    fieldObjectNumber: number,
+    before: FormValueEntry,
+    after: FormValueEntry,
+  ): void {
+    if (valueEntriesEqual(before, after)) return;
     const docPtr = this.session.requireDocPtr();
-    const ok = withWideStringArray(this.runtime, values, (valuesPtr, count) =>
-      fn.EPDFForm_SetFieldDefaultValues(docPtr, fieldObjectNumber, valuesPtr, count),
-    );
-    if (!ok) {
+    if (!writeFieldEntry(this.runtime, docPtr, fieldObjectNumber, after, 'default')) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'default value rejected');
     }
   }
@@ -834,17 +949,64 @@ export class FormMutator {
   }
 
   /** Run the native value write. Returns the changed widget objnums. */
-  private applyWrite(fieldObjectNumber: number, write: NativeFieldWrite): number[] {
+  /**
+   * Write what `after` holds that `before` doesn't, as engine-core worked it
+   * out: `/V`; a checkbox's or radio group's widgets on or off; a choice
+   * field's selected options (`/I`); and a text or choice field's new
+   * pictures (also with `redraw`, for new options). Returns the widgets whose
+   * pictures changed, or `null` when the field already held it all and
+   * nothing was written.
+   */
+  private writeFieldAfter(
+    fieldObjectNumber: number,
+    before: FormFieldDTO<PdfCoordinates>,
+    after: FormFieldDTO<PdfCoordinates>,
+    redraw = false,
+  ): number[] | null {
+    const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const changed = this.withChangedWidgets((buf, cap, countPtr) =>
-      applyNativeWrite(this.runtime, docPtr, fieldObjectNumber, write, { buf, cap, countPtr }),
-    );
-    if (changed === null) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        'form value rejected (a radio group that must keep a choice, or a length limit)',
-      );
+    const toggles = after.family === 'checkbox' || after.family === 'radio' ? after.widgets : null;
+    const valueChanges = !valueEntriesEqual(before.valueEntry, after.valueEntry);
+    const statesChange =
+      toggles?.some(
+        (widget, at) => widget.checked !== (before.widgets[at] as ToggleFieldWidget)?.checked,
+      ) ?? false;
+    if (!valueChanges && !statesChange && !redraw) return null;
+
+    const refused = () =>
+      new EngineError(EngineErrorCode.InvalidArg, `'${after.name}' could not take the value`);
+    if (
+      valueChanges &&
+      !writeFieldEntry(this.runtime, docPtr, fieldObjectNumber, after.valueEntry, 'value')
+    ) {
+      throw refused();
     }
+    if (after.family === 'combobox' || after.family === 'listbox') {
+      const selected = after.options.flatMap((option, at) => (option.selected ? [at] : []));
+      if (!writeSelectedIndices(this.runtime, docPtr, fieldObjectNumber, selected)) {
+        throw refused();
+      }
+    }
+    if (toggles?.length === 0) return [];
+    const changed = this.withChangedWidgets((buf, cap, countPtr) =>
+      toggles
+        ? withI32Array(
+            mem,
+            toggles.map((widget) => (widget.checked ? 1 : 0)),
+            (checkedPtr, count) =>
+              fn.EPDFForm_SetFieldWidgetsChecked(
+                docPtr,
+                fieldObjectNumber,
+                checkedPtr,
+                count,
+                buf,
+                cap,
+                countPtr,
+              ),
+          )
+        : fn.EPDFForm_RedrawFieldWidgets(docPtr, fieldObjectNumber, buf, cap, countPtr),
+    );
+    if (changed === null) throw refused();
     return changed;
   }
 
@@ -873,6 +1035,8 @@ export class FormMutator {
   private readBack(
     fieldObjectNumber: number,
     changedObjNums: number[],
+    /** Whether the write drew the widgets again; a value write: by the field's family. */
+    redraws?: boolean,
   ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     this.session.invalidateDerived();
     const fresh = acquireFormModel(this.runtime, this.session);
@@ -892,7 +1056,16 @@ export class FormMutator {
       .map((w) => formWidget(w.objectNumber, w.page));
     return {
       field,
-      meta: formMutationMeta(this.session.writeStamp(), [field.ref], changedWidgets),
+      meta: formMutationMeta(
+        this.session.writeStamp(),
+        [field.ref],
+        changedWidgets,
+        redraws === undefined
+          ? redrawnByValue(field.family, changedWidgets)
+          : redraws
+            ? changedWidgets
+            : [],
+      ),
     };
   }
 }
@@ -906,6 +1079,8 @@ const PATCH_BASE_MEMBERS = [
   'noExport',
   'alternateName',
   'mappingName',
+  'groupId',
+  'actions',
 ];
 
 /** The members each family's patch adds; a family not listed takes the base only. */
@@ -958,7 +1133,7 @@ function assertPatchFitsFamily(patch: FormFieldPatch, family: FormFieldFamily): 
  * radio button needs one other than `'Off'`; a checkbox's is `'Yes'` when
  * left out; other families take none.
  */
-function onStateOf(family: FormFieldFamily, placement: WidgetPlacement<PdfCoordinates>): string {
+function onStateOf(family: FormFieldFamily, placement: PlacedWidget): string {
   const { exportValue } = placement;
   if (family !== 'checkbox' && family !== 'radio') {
     if (exportValue !== undefined) {
@@ -984,33 +1159,6 @@ function onStateOf(family: FormFieldFamily, placement: WidgetPlacement<PdfCoordi
 }
 
 /** A list's default: option values, each once, and one unless it's multi-select. */
-function assertListDefault(
-  values: readonly string[],
-  options: readonly FormFieldOptionInput[],
-  multiSelect: boolean,
-): void {
-  const invalid = (message: string) =>
-    new EngineError(EngineErrorCode.InvalidArg, message, { details: { field: 'defaultValue' } });
-  if (new Set(values).size !== values.length) throw invalid('the default values must not repeat');
-  if (!multiSelect && values.length > 1)
-    throw invalid('a list without multiSelect has one default');
-  const optionValues = new Set(options.map((option) => option.value));
-  const unknown = values.find((value) => !optionValues.has(value));
-  if (unknown !== undefined) throw invalid(`'${unknown}' is not an option value of the list`);
-}
-
-/** `%FDF-…` payloads are FDF; anything starting with markup is XFDF. */
-function sniffFormat(bytes: Uint8Array): FormDataFormat {
-  for (let i = 0; i < Math.min(bytes.length, 64); i++) {
-    const c = bytes[i];
-    // Skip UTF-8 BOM and whitespace.
-    if (c === 0xef || c === 0xbb || c === 0xbf) continue;
-    if (c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d) continue;
-    return c === 0x3c /* '<' */ ? 'xfdf' : 'fdf';
-  }
-  return 'fdf';
-}
-
 /** Widgets are addressed by object number: a name or index address cannot join a field. */
 function widgetObjectNumber(widget: AnnotationRef): number {
   if (widget.kind !== 'objectNumber') {

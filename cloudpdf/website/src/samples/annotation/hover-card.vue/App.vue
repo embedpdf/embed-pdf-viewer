@@ -30,7 +30,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
       <p class="hint">Point at a note or the green rectangle</p>
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
         </template>
         <template #overlay><HoverCard /></template>

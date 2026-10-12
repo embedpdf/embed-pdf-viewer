@@ -6,8 +6,8 @@ import {
   toPageRef,
   wirePack,
   type AnnotationAppearanceImageOptions,
-  type AnnotationAppearanceManifest,
-  type AnnotationAppearanceManifestEntry,
+  type AnnotationAppearanceBatch,
+  type AnnotationAppearanceBatchEntry,
   type AnnotationFamily,
   type PageNetworkRenderFormat,
   type WorkerJobId,
@@ -138,11 +138,11 @@ export async function renderAppearanceBatch(input: {
   // The legacy branch (CLOUDPDF_ENCODE_IN_ENGINE=0) keeps API-side sharp
   // on the raw raster payload for one release.
   const collect = async (): Promise<{
-    page: AnnotationAppearanceManifest['page'];
-    entries: AnnotationAppearanceManifestEntry[];
+    page: AnnotationAppearanceBatch['page'];
+    entries: AnnotationAppearanceBatchEntry[];
     parts: MultipartPart[];
   }> => {
-    const entries: AnnotationAppearanceManifestEntry[] = [];
+    const entries: AnnotationAppearanceBatchEntry[] = [];
     const parts: MultipartPart[] = [];
     const ext = format === 'webp' ? 'webp' : 'png';
     let i = 0;
@@ -177,12 +177,12 @@ export async function renderAppearanceBatch(input: {
         );
       }
       // Every annotation with an appearance stream is emitted, once per mode
-      // and state: the client addresses the image by `part` name and
-      // identifies it by `ref`, `mode` and `state`.
+      // and state: the client finds the image by its key and identifies it
+      // by `ref`, `mode` and `state`.
       for (const appearance of payload.result.appearances) {
-        const partName = `appearance-${i++}`;
+        const key = `appearance-${i++}`;
         entries.push({
-          part: partName,
+          resources: { image: key },
           ref: appearance.ref,
           mode: appearance.mode,
           state: appearance.state,
@@ -193,8 +193,8 @@ export async function renderAppearanceBatch(input: {
           contentType: appearance.image.contentType,
         });
         parts.push({
-          name: partName,
-          filename: `${partName}.${ext}`,
+          key,
+          filename: `${key}.${ext}`,
           contentType: appearance.image.contentType,
           body: Buffer.from(appearance.image.bytes),
         });
@@ -232,17 +232,17 @@ export async function renderAppearanceBatch(input: {
     const result = payload.result;
 
     // Encode each appearance to the requested format. Every annotation with an
-    // appearance stream is emitted: the client addresses the image by `part`
-    // name and identifies the annotation by `ref`.
+    // appearance stream is emitted: the client finds the image by its key
+    // and identifies the annotation by `ref`.
     for (const appearance of result.appearances) {
       const encoded = input.imageEncoder.encode(appearance.raster, {
         format,
         ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
       });
       const body = await encoded.stream.toBuffer();
-      const partName = `appearance-${i++}`;
+      const key = `appearance-${i++}`;
       entries.push({
-        part: partName,
+        resources: { image: key },
         ref: appearance.ref,
         mode: appearance.mode,
         state: appearance.state,
@@ -253,8 +253,8 @@ export async function renderAppearanceBatch(input: {
         contentType: encoded.contentType,
       });
       parts.push({
-        name: partName,
-        filename: `${partName}.${ext}`,
+        key,
+        filename: `${key}.${ext}`,
         contentType: encoded.contentType,
         body,
       });
@@ -263,7 +263,7 @@ export async function renderAppearanceBatch(input: {
   };
   const collected = await collect();
 
-  const manifest: AnnotationAppearanceManifest = {
+  const manifest: AnnotationAppearanceBatch = {
     page: collected.page,
     appearances: collected.entries,
   };

@@ -11,6 +11,9 @@ import {
   type DbSeededFixture,
 } from './_helpers/db-seeded-app';
 
+/** The picture with annotations and without form fields: `render/annotations/`. */
+const WITH_ANNOTATIONS = { includeAnnotations: true, includeFormFields: false } as const;
+
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
   here,
@@ -74,14 +77,14 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
 
       // Annotated renders share too — this base carries real annotations
       // and a pristine layer's annotation view is the base's (the axiom the
-      // first cut got wrong). Own path family: /render/annotated/.
+      // first cut got wrong). Own path family: /render/annotations/.
       const [aa, ba] = await Promise.all([
-        alice.doc.page(toPageRef(pageObjectNumber)).render.image({ includeAnnotations: true }),
-        bob.doc.page(toPageRef(pageObjectNumber)).render.image({ includeAnnotations: true }),
+        alice.doc.page(toPageRef(pageObjectNumber)).render.image(WITH_ANNOTATIONS),
+        bob.doc.page(toPageRef(pageObjectNumber)).render.image(WITH_ANNOTATIONS),
       ]);
       expect(urlOf(aa)).toBe(urlOf(ba));
       expect(urlOf(aa)).toContain(
-        `/v1/docs/${DOC_ID}/render/annotated/pages/${pageKey(pageObjectNumber)}/data@`,
+        `/v1/docs/${DOC_ID}/render/annotations/pages/${pageKey(pageObjectNumber)}/data@`,
       );
       expect(urlOf(aa)).not.toContain('/layers/');
       expect((await aa.objectUrl()).url).toBeTruthy();
@@ -117,8 +120,8 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
 
       // Pre-write: everything doc-level, including an annotated handle we
       // deliberately keep to prove the blob rail self-heals after the flip.
-      const preAnnotated = await page.render.image({ includeAnnotations: true });
-      expect(urlOf(preAnnotated)).toContain('/render/annotated/');
+      const preAnnotated = await page.render.image(WITH_ANNOTATIONS);
+      expect(urlOf(preAnnotated)).toContain('/render/annotations/');
 
       const created = await page.annotations.create({
         subtype: 'highlight',
@@ -148,7 +151,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
 
       // …while annotation-plane reads flipped to carol's own layer view,
       // which contains the base annotations plus her new one.
-      const annotated = await page.render.image({ includeAnnotations: true });
+      const annotated = await page.render.image(WITH_ANNOTATIONS);
       expect(urlOf(annotated)).toContain('/layers/carol/');
       const list = await page.annotations.list();
       expect(list.annotations.some((x) => x.contents === 'view-sharing: carol diverges')).toBe(
@@ -163,8 +166,8 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
       // Dave's pristine layer is untouched: still fully shared.
       const daveAnnotated = await dave.doc
         .page(toPageRef(pageObjectNumber))
-        .render.image({ includeAnnotations: true });
-      expect(urlOf(daveAnnotated)).toContain('/render/annotated/');
+        .render.image(WITH_ANNOTATIONS);
+      expect(urlOf(daveAnnotated)).toContain('/render/annotations/');
       expect(urlOf(daveAnnotated)).not.toContain('/layers/');
     } finally {
       await carol.doc.close();

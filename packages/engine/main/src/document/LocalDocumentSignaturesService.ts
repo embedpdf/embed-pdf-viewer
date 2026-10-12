@@ -121,15 +121,24 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     input: SignaturePrepareInput,
     options?: WriteOptions,
   ): AbortablePromise<SignaturePrepared> {
+    // The job checks that the handle may sign this field (its group).
     const rejected =
-      this.gate('doc.sign') ?? (input.certify ? this.gate('doc.sign.certify') : null);
+      this.gate('sign-some-field') ?? (input.certify ? this.gate('doc.sign.certify') : null);
     if (rejected) return rejected;
     const write = this.opIdFor(options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
+    const authority = this.guard.changeAuthority();
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'signatures.prepare', effect: 'snapshot', jobId, docId, input }),
+        wirePack({
+          kind: 'signatures.prepare',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          input,
+          authority,
+        }),
     });
     return this.await(submission, 'signatures.prepare', (payload) => {
       this.publisher.publishWrite(write.opId, {
@@ -145,14 +154,23 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     input: SignatureCompleteInput,
     options?: WriteOptions,
   ): AbortablePromise<SignatureCompleteResult> {
-    const rejected = this.gate('doc.sign');
+    const rejected = this.gate('sign-some-field');
     if (rejected) return rejected;
     const write = this.opIdFor(options);
     if (write.rejected) return write.rejected;
     const docId = this.docId;
+    const authority = this.guard.changeAuthority();
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'signatures.complete', effect: 'contentWrite', jobId, opId: write.opId, docId, input }),
+        wirePack({
+          kind: 'signatures.complete',
+          effect: 'contentWrite',
+          jobId,
+          opId: write.opId,
+          docId,
+          input,
+          authority,
+        }),
     });
     return this.await(submission, 'signatures.complete', (payload) => {
       const result = payload.result;
@@ -171,7 +189,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
   }
 
   cancel(signingId: string, options?: WriteOptions): AbortablePromise<SignatureCancelResult> {
-    const rejected = this.gate('doc.sign');
+    const rejected = this.gate('sign-some-field');
     if (rejected) return rejected;
     const write = this.opIdFor(options);
     if (write.rejected) return write.rejected;
@@ -199,8 +217,13 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     }
   }
 
+  /**
+   * The checks before a call: the document is open and the handle may `cap`.
+   * `sign-some-field`: the handle may sign some signature field (`doc.sign`,
+   * or a `fields:sign` scope); the job checks the field it signs.
+   */
   private gate(
-    cap: 'doc.forms.read' | 'doc.download' | 'doc.sign' | 'doc.sign.certify',
+    cap: 'doc.forms.read' | 'doc.download' | 'doc.sign.certify' | 'sign-some-field',
   ): AbortablePromise<never> | null {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -208,7 +231,8 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       );
     }
     try {
-      this.guard.assertCapability(cap);
+      if (cap === 'sign-some-field') this.guard.assertSomeFieldWrite('sign');
+      else this.guard.assertCapability(cap);
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }

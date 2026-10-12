@@ -78,9 +78,12 @@ export function matchShortcut(
   if (stroke.metaKey !== wantMeta) return false;
   if (stroke.altKey !== parsed.alt) return false;
   // Shift changes what `key` is for printable characters ('=' vs '+'), so only
-  // enforce declared shift; an undeclared shift is rejected for non-printables.
+  // enforce declared shift; an undeclared shift is rejected for non-printables,
+  // and for letters, where it only changes the case: 'Mod+Z' isn't
+  // 'Shift+Mod+Z'.
   if (parsed.shift && !stroke.shiftKey) return false;
-  if (!parsed.shift && stroke.shiftKey && parsed.key.length > 1) return false;
+  const hasCase = parsed.key !== parsed.key.toUpperCase();
+  if (!parsed.shift && stroke.shiftKey && (parsed.key.length > 1 || hasCase)) return false;
 
   const key = stroke.key.toLowerCase();
   if (key === parsed.key) return true;

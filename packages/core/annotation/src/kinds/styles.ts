@@ -100,7 +100,9 @@ export function widgetStyle(annotation: Annotation): Style {
     opacity: 1,
     blendMode: widget.blendMode,
     ...PLAIN_BORDER,
-    borderStyle: widget.borderStyle,
+    // Only a widget draws an underline border; a box drawn for it (a tool's
+    // ghost) shows it solid.
+    borderStyle: widget.borderStyle === 'underline' ? 'solid' : widget.borderStyle,
   };
 }
 

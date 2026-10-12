@@ -5,7 +5,7 @@
  *     GET  /v1/docs/:docId/layers/:layerName/signatures[@docVersion]
  *     GET  /v1/docs/:docId/layers/:layerName/signatures/analysis[@token]
  *   Mutations (current only; never cached):
- *     POST   …/signatures/prepare                 multipart envelope (JSON body + resource:appearance)
+ *     POST   …/signatures/prepare                 multipart (`body`, naming its artwork's `resource:<key>` part)
  *     POST   …/signatures/:signingId/complete     JSON { cms: base64, expectedVersion }
  *     DELETE …/signatures/:signingId
  *   Version-scoped reads (content-addressed by base sha; immutable; the
@@ -57,10 +57,11 @@ import {
   setNoStore,
   type SchemaLike,
 } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
   requireDocAccessOnly,
   requireLayerCapability,
+  requireLayerFieldWrite,
   requireLayerDocAccessOnly,
   requireLayerResource,
   requireResource,
@@ -204,29 +205,24 @@ export async function registerSignatureRoutes(
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+    // Whether this field is the token's to sign (its group) is checked in the worker.
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
     // Appearance artwork is a page of a PDF: the stamp rule (sniffed, never declared).
-    const { body, resources } = await readMutationEnvelope(req, () => 'image-or-pdf');
+    const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
     const parsed = parseOrInvalidArg(
       SignaturePrepareBodySchema as unknown as SchemaLike<
         ReturnType<typeof SignaturePrepareBodySchema.parse>
       >,
-      body,
+      envelope.body,
       'request body',
     );
     if (parsed.certify) {
       requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
     }
-    const { appearance, ...rest } = parsed;
+    const { resources: named, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
-    if (appearance) {
-      const resource = resources?.[appearance.resource];
-      if (!resource) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `body references resource '${appearance.resource}' but no such multipart part arrived`,
-        );
-      }
+    const resource = resourcesByRole(envelope, named).appearance;
+    if (resource) {
       if (resource.mimeType !== 'application/pdf') {
         throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
       }
@@ -235,7 +231,7 @@ export async function registerSignatureRoutes(
     setNoStore(reply);
     const prepared = await layerService.prepareSignature(
       ctx,
-      { docId, layerName, input },
+      { docId, layerName, input, authority: ctx.authority },
       abortSignalOf(reply),
     );
     return encodePrepared(prepared);
@@ -251,7 +247,9 @@ export async function registerSignatureRoutes(
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+      // Its field was checked when the signing was prepared; the signing id
+      // goes only to whoever prepared it.
+      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
       const body = parseOrInvalidArg(
         SignatureCompleteBodySchema as unknown as SchemaLike<
           ReturnType<typeof SignatureCompleteBodySchema.parse>
@@ -282,7 +280,7 @@ export async function registerSignatureRoutes(
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
     setNoStore(reply);
     return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });

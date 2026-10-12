@@ -240,23 +240,7 @@ describe('actions dispatcher', () => {
           });
         }
       }
-      return {
-        results: effects.map((_, index) => ({
-          index,
-          status: 'applied' as const,
-          fields: [],
-          changedWidgets: [],
-        })),
-        widgets: [],
-        meta: {
-          affectedPages: [],
-          cacheDelta: null,
-          opId: 'test',
-          undoable: false,
-          changedFields: [],
-          changedWidgets: [],
-        },
-      };
+      return { status: 'applied' };
     });
     const flagged: Array<{ annotObjectNumber: number; hidden: boolean | undefined }> = [];
     capability.registerAnnotCommitSink(async (entries) => {

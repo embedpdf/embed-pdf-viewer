@@ -177,11 +177,11 @@ free text, send `contents` or `richText`, not both with different text.
 ### Move or resize by `rect`
 
 An update takes a new `rect` for every annotation, as a script's `annot.rect` does in Acrobat. A
-note, a file, a link, a popup, a form field's widget and a redaction take it as it is.
+note, a file, a link, a popup and a redaction take it as it is.
 
-Every other annotation is drawn from its shape: rectangles, ellipses, text boxes, stamps and
-carets from their `box`, lines, polylines, polygons and ink from their points, and text markup
-from its quads. For these, a new `rect` puts the shape there: each point is mapped from the old
+Every other annotation is drawn from its shape: rectangles, ellipses, text boxes, stamps, carets
+and form fields' widgets from their `box`, lines, polylines, polygons and ink from their points,
+and text markup from its quads. For these, a new `rect` puts the shape there: each point is mapped from the old
 `rect` onto the new one, each axis on its own. A `rect` of the same size moves the drawing, and a
 bigger one stretches it:
 
@@ -201,7 +201,8 @@ sent back, changes nothing, so a read passed straight back works.
 - A new `rect` with a new shape (`box`, points or quads) fails with `InvalidArg`: send one or the
   other.
 - A turned drawing can only move. A `rect` of another size fails with `InvalidArg`; resize its
-  `box` or its points instead.
+  `box` or its points instead. A box at a quarter turn is the exception: it stands upright on the
+  page, so a `rect` resizes it along its own sides.
 - A `rect` that would squash a drawing to no width or no height fails with `InvalidArg`.
 
 `shapeForRect(annotation, rect)` gives the fields that put an annotation at a `rect`, by the same
@@ -214,7 +215,8 @@ await page.annotations.create({ ...copy, ...shapeForRect(copy, target) });
 ```
 
 A create works out a drawn annotation's `rect` from its shape, whatever `rect` you send, so a
-copy of another app's drawing keeps its shape exactly.
+copy of another app's drawing keeps its shape exactly. A box turned a quarter can be created by
+its `rect` instead of its `box`; see [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
 
 ## Delete and reorder
 

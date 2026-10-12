@@ -14,7 +14,7 @@ import { EngineError } from '../../../src/errors/EngineError';
 import { EngineErrorCode } from '../../../src/errors/EngineErrorCode';
 import type { AnnotationRef } from '../../../src/identity/AnnotationRef';
 
-const BOB: Identity = { userId: 'bob', displayName: 'Bob', groupId: '5', groups: ['5'] };
+const BOB: Identity = { userId: 'bob', displayName: 'Bob', groupId: '5' };
 const bob = (scope: string[]): AnnotationAuthority => ({
   identity: BOB,
   grants: { scope, pdfBits: decodePdfBits(null) },

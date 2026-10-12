@@ -14,7 +14,7 @@
 </script>
 
 <Stage>
-  <RenderLayer annotations={false} />
+  <RenderLayer />
   <AnnotationLayer />
 
   {#snippet overlay()}

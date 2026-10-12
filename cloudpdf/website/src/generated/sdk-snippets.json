@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.14",
-  "openapiSha256": "7e2860dab3b58b9bdfd918f4dd48187b845c694def3d953bf76967086a5c1613",
+  "openapiSha256": "cf2d7b8dbac8782ef138fca206ab2263b6d7dbf065c4dceb1b209573a6cde556",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -579,77 +579,40 @@
         "frameLines": 7
       }
     },
-    "doc.forms.exportData": {
+    "doc.forms.reorderCalculations": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.exportData({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.reorderCalculations({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  fields: [{\n      kind: \"objectNumber\",\n      objectNumber: 1\n    }],\n  position: \"start\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.forms.export_data(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n)",
-        "frameLines": 7
+        "source": "from cloudpdf import CloudPDFClient\nfrom cloudpdf import CloudPDFClient, FormFieldRef_ObjectNumber\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.forms.reorder_calculations(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    fields=[\n        FormFieldRef_ObjectNumber(\n            object_number=1,\n        )\n    ],\n    position=\"start\",\n)",
+        "frameLines": 8
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->forms->exportData(\n    'docId',\n    'layerName',\n    new ExportDataFormsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->forms->reorderCalculations(\n    'docId',\n    'layerName',\n    new DocFormsReorderCalculationsRequest([\n        'fields' => [\n            FormFieldRef::objectNumber(new FormFieldRefObjectNumber([\n                'objectNumber' => 1,\n            ])),\n        ],\n        'position' => FieldPositionZero::Start->value,\n    ]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Forms.ExportDataAsync(\n    new ExportDataFormsRequest { DocId = \"docId\", LayerName = \"layerName\" }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Forms.ReorderCalculationsAsync(\n    new DocFormsReorderCalculationsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Fields = new List<FormFieldRef>()\n        {\n            new FormFieldRef(\n                new FormFieldRef.ObjectNumber(new FormFieldRefObjectNumber { ObjectNumber = 1 })\n            ),\n        },\n        Position = FieldPositionZero.Start,\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.ExportDataFormsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n}\nclient.Doc.Forms.ExportData(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 12
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.DocFormsReorderCalculationsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Fields: []*cloudpdf.FormFieldRef{\n        &cloudpdf.FormFieldRef{\n            ObjectNumber: &cloudpdf.FormFieldRefObjectNumber{\n                ObjectNumber: 1,\n            },\n        },\n    },\n    Position: &cloudpdf.FieldPosition{\n        FieldPositionZero: cloudpdf.FieldPositionZeroStart,\n    },\n}\nclient.Doc.Forms.ReorderCalculations(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().forms().exportData(\n    \"docId\",\n    \"layerName\",\n    ExportDataFormsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().forms().reorderCalculations(\n    \"docId\",\n    \"layerName\",\n    DocFormsReorderCalculationsRequest\n        .builder()\n        .position(\n            FieldPosition.of(FieldPositionZero.START)\n        )\n        .fields(\n            Arrays.asList(\n                FormFieldRef.objectNumber(\n                    FormFieldRefObjectNumber\n                        .builder()\n                        .objectNumber(1)\n                        .build()\n                )\n            )\n        )\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.forms.export_data(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
-        "frameLines": 7
-      }
-    },
-    "doc.forms.importData": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.importData({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.forms.import_data(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    request={\n        \"key\": \"value\"\n    },\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->forms->importData(\n    'docId',\n    'layerName',\n    new ImportDataFormsRequest([\n        'body' => [\n            'key' => \"value\",\n        ],\n    ]),\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Forms.ImportDataAsync(\n    new ImportDataFormsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Body = new Dictionary<string, object?>() { { \"key\", \"value\" } },\n    }\n);",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.ImportDataFormsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Body: map[string]any{\n        \"key\": \"value\",\n    },\n}\nclient.Doc.Forms.ImportData(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 12
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().forms().importData(\n    \"docId\",\n    \"layerName\",\n    ImportDataFormsRequest\n        .builder()\n        .body(\n            new HashMap<String, Object>() {{\n                put(\"key\", \"value\");\n            }}\n        )\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.forms.import_data(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  request: {\n    key: \"value\"\n  }\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.forms.reorder_calculations(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  fields: [],\n  position: \"start\"\n)",
         "frameLines": 7
       }
     },

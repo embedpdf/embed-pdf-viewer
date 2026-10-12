@@ -1131,7 +1131,7 @@
         "x-fern-sdk-method-name": "changes",
         "x-docs-title": "Apply changes",
         "summary": "Apply user actions to a layer, each a change whose ops apply in order, all or none, or the undo of an earlier change.",
-        "description": "Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart `resource:<key>` parts beside a JSON `body` part that names them by key. At most 64 changes per request and 512 ops per change.",
+        "description": "Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.",
         "security": [
           {
             "apiToken": []
@@ -1416,107 +1416,13 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/form/data": {
-      "get": {
-        "operationId": "doc.forms.exportData",
-        "x-fern-sdk-group-name": ["doc", "forms"],
-        "x-fern-sdk-method-name": "exportData",
-        "x-docs-title": "Export form data",
-        "summary": "Export form data as FDF or XFDF.",
-        "security": [
-          {
-            "apiToken": []
-          },
-          {
-            "docToken": []
-          }
-        ],
-        "x-required-scope": [],
-        "x-required-capability": ["doc.forms.read"],
-        "parameters": [
-          {
-            "name": "docId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9_-]+$"
-            }
-          },
-          {
-            "name": "layerName",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          {
-            "name": "format",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["fdf", "xfdf"]
-            }
-          },
-          {
-            "name": "X-Document-Password",
-            "in": "header",
-            "required": false,
-            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/vnd.adobe.xfdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "application/vnd.fdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocFormsExportDataResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
-                }
-              }
-            }
-          }
-        }
-      },
+    "/v1/docs/{docId}/layers/{layerName}/form/calculations/reorder": {
       "post": {
-        "operationId": "doc.forms.importData",
+        "operationId": "doc.forms.reorderCalculations",
         "x-fern-sdk-group-name": ["doc", "forms"],
-        "x-fern-sdk-method-name": "importData",
-        "x-docs-title": "Import form data",
-        "summary": "Import form data (FDF/XFDF), filling matching fields.",
+        "x-fern-sdk-method-name": "reorderCalculations",
+        "x-docs-title": "Reorder form calculations",
+        "summary": "Change the form's calculation order, the order its fields' calculate scripts run in: the fields go together, in the order given, next to a neighbour field or to the start (`'start'`) or end (`'end'`). Every field named must have a calculate script, which puts it in the order. Returns the whole new order.",
         "security": [
           {
             "apiToken": []
@@ -1526,7 +1432,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": ["doc.forms.fill"],
+        "x-required-capability": ["doc.forms.modify"],
         "parameters": [
           {
             "name": "docId",
@@ -1570,7 +1476,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DocFormsImportDataRequest"
+                "$ref": "#/components/schemas/DocFormsReorderCalculationsRequest"
               }
             }
           }
@@ -1581,7 +1487,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsImportData200Response"
+                  "$ref": "#/components/schemas/DocFormsReorderCalculations200Response"
                 }
               }
             }
@@ -1591,7 +1497,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsImportData400Response"
+                  "$ref": "#/components/schemas/DocFormsReorderCalculations400Response"
                 }
               }
             }
@@ -1601,7 +1507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsImportData404Response"
+                  "$ref": "#/components/schemas/DocFormsReorderCalculations404Response"
                 }
               }
             }
@@ -2994,7 +2900,7 @@
         "x-fern-sdk-method-name": "insert",
         "x-docs-title": "Insert pages from a PDF",
         "summary": "Copy every page of an uploaded PDF into the document at an index.",
-        "description": "Multipart mutation envelope: a `body` field holding `{\"position\"?: PagePosition}` (omitted → the end) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.",
+        "description": "Multipart: a JSON `body` part `{\"position\"?: PagePosition, \"resources\": {\"source\": \"<key>\"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.",
         "security": [
           {
             "apiToken": []
@@ -4267,7 +4173,7 @@
         "x-fern-sdk-method-name": "prepare",
         "x-docs-title": "Prepare a signature",
         "summary": "Author and seal a signing candidate; returns the digest to sign and the version fences.",
-        "description": "The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).",
+        "description": "Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).",
         "security": [
           {
             "apiToken": []
@@ -8156,6 +8062,314 @@
           }
         },
         "required": ["nameTreeScripts", "openAction"],
+        "additionalProperties": false
+      },
+      "FieldScriptWrite": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["javascript"]
+          },
+          "script": {
+            "type": "string"
+          },
+          "next": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": ["type", "script"],
+        "additionalProperties": false
+      },
+      "FieldActionsPatch": {
+        "type": "object",
+        "properties": {
+          "keystroke": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "validate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "calculate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldScriptWrite"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PdfActionWrite": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["javascript"]
+              },
+              "script": {
+                "type": "string"
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["type", "script"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["goto"]
+              },
+              "destination": {
+                "$ref": "#/components/schemas/PageDestination"
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["type", "destination"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["uri"]
+              },
+              "uri": {
+                "type": "string",
+                "minLength": 1
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["type", "uri"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["named"]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["type", "name"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["hide"]
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfActionTargetRef"
+                },
+                "minItems": 1
+              },
+              "hide": {
+                "type": "boolean"
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["type", "targets", "hide"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["reset-form"]
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfActionTargetRef"
+                },
+                "nullable": true
+              },
+              "exclude": {
+                "type": "boolean"
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["type", "fields", "exclude"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["submit-form"]
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfActionTargetRef"
+                },
+                "nullable": true
+              },
+              "flags": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["type", "url", "fields"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "WidgetActionsPatch": {
+        "type": "object",
+        "properties": {
+          "activate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "cursorEnter": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "cursorExit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "mouseDown": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "mouseUp": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "focus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "blur": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "pageOpen": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "pageClose": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "pageVisible": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          },
+          "pageInvisible": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionWrite"
+              }
+            ],
+            "nullable": true
+          }
+        },
         "additionalProperties": false
       },
       "Annotation": {
@@ -12717,7 +12931,27 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "width": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "height": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": ["x", "y", "width", "height"],
+                "additionalProperties": false
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -12867,7 +13101,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -12962,7 +13198,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13057,7 +13295,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13157,7 +13397,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13255,25 +13497,7 @@
                 "nullable": true
               },
               "box": {
-                "type": "object",
-                "properties": {
-                  "x": {
-                    "type": "number"
-                  },
-                  "y": {
-                    "type": "number"
-                  },
-                  "width": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "height": {
-                    "type": "number",
-                    "minimum": 0
-                  }
-                },
-                "required": ["x", "y", "width", "height"],
-                "additionalProperties": false
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -13286,7 +13510,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -13304,7 +13528,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13400,7 +13626,7 @@
                 "nullable": true
               },
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -13415,7 +13641,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -13433,7 +13659,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13716,7 +13944,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -13891,7 +14121,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14078,7 +14310,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -14173,7 +14405,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14301,7 +14535,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14369,7 +14605,7 @@
               "importedBy": {},
               "actions": {},
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -14644,7 +14880,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -14662,7 +14898,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14736,7 +14974,7 @@
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
               },
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -14748,7 +14986,7 @@
                 "nullable": true
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -14767,7 +15005,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -14877,7 +15115,9 @@
                 "type": "string",
                 "nullable": true
               },
-              "rect": {},
+              "rect": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
               "contents": {
                 "type": "string",
                 "nullable": true
@@ -14945,7 +15185,7 @@
               "importedBy": {},
               "actions": {},
               "box": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
                 "type": "number",
@@ -14966,7 +15206,7 @@
                 "maximum": 1
               }
             },
-            "required": ["subtype", "box"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -14985,7 +15225,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -15103,7 +15343,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -15170,7 +15410,38 @@
               "createdBy": {},
               "modifiedBy": {},
               "importedBy": {},
-              "actions": {},
+              "actions": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/WidgetActionsPatch"
+                  }
+                ],
+                "nullable": true
+              },
+              "box": {
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
+              },
+              "rotation": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "enum": [0]
+                  },
+                  {
+                    "type": "number",
+                    "enum": [90]
+                  },
+                  {
+                    "type": "number",
+                    "enum": [180]
+                  },
+                  {
+                    "type": "number",
+                    "enum": [270]
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -15193,25 +15464,21 @@
               },
               "borderStyle": {
                 "type": "string",
-                "enum": ["solid", "dashed", "beveled", "inset"]
+                "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+              },
+              "dashArray": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "nullable": true
               },
               "fontFamily": {
-                "type": "string",
-                "enum": [
-                  "courier",
-                  "courier-bold",
-                  "courier-bold-oblique",
-                  "courier-oblique",
-                  "helvetica",
-                  "helvetica-bold",
-                  "helvetica-bold-oblique",
-                  "helvetica-oblique",
-                  "times-roman",
-                  "times-bold",
-                  "times-bold-italic",
-                  "times-italic",
-                  "symbol",
-                  "zapf-dingbats"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/fontFamily"
+                  }
                 ],
                 "nullable": true
               },
@@ -15232,10 +15499,19 @@
                 "type": "string",
                 "enum": ["left", "center", "right"]
               },
+              "caption": {
+                "type": "string",
+                "nullable": true
+              },
+              "checkStyle": {
+                "type": "string",
+                "enum": ["check", "cross", "star", "circle", "square", "diamond"],
+                "nullable": true
+              },
               "field": {},
               "fieldFamily": {}
             },
-            "required": ["subtype", "rect"],
+            "required": ["subtype"],
             "additionalProperties": false
           },
           {
@@ -15254,7 +15530,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -15382,7 +15658,7 @@
                 "nullable": true
               },
               "rect": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/box"
+                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "contents": {
                 "type": "string",
@@ -18557,6 +18833,10 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "groupId": {
+                "type": "string",
+                "nullable": true
+              },
               "createdBy": {
                 "type": "string",
                 "nullable": true
@@ -18629,6 +18909,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -18681,6 +18962,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -18761,6 +19045,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -18809,6 +19094,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -18859,6 +19147,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -18908,6 +19197,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -18974,6 +19266,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19025,6 +19318,9 @@
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
+              },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
               },
@@ -19070,6 +19366,10 @@
                 "items": {
                   "$ref": "#/components/schemas/FormField/anyOf/3/properties/options/items"
                 }
+              },
+              "topIndex": {
+                "type": "integer",
+                "minimum": 0
               }
             },
             "required": [
@@ -19083,6 +19383,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19094,7 +19395,8 @@
               "selectedValues",
               "defaultValue",
               "multiSelect",
-              "options"
+              "options",
+              "topIndex"
             ],
             "additionalProperties": false
           },
@@ -19133,6 +19435,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19171,6 +19476,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19217,6 +19523,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19255,6 +19564,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19301,6 +19611,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormField/anyOf/0/properties/groupId"
               },
               "createdBy": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/createdBy"
@@ -19342,6 +19655,7 @@
               "mappingName",
               "valueEntry",
               "defaultValueEntry",
+              "groupId",
               "createdBy",
               "createdAt",
               "filledBy",
@@ -19426,6 +19740,14 @@
               "mappingName": {
                 "type": "string"
               },
+              "groupId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "type": "array",
                 "items": {
@@ -19478,6 +19800,12 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
@@ -19509,6 +19837,12 @@
               },
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
               },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
@@ -19547,6 +19881,12 @@
               },
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
               },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
@@ -19602,6 +19942,12 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
@@ -19649,6 +19995,50 @@
               "mappingName": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
               },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
+              "widgets": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
+              },
+              "family": {
+                "type": "string",
+                "enum": ["pushbutton"]
+              }
+            },
+            "required": ["name", "family"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/name"
+              },
+              "readOnly": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/readOnly"
+              },
+              "required": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/required"
+              },
+              "noExport": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/noExport"
+              },
+              "alternateName": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/alternateName"
+              },
+              "mappingName": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "groupId": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/groupId"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
@@ -19686,9 +20076,17 @@
             "type": "string",
             "nullable": true
           },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "actions": {
+            "$ref": "#/components/schemas/FieldActionsPatch"
+          },
           "family": {
             "type": "string",
-            "enum": ["text", "checkbox", "radio", "combobox", "listbox", "signature"]
+            "enum": ["text", "checkbox", "radio", "combobox", "listbox", "pushbutton", "signature"]
           },
           "defaultValue": {
             "anyOf": [
@@ -19750,6 +20148,26 @@
         },
         "additionalProperties": false
       },
+      "FieldPosition": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": ["start", "end"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#/components/schemas/FormFieldRef"
+              },
+              "after": {
+                "$ref": "#/components/schemas/FormFieldRef"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
       "WidgetPlacement": {
         "type": "object",
         "properties": {
@@ -19777,9 +20195,35 @@
             "required": ["x", "y", "width", "height"],
             "additionalProperties": false
           },
+          "box": {
+            "$ref": "#/components/schemas/WidgetPlacement/properties/rect"
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [0]
+              },
+              {
+                "type": "number",
+                "enum": [90]
+              },
+              {
+                "type": "number",
+                "enum": [180]
+              },
+              {
+                "type": "number",
+                "enum": [270]
+              }
+            ]
+          },
           "exportValue": {
             "type": "string",
             "minLength": 1
+          },
+          "actions": {
+            "$ref": "#/components/schemas/WidgetActionsPatch"
           },
           "color": {
             "type": "string",
@@ -19800,26 +20244,19 @@
           },
           "borderStyle": {
             "type": "string",
-            "enum": ["solid", "dashed", "beveled", "inset"]
+            "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+          },
+          "dashArray": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "nullable": true
           },
           "fontFamily": {
             "type": "string",
-            "enum": [
-              "courier",
-              "courier-bold",
-              "courier-bold-oblique",
-              "courier-oblique",
-              "helvetica",
-              "helvetica-bold",
-              "helvetica-bold-oblique",
-              "helvetica-oblique",
-              "times-roman",
-              "times-bold",
-              "times-bold-italic",
-              "times-italic",
-              "symbol",
-              "zapf-dingbats"
-            ],
+            "minLength": 1,
             "nullable": true
           },
           "fontSize": {
@@ -19838,9 +20275,18 @@
           "textAlign": {
             "type": "string",
             "enum": ["left", "center", "right"]
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkStyle": {
+            "type": "string",
+            "enum": ["check", "cross", "star", "circle", "square", "diamond"],
+            "nullable": true
           }
         },
-        "required": ["page", "rect"],
+        "required": ["page"],
         "additionalProperties": false
       },
       "WidgetAnnotation": {
@@ -20016,6 +20462,30 @@
             ],
             "nullable": true
           },
+          "box": {
+            "$ref": "#/components/schemas/WidgetAnnotation/properties/rect"
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [0]
+              },
+              {
+                "type": "number",
+                "enum": [90]
+              },
+              {
+                "type": "number",
+                "enum": [180]
+              },
+              {
+                "type": "number",
+                "enum": [270]
+              }
+            ],
+            "nullable": true
+          },
           "color": {
             "type": "string",
             "pattern": "^#[0-9a-fA-F]{6}$",
@@ -20035,26 +20505,19 @@
           },
           "borderStyle": {
             "type": "string",
-            "enum": ["solid", "dashed", "beveled", "inset"]
+            "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+          },
+          "dashArray": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "nullable": true
           },
           "fontFamily": {
             "type": "string",
-            "enum": [
-              "courier",
-              "courier-bold",
-              "courier-bold-oblique",
-              "courier-oblique",
-              "helvetica",
-              "helvetica-bold",
-              "helvetica-bold-oblique",
-              "helvetica-oblique",
-              "times-roman",
-              "times-bold",
-              "times-bold-italic",
-              "times-italic",
-              "symbol",
-              "zapf-dingbats"
-            ],
+            "minLength": 1,
             "nullable": true
           },
           "fontSize": {
@@ -20073,6 +20536,15 @@
           "textAlign": {
             "type": "string",
             "enum": ["left", "center", "right"]
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkStyle": {
+            "type": "string",
+            "enum": ["check", "cross", "star", "circle", "square", "diamond"],
+            "nullable": true
           },
           "field": {
             "allOf": [
@@ -20128,14 +20600,19 @@
           "modifiedBy",
           "importedBy",
           "actions",
+          "box",
+          "rotation",
           "color",
           "interiorColor",
           "strokeWidth",
           "borderStyle",
+          "dashArray",
           "fontFamily",
           "fontSize",
           "fontColor",
           "textAlign",
+          "caption",
+          "checkStyle",
           "field",
           "fieldFamily"
         ],
@@ -20264,7 +20741,50 @@
           "createdBy": {},
           "modifiedBy": {},
           "importedBy": {},
-          "actions": {},
+          "actions": {
+            "anyOf": [
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/WidgetActionsPatch"
+                  }
+                ],
+                "nullable": true
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PdfAnnotationActions"
+                  }
+                ],
+                "nullable": true
+              }
+            ]
+          },
+          "box": {
+            "$ref": "#/components/schemas/WidgetPatch/properties/rect"
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [0]
+              },
+              {
+                "type": "number",
+                "enum": [90]
+              },
+              {
+                "type": "number",
+                "enum": [180]
+              },
+              {
+                "type": "number",
+                "enum": [270]
+              }
+            ],
+            "nullable": true
+          },
           "color": {
             "type": "string",
             "pattern": "^#[0-9a-fA-F]{6}$",
@@ -20284,26 +20804,19 @@
           },
           "borderStyle": {
             "type": "string",
-            "enum": ["solid", "dashed", "beveled", "inset"]
+            "enum": ["solid", "dashed", "beveled", "inset", "underline"]
+          },
+          "dashArray": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "nullable": true
           },
           "fontFamily": {
             "type": "string",
-            "enum": [
-              "courier",
-              "courier-bold",
-              "courier-bold-oblique",
-              "courier-oblique",
-              "helvetica",
-              "helvetica-bold",
-              "helvetica-bold-oblique",
-              "helvetica-oblique",
-              "times-roman",
-              "times-bold",
-              "times-bold-italic",
-              "times-italic",
-              "symbol",
-              "zapf-dingbats"
-            ],
+            "minLength": 1,
             "nullable": true
           },
           "fontSize": {
@@ -20322,6 +20835,15 @@
           "textAlign": {
             "type": "string",
             "enum": ["left", "center", "right"]
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkStyle": {
+            "type": "string",
+            "enum": ["check", "cross", "star", "circle", "square", "diamond"],
+            "nullable": true
           },
           "field": {},
           "fieldFamily": {}
@@ -20362,6 +20884,12 @@
             "items": {
               "$ref": "#/components/schemas/FormWidget"
             }
+          },
+          "redrawnWidgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormWidget"
+            }
           }
         },
         "required": [
@@ -20370,7 +20898,8 @@
           "opId",
           "undoable",
           "changedFields",
-          "changedWidgets"
+          "changedWidgets",
+          "redrawnWidgets"
         ],
         "additionalProperties": false
       },
@@ -20402,8 +20931,7 @@
                     "minLength": 1
                   },
                   "file": {
-                    "type": "string",
-                    "minLength": 1
+                    "$ref": "#/components/schemas/ChangeOp/anyOf/0/properties/resources/properties/appearance"
                   }
                 },
                 "additionalProperties": false
@@ -20509,9 +21037,6 @@
               "display": {
                 "type": "string",
                 "enum": ["visible", "hidden", "noPrint", "noView"]
-              },
-              "expect": {
-                "$ref": "#/components/schemas/ChangeOp/anyOf/5/properties/display"
               }
             },
             "required": ["type", "field", "display"],
@@ -20681,6 +21206,27 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": ["forms.reorderCalculations"]
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                },
+                "minItems": 1
+              },
+              "position": {
+                "$ref": "#/components/schemas/FieldPosition"
+              }
+            },
+            "required": ["type", "fields", "position"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "enum": ["forms.reorderWidgets"]
               },
               "page": {
@@ -20730,19 +21276,18 @@
               "field": {
                 "$ref": "#/components/schemas/FormFieldRef"
               },
-              "appearance": {
+              "resources": {
                 "type": "object",
                 "properties": {
-                  "pdf": {
-                    "type": "string",
-                    "minLength": 1
+                  "appearance": {
+                    "$ref": "#/components/schemas/ChangeOp/anyOf/0/properties/resources/properties/appearance"
                   }
                 },
-                "required": ["pdf"],
+                "required": ["appearance"],
                 "additionalProperties": false
               }
             },
-            "required": ["type", "field", "appearance"],
+            "required": ["type", "field", "resources"],
             "additionalProperties": false
           },
           {
@@ -20808,6 +21353,7 @@
                   "forms.addWidget",
                   "forms.removeWidget",
                   "forms.deleteWidget",
+                  "forms.reorderCalculations",
                   "forms.reorderWidgets",
                   "forms.updateWidget",
                   "forms.setSignatureAppearance",
@@ -20986,6 +21532,12 @@
                   "$ref": "#/components/schemas/WidgetAnnotation"
                 }
               },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
@@ -21005,6 +21557,9 @@
               },
               "widgets": {
                 "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+              },
+              "calculationOrder": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -21058,6 +21613,12 @@
                   "$ref": "#/components/schemas/WidgetAnnotation"
                 }
               },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
@@ -21081,6 +21642,9 @@
               "widgets": {
                 "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
               },
+              "calculationOrder": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
@@ -21094,6 +21658,12 @@
               "type": {
                 "type": "string",
                 "enum": ["forms.delete"]
+              },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -21137,6 +21707,9 @@
               },
               "widgets": {
                 "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+              },
+              "calculationOrder": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/calculationOrder"
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -21265,6 +21838,26 @@
               }
             },
             "required": ["type", "page", "order", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.reorderCalculations"]
+              },
+              "calculationOrder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormFieldRef"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/FormMutationMeta"
+              }
+            },
+            "required": ["type", "calculationOrder", "meta"],
             "additionalProperties": false
           },
           {
@@ -22352,15 +22945,6 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 256
-                  },
-                  "groups": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256
-                    },
-                    "maxItems": 64
                   }
                 },
                 "additionalProperties": false
@@ -25577,6 +26161,45 @@
       "DocFormsReorderWidgets404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
+      "DocFormsReorderCalculationsRequest": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormFieldRef"
+            },
+            "minItems": 1
+          },
+          "position": {
+            "$ref": "#/components/schemas/FieldPosition"
+          }
+        },
+        "required": ["fields", "position"],
+        "additionalProperties": false
+      },
+      "DocFormsReorderCalculations200Response": {
+        "type": "object",
+        "properties": {
+          "calculationOrder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormFieldRef"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/FormMutationMeta"
+          }
+        },
+        "required": ["calculationOrder", "meta"],
+        "additionalProperties": false
+      },
+      "DocFormsReorderCalculations400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsReorderCalculations404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
       "DocFormsResetRequest": {
         "type": "object",
         "properties": {
@@ -25615,74 +26238,6 @@
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocFormsReset404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsExportDataResponse": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsImportDataRequest": {
-        "type": "object",
-        "additionalProperties": {}
-      },
-      "DocFormsImportData200Response": {
-        "type": "object",
-        "properties": {
-          "form": {
-            "type": "object",
-            "properties": {
-              "formKind": {
-                "type": "string",
-                "enum": ["none", "acroform", "xfa"]
-              },
-              "needsAppearances": {
-                "type": "boolean"
-              },
-              "fields": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/FormField"
-                }
-              },
-              "widgets": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/WidgetAnnotation"
-                }
-              },
-              "calculationOrder": {
-                "type": "array",
-                "items": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/FormFieldRef"
-                    }
-                  ],
-                  "nullable": true
-                }
-              }
-            },
-            "required": ["formKind", "needsAppearances", "fields", "widgets", "calculationOrder"],
-            "additionalProperties": false
-          },
-          "applied": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "skipped": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "meta": {
-            "$ref": "#/components/schemas/MutationMeta"
-          }
-        },
-        "required": ["form", "applied", "skipped", "meta"],
-        "additionalProperties": false
-      },
-      "DocFormsImportData400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsImportData404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocPagesViewports200Response": {
@@ -26082,6 +26637,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -26152,6 +26712,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -26303,6 +26864,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -26373,6 +26939,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -26524,6 +27091,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -26594,6 +27166,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -26745,6 +27318,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -26815,6 +27393,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -26966,6 +27545,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -27036,6 +27620,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -27236,6 +27821,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -27306,6 +27896,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],
@@ -27463,6 +28054,11 @@
                       "exclusiveMinimum": true,
                       "minimum": 0
                     },
+                    "tabOrder": {
+                      "type": "string",
+                      "enum": ["rows", "columns", "structure", "annotations", "widgets"],
+                      "nullable": true
+                    },
                     "boxes": {
                       "type": "object",
                       "properties": {
@@ -27533,6 +28129,7 @@
                     "size",
                     "rotation",
                     "userUnit",
+                    "tabOrder",
                     "boxes",
                     "pdfCropBox"
                   ],

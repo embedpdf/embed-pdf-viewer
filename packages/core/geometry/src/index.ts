@@ -94,6 +94,23 @@ export function rectsOverlap(left: Rect, right: Rect): boolean {
 }
 
 /**
+ * The largest rect of `content`'s proportions inside `box`, centred in it:
+ * CSS `object-fit: contain`. `box` itself when `content` has no area.
+ */
+export function containedRect(content: Size, box: Rect): Rect {
+  if (content.width <= 0 || content.height <= 0) return box;
+  const scale = Math.min(box.width / content.width, box.height / content.height);
+  const width = content.width * scale;
+  const height = content.height * scale;
+  return {
+    x: box.x + (box.width - width) / 2,
+    y: box.y + (box.height - height) / 2,
+    width,
+    height,
+  };
+}
+
+/**
  * Quarter-turn display rotation, degrees clockwise. The viewer-side notion of a
  * page's on-screen rotation — the total = (document /Rotate + any view
  * rotation), resolved by the shell. Structurally identical to the engine's

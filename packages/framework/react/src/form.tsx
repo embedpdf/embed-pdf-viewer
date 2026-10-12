@@ -1,12 +1,11 @@
 /**
  * The React view of @embedpdf/plugin-form.
  *
- * `<FormLayer />` puts a real HTML control over each field box of its page,
- * with or without the annotation plugin. The field's own picture, the
- * engine's drawing of its value, borders and fonts, is drawn below it: by the
- * `<RenderLayer>` raster, or by the `<AnnotationLayer>` while the form plugin
- * keeps widgets inert for filling. The controls add what people interact
- * with on top of it:
+ * `<FormLayer />` paints the fields of its page as the engine draws them
+ * (their values, borders and fonts) and puts a real HTML control over each
+ * field box, with or without the annotation plugin. While it's on the page,
+ * the `<RenderLayer>` leaves the fields out of the page's picture. The
+ * controls add what people interact with on top of the pictures:
  *
  *   text   → the picture at rest; focus shows an editor in the field's font
  *            (the plugin keeps what is typed, so a download writes it);
@@ -34,7 +33,8 @@
 export * from '@embedpdf/plugin-form';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { EventHook } from '@embedpdf/core';
+import { annotationKey, type EventHook } from '@embedpdf/core';
+import { MITER_LIMIT } from '@embedpdf/core-annotation';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import {
@@ -47,22 +47,31 @@ import {
 } from '@embedpdf/plugin-form';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  createShownUrls,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
   formColorsOf,
   isolatePointerDown,
   listBoxControlStyleOf,
+  loadAppearanceUrls,
+  pictureOrPainting,
   pressToggle,
   rectInPixels,
+  shownAppearance,
+  svgShapesOf,
   textFieldEditorStyleOf,
   widgetBoxStyleOf,
+  type AppearanceUrl,
   type FormColors,
+  type MountableFontProgram,
 } from '@embedpdf/web';
 
 import { NativeListBox } from './form-listbox';
 import { FormFocusRing } from './form-focus-ring';
+import { usePaintsPagePart } from './page-layers';
 import {
   shallowArray,
   useCapability,
@@ -77,6 +86,8 @@ import {
 } from './runtime';
 import type { PageContextValue } from './runtime';
 import { settingsHook, stateHook } from './state';
+import { useFontMounts } from './font-mounts';
+import { SvgShapes } from './svg-shapes';
 
 // ── what every control shares ──────────────────────────────────────────────
 
@@ -234,6 +245,9 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
   useEffect(() => editor.setValue(item.value), [editor, item.value]);
 
   const frame = rectInPixels(item.box, page.transform);
+  // The text being typed, where the engine will draw it, in its face.
+  const layout = item.annotationRef ? form.getTextEditorLayout(item.annotationRef, draft) : null;
+  useFontMounts(layout ? [layout.program] : NO_PROGRAMS);
   const editorProps = {
     value: draft,
     maxLength: item.maxLength ?? undefined,
@@ -246,7 +260,7 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       if (editor.keyDown(event.key, item.multiline)) event.currentTarget.blur();
     },
-    style: textFieldEditorStyleOf(item, frame, colors, focused),
+    style: textFieldEditorStyleOf(item, frame, colors, focused, layout),
   };
   return (
     // A click runs the widget's action too, as in Acrobat: the editor's
@@ -428,11 +442,13 @@ function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
 }
 
 /**
- * The form's fields on one page, as controls people fill in. Put it above the
- * page's picture (`<RenderLayer>`, and `<AnnotationLayer>` when the
- * annotation plugin is registered). It shows while the active tool fills
- * forms (the `pointer` and `pan` tools do), and stands down in design mode,
- * where fields are boxes you select and move.
+ * The form's fields on one page: their pictures, and the controls people fill
+ * them in with. Put it above the page's picture (`<RenderLayer>`, and
+ * `<AnnotationLayer>` when the annotation plugin is registered); while it's
+ * there, the render layer leaves the fields out of the page's picture. The
+ * controls show while the active tool fills forms (the `pointer` and `pan`
+ * tools do), and stand down in design mode, where fields are boxes you
+ * select and move.
  */
 export function FormLayer() {
   const page = usePage();
@@ -441,21 +457,22 @@ export function FormLayer() {
   const active = useSelector(InteractionToken, (interaction) =>
     interaction.activeToolEnables('form-fill'),
   );
+  usePaintsPagePart(page.ref, 'formFields');
 
   useEffect(() => {
-    if (active) void form.ensureLoaded(page.ref);
-  }, [active, form, page.ref]);
+    void form.ensureLoaded(page.ref);
+  }, [form, page.ref]);
 
   const items = useSelector(
     FormHostToken,
     (capability) => capability.listWidgets(page.ref),
     shallowArray,
   );
-  if (!active) return null;
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      {items.map((item) => {
+      <FieldPictures page={page} />
+      {(active ? items : []).map((item) => {
         const key = `${item.key}:${item.annotObjectNumber}`;
         switch (item.control) {
           case 'text':
@@ -477,6 +494,107 @@ export function FormLayer() {
     </div>
   );
 }
+
+/**
+ * The page's fields as they look now. Each widget shows its picture, as the
+ * engine draws it (the form plugin's, every state loaded, so a check box
+ * shows its new state at once), or the painter's drawing while its look is
+ * pending or its picture is of an older version (`pictureOrPainting`): a
+ * value, a calculation, a restyle shows at once. Hidden widgets aren't drawn.
+ */
+function FieldPictures({ page }: { page: PageContextValue }) {
+  const form = useCapability(FormHostToken);
+  const widgets = useSelector(
+    FormHostToken,
+    (form) => form.listShownWidgets(page.ref),
+    shallowArray,
+  );
+  // Loaded again when one of the page's widgets is drawn again, and at appearance-scale crossings.
+  const epoch = useSelector(FormHostToken, (form) => form.getAppearanceEpoch(page.ref));
+  const scale = useOptionalSelector(
+    RenderToken,
+    (render) => render.getAppearanceScale(page.transform.renderScale),
+    0,
+  );
+  // `null` until the page's first pictures arrive.
+  const [urls, setUrls] = useState<Record<string, AppearanceUrl> | null>(null);
+  // The pictures shown stay valid until the next ones are shown.
+  const [shown] = useState(createShownUrls);
+  useEffect(() => () => shown.release(), [shown]);
+
+  useEffect(() => {
+    if (!scale) return;
+    return loadAppearanceUrls(
+      shown,
+      (signal) => form.renderAppearances(page.ref, scale, signal),
+      annotationKey,
+      setUrls,
+    );
+  }, [shown, form, page.ref, scale, epoch]);
+
+  const looks = widgets.map((widget) =>
+    pictureOrPainting({
+      pending: widget.pending,
+      picture: urls && shownAppearance(urls, annotationKey(widget.ref), widget.appearanceState),
+      version: widget.pictureVersion,
+      loaded: urls !== null,
+      paint: () => form.getWidgetPainting(widget.ref),
+    }),
+  );
+
+  return (
+    <>
+      {widgets.map((widget, index) => {
+        const look = looks[index];
+        if (!look) return null;
+        const key = annotationKey(widget.ref);
+        if (look.kind === 'painting') {
+          const { x, y, width, height } = widget.rect;
+          const frame = rectInPixels(widget.rect, page.transform);
+          return (
+            <svg
+              key={key}
+              viewBox={`${x} ${y} ${width} ${height}`}
+              style={{
+                position: 'absolute',
+                left: frame.left,
+                top: frame.top,
+                width: frame.width,
+                height: frame.height,
+                overflow: 'visible',
+                pointerEvents: 'none',
+              }}
+            >
+              <SvgShapes shapes={svgShapesOf(look.painting.scene, { miterLimit: MITER_LIMIT })} />
+            </svg>
+          );
+        }
+        const frame = rectInPixels(look.picture.box, page.transform);
+        return (
+          <img
+            key={key}
+            src={look.picture.url}
+            alt=""
+            draggable={false}
+            style={{
+              position: 'absolute',
+              left: frame.left,
+              top: frame.top,
+              width: frame.width,
+              height: frame.height,
+              // A global `img { max-width: 100% }` reset would clamp it.
+              maxWidth: 'none',
+              maxHeight: 'none',
+              pointerEvents: 'none',
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+const NO_PROGRAMS: readonly MountableFontProgram[] = Object.freeze([]);
 
 // ── hooks ──────────────────────────────────────────────────────────────────
 

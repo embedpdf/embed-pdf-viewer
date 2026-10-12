@@ -12,18 +12,18 @@ import { viewerWith } from '../fixtures/viewer';
 
 /**
  * `<RenderLayer>` on Stage pages: each visible page shows the picture the render plugin gives
- * for it, and an invalidation (a new epoch, so a new source key) fetches and shows a new one,
- * releasing the old URL.
+ * for it, leaving out what a layer on the page paints, and an invalidation (a new epoch, so a new
+ * source key) fetches and shows a new one, releasing the old URL.
  */
 
 const host = StageToken as unknown as CapabilityToken<StageHostCapability>;
 
-async function renderedStage(annotations = true) {
+async function renderedStage(props: { annotations?: boolean; painter?: boolean } = {}) {
   const fake = renderEngine(2);
   const viewer = await viewerWith(
     [stagePlugin(), renderPlugin()],
     RenderHarness,
-    { annotations },
+    props,
     fake.engine,
   );
   await viewer.kernel.documents.open(bytesInput('a'));
@@ -36,15 +36,25 @@ async function renderedStage(annotations = true) {
 }
 
 describe('RenderLayer', () => {
-  it('shows each visible page’s picture', async () => {
+  it('shows each visible page’s picture, with what the user may read', async () => {
     const { sources, renders } = await renderedStage();
     await waitFor(() => expect(sources().filter(Boolean).length).toBeGreaterThan(0));
     expect(sources()[0]).toMatch(/^blob:page-1-call-\d+$/);
-    expect(renders[0]!.options.includeAnnotations).toBe(true);
+    expect(renders[0]!.options).toMatchObject({
+      includeAnnotations: true,
+      includeFormFields: true,
+    });
+  });
+
+  it('leaves out what a layer on the page paints, from the first request', async () => {
+    const { sources, renders } = await renderedStage({ painter: true });
+    await waitFor(() => expect(sources().filter(Boolean).length).toBeGreaterThan(0));
+    expect(renders.every((call) => call.options.includeAnnotations === false)).toBe(true);
+    expect(renders[0]!.options.includeFormFields).toBe(true);
   });
 
   it('leaves annotations out of the picture when asked', async () => {
-    const { sources, renders } = await renderedStage(false);
+    const { sources, renders } = await renderedStage({ annotations: false });
     await waitFor(() => expect(sources().filter(Boolean).length).toBeGreaterThan(0));
     expect(renders.every((call) => call.options.includeAnnotations === false)).toBe(true);
   });

@@ -29,16 +29,17 @@ for (const page of pages) {
 }
 ```
 
-| Field        | What it is                                                                              |
-| :----------- | :-------------------------------------------------------------------------------------- |
-| `index`      | Position in the document, from 0. Changes when pages move.                              |
-| `ref`        | The page's address. Stays the same when pages move; pass it to every page call.         |
-| `label`      | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none.     |
-| `size`       | `{ width, height }` of the visible area (the crop box) in points, before rotation.      |
-| `rotation`   | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.             |
-| `userUnit`   | How large one point is, in multiples of 1/72 inch. `1` for almost every file.           |
-| `boxes`      | The page's five boxes: `media`, `crop`, `bleed`, `trim` and `art`. See below.           |
-| `pdfCropBox` | Where the page sits in the PDF file's own numbers, for tools that use those. See below. |
+| Field        | What it is                                                                                                                                                                |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `index`      | Position in the document, from 0. Changes when pages move.                                                                                                                |
+| `ref`        | The page's address. Stays the same when pages move; pass it to every page call.                                                                                           |
+| `label`      | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none.                                                                                       |
+| `size`       | `{ width, height }` of the visible area (the crop box) in points, before rotation.                                                                                        |
+| `rotation`   | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.                                                                                               |
+| `userUnit`   | How large one point is, in multiples of 1/72 inch. `1` for almost every file.                                                                                             |
+| `tabOrder`   | The order its annotations and form fields take keyboard focus in: `'rows'`, `'columns'`, `'structure'`, `'annotations'` or `'widgets'`; `null` when the page doesn't say. |
+| `boxes`      | The page's five boxes: `media`, `crop`, `bleed`, `trim` and `art`. See below.                                                                                             |
+| `pdfCropBox` | Where the page sits in the PDF file's own numbers, for tools that use those. See below.                                                                                   |
 
 `boxes` follows the PDF standard. A box the file leaves out takes its default: the crop box is the
 media box, and the bleed, trim and art boxes are the crop box. Every box stays inside the media

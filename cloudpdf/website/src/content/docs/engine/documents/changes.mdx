@@ -64,8 +64,9 @@ error. The document is as it was before the call.
 | `forms.deleteWidget`           | `widget`, `expect`                                        | `doc.forms.deleteWidget(widget)`                                                |
 | `forms.updateWidget`           | `widget`, `patch`, `expect`                               | `doc.forms.updateWidget(widget, patch)`                                         |
 | `forms.reorderWidgets`         | `page`, `widgets`, `position`                             | `doc.forms.reorderWidgets(widgets, position)`                                   |
+| `forms.reorderCalculations`    | `fields`, `position`                                      | `doc.forms.reorderCalculations(fields, position)`                               |
 | `forms.setSignatureAppearance` | `field`, `appearance`                                     | `doc.forms.setSignatureAppearance(field, appearance)`                           |
-| `forms.setDisplay`             | `field`, `display`, `expect`                              | Shows or hides a field's widgets, as a form script does                         |
+| `forms.setDisplay`             | `field`, `display`                                        | Shows or hides a field's widgets, as a form script does                         |
 | `forms.setAppearanceText`      | `field`, `text`                                           | Sets the text a field shows without changing its value, as a format script does |
 | `metadata.update`              | `patch`, `expect`                                         | `doc.metadata.update(patch)`                                                    |
 | `metadata.updateCustom`        | `patch`                                                   | `doc.metadata.custom.update(patch)`                                             |
@@ -213,8 +214,11 @@ the widget back at its place and in its field.
 
 `meta.undoable` says whether a write can be undone. It's `false` for:
 
-- **A write that changed nothing**, such as a change with no ops.
-- **Writes a change can't hold**: page edits, attachments, imports. They're writes of their own.
+- **A write that changed nothing**, such as a change with no ops, a reset of fields already at
+  their defaults, or hiding a field that's already hidden.
+- **Writes a change can't hold**: page edits, attachments, form data imports. They're writes of
+  their own. An [annotation import](/docs/engine/annotations/import-export#undo-an-import) is a
+  change and can be undone.
 - **Final writes**: [applying redactions](/docs/engine/documents/redaction),
   [flattening](/docs/engine/documents/pages#flatten-a-pages-annotations),
   [signing](/docs/engine/forms/signatures) and

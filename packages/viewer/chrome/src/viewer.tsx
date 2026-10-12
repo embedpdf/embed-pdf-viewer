@@ -41,6 +41,7 @@ import { I18nToken, i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i1
 import type { Locale, TranslationDictionary } from '@embedpdf/react/i18n';
 import { CommandsToken, commandsPlugin } from '@embedpdf/react/commands';
 import type { CommandDef, NotAllowedMode } from '@embedpdf/react/commands';
+import { historyPlugin } from '@embedpdf/react/history';
 import { shellPlugin } from '@embedpdf/react/shell';
 import type { LayoutOption } from '@embedpdf/core-ui';
 import { EPDF_VARIABLES } from '@embedpdf/web';
@@ -412,6 +413,8 @@ export function FullViewer({
         },
       ],
     }),
+    // Undo and redo of what the user changes, one history per document.
+    historyPlugin(),
     // Stamp libraries (workspace-scoped): named reusable assets — the built-in
     // set plus any PDF the user imports, each page one vector stamp. The
     // stamps sidebar is the picker; placement rides annotation's armed stamp.

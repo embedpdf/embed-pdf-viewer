@@ -34,7 +34,7 @@ const RENDERERS: AnnotationRenderer[] = [
       <FormatButtons />
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer :renderers="RENDERERS" />
         </template>
       </Stage>

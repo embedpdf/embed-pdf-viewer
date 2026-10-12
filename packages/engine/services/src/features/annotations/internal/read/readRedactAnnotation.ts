@@ -1,13 +1,14 @@
-import type {
-  AnnotationBase,
-  Color,
-  RedactAnnotation,
-  PdfCoordinates,
+import {
+  freeTextFontForFace,
+  type AnnotationBase,
+  type Color,
+  type RedactAnnotation,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
-import { freeTextFontForFace, readEngineRichText } from '../richTextWire';
+import { readEngineRichText } from '../richTextWire';
 import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
 import type { AnnotationReadContext } from './annotationReadContext';

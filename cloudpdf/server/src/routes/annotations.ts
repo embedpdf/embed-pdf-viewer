@@ -3,12 +3,11 @@ import { Buffer } from 'node:buffer';
 import {
   EngineError,
   EngineErrorCode,
-  ANNOTATION_RESOURCE_ROLE_NAMES,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   checkSetGroup,
   wirePack,
   type AnnotationActor,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type AnnotationDeleteResult,
   type AnnotationUpdateResult,
   type AnnotationDraft,
@@ -23,6 +22,7 @@ import {
   type WorkerJobId,
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
+  type AnnotationImportBody,
   toPageRef,
   PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
@@ -35,6 +35,8 @@ import {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
+  AnnotationImportBodySchema,
+  AnnotationResourceKeysSchema,
   AnnotationsExportRequestSchema,
   decodeAnnotationsExportToken,
   type AnnotationsExportToken,
@@ -51,10 +53,15 @@ import {
   type SchemaLike,
   objectNumberQuery,
 } from './_helpers';
-import { readAnnotationImportRequest } from './_annotationImportRequest';
+import { sendBundle } from './_bundleExportResponse';
+import { readBundleImportRequest } from './_bundleImportRequest';
 import { renderAppearanceBatch, resolvePageForRead, type ReadScope } from './_appearanceBatch';
-import { buildMultipart, type MultipartPart } from './_multipart';
-import { readMutationEnvelope, type MutationEnvelope } from './_mutationEnvelope';
+import {
+  policyByRole,
+  readMutationEnvelope,
+  resourcesByRole,
+  type MutationEnvelope,
+} from './_mutationEnvelope';
 import { requireSharedDocRead } from './_planeGuard';
 import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
 import {
@@ -80,7 +87,7 @@ interface AnnotationRouteDeps {
   /** Render-lattice policy plane (absent = legacy compute-only). */
   derivedRenders?: DerivedRenderService;
   /** How large an exported or imported annotation bundle may be; the defaults otherwise. */
-  bundleLimits?: AnnotationBundleLimits;
+  bundleLimits?: BundleLimits;
 }
 
 export async function registerAnnotationRoutes(
@@ -89,7 +96,7 @@ export async function registerAnnotationRoutes(
 ): Promise<void> {
   const { documentService, layerService, imageEncoder, derivedRenders } = deps;
   const encodeInEngine = deps.encodeInEngine ?? true;
-  const bundleLimits = deps.bundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS;
+  const bundleLimits = deps.bundleLimits ?? DEFAULT_BUNDLE_LIMITS;
 
   // ── Plane-scoped doc-level reads: a base's own annotations —
   //    inline ones included — are simply visible through every
@@ -424,8 +431,11 @@ export async function registerAnnotationRoutes(
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const limits = bundleLimits;
-    const { manifest, resources } = await readAnnotationImportRequest(req, limits);
-    const attribution = manifest.options.attribution ?? 'restore';
+    const { body, resources } = await readBundleImportRequest(req, limits, {
+      kind: 'annotation',
+      bodySchema: AnnotationImportBodySchema as unknown as SchemaLike<AnnotationImportBody>,
+    });
+    const attribution = body.options.attribution ?? 'restore';
 
     let ctx: ReturnType<typeof requireLayerCollabAction>;
     if (attribution === 'restore') {
@@ -445,7 +455,7 @@ export async function registerAnnotationRoutes(
       // items name takes the authority a create in it would, and nothing
       // more: a user who may create their own annotations may paste them.
       const groups = new Set<string | undefined>();
-      for (const item of manifest.bundle.items as unknown as Array<{
+      for (const item of body.bundle.items as unknown as Array<{
         data?: { groupId?: unknown };
       }>) {
         const groupId = item?.data?.groupId;
@@ -455,7 +465,7 @@ export async function registerAnnotationRoutes(
       if (groups.size === 0) groups.add(undefined);
       let checked: ReturnType<typeof requireLayerCollabAction> | undefined;
       for (const groupId of groups) {
-        const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft, pdfBits);
+        const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft);
         const target = targetForSelfCreate(accessCtx.jwt, group);
         checked = requireLayerCollabAction(
           req,
@@ -478,8 +488,8 @@ export async function registerAnnotationRoutes(
       {
         docId,
         layerName,
-        bundle: { ...manifest.bundle, resources },
-        ...(manifest.options.pages !== undefined ? { pages: manifest.options.pages } : {}),
+        bundle: { ...body.bundle, resources },
+        ...(body.options.pages !== undefined ? { pages: body.options.pages } : {}),
         attribution,
         ...(actor ? { actor } : {}),
         limits,
@@ -501,12 +511,14 @@ export async function registerAnnotationRoutes(
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
+      // The draft, and beside its fields the files it names by role.
+      const { resources: named, ...data } = isRecord(envelope.body) ? envelope.body : {};
       const draft = parseOrInvalidArg<AnnotationDraft>(
         AnnotationDraftSchema as unknown as SchemaLike<AnnotationDraft>,
-        envelope.body,
+        isRecord(envelope.body) ? data : envelope.body,
         'request body',
       );
-      const resources = annotationResourcesOf(envelope);
+      const resources = annotationResourcesOf(envelope, named);
       // Creation is a collab check against the caller's own identity
       // (no impersonation), in the group the annotation is created in:
       // the draft's, when it names one the caller may set, else the
@@ -514,7 +526,7 @@ export async function registerAnnotationRoutes(
       // constrains that group to X. Under the narrowing model,
       // `doc.annotate.modify` covers create when no create-collab filter
       // is present.
-      const groupId = createGroupOf(accessCtx.jwt, draft, pdfBits);
+      const groupId = createGroupOf(accessCtx.jwt, draft);
       const target = targetForSelfCreate(accessCtx.jwt, groupId);
       const ctx = requireLayerCollabAction(
         req,
@@ -702,7 +714,7 @@ export async function registerAnnotationRoutes(
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const body = envelope.body as Record<string, unknown> | null | undefined;
-      const resources = annotationResourcesOf(envelope);
+      const resources = annotationResourcesOf(envelope, body?.resources);
       const signal = abortSignalOf(reply);
 
       setNoStore(reply);
@@ -825,14 +837,10 @@ export async function registerAnnotationRoutes(
  * caller's own needs `annotations:set-group` authority for it, as a
  * reassignment on update does.
  */
-function createGroupOf(
-  jwt: RequestJwtContext,
-  draft: AnnotationDraft,
-  pdfBits: PdfBits,
-): string | undefined {
+function createGroupOf(jwt: RequestJwtContext, draft: AnnotationDraft): string | undefined {
   const groupId = (draft as { groupId?: string | null }).groupId ?? jwt.identity.groupId;
   if (groupId !== undefined && groupId !== jwt.identity.groupId) {
-    if (!checkSetGroup(groupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
+    if (!checkSetGroup('annotations', groupId, jwt.identity.groupId, jwt.scope)) {
       throw new PermissionDenied('annotations:set-group', `group=${groupId}`);
     }
   }
@@ -853,33 +861,34 @@ function targetForSelfCreate(jwt: RequestJwtContext, groupId: string | undefined
 }
 
 /**
- * How an annotation's resource parts are checked: an `appearance` must be
- * PNG, JPEG or PDF, and a `file` may be any bytes (attaching any format is
- * the point). The parts are named by role: `resource:appearance`,
- * `resource:file`.
+ * How an annotation's parts are checked, by the role the body gives them:
+ * an `appearance` must be PNG, JPEG or PDF, and a `file` may be any bytes
+ * (attaching any format is the point).
  */
-function annotationBinaryPolicy(_body: unknown, key: string): 'image-or-pdf' | 'any' {
-  return key === 'file' ? 'any' : 'image-or-pdf';
-}
+const annotationBinaryPolicy = policyByRole({ file: 'any' });
 
-/**
- * The resources of an annotation write, by role, from its multipart parts.
- * Whether the kind takes them is the engine's check.
- */
-function annotationResourcesOf(envelope: MutationEnvelope): WireAnnotationResources | undefined {
-  if (!envelope.resources) return undefined;
+/** The files an annotation write names by role, `resources: { appearance, file }`. */
+function annotationResourcesOf(
+  envelope: MutationEnvelope,
+  named: unknown,
+): WireAnnotationResources | undefined {
+  if (named === undefined && !envelope.resources) return undefined;
+  const keys = parseOrInvalidArg(
+    AnnotationResourceKeysSchema as unknown as SchemaLike<
+      Partial<Record<AnnotationResourceRole, string>>
+    >,
+    named ?? {},
+    'resources',
+  );
   const resources: WireAnnotationResources = {};
-  for (const [role, { bytes }] of Object.entries(envelope.resources)) {
-    if ((ANNOTATION_RESOURCE_ROLE_NAMES as readonly string[]).includes(role)) {
-      resources[role as AnnotationResourceRole] = bytes;
-    } else {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `unknown annotation resource part 'resource:${role}'; expected 'resource:appearance' or 'resource:file'`,
-      );
-    }
+  for (const [role, part] of Object.entries(resourcesByRole(envelope, keys))) {
+    if (part) resources[role as AnnotationResourceRole] = part.bytes;
   }
   return resources;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -1008,11 +1017,12 @@ async function readAnnotations(input: {
  * One export job at the token's pins, checked before and after the job so an
  * immutable body never belongs to another version: a stale pin is a 404 the
  * client answers by refreshing its manifest. The response is the bundle
- * without its bytes as `manifest`, then one part per resource, named by id.
+ * without its bytes as the `body` part, then one `resource:<id>` part per
+ * resource.
  */
 async function exportAnnotations(input: {
   documentService: DocumentService;
-  limits: AnnotationBundleLimits;
+  limits: BundleLimits;
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
@@ -1063,19 +1073,7 @@ async function exportAnnotations(input: {
     );
   }
   await assertCurrent();
-
-  const { resources, ...manifest } = result.bundle;
-  const parts: MultipartPart[] = Object.entries(resources).map(([id, bytes]) => ({
-    name: `resource:${id}`,
-    filename: id,
-    contentType: 'application/octet-stream',
-    body: Buffer.from(bytes),
-  }));
-  if (input.cache === 'no-store') setNoStore(input.reply);
-  else setImmutableCache(input.reply);
-  const { contentType, body } = buildMultipart(manifest, parts);
-  input.reply.type(contentType);
-  return input.reply.send(body);
+  return sendBundle(input.reply, result.bundle, input.cache ?? 'immutable');
 }
 
 async function readAnnotationsAll(input: {

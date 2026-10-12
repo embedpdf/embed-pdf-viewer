@@ -5,8 +5,12 @@
  *
  * - {@link objectUrlOf}: bytes (a stamp's gallery preview) as a URL, now;
  * - {@link loadObjectUrl}: bytes still to load (the armed stamp's ghost);
- * - {@link loadAppearanceUrls}: a page's baked annotation appearances, and
- *   {@link bakedAppearanceOf}, one of them as a renderer's `appearance`.
+ * - {@link loadAppearanceUrls}: a page's pictures of its annotations or its
+ *   form widgets, every state; {@link shownAppearance} picks the one an item
+ *   shows, and {@link bakedAppearanceOf} gives it as a renderer's `appearance`.
+ *
+ * A layer's pictures are loaded again whenever its page changes, and the set
+ * it shows stays valid until the next one is shown ({@link createShownUrls}).
  */
 import type { ObjectUrlImageSource } from './painted-image';
 
@@ -56,67 +60,159 @@ export function loadObjectUrl(
   };
 }
 
-/** One baked appearance as the annotation plugin renders it (`renderAppearances`). */
+/**
+ * One picture as its owner hands it out (the annotation plugin's or the form
+ * plugin's `renderAppearances`): an item in one of its states, at its version.
+ */
 export interface AppearancePicture<Ref> {
   readonly ref: Ref;
+  /** The state it draws (`/AS`), or `null` for an item without states. */
+  readonly state: string | null;
   /** The box it was rendered into, in page points. */
   readonly rect: { x: number; y: number; width: number; height: number };
+  /** The version of its item it shows: an item at another version looks different now. */
+  readonly version: number;
   readonly image: ObjectUrlImageSource;
 }
 
-/** A baked appearance's URL, and the box it was rendered into. */
+/** A picture's URL, the box it was rendered into, and the version of its item it shows. */
 export interface AppearanceUrl {
   url: string;
   box: { x: number; y: number; width: number; height: number };
+  version: number;
+}
+
+/** A picture's key: its item's key and the state it draws. */
+const pictureKey = (itemKey: string, state: string | null): string => `${itemKey}|${state ?? ''}`;
+
+/**
+ * The picture an item shows, from {@link loadAppearanceUrls}: the one of the
+ * state it's in (`'Off'` when it names none), or its only picture when it has
+ * no states; `null` until it's loaded.
+ */
+export function shownAppearance(
+  urls: Readonly<Record<string, AppearanceUrl>>,
+  itemKey: string,
+  appearanceState: string | null,
+): AppearanceUrl | null {
+  return (
+    urls[pictureKey(itemKey, appearanceState ?? 'Off')] ?? urls[pictureKey(itemKey, null)] ?? null
+  );
 }
 
 /**
  * The engine's picture of an annotation as a renderer gets it (its
- * `appearance`): `{ url }` once {@link loadAppearanceUrls} has loaded one for
- * the annotation's key (a render item's `id`), else `null`.
+ * `appearance`): `{ url }` once {@link loadAppearanceUrls} has loaded the one
+ * of the state it shows, else `null`.
  */
 export function bakedAppearanceOf(
   urls: Readonly<Record<string, AppearanceUrl>>,
-  key: string,
+  itemKey: string,
+  appearanceState: string | null,
 ): { url: string } | null {
-  const baked = urls[key];
+  const baked = shownAppearance(urls, itemKey, appearanceState);
   return baked ? { url: baked.url } : null;
 }
 
 /**
- * Load a page's baked appearances and hand their URLs, by annotation key, to
- * `onLoaded`, once all of them are there. What it returns cancels: the load
- * is aborted, and every URL it made is revoked. Start it again when the
- * page's appearance epoch or the bake scale changes, never mid-gesture.
+ * The URLs a layer shows, kept from one load to the next: a set stays valid
+ * until the set after it is shown, so a picture that shows again before the
+ * next set arrives (an annotation an undo brings back) still has a live URL.
+ * One per layer, passed to every load; `release()` when the layer goes.
+ */
+export interface ShownUrls {
+  /** Revoke the URLs shown now: the layer is going. A later load starts afresh. */
+  release(): void;
+}
+
+/** The set of URLs a layer shows, and the one place it is replaced. */
+interface ShownUrlsHolder extends ShownUrls {
+  /** `revokers` are shown now: revoke the set before them. */
+  replace(revokers: readonly (() => void)[]): void;
+}
+
+/** What a layer shows, for {@link loadAppearanceUrls}. */
+export function createShownUrls(): ShownUrls {
+  let shown: readonly (() => void)[] = [];
+  const holder: ShownUrlsHolder = {
+    replace(revokers) {
+      const before = shown;
+      shown = revokers;
+      before.forEach((revoke) => revoke());
+    },
+    release: () => holder.replace([]),
+  };
+  return holder;
+}
+
+/**
+ * Load a page's pictures, every state of every item, and hand their URLs to
+ * `onLoaded` once all of them are there; the set `shown` held before is
+ * revoked then. {@link shownAppearance} picks an item's: a check box that
+ * changes shows its other picture at once. What it returns cancels: the load
+ * is aborted and the URLs it made are revoked, unless it already handed them
+ * over. Start it again when the page's appearance epoch or the appearance
+ * scale changes, never mid-gesture.
  */
 export function loadAppearanceUrls<Ref>(
+  shown: ShownUrls,
   load: (signal: AbortSignal) => Promise<readonly AppearancePicture<Ref>[]>,
   keyOf: (ref: Ref) => string,
   onLoaded: (urls: Record<string, AppearanceUrl>) => void,
 ): () => void {
+  return loadPictureUrls(
+    shown,
+    load,
+    (picture) => pictureKey(keyOf(picture.ref), picture.state),
+    onLoaded,
+  );
+}
+
+function loadPictureUrls<Picture extends AppearancePicture<unknown>>(
+  shown: ShownUrls,
+  load: (signal: AbortSignal) => Promise<readonly Picture[]>,
+  keyOf: (picture: Picture) => string,
+  onLoaded: (urls: Record<string, AppearanceUrl>) => void,
+): () => void {
   const controller = new AbortController();
-  const revokers: Array<() => void> = [];
+  /** The URLs this load made and hasn't handed over. */
+  let made: (() => void)[] = [];
+  const drop = () => {
+    made.forEach((revoke) => revoke());
+    made = [];
+  };
+  const urlOf = async (picture: Picture) => {
+    const url = await picture.image.objectUrl().abortWith(controller.signal);
+    // Arrived after the load was dropped: nobody else will revoke it.
+    if (controller.signal.aborted) {
+      url.revoke();
+      throw controller.signal.reason;
+    }
+    made.push(url.revoke);
+    return url.url;
+  };
   void (async () => {
     try {
       const pictures = await load(controller.signal);
+      const minted = await Promise.all(pictures.map(urlOf));
+      if (controller.signal.aborted) return;
       const urls: Record<string, AppearanceUrl> = {};
-      for (const picture of pictures) {
-        const made = await picture.image.objectUrl().abortWith(controller.signal);
-        if (controller.signal.aborted) {
-          made.revoke();
-          return;
-        }
-        revokers.push(made.revoke);
-        // Placed by its own rect (the box it was rendered into), never a recomputed bound.
-        urls[keyOf(picture.ref)] = { url: made.url, box: picture.rect };
-      }
-      if (!controller.signal.aborted) onLoaded(urls);
+      // Placed by its own rect (the box it was rendered into), never a recomputed bound.
+      pictures.forEach((picture, index) => {
+        urls[keyOf(picture)] = { url: minted[index]!, box: picture.rect, version: picture.version };
+      });
+      onLoaded(urls);
+      (shown as ShownUrlsHolder).replace(made);
+      made = [];
     } catch {
-      // Aborted, or the page has no appearances to render.
+      // Aborted, or the page has no appearances to render: what is still on
+      // its way is dropped with what was made.
+      controller.abort();
+      drop();
     }
   })();
   return () => {
     controller.abort();
-    revokers.forEach((revoke) => revoke());
+    drop();
   };
 }

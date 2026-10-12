@@ -153,6 +153,13 @@ When you draw only the form fields yourself, over the page, leave out just those
 await page.render.image({ includeFormFields: false });
 ```
 
+And the other way round: when you draw the annotations yourself, ask for the form fields without
+them:
+
+```ts
+await page.render.image({ includeAnnotations: false, includeFormFields: true });
+```
+
 Hidden form fields are never drawn, and fields marked not to show on screen are drawn only when
 printing.
 
@@ -161,13 +168,6 @@ annotations when the user may read them (`doc.annotate.read`), and `includeFormF
 fields when they may read the form (`doc.forms.read`). So someone who may fill a form but not read
 its comments gets a picture without the comments. Asking for annotations or fields the user may
 not read fails with `Forbidden`, naming the option.
-
-<Engine cloud>
-
-Pictures from the server don't draw form fields yet: leave `includeFormFields` out, or pass
-`false`. Draw the fields over the picture yourself, as the viewer's form layer does.
-
-</Engine>
 
 ## Part of a page
 

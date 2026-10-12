@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { DocumentMeta } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -48,7 +48,7 @@ describe('recalculation', () => {
       utcOffsetMinutes: () => 0,
       sandboxFactory: () => createQuickJsSandbox(),
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document,
       transaction: realm.transaction,
@@ -60,7 +60,6 @@ describe('recalculation', () => {
     expect(result.status).toBe('applied');
     expect(result.error ?? null).toBeNull();
     expect(result.diagnostics).toEqual([]);
-    expect(result.effectsResult?.results.every((entry) => entry.status === 'applied')).toBe(true);
     const after = await doc.forms.list();
     const total = after.fields.find((field) => field.name === 'total_amount');
     expect(total?.valueEntry).toEqual({ kind: 'scalar', value: '$1700.00' });

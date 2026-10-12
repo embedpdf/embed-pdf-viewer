@@ -1,31 +1,28 @@
 /**
  * The field tree, mirrored from the engine. It changes only by loads and by
  * confirmed form events, whoever caused them: the plugin's own writes, the
- * document's scripts, or another session. This is also the one place the
+ * document's scripts, or another session. Its view shows this session's
+ * pending changes on top (`predictFormOp`). This is also the one place the
  * value and field events fire.
  */
 import type { Mirror } from '@embedpdf/core';
 
-import {
-  emptyFieldIndex,
-  fieldsWithChangedValues,
-  foldFormEvent,
-  indexFields,
-  type FieldIndex,
-} from '../model';
+import { emptyFieldIndex, foldFormEvent, indexLoadedFields, type FieldIndex } from '../model';
+import { predictFormOp } from './predict';
 import type { FormContext } from '../services/context';
 import type { FormEvents } from '../services/events';
 
 export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror<FieldIndex> {
-  return ctx.mirror<FieldIndex>({
+  const fields: Mirror<FieldIndex> = ctx.mirror<FieldIndex>({
     name: 'fields',
     initial: emptyFieldIndex,
     // A reviewer-shaped token without `doc.forms.read` is a common narrowed
     // scope: skip the doomed read and report `forbidden`.
     readable: () => ctx.allows('doc.forms.read'),
-    load: async (doc) => ({ value: indexFields(await doc.forms.list()) }),
+    load: async (doc) => ({ value: indexLoadedFields(fields.get(), await doc.forms.list()) }),
     fold: foldFormEvent,
-    changed: ({ cause, event, previous, next }) => {
+    predict: predictFormOp,
+    changed: ({ cause, event, next }) => {
       if (cause === 'load') {
         if (next.snapshot) events.resynced.emit({ snapshot: next.snapshot });
         return;
@@ -51,15 +48,10 @@ export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror
         case 'forms.deleted':
           if (event.deleted) events.fieldDeleted.emit({ ref: event.deleted, origin });
           return;
-        case 'forms.effectsApplied':
-        case 'forms.imported':
-          for (const field of fieldsWithChangedValues(previous, next)) {
-            events.valueChanged.emit({ field, origin });
-          }
-          return;
         default:
           return;
       }
     },
   });
+  return fields;
 }

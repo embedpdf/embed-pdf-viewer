@@ -77,7 +77,7 @@ export default function App() {
               <RenderLayer />
             ) : (
               <>
-                <RenderLayer annotations={false} />
+                <RenderLayer />
                 <AnnotationLayer />
               </>
             )

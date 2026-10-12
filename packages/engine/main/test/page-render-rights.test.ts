@@ -29,7 +29,7 @@ describe('page pictures draw what the caller may read (local engine)', () => {
     {
       who: 'a filler, who may not read annotations',
       scope: ['doc.open', 'doc.render', 'doc.forms.fill'],
-      shows: { box: WHITE, square: WHITE },
+      shows: { box: GREEN, square: WHITE },
       refused: { includeAnnotations: true },
     },
     {

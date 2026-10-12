@@ -25,13 +25,13 @@ import {
   wirePack,
   type AnnotationActor,
   type ChangeAuthority,
-  type ChangeOp,
+  type RecordedOp,
   type ChangeRecordPayload,
   type PageCoordinates,
   type ServerChangeOutcome,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type AnnotationCreateResult,
-  type AnnotationImportPages,
+  type BundleImportPages,
   type AnnotationImportResult,
   type AnnotationDeleteResult,
   type AnnotationDraft,
@@ -44,9 +44,6 @@ import {
   type WireResourceMap,
   type AnnotationRef,
   type AnnotationUpdateResult,
-  type FormDataFormat,
-  type FormEffect,
-  type FormEffectsResult,
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
@@ -55,6 +52,8 @@ import {
   type FormFieldUpdateResult,
   type FormFieldValue,
   type FormImportResult,
+  type FormValuesImportResult,
+  type WireFormBundle,
   type FormRepairResult,
   type FormResetResult,
   type FormSetValueResult,
@@ -63,8 +62,9 @@ import {
   type FormWidgetDeleteResult,
   type FormWidgetUpdateResult,
   type FormWidgetsReorderResult,
+  type FormCalculationsReorderResult,
+  type FieldPosition,
   type WidgetPatch,
-  type FormWidget,
   type Identity,
   type WidgetPlacement,
   type MetadataPatch,
@@ -465,9 +465,9 @@ export class LayerService {
   }
 
   /**
-   * `doc.annotations.import` on a layer: one worker job, whose failure
-   * leaves the session as it was, then one artifact, one commit across every
-   * page it touched and one audit row.
+   * `doc.annotations.import` on a layer: one change, its one op the import,
+   * kept under the request's `Idempotency-Key` with the record that undoes
+   * it, and audited as `annot.import`.
    */
   async importAnnotations(
     ctx: LayerWriteContext,
@@ -475,51 +475,29 @@ export class LayerService {
       docId: string;
       layerName: string;
       bundle: WireAnnotationBundle;
-      pages?: AnnotationImportPages;
+      pages?: BundleImportPages;
       attribution: 'restore' | 'stamp';
       /** The caller's identity, which `'stamp'` attributes each annotation to. */
       actor?: AnnotationActor;
-      limits: AnnotationBundleLimits;
+      limits: BundleLimits;
     },
     signal?: AbortSignal,
   ): Promise<AnnotationImportResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack(
-            {
-              kind: 'annotations.import' as const,
-              effect: 'write' as const,
-              jobId,
-              opId,
-              docId: input.docId,
-              layerName: input.layerName,
-              bundle: input.bundle,
-              ...(input.pages !== undefined ? { pages: input.pages } : {}),
-              attribution: input.attribution,
-              ...(input.actor ? { actor: input.actor } : {}),
-              limits: input.limits,
-              artifactPath,
-            },
-            Object.values(input.bundle.resources),
-          );
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'annotations.import') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected annotations.import payload: ${payload.tag}`,
-          );
-        }
-        // Everything was left out: nothing was written, nothing to commit.
-        if (payload.result.annotations.length === 0) return payload.result;
-        return this.persistAnnotationImport(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<AnnotationImportResult>(
+      ctx,
+      input,
+      {
+        type: 'annotations.import',
+        bundle: input.bundle,
+        ...(input.pages !== undefined ? { pages: input.pages } : {}),
+        attribution: input.attribution,
+        ...(input.actor ? { actor: input.actor } : {}),
+        limits: input.limits,
+      },
+      checkedAuthority(input.actor),
+      'annot.import',
+      signal,
+    );
   }
 
   async updateAnnotation(
@@ -1272,44 +1250,23 @@ export class LayerService {
     return payload.snapshot;
   }
 
-  /** Read: serialized FDF/XFDF of the reconciled form state. */
-  async exportFormData(
-    ctx: OpenContext,
-    input: { docId: string; layerName: string; format: FormDataFormat },
-    signal?: AbortSignal,
-  ): Promise<{ format: FormDataFormat; bytes: ArrayBuffer }> {
-    const documentService = this.requireDocumentService();
-    await documentService.getLayerManifest(ctx, input.docId, input.layerName);
-    await documentService.ensureLayerOnPool(ctx, input.docId, input.layerName);
-    const build = (jobId: WorkerJobId) =>
-      wirePack({
-        kind: 'forms.export' as const,
-        effect: 'snapshot' as const,
-        jobId,
-        docId: input.docId,
-        layerName: input.layerName,
-        format: input.format,
-      });
-    const payload = await this.requirePool().run(input.docId, build, signal);
-    if (payload.tag !== 'forms.export') {
-      throw new EngineError(
-        EngineErrorCode.WireFormat,
-        `unexpected forms.export payload: ${payload.tag}`,
-      );
-    }
-    return { format: payload.format, bytes: payload.bytes };
-  }
-
   async setFormValue(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef; value: FormFieldValue },
+    input: {
+      docId: string;
+      layerName: string;
+      ref: FormFieldRef;
+      value: FormFieldValue;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<FormSetValueResult> {
     return this.applySingleOp<FormSetValueResult>(
       ctx,
       input,
       { type: 'forms.setValue', field: input.ref, value: input.value },
-      checkedAuthority(actorFromContext(ctx)),
+      input.authority,
       'form.setValue',
       signal,
     );
@@ -1318,111 +1275,97 @@ export class LayerService {
   /** Reset the fields named, or the whole form without `refs`. */
   async resetForm(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; refs?: FormFieldRef[] },
+    input: {
+      docId: string;
+      layerName: string;
+      refs?: FormFieldRef[];
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<FormResetResult> {
     return this.applySingleOp<FormResetResult>(
       ctx,
       input,
       { type: 'forms.reset', ...(input.refs ? { fields: input.refs } : {}) },
-      checkedAuthority(),
+      input.authority,
       'form.reset',
       signal,
     );
   }
 
-  async applyFormEffects(
+  /**
+   * `doc.forms.import` on a layer: one change, its one op the import, kept
+   * under the request's `Idempotency-Key` with the record that undoes it,
+   * and audited as `form.import`.
+   */
+  async importForm(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; effects: FormEffect[] },
-    signal?: AbortSignal,
-  ): Promise<FormEffectsResult> {
-    const opId = writeOpIdOf(ctx);
-    // The scripts' values count as filled in by the user whose fill ran them.
-    const actor = actorFromContext(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      const { layer } = materialized;
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.runLayerWrite(
-          input.docId,
-          (jobId) =>
-            wirePack({
-              kind: 'forms.applyEffects' as const,
-              effect: 'write' as const,
-              jobId,
-              opId,
-              docId: input.docId,
-              layerName: input.layerName,
-              effects: input.effects,
-              artifactPath,
-              ...(actor ? { actor } : {}),
-            }),
-          signal,
-        );
-        if (payload.tag !== 'forms.applyEffects') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected forms.applyEffects payload: ${payload.tag}`,
-          );
-        }
-        const result = payload.result;
-        if (!payload.wrote) return result;
-
-        const touchedPages = widgetPages(result.meta.changedWidgets);
-        const failed = result.results.filter((entry) => entry.status === 'failed');
-        for (const entry of failed) {
-          touchedPages.push(...widgetPages(entry.fields.flatMap((field) => field.widgets)));
-        }
-        // A failed native call is outcome-indeterminate. If its field could
-        // not be re-read, invalidate every page rather than under-reporting
-        // a possibly changed widget appearance.
-        const conservativePages = failed.some((entry) => entry.fields.length === 0)
-          ? allPages(materialized)
-          : touchedPages;
-
-        return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
-          auditKind: 'form.applyEffects',
-          touchedPages: conservativePages,
-          result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async importFormData(
-    ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; data: ArrayBuffer; format?: FormDataFormat },
+    input: {
+      docId: string;
+      layerName: string;
+      bundle: WireFormBundle;
+      pages?: BundleImportPages;
+      attribution: 'restore' | 'stamp';
+      values: boolean;
+      /** Whether the caller holds `doc.forms.script`, which the route checked. */
+      mayScript: boolean;
+      limits: BundleLimits;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<FormImportResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.runFormMutation(
+    const actor = actorFromContext(ctx);
+    return this.applySingleOp<FormImportResult>(
       ctx,
+      input,
       {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.import',
-        auditKind: 'form.import',
-        build: (jobId, artifactPath) =>
-          wirePack(
-            {
-              kind: 'forms.import' as const,
-              effect: 'write' as const,
-              jobId,
-              opId,
-              docId: input.docId,
-              layerName: input.layerName,
-              data: input.data,
-              ...(input.format ? { format: input.format } : {}),
-              artifactPath,
-            },
-            [input.data],
-          ),
-        // The worker reports per-field counts, not per-widget pages; an
-        // import may touch widgets on any page, so every page's annotation
-        // collection is conservatively invalidated.
-        touchedPages: (_result: FormImportResult, materialized) => allPages(materialized),
+        type: 'forms.import',
+        bundle: input.bundle,
+        ...(input.pages !== undefined ? { pages: input.pages } : {}),
+        attribution: input.attribution,
+        values: input.values,
+        ...(actor ? { actor } : {}),
+        limits: input.limits,
+        mayScript: input.mayScript,
       },
+      input.authority,
+      'form.import',
+      signal,
+    );
+  }
+
+  /**
+   * `doc.forms.importValues` on a layer: one change, as {@link importForm},
+   * audited as `form.importValues`.
+   */
+  async importFormValues(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      bundle: WireFormBundle;
+      attribution: 'restore' | 'stamp';
+      limits: BundleLimits;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
+    signal?: AbortSignal,
+  ): Promise<FormValuesImportResult> {
+    const actor = actorFromContext(ctx);
+    return this.applySingleOp<FormValuesImportResult>(
+      ctx,
+      input,
+      {
+        type: 'forms.importValues',
+        bundle: input.bundle,
+        attribution: input.attribution,
+        ...(actor ? { actor } : {}),
+        limits: input.limits,
+      },
+      input.authority,
+      'form.importValues',
       signal,
     );
   }
@@ -1468,6 +1411,8 @@ export class LayerService {
       objectNumber?: number;
       /** Its widgets', in `draft.widgets` order: ones the editing session holds. */
       widgetObjectNumbers?: readonly number[];
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
     },
     signal?: AbortSignal,
   ): Promise<FormFieldCreateResult> {
@@ -1480,7 +1425,7 @@ export class LayerService {
         ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
         ...(input.widgetObjectNumbers ? { widgetObjectNumbers: input.widgetObjectNumbers } : {}),
       },
-      checkedAuthority(actorFromContext(ctx)),
+      input.authority,
       'form.createField',
       signal,
     );
@@ -1488,14 +1433,21 @@ export class LayerService {
 
   async updateFormField(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef; patch: FormFieldPatch },
+    input: {
+      docId: string;
+      layerName: string;
+      ref: FormFieldRef;
+      patch: FormFieldPatch;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
     return this.applySingleOp<FormFieldUpdateResult>(
       ctx,
       input,
       { type: 'forms.update', field: input.ref, patch: input.patch },
-      checkedAuthority(),
+      input.authority,
       'form.updateField',
       signal,
     );
@@ -1509,6 +1461,8 @@ export class LayerService {
       layerName: string;
       ref: FormFieldRef;
       pdf: Uint8Array;
+      /** Who writes, their grants and the document's protection: checked field by field in the write. */
+      authority: ChangeAuthority;
     },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
@@ -1520,7 +1474,7 @@ export class LayerService {
         field: input.ref,
         appearance: { pdf: input.pdf },
       },
-      checkedAuthority(),
+      input.authority,
       'form.setSignatureAppearance',
       signal,
     );
@@ -1643,6 +1597,22 @@ export class LayerService {
       },
       checkedAuthority(),
       'form.reorderWidgets',
+      signal,
+    );
+  }
+
+  /** The form's calculation order: `fields` go together to `position`. */
+  async reorderFormCalculations(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; fields: FormFieldRef[]; position: FieldPosition },
+    signal?: AbortSignal,
+  ): Promise<FormCalculationsReorderResult> {
+    return this.applySingleOp<FormCalculationsReorderResult>(
+      ctx,
+      input,
+      { type: 'forms.reorderCalculations', fields: input.fields, position: input.position },
+      checkedAuthority(),
+      'form.reorderCalculations',
       signal,
     );
   }
@@ -2405,7 +2375,7 @@ export class LayerService {
   private async applySingleOp<T>(
     ctx: LayerWriteContext,
     target: { docId: string; layerName: string },
-    op: ChangeOp<PageCoordinates, WireAnnotationResources>,
+    op: RecordedOp<PageCoordinates, WireAnnotationResources>,
     authority: ChangeAuthority,
     auditKind: AuditMutationKind,
     signal?: AbortSignal,
@@ -2768,35 +2738,6 @@ export class LayerService {
       nextVersion,
     });
     this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
-  private async persistAnnotationImport(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      result: AnnotationImportResult;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<AnnotationImportResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitAnnotationImport({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      raw: input.result,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    // The response is the audited payload — one fact for caller and history.
     return committed.result;
   }
 
@@ -3417,112 +3358,6 @@ export class LayerService {
       });
   }
 
-  /**
-   * An import's commit: every page it touched advances its annotation
-   * version, the layer's `doc_version` and bulk annotations pin once, and one audit row holds the finalized result
-   * under the request's idempotency key.
-   */
-  private async commitAnnotationImport(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    raw: AnnotationImportResult;
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-  }): Promise<{ result: AnnotationImportResult; auditId: number }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await this.readLayerForCommit(trx, input.layer);
-        const affected = input.raw.meta.affectedPages.map((page) => page.objectNumber);
-
-        const nextPages: DurablePageRow[] = [];
-        for (const pageObjectNumber of affected) {
-          const row = await trx
-            .selectFrom('layer_pages')
-            .selectAll()
-            .where('layer_id', '=', input.layer.id)
-            .where('page_object_number', '=', pageObjectNumber)
-            .executeTakeFirst();
-          if (!row) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `annotations.import reported unknown page object number ${pageObjectNumber}`,
-            );
-          }
-          nextPages.push({
-            pageObjectNumber,
-            contentVersion: Number(row.content_version),
-            annotationVersion: Number(row.annotation_version) + 1,
-            widgetVersion: Number(row.widget_version),
-            updatedAt: now,
-          });
-        }
-
-        const previousLayerDocVersion = Number(currentLayer.doc_version);
-        const layerDocVersion = previousLayerDocVersion + 1;
-        const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
-        const result: AnnotationImportResult = {
-          ...input.raw,
-          meta: {
-            ...input.raw.meta,
-            cacheDelta: this.layerState.buildCacheDelta({
-              docId: input.docId,
-              layerName: input.layerName,
-              previousDocVersion: previousLayerDocVersion,
-              docVersion: layerDocVersion,
-              annotationsVersion,
-              pages: nextPages,
-            }),
-          },
-        };
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: 'annot.import',
-          pageObjectNumber: null,
-          affectedPages: affected,
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          input,
-          { doc_version: layerDocVersion, annotations_version: annotationsVersion },
-          auditId,
-          now,
-        );
-        for (const page of nextPages) {
-          await trx
-            .updateTable('layer_pages')
-            .set({
-              content_version: page.contentVersion,
-              annotation_version: page.annotationVersion,
-              widget_version: page.widgetVersion,
-              updated_at: now,
-            })
-            .where('layer_id', '=', input.layer.id)
-            .where('page_object_number', '=', page.pageObjectNumber)
-            .execute();
-        }
-
-        return { result, auditId };
-      });
-  }
-
   private async commitRedactionApply(input: {
     ctx: LayerWriteContext;
     docId: string;
@@ -3706,7 +3541,13 @@ export class LayerService {
    */
   async prepareSignature(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; input: SignaturePrepareInput },
+    input: {
+      docId: string;
+      layerName: string;
+      input: SignaturePrepareInput;
+      /** Who signs and their grants: the worker checks the field is theirs to sign. */
+      authority: ChangeAuthority;
+    },
     signal?: AbortSignal,
   ): Promise<SignaturePrepared> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
@@ -3741,6 +3582,7 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             input: input.input,
+            authority: input.authority,
           }),
         signal,
       );
@@ -5052,14 +4894,6 @@ function requireLayerArtifact(payload: unknown): LayerArtifactInput {
     );
   }
   return artifact;
-}
-
-/**
- * The pages a widget change report touched. A widget stored as a direct
- * object has no page (`page === null`) and is skipped.
- */
-function widgetPages(widgets: ReadonlyArray<FormWidget>): PageObjectNumber[] {
-  return widgets.flatMap((widget) => (widget.page === null ? [] : [widget.page.objectNumber]));
 }
 
 /** One key grammar for everything scoped to a layer's write pipeline. */

@@ -26,7 +26,7 @@ export type { CustomMetadata } from './dto/CustomMetadata';
 export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
-export type { PageLayout, PageBoxes } from './dto/PageLayout';
+export type { PageLayout, PageBoxes, PageTabOrder } from './dto/PageLayout';
 export type {
   PdfActionType,
   PdfActionNode,
@@ -41,8 +41,23 @@ export type {
   ActionReadBudget,
   SubmitFormFlags,
   SubmitFormPayload,
+  PdfActionWrite,
+  FieldScriptWrite,
+  FieldScriptEvent,
+  FieldActionsPatch,
+  WidgetActionEvent,
+  WidgetActionsPatch,
 } from './dto/PdfAction';
-export { decodeSubmitFormFlags } from './dto/PdfAction';
+export {
+  actionWriteOf,
+  decodeSubmitFormFlags,
+  fieldScriptOf,
+  isFieldScript,
+  needsScriptRight,
+  widgetActionsOf,
+  writesScripts,
+  WIDGET_ACTION_EVENTS,
+} from './dto/PdfAction';
 
 // Canonical PDF-document geometry vocabulary (y-up, edges, browser-free).
 export type {
@@ -70,6 +85,8 @@ export {
   pdfQuadBounds,
   normalizePdfQuad,
   pdfRectTurnedBounds,
+  pdfQuarterTurnBox,
+  quarterTurnOf,
   pdfRectIntersection,
   isSamePdfRect,
   pdfPointsBounds,
@@ -100,6 +117,7 @@ export { glyphLooseBounds, glyphLooseQuad, isRotatedGeometryRun } from './dto/Pa
 export type {
   PageImageHandle,
   PageImageBlobSource,
+  ImageSource,
   PageImageOptions,
   PageImageObjectUrl,
   PageImageResult,
@@ -111,13 +129,19 @@ export type {
   PageRenderEncodedFormat,
   PageRenderFormat,
   PageRenderImage,
+  PageRenderLayers,
   PageRenderOptions,
   PageRenderRaster,
   PageRenderQuery,
   PageRenderTarget,
   PageRenderViewport,
 } from './dto/PageRender';
-export { checkImageQuality, createPageImageHandle, resolvePageLayers } from './dto/PageRender';
+export {
+  checkImageQuality,
+  createPageImageHandle,
+  imageSourceOfBytes,
+  resolvePageLayers,
+} from './dto/PageRender';
 export {
   ANNOTATION_APPEARANCE_MODES,
   appearanceModesOf,
@@ -133,8 +157,8 @@ export type {
   AnnotationAppearancesResult,
   AnnotationAppearanceImage,
   AnnotationAppearanceImagesResult,
-  AnnotationAppearanceManifestEntry,
-  AnnotationAppearanceManifest,
+  AnnotationAppearanceBatchEntry,
+  AnnotationAppearanceBatch,
 } from './dto/AnnotationRender';
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
@@ -205,6 +229,8 @@ export type {
   AnnotationReplyType,
   AnnotationBorderStyle,
   DrawnBorderStyle,
+  WidgetBorderStyle,
+  WidgetCheckStyle,
   StandardFont,
   FreeTextFont,
   TextAlignment,
@@ -264,13 +290,24 @@ export {
 } from './annotation/resources';
 export { normalizeAttachmentFileSource } from './dto/normalizeAttachmentFileSource';
 
-// Annotation bundles: annotations and their resources, to move between
-// documents in one call, and the JSON file that holds one.
+// Bundles: rows and their resources, to move between documents in one call,
+// and the JSON file that holds one. What every family shares, then
+// annotations.
+export type {
+  BundleImportPages,
+  BundleImportTarget,
+  BundleKind,
+  BundlePage,
+  ResourceId,
+} from './transfer/bundle';
+export { bundlePageMapping, resourceIdOf } from './transfer/bundle';
+export type { BundleLimits } from './transfer/bundleLimits';
+export { assertWithinLimit, DEFAULT_BUNDLE_LIMITS, manifestBytesOf } from './transfer/bundleLimits';
+export type { BundleCodec, BundleFileSpec, BundleTransferOptions } from './transfer/codec';
+export { bundleCodec } from './transfer/codec';
 export type {
   AnnotationBundle,
   AnnotationBundleItem,
-  AnnotationBundlePage,
-  ResourceId,
   WireAnnotationBundle,
 } from './transfer/AnnotationBundle';
 export type { AnnotationExportSelection } from './transfer/exportSelection';
@@ -278,11 +315,9 @@ export type {
   AnnotationDropReason,
   AnnotationImportDrop,
   AnnotationImportOptions,
-  AnnotationImportManifest,
-  AnnotationImportPages,
+  AnnotationImportBody,
   AnnotationImportPlan,
   AnnotationImportResult,
-  AnnotationImportTarget,
   PlannedAnnotation,
 } from './transfer/annotationImport';
 export { annotationImportFacts, planAnnotationImport } from './transfer/annotationImport';
@@ -290,17 +325,45 @@ export { closeExportSelection } from './transfer/exportSelection';
 export { mapPageRefs, pageRefsIn } from './transfer/pageRefs';
 export {
   assertAnnotationBundle,
-  assertBundleManifest,
-  resourceIdOf,
+  assertAnnotationBundleManifest,
 } from './transfer/AnnotationBundle';
-export type { AnnotationBundleLimits } from './transfer/bundleLimits';
-export {
-  assertWithinLimit,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
-  manifestBytesOf,
-} from './transfer/bundleLimits';
-export type { AnnotationTransferOptions } from './transfer/AnnotationTransfer';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
+// Form bundles: whole fields with their widgets, to copy a form's design or
+// fill it again, and the JSON file that holds one.
+export type {
+  FormBundle,
+  FormBundleField,
+  FormBundleWidget,
+  WireFormBundle,
+} from './transfer/FormBundle';
+export { assertFormBundle, assertFormBundleManifest } from './transfer/FormBundle';
+export { FormTransfer } from './transfer/FormTransfer';
+export type { FormExportRows, FormExportSelection } from './transfer/formExport';
+export { fieldMatches, formExportRowsOf } from './transfer/formExport';
+export type {
+  FormImportBody,
+  FormImportDrop,
+  FormImportDropReason,
+  FormImportOptions,
+  FormImportPlan,
+  FormImportResult,
+  FormValuesImportBody,
+  FormValuesImportDrop,
+  FormValuesImportDropReason,
+  FormValuesImportOptions,
+  FormValuesImportResult,
+  FormValuesImportTarget,
+  PlannedFormField,
+  PlannedValueWrite,
+  WidgetFlags,
+} from './transfer/formImport';
+export {
+  formImportFacts,
+  formValuesImportFacts,
+  planFormImport,
+  planFormValuesImport,
+  WIDGET_FLAG_NAMES,
+} from './transfer/formImport';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
 // file-attachment kind and the document-level attachments service.
@@ -479,6 +542,7 @@ export {
   resolveMeasurementDraft,
   touchesCaption,
   type DraftResolveOptions,
+  type PlacedDraft,
   type ResolveOptions,
 } from './annotation/resolve';
 export {
@@ -488,10 +552,13 @@ export {
 } from './annotation/defaults';
 export {
   faceForFreeTextFont,
+  familyKey,
+  freeTextFontForFace,
   isStandardFontName,
   STANDARD_FACES,
   type DescribeFont,
   type FaceRequest,
+  type KeyForFace,
 } from './annotation/fontFaces';
 
 // Page space: positions from the top-left of a page's visible box, y down.
@@ -542,29 +609,52 @@ export type {
   RadioFieldDraft,
   ComboBoxFieldDraft,
   ListBoxFieldDraft,
+  PushButtonFieldDraft,
+  SignatureFieldDraft,
   FormFieldDraft,
 } from './forms/draft';
+export { draftWritesScripts } from './forms/draft';
+export { placedWidgetOf, type PlacedWidget } from './forms/placement';
 export type {
   TextFieldPatch,
   CheckboxFieldPatch,
   RadioFieldPatch,
   ComboBoxFieldPatch,
   ListBoxFieldPatch,
+  PushButtonFieldPatch,
+  SignatureFieldPatch,
   FormFieldPatch,
 } from './forms/patch';
-export type { FormFieldValue, FormDataFormat } from './forms/value';
+export type { FormFieldValue } from './forms/value';
+export { fieldValueOf } from './forms/value';
+export {
+  assertChoiceDefault,
+  fieldValueWriteOf,
+  isAtDefault,
+  isNoOpWrite,
+  valueEntriesEqual,
+  type ChoiceDefaultTarget,
+  type FieldValueWrite,
+} from './forms/write';
+export {
+  fieldAfterReset,
+  fieldAfterValue,
+  formFieldAfter,
+  defaultEntryOfDraft,
+  formFieldOfDraft,
+  topRowOf,
+  widgetsAfterDisplay,
+  type FieldDraftContext,
+  type FieldWithWidgets,
+} from './forms/predict';
+export { fitWidgetToFamily, widgetAfterPatch } from './forms/widgets';
 export type {
   FormSubmissionEntry,
   FormSubmissionRequest,
   FormSubmissionReceipt,
 } from './forms/submission';
-export type {
-  FormFieldDisplay,
-  FormEffect,
-  FormEffectStatus,
-  FormEffectResult,
-  FormEffectsResult,
-} from './forms/effects';
+export type { FormFieldDisplay, FormEffect } from './forms/effects';
+export { formEffectOps } from './forms/effects';
 export type {
   BaseVersionInfo,
   DigestAlgorithm,
@@ -652,8 +742,6 @@ export type {
   FormMutationMeta,
   FormSetValueResult,
   FormResetResult,
-  FormImportResult,
-  FormDataExport,
   FormRepairResult,
   FormFieldCreateResult,
   FormFieldUpdateResult,
@@ -663,6 +751,7 @@ export type {
   FormWidgetRestoreResult,
   FormWidgetRows,
   FormWidgetsReorderResult,
+  FormCalculationsReorderResult,
   FormWidgetUpdateResult,
 } from './mutation/FormMutationResults';
 // Search: contract types + the pure match/anchor stages. The matcher and
@@ -711,7 +800,12 @@ export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 export type { PageReorderInput } from './mutation/PageReorderInput';
 export type { PageReorderResult } from './mutation/PageReorderResult';
 export { anchorOf, positionIndex, reorderPart, reorderedList } from './mutation/ListPosition';
-export type { AnnotationPosition, ListPosition, PagePosition } from './mutation/ListPosition';
+export type {
+  AnnotationPosition,
+  FieldPosition,
+  ListPosition,
+  PagePosition,
+} from './mutation/ListPosition';
 export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
 export type { PageNameResult } from './mutation/PageNameResult';
 export type {
@@ -730,14 +824,20 @@ export { opIdOf } from './mutation/WriteOptions';
 export {
   isSkippedItem,
   isUndoChange,
+  itemWrote,
   objectNumbersNamedBy,
+  objectNumbersReferencedBy,
   resolveChangeResources,
 } from './mutation/Change';
 export { changeFingerprint, isKeptRefusal } from './mutation/changeOutcome';
 export type {
+  AnnotationImportOp,
+  FormImportOp,
   Change,
   ChangeAnswer,
   ChangeOp,
+  RecordedChange,
+  RecordedOp,
   ChangeItem,
   ChangeResult,
   ChangeItemType,
@@ -776,6 +876,8 @@ export type {
   CollabEntity,
   CollabFilter,
   DocCapability,
+  FieldAction,
+  FieldFilter,
   Identity,
   ParsedCapability,
   ParsedCollab,
@@ -787,22 +889,32 @@ export type {
 export { PDF_BITS, decodePdfBits } from './auth/scope';
 export { parseScope, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
-export type { AnnotationAuthority, ChangeAuthority } from './auth/scope';
+export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {
   annotationWriteCapabilities,
   annotationWriteCapability,
   authorizeAnnotationCreate,
+  allowsCapability,
   authorizeCapability,
   authorizeUnprotected,
   authorizeAnnotationDelete,
   authorizeAnnotationUpdate,
+  allowsFieldWrite,
+  allowsSomeFieldWrite,
+  authorizeFieldGroup,
+  authorizeFieldWrite,
 } from './auth/scope';
 export type { CollabTarget } from './auth/scope';
 export { collabTargetOf } from './auth/scope';
 export {
   checkAnyCapability,
+  checkAnyFieldAction,
   checkCapability,
   checkCollab,
+  checkFieldAction,
+  fieldRightsOf,
+  type FieldGroupRight,
+  type FieldRights,
   checkSetGroup,
   expandedCapabilities,
   expandRawScope,

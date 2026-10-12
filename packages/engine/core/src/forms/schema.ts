@@ -5,16 +5,20 @@ import { z } from 'zod';
 
 import { WidgetDTOSchema } from '../annotation/kinds/widget';
 import { WIDGET_STYLE_SHAPE, WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
-import { PageBoxSchema } from '../geometry/schemas';
+import { PageBoxSchema, PdfRotationSchema } from '../geometry/schemas';
 import type { FormWidget } from '../identity/FormFieldRef';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
 import type { FormFieldPatch } from './patch';
 import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
 import type { FormKind, FormSnapshot } from './snapshot';
-import type { FormDataFormat, FormFieldValue } from './value';
+import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
-import { PdfFieldActionsSchema } from '../dto/PdfAction.schema';
+import {
+  FieldActionsPatchSchema,
+  PdfFieldActionsSchema,
+  WidgetActionsPatchSchema,
+} from '../dto/PdfAction.schema';
 
 export { FormFieldRefSchema };
 
@@ -62,6 +66,7 @@ const FormFieldBaseShape = {
   valueEntry: FormValueEntrySchema,
   defaultValueEntry: FormValueEntrySchema,
   actions: PdfFieldActionsSchema.optional(),
+  groupId: z.string().nullable(),
   createdBy: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
   filledBy: z.string().nullable(),
@@ -112,6 +117,7 @@ export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = z.discriminatedUnion(
     defaultValue: z.array(z.string()),
     multiSelect: z.boolean(),
     options: z.array(FormFieldOptionSchema),
+    topIndex: z.number().int().nonnegative(),
   }),
   z.object({
     ...FormFieldBaseShape,
@@ -157,15 +163,16 @@ export const FormFieldValueSchema: z.ZodType<FormFieldValue> = z
     { message: 'exactly one of value, checked or selectedValues' },
   ) as unknown as z.ZodType<FormFieldValue>;
 
-export const FormDataFormatSchema: z.ZodType<FormDataFormat> = z.enum(['fdf', 'xfdf']);
-
 export { WidgetAppearanceSchema };
 
 export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z
   .object({
     page: PageRefSchema,
-    rect: PageBoxSchema,
+    rect: PageBoxSchema.optional(),
+    box: PageBoxSchema.optional(),
+    rotation: PdfRotationSchema.optional(),
     exportValue: z.string().min(1).optional(),
+    actions: WidgetActionsPatchSchema.optional(),
     ...WIDGET_STYLE_SHAPE,
   })
   .strict() as unknown as z.ZodType<WidgetPlacement>;
@@ -182,6 +189,8 @@ const FormFieldDraftBaseShape = {
   noExport: z.boolean().optional(),
   alternateName: z.string().optional(),
   mappingName: z.string().optional(),
+  groupId: z.string().min(1).max(256).optional(),
+  actions: FieldActionsPatchSchema.optional(),
   widgets: z.array(WidgetPlacementSchema).optional(),
 };
 
@@ -225,6 +234,7 @@ export const FormFieldDraftSchema: z.ZodType<FormFieldDraft> = z.discriminatedUn
       defaultValue: z.array(z.string()).optional(),
     })
     .strict(),
+  z.object({ ...FormFieldDraftBaseShape, family: z.literal('pushbutton') }).strict(),
   z.object({ ...FormFieldDraftBaseShape, family: z.literal('signature') }).strict(),
 ]) as unknown as z.ZodType<FormFieldDraft>;
 
@@ -235,6 +245,8 @@ const FormFieldPatchBaseShape = {
   noExport: z.boolean().optional(),
   alternateName: z.string().nullable().optional(),
   mappingName: z.string().nullable().optional(),
+  groupId: z.string().min(1).max(256).optional(),
+  actions: FieldActionsPatchSchema.optional(),
 };
 
 /**
@@ -245,7 +257,9 @@ const FormFieldPatchBaseShape = {
 export const FormFieldPatchSchema: z.ZodType<FormFieldPatch> = z
   .object({
     ...FormFieldPatchBaseShape,
-    family: z.enum(['text', 'checkbox', 'radio', 'combobox', 'listbox', 'signature']).optional(),
+    family: z
+      .enum(['text', 'checkbox', 'radio', 'combobox', 'listbox', 'pushbutton', 'signature'])
+      .optional(),
     // A string for text fields and dropdowns, option values for a list.
     defaultValue: z
       .union([z.string(), z.array(z.string())])

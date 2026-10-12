@@ -23,7 +23,7 @@ export function Pages() {
     <Stage>
       {() => (
         <>
-          <RenderLayer annotations={false} />
+          <RenderLayer />
           <SelectionLayer />
           <AnnotationLayer />
         </>

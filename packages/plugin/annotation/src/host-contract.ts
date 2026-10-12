@@ -4,12 +4,15 @@
  * extension seams. Same runtime token as the public one, typed wider.
  */
 import { createHostToken } from '@embedpdf/core';
-import type { DocumentEvent, EventHook, Unsubscribe } from '@embedpdf/core';
+import type { DocumentEvent, EventHook, PredictedOp, Unsubscribe } from '@embedpdf/core';
 import type {
   ChromeNode,
+  Effect,
   Id,
+  Model,
   Rect,
   RenderItem,
+  SceneNode,
   KindName,
   TextEndAnchor,
   Quad,
@@ -19,7 +22,10 @@ import type {
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
+  AnnotationPosition,
   AnnotationRef,
+  ChangeOp,
+  ImageSource,
   PageMeasurementViewport,
   PageRef,
   PdfMeasure,
@@ -27,6 +33,7 @@ import type {
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
+import type { AppearancePicture } from '@embedpdf/plugin-render/contract/host';
 
 import type {
   Annotation,
@@ -51,6 +58,79 @@ export {
   ANNOTATION_MARQUEE_PRIORITY,
   ANNOTATION_PLACE_PRIORITY,
 } from './priorities';
+
+/**
+ * One annotation's look at rest in one of its states, as the render layer
+ * paints it: the engine's picture, or, while the annotation's create is on
+ * its way, the one this device made (a placed stamp's preview), which the
+ * engine's replaces. `version` is the record's picture version it shows
+ * (`RenderItem.pictureVersion`): one drawn at another version shows another look.
+ */
+export interface AnnotationAppearancePicture extends Pick<
+  AnnotationAppearanceImage,
+  'ref' | 'mode' | 'state' | 'rect'
+> {
+  readonly image: ImageSource;
+  readonly version: number;
+}
+
+/**
+ * A sibling plugin that lends this plugin records it owns (the form plugin's
+ * widgets), so they are selected, moved, resized, restyled and deleted with
+ * the annotation tools. This plugin never stores them: it shows them as the
+ * lender says, and an edit of one becomes the lender's ops, in the same change
+ * as the rest of the edit.
+ */
+export interface AnnotationLender {
+  /** Who owns the records, for a refusal that sends you there (`'form'`). */
+  readonly owner: string;
+  /**
+   * Its records as the engine confirmed them and as they show, each list the
+   * same object until it changes; `null` while it lends none.
+   */
+  records(): {
+    readonly confirmed: readonly Annotation[];
+    readonly shown: readonly Annotation[];
+  } | null;
+  /**
+   * The ops that write a message's effects on its records, all at once:
+   * `model` is the model the message left, `before` the one it started from
+   * (a record it deleted is there).
+   */
+  opsOf(effects: readonly Effect[], model: Model, before: Model): readonly ChangeOp[];
+  /** What undoing these ops looks like. */
+  undoOf(ops: readonly ChangeOp[]): readonly PredictedOp[];
+  /** The ops that move these records of one page to `position` in its drawing order. */
+  reorderOps(
+    page: PageRef,
+    refs: readonly AnnotationRef[],
+    position: AnnotationPosition,
+  ): readonly ChangeOp[];
+  /** Whether this session may change and delete the record. */
+  authority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
+  /** What its records' pictures on a page depend on: a new value means new pictures. */
+  pictureEpoch(page: PageRef): string;
+  /** A record's confirmed picture version; kept for one that went, so an undo brings it back with it. */
+  pictureVersion(record: AnnotationRef): number;
+  /**
+   * The record's look as it shows isn't its confirmed look yet, whatever changed it (a restyle,
+   * a resize, one just placed, a change the lender made itself): it draws live, by its
+   * {@link painter}, until the engine's picture of it is there.
+   */
+  pending(record: AnnotationRef): boolean;
+  /**
+   * How the lender draws the record live: the record upright in `box` (its box, or where a
+   * gesture has it), in page space; `null` for one it doesn't draw. A record with a painter
+   * draws live while a gesture reshapes it, as a square does.
+   */
+  painter(record: Annotation): ((box: Rect) => readonly SceneNode[]) | null;
+  /** Its records' pictures on a page, at rest, in every state, each with its record's picture version. */
+  renderAppearances(
+    page: PageRef,
+    scale: number,
+    signal?: AbortSignal,
+  ): Promise<readonly AppearancePicture[]>;
+}
 
 export interface RecalibrationReport {
   page: PageRef;
@@ -126,13 +206,23 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     zoom?: number,
   ): ChromeNode[];
   listLinkItems(page: PageRef): LinkNavItem[];
+  /**
+   * What a page's pictures depend on: its baked records at their picture
+   * versions, the stamps this session placed, the pictures kept for an undone
+   * delete and the lender's widgets. Load the pictures again when it changes,
+   * or when the appearance scale (`render.getAppearanceScale`) does.
+   */
   getAppearanceEpoch(page: PageRef): string;
-  getBakeScale(renderScale: number): number;
+  /**
+   * Every picture a page's annotations show at rest, in every state, each
+   * with its record's picture version: the engine's (through the render
+   * plugin; none without it), the lender's, and this session's placed stamps.
+   */
   renderAppearances(
     page: PageRef,
     scale: number,
     signal?: AbortSignal,
-  ): Promise<AnnotationAppearanceImage[]>;
+  ): Promise<AnnotationAppearancePicture[]>;
 
   // ── sync ──
   /**
@@ -265,6 +355,12 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   renderArmedStampPreview(devicePixelWidth?: number): Promise<ArmedStampPreview | null>;
 
   // ── extension ──
+  /**
+   * Show a sibling's records with the annotations and edit them with the same
+   * tools (see {@link AnnotationLender}). One lender at a time; returns the
+   * release.
+   */
+  lend(lender: AnnotationLender): Unsubscribe;
   listResolvedTools(): ResolvedTool[];
   getResolvedTool(id: string): ResolvedTool | null;
   getToolSubtype(id: string): KindName;

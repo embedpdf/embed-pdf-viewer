@@ -1,7 +1,7 @@
 <!--
   A page's annotations, the selection's outline and handles, the tool's preview and the text boxes
-  being typed in. Put it in the Stage's page content above the rendered page, with the render
-  layer leaving annotations out (`<RenderLayer annotations={false} />`).
+  being typed in. Put it in the Stage's page content above the rendered page: while it's there,
+  the render layer leaves the annotations out of the page's picture.
 
   Pure paint: it reads the plugin's per-page render items and chrome and draws them. Presses reach
   the plugin through the interaction hub (the Stage forwards them), and so does the cursor. Each
@@ -18,9 +18,11 @@
   // appearances…): the same runtime token as the public one, typed wider.
   import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
   import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+  import { RenderToken } from '@embedpdf/plugin-render/contract/host';
   import {
     annotationDrawingOf,
     bakedAppearanceOf,
+    createShownUrls,
     editingTextKeyOf,
     layerTextBoxesOf,
     loadAppearanceUrls,
@@ -29,8 +31,8 @@
     type AppearanceUrl,
   } from '@embedpdf/web';
   import { devWarn } from '../runtime/dev';
-  import { usePageLayerFact } from '../runtime/dev-registry.svelte';
   import { usePage } from '../runtime/page';
+  import { usePaintsPagePart } from '../runtime/page-layers.svelte';
   import {
     shallowArray,
     useOptionalCapability,
@@ -53,6 +55,8 @@
   let { renderers, handle, rotationHandle }: AnnotationLayerProps = $props();
 
   const page = usePage();
+  // While it's here, the page's picture leaves the annotations to it.
+  usePaintsPagePart(() => page.ref, 'annotations');
   const annotation = useOptionalCapability(AnnotationHostToken);
   const interaction = useOptionalCapability(InteractionToken);
   // The active tool decides which interactive renderers take the pointer, so a tool change draws
@@ -89,8 +93,6 @@
 
   // ── your renderers ─────────────────────────────────────────────────────────
 
-  usePageLayerFact(page, 'annotationRenderers', () => renderers ?? null);
-
   /** Bumped when the renderers' behaviors register again, so the drawings are read again. */
   let registrations = $state(0);
   let previousRenderers: AnnotationRenderer[] | undefined;
@@ -121,7 +123,11 @@
 
   // ── baked appearances ──────────────────────────────────────────────────────
 
-  let urls = $state.raw<Record<string, AppearanceUrl>>({});
+  // `null` until the page's first pictures arrive.
+  let urls = $state.raw<Record<string, AppearanceUrl> | null>(null);
+  // The pictures shown stay valid until the next ones are shown.
+  const shown = createShownUrls();
+  $effect(() => () => shown.release());
   // Baked annotations draw from engine rasters: load them again when the page's baked set or an
   // appearance version changes (a stamp just placed, a resize whose new appearance arrived), and
   // when the bake scale does. A move or a turn leaves the epoch as it is (the same pixels, placed
@@ -131,12 +137,13 @@
     (host) => host.getAppearanceEpoch(page.ref),
     null,
   );
-  // The bake scale follows the document's render policy: zoom steps inside one rung of the
-  // appearance lattice bake nothing again.
+  // The appearance scale follows the document's render policy: zoom steps inside one rung of the
+  // appearance lattice bake nothing again. Without the render plugin, only this session's
+  // pictures load.
   const bakeScale = useOptionalSelector(
-    AnnotationHostToken,
-    (host) => host.getBakeScale(page.transform.renderScale),
-    0,
+    RenderToken,
+    (render) => render.getAppearanceScale(page.transform.renderScale),
+    page.transform.renderScale,
   );
   $effect(() => {
     const host = annotation.current;
@@ -146,6 +153,7 @@
     if (!host || !scale) return;
     return untrack(() =>
       loadAppearanceUrls(
+        shown,
         (signal) => host.renderAppearances(ref, scale, signal),
         annotationKey,
         (loaded) => (urls = loaded),
@@ -183,15 +191,14 @@
 <div style="position: absolute; inset: 0; pointer-events: none">
   {#each items.current as item (item.id)}
     {@const drawing = drawingOf(item)}
-    {@const url = urls[item.id]?.url ?? null}
     <!-- The layer's own drawing, for a renderer to keep: `{@render native()}`. -->
     {#snippet native()}
-      <NativeDrawing {item} {url} />
+      <NativeDrawing {item} {urls} />
     {/snippet}
     <!-- The same in its frame, where the layer draws it: what a sibling plugin's renderer keeps. -->
     {#snippet framedNative()}
       <AnnotationFrame {item} {page}>
-        <NativeDrawing {item} {url} />
+        <NativeDrawing {item} {urls} />
       </AnnotationFrame>
     {/snippet}
     {#if drawing.kind === 'owned' && item.annotation}
@@ -213,7 +220,8 @@
           {item}
           {page}
           {native}
-          appearance={bakedAppearanceOf(urls, item.id)}
+          appearance={urls &&
+            bakedAppearanceOf(urls, item.id, item.annotation?.appearanceState ?? null)}
           interactive={drawing.interactive}
         />
       </AnnotationFrame>
@@ -221,7 +229,7 @@
       <!-- Inert when an engaged behavior has no renderer of yours: its plugin owns the input (a
            link's anchor takes the click), and the annotation keeps its own look. -->
       <AnnotationFrame {item} {page} inert={drawing.kind === 'native' && drawing.inert}>
-        <NativeDrawing {item} {url} />
+        <NativeDrawing {item} {urls} />
       </AnnotationFrame>
     {/if}
   {/each}

@@ -123,7 +123,7 @@ export class ChromeControls {
       <demo-chrome-controls [(own)]="own" />
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer>
             <!-- Your own handles: the layer places them, and still decides where they can be grabbed. -->
             @if (own()) {

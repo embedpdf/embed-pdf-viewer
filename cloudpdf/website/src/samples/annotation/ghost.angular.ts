@@ -112,7 +112,7 @@ export class Toolbar {
       <demo-toolbar [(opacity)]="opacity" />
       <epdf-stage class="stage" [style.--epdf-ghost-opacity]="opacity()">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

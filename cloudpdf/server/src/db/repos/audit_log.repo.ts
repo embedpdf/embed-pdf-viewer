@@ -24,7 +24,10 @@ export type AuditMutationKind =
   | 'attachment.delete'
   | 'form.setValue'
   | 'form.reset'
+  /** A bundle's fields, copied in as one change (`doc.forms.import`). */
   | 'form.import'
+  /** A bundle's values, filled in as one change (`doc.forms.importValues`). */
+  | 'form.importValues'
   | 'form.repair'
   | 'form.createField'
   | 'form.updateField'
@@ -35,9 +38,10 @@ export type AuditMutationKind =
   | 'form.updateWidget'
   /** A page's widgets restacked (`doc.forms.reorderWidgets`). */
   | 'form.reorderWidgets'
+  /** The form's calculation order changed (`doc.forms.reorderCalculations`). */
+  | 'form.reorderCalculations'
   /** A widget deleted from its page and its field (`doc.forms.deleteWidget`). */
   | 'form.deleteWidget'
-  | 'form.applyEffects'
   | 'form.setSignatureAppearance'
   /** A signing was prepared on this layer: the layer is locked until it ends. */
   | 'signature.prepare'

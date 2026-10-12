@@ -4,7 +4,7 @@ import {
   decodePdfBits,
   expandRawScope,
   permissionInfoWithAdvisory,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type DocumentAccessInfo,
   type DocumentProtection,
   type PdfBits,
@@ -40,7 +40,7 @@ export interface AccessRouteDeps {
   /** When present, /access advertises the deployment's render lattice. */
   derivedRenders?: DerivedRenderService;
   /** The deployment's annotation import limits, advertised so a client checks them first. */
-  annotationBundleLimits: AnnotationBundleLimits;
+  bundleLimits: BundleLimits;
   usageMeters?: UsageMeters;
   tenantUsage?: TenantUsageRepo;
 }
@@ -49,15 +49,8 @@ export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const {
-    service,
-    layers,
-    cdnSigner,
-    derivedRenders,
-    usageMeters,
-    tenantUsage,
-    annotationBundleLimits,
-  } = deps;
+  const { service, layers, cdnSigner, derivedRenders, usageMeters, tenantUsage, bundleLimits } =
+    deps;
 
   const handleAccess = async (
     req: FastifyRequest,
@@ -132,7 +125,7 @@ export async function registerAccessRoutes(
       docId,
       layerName,
       `${req.protocol}://${req.hostname}`,
-      annotationBundleLimits,
+      bundleLimits,
       derivedRenders?.policy(),
       layerScopes,
     );
@@ -200,7 +193,7 @@ function buildAccessResponse(
   docId: string,
   layerName: string,
   originUrl: string,
-  annotationBundleLimits: AnnotationBundleLimits,
+  bundleLimits: BundleLimits,
   renderPolicy?: RenderPolicy,
   layerScopes?: LayerScopes,
 ): DocumentAccessInfo {
@@ -253,11 +246,10 @@ function buildAccessResponse(
     // version-pinned immutable objects; the lattice is mutable deployment
     // policy.
     ...(renderPolicy ? { renderPolicy } : {}),
-    annotationBundleLimits,
+    bundleLimits,
   };
 }
 
 function identityForResponse(jwt: RequestJwtContext): DocumentAccessInfo['identity'] {
-  const id = jwt.identity;
-  return { ...id, ...(id.groups !== undefined ? { groups: [...id.groups] } : {}) };
+  return { ...jwt.identity };
 }

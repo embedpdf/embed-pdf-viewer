@@ -52,7 +52,7 @@ const mine = ref(true);
       </div>
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer :renderers="mine ? RENDERERS : NONE" />
         </template>
       </Stage>

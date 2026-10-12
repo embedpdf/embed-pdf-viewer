@@ -592,7 +592,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     }
   });
 
-  test('multipart stamp create: the data as `body`, its drawing as `resource:appearance` → persisted, version bumped', async () => {
+  test('multipart stamp create: the `body` names its drawing by role, a `resource:<key>` part carries it → persisted, version bumped', async () => {
     const tenantId = 'tenant-layer-multipart';
     const docId = 'doclayermut010';
     const layerName = 'alice';
@@ -605,9 +605,10 @@ describe('Phase 5 layer mutation pipeline', () => {
         subtype: 'stamp',
         box: { x: 100, y: 212, width: 160, height: 80 },
         fit: 'contain',
+        resources: { appearance: 'logo' },
       }),
     );
-    form.append('resource:appearance', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+    form.append('resource:logo', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
 
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
@@ -644,6 +645,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       JSON.stringify({
         subtype: 'stamp',
         box: { x: 0, y: 0, width: 10, height: 10 },
+        resources: { appearance: 'appearance' },
       }),
     );
     form.append(
@@ -695,6 +697,37 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(
       /resource:r0/,
+    );
+  });
+
+  test('multipart create: the body names a part that never arrived → 400', async () => {
+    const tenantId = 'tenant-layer-multipart';
+    const docId = 'doclayermut014';
+    const layerName = 'alice';
+    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
+
+    const form = new FormData();
+    form.append(
+      'body',
+      JSON.stringify({
+        subtype: 'stamp',
+        box: { x: 0, y: 0, width: 10, height: 10 },
+        resources: { appearance: 'logo' },
+      }),
+    );
+    form.append('resource:other', new Blob([tinyPng()], { type: 'image/png' }), 'stamp.png');
+
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
+        body: form,
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(
+      /resource:logo/,
     );
   });
 

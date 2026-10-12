@@ -10,7 +10,7 @@ import { styleOf } from '../record';
 import { caretFromAnchor } from '../shapes/caret';
 import type { QuadsShape } from '../shapes/quads';
 import type { Effect, Model, KindName, TextEndAnchor, Quad } from '../types';
-import { draftOf, newRecord } from './changes';
+import { draftOf, newRecord, numbersLeft } from './changes';
 import { defaultsFor, toolAnnotation } from './session';
 
 /** Drop degenerate segment quads (zero-length baseline or ink extent). Area is
@@ -51,7 +51,7 @@ export function createMarkup(
   return [
     {
       ...model,
-      seq: model.seq + 1,
+      objectNumbers: numbersLeft(model, 1),
       byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
@@ -63,10 +63,10 @@ export function createMarkup(
 }
 
 /**
- * Create Adobe-compatible Replace Text as one optimistic logical annotation:
- * a top-level Caret (`/IT /Replace`) plus a StrikeOut subordinate
- * (`/IT /StrikeOutTextEdit`, `/IRT` caret, `/RT /Group`). Persistence performs
- * the two ordered writes and rolls the primary back if the subordinate fails.
+ * Create Adobe-compatible Replace Text as one logical annotation: a top-level
+ * Caret (`/IT /Replace`) plus a StrikeOut subordinate (`/IT /StrikeOutTextEdit`,
+ * `/IRT` caret, `/RT /Group`). Two creates, the caret first: the strikeout
+ * names the caret by the object number it takes, so one change writes both.
  */
 export function createReplaceText(
   model: Model,
@@ -104,7 +104,7 @@ export function createReplaceText(
   return [
     {
       ...model,
-      seq: model.seq + 2,
+      objectNumbers: numbersLeft(model, 2),
       byId: { ...model.byId, [primaryId]: caret.record, [strikeoutId]: strikeout.record },
       order: [...model.order, primaryId, strikeoutId],
       selected: [primaryId, strikeoutId],
@@ -112,12 +112,8 @@ export function createReplaceText(
       preview: null,
     },
     [
-      {
-        type: 'createGroup',
-        primary: primaryId,
-        members: [strikeoutId],
-        drafts: { [primaryId]: caret.draft, [strikeoutId]: strikeout.draft },
-      },
+      { type: 'create', id: primaryId, draft: caret.draft },
+      { type: 'create', id: strikeoutId, draft: strikeout.draft },
     ],
   ];
 }
@@ -139,7 +135,7 @@ export function createCaret(
   return [
     {
       ...model,
-      seq: model.seq + 1,
+      objectNumbers: numbersLeft(model, 1),
       byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],

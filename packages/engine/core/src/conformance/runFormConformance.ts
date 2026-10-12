@@ -7,13 +7,13 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
+import { formEffectOps } from '../forms/effects';
 import type { FormFieldDTO } from '../forms/field';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
 import { toFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
 import {
-  FormImportResultSchema,
   FormRepairResultSchema,
   FormResetResultSchema,
   FormSetValueResultSchema,
@@ -223,64 +223,80 @@ export function runFormConformance(
       }
     });
 
-    test('applies ordered script effects once and produces zero churn for a no-op batch', async () => {
+    test("a script run's effects are one change: all of it, or none of it", async () => {
       const doc = await open(opts.fixtures.toggleFields);
-      if (!doc.forms.applyEffects) {
-        await doc.close();
-        return;
-      }
       try {
-        const events: DocumentEvent[] = [];
+        const events: Extract<DocumentEvent, { type: 'forms.valueSet' }>[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
-          if (event.type === 'forms.effectsApplied') events.push(event);
+          if (event.type === 'forms.valueSet') events.push(event);
         });
-        const result = await doc.forms.applyEffects([
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { value: 'abcdef' },
-          },
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'missing.effect.field' },
-            value: { value: 'ignored' },
-          },
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { value: 'abcde' },
-          },
-        ]);
-        expect(result.results.map((entry) => entry.status)).toEqual([
-          'applied',
-          'rejected',
-          'unchanged',
-        ]);
-        // The meta names the written field and every widget an effect repainted.
-        expect(result.meta.changedFields.length).toBe(1);
-        expect(result.meta.changedWidgets).toEqual(
-          result.results.flatMap((entry) => entry.changedWidgets),
-        );
-        expect(events).toHaveLength(1);
-        const appliedText = result.results[0]?.fields[0];
-        if (appliedText?.family !== 'text') throw new Error('expected text family');
-        expect(appliedText.value).toBe('abcde');
+        const text = { kind: 'fqn', name: 'maxlen_text' } as const;
+        const before = await doc.forms.get(text);
+        // One effect names a field the form doesn't have: nothing is written.
+        const refusal = await doc
+          .apply({
+            ops: formEffectOps([
+              { kind: 'setValue', ref: text, value: { value: 'abcdef' } },
+              {
+                kind: 'setValue',
+                ref: { kind: 'fqn', name: 'missing.effect.field' },
+                value: { value: 'ignored' },
+              },
+            ]),
+          })
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+        expect(refusal === null).toBe(false);
+        const untouched = await doc.forms.get(text);
+        if (untouched.family === 'text' && before.family === 'text') {
+          expect(untouched.value).toBe(before.value);
+        }
+        expect(events).toHaveLength(0);
 
-        const noOp = await doc.forms.applyEffects([
-          {
-            kind: 'setValue',
-            ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { value: 'abcde' },
-          },
-        ]);
-        expect(noOp.results.map((entry) => entry.status)).toEqual(['unchanged']);
-        // Nothing written: the meta names nothing, and no event fires.
-        expect(noOp.meta.changedFields).toEqual([]);
-        expect(noOp.meta.changedWidgets).toEqual([]);
-        expect(noOp.meta.affectedPages).toEqual([]);
-        expect(noOp.meta.cacheDelta).toBeNull();
-        expect(events).toHaveLength(1);
+        // Every effect in order, as one change: the last value wins, cut to the length.
+        const result = await doc.apply({
+          ops: formEffectOps([
+            { kind: 'setValue', ref: text, value: { value: 'abcdef' } },
+            { kind: 'setValue', ref: text, value: { value: 'xyz' } },
+          ]),
+        });
+        expect(result.items.map((item) => item.type)).toEqual(['forms.setValue', 'forms.setValue']);
+        const after = await doc.forms.get(text);
+        if (after.family !== 'text') throw new Error('expected text family');
+        expect(after.value).toBe('xyz');
+        // One burst: the change's events share its opId.
+        expect(new Set(events.map((event) => event.origin.tx?.id))).toEqual(
+          new Set([result.meta.opId]),
+        );
         unsubscribe();
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a value, reset or display that changes nothing has nothing to undo', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      try {
+        const text = { kind: 'fqn', name: 'maxlen_text' } as const;
+        const fill = {
+          ops: formEffectOps([{ kind: 'setValue', ref: text, value: { value: 'abc' } }]),
+        };
+        const hide = { ops: formEffectOps([{ kind: 'setDisplay', ref: text, display: 'hidden' }]) };
+        const reset = { ops: formEffectOps([{ kind: 'reset', refs: [text] }]) };
+        await doc.forms.setValue(text, { value: 'xyz' });
+
+        expect((await doc.apply(fill)).meta.undoable).toBe(true);
+        expect((await doc.apply(hide)).meta.undoable).toBe(true);
+        expect((await doc.apply(reset)).meta.undoable).toBe(true);
+        // The value it holds, already hidden, already at its default: the
+        // same change again writes nothing.
+        await doc.forms.setValue(text, { value: 'abc' });
+        expect((await doc.apply(fill)).meta.undoable).toBe(false);
+        expect((await doc.apply(hide)).meta.undoable).toBe(false);
+        await doc.apply(reset);
+        expect((await doc.apply(reset)).meta.undoable).toBe(false);
       } finally {
         await doc.close();
       }
@@ -373,51 +389,6 @@ export function runFormConformance(
         const after = await doc.forms.list();
         const radio = after.fields.find((field) => field.name === 'ntto_radio');
         if (radio?.family === 'radio') expect(radio.value).toBe('x');
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test('round-trips form data across documents via XFDF and FDF', async () => {
-      const first = await open(opts.fixtures.toggleFields);
-      let second: DocumentHandle | null = null;
-      try {
-        // A second, independent copy of the same fixture (a dedicated
-        // fixture when the transport needs server-side state, else the same
-        // bytes under a suffixed id so the two sessions coexist).
-        second = opts.fixtures.importTarget
-          ? await open(opts.fixtures.importTarget)
-          : await open(opts.fixtures.toggleFields, '-import-target');
-        const tricky = 'a<b>&"c" \'d\'';
-        await first.forms.setValue({ kind: 'fqn', name: 'billing.name' }, { value: tricky });
-
-        const xfdf = await first.forms.export('xfdf');
-        expect(xfdf.format).toBe('xfdf');
-        expect(xfdf.bytes.length > 0).toBe(true);
-
-        const imported = await second!.forms.import(xfdf.bytes);
-        FormImportResultSchema.parse(imported);
-        expect(imported.skipped).toBe(0);
-        expect(imported.applied > 0).toBe(true);
-        const nested = imported.form.fields.find((f) => f.name === 'billing.name');
-        if (nested?.family === 'text') expect(nested.value).toBe(tricky);
-
-        const fdf = await first.forms.export('fdf');
-        expect(fdf.format).toBe('fdf');
-        const head = String.fromCharCode(...fdf.bytes.slice(0, 5));
-        expect(head).toBe('%FDF-');
-      } finally {
-        await first.close();
-        if (second) await second.close();
-      }
-    });
-
-    test('rejects garbage import payloads', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      try {
-        await expect(
-          doc.forms.import(new TextEncoder().encode('not a form payload')),
-        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       } finally {
         await doc.close();
       }
@@ -760,6 +731,141 @@ export function runFormConformance(
         await expect(doc.forms.get({ kind: 'fqn', name: 'renamed_radio' })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,
         });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("a widget's colour change keeps its font and size", async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      try {
+        const { field } = await doc.forms.create({
+          family: 'text',
+          name: 'styled',
+          widgets: [
+            {
+              page,
+              rect: { x: 20, y: 160, width: 160, height: 24 },
+              fontFamily: 'courier',
+              fontSize: 9,
+            },
+          ],
+        });
+        const widget = field.widgets[0]!.ref!;
+        const { widget: recoloured } = await doc.forms.updateWidget(widget, {
+          fontColor: '#cc0000',
+        });
+        expect(recoloured).toMatchObject({
+          fontFamily: 'courier',
+          fontSize: 9,
+          fontColor: '#cc0000',
+        });
+        // A new size keeps the font and the colour.
+        const { widget: resized } = await doc.forms.updateWidget(widget, { fontSize: 11 });
+        expect(resized).toMatchObject({
+          fontFamily: 'courier',
+          fontSize: 11,
+          fontColor: '#cc0000',
+        });
+        // A standard font that isn't the widget's changes it.
+        const { widget: refonted } = await doc.forms.updateWidget(widget, {
+          fontFamily: 'times-roman',
+        });
+        expect(refonted).toMatchObject({
+          fontFamily: 'times-roman',
+          fontSize: 11,
+          fontColor: '#cc0000',
+        });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a push button has a caption and an action, and holds no value', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      try {
+        const { field } = await doc.forms.create({
+          family: 'pushbutton',
+          name: 'clear',
+          widgets: [
+            {
+              page,
+              rect: { x: 20, y: 120, width: 120, height: 28 },
+              caption: 'Clear form',
+              interiorColor: '#f6f8fa',
+              actions: { activate: { type: 'reset-form', fields: null, exclude: false } },
+            },
+          ],
+        });
+        expect(field.family).toBe('pushbutton');
+        const widget = field.widgets[0]!.ref!;
+        const rowOf = async (ref: AnnotationRef) =>
+          (await doc.forms.list()).widgets.find(
+            (w) => annotationKey(w.ref) === annotationKey(ref),
+          )!;
+        let row = await rowOf(widget);
+        expect(row).toMatchObject({
+          fieldFamily: 'pushbutton',
+          caption: 'Clear form',
+          interiorColor: '#f6f8fa',
+          hasAppearance: true,
+        });
+        expect(row.actions?.activate?.root?.type).toBe('reset-form');
+
+        // A push button holds no value: the value writes refuse it.
+        await expect(doc.forms.setValue(field.ref, { value: 'x' })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+        // Its field takes the settings every field has, and no family's own.
+        await doc.forms.update(field.ref, { alternateName: 'Clears every field' });
+        await expect(doc.forms.update(field.ref, { multiline: true })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+
+        // Its drawing is the engine's to keep: a move, new actions or the row
+        // sent back keep it; a new caption draws it again.
+        const moved = await doc.forms.updateWidget(widget, {
+          rect: { x: 30, y: 130, width: 120, height: 28 },
+        });
+        const restyled = await doc.forms.updateWidget(widget, {
+          actions: { focus: { type: 'reset-form', fields: null, exclude: false } },
+        });
+        const sentBack = await doc.forms.updateWidget(widget, { ...(await rowOf(widget)) });
+        expect([moved, restyled, sentBack].map((result) => result.appearance.action)).toEqual([
+          'preserved',
+          'preserved',
+          'preserved',
+        ]);
+
+        // The caption changes with the widget, and undo puts it back.
+        const renamed = await doc.forms.updateWidget(widget, { caption: 'Start over' });
+        expect(renamed.appearance.action).toBe('regenerated');
+        expect((await rowOf(widget)).caption).toBe('Start over');
+        await doc.apply({ undoOf: renamed.meta.opId });
+        expect((await rowOf(widget)).caption).toBe('Clear form');
+        await doc.forms.updateWidget(widget, { caption: null });
+        row = await rowOf(widget);
+        expect([row.caption, row.hasAppearance]).toEqual([null, true]);
+
+        // Another widget has no caption: its row reads none, sent back it is
+        // kept, and a caption is refused, on its placement too.
+        const checkbox = (await doc.forms.list()).widgets.find(
+          (w) => w.fieldFamily === 'checkbox',
+        )!;
+        expect(checkbox.caption).toBeNull();
+        await doc.forms.updateWidget(checkbox.ref, { ...checkbox });
+        await expect(
+          doc.forms.updateWidget(checkbox.ref, { caption: 'Yes' }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(
+          doc.forms.create({
+            family: 'text',
+            name: 'captioned',
+            widgets: [{ page, rect: { x: 20, y: 160, width: 120, height: 20 }, caption: 'x' }],
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       } finally {
         await doc.close();
       }

@@ -36,7 +36,7 @@ const ebook = async (): Promise<OpenInput> => {
       <FieldPalette />
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
           <FormLayer />
         </template>

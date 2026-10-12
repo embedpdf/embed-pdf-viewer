@@ -200,7 +200,7 @@ Everything `useSignature()` gives you.
 | `getMode()`                                               | The mode in effect: the `mode` setting, or its default. [Settings](#settings)                                                            |
 | `getSnapshot()`                                           | Everything at once, as the engine reads it: every signature field, signed or not, the file's versions, and `protection`                   |
 | `refresh()`                                               | Reads the signatures again. You rarely need it: the plugin reads and checks them again after every change.                                |
-| `canSign()`, `canCertify()`, `canFill()`, `canReadRevision()` | Whether signing, certifying, drawing a mark without signing, and reading the signed bytes are allowed. [Permissions](#permissions)    |
+| `canSign(field)`, `canCertify()`, `canFill(field)`, `canReadRevision()` | Whether signing a field, certifying, drawing a mark into a field without signing, and reading the signed bytes are allowed. [Permissions](#permissions) |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useSignatureSettings()`. [Settings](#settings) |
 
 `field` is a field's ref, such as `toFieldRef('approval')`; the methods that only read also take the
@@ -254,14 +254,16 @@ for the last three.
 
 ## Permissions
 
-| Permission         | What it allows                                     | Check                     |
-| :----------------- | :------------------------------------------------- | :------------------------ |
-| `doc.sign`         | Signing                                            | `signature.canSign()`     |
-| `doc.sign.certify` | Signing a certification                            | `signature.canCertify()`  |
-| `doc.forms.fill`   | Drawing a mark into a field without signing        | `signature.canFill()`     |
-| `doc.download`     | Reading the exact bytes a signature covers          | `signature.canReadRevision()` |
+| Permission         | What it allows                              | Check                         |
+| :----------------- | :------------------------------------------ | :---------------------------- |
+| `doc.sign`         | Signing                                     | `signature.canSign(field)`    |
+| `doc.sign.certify` | Signing a certification                     | `signature.canCertify()`      |
+| `doc.forms.fill`   | Drawing a mark into a field without signing | `signature.canFill(field)`    |
+| `doc.download`     | Reading the exact bytes a signature covers  | `signature.canReadRevision()` |
 
-On a signed document, the engine also refuses what its signatures forbid.
+A user with a `fields:sign` (`fields:fill`) permission for one group signs (fills in) that group's
+fields only, so the checks take the field. See [Signers and groups](/docs/engine/forms/groups). On a
+signed document, the engine also refuses what its signatures forbid.
 
 ## Good to know
 

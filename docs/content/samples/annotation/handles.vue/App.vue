@@ -35,7 +35,7 @@ const own = ref(false);
       <ChromeControls v-model:own="own" />
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <!-- Your own handles: the layer places them, and still decides where they can be grabbed. -->
           <AnnotationLayer>
             <template v-if="own" #handle="handle"><Handle v-bind="handle" /></template>

@@ -80,6 +80,7 @@ export class EpdfForm extends pluginService({
     'delete',
     'removeWidget',
     'deleteWidget',
+    'reorderCalculations',
     'repair',
     'canRead',
     'canFill',
@@ -142,22 +143,21 @@ export class EpdfForm extends pluginService({
     const fillable = this.binding.select(
       (form) => {
         const current = form.get(refOf());
-        return current !== null && !current.readOnly && form.canFill();
+        return current !== null && !current.readOnly && form.canFill(current.ref);
       },
       false,
     );
 
     const control = new FormControl<FormPlainValue>(untracked(value));
-    // Writes on their way. While there are any, the field's value lags behind the control's,
-    // and putting it in the control would undo what's being typed.
-    let writing = 0;
     const show = (plain: FormPlainValue) => {
       if (!samePlain(plain, control.value)) control.setValue(plain, { emitEvent: false });
     };
 
+    // The field shows a write as soon as it's made, so the control follows the field: a value
+    // the form refuses, or its scripts rewrite, shows as the field has it.
     effect(() => {
       const plain = value();
-      if (writing === 0) untracked(() => show(plain));
+      untracked(() => show(plain));
     });
     effect(() => {
       const enabled = fillable();
@@ -169,16 +169,10 @@ export class EpdfForm extends pluginService({
     const subscription = control.valueChanges.subscribe((plain) => {
       const name = untracked(field)?.name;
       if (name === undefined) return;
-      writing += 1;
       // By name, through the plugin's own plain-value conversion and its write queue.
       void Promise.resolve()
         .then(() => this.importValues({ [name]: plain }))
-        .catch(() => undefined)
-        .finally(() => {
-          writing -= 1;
-          // The field has the last word: a refused or rewritten value shows as the field has it.
-          if (writing === 0) show(untracked(value));
-        });
+        .catch(() => undefined);
     });
     inject(DestroyRef).onDestroy(() => subscription.unsubscribe());
     return control;

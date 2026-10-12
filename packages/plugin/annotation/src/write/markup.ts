@@ -65,17 +65,17 @@ export function createMarkupWrites(
         preset,
         flags: preset ? tools.get(preset)?.flags : undefined,
       },
-      adjust,
+      { adjust },
     );
   const commitCaret = (page: PageRef, anchor: TextEndAnchor, adjust?: Adjust) =>
-    store.commit({ type: 'createCaret', page, anchor }, adjust);
+    store.commit({ type: 'createCaret', page, anchor }, { adjust });
   const commitReplaceText = (
     page: PageRef,
     quads: Quad[],
     anchor: TextEndAnchor,
     preset?: string,
     adjust?: Adjust,
-  ) => store.commit({ type: 'createReplaceText', page, quads, anchor, preset }, adjust);
+  ) => store.commit({ type: 'createReplaceText', page, quads, anchor, preset }, { adjust });
 
   /**
    * The selection as `markup`: one annotation per page, over the page's

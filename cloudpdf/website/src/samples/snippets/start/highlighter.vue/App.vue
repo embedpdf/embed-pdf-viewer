@@ -26,7 +26,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
       <HighlightButton />
       <Stage style="height: 500px">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <SelectionLayer />
           <AnnotationLayer />
         </template>

@@ -1,9 +1,6 @@
 /**
  * What happens when the engine confirms a change, whoever made it:
  *
- *   - a new record this session created finds its real key (by its /NM), and
- *     the selection and text editing follow it; once the records hold it,
- *     its create change settles, whatever confirmed it;
  *   - how the record renders follows who changed it: this session's creates
  *     render live from their description, another session's changes render
  *     from the engine's raster (their appearance is the truth it baked);
@@ -22,13 +19,10 @@ import type { Announcer } from '../services/announce';
 
 export function followConfirmedChanges(
   ctx: Pick<AnnotationContext, 'state'>,
-  { events, identity }: Pick<AnnotationServices, 'events' | 'identity'>,
+  { events }: Pick<AnnotationServices, 'events'>,
   announce: Announcer,
 ): void {
-  events.recordsChanged.on((change) => {
-    follow(change);
-    identity.settleHeldCreates();
-  });
+  events.recordsChanged.on((change) => follow(change));
 
   function follow(change: MirrorChange<AnnotationRecords>): void {
     if (change.cause === 'load') {
@@ -42,7 +36,6 @@ export function followConfirmedChanges(
     switch (event.type) {
       case 'annotations.created': {
         const { annotation: created } = event;
-        identity.confirmByName(created.nm, created.ref);
         const key = annotationKey(created.ref);
         ctx.state.update(remote ? preferBaked : preferVector, [key]);
         announce.created(created, origin);

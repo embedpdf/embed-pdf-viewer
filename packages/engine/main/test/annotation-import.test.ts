@@ -56,6 +56,15 @@ runAnnotationImportConformance(runner, {
       },
       { scope: ['*'] },
     ),
+  openScoped: async (engine, fixture, scope) =>
+    engine.open(
+      {
+        kind: 'bytes',
+        id: `${fixture}-${++opened}`,
+        bytes: new Uint8Array(await readFile(fixtures[fixture])),
+      },
+      { scope: [...scope], identity: { userId: 'importer', displayName: 'Importer' } },
+    ),
 });
 
 /** hello_world.pdf's annotations of every kind a create makes, with a thread and a link, as a bundle. */

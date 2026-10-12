@@ -23,6 +23,7 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.FormsDeleteWidget
     | CloudPDF.ChangeItem.FormsRestoreWidget
     | CloudPDF.ChangeItem.FormsReorderWidgets
+    | CloudPDF.ChangeItem.FormsReorderCalculations
     | CloudPDF.ChangeItem.FormsUpdateWidget
     | CloudPDF.ChangeItem.MetadataUpdate
     | CloudPDF.ChangeItem.MetadataUpdateCustom;
@@ -50,6 +51,7 @@ export namespace ChangeItem {
             FormsAddWidget: "forms.addWidget",
             FormsRemoveWidget: "forms.removeWidget",
             FormsDeleteWidget: "forms.deleteWidget",
+            FormsReorderCalculations: "forms.reorderCalculations",
             FormsReorderWidgets: "forms.reorderWidgets",
             FormsUpdateWidget: "forms.updateWidget",
             FormsSetSignatureAppearance: "forms.setSignatureAppearance",
@@ -125,6 +127,7 @@ export namespace ChangeItem {
         type: "forms.setDisplay";
         field: CloudPDF.FormField;
         widgets: CloudPDF.WidgetAnnotation[];
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -132,6 +135,7 @@ export namespace ChangeItem {
         type: "forms.setAppearanceText";
         field: CloudPDF.FormField;
         widgets: CloudPDF.WidgetAnnotation[];
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -147,6 +151,7 @@ export namespace ChangeItem {
         type: "forms.create";
         field: CloudPDF.FormField;
         widgets: CloudPDF.WidgetAnnotation[];
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -155,11 +160,13 @@ export namespace ChangeItem {
         skipped?: string[] | undefined;
         field: CloudPDF.FormField;
         widgets: CloudPDF.WidgetAnnotation[];
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsDelete {
         type: "forms.delete";
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -174,6 +181,7 @@ export namespace ChangeItem {
         type: "forms.setSignatureAppearance";
         field: CloudPDF.FormField;
         widgets: CloudPDF.WidgetAnnotation[];
+        calculationOrder?: CloudPDF.FormFieldRef[] | undefined;
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -210,6 +218,12 @@ export namespace ChangeItem {
         type: "forms.reorderWidgets";
         page: CloudPDF.PageRef;
         order: CloudPDF.AnnotationRef[];
+        meta: CloudPDF.FormMutationMeta;
+    }
+
+    export interface FormsReorderCalculations {
+        type: "forms.reorderCalculations";
+        calculationOrder: CloudPDF.FormFieldRef[];
         meta: CloudPDF.FormMutationMeta;
     }
 

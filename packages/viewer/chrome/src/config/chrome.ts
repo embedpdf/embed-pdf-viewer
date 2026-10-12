@@ -125,6 +125,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
       center: [
         { id: 'fields', items: ['tool:text-field', 'tool:checkbox', 'tool:radio'], importance: 4 },
         { id: 'choices', items: ['tool:combo-box', 'tool:list-box'], importance: 2 },
+        { id: 'buttons', items: ['tool:button'], importance: 2 },
         { id: 'signatures', items: ['tool:signature-field'], importance: 2 },
         history,
       ],

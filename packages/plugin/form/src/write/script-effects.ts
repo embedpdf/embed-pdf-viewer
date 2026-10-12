@@ -1,15 +1,14 @@
 /**
  * The actions plugin's seams into the form plugin: the form-effects commit
  * sink (script `setValue`, `setDisplay` and reset effects are written through
- * the plugin that owns the fields) and the submit dataset resolver.
+ * the plugin that owns the fields, as one fill with the calculations they
+ * cause) and the submit dataset resolver.
  */
 import {
-  EngineError,
-  EngineErrorCode,
-  opIdOf,
+  formEffectOps,
   serializeError,
-  type FormEffectsResult,
-  type FormMutationMeta,
+  type FormEffect,
+  type FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
 import type {
   ActionContext,
@@ -20,28 +19,39 @@ import type {
 
 import { buildSubmitEntries } from '../field-selection';
 import type { FormHostCapability } from '../host-contract';
-import type { FormContext } from '../services';
+import { fieldByRef } from '../model';
+import type { FormContext, FormServices } from '../services';
+import type { Fills } from './fill';
 
-export function createScriptEffects(ctx: FormContext) {
+/** The fields a script's effects write to. */
+const refsOf = (effects: readonly FormEffect[]): FormFieldRef[] =>
+  effects.flatMap((effect) => (effect.kind === 'reset' ? effect.refs : [effect.ref]));
+
+export function createScriptEffects(
+  ctx: FormContext,
+  { fields, rights, enqueue }: Pick<FormServices, 'fields' | 'rights' | 'enqueue'>,
+  { fillSoon }: Fills,
+) {
   /**
-   * The submit dataset: the field tree read from the engine at submit time,
-   * then the pure ISO builder. Selection, veto and value semantics live in
-   * `field-selection.ts`; this only supplies the fields and assembles the
-   * request.
+   * The submit dataset: the fields as the user sees them once every fill on its way is
+   * answered, then the pure ISO builder. Selection, veto and value semantics live in
+   * `field-selection.ts`; this only supplies the fields and assembles the request.
    */
   const resolveSubmitDataset = async (
     intent: SubmitIntent,
     actionContext: ActionContext,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest> => {
-    const snapshot = await ctx.doc.forms.list();
+    await enqueue.idle();
+    await ctx.changes.whenSettled();
+    if (!fields.view().snapshot) await fields.settled();
     return {
       url: intent.url,
       method: intent.method,
       format: intent.format,
       flagsRaw: intent.flagsRaw,
       ...(intent.charSet === undefined ? {} : { charSet: intent.charSet }),
-      entries: buildSubmitEntries(snapshot.fields, intent, diagnose),
+      entries: buildSubmitEntries(fields.view().snapshot?.fields ?? [], intent, diagnose),
       origin: actionContext.origin,
       event: actionContext.event,
     };
@@ -51,60 +61,29 @@ export function createScriptEffects(ctx: FormContext) {
     api: {
       resolveSubmitDataset,
       commitScriptFormEffects: async (effects) => {
-        const doc = ctx.doc;
-        // The batch's id, minted here so a batch that never runs reports it too.
-        const opId = opIdOf(undefined);
-        if (!doc.forms.applyEffects) {
-          // The sink never throws: report every effect as failed instead.
-          return {
-            results: effects.map((_, index) => ({
-              index,
-              status: 'failed' as const,
-              fields: [],
-              changedWidgets: [],
-              error: serializeError(
-                new EngineError(EngineErrorCode.NotImplemented, 'no form-effects batch door'),
-              ),
-            })),
-            widgets: [],
-            meta: nothingChanged(opId),
-          };
-        }
-        let result: FormEffectsResult;
         try {
-          result = await doc.forms.applyEffects(effects, { opId });
+          // A field the session may not fill in is refused here, at once: the script learns
+          // its write failed, as it would from the engine.
+          for (const ref of refsOf(effects)) {
+            const field = fieldByRef(fields.view(), ref);
+            if (field) rights.assertMayFill(field, 'form.fill');
+          }
+          // The script's realm transaction is still running: the effects show at once, and
+          // the calculations a value causes run once it ends, in the same change.
+          const recalculates = effects.some(
+            (effect) => effect.kind === 'setValue' || effect.kind === 'reset',
+          );
+          fillSoon({
+            ops: formEffectOps(effects),
+            scripts: recalculates ? { kind: 'recalculate' } : null,
+            origin: 'user',
+          });
+          return { status: 'applied' };
         } catch (error) {
-          // The sink never throws: a refused batch (for example a permission
-          // refusal) reports every effect as failed.
-          const refusal = serializeError(error);
-          return {
-            results: effects.map((_, index) => ({
-              index,
-              status: 'failed' as const,
-              fields: [],
-              changedWidgets: [],
-              error: refusal,
-            })),
-            widgets: [],
-            meta: nothingChanged(opId),
-          };
+          // The sink never throws: a change it can't stage reports why.
+          return { status: 'failed', error: serializeError(error).message };
         }
-        // The form's mirror applies the confirmed effects from the
-        // `forms.effectsApplied` event.
-        return result;
       },
     } satisfies Partial<FormHostCapability>,
-  };
-}
-
-/** The meta of a batch that wrote nothing. */
-function nothingChanged(opId: string): FormMutationMeta {
-  return {
-    affectedPages: [],
-    cacheDelta: null,
-    opId,
-    undoable: false,
-    changedFields: [],
-    changedWidgets: [],
   };
 }

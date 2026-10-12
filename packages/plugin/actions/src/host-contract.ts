@@ -16,7 +16,7 @@ import type {
 import type {
   DocumentHandle,
   FormEffect,
-  FormEffectsResult,
+  FormSnapshot,
   PageRef,
 } from '@embedpdf/engine-core/runtime';
 
@@ -76,9 +76,24 @@ export interface AnnotCommitResult {
 }
 export type AnnotCommitSink = (entries: AnnotCommitEntry[]) => Promise<AnnotCommitResult>;
 
-/** The form plugin's document commit: engine `applyEffects` + snapshot
- *  reconciliation (its existing commit tail, extracted). */
-export type FormCommitSink = (effects: FormEffect[]) => Promise<FormEffectsResult>;
+/**
+ * What the form plugin's commit did: `applied`, the effects are one change on its way (shown at
+ * once; the engine's refusal comes through the change queue); `failed`, none of them is.
+ */
+export interface FormCommitSinkResult {
+  status: 'applied' | 'failed';
+  /** Why the change couldn't be made, when it couldn't. */
+  error?: string;
+}
+/** The form plugin's document commit: a script run's form effects, written as one change. */
+export type FormCommitSink = (effects: FormEffect[]) => Promise<FormCommitSinkResult>;
+
+/**
+ * The form as the user sees it: the form plugin's fields and widgets with this session's pending
+ * fills, or `null` before it has read the form. What scripts and dispatch read instead of the
+ * engine, so they see a fill before the engine answers it.
+ */
+export type FormReader = () => FormSnapshot | null;
 
 /**
  * Which realm produced a script result. `'document'` = this document's own
@@ -161,6 +176,8 @@ export interface ActionsHostCapability extends ActionsCapability {
   registerAnnotCommitSink(sink: AnnotCommitSink): Unsubscribe;
   /** The form plugin's commit sink for script and Hide form effects. Identity-safe. */
   registerFormCommitSink(sink: FormCommitSink): Unsubscribe;
+  /** The form plugin's form, which scripts and dispatch read; without one they read the engine. Identity-safe. */
+  registerFormReader(reader: FormReader): Unsubscribe;
   /**
    * This document's realm, present only when `javascript.enabled` (its
    * presence is the form plugin's "scripting on" signal).

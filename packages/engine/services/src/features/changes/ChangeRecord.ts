@@ -37,6 +37,7 @@ export type ReverseStep =
   | FieldRestoreStep
   | WidgetRestoreStep
   | WidgetDeleteStep
+  | CalculationOrderStep
   | MetadataRevertStep;
 
 /**
@@ -68,6 +69,8 @@ export interface ObjectsRevertStep {
   /** Whether the op changed what the annotation shows (its update's `appearance.changed`). */
   readonly appearanceChanged?: boolean;
   readonly fallback?: RevertFallback;
+  /** The rights it takes beside its op's: an import's (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /** How a revert puts values back when the dictionaries it wrote changed since. */
@@ -98,16 +101,29 @@ export type RevertFallback =
     };
 
 /**
- * Deletes what a create or a restore brought back, when nobody changed it
- * since and deleting it takes nothing else: undoing a create never deletes
- * someone else's reply.
+ * Deletes what a create, an import or a restore brought back, when nobody
+ * changed it since and deleting it takes nothing else: undoing a create
+ * never deletes someone else's reply.
  */
 export interface AnnotationRemoveStep {
   readonly kind: 'annotation.remove';
   readonly ref: AnnotationRef;
   /** What the delete takes, as the change left it: the annotation first. */
   readonly left: readonly Annotation<PdfCoordinates>[];
+  /** The rights it takes: an import's (see {@link StepRights}); a delete's when absent. */
+  readonly rights?: StepRights;
 }
+
+/**
+ * The rights a step takes as a restoring import's undo or redo: what the
+ * import took. For annotations, `doc.annotate.modify` and
+ * `doc.annotate.import` instead of the per-annotation rules: a restoring
+ * import gives annotations other people's `userId`, which a delete's rules
+ * (`annotations:delete:self`) would never let the importer remove. For
+ * forms, `doc.forms.import` beside `doc.forms.modify` or `doc.forms.fill`:
+ * putting back who made or filled a field is restoring attribution too.
+ */
+export type StepRights = 'import';
 
 /**
  * Brings back what a delete removed: the same objects, at the same numbers and
@@ -121,6 +137,8 @@ export interface AnnotationRestoreStep {
   readonly capture: Uint8Array;
   /** Annotations the delete unlinked a popup from, put back as they were. */
   readonly unlinked: readonly CapturedObject[];
+  /** The rights it takes: those of the remove it reverses (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /**
@@ -138,6 +156,20 @@ export interface AnnotationReorderStep {
   readonly before: readonly AnnotationRef[];
   /** The family's order it left. */
   readonly after: readonly AnnotationRef[];
+}
+
+/**
+ * Takes back what a change did to the form's calculation order, by field
+ * object number, where nobody changed it since (see `orderBack`): a field it
+ * added leaves, one it took out comes back, one it moved goes back beside
+ * its old neighbour.
+ */
+export interface CalculationOrderStep {
+  readonly kind: 'calculations.restore';
+  /** The order before the change. */
+  readonly before: readonly number[];
+  /** The order the change left. */
+  readonly after: readonly number[];
 }
 
 /**
@@ -164,12 +196,14 @@ export interface WidgetDeleteStep {
   readonly left: WidgetAnnotation<PdfCoordinates>;
 }
 
-/** Deletes a field a create made, when nobody changed it since. */
+/** Deletes a field a create or an import made, when nobody changed it since. */
 export interface FieldRemoveStep {
   readonly kind: 'field.remove';
   readonly objectNumber: number;
   /** The field as the change left it. */
   readonly left: FormFieldDTO<PdfCoordinates>;
+  /** The rights it takes beside `doc.forms.modify`: an import's (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /** Brings back a field a delete removed, its widgets and the parents it pruned. */
@@ -181,6 +215,8 @@ export interface FieldRestoreStep {
   /** The pages its widgets were on: the restore is skipped when one is gone. */
   readonly pages: readonly PageRef[];
   readonly capture: Uint8Array;
+  /** The rights it takes: those of the remove it reverses (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /** Puts metadata back, entry by entry, where an entry still holds what the change set. */

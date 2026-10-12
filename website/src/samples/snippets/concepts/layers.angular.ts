@@ -18,7 +18,7 @@ import { EpdfPageTemplate, EpdfStage } from '@embedpdf/angular/stage';
   template: `
     <epdf-stage>
       <ng-template epdfPage>
-        <epdf-render-layer [annotations]="false" />
+        <epdf-render-layer />
         <epdf-search-layer />
         <epdf-selection-layer />
         <epdf-annotation-layer />

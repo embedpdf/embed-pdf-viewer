@@ -31,7 +31,7 @@ export type DocCapability =
 
   // Forms
   | 'doc.forms.read' // structured read of form field definitions/values (cloud-only; no PDF-bit gate — reading is unconditional)
-  | 'doc.forms.fill' // set form field values (PDF bit 9, also implied by bit 6)
+  | 'doc.forms.fill' // set form field values (PDF bit 4, 6 or 9)
   | 'doc.forms.modify' // create/restructure/delete fields (PDF bit 6 + bit 4)
   | 'doc.forms.import' // restore form fields and values with who created and filled them (grant-minted only — `pdf.permissions` never expands it; removed wherever a signature removes `doc.forms.fill`)
   | 'doc.forms.script' // write JavaScript, submit-form and URI actions into the form: code and ways out that every later filler gets (grant-minted only — `pdf.permissions` never expands it; guards writing them, never running them; removed wherever a signature removes `doc.forms.modify`)
@@ -52,14 +52,15 @@ export type DocCapability =
   | 'doc.redact'
 
   // Digital signatures
-  | 'doc.sign' // prepare/complete/abort an approval signature or document timestamp (PDF bit 6 or bit 9: filling in a signature field is form fill)
+  | 'doc.sign' // prepare/complete/abort an approval signature or document timestamp (PDF bit 4, 6 or 9: signing a signature field is filling it in)
   | 'doc.sign.certify'; // additionally make it the certification signature (/Perms /DocMDP) — grant-minted only, never expanded from PDF bits
 
 /**
- * Single-entity collaboration vocabulary. Only annotations are
- * collab-scoped today; future entities slot into the same grammar.
+ * What a collab scope is about: annotations, or form fields. Both follow one
+ * grammar, `entity:action:filter`, and a filter compares one fact on the
+ * record (its creator, its group) with the value the scope names.
  */
-export type CollabEntity = 'annotations';
+export type CollabEntity = 'annotations' | 'fields';
 
 /**
  * Collab actions for annotations. Each can be qualified by a filter that
@@ -83,17 +84,34 @@ export type CollabFilter =
   | { kind: 'createdBy'; userId: string }
   | { kind: 'group'; groupId: string };
 
+/**
+ * Collab actions for form fields: filling one in (its value, its displayed
+ * text), signing a signature field, and putting a field in a group. A
+ * field's group is who fills it (the buyer's fields), not who made it.
+ */
+export type FieldAction = 'fill' | 'sign' | 'set-group';
+
+/** A field filter: every field, or the fields of one group. Fields record no owner to match. */
+export type FieldFilter = { kind: 'all' } | { kind: 'group'; groupId: string };
+
 export interface ParsedCapability {
   kind: 'capability';
   name: DocCapability;
 }
 
-export interface ParsedCollab {
-  kind: 'collab';
-  entity: CollabEntity;
-  action: CollabAction | '*';
-  filter: CollabFilter;
-}
+export type ParsedCollab =
+  | {
+      kind: 'collab';
+      entity: 'annotations';
+      action: CollabAction | '*';
+      filter: CollabFilter;
+    }
+  | {
+      kind: 'collab';
+      entity: 'fields';
+      action: FieldAction | '*';
+      filter: FieldFilter;
+    };
 
 export interface ParsedVirtual {
   kind: 'virtual';
@@ -141,10 +159,11 @@ export interface Identity {
   readonly title?: string;
   readonly organization?: string;
   readonly organizationalUnit?: string;
-  /** The group new annotations belong to: `/EMBD_Metadata/GroupID`. */
+  /**
+   * The group what they create goes into: a new annotation's or form
+   * field's `/EMBD_Metadata/GroupID`, unless the write names another.
+   */
   readonly groupId?: string;
-  /** The groups the person is in, for `:group=` collab filters. */
-  readonly groups?: ReadonlyArray<string>;
 }
 
 /**

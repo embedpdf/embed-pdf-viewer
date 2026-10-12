@@ -35,6 +35,7 @@ const page: PageLayout = {
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
+  tabOrder: null,
   boxes: { media: box, crop: box, bleed: box, trim: box, art: box },
   pdfCropBox: { left: 0, bottom: 0, right: 600, top: 800 },
 };

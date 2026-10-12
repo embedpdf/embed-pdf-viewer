@@ -1,4 +1,4 @@
-import type { Change } from './Change';
+import type { RecordedChange } from './Change';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { Coordinates } from '../pageSpace/coordinates';
 
@@ -32,7 +32,7 @@ export function isKeptRefusal(code: EngineErrorCode): boolean {
  * same ops with the same bytes give the same fingerprint whatever the order
  * of their keys; bytes count by their content.
  */
-export function changeFingerprint<C extends Coordinates, R>(change: Change<C, R>): string {
+export function changeFingerprint<C extends Coordinates, R>(change: RecordedChange<C, R>): string {
   const text = canonicalJson(change);
   return `${text.length.toString(36)}-${hashText(text)}`;
 }

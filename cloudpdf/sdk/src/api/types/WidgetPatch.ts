@@ -33,15 +33,20 @@ export interface WidgetPatch {
     createdBy?: unknown | undefined;
     modifiedBy?: unknown | undefined;
     importedBy?: unknown | undefined;
-    actions?: unknown | undefined;
+    actions?: WidgetPatch.Actions | undefined;
+    box?: WidgetPatch.Box | undefined;
+    rotation?: (number | null) | undefined;
     color?: (string | null) | undefined;
     interiorColor?: (string | null) | undefined;
     strokeWidth?: number | undefined;
     borderStyle?: WidgetPatch.BorderStyle | undefined;
-    fontFamily?: (WidgetPatch.FontFamily | null) | undefined;
+    dashArray?: (number[] | null) | undefined;
+    fontFamily?: (string | null) | undefined;
     fontSize?: (number | null) | undefined;
     fontColor?: (string | null) | undefined;
     textAlign?: WidgetPatch.TextAlign | undefined;
+    caption?: (string | null) | undefined;
+    checkStyle?: (WidgetPatch.CheckStyle | null) | undefined;
     field?: unknown | undefined;
     fieldFamily?: unknown | undefined;
 }
@@ -92,34 +97,36 @@ export namespace WidgetPatch {
         export type Type = (typeof Type)[keyof typeof Type];
     }
 
+    export type Actions = CloudPDF.WidgetActionsPatch | null | CloudPDF.PdfAnnotationActions | null;
+
+    export interface Box {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }
+
     export const BorderStyle = {
         Solid: "solid",
         Dashed: "dashed",
         Beveled: "beveled",
         Inset: "inset",
+        Underline: "underline",
     } as const;
     export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-    export const FontFamily = {
-        Courier: "courier",
-        CourierBold: "courier-bold",
-        CourierBoldOblique: "courier-bold-oblique",
-        CourierOblique: "courier-oblique",
-        Helvetica: "helvetica",
-        HelveticaBold: "helvetica-bold",
-        HelveticaBoldOblique: "helvetica-bold-oblique",
-        HelveticaOblique: "helvetica-oblique",
-        TimesRoman: "times-roman",
-        TimesBold: "times-bold",
-        TimesBoldItalic: "times-bold-italic",
-        TimesItalic: "times-italic",
-        Symbol: "symbol",
-        ZapfDingbats: "zapf-dingbats",
-    } as const;
-    export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
     export const TextAlign = {
         Left: "left",
         Center: "center",
         Right: "right",
     } as const;
     export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+    export const CheckStyle = {
+        Check: "check",
+        Cross: "cross",
+        Star: "star",
+        Circle: "circle",
+        Square: "square",
+        Diamond: "diamond",
+    } as const;
+    export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
 }

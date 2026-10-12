@@ -29,6 +29,7 @@ const layout = (pageObjectNumber: number, visible: PdfRect): PageLayout<PdfCoord
   size: { width: visible.right - visible.left, height: visible.top - visible.bottom },
   rotation: 0,
   userUnit: 1,
+  tabOrder: null,
   boxes: { media: visible, crop: visible, bleed: visible, trim: visible, art: visible },
   pdfCropBox: visible,
 });

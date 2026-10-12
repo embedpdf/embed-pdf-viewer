@@ -2,7 +2,7 @@
 import { computed, ref, shallowRef, watch } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
-import { useForm, useFormState } from '@embedpdf/vue/form';
+import { FormTransfer, useForm, useFormState, type FormBundle } from '@embedpdf/vue/form';
 
 // How the new fields look: part of the PDF, like the rest of the page.
 const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
@@ -53,32 +53,34 @@ function useSignUpForm() {
 
 useSignUpForm();
 const form = useForm();
-const xfdf = shallowRef<Uint8Array | null>(null);
+const bundle = shallowRef<FormBundle | null>(null);
 const result = ref('');
 
-async function exportData() {
-  const { bytes } = await form.export(); // XFDF; form.export('fdf') for FDF
-  xfdf.value = bytes;
-  result.value = `Exported ${bytes.byteLength} bytes of XFDF`;
+async function exportFields() {
+  const exported = await form.export();
+  // One JSON text: what you'd store, and read back with FormTransfer.parse().
+  const text = FormTransfer.stringify(exported);
+  bundle.value = exported;
+  result.value = `Exported ${exported.fields.length} fields, ${text.length} characters of JSON`;
 }
 
-async function clear() {
-  await form.reset();
-  result.value = 'The form is empty';
+async function remove() {
+  for (const field of form.list()) await form.delete(field.ref);
+  result.value = 'The form is gone';
 }
 
-async function importData() {
-  if (!xfdf.value) return;
-  const { applied } = await form.import(xfdf.value);
-  result.value = `Imported ${applied} values`;
+async function importFields() {
+  if (!bundle.value) return;
+  const { fields, dropped } = await form.import(bundle.value);
+  result.value = `Imported ${fields.length} fields, left out ${dropped.length}`;
 }
 </script>
 
 <template>
   <div class="toolbar">
-    <button type="button" class="button" @click="exportData">Export</button>
-    <button type="button" class="button" @click="clear">Clear</button>
-    <button type="button" class="button" :disabled="!xfdf" @click="importData">Import</button>
+    <button type="button" class="button" @click="exportFields">Export</button>
+    <button type="button" class="button" @click="remove">Remove</button>
+    <button type="button" class="button" :disabled="!bundle" @click="importFields">Import</button>
     <output v-if="result" class="readout">{{ result }}</output>
   </div>
 </template>

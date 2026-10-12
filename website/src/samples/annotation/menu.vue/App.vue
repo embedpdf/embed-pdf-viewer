@@ -27,7 +27,7 @@ const ebook = async (): Promise<OpenInput> => {
       <AddAnnotations />
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
         </template>
         <template #overlay>

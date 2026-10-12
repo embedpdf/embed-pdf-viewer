@@ -88,7 +88,7 @@ export class Toolbar {
       <demo-toolbar />
       <epdf-stage class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>

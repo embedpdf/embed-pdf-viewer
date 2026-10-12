@@ -160,7 +160,9 @@ describe('pressToggle', () => {
 });
 
 describe('createTextFieldEditor', () => {
-  function harness(commit: () => Promise<unknown> = async () => null) {
+  function harness(
+    commit: () => Promise<{ readonly status: string } | null> = async () => ({ status: 'applied' }),
+  ) {
     const form = { draftText: vi.fn(), commitDraftText: vi.fn(commit), discardDraftText: vi.fn() };
     const editor = createTextFieldEditor(form, 'name', 'Ada');
     return { form, editor };
@@ -174,10 +176,38 @@ describe('createTextFieldEditor', () => {
     expect(editor.getState()).toEqual({ focused: true, draft: 'Ada L' });
     editor.blur();
     expect(form.commitDraftText).toHaveBeenCalledWith('name');
-    // At rest it shows the field's value until the commit brings the new one.
-    expect(editor.getState()).toEqual({ focused: false, draft: 'Ada' });
+    // The typed text stays: a blur never shows the old value for a moment.
+    expect(editor.getState()).toEqual({ focused: false, draft: 'Ada L' });
     editor.setValue('Ada L');
     expect(editor.getState().draft).toBe('Ada L');
+  });
+
+  it('keeps the typed text until the field shows it, then follows the field', async () => {
+    let answer!: (result: { status: string }) => void;
+    const { editor } = harness(() => new Promise((resolve) => (answer = resolve)));
+    editor.focus();
+    editor.input('ada');
+    editor.blur();
+    // A render with the field's old value, before the view shows the commit.
+    editor.setValue('Ada');
+    expect(editor.getState().draft).toBe('ada');
+    editor.setValue('ada');
+    // The form's scripts changed it: the field's value shows from now on.
+    editor.setValue('ADA');
+    expect(editor.getState().draft).toBe('ADA');
+    answer({ status: 'applied' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(editor.getState().draft).toBe('ADA');
+  });
+
+  it('keeps a value the form’s validation refuses typed, as Acrobat does', async () => {
+    const { editor } = harness(async () => ({ status: 'rejected' }));
+    editor.focus();
+    editor.input('abc');
+    editor.blur();
+    editor.setValue('Ada');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(editor.getState().draft).toBe('abc');
   });
 
   it('discards an unchanged edit, and one cancelled with Escape', () => {
@@ -214,7 +244,7 @@ describe('createTextFieldEditor', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('puts the value back when the form refuses the commit', async () => {
+  it('puts the value back when the engine refuses the commit', async () => {
     const { editor } = harness(async () => {
       throw new Error('refused');
     });

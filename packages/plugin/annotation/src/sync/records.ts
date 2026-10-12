@@ -1,20 +1,39 @@
 /**
- * The confirmed layer: every annotation record the engine confirmed, held in
- * a mirror. It is loaded whole once, kept current by folding confirmed events
- * from every origin, and re-reads a page only when an event describes it too
- * coarsely (a redaction, an inserted page, a new form field).
+ * The records: every annotation the engine confirmed, held in a mirror. It is
+ * loaded whole once, kept current by folding confirmed events from every
+ * origin, and re-reads a page only when an event describes it too coarsely (a
+ * redaction, an inserted page). Form fields' widgets aren't annotation
+ * records: they come with the form, and so do their events.
  *
- * Nothing unconfirmed ever enters it: the user's changes wait in the plugin
- * state's `pending` entries (model.ts) and the view lays them on top
- * (read/view.ts). What happens when a change is confirmed (new records find
- * their keys, record events fire) is in sync/confirmed.ts.
+ * Two pure functions change the records, side by side here:
+ *
+ *   foldRecords      what the engine confirmed: `records.get()`
+ *   predictRecords   what this session asked for and the engine hasn't
+ *                    answered yet, op by op: `records.view()` shows it on top
+ *
+ * What happens when a change is confirmed (render preferences, record
+ * events) is in sync/confirmed.ts.
  */
-import { reload, type DocumentEvent, type Mirror, type PageRef } from '@embedpdf/core';
+import {
+  reload,
+  type DocumentEvent,
+  type Mirror,
+  type PageRef,
+  type PredictedOp,
+} from '@embedpdf/core';
+import { annotationAfter, annotationOfNew } from '@embedpdf/core-annotation';
 import {
   annotationKey,
+  annotationPatchBetween,
+  deletedWith,
+  reorderedList,
   reorderPart,
   type Annotation,
-  type FormWidget,
+  type AnnotationDraft,
+  type AnnotationPatch,
+  type AnnotationRef,
+  type ChangeOp,
+  type ListPosition,
 } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from '../services/context';
@@ -25,10 +44,10 @@ export interface AnnotationRecord {
   readonly dto: Annotation;
   /**
    * Revision of the engine-baked appearance. It advances when the engine
-   * reports new raster content (a re-bake, a repainted widget, a reload), and
+   * reports new raster content (a re-bake, a reload), and
    * only then: the page's rasters are fetched again exactly when it changes.
    */
-  readonly apVersion: number;
+  readonly pictureVersion: number;
 }
 
 /** Every confirmed annotation of the document, by annotation key. */
@@ -59,7 +78,7 @@ function put(
     const key = annotationKey(dto.ref);
     const previous = byKey[key];
     if (!previous) added.push(key);
-    byKey[key] = { dto, apVersion: (previous?.apVersion ?? 0) + (bump ? 1 : 0) };
+    byKey[key] = { dto, pictureVersion: (previous?.pictureVersion ?? 0) + (bump ? 1 : 0) };
   }
   return { byKey, order: added.length ? [...records.order, ...added] : records.order };
 }
@@ -71,15 +90,6 @@ function drop(records: AnnotationRecords, keys: readonly string[]): AnnotationRe
   const byKey = { ...records.byKey };
   for (const key of present) delete byKey[key];
   return { byKey, order: records.order.filter((key) => !gone.has(key)) };
-}
-
-/** The engine repainted these records without changing them (a form value, a signature). */
-function bumpAppearance(records: AnnotationRecords, keys: readonly string[]): AnnotationRecords {
-  const present = keys.filter((key) => key in records.byKey);
-  if (!present.length) return records;
-  const byKey = { ...records.byKey };
-  for (const key of present) byKey[key] = { ...byKey[key]!, apVersion: byKey[key]!.apVersion + 1 };
-  return { ...records, byKey };
 }
 
 const keysOnPages = (records: AnnotationRecords, pages: readonly PageRef[]): string[] => {
@@ -99,7 +109,7 @@ function fromSnapshot(current: AnnotationRecords, dtos: readonly Annotation[]): 
     const key = annotationKey(dto.ref);
     const previous = current.byKey[key];
     if (!(key in byKey)) order.push(key);
-    byKey[key] = { dto, apVersion: previous ? previous.apVersion + 1 : 0 };
+    byKey[key] = { dto, pictureVersion: previous ? previous.pictureVersion + 1 : 0 };
   }
   return { byKey, order };
 }
@@ -115,17 +125,7 @@ function withPages(
   return put(drop(records, stale), dtos, true);
 }
 
-const pagesOfWidgets = (widgets: readonly FormWidget[]): PageRef[] =>
-  widgets.flatMap((widget) => (widget.page ? [widget.page] : []));
-
-const widgetKeys = (widgets: readonly FormWidget[]): string[] =>
-  widgets.flatMap((widget) => (widget.ref ? [annotationKey(widget.ref)] : []));
-
-/**
- * Apply one confirmed document event to the records. Pure, and the same for
- * every origin. Events that change widgets through the form plane re-read
- * the widgets' pages: the form result carries fields, not annotation records.
- */
+/** Apply one confirmed document event to the records. Pure, and the same for every origin. */
 export function foldRecords(
   records: AnnotationRecords,
   event: DocumentEvent,
@@ -152,6 +152,10 @@ export function foldRecords(
     }
     case 'annotations.deleted':
       return drop(records, event.deleted.map(annotationKey));
+    // An undo brought deleted annotations back, each in the place it had:
+    // the event doesn't say where, so the page is read again.
+    case 'annotations.restored':
+      return reload({ pages: [event.page] });
     case 'pages.deleted':
       return drop(records, keysOnPages(records, event.pages));
     case 'pages.inserted':
@@ -168,39 +172,200 @@ export function foldRecords(
       return event.results.some((result) => result.status === 'applied')
         ? reload({ pages: [event.page] })
         : records;
-    // A repair links stray widgets into fields and re-bakes appearances, and
-    // its result names none of them.
-    case 'forms.repaired':
-      return event.widgetsLinked > 0 || event.appearancesBaked > 0 ? reload() : records;
-    case 'forms.created':
-    case 'forms.widgetAdded':
-    case 'forms.widgetRemoved': {
-      const pages = pagesOfWidgets(event.field.widgets);
-      return pages.length ? reload({ pages }) : records;
-    }
-    case 'forms.deleted':
-      return drop(records, widgetKeys(event.meta.changedWidgets));
-    case 'forms.effectsApplied': {
-      // A script can change a widget's display flags.
-      const pages = pagesOfWidgets(event.meta.changedWidgets);
-      return pages.length ? reload({ pages }) : records;
-    }
-    // The form plane and signatures repaint widgets without changing their records.
-    case 'forms.valueSet':
-      return bumpAppearance(records, widgetKeys(event.meta.changedWidgets));
-    case 'forms.updated':
-      return bumpAppearance(records, widgetKeys(event.field.widgets));
-    case 'forms.imported':
-      return event.applied > 0
-        ? bumpAppearance(records, widgetKeys(event.form.fields.flatMap((field) => field.widgets)))
-        : records;
-    case 'signatures.completed':
-      return event.signature.widget
-        ? bumpAppearance(records, widgetKeys([event.signature.widget]))
-        : records;
     default:
       return records;
   }
+}
+
+/* ── what this session asked for ─────────────────────────────────────────── */
+
+/**
+ * The annotation a create writes, as the engine reads it back. The
+ * annotations it links to (the one it answers, the one a popup shows) are the
+ * engine's to look up as it writes: it is read without them, then they are
+ * stated. Throws for a draft the engine would refuse.
+ */
+export function annotationOfCreate(draft: AnnotationDraft, ref: AnnotationRef): Annotation {
+  const { reply, parent, ...fields } = draft as AnnotationDraft & {
+    reply?: { to: AnnotationRef; type?: 'reply' | 'group' } | null;
+    parent?: AnnotationRef | null;
+  };
+  return {
+    ...annotationOfNew(fields as AnnotationDraft, { ref }),
+    ...(reply ? { reply: { to: reply.to, type: reply.type ?? 'reply' } } : {}),
+    ...(parent ? { parent } : {}),
+  } as Annotation;
+}
+
+/**
+ * The record keys of one page in a new drawing order: `keys` moved to
+ * `position` among the page's others, in the order given, as the engine
+ * reorders. Other pages keep their places. Unchanged when the engine would
+ * refuse it (a key or the neighbour no longer on the page).
+ */
+function reorderedKeys(
+  records: AnnotationRecords,
+  page: number,
+  keys: readonly string[],
+  position: ListPosition<string>,
+): readonly string[] {
+  const onPage = (key: string) => records.byKey[key]?.dto.page.objectNumber === page;
+  try {
+    const order = reorderedList(records.order.filter(onPage), keys, position, (key) => key);
+    return reorderPart(records.order, onPage, order, (key) => key);
+  } catch {
+    return records.order;
+  }
+}
+
+/** The page's annotations, in drawing order. */
+const annotationsOn = (records: AnnotationRecords, page: number): Annotation[] =>
+  records.order
+    .map((key) => records.byKey[key]!.dto)
+    .filter((dto) => dto.page.objectNumber === page);
+
+/**
+ * One op of this session's pending changes, applied to the records as the
+ * engine will apply it; `records.view()` replays them, in staging order, over
+ * what the engine confirmed. Pure and absolute: an op whose answer the
+ * records hold already changes nothing, and so does an op the engine would
+ * refuse (its annotation gone, a patch it no longer takes). A record it
+ * changes keeps its appearance version: the engine's raster is the one it
+ * had until the answer brings a new one.
+ */
+export function predictRecords(records: AnnotationRecords, op: PredictedOp): AnnotationRecords {
+  switch (op.type) {
+    case 'annotations.create': {
+      // A create the engine names has no key to show it by until it answers.
+      if (op.objectNumber === undefined) return records;
+      const ref: AnnotationRef = {
+        kind: 'objectNumber',
+        page: op.page,
+        objectNumber: op.objectNumber,
+      };
+      if (annotationKey(ref) in records.byKey) return records;
+      try {
+        return put(records, [annotationOfCreate(op.data, ref)], false);
+      } catch {
+        return records;
+      }
+    }
+    case 'annotations.update': {
+      const stored = records.byKey[annotationKey(op.ref)];
+      if (!stored) return records;
+      let dto: Annotation;
+      try {
+        dto = annotationAfter(stored.dto, op.patch);
+      } catch {
+        return records;
+      }
+      return put(records, [dto], false);
+    }
+    case 'annotations.delete': {
+      // What goes with it goes too: its replies and grouped parts, their popups.
+      const page = annotationsOn(records, op.ref.page.objectNumber);
+      return drop(
+        records,
+        deletedWith(page, op.ref).map((annotation) => annotationKey(annotation.ref)),
+      );
+    }
+    case 'annotations.reorder': {
+      const order = reorderedKeys(
+        records,
+        op.page.objectNumber,
+        op.refs.map(annotationKey),
+        typeof op.position === 'object'
+          ? 'before' in op.position
+            ? { before: annotationKey(op.position.before) }
+            : { after: annotationKey(op.position.after) }
+          : op.position,
+      );
+      return order === records.order ? records : { ...records, order };
+    }
+    case 'annotations.restore': {
+      const key = annotationKey(op.annotation.ref);
+      if (key in records.byKey) return records;
+      // Back in its place among the page's annotations.
+      const page = op.annotation.page.objectNumber;
+      const onPage = records.order.filter(
+        (each) => records.byKey[each]!.dto.page.objectNumber === page,
+      );
+      const before = onPage[op.index];
+      const at = before === undefined ? records.order.length : records.order.indexOf(before);
+      return {
+        byKey: { ...records.byKey, [key]: { dto: op.annotation, pictureVersion: 0 } },
+        order: [...records.order.slice(0, at), key, ...records.order.slice(at)],
+      };
+    }
+    default:
+      return records;
+  }
+}
+
+/** What undoing one op looks like, over the records it applies to. */
+function undoOfOp(records: AnnotationRecords, op: ChangeOp): PredictedOp[] {
+  switch (op.type) {
+    case 'annotations.create':
+      return op.objectNumber === undefined
+        ? []
+        : [
+            {
+              type: 'annotations.delete',
+              ref: { kind: 'objectNumber', page: op.page, objectNumber: op.objectNumber },
+            },
+          ];
+    case 'annotations.update': {
+      const stored = records.byKey[annotationKey(op.ref)];
+      if (!stored) return [];
+      let after: Annotation;
+      try {
+        after = annotationAfter(stored.dto, op.patch);
+      } catch {
+        return [];
+      }
+      const patch = {
+        ...annotationPatchBetween(after, stored.dto),
+        subtype: stored.dto.subtype,
+      } as AnnotationPatch;
+      return [{ type: 'annotations.update', ref: op.ref, patch }];
+    }
+    case 'annotations.delete': {
+      // Everything that went with it comes back, each in its place.
+      const page = annotationsOn(records, op.ref.page.objectNumber);
+      const gone = new Set(deletedWith(page, op.ref));
+      return page.flatMap((annotation, index): PredictedOp[] =>
+        gone.has(annotation) ? [{ type: 'annotations.restore', annotation, index }] : [],
+      );
+    }
+    case 'annotations.reorder':
+      // The page's whole order as it was.
+      return [
+        {
+          type: 'annotations.reorder',
+          page: op.page,
+          refs: annotationsOn(records, op.page.objectNumber).map((annotation) => annotation.ref),
+          position: 'start',
+        },
+      ];
+    default:
+      return [];
+  }
+}
+
+/**
+ * What undoing `ops` looks like, read off the records they apply to, each
+ * over what the ones before it left: the ops that bring the records back,
+ * the last op's first. It is drawing only: the engine undoes a change by
+ * its own record of it.
+ */
+export function undoOf(records: AnnotationRecords, ops: readonly ChangeOp[]): PredictedOp[] {
+  const undo: PredictedOp[][] = [];
+  let current = records;
+  for (const op of ops) {
+    undo.push(undoOfOp(current, op));
+    current = predictRecords(current, op);
+  }
+  return undo.reverse().flat();
 }
 
 /* ── the mirror ──────────────────────────────────────────────────────────── */
@@ -227,6 +392,7 @@ export function createRecordsMirror(
       };
     },
     fold: foldRecords,
+    predict: predictRecords,
     loadPages: async (doc, pages) => {
       const { annotations } = await doc.annotations.list({ pages });
       return (current) => withPages(current, pages, annotations);

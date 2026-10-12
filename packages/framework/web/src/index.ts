@@ -127,7 +127,13 @@ export type {
   RichTextEditorScript,
   RichTextEditorStyle,
 } from './rich-text-editor';
-export { mountWebFont } from './web-font';
+export {
+  createFontMounts,
+  mountFontProgram,
+  mountWebFont,
+  type MountableFontProgram,
+} from './web-font';
+export { pictureOrPainting, type LookState, type PictureOrPainting } from './picture-or-painting';
 export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
 export type { LineModel, WebFontMetrics } from './web-font-metrics';
 export { EPDF_VARIABLES, epdfThemeVariables, mixAccent, paint, paintDefault } from './theme';
@@ -162,7 +168,7 @@ export type {
   SelectionEndpointShape,
   SelectionEndpointsShape,
 } from './anchor-equality';
-export { ghostOpacity, sceneViewBox, svgShapesOf } from './annotation-scene';
+export { fontProgramsOf, ghostOpacity, sceneViewBox, svgShapesOf } from './annotation-scene';
 export type {
   ScenePaint,
   SceneShapeNode,
@@ -212,8 +218,21 @@ export type {
   RendererEntry,
   RendererInteractiveContext,
 } from './annotation-renderers';
-export { bakedAppearanceOf, loadAppearanceUrls, loadObjectUrl, objectUrlOf } from './object-urls';
-export type { AppearancePicture, AppearanceUrl, ObjectUrl, PictureBytes } from './object-urls';
+export {
+  bakedAppearanceOf,
+  createShownUrls,
+  loadAppearanceUrls,
+  loadObjectUrl,
+  objectUrlOf,
+  shownAppearance,
+} from './object-urls';
+export type {
+  AppearancePicture,
+  AppearanceUrl,
+  ObjectUrl,
+  PictureBytes,
+  ShownUrls,
+} from './object-urls';
 export { enrichCommentThreads } from './comment-threads';
 export type { CommentPageLayout, CommentThreadPage } from './comment-threads';
 export {
@@ -254,6 +273,7 @@ export type {
   FormControlFill,
   FormFocusRingStyle,
   ListBoxControlStyle,
+  TextEditorLayout,
   TextFieldEditorStyle,
   WidgetBoxStyle,
 } from './form-styles';
@@ -285,6 +305,15 @@ export type {
   PageContextTransform,
   PageFrameShape,
 } from './page-context';
+export { pageLayersOf, partsDrawnTwice, pictureLayerOptionsOf } from './page-layers';
+export type {
+  PageLayers,
+  PagePart,
+  PaintedParts,
+  PartRights,
+  PictureLayerOptions,
+  PicturePartProps,
+} from './page-layers';
 export { pageSurfaceLayout, pageViewTransformInput, stagePageDemand } from './page-surface';
 export type {
   PageSurfaceLayout,

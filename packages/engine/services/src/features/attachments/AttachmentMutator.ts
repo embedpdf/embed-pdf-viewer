@@ -48,11 +48,11 @@ export class AttachmentMutator {
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
-    const resource = resources?.[file.resource];
+    const resource = resources?.[file.resources.file];
     if (!resource) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `attachment file references resource '${file.resource}' but no such binary payload accompanied the mutation`,
+        `attachment file references resource '${file.resources.file}' but no such binary payload accompanied the mutation`,
       );
     }
     if (file.name.length === 0) {
@@ -115,6 +115,8 @@ export class AttachmentMutator {
     if (!fn.FPDFDoc_DeleteAttachment(docPtr, index)) {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDFDoc_DeleteAttachment returned false');
     }
-    return { meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed: [ref] } };
+    return {
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed: [ref] },
+    };
   }
 }

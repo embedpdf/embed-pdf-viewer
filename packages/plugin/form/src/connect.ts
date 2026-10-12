@@ -1,12 +1,15 @@
 /**
  * The form plugin's wiring to its siblings, run once every capability exists:
- * its tools and place handler on the interaction hub, the widget behavior on
- * the annotation plugin, and the reset executor, commit sink and submit
- * resolver on the actions plugin. Every registration is released with the
- * document.
+ * its tools and place handler on the interaction hub, its widgets lent to the
+ * annotation plugin for design, and the reset executor, commit sink, form
+ * reader and submit resolver on the actions plugin. Every registration is released with
+ * the document.
  */
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
+import {
+  AnnotationToken as AnnotationHostToken,
+  type AnnotationLender,
+} from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import type { FormHostCapability } from './host-contract';
@@ -14,7 +17,11 @@ import type { FormContext } from './services';
 import { FORM_TOOLS, PLACE_TAGS } from './tools/definitions';
 import { createPlaceHandler } from './tools/handlers';
 
-export function connectForm(ctx: FormContext, form: FormHostCapability): void {
+export function connectForm(
+  ctx: FormContext,
+  form: FormHostCapability,
+  lender: AnnotationLender,
+): void {
   const interaction = ctx.get(InteractionToken);
   const annotation = ctx.tryGet(AnnotationHostToken);
 
@@ -68,21 +75,18 @@ export function connectForm(ctx: FormContext, form: FormHostCapability): void {
   }
   ctx.cleanup(interaction.registerHandler(createPlaceHandler(form, interaction, annotation)));
 
-  // Widgets stay inert annotations while the active tool fills forms.
-  if (annotation) {
-    ctx.cleanup(
-      annotation.registerBehavior({
-        id: 'form-widgets',
-        matches: (record) => record.subtype.startsWith('widget'),
-        engaged: () => interaction.getActiveTool()?.enables.has('form-fill') ?? false,
-      }),
-    );
+  // Design mode: the widgets are lent to the annotation plugin, which selects,
+  // moves, restyles and deletes them with its own tools (write/lending.ts).
+  if (annotation && ctx.allows('doc.forms.modify')) {
+    ctx.cleanup(annotation.lend(lender));
   }
 
   const actions = ctx.tryGet(ActionsHostToken);
   if (!actions) return;
-  // Script form effects are written through this plugin, which owns the fields.
+  // Script form effects are written through this plugin, which owns the fields, and scripts
+  // read the form as the user sees it, with the fills still on their way.
   ctx.cleanup(actions.registerFormCommitSink((effects) => form.commitScriptFormEffects(effects)));
+  ctx.cleanup(actions.registerFormReader(() => form.getSnapshot()));
   ctx.cleanup(
     actions.registerSubmitResolver((intent, actionContext, diagnose) =>
       form.resolveSubmitDataset(intent, actionContext, diagnose),
@@ -97,7 +101,7 @@ export function connectForm(ctx: FormContext, form: FormHostCapability): void {
       if (result.status === 'failed') {
         return { status: 'failed', error: result.error?.message ?? 'reset failed' };
       }
-      if (result.effectsResult === null) {
+      if (result.status === 'unchanged') {
         return {
           status: 'inert',
           reason: result.diagnostics[0]?.message ?? 'reset-form resolved no fields',

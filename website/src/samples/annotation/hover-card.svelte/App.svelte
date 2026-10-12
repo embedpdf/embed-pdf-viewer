@@ -32,7 +32,7 @@
     <AddAnnotations />
     <p class="hint">Point at a note or the green rectangle</p>
     <Stage class="stage">
-      <RenderLayer annotations={false} />
+      <RenderLayer />
       <AnnotationLayer />
       {#snippet overlay()}
         <HoverCard />

@@ -82,25 +82,16 @@ export function buildHandleScopeContext(input: BuildHandleScopeContextInput): Ha
  *
  * Rules:
  *   - `annotations:*:self` needs `identity.userId`
- *   - `annotations:*:group=X` needs `identity.groups` to include `X`
- *     (matching the resolver's group-membership check)
- *   - `annotations:*:createdBy=Y` is row-scoped, not caller-scoped, so
- *     no identity field is required at open time.
- *   - `annotations:set-group:group=X` names a destination group, which
- *     the caller needn't belong to (see `checkSetGroup`), so it requires
- *     nothing either.
+ *   - every other filter compares a fact on the record with the value the
+ *     scope names (`group=X`, `createdBy=Y`, `all`), so it needs no
+ *     identity field.
  */
 function assertIdentityForCollabScopes(scope: ReadonlyArray<string>, identity: Identity): void {
   for (const s of scope) {
     const parsed = parseScope(s);
-    if (parsed.kind !== 'collab' || parsed.action === 'set-group') continue;
+    if (parsed.kind !== 'collab') continue;
     if (parsed.filter.kind === 'self' && !identity.userId) {
       throw new MissingIdentity(s);
-    }
-    if (parsed.filter.kind === 'group') {
-      if (!identity.groups?.includes(parsed.filter.groupId)) {
-        throw new MissingIdentity(s);
-      }
     }
   }
 }

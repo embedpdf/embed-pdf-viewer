@@ -51,6 +51,7 @@ export { shownAppearances } from './dto/AnnotationRender';
 export { ANNOTATION_DEFAULTS, type AnnotationDefaults } from './annotation/defaults';
 export { buildCommentThreads } from './annotation/comments';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
+export { FormTransfer } from './transfer/FormTransfer';
 export {
   formatMeasurement,
   measureFromKnownLength,
@@ -158,6 +159,7 @@ export type {
   PageRenderOptions,
   PageImageOptions,
   PageImageHandle,
+  ImageSource,
   PageRaster,
   PageRenderImage,
   PageRenderRaster,
@@ -190,6 +192,9 @@ export type {
   MeasureFromRatioOptions,
   FormFieldRef,
   FormFieldDTO,
+  FormBundle,
+  FormImportResult,
+  FormValuesImportResult,
   Attachment,
   AttachmentList,
   AttachmentRef,

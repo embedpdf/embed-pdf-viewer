@@ -238,7 +238,7 @@ export class StylePanel {
       <div class="viewer">
         <epdf-stage class="stage">
           <ng-template epdfPage>
-            <epdf-render-layer [annotations]="false" />
+            <epdf-render-layer />
             <epdf-annotation-layer />
           </ng-template>
         </epdf-stage>

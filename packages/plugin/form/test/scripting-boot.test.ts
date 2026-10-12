@@ -9,13 +9,13 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   toPageRef,
   type DocumentHandle,
-  type FormEffect,
+  type ChangeOp,
   type FormSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import type { ScriptInput, ScriptOutput } from '@embedpdf/core-acrojs';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const okEvent = (value: unknown = '') => ({
@@ -61,6 +61,12 @@ function textField(objnum: number, name: string) {
     noExport: false,
     alternateName: null,
     mappingName: null,
+    createdBy: null,
+    createdAt: null,
+    filledBy: null,
+    filledByName: null,
+    filledAt: null,
+    importedBy: null,
     widgets: [{ objectNumber: objnum + 100, page: toPageRef(3) }],
     value: '',
     defaultValue: '',
@@ -73,7 +79,7 @@ function textField(objnum: number, name: string) {
   };
 }
 
-function makeDoc(applied: FormEffect[][]) {
+function makeDoc(applied: ChangeOp[][]) {
   return {
     id: 'diag-doc',
     security: { identity: null },
@@ -95,13 +101,11 @@ function makeDoc(applied: FormEffect[][]) {
         ],
       }),
     },
-    forms: {
-      list: async () => snapshot(),
-      applyEffects: vi.fn(async (effects: FormEffect[]) => {
-        applied.push(effects);
-        return { results: effects.map(() => ({ status: 'applied' as const })) };
-      }),
-    },
+    apply: vi.fn(async ({ ops }: { ops: ChangeOp[] }) => {
+      applied.push(ops);
+      return { items: [], meta: { undoable: true } as never };
+    }),
+    forms: { list: async () => snapshot() },
   } as unknown as DocumentHandle;
 }
 
@@ -111,16 +115,17 @@ const snapshot = (): FormSnapshot =>
     needsAppearances: false,
     calculationOrder: [],
     fields: [textField(7, 'First_Name')],
+    widgets: [],
   }) as unknown as FormSnapshot;
 
 describe('FormScriptingController — boot failures degrade, never brick', () => {
   it('a throwing boot script still lets the user commit (and again after)', async () => {
-    const applied: FormEffect[][] = [];
+    const applied: ChangeOp[][] = [];
     const doc = makeDoc(applied);
     const realm = standaloneRealm(doc, () => null, {
       sandboxFactory: async () => failingBootSandbox(),
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document: () => null,
       transaction: realm.transaction,
@@ -134,8 +139,8 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     expect(first.status).toBe('applied');
     expect(applied[0]).toEqual([
       {
-        kind: 'setValue',
-        ref: { kind: 'objectNumber', objectNumber: 7 },
+        type: 'forms.setValue',
+        field: { kind: 'objectNumber', objectNumber: 7 },
         value: { value: 'HELLO' },
       },
     ]);
@@ -155,7 +160,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
   });
 
   it('a failing doc.actions.get also degrades to a diagnostic', async () => {
-    const applied: FormEffect[][] = [];
+    const applied: ChangeOp[][] = [];
     const doc = makeDoc(applied);
     // The fake's `read` is a plain async function, not an AbortablePromise.
     (doc.actions as unknown as { get: () => Promise<never> }).get = async () => {
@@ -164,7 +169,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     const realm = standaloneRealm(doc, () => null, {
       sandboxFactory: async () => failingBootSandbox(),
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document: () => null,
       transaction: realm.transaction,

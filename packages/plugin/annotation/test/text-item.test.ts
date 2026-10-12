@@ -56,7 +56,7 @@ const freeText = (
     ...FLAGS,
   } as AnnotationDraft;
   const annotation = annotationOfDraft(draft, {
-    ref: { kind: 'nm', page: PAGE, nm: id },
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: 1 },
   });
   return { id, unconfirmed: true, source: 'baked', annotation };
 };

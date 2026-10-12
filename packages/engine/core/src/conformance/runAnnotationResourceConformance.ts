@@ -43,6 +43,12 @@ export interface AnnotationResourceConformanceOptions {
   makeEngine: () => Promise<Engine> | Engine;
   /** Open a fresh copy of a fixture, with `doc.download` among its scopes. */
   open: (engine: Engine, fixture: AnnotationResourceFixture) => Promise<DocumentHandle>;
+  /** Open a fresh copy of a fixture with `scope` only: the import's rights tests run with it. */
+  openScoped?: (
+    engine: Engine,
+    fixture: AnnotationResourceFixture,
+    scope: readonly string[],
+  ) => Promise<DocumentHandle>;
 }
 
 /**

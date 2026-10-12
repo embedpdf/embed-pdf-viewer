@@ -1,18 +1,17 @@
 /**
- * What a verb returns once its engine writes settled: a `BatchResult` over the
- * annotations it addressed, the ref of the record it created, or the first
+ * What a verb returns once the engine answered its change: a `BatchResult`
+ * over the annotations it addressed, the ref of the record it created, or the
  * refusal as an error.
  */
 import { PluginError, toPluginError, toPluginErrorInfo, type BatchResult } from '@embedpdf/core';
 import { annotationKey, type Annotation, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
-import type { IntentOutcome } from '../services/intents';
-import type { Applied, AppliedOutcome, Commit } from '../services/store';
+import type { Applied, AppliedOutcome, Commit, Written } from '../services/store';
 
 /** The outcome over the refs a selection verb addressed: each applied, or failed with the refusal. */
 export function batchResultOf(
   refs: readonly AnnotationRef[],
-  outcome: Pick<IntentOutcome, 'failed'>,
+  outcome: Pick<Written, 'failed'>,
 ): BatchResult<AnnotationRef, AnnotationRef> {
   const errors = new Map<string, PluginError>();
   for (const { ids, error } of outcome.failed) for (const id of ids) errors.set(id, error);
@@ -27,26 +26,33 @@ export function batchResultOf(
   };
 }
 
-/** Reject with the first refusal, for verbs whose promise fails when a write does. */
-export function throwIfFailed(outcome: IntentOutcome): void {
+/** Reject with the refusal, for verbs whose promise fails when their change does. */
+export function throwIfFailed(outcome: Pick<Written, 'failed'>): void {
   const [first] = outcome.failed;
   if (first) throw first.error;
 }
 
-/** The ref of the record a create message made, once the engine confirmed it. */
+const notCreated = (): PluginError =>
+  new PluginError('operation-failed', 'annotation', 'the annotation could not be created');
+
+/** The annotation the engine created for record `id`, from its answer. */
+const createdIn = (outcome: Written, id: string): Annotation | null => {
+  for (const item of outcome.result?.items ?? []) {
+    if (item.type === 'annotations.create' && annotationKey(item.annotation.ref) === id) {
+      return item.annotation as Annotation;
+    }
+  }
+  return null;
+};
+
+/** The ref of the record a create message made (its first), once the engine wrote it. */
 export async function createdRefOf(commit: Commit): Promise<AnnotationRef> {
-  const effect = commit.effects.find(
-    (candidate) => candidate.type === 'create' || candidate.type === 'createGroup',
-  );
-  const id =
-    effect?.type === 'create' ? effect.id : effect?.type === 'createGroup' ? effect.primary : null;
+  const effect = commit.effects.find((candidate) => candidate.type === 'create');
   const outcome = await commit.written;
   throwIfFailed(outcome);
-  const ref = id === null ? undefined : outcome.created[id];
-  if (!ref) {
-    throw new PluginError('operation-failed', 'annotation', 'the annotation could not be created');
-  }
-  return ref;
+  const created = effect?.type === 'create' ? createdIn(outcome, effect.id) : null;
+  if (!created) throw notCreated();
+  return created.ref;
 }
 
 /** Wait for stated changes to be written; rejects with the first refusal. */
@@ -66,15 +72,11 @@ export async function appliedAnnotationOf(applied: Applied, index = 0): Promise<
   return outcome.annotations[index] ?? null;
 }
 
-/** The ref of the record a stated create made, once the engine confirmed it. */
+/** The ref of the record a stated create made, once the engine wrote it. */
 export async function appliedRefOf(applied: Applied, index = 0): Promise<AnnotationRef> {
-  const outcome = await appliedOrThrow(applied);
-  const id = applied.ids[index];
-  const ref = id === undefined ? undefined : outcome.created[id];
-  if (!ref) {
-    throw new PluginError('operation-failed', 'annotation', 'the annotation could not be created');
-  }
-  return ref;
+  const annotation = await appliedAnnotationOf(applied, index);
+  if (!annotation) throw notCreated();
+  return annotation.ref;
 }
 
 /** Run a verb per item, in order, folding refusals into a `BatchResult`. */

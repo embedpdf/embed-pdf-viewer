@@ -39,7 +39,7 @@ const ebook = async (): Promise<OpenInput> => {
       <ArmBar />
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <AnnotationLayer />
           <FormLayer />
         </template>

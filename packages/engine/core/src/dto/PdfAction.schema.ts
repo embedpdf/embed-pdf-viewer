@@ -2,10 +2,14 @@ import { z } from 'zod';
 
 import type {
   DocumentActionsSnapshot,
+  FieldActionsPatch,
+  FieldScriptWrite,
   PdfActionNode,
   PdfActionTargetRef,
   PdfActionTree,
   PdfActionType,
+  PdfActionWrite,
+  WidgetActionsPatch,
 } from './PdfAction';
 import { PageDestinationSchema, PdfDestinationSchema } from './PdfDestination.schema';
 
@@ -144,6 +148,75 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
 const PAGE_SPACE = actionSchemasFor(PageDestinationSchema);
 const PDF_SPACE = actionSchemasFor(PdfDestinationSchema);
 
+/**
+ * The write schemas for one kind of destination: an action a write makes,
+ * and a widget's actions patch.
+ */
+function actionWriteSchemasFor<Destination>(destination: z.ZodType<Destination>) {
+  // A fresh schema at each place, so a generator names the action there and
+  // never points into another one.
+  const next = () => ({ next: z.array(z.lazy(() => node)).optional() });
+  const arms = [
+    z.object({ type: z.literal('javascript'), script: z.string(), ...next() }),
+    z.object({ type: z.literal('goto'), destination, ...next() }),
+    z.object({ type: z.literal('uri'), uri: z.string().min(1), ...next() }),
+    z.object({ type: z.literal('named'), name: z.string().min(1), ...next() }),
+    z.object({
+      type: z.literal('hide'),
+      targets: z.array(PdfActionTargetRefSchema).min(1),
+      hide: z.boolean(),
+      ...next(),
+    }),
+    z.object({
+      type: z.literal('reset-form'),
+      fields: z.array(PdfActionTargetRefSchema).nullable(),
+      exclude: z.boolean(),
+      ...next(),
+    }),
+    z.object({
+      type: z.literal('submit-form'),
+      url: z.string().min(1),
+      fields: z.array(PdfActionTargetRefSchema).nullable(),
+      flags: z.number().int().nonnegative().optional(),
+      ...next(),
+    }),
+  ] as const;
+  const node: z.ZodType<PdfActionWrite<Destination>> = z.lazy(
+    () =>
+      z.discriminatedUnion('type', [...arms]) as unknown as z.ZodType<PdfActionWrite<Destination>>,
+  );
+  const event = () => node.nullable().optional();
+  const widgetActions: z.ZodType<WidgetActionsPatch<Destination>> = z
+    .object({
+      activate: event(),
+      cursorEnter: event(),
+      cursorExit: event(),
+      mouseDown: event(),
+      mouseUp: event(),
+      focus: event(),
+      blur: event(),
+      pageOpen: event(),
+      pageClose: event(),
+      pageVisible: event(),
+      pageInvisible: event(),
+    })
+    .strict() as unknown as z.ZodType<WidgetActionsPatch<Destination>>;
+  return { node, widgetActions };
+}
+
+const PAGE_SPACE_WRITES = actionWriteSchemasFor(PageDestinationSchema);
+const PDF_SPACE_WRITES = actionWriteSchemasFor(PdfDestinationSchema);
+
+/** An action a write makes, its destinations in page space. */
+export const PdfActionWriteSchema: z.ZodType<PdfActionWrite> = PAGE_SPACE_WRITES.node;
+
+/** A widget's actions to write, by event, their destinations in page space. */
+export const WidgetActionsPatchSchema: z.ZodType<WidgetActionsPatch> =
+  PAGE_SPACE_WRITES.widgetActions;
+
+/** A widget's actions to write, as the engine writes the file: destinations in its coordinates. */
+export const FileWidgetActionsPatchSchema = PDF_SPACE_WRITES.widgetActions;
+
 export const PdfActionNodeSchema: z.ZodType<PdfActionNode> = PAGE_SPACE.node;
 
 /** The `/S` vocabulary, derived from the union arms so it cannot drift. */
@@ -164,6 +237,26 @@ export const PdfAnnotationActionsSchema = PAGE_SPACE.annotationActions;
 export const FileAnnotationActionsSchema = PDF_SPACE.annotationActions;
 
 /**
+ * A field event's script: JavaScript all through. Any other action type is
+ * refused here, at the boundary.
+ */
+export const FieldScriptWriteSchema: z.ZodType<FieldScriptWrite> = z.lazy(() =>
+  z.object({
+    type: z.literal('javascript'),
+    script: z.string(),
+    next: z.array(FieldScriptWriteSchema).optional(),
+  }),
+);
+
+/** A field's scripts to write, by event: a script sets one, `null` removes it. */
+export const FieldActionsPatchSchema: z.ZodType<FieldActionsPatch> = z.object({
+  keystroke: FieldScriptWriteSchema.nullable().optional(),
+  format: FieldScriptWriteSchema.nullable().optional(),
+  validate: FieldScriptWriteSchema.nullable().optional(),
+  calculate: FieldScriptWriteSchema.nullable().optional(),
+});
+
+/**
  * Stable public component names for generators that project the action wire
  * model into OpenAPI or another schema format. Keep reusable boundaries here;
  * individual action arms remain owned by `PdfActionNodeSchema`.
@@ -177,4 +270,8 @@ export const PdfActionWireComponents = {
   PdfPageActions: PdfPageActionsSchema,
   PdfAnnotationActions: PdfAnnotationActionsSchema,
   DocumentActionsSnapshot: DocumentActionsSnapshotSchema,
+  FieldScriptWrite: FieldScriptWriteSchema,
+  FieldActionsPatch: FieldActionsPatchSchema,
+  PdfActionWrite: PdfActionWriteSchema,
+  WidgetActionsPatch: WidgetActionsPatchSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;

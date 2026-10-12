@@ -36,6 +36,7 @@ import { observeOutsidePress } from '@embedpdf/web';
 import { Icon } from './icons';
 import { useAnnotationFonts } from './annotation-fonts';
 import { AnnotationFlagsSection } from './annotation-flags';
+import { FieldSettingsSection } from './field-settings';
 
 // ── app-level vocabulary (a viewer's decision) ────────────────────────────────
 // The engine schema says which controls to show; these lists say what the app
@@ -921,6 +922,8 @@ export function AnnotationStylePanel() {
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
           style field, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
+      {/* A form field's own settings: name, tooltip, required, its family's own. */}
+      <FieldSettingsSection />
       {/* `/F` flags for whatever is selected — the live flags test surface. */}
       <AnnotationFlagsSection />
     </div>

@@ -121,10 +121,9 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
   }
 
   /**
-   * Create an embedded file in the name tree. Same splitter the
-   * file-attachment annotation draft uses — metadata into the `body`
-   * JSON part, bytes into the `resource:r0` file part — POSTed as the
-   * standard multipart mutation envelope.
+   * Create an embedded file in the name tree: metadata into the `body`
+   * part, naming its file `resources: { file: 'file' }`, and the bytes in
+   * the part `resource:file`.
    */
   create(
     file: AttachmentFileSource,
@@ -138,11 +137,11 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     return AbortablePromise.run<AttachmentCreateResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
-        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
+        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'file');
         const result = await write.send((sent) =>
           this.http.postMultipartJson(
             wirePaths.layerAttachmentsCollection(this.docId, this.layerName),
-            buildMutationForm(wireFile, { r0: resource }),
+            buildMutationForm(wireFile, { file: resource }),
             (raw) => AttachmentCreateResultSchema.parse(raw),
             signal,
             sent,

@@ -15,6 +15,7 @@ import { shapeMeasurementLayout } from './measurement-shape';
 import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import { HELVETICA_ASCENT, HELVETICA_LINE_HEIGHT, helveticaAdvance } from './helvetica';
+import { drawsLive } from './appearance';
 import { fileAttachmentIconScene, noteIconScene } from './icons';
 import { blendFor, dashOf } from './kinds/styles';
 import { CARET_STROKE_WIDTH } from './shapes/caret';
@@ -300,8 +301,21 @@ function redactScene(item: RenderItem): SceneNode[] {
   return nodes;
 }
 
+/**
+ * Whether the item can be drawn live now (`scene(item)`): anything not
+ * drawn from the engine's picture, a kind with a live drawing, and a lent
+ * record its lender draws. A stamp or a link can't: its picture is its
+ * drawing.
+ */
+export const hasLiveDrawing = (item: RenderItem): boolean =>
+  item.source !== 'baked' ||
+  item.lentScene !== undefined ||
+  (item.annotation !== undefined && drawsLive({ annotation: item.annotation }));
+
 /** The full painted scene for one annotation. */
 export function scene(item: RenderItem): SceneNode[] {
+  // A lent record: its lender draws it.
+  if (item.lentScene) return [...item.lentScene()];
   // A link draws nothing live: its look, a border when the file gives it one,
   // is the engine's raster (`rasterOnly`), and one being drawn shows as the
   // rubber band. Selection chrome outlines it, so an editable link is

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { IsoDateTimeSchema } from './IsoDateTime.schema';
+import { FileResourceKeysSchema } from '../wire/resourceKeys';
 
 import type {
   Attachment,
@@ -16,7 +17,7 @@ import type {
  */
 
 export const WireAttachmentFileSchema: z.ZodType<WireAttachmentFile> = z.object({
-  resource: z.string().min(1),
+  resources: FileResourceKeysSchema,
   name: z.string().min(1),
   mimeType: z.string().optional(),
   description: z.string().optional(),

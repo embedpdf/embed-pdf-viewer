@@ -1,10 +1,13 @@
 /** The props of `<RenderLayer>`. */
 export interface RenderLayerProps {
   /**
-   * Bake annotations into the page picture (default true). Pass false when an
-   * `<AnnotationLayer>` draws them, so they aren't drawn twice.
+   * Draw the annotations into the page's picture (`true`) or leave them out (`false`). Left
+   * unset, the picture leaves them to an `<AnnotationLayer>` on the page, and otherwise draws them
+   * when the user may read them.
    */
   annotations?: boolean;
+  /** The same for the form fields, which a `<FormLayer>` paints. */
+  formFields?: boolean;
   /**
    * Mount the tile plane (default true). Whether it spends anything is the render plugin's
    * arithmetic: leave it on, and pass false only for a view that must never tile.

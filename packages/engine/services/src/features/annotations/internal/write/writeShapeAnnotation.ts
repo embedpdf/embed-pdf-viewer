@@ -4,6 +4,7 @@ import {
   type SquareDraft,
   type SquarePatch,
   type PdfCoordinates,
+  type PlacedDraft,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -29,7 +30,7 @@ export function applyShapeDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: ShapeDraft,
+  draft: PlacedDraft<ShapeDraft>,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
 

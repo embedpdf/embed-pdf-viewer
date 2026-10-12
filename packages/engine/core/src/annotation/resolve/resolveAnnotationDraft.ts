@@ -2,6 +2,7 @@ import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { assertAnnotationDraft } from '../checkWrite';
 import type { DescribeFont } from '../fontFaces';
 import type { AnnotationDraft } from '../kinds';
+import { boxDraftFollows } from './box';
 import { freeTextDraftFollows } from './freeText';
 import { resolveMeasurementDraft } from './measurement';
 import { redactDraftFollows } from './redact';
@@ -25,6 +26,7 @@ export interface DraftResolveOptions {
  * The draft the engine writes for `draft`, in the file's coordinates:
  * checked against its kind, and every field that follows from it stated.
  *
+ * - A box kind placed by its `rect` at a quarter turn states its `box`.
  * - A note's standard review state brings its state model.
  * - A free text states its intent, and its text as rich text carrying its
  *   text style, with `contents` its plain projection.
@@ -41,10 +43,11 @@ export function pdfResolveAnnotationDraft(
   options: DraftResolveOptions = {},
 ): AnnotationDraft<PdfCoordinates> {
   assertDeclaredFields(draft.subtype, draft);
-  assertAnnotationDraft(draft, { linked: options.linked ?? [] });
-  assertRichTextAgreement(draft);
+  const placed = boxDraftFollows(draft);
+  assertAnnotationDraft(placed, { linked: options.linked ?? [] });
+  assertRichTextAgreement(placed);
   const followed = redactDraftFollows(
-    freeTextDraftFollows(noteDraftStateFollows(draft), options.describeFont),
+    freeTextDraftFollows(noteDraftStateFollows(placed), options.describeFont),
   );
   return resolveMeasurementDraft(followed);
 }

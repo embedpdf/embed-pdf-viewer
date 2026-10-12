@@ -282,14 +282,15 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
    * Sign a field: the mark becomes what it shows, the key seals the document,
    * and the signed document is a new version. A signal that fires before the
    * seal leaves nothing signed. Fires `onSigned`. Rejects `permission-denied`
-   * without `doc.sign` (or `doc.sign.certify` to certify), `invalid-input`
-   * without a key, `not-found`, `operation-cancelled`.
+   * for a field you may not sign (`canSign`), or without `doc.sign.certify`
+   * to certify, `invalid-input` without a key, `not-found`,
+   * `operation-cancelled`.
    */
   sign(input: SignFieldInput, options?: OperationOptions): Promise<SignatureCompleteResult>;
   /**
    * Signing in two steps, the first: resolves the digest for your key to sign,
    * and keeps the document from changing until `completeSignature()` or
-   * `cancelPending()`. Rejects `permission-denied` without `doc.sign`.
+   * `cancelPending()`. Rejects like `sign()`.
    */
   prepareSignature(
     input: PrepareSignatureInput,
@@ -305,7 +306,8 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   cancelPending(options?: OperationOptions): Promise<void>;
   /**
    * Draw a mark into a field without signing. Fires `onFilled`. Rejects
-   * `permission-denied` without `doc.forms.fill`, `conflict` on a signed field.
+   * `permission-denied` for a field you may not fill in (`canFill`),
+   * `conflict` on a signed field.
    */
   fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void>;
   /** Take a drawn mark out of a field. Fires `onCleared`. Rejects like `fillField()`. */
@@ -352,10 +354,17 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   ): Promise<Uint8Array>;
 
   // ── permissions ──
-  /** Whether signing is allowed: `doc.sign`. A per-call key or two-step signing needs no `key` setting. */
-  canSign(): boolean;
-  /** Whether drawing a mark into a field without signing is allowed: `doc.forms.fill`. */
-  canFill(): boolean;
+  /**
+   * Whether signing this field is allowed: `doc.sign`, or a `fields:sign`
+   * permission for its group. `false` for a field the form doesn't have. A
+   * per-call key or two-step signing needs no `key` setting.
+   */
+  canSign(field: FormFieldRef): boolean;
+  /**
+   * Whether drawing a mark into this field without signing is allowed:
+   * `doc.forms.fill`, or a `fields:fill` permission for its group.
+   */
+  canFill(field: FormFieldRef): boolean;
   /** Whether a certification may be offered: the `allowCertify` setting and `doc.sign.certify`. */
   canCertify(): boolean;
   /** Whether the signed bytes may be read: `doc.download`. */

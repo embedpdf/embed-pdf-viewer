@@ -202,6 +202,12 @@ export function unmadeItem(
   );
 }
 
+/** `paint(box)`, made the first time it's asked for and kept. */
+function once<Result>(paint: (box: Rect) => Result, box: Rect): () => Result {
+  let made: { readonly result: Result } | null = null;
+  return () => (made ??= { result: paint(box) }).result;
+}
+
 /** A free-text box renders as a live element (editable / reflowing) while it's
  *  being edited or while its source is vector (a resize, in-progress or committed);
  *  otherwise it renders as the engine's baked /AP image, exactly like a shape. */
@@ -232,6 +238,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     const ap = rasterPlacement(model, id, view, geometry);
     const measure = effMeasure(model, id);
     const distance = measure && measurementLayout(geometry, measure, style);
+    const box = distance?.visualBounds ?? geomVisualBounds(geometry, style);
     items.push(
       placed(
         {
@@ -240,7 +247,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
           annotation: record.annotation,
           subtype: kindOf(record.annotation).name,
           geometry,
-          box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
+          box,
           apBox: ap.box,
           style,
           ...(text ? { text } : {}),
@@ -248,6 +255,9 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
           ...redactionLabelOf(record.annotation),
           measure,
           source: sourceDuring(model, id),
+          pictureVersion: record.pictureVersion ?? 0,
+          // A lent record's lender draws it where it is now, a gesture included.
+          ...(record.painter ? { lentScene: once(record.painter, box) } : {}),
           selected: model.selected.includes(id),
           ...(model.hovered === id ? { hovered: true } : {}),
           rot: geomRotation(geometry),

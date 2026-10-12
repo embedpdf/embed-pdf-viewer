@@ -50,12 +50,6 @@ export interface AppearanceStatesConformanceOptions {
   makeEngine: () => Promise<Engine> | Engine;
   /** Open {@link APPEARANCE_STATES_FIXTURE_PDF}, fresh for each call. */
   open: (engine: Engine) => Promise<DocumentHandle>;
-  /**
-   * Whether this engine's page pictures draw form fields. The cloud's don't
-   * yet: whether a caller may read the form isn't in a picture's path.
-   * Default `true`.
-   */
-  pageRendersDrawFormFields?: boolean;
 }
 
 /**
@@ -65,10 +59,8 @@ export interface AppearanceStatesConformanceOptions {
  * image labelled with both, whatever `/AS` says. The annotation's
  * `appearanceState` says which state it shows. Each family has its own
  * batch: `page.annotations` the square's, `page.forms` the check box's, and
- * neither holds the other's. A page rendered with its
- * annotations shows its form fields too, unless `includeFormFields` is false
- * (or the engine's pictures draw none, see
- * {@link AppearanceStatesConformanceOptions.pageRendersDrawFormFields}).
+ * neither holds the other's. A page picture draws what its two options ask
+ * for, the annotations and the form fields, each without the other.
  */
 export function runAppearanceStatesConformance(
   runner: ConformanceTestRunner,
@@ -200,7 +192,7 @@ export function runAppearanceStatesConformance(
       });
     });
 
-    test('a page rendered with its annotations shows its form fields', async () => {
+    test('a page picture draws its annotations and its form fields, each without the other', async () => {
       const middleOf = async (options: {
         includeAnnotations?: boolean;
         includeFormFields?: boolean;
@@ -218,9 +210,18 @@ export function runAppearanceStatesConformance(
           square: pixel(raster, 120, 160).slice(0, 3),
         };
       };
-      const fields = opts.pageRendersDrawFormFields ?? true;
-      expect(await middleOf({})).toEqual({ box: fields ? GREEN : WHITE, square: CYAN });
+      // Left out: everything the caller may read (here, everything).
+      expect(await middleOf({})).toEqual({ box: GREEN, square: CYAN });
+      expect(await middleOf({ includeAnnotations: true, includeFormFields: true })).toEqual({
+        box: GREEN,
+        square: CYAN,
+      });
       expect(await middleOf({ includeFormFields: false })).toEqual({ box: WHITE, square: CYAN });
+      expect(await middleOf({ includeAnnotations: false, includeFormFields: true })).toEqual({
+        box: GREEN,
+        square: WHITE,
+      });
+      // Annotations off turns the fields off too, unless they're asked for.
       expect(await middleOf({ includeAnnotations: false })).toEqual({ box: WHITE, square: WHITE });
     });
   });

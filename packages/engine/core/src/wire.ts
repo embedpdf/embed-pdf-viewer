@@ -46,7 +46,7 @@ export {
   ObjectNumberRangeSchema,
   ObjectNumberReservationRequestSchema,
   ObjectNumberReservationResponseSchema,
-  AnnotationBundleLimitsSchema,
+  BundleLimitsSchema,
   OpenDocumentResponseSchema,
   DocumentHeadSchema,
   DocumentSecurityStateSchema,
@@ -62,11 +62,10 @@ export {
   PageTextSnapshotSchema,
   PageGeometrySnapshotSchema,
   PageNetworkRenderFormatSchema,
-  PageRenderQuerySchema,
-  PageRenderAnnotatedQuerySchema,
+  PageRenderQuerySchemas,
   AnnotationAppearancesQuerySchema,
   WidgetAppearancesQuerySchema,
-  AnnotationAppearanceManifestSchema,
+  AnnotationAppearanceBatchSchema,
   AnnotationListMutationMetaSchema,
   AnnotationCreateResultSchema,
   AppearanceOutcomeSchema,
@@ -83,7 +82,14 @@ export {
   FormResetResultSchema,
   FormResetBodySchema,
   FormWidgetUpdateBodySchema,
+  FormExportRequestSchema,
+  FormExportSelectionSchema,
+  FormImportBodySchema,
+  FormImportOptionsSchema,
   FormImportResultSchema,
+  FormValuesImportBodySchema,
+  FormValuesImportOptionsSchema,
+  FormValuesImportResultSchema,
   FormRepairResultSchema,
   FormFieldCreateResultSchema,
   FormFieldUpdateResultSchema,
@@ -94,6 +100,9 @@ export {
   FormWidgetUpdateResultSchema,
   FormWidgetsReorderBodySchema,
   FormWidgetsReorderResultSchema,
+  FormCalculationsReorderBodySchema,
+  FormCalculationsReorderResultSchema,
+  FieldPositionSchema,
   PageListSnapshotSchema,
   PageLayoutSchema,
   PageBoxesSchema,
@@ -105,7 +114,7 @@ export {
   AnnotationAppearanceExportInputSchema,
   AnnotationExportSelectionSchema,
   AnnotationsExportRequestSchema,
-  AnnotationImportManifestSchema,
+  AnnotationImportBodySchema,
   AnnotationImportResultSchema,
   AnnotationImportOptionsSchema,
   NamedPageEntrySchema,
@@ -120,8 +129,6 @@ export {
   PageInsertBlankInputSchema,
   PageExtractInputSchema,
   PageInsertResultSchema,
-  FormEffectSchema,
-  FormEffectsResultSchema,
   PageFlattenInputSchema,
   PageFlattenResultSchema,
   RedactionApplyScopeSchema,
@@ -142,6 +149,11 @@ export {
   PdfPageActionsSchema,
   PdfAnnotationActionsSchema,
   DocumentActionsSnapshotSchema,
+  FieldScriptWriteSchema,
+  FieldActionsPatchSchema,
+  PdfActionWriteSchema,
+  WidgetActionsPatchSchema,
+  FileWidgetActionsPatchSchema,
   PdfActionWireComponents,
 } from './dto/PdfAction.schema';
 export type {
@@ -166,7 +178,6 @@ export {
   FormKindSchema,
   FormSnapshotSchema,
   FormFieldValueSchema,
-  FormDataFormatSchema,
   WidgetAppearanceSchema,
   WidgetPlacementSchema,
   FormFieldOptionInputSchema,
@@ -180,6 +191,17 @@ export {
   FormSubmissionReceiptSchema,
 } from './forms/submission';
 export { DEFAULT_LAYER_NAME, wirePaths, wireTemplates } from './wire/paths';
+export {
+  AnnotationResourceKeysSchema,
+  AppearanceResourceKeysSchema,
+  FileResourceKeysSchema,
+  ImageResourceKeysSchema,
+  ResourceKeySchema,
+  SourceResourceKeysSchema,
+} from './wire/resourceKeys';
+// The four page pictures: what each draws, needs, depends on and pins.
+export { PAGE_RENDER_FAMILIES, pageRenderFamilyOf } from './wire/renderFamilies';
+export type { PageRenderFamily, PageRenderFamilySpec, PageRenderPin } from './wire/renderFamilies';
 // General resource catalog + route-guard helper (server uses this for
 // every read endpoint, not just CDN-cacheable ones).
 export { checkResourceAccess, DOC_RESOURCES } from './wire/resources';
@@ -223,6 +245,7 @@ export {
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
   decodeAnnotationsExportToken,
+  decodeFormExportToken,
   decodeActionsToken,
   decodeAttachmentsToken,
   decodeContentToken,
@@ -237,6 +260,7 @@ export {
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
   encodeAnnotationsExportToken,
+  encodeFormExportToken,
   encodeActionsToken,
   encodeAttachmentsToken,
   encodeContentToken,
@@ -297,6 +321,8 @@ export {
   LineEndingsSchema,
   AnnotationBorderStyleSchema,
   DrawnBorderStyleSchema,
+  WidgetBorderStyleSchema,
+  WidgetCheckStyleSchema,
   StandardFontSchema,
   TextAlignmentSchema,
   FreeTextIntentSchema,
@@ -400,7 +426,7 @@ export type {
   DocumentVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
-export type { AnnotationsExportToken } from './wire/tokens';
+export type { AnnotationsExportToken, FormExportToken } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';

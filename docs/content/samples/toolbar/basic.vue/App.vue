@@ -48,7 +48,7 @@ const width = ref(100);
       </div>
       <Stage class="stage">
         <template #page>
-          <RenderLayer :annotations="false" />
+          <RenderLayer />
           <SelectionLayer />
           <AnnotationLayer />
         </template>

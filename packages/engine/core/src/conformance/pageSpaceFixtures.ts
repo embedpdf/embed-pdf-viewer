@@ -1,4 +1,5 @@
 import { pdfOf } from './pdfOf';
+import type { PageTabOrder } from '../dto/PageLayout';
 import type { PdfRect, PdfRotation } from '../geometry/primitives';
 
 /**
@@ -74,6 +75,8 @@ export interface PageSpaceFixturePage {
     boxes: PageSpaceBoxes;
     rotation: PdfRotation;
     userUnit: number;
+    /** The order its annotations take focus in (`/Tabs`); none when the page sets none. */
+    tabOrder?: PageTabOrder;
   };
 }
 
@@ -220,6 +223,19 @@ export const PAGE_SPACE_FIXTURES: readonly PageSpaceFixture[] = [
         boxes: sameBoxes(LETTER),
         rotation: 0,
         userUnit: 1,
+      }),
+    ],
+  }),
+  build({
+    name: 'tab-order',
+    about: 'a page that says the order its annotations take focus in (/Tabs), as it writes it',
+    source: 'iso',
+    pages: [
+      markedPage('/MediaBox [0 0 612 792] /Tabs /S', LETTER, {
+        boxes: sameBoxes(LETTER),
+        rotation: 0,
+        userUnit: 1,
+        tabOrder: 'structure',
       }),
     ],
   }),

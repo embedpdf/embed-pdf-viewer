@@ -131,7 +131,6 @@ const FIELD_SET_EVENTS: ReadonlySet<DocumentEvent['type']> = new Set([
   'forms.deleted',
   'forms.widgetAdded',
   'forms.widgetRemoved',
-  'forms.imported',
   'forms.repaired',
 ]);
 

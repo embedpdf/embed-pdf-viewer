@@ -241,3 +241,202 @@ export interface ActionReadBudget {
    *  before allocation. */
   maxPayloadCodeUnits: number;
 }
+
+// ── writing actions ──
+
+/**
+ * An action to write: the read shape ({@link PdfActionNode}) of a type a
+ * write can make, without what only a read reports (`subtype`, a tree's
+ * warnings). `next` runs after it, in order. A write makes JavaScript,
+ * go-to, URI, named, hide, reset-form and submit-form actions; a `uri`'s
+ * `isMap` and a submit's `charSet` are read, never written.
+ */
+export type PdfActionWrite<Destination = PageDestination> = {
+  next?: PdfActionWrite<Destination>[];
+} & (
+  | { type: 'javascript'; script: string }
+  | { type: 'goto'; destination: Destination }
+  | { type: 'uri'; uri: string }
+  | { type: 'named'; name: string }
+  | { type: 'hide'; targets: PdfActionTargetRef[]; hide: boolean }
+  | {
+      type: 'reset-form';
+      /** As read: `null` resets every field, `[]` with `exclude` false resets none. */
+      fields: PdfActionTargetRef[] | null;
+      exclude: boolean;
+    }
+  | {
+      type: 'submit-form';
+      url: string;
+      /** As read: `null` submits every field the form exports. */
+      fields: PdfActionTargetRef[] | null;
+      /** The raw `/Flags` word (ISO 32000-2 Table 240); 0 when left out. */
+      flags?: number;
+    }
+);
+
+/**
+ * A field event's script: JavaScript, with more scripts to run after it.
+ * A field's events (keystroke, format, validate, calculate) take JavaScript
+ * only: every viewer runs them as script hooks.
+ */
+export interface FieldScriptWrite {
+  type: 'javascript';
+  script: string;
+  next?: FieldScriptWrite[];
+}
+
+/** The events a field's scripts run on. */
+export type FieldScriptEvent = keyof PdfFieldActions;
+
+/** The events a widget's actions run on: `activate` (`/A`, a click) and its `/AA` events. */
+export type WidgetActionEvent = keyof PdfAnnotationActions;
+
+/**
+ * A widget's actions to write, by event: an action sets the event's, `null`
+ * removes it, and an event left out keeps what it has. Any type a write
+ * makes; a JavaScript, submit-form or URI action anywhere in a tree takes
+ * `doc.forms.script` too.
+ */
+export type WidgetActionsPatch<Destination = PageDestination> = {
+  [Event in WidgetActionEvent]?: PdfActionWrite<Destination> | null;
+};
+
+/**
+ * A field's scripts to write, by event: a script sets the event's, `null`
+ * removes it, and an event left out keeps what it has. A `calculate` script
+ * puts the field in the form's calculation order (at the end, when it isn't
+ * there yet); removing it takes the field out.
+ */
+export type FieldActionsPatch = { [Event in FieldScriptEvent]?: FieldScriptWrite | null };
+
+/**
+ * Whether writing `action` puts code or a way out of the viewer into the
+ * document, which takes `doc.forms.script`: a JavaScript, submit-form or URI
+ * action anywhere in its tree.
+ */
+export function needsScriptRight(action: PdfActionWrite<unknown>): boolean {
+  return (
+    action.type === 'javascript' ||
+    action.type === 'submit-form' ||
+    action.type === 'uri' ||
+    (action.next ?? []).some(needsScriptRight)
+  );
+}
+
+/**
+ * Whether writing actions, a field's or a widget's, takes `doc.forms.script`:
+ * an event gets a tree holding a JavaScript, submit-form or URI action.
+ * Removing actions (`null`) never does, and neither does a widget's read sent
+ * back: its trees are kept unchanged or refused, never written.
+ */
+export function writesScripts(
+  actions:
+    | FieldActionsPatch
+    | WidgetActionsPatch<unknown>
+    | PdfAnnotationActions<unknown>
+    | null
+    | undefined,
+): boolean {
+  return Object.values(actions ?? {}).some(
+    (action: PdfActionWrite<unknown> | PdfActionTree<unknown> | null | undefined) =>
+      action != null && !('root' in action) && needsScriptRight(action),
+  );
+}
+
+/**
+ * The write of a read action tree: what a copy writes. `null` when the tree
+ * is incomplete, or holds a type a write can't make (a submit-form whose
+ * payload the read dropped included).
+ */
+export function actionWriteOf<Destination>(
+  tree: PdfActionTree<Destination>,
+): PdfActionWrite<Destination> | null {
+  if (tree.incomplete || !tree.root) return null;
+  return nodeWriteOf(tree.root);
+}
+
+/**
+ * A widget's read actions as a patch writes them: `null` for an event
+ * without one. An event whose actions a write can't make is left out, so
+ * writing the patch back never removes it.
+ */
+export function widgetActionsOf<Destination>(
+  actions: PdfAnnotationActions<Destination> | null,
+): WidgetActionsPatch<Destination> {
+  const patch: WidgetActionsPatch<Destination> = {};
+  for (const event of WIDGET_ACTION_EVENTS) {
+    const tree = actions?.[event];
+    if (!tree) {
+      patch[event] = null;
+      continue;
+    }
+    const write = actionWriteOf(tree);
+    if (write) patch[event] = write;
+  }
+  return patch;
+}
+
+/** Every event a widget's actions run on, in `EPDF_ANNOT_ACTION_*` order. */
+export const WIDGET_ACTION_EVENTS = [
+  'activate',
+  'cursorEnter',
+  'cursorExit',
+  'mouseDown',
+  'mouseUp',
+  'focus',
+  'blur',
+  'pageOpen',
+  'pageClose',
+  'pageVisible',
+  'pageInvisible',
+] as const satisfies readonly WidgetActionEvent[];
+
+/** The field script of a read tree: `null` unless it is JavaScript all through. */
+export function fieldScriptOf(tree: PdfActionTree<unknown>): FieldScriptWrite | null {
+  const write = actionWriteOf(tree);
+  return write && isFieldScript(write) ? write : null;
+}
+
+/** Whether `action` is JavaScript all through: what a field event takes. */
+export function isFieldScript(action: PdfActionWrite<unknown>): action is FieldScriptWrite {
+  return action.type === 'javascript' && (action.next ?? []).every(isFieldScript);
+}
+
+function nodeWriteOf<Destination>(
+  node: PdfActionNode<Destination>,
+): PdfActionWrite<Destination> | null {
+  const next: PdfActionWrite<Destination>[] = [];
+  for (const child of node.next) {
+    const write = nodeWriteOf(child);
+    if (!write) return null;
+    next.push(write);
+  }
+  const tail = next.length > 0 ? { next } : {};
+  switch (node.type) {
+    case 'javascript':
+      return { type: 'javascript', script: node.script, ...tail };
+    case 'goto':
+      return { type: 'goto', destination: node.destination, ...tail };
+    case 'uri':
+      return { type: 'uri', uri: node.uri, ...tail };
+    case 'named':
+      return { type: 'named', name: node.name, ...tail };
+    case 'hide':
+      return { type: 'hide', targets: node.targets, hide: node.hide, ...tail };
+    case 'reset-form':
+      return { type: 'reset-form', fields: node.fields, exclude: node.exclude, ...tail };
+    case 'submit-form':
+      return node.payload
+        ? {
+            type: 'submit-form',
+            url: node.payload.url,
+            fields: node.payload.fields,
+            flags: node.payload.flags.raw,
+            ...tail,
+          }
+        : null;
+    default:
+      return null;
+  }
+}

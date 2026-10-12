@@ -35,7 +35,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
-import { buildMutationForm } from './buildMutationForm';
+import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
@@ -305,10 +305,9 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
-        // The multipart mutation envelope: the JSON the plain request would
-        // have been rides the `body` part; the source PDF is `resource:source`.
+        // The body names the source PDF by its role, `resources: { source }`.
         const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
-        const form = buildMutationForm(
+        const form = buildRoleMutationForm(
           { position },
           {
             source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' },

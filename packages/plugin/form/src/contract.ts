@@ -16,16 +16,16 @@ import type {
 import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@embedpdf/core-acrojs';
 import type {
   AnnotationRef,
-  FormDataExport,
-  FormDataFormat,
-  FormEffectsResult,
+  FieldPosition,
+  FormBundle,
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
-  FormImportResult,
+  FormImportDrop,
+  FormImportOptions,
   FormKind,
   FormRepairOptions,
   FormRepairResult,
@@ -33,6 +33,7 @@ import type {
   FormWidget,
   PageRef,
   WidgetAnnotation,
+  WidgetPatch,
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions/contract';
 
@@ -41,18 +42,20 @@ import type { FormWidgetItem } from './read/fill-items';
 
 export { FormToken } from './token';
 export { toFieldRef } from '@embedpdf/engine-core/runtime';
+export { FormTransfer } from '@embedpdf/engine-core/public';
 export type { FormWidgetItem, FormWidgetLook } from './read/fill-items';
 export type { Box, WidgetHit } from './model';
 export type {
-  FormDataExport,
-  FormDataFormat,
+  FormBundle,
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
-  FormImportResult,
+  FormImportDrop,
+  FormImportDropReason,
+  FormImportOptions,
   FormKind,
   FormRepairOptions,
   FormRepairResult,
@@ -131,10 +134,13 @@ export interface FormSetValueResult {
  */
 export type FormPlainValue = string | boolean | readonly string[] | null;
 
-/** What `validate()` returns: whether every required field has a value, and the ones that don't. */
+/** What `validate()` returns: whether every required field you fill in has a value, and the ones that don't. */
 export interface FormValidation {
   readonly valid: boolean;
-  /** The required fields that are empty, in page order (page, then top to bottom, then left to right). */
+  /**
+   * The required fields you may fill in that are empty, in page order (page,
+   * then top to bottom, then left to right).
+   */
   readonly missing: readonly FormFieldDTO[];
 }
 
@@ -143,9 +149,81 @@ export interface FormResetResult {
   readonly fields: readonly FormFieldDTO[];
 }
 
+/** A field setting that is on or off. */
+export type FormFieldFlagSetting =
+  | 'required'
+  | 'readOnly'
+  | 'noExport'
+  | 'multiline'
+  | 'password'
+  | 'comb'
+  | 'radiosInUnison'
+  | 'noToggleToOff'
+  | 'edit'
+  | 'multiSelect';
+
+/**
+ * One setting of a field, as a settings panel draws it: `key` names it in
+ * `update()`'s patch, and `control` says how it is edited. `text`: a line of
+ * text. `flag`: on or off. `number`: a whole number from `min`, or none
+ * (`null`). `choice`: one of `options`, or any text when `free`. `choices`:
+ * any of `options`. `options`: the field's options, each a label and a value.
+ */
+export type FormFieldSetting =
+  | { readonly key: 'name' | 'alternateName'; readonly control: 'text'; readonly label: string }
+  | { readonly key: FormFieldFlagSetting; readonly control: 'flag'; readonly label: string }
+  | {
+      readonly key: 'maxLength';
+      readonly control: 'number';
+      readonly label: string;
+      readonly min: number;
+    }
+  | { readonly key: 'defaultValue'; readonly control: 'text'; readonly label: string }
+  | {
+      readonly key: 'defaultValue';
+      readonly control: 'choice';
+      readonly label: string;
+      readonly options: readonly string[];
+      readonly free: boolean;
+    }
+  | {
+      readonly key: 'defaultValue';
+      readonly control: 'choices';
+      readonly label: string;
+      readonly options: readonly string[];
+    }
+  | { readonly key: 'options'; readonly control: 'options'; readonly label: string };
+
+/**
+ * What a settings panel shows for one field: its settings in display order,
+ * and each one's value by key. `name` is the field's own part of its dotted
+ * name, what `update({ name })` replaces.
+ */
+export interface FormFieldSettings {
+  readonly properties: readonly FormFieldSetting[];
+  readonly values: Readonly<Record<string, unknown>>;
+}
+
 /** What `create()`, `update()` and `removeWidget()` resolve: the field as it is now. */
 export interface FormFieldResult {
   readonly field: FormFieldDTO;
+}
+
+/** Which fields `export()` takes, each whole. Without either, every field. */
+export interface FormExportSelection {
+  readonly fields?: readonly FormFieldRef[];
+  /** Every field with a widget on these pages, as refs or indexes. */
+  readonly pages?: readonly (PageRef | number)[];
+}
+
+/** What `import()` did: the new fields, where each bundle field went, and what was left out. */
+export interface FormImportResult {
+  /** The new fields, in bundle order. */
+  readonly fields: readonly FormFieldDTO[];
+  /** Each imported field's ref in the bundle, and its new ref here. */
+  readonly refMap: ReadonlyArray<{ readonly from: FormFieldRef; readonly to: FormFieldRef }>;
+  /** What was left out, and why, in bundle order. */
+  readonly dropped: readonly FormImportDrop[];
 }
 
 /**
@@ -167,7 +245,6 @@ export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
 export interface FormCommitResult {
   status: FormCommitStatus;
   scripted: boolean;
-  effectsResult: FormEffectsResult | null;
   uiEffects: FormUiEffect[];
   diagnostics: ScriptDiagnostic[];
   error?: ScriptExecutionError;
@@ -268,7 +345,16 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   getWidgetAt(page: PageRef | number, point: { x: number; y: number }): WidgetHit | null;
   /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
   getSelectedField(): FormFieldDTO | null;
-  /** Check the required fields: `missing` lists the empty ones in page order. */
+  /**
+   * A field's settings, described for a settings panel, which writes them
+   * with `update()`; `null` for a field the form doesn't have. Every setting
+   * `update()` takes but scripts and `mappingName`.
+   */
+  getFieldSettings(field: FormFieldRef): FormFieldSettings | null;
+  /**
+   * Check the required fields you may fill in: `missing` lists the empty ones
+   * in page order. Another signer's fields are theirs to fill.
+   */
   validate(): FormValidation;
   /** Every value, keyed by full name, as plain data. Fields without a value are left out. */
   exportValues(): Readonly<Record<string, FormPlainValue>>;
@@ -278,9 +364,9 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    * Fill in a field with `{ value }`, `{ checked }` or `{ selectedValues }`,
    * running the form's checks and scripts when the `validation` setting says
    * so. Fires `onValueChanged`, or `onValidationRejected` when the form
-   * refuses the value. Rejects `permission-denied` without `doc.forms.fill`,
-   * `not-found`, `invalid-input` for a value the field can't take,
-   * `operation-cancelled`.
+   * refuses the value. Rejects `permission-denied` for a field you may not
+   * fill in (`canFill`), `not-found`, `invalid-input` for a value the field
+   * can't take, `operation-cancelled`.
    */
   setValue(
     ref: FormFieldRef,
@@ -288,8 +374,8 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     options?: OperationOptions,
   ): Promise<FormSetValueResult>;
   /**
-   * Fill in several fields, in order; one that fails doesn't stop the rest.
-   * Rejects `permission-denied` without `doc.forms.fill`.
+   * Fill in several fields, in order; one that fails, such as a field you may
+   * not fill in, doesn't stop the rest.
    */
   setValues(
     entries: readonly { readonly ref: FormFieldRef; readonly value: FormFieldValue }[],
@@ -297,18 +383,18 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   ): Promise<BatchResult<FormFieldRef, FormFieldRef>>;
   /**
    * Fill in fields by full name from plain values (as `exportValues()` gives
-   * them). A name the form doesn't have, or a value its field can't take, is
-   * skipped; the rest still land. Rejects `permission-denied` without
-   * `doc.forms.fill`.
+   * them). A name the form doesn't have, a field you may not fill in, or a
+   * value its field can't take, is skipped; the rest still land.
    */
   importValues(
     values: Readonly<Record<string, FormPlainValue>>,
     options?: OperationOptions,
   ): Promise<BatchResult<FormFieldRef, string>>;
   /**
-   * Put back each field's default, for the whole form or the fields you
-   * pass, then run the form's calculations. Fires `onValueChanged` per
-   * changed field. Rejects `permission-denied` without `doc.forms.fill`.
+   * Put back each field's default, for the fields you pass, or every field
+   * you may fill in, then run the form's calculations. Fires
+   * `onValueChanged` per changed field. Rejects `permission-denied` when you
+   * pass a field you may not fill in.
    */
   reset(refs?: readonly FormFieldRef[], options?: OperationOptions): Promise<FormResetResult>;
   /** Do what a click on a widget does, such as running a button's action. Rejects `not-found` for a widget of no field. */
@@ -317,15 +403,27 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     options?: OperationOptions,
   ): Promise<WidgetActivationResult>;
 
-  // ── form data ──
-  /** The form data as XFDF, or FDF with `'fdf'`. Rejects `permission-denied` without `doc.forms.read`. */
-  export(format?: FormDataFormat, options?: OperationOptions): Promise<FormDataExport>;
+  // ── moving fields ──
   /**
-   * Fill in the fields from FDF or XFDF bytes, telling the format by itself;
-   * an entry the form can't take is skipped. Rejects `permission-denied`
-   * without `doc.forms.fill`.
+   * Take fields out as a bundle: each whole, with its widgets, value,
+   * scripts and actions. Every field, the ones named, or the ones on some
+   * pages. Waits for pending writes first. Rejects `permission-denied`
+   * without `doc.forms.read` or `doc.download`.
    */
-  import(data: Uint8Array | ArrayBuffer, options?: OperationOptions): Promise<FormImportResult>;
+  export(selection?: FormExportSelection, options?: OperationOptions): Promise<FormBundle>;
+  /**
+   * Copy a bundle's fields into this document, as one change you can undo:
+   * their widgets on the same pages (or `options.pages`), their values, and
+   * their place in the calculation order. A field whose name is taken is
+   * left out, as are scripts, submits and links without `doc.forms.script`.
+   * Fires `onFieldCreated` per field. Rejects `permission-denied` without
+   * `doc.forms.modify` (and, for the default `attribution: 'restore'`,
+   * `doc.forms.import`).
+   */
+  import(
+    bundle: FormBundle,
+    options?: FormImportOptions & OperationOptions,
+  ): Promise<FormImportResult>;
   /** Read the whole form again; fires `onResynced`. */
   refresh(options?: OperationOptions): Promise<void>;
 
@@ -333,8 +431,9 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   /**
    * Add a field with a widget for each place it shows, with every setting the
    * engine takes. Fires `onFieldCreated`. Rejects `permission-denied` without
-   * `doc.forms.modify`, `invalid-input` (a name that's taken, a radio button
-   * without its export value).
+   * `doc.forms.modify`, or without `doc.forms.script` when the field or a
+   * widget gets a script, a submit or a link; `invalid-input` (a name that's
+   * taken, a radio button without its export value).
    */
   create(draft: FormFieldDraft, options?: OperationOptions): Promise<FormFieldResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */
@@ -356,6 +455,17 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     options?: OperationOptions,
   ): Promise<FormFieldResult>;
   /**
+   * Change one widget's place or look: pass only what changes. Its field
+   * keeps its value and settings. Rejects `permission-denied` without
+   * `doc.forms.modify`, `invalid-input` for what the widget doesn't take (a
+   * check style on a text field's widget).
+   */
+  updateWidget(
+    widget: AnnotationRef,
+    patch: WidgetPatch,
+    options?: OperationOptions,
+  ): Promise<{ readonly widget: WidgetAnnotation }>;
+  /**
    * Delete a widget: it leaves its page, and its field when it has one, and
    * resolves that field as it is now (`null` for a widget in no field). Fires
    * `onFieldUpdated` when it had a field. A field shown in one place is
@@ -367,6 +477,18 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     options?: OperationOptions,
   ): Promise<{ readonly field: FormFieldDTO | null }>;
   /**
+   * Change the order the fields' calculate scripts run in: the fields go
+   * together, in the order given, to `position`, next to a neighbour or at
+   * `'start'` / `'end'`. A field is in the order while it has a calculate
+   * script. Resolves the whole new order. Rejects `permission-denied`
+   * without `doc.forms.modify`, `not-found` for a field not in the order.
+   */
+  reorderCalculations(
+    fields: FormFieldRef[],
+    position: FieldPosition,
+    options?: OperationOptions,
+  ): Promise<{ readonly calculationOrder: readonly FormFieldRef[] }>;
+  /**
    * Fix a form other PDF apps read differently, such as fields missing from
    * the form's list, and resolve what was fixed. Fires `onResynced`. Rejects
    * `permission-denied` without `doc.forms.modify`.
@@ -376,8 +498,12 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   // ── permissions ──
   /** Whether reading the form is allowed: `doc.forms.read`. */
   canRead(): boolean;
-  /** Whether filling it in is allowed: `doc.forms.fill`. */
-  canFill(): boolean;
+  /**
+   * Whether filling in this field is allowed: `doc.forms.fill`, or a
+   * `fields:fill` permission for the field's group. `false` for a field the
+   * form doesn't have.
+   */
+  canFill(field: FormFieldRef): boolean;
   /** Whether adding, changing and removing fields is allowed: `doc.forms.modify`. */
   canDesign(): boolean;
   /**
@@ -386,8 +512,8 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    */
   canRestoreAttribution(): boolean;
   /**
-   * Whether scripts, submit buttons and links may be written into fields:
-   * `doc.forms.script`. Running a form's scripts never needs it.
+   * Whether scripts, submit buttons and links may be written into fields and
+   * their widgets: `doc.forms.script`. Running a form's scripts never needs it.
    */
   canWriteScripts(): boolean;
 

@@ -14,7 +14,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationP
   <Viewer :engine="engine" :plugins="plugins">
     <Stage>
       <template #page>
-        <RenderLayer :annotations="false" />
+        <RenderLayer />
         <AnnotationLayer />
       </template>
     </Stage>

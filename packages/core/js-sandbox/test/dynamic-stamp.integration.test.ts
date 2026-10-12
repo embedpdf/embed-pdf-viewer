@@ -124,18 +124,22 @@ describe('dynamic stamp real-PDF vertical slice', () => {
         applyOverlay(fields, output.formEffects);
       }
 
+      // The scripts only set values: each is a `forms.setValue` op of one change.
+      const ops = effects.map((effect) => {
+        if (effect.kind !== 'setValue') throw new Error(`unexpected ${effect.kind} effect`);
+        return { type: 'forms.setValue' as const, field: effect.ref, value: effect.value };
+      });
       const events: string[] = [];
       const unsubscribe = document.events.subscribe((event) => events.push(event.type));
-      const applied = await document.forms.applyEffects!(effects);
+      const applied = await document.apply({ ops });
       unsubscribe();
-      expect(applied.results.map(({ status }) => status)).toEqual([
-        'applied',
-        'applied',
-        'applied',
-        'applied',
+      expect(applied.meta.undoable).toBe(true);
+      expect(events).toEqual([
+        'forms.valueSet',
+        'forms.valueSet',
+        'forms.valueSet',
+        'forms.valueSet',
       ]);
-      expect(applied.meta).not.toBeNull();
-      expect(events).toEqual(['forms.effectsApplied']);
 
       const afterApply = await document.forms.list();
       expect(

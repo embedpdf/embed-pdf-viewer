@@ -2,7 +2,6 @@ import type { MutationMeta } from './MutationMeta';
 import type { AppearanceOutcome } from '../annotation/appearance';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormFieldDTO } from '../forms/field';
-import type { FormSnapshot } from '../forms/snapshot';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageRef } from '../identity/PageRef';
@@ -19,6 +18,13 @@ export interface FormMutationMeta extends MutationMeta {
   /** The fields written, by object number. */
   changedFields: FormFieldRef[];
   changedWidgets: FormWidget[];
+  /**
+   * The widgets of `changedWidgets` whose look was drawn again (a text or
+   * choice value, a new look): their pictures changed. A checkbox or radio
+   * button whose value only switched its state isn't one, nor is a widget
+   * shown or hidden: their pictures are the ones they had.
+   */
+  redrawnWidgets: FormWidget[];
 }
 
 /**
@@ -78,30 +84,10 @@ export function formResetFacts<C extends Coordinates>(
         undoable: result.meta.undoable,
         changedFields: [field.ref],
         changedWidgets,
+        redrawnWidgets: result.meta.redrawnWidgets.filter((widget) => own.has(widget.objectNumber)),
       },
     };
   });
-}
-
-/**
- * Result of applying an FDF/XFDF payload. Import is per-field: one bad
- * entry (unknown name, family mismatch, failed validation) is counted in
- * `skipped` and never poisons the rest.
- */
-export interface FormImportResult<C extends Coordinates = PageCoordinates> {
-  /** The complete form after the import — no second round trip. */
-  form: FormSnapshot<C>;
-  /** Fields filled. */
-  applied: number;
-  /** Fields left out: unknown, the wrong kind, a value they can't take, or locked. */
-  skipped: number;
-  meta: MutationMeta;
-}
-
-/** Serialized form data produced by `export`. */
-export interface FormDataExport {
-  format: 'fdf' | 'xfdf';
-  bytes: Uint8Array;
 }
 
 /** Result of `create`: the field read back, and its widget rows. */
@@ -109,6 +95,8 @@ export interface FormFieldCreateResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
+  /** The form's calculation order, when the write changed it (a `calculate` script). */
+  calculationOrder?: FormFieldRef[];
   meta: FormMutationMeta;
 }
 
@@ -117,6 +105,8 @@ export interface FormFieldUpdateResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
+  /** The form's calculation order, when the write changed it (a `calculate` script). */
+  calculationOrder?: FormFieldRef[];
   meta: FormMutationMeta;
 }
 
@@ -148,6 +138,18 @@ export interface FormWidgetsReorderResult {
  * the field and lists them, so caches can invalidate.
  */
 export interface FormFieldDeleteResult {
+  /** The form's calculation order, when the field was in it. */
+  calculationOrder?: FormFieldRef[];
+  meta: FormMutationMeta;
+}
+
+/**
+ * Result of `reorderCalculations`: the form's calculation order, whole: the
+ * fields whose calculate scripts run, in the order they run.
+ */
+export interface FormCalculationsReorderResult {
+  calculationOrder: FormFieldRef[];
+  /** `meta.changedFields` names the fields that moved, in the order given. */
   meta: FormMutationMeta;
 }
 

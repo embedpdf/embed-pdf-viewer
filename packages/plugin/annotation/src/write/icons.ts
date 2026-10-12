@@ -39,13 +39,15 @@ export function createIcons(
     tool: ResolvedTool,
     pageObjectNumber: number,
     { data, resources }: { data: AnnotationDraft; resources?: AnnotationResources },
-  ): Promise<unknown> => {
-    const applied = store.apply([
-      { type: 'create', page: toPageRef(pageObjectNumber), draft: data, resources },
-    ]);
-    afterCreate.placed(tool.id, applied.ids);
-    return appliedOrThrow(applied);
-  };
+  ): Promise<unknown> =>
+    store
+      .applyWhenNumbered([
+        { type: 'create', page: toPageRef(pageObjectNumber), draft: data, resources },
+      ])
+      .then((applied) => {
+        afterCreate.placed(tool.id, applied.ids);
+        return appliedOrThrow(applied);
+      });
 
   /** Place an icon annotation (note / file attachment) at its usual size,
    *  shown centred on a page point at the view the user sees (`iconPlaceAt`,

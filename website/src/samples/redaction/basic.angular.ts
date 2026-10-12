@@ -107,7 +107,7 @@ export class RedactBar {
       <demo-redact-bar [stage]="stage" />
       <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
-          <epdf-render-layer [annotations]="false" />
+          <epdf-render-layer />
           <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>

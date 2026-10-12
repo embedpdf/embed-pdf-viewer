@@ -1,8 +1,8 @@
 import type {
   ChangeAuthority,
   ChangeItem,
-  ChangeOp,
   PdfCoordinates,
+  RecordedOp,
   WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
@@ -11,6 +11,7 @@ import type { ChangeRecord, ReverseStep } from './ChangeRecord';
 import {
   createAnnotation,
   deleteAnnotation,
+  importAnnotations,
   removeAnnotation,
   reorderAnnotations,
   reorderBack,
@@ -25,17 +26,23 @@ import {
   deleteField,
   deleteRestoredWidget,
   deleteWidget,
+  importForm,
+  importFormValues,
+  opsFillOwnField,
   removeField,
   removeWidget,
   reorderWidgets,
   reset,
   restoreField,
   restoreWidget,
+  reorderCalculations,
+  restoreCalculationOrder,
   revertForm,
   setAppearanceText,
   setDisplay,
   setSignatureAppearance,
   setValue,
+  stepsFillOwnField,
   updateField,
   updateWidget,
 } from './internal/formChanges';
@@ -70,11 +77,11 @@ export class ChangeApplier {
   ) {}
 
   apply(
-    ops: readonly ChangeOp<PdfCoordinates, WireAnnotationResources>[],
+    ops: readonly RecordedOp<PdfCoordinates, WireAnnotationResources>[],
     authority: ChangeAuthority,
     signal: AbortSignal,
   ): AppliedChange {
-    const ctx = this.context(authority, signal);
+    const ctx = this.context(authority, signal, (self) => opsFillOwnField(self, ops));
     return collect(
       authority,
       ops.map((op, at) => () => runOp(ctx, op, at)),
@@ -83,7 +90,7 @@ export class ChangeApplier {
   }
 
   undo(record: ChangeRecord, authority: ChangeAuthority, signal: AbortSignal): AppliedChange {
-    const ctx = this.context(authority, signal);
+    const ctx = this.context(authority, signal, (self) => stepsFillOwnField(self, record.steps));
     return collect(
       authority,
       record.steps.map((step) => () => runStep(ctx, step)),
@@ -91,14 +98,23 @@ export class ChangeApplier {
     );
   }
 
-  private context(authority: ChangeAuthority, signal: AbortSignal): ChangeContext {
-    return {
+  private context(
+    authority: ChangeAuthority,
+    signal: AbortSignal,
+    ownFill: (ctx: ChangeContext) => boolean,
+  ): ChangeContext {
+    // Asked only when a field outside the caller's groups is written, and
+    // answered once: before that write, from the fields as they are.
+    let answer: boolean | undefined;
+    const ctx: ChangeContext = {
       runtime: this.runtime,
       session: this.session,
       ...(this.fonts ? { fonts: this.fonts } : {}),
       authority,
       signal,
+      fillsOwnField: () => (answer ??= ownFill(ctx)),
     };
+    return ctx;
   }
 }
 
@@ -124,12 +140,14 @@ function collect(
 
 function runOp(
   ctx: ChangeContext,
-  op: ChangeOp<PdfCoordinates, WireAnnotationResources>,
+  op: RecordedOp<PdfCoordinates, WireAnnotationResources>,
   at: number,
 ): Done {
   switch (op.type) {
     case 'annotations.create':
       return createAnnotation(ctx, op);
+    case 'annotations.import':
+      return importAnnotations(ctx, op);
     case 'annotations.update':
       return updateAnnotation(ctx, op, at);
     case 'annotations.delete':
@@ -160,8 +178,14 @@ function runOp(
       return updateWidget(ctx, op, at);
     case 'forms.reorderWidgets':
       return reorderWidgets(ctx, op);
+    case 'forms.reorderCalculations':
+      return reorderCalculations(ctx, op);
     case 'forms.setSignatureAppearance':
       return setSignatureAppearance(ctx, op);
+    case 'forms.import':
+      return importForm(ctx, op);
+    case 'forms.importValues':
+      return importFormValues(ctx, op);
     case 'metadata.update':
       return updateMetadata(ctx, op, at);
     case 'metadata.updateCustom':
@@ -189,6 +213,8 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return restoreWidget(ctx, step);
     case 'widget.delete':
       return deleteRestoredWidget(ctx, step);
+    case 'calculations.restore':
+      return restoreCalculationOrder(ctx, step);
     case 'metadata.revert':
       return revertMetadata(ctx, step);
   }

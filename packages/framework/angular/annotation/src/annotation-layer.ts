@@ -1,10 +1,10 @@
 /**
  * `<epdf-annotation-layer>`: a page's annotations, the selection's outline and handles, the
  * tool's preview, and the text boxes being typed in. Put it in each page, above the rendered
- * page, with the render layer leaving annotations out:
+ * page; while it's there, the render layer leaves the annotations out of the page's picture:
  *
  *   <ng-template epdfPage>
- *     <epdf-render-layer [annotations]="false" />
+ *     <epdf-render-layer />
  *     <epdf-annotation-layer />
  *   </ng-template>
  *
@@ -27,6 +27,7 @@ import {
   computed,
   contentChild,
   contentChildren,
+  DestroyRef,
   effect,
   inject,
   Injector,
@@ -35,20 +36,22 @@ import {
   untracked,
 } from '@angular/core';
 import { annotationKey } from '@embedpdf/core';
-import type { RenderItem } from '@embedpdf/core-annotation';
+import { hasLiveDrawing, type RenderItem } from '@embedpdf/core-annotation';
 import {
   CapabilityBinding,
   injectKernelHost,
   injectPage,
-  publishPageLayerFact,
+  paintsPagePart,
 } from '@embedpdf/angular/runtime';
 import type { Annotation, TextItem } from '@embedpdf/plugin-annotation';
 import { previewBucket } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import {
   annotationChromePaint,
   annotationDrawingOf,
   bakedAppearanceOf,
+  createShownUrls,
   editingTextKeyOf,
   frameInPixels,
   ghostOpacity,
@@ -56,10 +59,13 @@ import {
   loadAppearanceUrls,
   loadObjectUrl,
   lookFrameOf,
+  pictureOrPainting,
   rectInPixels,
   registerRendererBehaviors,
+  shownAppearance,
   type AppearanceUrl,
   type FramePixels,
+  type PictureOrPainting,
 } from '@embedpdf/web';
 import { EpdfAnnotationChrome } from './chrome';
 import { EpdfAnnotationFrame, EpdfAnnotationNative } from './drawing';
@@ -77,7 +83,6 @@ import { EPDF_LOOK_SCALE, EpdfFreeTextBox } from './text-box';
 
 const NO_ITEMS: readonly RenderItem[] = Object.freeze([]);
 const NO_TEXTS: readonly TextItem[] = Object.freeze([]);
-const NO_URLS: Readonly<Record<string, AppearanceUrl>> = Object.freeze({});
 
 /** Your look of one annotation, with what its template gets. */
 interface DrawnLook {
@@ -95,8 +100,8 @@ interface Drawn {
   readonly item: RenderItem;
   /** Its frame in the layer's pixels. */
   readonly frame: FramePixels;
-  /** The engine's picture of it, once loaded. */
-  readonly url: string | null;
+  /** What its own drawing shows: the engine's picture of it, or its scene (`pictureOrPainting`). */
+  readonly shows: PictureOrPainting<RenderItem>;
   /** The same picture as a look gets it: its `appearance`. */
   readonly appearance: { url: string } | null;
   /** Your look that draws it, when one does. */
@@ -127,7 +132,7 @@ interface Drawn {
     @for (drawn of drawings(); track drawn.item.id) {
       <!-- The layer's own drawing of it, which a look may keep: its \`native\`. -->
       <ng-template #native>
-        <epdf-annotation-native [item]="drawn.item" [url]="drawn.url" />
+        <epdf-annotation-native [item]="drawn.item" [shows]="drawn.shows" />
       </ng-template>
       @if (drawn.owner; as owner) {
         <!-- A sibling plugin's controls place themselves in the layer and take the input;
@@ -234,6 +239,11 @@ export class EpdfAnnotationLayer {
     () => InteractionToken,
     () => this.page.documentId,
   );
+  private readonly render = new CapabilityBinding(
+    injectKernelHost('<epdf-annotation-layer>'),
+    () => RenderToken,
+    () => this.page.documentId,
+  );
   private readonly chrome = injectChromeSettings();
 
   // ── your templates ───────────────────────────────────────────────────────────
@@ -284,8 +294,10 @@ export class EpdfAnnotationLayer {
     '',
   );
 
-  /** The baked pictures' URLs, by annotation key, for the page's appearance epoch and bake scale. */
-  private readonly urls = signal<Readonly<Record<string, AppearanceUrl>>>(NO_URLS);
+  /** The pictures' URLs, by annotation and state; `null` until the page's first ones arrive. */
+  private readonly urls = signal<Readonly<Record<string, AppearanceUrl>> | null>(null);
+  /** The pictures shown stay valid until the next ones are shown. */
+  private readonly shown = createShownUrls();
   // A move or a turn leaves the epoch as it is (the same pixels, placed elsewhere), and live
   // gestures don't touch it: nothing loads mid-drag.
   private readonly appearanceEpoch = this.annotation.select(
@@ -293,9 +305,13 @@ export class EpdfAnnotationLayer {
     '',
   );
   // Zoom steps inside one rung of the document's appearance lattice bake nothing again.
-  private readonly bakeScale = this.annotation.select(
-    (annotation) => annotation.getBakeScale(this.page.transform().renderScale),
+  // Without the render plugin, only this session's pictures load.
+  private readonly appearanceScale = this.render.select(
+    (render) => render.getAppearanceScale(this.page.transform().renderScale),
     0,
+  );
+  private readonly bakeScale = computed(() =>
+    this.render.capability() ? this.appearanceScale() : this.page.transform().renderScale,
   );
 
   /** The text box being typed in, by key: while it is, a look's editor takes the keys. */
@@ -316,11 +332,18 @@ export class EpdfAnnotationLayer {
     const editingKey = this.editingKey();
     const drawings = this.items().map((item): Drawn => {
       const frame = frameInPixels(item.frame, pixels);
+      const state = item.annotation?.appearanceState ?? null;
       const drawn: Drawn = {
         item,
         frame,
-        url: urls[item.id]?.url ?? null,
-        appearance: bakedAppearanceOf(urls, item.id),
+        shows: pictureOrPainting({
+          pending: item.source !== 'baked',
+          picture: urls && shownAppearance(urls, item.id, state),
+          version: item.pictureVersion ?? 0,
+          loaded: urls !== null,
+          paint: () => (hasLiveDrawing(item) ? item : null),
+        }),
+        appearance: urls && bakedAppearanceOf(urls, item.id, state),
         look: null,
         owner: null,
         interactive: false,
@@ -418,9 +441,11 @@ export class EpdfAnnotationLayer {
   });
 
   constructor() {
-    publishPageLayerFact(this.page, 'annotationRenderers', () => this.renderers());
+    // While it's here, the page's picture leaves the annotations to it.
+    paintsPagePart(() => this.page.ref, 'annotations');
     this.registerBehaviors();
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
+    inject(DestroyRef).onDestroy(() => this.shown.release());
     this.loadAppearances();
     this.loadGhost();
   }
@@ -462,7 +487,7 @@ export class EpdfAnnotationLayer {
 
   /**
    * The baked pictures, loaded again when the page's appearance epoch or the bake scale changes;
-   * each load revokes the URLs of the one before.
+   * the ones shown stay valid until the next are shown.
    */
   private loadAppearances(): void {
     effect((onCleanup) => {
@@ -474,6 +499,7 @@ export class EpdfAnnotationLayer {
       onCleanup(
         untracked(() =>
           loadAppearanceUrls(
+            this.shown,
             (abort) => annotation.renderAppearances(page, scale, abort),
             annotationKey,
             (urls) => this.urls.set(urls),
