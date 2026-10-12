@@ -21,6 +21,10 @@ import type { Slices } from '../../shared/slices';
  *   again after every slice of a load, as the page grows. A page a job holds
  *   never closes, so one page may be over the budget on its own: the one a
  *   job needs.
+ * - A page bigger than the whole budget stays parsed after its job too, or
+ *   every job on it would parse it again: of such pages, the one that would
+ *   close last is kept, and the budget holds every other page beside it. It
+ *   closes when the pages jobs hold need the budget's room themselves.
  * - What the viewers show decides what closes first (`setWorkingSet`): pages
  *   in no working set, then `near` pages, then `visible` pages from the
  *   fewest device pixels on screen up, so a thumbnail rail's pages close
@@ -40,7 +44,10 @@ import type { Slices } from '../../shared/slices';
  * Pages belong to an owner, one per open document ({@link PagePtrPool}).
  */
 export interface PageResidencyPolicy {
-  /** Bytes of parsed pages kept at once; a page a job holds may be over it alone. */
+  /**
+   * Bytes of parsed pages kept at once; a page a job holds, or one page bigger
+   * than the budget, may be over it alone.
+   */
   budgetBytes: number;
   /** Pages no job uses close after this many milliseconds; 0 disables the timer. */
   idleMs: number;
@@ -334,29 +341,72 @@ export class PageResidency {
   /**
    * Closes pages no job holds until `incoming` more bytes fit: the worst
    * placed first (see the class notes), least recently used first among
-   * equals. Only a page a job holds may keep the total over the budget.
+   * equals.
+   *
+   * A page bigger than the budget on its own may stay over it: of such pages,
+   * the one that would close last. So it stays parsed between the jobs that
+   * use it, instead of parsing again for each one. Every other page fits in
+   * the budget beside it; when the pages jobs hold don't, they are the pages
+   * over it, and the spared page closes too. A budget of 0 keeps nothing.
    */
   private makeRoom(incoming: number): void {
-    while (this.totalBytes + incoming > this.policy.budgetBytes) {
-      let victim: ResidentPage | null = null;
-      let victimPlace = ELSEWHERE;
-      for (const owned of this.pages.values()) {
-        for (const page of owned.values()) {
-          if (page.refs > 0) continue;
-          const placed = this.placeOf(page);
-          const worse =
-            !victim ||
-            placedBefore(victimPlace, placed) ||
-            (!placedBefore(placed, victimPlace) && page.lastUsed < victim.lastUsed);
-          if (worse) {
-            victim = page;
-            victimPlace = placed;
-          }
+    let spared = this.policy.budgetBytes > 0 ? this.lastToCloseOverBudget() : null;
+    while (this.totalBytes - (spared?.bytes ?? 0) + incoming > this.policy.budgetBytes) {
+      const victim = this.firstToClose(spared);
+      if (victim) {
+        this.close(victim);
+      } else if (spared && spared.refs === 0) {
+        this.close(spared);
+        spared = null;
+      } else {
+        return;
+      }
+    }
+  }
+
+  /** The page no job holds that closes first, other than `spared`. */
+  private firstToClose(spared: ResidentPage | null): ResidentPage | null {
+    let victim: ResidentPage | null = null;
+    let victimPlace = ELSEWHERE;
+    for (const owned of this.pages.values()) {
+      for (const page of owned.values()) {
+        if (page.refs > 0 || page === spared) continue;
+        const placed = this.placeOf(page);
+        const worse =
+          !victim ||
+          placedBefore(victimPlace, placed) ||
+          (!placedBefore(placed, victimPlace) && page.lastUsed < victim.lastUsed);
+        if (worse) {
+          victim = page;
+          victimPlace = placed;
         }
       }
-      if (!victim) return;
-      this.close(victim);
     }
+    return victim;
+  }
+
+  /**
+   * Of the pages bigger than the budget, the one that closes last: the best
+   * placed, the most recently used among equals.
+   */
+  private lastToCloseOverBudget(): ResidentPage | null {
+    let kept: ResidentPage | null = null;
+    let keptPlace = ELSEWHERE;
+    for (const owned of this.pages.values()) {
+      for (const page of owned.values()) {
+        if (page.bytes <= this.policy.budgetBytes) continue;
+        const placed = this.placeOf(page);
+        const better =
+          !kept ||
+          placedBefore(placed, keptPlace) ||
+          (!placedBefore(keptPlace, placed) && page.lastUsed > kept.lastUsed);
+        if (better) {
+          kept = page;
+          keptPlace = placed;
+        }
+      }
+    }
+    return kept;
   }
 
   /** Where the working sets have the page: the best place any view gives it. */

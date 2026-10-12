@@ -236,6 +236,17 @@ describe('parsed pages kept across jobs (wasm engine)', () => {
     expect(parses(tight)).toBe(4);
   }, 120_000);
 
+  test('a page bigger than the whole budget parses once for all the jobs on it', async () => {
+    // A heavy drawing of one page: every tile, read and re-render is a job.
+    const host = await openHost({ parsedPageBudgetBytes: 1024 * 1024 });
+    const first = await digest(host, FIRST);
+    await host.ok({ kind: 'pages.geometry', effect: 'read', page: FIRST });
+    expect(await digest(host, FIRST)).toBe(first);
+    expect(await digest(host, FIRST)).toBe(first);
+    expect(parses(host)).toBe(1);
+    expect(host.counts.closes).toBe(0);
+  }, 120_000);
+
   test('a working set is taken at once, even during a render, and decides which page a load closes', async () => {
     const THIRD = toPageRef(7);
     const host = await openHost(
