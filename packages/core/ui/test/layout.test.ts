@@ -358,6 +358,58 @@ describe('menus, panels and tabs', () => {
     ]);
   });
 
+  it('changes every panel with panels(), and one panel after it', () => {
+    const layout = createLayout(base)
+      .panels({ present: { medium: 'dock' }, resizable: false })
+      .panel('thumbnails', { present: { compact: 'overlay' } })
+      .addPanel('notes', { side: 'end' });
+    expect(layout.toJSON().panels).toEqual({
+      comments: { side: 'end', present: { medium: 'dock' }, resizable: false },
+      thumbnails: {
+        side: 'start',
+        present: { medium: 'dock', compact: 'overlay' },
+        resizable: false,
+      },
+      // Added after panels(): its own fields only.
+      notes: { side: 'end' },
+    });
+    expect(layoutWarningsOf(layout)).toEqual([]);
+  });
+
+  it('changes only the sizes a present map names, over one way for every size', () => {
+    const layout = createLayout(base)
+      .panel('comments', { present: 'overlay' })
+      .panel('comments', { present: { expanded: 'dock' } })
+      .panel('thumbnails', { present: { compact: 'overlay' } })
+      .panel('thumbnails', { present: 'dock' });
+    expect(layout.toJSON().panels).toEqual({
+      comments: {
+        side: 'end',
+        present: { compact: 'overlay', medium: 'overlay', expanded: 'dock' },
+      },
+      // One way for every size replaces the map.
+      thumbnails: { side: 'start', present: 'dock' },
+    });
+  });
+
+  it('keeps the width limits when only where it starts changes', () => {
+    const layout = createLayout(base)
+      .panel('comments', { width: { initial: 360, min: 280, max: 520 } })
+      .panel('comments', { width: 400 })
+      .panel('thumbnails', { width: 300 })
+      .panel('thumbnails', { width: { max: 480 } });
+    expect(layout.toJSON().panels).toEqual({
+      comments: { side: 'end', width: { initial: 400, min: 280, max: 520 } },
+      thumbnails: { side: 'start', width: { initial: 300, max: 480 } },
+    });
+    expect(
+      createLayout(base)
+        .panel('comments', { width: 300 })
+        .panel('comments', { width: 320 })
+        .toJSON().panels!.comments,
+    ).toEqual({ side: 'end', width: 320 });
+  });
+
   it('takes a removed panel’s button out of every bar and menu', () => {
     const next = createLayout(base)
       .addMenu('extra', [['panel:comments', 'acme:x']])

@@ -7,7 +7,9 @@
  * live through the command registry: label, icon, shortcut, whether it's the
  * current choice, enabled state; a row whose command isn't visible is gone, and a section
  * with none left goes with its line. A row whose command opens a menu opens
- * it beside it.
+ * it beside it. On a phone (a compact viewer) every menu is a sheet from the
+ * bottom of the viewer instead, and a submenu slides in over the menu it
+ * opened from, with a row that goes back.
  */
 import { formatShortcut, useCommand, useCommands } from '@embedpdf/react/commands';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
@@ -20,6 +22,7 @@ import {
   attachMenuKeys,
   directionOf,
   fitAnchoredRect,
+  isUnavailable,
   observeClientGeometry,
   observeOutsidePress,
   type AnchoredPlacement,
@@ -45,7 +48,8 @@ import {
   type MenuAlign,
   type MenuDirection,
 } from './menu-placement';
-import { useMenu } from '../config-context';
+import { Sheet } from './sheet';
+import { useLayoutEnv, useMenu } from '../config-context';
 
 // ── the popover ──────────────────────────────────────────────────────────────
 
@@ -214,16 +218,18 @@ interface MenuPopoverProps {
  * A menu's surface, opened by the button beside it in the same parent (the
  * one with `aria-haspopup`). It opens away from its bar's edge, or beside its
  * row in another menu, and closes on Escape, Tab or a press anywhere outside
- * it and its button.
+ * it and its button. In a compact viewer it opens as a sheet.
  */
 export function MenuPopover(props: MenuPopoverProps) {
   const probe = useRef<HTMLSpanElement>(null);
   const [usable, setUsable] = useState(false);
+  const compact = useLayoutEnv().size === 'compact';
   useLayoutEffect(() => {
     const holder = probe.current?.parentElement;
     if (holder && !holder.closest(HIDDEN_COPY_SELECTOR)) setUsable(true);
   }, []);
-  return usable ? <OpenMenu {...props} /> : <span ref={probe} hidden />;
+  if (!usable) return <span ref={probe} hidden />;
+  return compact ? <MenuSheet {...props} /> : <OpenMenu {...props} />;
 }
 
 function OpenMenu({ children, onClose, align = 'start' }: MenuPopoverProps) {
@@ -253,6 +259,180 @@ function OpenMenu({ children, onClose, align = 'start' }: MenuPopoverProps) {
       className="border-border-subtle bg-elevated text-fg z-50 overflow-y-auto rounded-lg border shadow-xl"
       style={{ position: 'fixed', right: 'auto', bottom: 'auto', margin: 0 }}
     >
+      <InMenuContext.Provider value={true}>{children}</InMenuContext.Provider>
+    </div>
+  );
+}
+
+// ── on a phone: the menu as a sheet ──────────────────────────────────────────
+
+/** A submenu open in a menu's sheet, over the menu its row is in. */
+interface SheetSubmenu {
+  readonly menuId: string;
+  readonly label: string;
+  /** The row that opened it: it has focus again when the submenu goes. */
+  readonly opener: HTMLElement;
+  /** Runs when a row in it is picked, as in the menu it opened from. */
+  readonly onRun?: () => void;
+}
+
+/** In a menu's sheet: how a row opens its submenu, over the menu. Null outside a sheet. */
+const MenuSheetContext = createContext<((submenu: SheetSubmenu) => void) | null>(null);
+
+/** The button a menu's sheet opened from: the one beside the sheet that says it has a popup. */
+function sheetTriggerOf(menu: HTMLElement): HTMLElement | null {
+  const layer = menu.closest<HTMLElement>('[data-epdf-layer]');
+  const holder = layer?.parentElement;
+  return layer && holder ? triggerOf(holder, layer) : null;
+}
+
+/**
+ * A menu as a sheet: its rows in a sheet from the bottom of the viewer, which closes on a tap
+ * above it, Escape or a pick. A row that opens a menu slides that menu in over this one, with a
+ * row (or the arrow key back) that goes back to where it was.
+ */
+function MenuSheet({ children, onClose }: MenuPopoverProps) {
+  const [submenus, setSubmenus] = useState<readonly SheetSubmenu[]>([]);
+  const current = useRef(submenus);
+  current.current = submenus;
+  /** The row to give focus back to once the submenu over it has gone. */
+  const refocus = useRef<HTMLElement | null>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  const open = (submenu: SheetSubmenu) => setSubmenus([...current.current, submenu]);
+  const back = () => {
+    const shown = current.current;
+    if (shown.length === 0) return;
+    refocus.current = shown[shown.length - 1]!.opener;
+    setSubmenus(shown.slice(0, -1));
+  };
+  // After the menu under it stops being inert (its own layout effect runs first).
+  useLayoutEffect(() => {
+    refocus.current?.focus();
+    refocus.current = null;
+  }, [submenus]);
+
+  return (
+    // The menus in it are named after their buttons; the sheet holds no focus of its own.
+    <Sheet label="" onClose={onClose} trapFocus={false}>
+      <MenuSheetContext.Provider value={open}>
+        <div className="grid">
+          <SheetMenu covered={submenus.length > 0} close={() => close.current()}>
+            {children}
+          </SheetMenu>
+          {submenus.map((submenu, i) => (
+            <SheetMenu
+              key={i}
+              covered={i < submenus.length - 1}
+              close={back}
+              opener={submenu.opener}
+              label={submenu.label}
+              onBack={back}
+            >
+              <MenuBody menuId={submenu.menuId} onRun={submenu.onRun} />
+            </SheetMenu>
+          ))}
+        </div>
+      </MenuSheetContext.Provider>
+    </Sheet>
+  );
+}
+
+/**
+ * One menu in a menu's sheet: the first one, or a submenu over it with a row that goes back.
+ * It takes the menu keys while it's on top; covered, it can't take focus or presses.
+ */
+function SheetMenu({
+  covered,
+  close,
+  opener,
+  label,
+  onBack,
+  children,
+}: {
+  covered: boolean;
+  close: () => void;
+  /** A submenu's row in the menu under it; the first menu's opener is the sheet's button. */
+  opener?: HTMLElement;
+  label?: string;
+  onBack?: () => void;
+  children: ReactNode;
+}) {
+  const t = useT();
+  const menu = useRef<HTMLDivElement>(null);
+  const actions = useRef({ close, onBack });
+  actions.current = { close, onBack };
+  useLayoutEffect(() => {
+    const element = menu.current;
+    if (!element) return;
+    const trigger = opener ?? sheetTriggerOf(element);
+    const name = label ?? (trigger?.getAttribute('aria-label') || trigger?.getAttribute('title'));
+    if (name) element.setAttribute('aria-label', name);
+    const detachKeys = attachMenuKeys(element, {
+      trigger,
+      close: () => actions.current.close(),
+      items: () => itemsOf(element),
+      initialFocus: 'none',
+    });
+    // The first row takes focus once the sheet is showing: the sheet shows itself after this.
+    queueMicrotask(() => {
+      if (element.isConnected && !element.inert) {
+        itemsOf(element)
+          .find((item) => !isUnavailable(item))
+          ?.focus();
+      }
+    });
+    const keys = submenuKeysOf(directionOf(element));
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const item = event.target as HTMLElement;
+      if (event.key === keys.open && item.getAttribute('aria-haspopup') === 'menu') {
+        event.preventDefault();
+        item.click();
+      } else if (event.key === keys.close && actions.current.onBack) {
+        event.preventDefault();
+        actions.current.onBack();
+      }
+    };
+    element.addEventListener('keydown', onKeyDown);
+    return () => {
+      element.removeEventListener('keydown', onKeyDown);
+      detachKeys();
+    };
+    // A menu in the sheet opens once; it goes by unmounting.
+  }, []);
+  useLayoutEffect(() => {
+    if (menu.current) menu.current.inert = covered;
+  }, [covered]);
+  return (
+    <div
+      ref={menu}
+      role="menu"
+      part="menu"
+      className={`bg-elevated col-start-1 row-start-1 min-w-0 ${
+        onBack
+          ? 'starting:translate-x-full rtl:starting:-translate-x-full transition-[translate] duration-200 ease-out motion-reduce:transition-none'
+          : ''
+      }`}
+    >
+      {onBack && (
+        <div className="p-1 pb-0">
+          <button
+            type="button"
+            tabIndex={-1}
+            role="menuitem"
+            part="menu-item"
+            data-epdf-menu-back=""
+            onClick={onBack}
+            className={ROW_CLASS}
+          >
+            <Icon name="chevronLeft" size={16} className="text-fg-muted rtl:-scale-x-100" />
+            <span className="flex-1 truncate">{t('menu.back')}</span>
+          </button>
+          {label && <div className="text-fg px-2.5 pb-1 pt-2 text-sm font-semibold">{label}</div>}
+        </div>
+      )}
       <InMenuContext.Provider value={true}>{children}</InMenuContext.Provider>
     </div>
   );
@@ -376,7 +556,7 @@ const CHOSEN_ROW_CLASS = `${ROW_BASE} bg-selected text-accent focus-visible:ring
  * is the current choice. A row that can't run says why in its tooltip, and
  * stays where it is, greyed out.
  */
-function MenuItem({
+export function MenuItem({
   command,
   choice,
   onSelect,
@@ -430,6 +610,7 @@ function SubmenuItem({
   onRun?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const openInSheet = useContext(MenuSheetContext);
   return (
     <div role="none" className="relative">
       <button
@@ -441,8 +622,12 @@ function SubmenuItem({
         aria-disabled={command.enabled ? undefined : true}
         title={command.enabled ? undefined : command.disabledReason}
         part="menu-item"
-        onClick={() => {
-          if (command.enabled) setOpen((previous) => !previous);
+        onClick={(event) => {
+          if (!command.enabled) return;
+          // In a sheet, the submenu slides in over this menu.
+          if (openInSheet) {
+            openInSheet({ menuId, label: command.label, opener: event.currentTarget, onRun });
+          } else setOpen((previous) => !previous);
         }}
         className={`${ROW_CLASS} ${open ? 'bg-hover' : ''}`}
       >
@@ -477,7 +662,7 @@ function MenuRow({
   onRun?: () => void;
 }) {
   const command = useCommand(commandId);
-  if (!command || !command.visible) return null;
+  if (!command.visible) return null;
   if (command.menu) {
     return <SubmenuItem command={command} menuId={command.menu} onRun={onRun} />;
   }

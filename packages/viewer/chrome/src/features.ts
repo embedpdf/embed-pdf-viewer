@@ -175,6 +175,21 @@ export function byHandSettingsOf(
   return { editable: stillOn(FEATURE_ANNOTATIONS, off), fillable: stillOn(FEATURE_FIELDS, off) };
 }
 
+/**
+ * What two `editable` or `fillable` values both allow: `true` is everything, `false` nothing,
+ * and a list its names, in the order of `left`. The viewer's own value and the app's setting
+ * meet here, so each can only take away.
+ */
+export function bothAllow<Name extends string>(
+  left: boolean | readonly Name[],
+  right: boolean | readonly Name[],
+): boolean | readonly Name[] {
+  if (left === true) return right;
+  if (right === true) return left;
+  if (left === false || right === false) return false;
+  return left.filter((name) => right.includes(name));
+}
+
 /** Whether two `editable` or `fillable` values say the same. */
 export const sameByHand = (
   left: boolean | readonly string[],

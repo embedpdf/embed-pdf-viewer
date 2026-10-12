@@ -3,6 +3,7 @@ import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup } from '@testing-library/react';
 import { commandsPlugin, formatShortcut, useCommand } from '../src/commands';
+import { resetDevWarnings } from '../src/dev';
 import type { BoundCommand } from '../src/commands';
 import { i18nPlugin, useI18nState, useT } from '../src/i18n';
 import { epdfTheme } from '../src/theme';
@@ -18,7 +19,7 @@ afterEach(cleanup);
 
 const latest = <T,>(renders: T[]): T => renders[renders.length - 1];
 
-function CommandProbe({ id, renders }: { id: string; renders: (BoundCommand | null)[] }) {
+function CommandProbe({ id, renders }: { id: string; renders: BoundCommand[] }) {
   renders.push(useCommand(id));
   return null;
 }
@@ -38,24 +39,39 @@ describe('useCommand', () => {
         commands: [{ id: 'review:approve', label: 'Approve', shortcut: 'Mod+Enter', run }],
       }),
     ];
-    const renders: (BoundCommand | null)[] = [];
+    const renders: BoundCommand[] = [];
     const { kernel } = await viewerWith(
       plugins,
       <CommandProbe id="review:approve" renders={renders} />,
     );
     await act(() => kernel.documents.open(bytesInput('a')));
 
-    const command = latest(renders)!;
+    const command = latest(renders);
     expect(command).toMatchObject({ label: 'Approve', enabled: true });
     expect(command.shortcut).toBe(formatShortcut('Mod+Enter'));
     await act(() => command.run());
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ documentId: 'a' }));
   });
 
-  it('is null for an unknown id', async () => {
-    const renders: (BoundCommand | null)[] = [];
-    await viewerWith([commandsPlugin()], <CommandProbe id="nope" renders={renders} />);
-    expect(latest(renders)).toBeNull();
+  it('gives an unknown id as a command named by it, neither visible nor enabled, and warns once', async () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const renders: BoundCommand[] = [];
+    const plugins = [
+      commandsPlugin({ commands: [{ id: 'zoom:fit-width', label: 'Fit width', run: () => {} }] }),
+    ];
+    await viewerWith(plugins, <CommandProbe id="zoom:fit-widht" renders={renders} />);
+    expect(latest(renders)).toMatchObject({
+      id: 'zoom:fit-widht',
+      label: 'zoom:fit-widht',
+      visible: false,
+      enabled: false,
+    });
+    const said = warn.mock.calls.map(([message]) => String(message));
+    expect(said.filter((message) => message.includes('zoom:fit-widht'))).toEqual([
+      '[embedpdf] useCommand(): no command "zoom:fit-widht" (did you mean "zoom:fit-width"?): it shows as neither visible nor enabled',
+    ]);
+    warn.mockRestore();
   });
 });
 

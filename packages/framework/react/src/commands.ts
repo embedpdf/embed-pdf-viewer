@@ -9,7 +9,13 @@
 export * from '@embedpdf/plugin-commands';
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { formatShortcut as formatKeys } from '@embedpdf/core-ui';
-import { CommandsToken, boundCommandOf, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
+import {
+  CommandsToken,
+  boundCommandOf,
+  resolvedCommandsEqual,
+  unknownCommandWarning,
+  unregisteredCommand,
+} from '@embedpdf/plugin-commands';
 import type {
   BoundCommand,
   CommandId,
@@ -20,6 +26,7 @@ import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/co
 import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
 import type { EventHook } from '@embedpdf/core';
 import { bindCommandShortcuts, isMacPlatform, standardCommandsBrowser } from '@embedpdf/web';
+import { devWarn } from './dev';
 import { useCapability, useCapabilityEvent, useDocumentId, useKernelValue } from './runtime';
 import { settingsHook } from './state';
 
@@ -56,23 +63,28 @@ export function formatShortcut(shortcut: string, options: { isMac?: boolean } = 
 
 /**
  * A command for this component's document (the nearest <DocumentScope>, else the active one):
- * its label, icon, state, `run` and `shortcut`. Re-renders when any of them changes; `null` for
- * an unknown id.
+ * its label, icon, state, `run` and `shortcut`. Re-renders when any of them changes. Always a
+ * command: an id no plugin registered is labelled with its id, neither visible nor enabled, and
+ * warns once in development.
  */
-export function useCommand(id: string): BoundCommand | null {
+export function useCommand(id: string): BoundCommand {
   const commands = useCapability(CommandsToken);
   const documentId = useDocumentId() ?? undefined;
   const resolved = useKernelValue(
     () => commands.resolveCommand(id, documentId),
     resolvedCommandsEqual,
   );
+  if (resolved === null) {
+    devWarn(`useCommand:${id}`, `useCommand(): ${unknownCommandWarning(id, commands.listCommandIds())}`);
+  }
   return useMemo(
     () =>
-      resolved &&
-      boundCommandOf(resolved, (commandId) => commands.execute(commandId, { documentId }), {
-        isMac: isMacPlatform(),
-      }),
-    [resolved, commands, documentId],
+      boundCommandOf(
+        resolved ?? unregisteredCommand(id),
+        (commandId) => commands.execute(commandId, { documentId }),
+        { isMac: isMacPlatform() },
+      ),
+    [resolved, commands, documentId, id],
   );
 }
 

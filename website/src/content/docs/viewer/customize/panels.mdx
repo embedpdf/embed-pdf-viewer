@@ -1,6 +1,6 @@
 ---
 title: Panels
-description: Move the built-in panels, choose how they open, set their width, and add your own.
+description: Move the built-in panels, choose how they open at each size, set their width, and add your own.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -40,30 +40,82 @@ A panel opens in one of three ways:
 | `present` | What it does |
 | :-- | :-- |
 | `'dock'` | Beside the pages, which make room for it |
-| `'overlay'` | Over the edge of the pages, which stay where they are; a click on the pages closes it |
-| `'sheet'` | Up from the bottom of the viewer, over the pages |
+| `'overlay'` | Over the edge of the pages, which stay where they are and dim; a click on them closes it. The toolbars keep working. |
+| `'sheet'` | Up from the bottom of the viewer, over everything |
 
-By default a panel docks when the viewer is wide, overlays at medium widths, and is a sheet on a
-phone. Choose one yourself for every size, or per size with the layout function's
-[`env`](small-screens):
+By default a panel is a sheet on a phone, an overlay at medium widths, and docks when the viewer
+is wide: `{ compact: 'sheet', medium: 'overlay', expanded: 'dock' }`. Give `present` one way for
+every size, or a way for the sizes you name; the other sizes keep the default:
 
 ```js
 {
-  layout: (layout, env) =>
+  layout: (layout) =>
     layout
-      .panel('comments', { present: 'overlay' })
-      .panel('thumbnails', { present: env.size === 'compact' ? 'sheet' : 'dock' }),
+      // Every panel docks at medium widths too: never an overlay.
+      .panels({ present: { medium: 'dock' } })
+      // The thumbnails open over the pages on a phone, not as a sheet.
+      .panel('thumbnails', { present: { compact: 'overlay' } })
+      // The comments always open over the pages.
+      .panel('comments', { present: 'overlay' }),
 }
 ```
 
+`panels(changes)` changes every panel the layout has so far, the way `panel(id, changes)` changes
+one. A map of sizes changes only the sizes it names, so the thumbnails above still dock at medium
+widths. The sizes go by the viewer's own width: see [Small screens](small-screens#the-three-sizes).
+
 ## Width
 
-A docked panel is 288 px wide unless you say otherwise. People can drag its edge to make it wider
-or narrower, and the viewer remembers that width.
+A panel starts 288 px wide. People can drag its edge, or use the arrow keys on it, between 200 and
+640 px and never past half the viewer, and the viewer keeps that width while it runs. Set where it
+starts, how far it drags, or no dragging at all:
 
 ```js
-layout.panel('comments', { width: 360 });
+layout.panel('comments', { width: 360 }); // where it starts
+layout.panel('comments', { width: { initial: 360, min: 280, max: 520 } }); // and how far it drags
+layout.panel('comments', { resizable: false }); // no edge to drag
 ```
+
+`panels()` takes them too: `layout.panels({ resizable: false })` fixes every panel's width.
+
+### Keep the width people chose
+
+`onPanelResize` tells you each width someone gives a panel: once a drag ends, and on each arrow
+key. Keep it where you like, and start the panel at it next time:
+
+```js
+const saved = Number(localStorage.getItem('thumbnails-width'));
+
+{
+  layout: (layout) => (saved ? layout.panel('thumbnails', { width: saved }) : layout),
+  onPanelResize: ({ id, width }) => {
+    if (id === 'thumbnails') localStorage.setItem('thumbnails-width', String(width));
+  },
+}
+```
+
+A number keeps the panel's limits: it only says where it starts. The `<embedpdf-viewer>` element
+fires `epdf:panelresize` with the same `{ id, width }` as `event.detail`.
+
+## The thumbnails
+
+The thumbnails wrap: one column at the panel's default width, and more as it gets wider. They are
+a second [Stage](/docs/headless/viewing/stage) over the same document, so `plugins.thumbnails`
+takes the Stage's settings:
+
+```js
+{
+  plugins: {
+    thumbnails: {
+      zoom: { pageWidth: 110 }, // each thumbnail 110 px wide; the default is 150
+      columns: 1, // always one column; 'auto', the default, wraps
+    },
+  },
+}
+```
+
+From code, `viewer.get('thumbnails')` is that Stage:
+`viewer.get('thumbnails').updateSettings({ columns: 2 })`.
 
 ## Panels on the same side
 
@@ -100,8 +152,9 @@ layout.addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' });
 | `side` | `'start'` or `'end'` | `'end'` |
 | `title` | Its title, in its header; or `titleKey` for a [translated](translations) one | none |
 | `icon` | Its button's icon | none |
-| `present` | `'dock'`, `'overlay'` or `'sheet'` | by the viewer's size |
-| `width` | Its width when docked, in px | `288` |
+| `present` | `'dock'`, `'overlay'` or `'sheet'`, or one per size: `{ compact, medium, expanded }` | `{ compact: 'sheet', medium: 'overlay', expanded: 'dock' }` |
+| `width` | Where it starts, in px, or `{ initial, min, max }` | `{ initial: 288, min: 200, max: 640 }` |
+| `resizable` | Whether people can drag its edge | `true` |
 
 The viewer draws the frame, the header and the way it opens; you draw what's inside. See [Your own
 components](components#a-panel-of-your-own) for the content in each framework.
@@ -111,10 +164,11 @@ components](components#a-panel-of-your-own) for the content in each framework.
 ### Each document keeps its panels
 
 With several documents open, each one remembers which panels were open, so switching tabs brings
-them back.
+them back. Widths are the viewer's: a panel keeps its width from one document to the next.
 
 ### Focus
 
 An overlay or a sheet takes focus when it opens and gives it back to its button when it closes;
-`Escape` closes it. A docked panel doesn't take focus: it's part of the page, and `Tab` reaches it
-in order.
+`Escape` closes it. A sheet keeps `Tab` inside it; from an overlay, `Tab` moves on to the
+toolbars, which keep working while it's open. A docked panel doesn't take focus: it's part of the
+page, and `Tab` reaches it in order.

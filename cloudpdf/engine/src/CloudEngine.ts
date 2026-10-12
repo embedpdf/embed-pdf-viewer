@@ -37,6 +37,8 @@ export class CloudEngine implements Engine {
     return new CloudEngine(new HttpClient(opts));
   }
 
+  /** It opens the documents your server holds, never a file's bytes. */
+  readonly canOpenFiles = false;
   private destroyed = false;
   /** The documents this engine opened and nobody closed yet. */
   private readonly handles = new Set<CloudDocumentHandle>();

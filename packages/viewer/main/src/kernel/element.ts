@@ -2,8 +2,11 @@
  * <embedpdf-viewer> — the custom element. A shadow root with the compiled
  * chrome stylesheet adopted, one wrapper div (the theme's `.dark` target, so
  * theming never touches the host page), and the Preact-compiled FullViewer
- * rendered inside. Light-DOM children are reserved for the slot system
- * (children-as-slots), which lands with the framework wrappers.
+ * rendered inside. Light-DOM children are the page's own components, each
+ * shown through the slot its `slot` attribute names: a toolbar item
+ * (`item:<id>`), a panel's body (`panel:<id>`), or a region (`header`,
+ * `footer`, `tabs`, `empty`); the viewer's own components among them
+ * (`<epdf-button>`, `<epdf-menu>`) are drawn by the viewer (./components).
  *
  * Five keys follow their value while the viewer runs, from `.config`, their
  * own properties (`.src`, `.theme`, `.locale`, `.disable`, `.readOnly`) or the
@@ -21,11 +24,12 @@ import {
   themeConfigOf,
   themeTokenProperty,
   type FullViewerProps,
+  type PanelResizeEvent,
   type ThemeTokens,
   type Viewer,
+  type ViewerFont,
 } from '@embedpdf/viewer-chrome';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
-import chromeCss from '@embedpdf/viewer-chrome/styles.css?inline';
 import {
   changedConfigKeys,
   configFromAttributes,
@@ -36,6 +40,15 @@ import {
   type DocumentSrc,
   type ElementConfig,
 } from './config';
+import { placedComponentsOf } from './components';
+import { chromeSheet, sheetOf } from './sheets';
+
+/** What a door makes of a config's `engine` field. */
+export interface DoorEngine {
+  readonly engine: Engine | EngineFactory;
+  /** The fonts the field names, which the viewer registers on the engine and offers. */
+  readonly fonts?: readonly ViewerFont[];
+}
 
 /**
  * Turns a config's `engine` field — that door's options bag, or nothing — into
@@ -43,7 +56,7 @@ import {
  * the engine-agnostic door registers none, which is precisely what makes its
  * `engine` field required.
  */
-export type DefaultEngineProvider = (engineOption: unknown) => Engine | EngineFactory;
+export type DefaultEngineProvider = (engineOption: unknown) => DoorEngine;
 
 /** The attribute that marks the shadow wrapper: the viewer's root, which the chrome's sheet themes. */
 const ROOT_ATTRIBUTE = 'data-embedpdf-root';
@@ -71,13 +84,7 @@ const HOST_CSS =
 
 let sheets: CSSStyleSheet[] | null = null;
 const adoptSheets = (): CSSStyleSheet[] => {
-  if (!sheets) {
-    sheets = [HOST_CSS, chromeCss].map((css) => {
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync(css);
-      return sheet;
-    });
-  }
+  sheets ??= [sheetOf(HOST_CSS), chromeSheet()];
   return sheets;
 };
 
@@ -130,18 +137,18 @@ function buildTokenSheet(tokens?: ThemeTokens, dark?: ThemeTokens): CSSStyleShee
  * - a function → an EngineFactory, passed through (viewer-owned lifetime);
  * - an object with `open` → a live Engine instance, passed through (borrowed);
  * - anything else (that door's engine OPTIONS, or nothing) → the door's
- *   registered default. The local/snippet doors register the built-in engine;
- *   the `core` door registers nothing, so an engine-less config there is a
- *   configuration error, taught here.
+ *   registered default, with the fonts its options name. The local/snippet
+ *   doors register the built-in engine; the `core` door registers nothing, so
+ *   an engine-less config there is a configuration error, taught here.
  *
  * This is the whole reason `ElementConfig['engine']` is `unknown`: the element
  * recognises an engine, and otherwise forwards a sealed envelope to the only
  * code that can open it.
  */
-function engineOf(config: ElementConfig): Engine | EngineFactory {
+function engineOf(config: ElementConfig): DoorEngine {
   const option = config.engine;
-  if (typeof option === 'function') return option as EngineFactory;
-  if (option && typeof (option as Engine).open === 'function') return option as Engine;
+  if (typeof option === 'function') return { engine: option as EngineFactory };
+  if (option && typeof (option as Engine).open === 'function') return { engine: option as Engine };
 
   const provider = EmbedPdfViewerElement.defaultEngineProvider;
   if (!provider) {
@@ -365,6 +372,12 @@ export class EmbedPdfViewerElement extends ElementBase {
     this.#shown?.onDocumentChange?.(documentId);
   };
 
+  /** The user resized a panel: `epdf:panelresize` and the config's `onPanelResize`. */
+  #onPanelResize = (event: PanelResizeEvent): void => {
+    this.dispatchEvent(new CustomEvent('epdf:panelresize', { detail: event }));
+    this.#shown?.onPanelResize?.(event);
+  };
+
   /**
    * Open the document `src` names in the place of the one the previous `src` opened, which
    * closes. `documents` takes over from `src` when the config has them.
@@ -427,15 +440,20 @@ export class EmbedPdfViewerElement extends ElementBase {
     const { src: _src, documents, engine: _engine, theme, ...customization } = config;
     this.#adoptSheets(theme);
     this.#shown = config;
+    const { engine, fonts } = engineOf(config);
     this.#props = {
-      engine: engineOf(config),
+      engine,
+      fonts,
       initialDocuments: documents,
       theme,
       themeTarget: this.#wrapper,
+      // The viewer's own components among the children (`<epdf-button>`, `<epdf-menu>`).
+      components: placedComponentsOf(this),
       ...customization,
       // The element's own, which call the config's after its events.
       onReady: this.#onReady,
       onDocumentChange: this.#onDocumentChange,
+      onPanelResize: this.#onPanelResize,
     };
     this.#root = createRoot(this.#wrapper!);
     this.#root.render(createElement(FullViewer, this.#props));

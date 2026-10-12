@@ -64,7 +64,8 @@ colors are CSS variables your styles can use: `var(--epdf-surface)`, `var(--epdf
 ## Use the viewer's commands and state
 
 `useCommand(id)` gives you a command as a button needs it: its `label`, `icon` and `shortcut`,
-whether it's `enabled` and `active`, and `run()`. And every hook from the [headless
+whether it's `enabled`, `active` and `visible`, and `run()`. It's always there: an id the viewer
+doesn't have is neither visible nor enabled. And every hook from the [headless
 docs](/docs/headless) works inside the viewer, so your component reads the viewer's state the same
 way a headless app does:
 

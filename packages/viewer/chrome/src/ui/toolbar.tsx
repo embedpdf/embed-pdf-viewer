@@ -5,17 +5,19 @@
  */
 import { MeasurementScaleButton } from './measurement';
 import { useEffect, useState } from 'react';
-import { VIEW_MODE_COMMAND, groupMenuView } from '@embedpdf/core-ui';
+import { VIEW_MODE_COMMAND, groupMenuView, type CustomItem } from '@embedpdf/core-ui';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { Toolbar } from '@embedpdf/react/toolbar';
 import type {
   BarSchema,
   CollapsedGroupView,
+  CustomSlotCtx,
   GroupDisclosureView,
   OverflowMenuView,
 } from '@embedpdf/react/toolbar';
-import { useCommands } from '@embedpdf/react/commands';
+import { useCommand, useCommands } from '@embedpdf/react/commands';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
+import { TOOLBAR_ITEM_ATTRIBUTE } from '@embedpdf/web';
 import { PageNumber } from './page-number';
 import { QuickStamps } from './quick-stamps';
 import { ViewOnlyLabel } from './view-only';
@@ -23,6 +25,7 @@ import { ShellToken } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { StageToken } from '@embedpdf/react/stage';
 import { Icon } from './icons';
+import { ItemSocket } from './item-socket';
 import { MenuAnchor, ToolbarMenu } from './menu';
 
 // ── the Button recipe ─────────────────────────────────────────────────────────
@@ -45,7 +48,7 @@ const tabClass = (active: boolean, enabled = true): string =>
   `${TAB_BASE} ${active ? TAB_ACTIVE : TAB_INACTIVE} ${enabled ? '' : 'cursor-not-allowed opacity-50'}`;
 
 // ── a single command button (icon / icon+label / label=tab) ──────────────────
-function CommandButton({
+export function CommandButton({
   cmd,
   variant,
   run,
@@ -102,6 +105,16 @@ function CommandButton({
 }
 
 // ── the inline zoom widget ───────────────────────────────────────────────────
+
+/**
+ * Makes a control inside an item one more stop of the toolbar's arrow keys: the zoom field's
+ * buttons are reached with the arrows, like the bar's own, and the bar stays one Tab stop.
+ */
+const ARROW_STOP = { [TOOLBAR_ITEM_ATTRIBUTE]: '', className: 'contents' } as Record<
+  string,
+  string
+>;
+
 function ZoomControls() {
   const commands = useCommands();
   const shell = useOptionalCapability(ShellToken);
@@ -145,32 +158,38 @@ function ZoomControls() {
             <span className="shrink-0 text-sm">%</span>
           </form>
           {/* zoom menu chevron */}
-          <button
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={zoomOpen}
-            title="Zoom options"
-            className={buttonClass(false)}
-            onClick={() => shell?.toggleMenu('zoom')}
-          >
-            <Icon name="chevronDown" size={20} />
-          </button>
-          <button
-            type="button"
-            title="Zoom out"
-            className={buttonClass(false)}
-            onClick={() => commands.execute('zoom:out')}
-          >
-            <Icon name="zoomOut" size={20} />
-          </button>
-          <button
-            type="button"
-            title="Zoom in"
-            className={buttonClass(false)}
-            onClick={() => commands.execute('zoom:in')}
-          >
-            <Icon name="zoomIn" size={20} />
-          </button>
+          <span {...ARROW_STOP}>
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={zoomOpen}
+              title="Zoom options"
+              className={buttonClass(false)}
+              onClick={() => shell?.toggleMenu('zoom')}
+            >
+              <Icon name="chevronDown" size={20} />
+            </button>
+          </span>
+          <span {...ARROW_STOP}>
+            <button
+              type="button"
+              title="Zoom out"
+              className={buttonClass(false)}
+              onClick={() => commands.execute('zoom:out')}
+            >
+              <Icon name="zoomOut" size={20} />
+            </button>
+          </span>
+          <span {...ARROW_STOP}>
+            <button
+              type="button"
+              title="Zoom in"
+              className={buttonClass(false)}
+              onClick={() => commands.execute('zoom:in')}
+            >
+              <Icon name="zoomIn" size={20} />
+            </button>
+          </span>
         </div>
       )}
     </MenuAnchor>
@@ -302,6 +321,29 @@ function OverflowTrigger({ isOpen, toggle }: { isOpen: boolean; toggle: () => vo
   );
 }
 
+// ── your own items ───────────────────────────────────────────────────────────
+
+/** The custom items in `bar`, in order. */
+function customItemsOf(bar: BarSchema): CustomItem[] {
+  const groups = [
+    ...(bar.sections.start ?? []),
+    ...(bar.sections.center ?? []),
+    ...(bar.sections.end ?? []),
+  ];
+  return groups.flatMap((group) =>
+    group.items.filter(
+      (child): child is CustomItem => typeof child === 'object' && 'slot' in child,
+    ),
+  );
+}
+
+/** What your item stands for while nothing is slotted into it: its command's button. */
+function StandIn({ commandId }: { commandId: string }) {
+  const command = useCommand(commandId);
+  if (!command.visible) return null;
+  return <CommandButton cmd={command} variant="icon" run={() => void command.run()} />;
+}
+
 // ── the assembled toolbar ────────────────────────────────────────────────────
 export function AppToolbar({
   bar,
@@ -314,6 +356,36 @@ export function AppToolbar({
   className?: string;
 }) {
   const vertical = orientation === 'vertical';
+  // The custom items the viewer draws itself.
+  const builtIn: Record<string, (variant: string) => React.ReactNode> = {
+    'measurement-scale': () => <MeasurementScaleButton />,
+    // The zoom field, or its button when there's no room; the field runs across a bar, so a
+    // vertical one draws the button.
+    zoom: (variant) => (variant === 'button' || vertical ? <ZoomButton /> : <ZoomControls />),
+    'quick-stamps': () => <QuickStamps />,
+    'page-number': () => <PageNumber />,
+    'view-only': (variant) => <ViewOnlyLabel compact={variant === 'icon' || vertical} />,
+  };
+  // Every other one is yours, slotted in, so the measurement layer can't hold it: its socket is
+  // measured where it renders.
+  const yours = Object.fromEntries(
+    customItemsOf(bar)
+      .filter((item) => !Object.prototype.hasOwnProperty.call(builtIn, item.slot))
+      .map((item) => [
+        item.slot,
+        (variant: string, ctx: CustomSlotCtx) =>
+          ctx.layer === 'measure' ? null : (
+            <ItemSocket
+              id={item.slot}
+              variant={item.variants ? variant : null}
+              orientation={orientation}
+              measure={ctx.measure}
+            >
+              {item.terminal ? <StandIn commandId={item.terminal} /> : null}
+            </ItemSocket>
+          ),
+      ]),
+  );
   return (
     <Toolbar
       bar={bar}
@@ -322,15 +394,7 @@ export function AppToolbar({
       separatorWidth={1}
       className={className}
       renderCommand={(cmd, variant, run) => <CommandButton cmd={cmd} variant={variant} run={run} />}
-      renderCustom={{
-        'measurement-scale': () => <MeasurementScaleButton />,
-        // The zoom field, or its button when there's no room; the field runs across a bar, so a
-        // vertical one draws the button.
-        zoom: (variant) => (variant === 'button' || vertical ? <ZoomButton /> : <ZoomControls />),
-        'quick-stamps': () => <QuickStamps />,
-        'page-number': () => <PageNumber />,
-        'view-only': (variant) => <ViewOnlyLabel compact={variant === 'icon' || vertical} />,
-      }}
+      renderCustom={{ ...yours, ...builtIn }}
       renderCollapsed={(view) =>
         view.id === 'modes' ? (
           <CollapsedModes view={view} />

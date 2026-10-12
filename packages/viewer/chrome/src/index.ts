@@ -9,12 +9,25 @@
  */
 export { FullViewer, themeConfigOf, themeTokenProperty } from './viewer';
 export type { FullViewerProps, ThemeConfig, ThemeTokens, ViewerCustomization } from './viewer';
+// Your own components: where a toolbar item sits, and the viewer's own components a delivery
+// places in the page for the viewer to draw.
+export { TOOLBAR_ITEM_CONTEXT_ATTRIBUTES } from './ui/item-context';
+export type { ToolbarItemContext, ToolbarItemEdge } from './ui/item-context';
+export { createPlacedComponents } from './ui/placed-components';
 export type {
-  AnnotationFontSpec,
-  AnnotationsCustomization,
+  PlacedButton,
+  PlacedComponent,
+  PlacedComponents,
+  PlacedMenu,
+  PlacedMenuItem,
+} from './ui/placed-components';
+export type {
+  PanelResizeEvent,
   SignaturesCustomization,
   StampsCustomization,
+  ViewerFont,
 } from './config-context';
+export type { PluginSettings, ViewerPluginsConfig } from './plugin-settings';
 // The prop types a delivery needs to speak FullViewer's contract.
 export type { Engine, EngineFactory, Identity, InitialDocument } from '@embedpdf/react/runtime';
 
@@ -26,7 +39,14 @@ export type { Engine, EngineFactory, Identity, InitialDocument } from '@embedpdf
 // delivery bundle. Additions are features; removals are breaking — grow this
 // list by demand, never speculatively.
 export { VIEWER_PLUGINS, createViewer } from './handle';
-export type { PluginName, PluginTokens, ScopedViewer, Viewer, ViewerPlugins } from './handle';
+export type {
+  PluginName,
+  PluginTokens,
+  ScopedViewer,
+  Viewer,
+  ViewerLifetime,
+  ViewerPlugins,
+} from './handle';
 export type { Feature, ReadOnlyExceptions } from './features';
 export type {
   CapabilityToken,
@@ -74,6 +94,10 @@ export { InteractionToken } from '@embedpdf/react/interaction';
 export { I18nToken } from '@embedpdf/react/i18n';
 export { ShellToken } from '@embedpdf/react/shell';
 export { MetadataToken } from '@embedpdf/react/metadata';
+export { RenderToken } from '@embedpdf/react/render';
+export { LinkToken } from '@embedpdf/react/link';
+export { PageEditToken } from '@embedpdf/react/page-edit';
+export { ActionsToken } from '@embedpdf/react/actions';
 
 export { defaultLayout } from './config/chrome';
 export { defaultCommands } from './config/commands';
@@ -106,6 +130,8 @@ export type {
   LayoutPanelPatch,
   LayoutSection,
   PanelPresentation,
+  PanelPresentationBySize,
+  PanelWidth,
   RemoveItemOptions,
   SectionName,
   SelectionTarget,

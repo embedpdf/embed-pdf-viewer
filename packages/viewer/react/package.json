@@ -2,7 +2,7 @@
   "name": "@embedpdf/viewer-react",
   "version": "3.0.0-next.14",
   "private": false,
-  "description": "React wrapper for the full viewer: the PDFViewer component around the embedpdf-viewer custom element. Children are light-DOM slots - a child with slot=\"name\" projects into the chrome's matching custom() unit while staying in your React tree (your context, your CSS). No peer constraints beyond react>=18; the viewer inside is the Preact-compiled artifact.",
+  "description": "React wrapper for the full viewer: the PDFViewer component around the embedpdf-viewer custom element. Your own components (ToolbarItem, Panel, Region) are light-DOM children the viewer shows in its slots while they stay in your React tree (your context, your CSS). No peer constraints beyond react>=18; the viewer inside is the Preact-compiled artifact.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -28,7 +28,8 @@
   "scripts": {
     "build": "epdf-build",
     "clean": "rimraf dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@embedpdf/react": "workspace:*",
@@ -39,8 +40,16 @@
   },
   "devDependencies": {
     "@embedpdf/tooling-build": "workspace:*",
+    "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
-    "typescript": "^5.0.0"
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "^1.63.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.0.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.9"
   },
   "license": "Apache-2.0",
   "sideEffects": [

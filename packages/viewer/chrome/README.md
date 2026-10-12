@@ -177,8 +177,8 @@ falls back to English for everything you didn't provide.
 ### Slots — your component inside the measured toolbar
 
 Reserve a socket in the layout (`{ custom, command }`), then — through
-`<embedpdf-viewer>` or any wrapper — supply a child with the matching `slot`
-attribute:
+`<embedpdf-viewer>` or any wrapper — supply a child with the slot
+`item:<id>` (in React, a `<ToolbarItem id>`):
 
 ```tsx
 // @embedpdf/viewer-react
@@ -192,7 +192,9 @@ attribute:
     )
   }
 >
-  <DocStatus slot="doc-status" />
+  <ToolbarItem id="doc-status">
+    <DocStatus />
+  </ToolbarItem>
 </PDFViewer>
 ```
 
@@ -204,12 +206,15 @@ leaves the bar). An unfilled socket displays that command as native slot
 fallback, so the same layout works with and without the child (and outside
 shadow DOM entirely — this package's own React consumers see the fallback).
 
-Slot names must be unique across the layout (one `<slot name>` per shadow
-tree wins projection).
+Item ids must be unique across the layout (one `<slot name>` per shadow
+tree wins projection). The slotted element is told where it sits —
+`data-orientation`, `data-edge`, `data-variant`, `data-size` — and the
+viewer's own components (`<epdf-button>`, `<epdf-menu>`) inside it are drawn
+like its own.
 
 ### The frame — regions: arrangement, visibility, replacement
 
-Regions are a FIXED vocabulary (`header`, `tabs`, the bars — each carries
+Regions are a FIXED vocabulary (`header`, `footer`, `tabs`, `empty`, the bars — each carries
 semantics the shell owns: measurement physics, the document gate, aria). Three
 independent knobs on each:
 
@@ -219,7 +224,9 @@ layout={(layout) => layout.place('main', 'bottom').tabs('multiple')}
 
 // 2. REPLACE — regions are sockets; the built-in is the slot fallback:
 <PDFViewer documents={docs} onReady={setViewer}>
-  <AcmeTabBar slot="tabs" viewer={viewer} />
+  <Region name="tabs">
+    <AcmeTabBar viewer={viewer} />
+  </Region>
 </PDFViewer>
 ```
 
@@ -229,7 +236,9 @@ not to the PDF. The socket is there so yours can sit inside the frame:
 
 ```tsx
 <PDFViewer documents={docs}>
-  <AcmeHeader slot="header" />
+  <Region name="header">
+    <AcmeHeader />
+  </Region>
 </PDFViewer>
 ```
 
@@ -267,6 +276,11 @@ el.addEventListener('epdf:ready', () => {
   viewer.documents.list(); // the tab model
 });
 ```
+
+A `viewer` lives as long as the viewer it reaches: once that one unmounts, or
+mounts again with a new config, the listeners added through it stop and its
+calls refuse with `instance-closed` (`createViewer` returns it with its
+`dispose`).
 
 Rule of thumb: **buttons speak commands; code speaks capabilities.** The
 plugin names (`VIEWER_PLUGINS` in `handle.ts`) and the token re-export list in

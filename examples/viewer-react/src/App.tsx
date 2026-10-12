@@ -1,18 +1,15 @@
 /**
- * The wrapper, end to end — one example, four doors:
- *  - CONFIGURE: the chrome transform adds a toolbar socket AND sets the
- *    FRAME — `toolbar: 'bottom'` moves the whole measured main bar (mode
- *    band riding its content side) to the bottom edge.
- *  - SLOT (unit): <DocStatus slot="doc-status"> projects into the toolbar.
- *  - SLOT (region): <AcmeTabBar slot="tabs"> REPLACES the built-in tab bar
- *    wholesale — a component of THIS app, styled by index.css.
- *  - DRIVE: the tab bar is functional purely through el.viewer (onReady):
- *    documents list + active id via `watch`, activate/close via the
- *    documents capability. The kernel's registry IS the tab model.
+ * The React viewer with two components of this app inside it:
+ *
+ * - a status picker in the main toolbar (`ToolbarItem`, placed by the layout), and
+ * - a tab bar of its own in place of the viewer's (`Region name="tabs"`), which reads the open
+ *   documents through `usePDFViewer()` and switches and closes them through `viewer.documents`.
+ *
+ * Both live in the page's DOM, so this app's stylesheet (`index.css`) styles them.
  */
 import { useEffect, useState } from 'react';
-import { PDFViewer } from '@embedpdf/viewer-react';
-import type { DocumentInfo, InitialDocument, Viewer } from '@embedpdf/viewer-react';
+import { PDFViewer, Region, ToolbarItem, usePDFViewer } from '@embedpdf/viewer-react';
+import type { DocumentInfo, InitialDocument, LayoutFunction } from '@embedpdf/viewer-react';
 
 const STATUS = {
   draft: { label: 'Draft', color: '#f59e0b' },
@@ -20,10 +17,10 @@ const STATUS = {
   final: { label: 'Final', color: '#10b981' },
 } as const;
 
-function DocStatus(props: { slot?: string }) {
+function DocStatus() {
   const [status, setStatus] = useState<keyof typeof STATUS>('draft');
   return (
-    <span className="doc-status" {...props}>
+    <span className="doc-status">
       <span className="dot" style={{ background: STATUS[status].color }} />
       <select value={status} onChange={(e) => setStatus(e.target.value as keyof typeof STATUS)}>
         {Object.entries(STATUS).map(([value, { label }]) => (
@@ -36,41 +33,34 @@ function DocStatus(props: { slot?: string }) {
   );
 }
 
-/** A fully custom tab bar — region slot + DRIVE. No chrome internals: the
- *  document list, active id, activate and close all ride el.viewer. */
-function AcmeTabBar({ viewer, ...props }: { viewer: Viewer | null; slot?: string }) {
-  const [docs, setDocs] = useState<readonly DocumentInfo[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+/** This app's own tab bar: the open documents, from the viewer. */
+function AcmeTabBar() {
+  const viewer = usePDFViewer();
+  const [documents, setDocuments] = useState<readonly DocumentInfo[]>(viewer.documents.list());
+  const [activeId, setActiveId] = useState<string | null>(viewer.documents.getActiveId());
   useEffect(() => {
-    if (!viewer) return;
-    const offDocs = viewer.watch(
-      () => viewer.documents.list(),
-      setDocs,
-      (a, b) => a.length === b.length && a.every((d, i) => d === b[i]),
-    );
+    const offDocuments = viewer.watch(() => viewer.documents.list(), setDocuments);
     const offActive = viewer.watch(() => viewer.documents.getActiveId(), setActiveId);
-    setDocs(viewer.documents.list());
-    setActiveId(viewer.documents.getActiveId());
     return () => {
-      offDocs();
+      offDocuments();
       offActive();
     };
   }, [viewer]);
   return (
-    <nav className="acme-tabs" {...props}>
+    <nav className="acme-tabs">
       <span className="brand">ACME DMS</span>
-      {docs.map((d) => (
+      {documents.map((document) => (
         <button
-          key={d.id}
-          className={d.id === activeId ? 'tab active' : 'tab'}
-          onClick={() => viewer?.documents.setActive(d.id)}
+          key={document.id}
+          className={document.id === activeId ? 'tab active' : 'tab'}
+          onClick={() => viewer.documents.setActive(document.id)}
         >
-          {d.status === 'loading' ? '…' : (d.name ?? d.id)}
+          {document.status === 'loading' ? '…' : (document.name ?? document.id)}
           <span
             className="close"
-            onClick={(e) => {
-              e.stopPropagation();
-              void viewer?.documents.close(d.id);
+            onClick={(event) => {
+              event.stopPropagation();
+              void viewer.documents.close(document.id);
             }}
           >
             ×
@@ -81,7 +71,7 @@ function AcmeTabBar({ viewer, ...props }: { viewer: Viewer | null; slot?: string
   );
 }
 
-const lazyDoc = (id: string, name: string): InitialDocument => ({
+const fromPublic = (id: string, name: string): InitialDocument => ({
   name,
   source: async () => ({
     kind: 'bytes',
@@ -90,12 +80,22 @@ const lazyDoc = (id: string, name: string): InitialDocument => ({
   }),
 });
 
+const layout: LayoutFunction = (base) =>
+  base.add({ custom: 'status' }, { to: 'main', section: 'end' });
+
 export function App() {
-  const [viewer, setViewer] = useState<Viewer | null>(null);
   return (
     <PDFViewer
-      documents={[lazyDoc('proposal', 'Proposal'), lazyDoc('contract', 'Contract')]}
+      documents={[fromPublic('proposal', 'Proposal'), fromPublic('contract', 'Contract')]}
+      layout={layout}
       style={{ height: '100vh', display: 'block' }}
-    ></PDFViewer>
+    >
+      <ToolbarItem id="status">
+        <DocStatus />
+      </ToolbarItem>
+      <Region name="tabs">
+        <AcmeTabBar />
+      </Region>
+    </PDFViewer>
   );
 }

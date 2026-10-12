@@ -458,7 +458,7 @@ function FontFamilySelect({
   onChange: (family: string) => void;
 }) {
   // The standard faces plus the configured fonts that are registered and
-  // mounted (`annotations.fonts`) — a registered key is a `fontFamily` value
+  // mounted (`engine.fonts`) — a registered key is a `fontFamily` value
   // like any standard name.
   const configured = useAnnotationFonts();
   const options = [

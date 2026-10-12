@@ -162,3 +162,30 @@ body {
 [data-embedpdf-scrollbar][data-dragging] [data-embedpdf-scrollbar-thumb] {
   background: var(--ep-fg-muted);
 }
+
+/* With a finger as the main way of pointing (`data-touch` on the viewer's root, from its env),
+   every button in a bar, document tab, panel header button and menu row, in a sheet or not, is
+   at least 44 px tall: the size a fingertip hits. It follows the viewer's env, not a media
+   query, like the rest of its layout. */
+[data-touch] [role='toolbar'] button,
+[data-touch] [role='tab'],
+[data-touch] [data-epdf-panel-header] button,
+[data-touch]
+  [role='menu']
+  :is([role='menuitem'], [role='menuitemradio'], [role='menuitemcheckbox']) {
+  min-height: 44px;
+}
+[data-touch] [role='toolbar'] button,
+[data-touch] [data-epdf-panel-header] button {
+  min-width: 44px;
+}
+
+/* On a phone, the floating bar with the page number gets out of the way while the pages scroll
+   (places.tsx): it fades out, then takes no presses or focus until it fades back in. */
+[data-scroll-hidden] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 200ms,
+    visibility 0s 200ms;
+}

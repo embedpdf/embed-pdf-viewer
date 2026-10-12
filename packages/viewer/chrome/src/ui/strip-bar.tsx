@@ -6,8 +6,8 @@
  * `visible`/`enabled` derivations via `useStripView`. This file only draws.
  *
  * The strips sit below what's selected (and above it when there's no room),
- * so a menu from one opens below it, away from the selection, like a floating
- * bar's in the top half of the viewer; it flips when there's no room below.
+ * so a menu from one opens below it, away from the selection (the `selection`
+ * edge); it flips when there's no room below.
  */
 import type { ResolvedCommand } from '@embedpdf/react/commands';
 import type { useStripView } from '@embedpdf/react/toolbar';
@@ -47,7 +47,7 @@ export function StripBar({
   label: string;
 }) {
   return (
-    <BarEdgeProvider value="float-top">
+    <BarEdgeProvider value="selection">
       <div
         role="toolbar"
         aria-label={label}

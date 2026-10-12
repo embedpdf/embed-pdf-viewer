@@ -8,7 +8,8 @@
  * a right-to-left language. A floating bar draws as a pill around its items,
  * over the pages and under the bars over a selection. Each bar tells what opens
  * from it where it is ({@link BarEdgeProvider}). A bar with nothing visible
- * draws nothing, and a bar with a mode shows while that mode is open.
+ * draws nothing, and a bar with a mode shows while that mode is open. On a
+ * phone, a floating bar with the page number hides while the pages scroll.
  */
 import {
   FLOAT_POSITIONS,
@@ -31,8 +32,10 @@ import { isolatePointerDown } from '@embedpdf/web';
 import { useEffect, useMemo, useRef } from 'react';
 
 import { openModeSurfaceOf } from './config/modes';
-import { useResolvedLayout } from './config-context';
+import { useLayoutEnv, useResolvedLayout } from './config-context';
 import { BarEdgeProvider, type BarEdge } from './ui/bar-edge';
+import { useHiddenWhileScrolling } from './ui/compact';
+import { hidesWhileScrolling } from './ui/scroll-hiding';
 import { AppToolbar } from './ui/toolbar';
 
 /** Whether anything in the bar is visible now: a bar with nothing visible draws nothing. */
@@ -175,10 +178,17 @@ function FloatingBar({ id, position }: { id: string; position: FloatPosition }) 
   const lane = useRef<HTMLDivElement>(null);
   const drawn = placed !== null && shows;
   useEffect(() => (drawn && lane.current ? isolatePointerDown(lane.current) : undefined), [drawn]);
+  const { size } = useLayoutEnv();
+  const hidden = useHiddenWhileScrolling(hidesWhileScrolling(bar, size), lane);
   if (!drawn) return null;
   return (
     <BarEdgeProvider value={edgeOfFloat(position)}>
-      <div ref={lane} data-bar={id} className="flex w-full">
+      <div
+        ref={lane}
+        data-bar={id}
+        data-scroll-hidden={hidden ? '' : undefined}
+        className="flex w-full transition-opacity duration-200"
+      >
         <AppToolbar
           bar={placed}
           className="float-pill:pointer-events-auto float-pill:rounded-full float-pill:border float-pill:border-border-subtle float-pill:bg-elevated/95 float-pill:p-0.5 float-pill:shadow-lg pointer-events-none w-full"

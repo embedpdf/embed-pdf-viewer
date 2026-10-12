@@ -27,6 +27,7 @@ import {
 import type { SearchHit, SearchQuery, SearchSnippet } from '@embedpdf/react/search';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
+import { useCloseOnPick } from './panel-frame';
 import { buttonClass } from './toolbar';
 
 const DEBOUNCE_MS = 300;
@@ -123,6 +124,8 @@ export function SearchPanel() {
   const search = useSearch();
   const { query, status, hitCount, activeHitIndex } = useSearchState();
   const hits = useSearchHits();
+  // A sheet or an overlay closes once a match is picked, so you see it on its page.
+  const closeOnPick = useCloseOnPick();
 
   // `query` is the document-scoped stored search (survives the sidebar
   // closing). The box is a controlled draft that starts from it; the panel is
@@ -261,7 +264,10 @@ export function SearchPanel() {
                   key={index}
                   hit={hit}
                   active={index === activeHitIndex}
-                  onClick={() => search.goToHit(index)}
+                  onClick={() => {
+                    search.goToHit(index);
+                    closeOnPick();
+                  }}
                 />
               ))}
             </div>

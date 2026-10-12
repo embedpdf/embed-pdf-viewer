@@ -37,6 +37,15 @@ function pngChunks(bytes: Uint8Array): Map<string, Uint8Array[]> {
 }
 
 describe('localEngine() in Node', () => {
+  test('opens files: it says so before it boots', async () => {
+    const engine = localEngine();
+    try {
+      expect(engine.canOpenFiles).toBe(true);
+    } finally {
+      await engine.destroy();
+    }
+  });
+
   test('passes the local checks: engine, document and page', async () => {
     const engine = localEngine();
     try {

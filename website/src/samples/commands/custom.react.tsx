@@ -42,7 +42,7 @@ const ebook = async (): Promise<OpenInput> => {
 
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);
-  if (!command?.visible) return null;
+  if (!command.visible) return null;
 
   return (
     <button

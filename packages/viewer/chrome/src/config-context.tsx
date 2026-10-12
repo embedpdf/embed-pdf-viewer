@@ -62,32 +62,29 @@ export interface SignaturesCustomization {
   }>;
 }
 
-/** A font for free-text annotations beyond the standard 14. */
-export interface AnnotationFontSpec {
-  /** The stable id a free-text `fontFamily` carries — the engine key, and the
-   *  name of the face the live editor renders with. Not one of the 14 standard names. */
+/**
+ * A font beyond the standard 14, for the engine: what `engine.fonts` lists. The style panel
+ * offers it for text boxes, once it's registered on the engine and mounted for the live editor.
+ */
+export interface ViewerFont {
+  /** The id a free-text `fontFamily` carries, and the engine's key for it. Not one of the 14 standard names. */
   readonly key: string;
-  /** Where the TTF/OTF bytes come from (same-origin or CORS-enabled). */
-  readonly url: string;
-  /** The picker's label. */
-  readonly label: string;
-  /** Family / style refinements for fallback matching; inferred from the file
-   *  when omitted. */
+  /** Where the TTF or OTF file comes from (same-origin or CORS-enabled). */
+  readonly url?: string;
+  /** The file's bytes, in place of `url`. */
+  readonly data?: Uint8Array | ArrayBuffer;
+  /** The family's name, which the style panel shows (else the key); inferred from the file when left out. */
   readonly familyName?: string;
   readonly weight?: number;
   readonly italic?: boolean;
 }
 
-export interface AnnotationsCustomization {
-  /**
-   * Fonts the free-text style panel offers beyond the standard 14. Each is
-   * fetched once when the viewer mounts, registered on the viewer's engine
-   * under its `key`, and mounted as a `@font-face` for that key — so the DOM
-   * editor shows the face the appearance stream will bake. A font whose
-   * URL fails is skipped with a console warning. On the cloud engine (no
-   * `engine.fonts`) they are not offered: fonts there are a server policy.
-   */
-  readonly fonts?: ReadonlyArray<AnnotationFontSpec>;
+/** What `onPanelResize` hears: the panel, and the width the user gave it. */
+export interface PanelResizeEvent {
+  /** The panel's id. */
+  readonly id: string;
+  /** Its width now, in px. */
+  readonly width: number;
 }
 
 export interface ResolvedViewerConfig {
@@ -97,14 +94,17 @@ export interface ResolvedViewerConfig {
   readonly icons: Readonly<Record<string, IconDef>>;
   readonly stamps: StampsCustomization;
   readonly signatures: SignaturesCustomization;
-  readonly annotations: AnnotationsCustomization;
+  /** The engine's fonts the style panel offers (see {@link ViewerFont}). */
+  readonly fonts: readonly ViewerFont[];
+  /** Hears each width the user gives a panel, by dragging its edge or with its keys. */
+  readonly onPanelResize?: (event: PanelResizeEvent) => void;
 }
 
 const DEFAULT_CONFIG: ResolvedViewerConfig = {
   icons: {},
   stamps: {},
   signatures: {},
-  annotations: {},
+  fonts: [],
 };
 
 const ViewerConfigContext = createContext<ResolvedViewerConfig>(DEFAULT_CONFIG);
@@ -114,6 +114,12 @@ export const ViewerConfigProvider = ViewerConfigContext.Provider;
 /** The `layout` option, for <LayoutRoot> to resolve at the viewer's size. */
 export function useLayoutOption(): LayoutOption | undefined {
   return useContext(ViewerConfigContext).layout;
+}
+
+/** Tells the app a panel's new width: what the panel frame calls once the user has resized it. */
+export function usePanelResize(): (event: PanelResizeEvent) => void {
+  const { onPanelResize } = useContext(ViewerConfigContext);
+  return (event) => onPanelResize?.(event);
 }
 
 // ── the layout at the viewer's current size ──────────────────────────────────
@@ -211,6 +217,6 @@ export function useSignaturesConfig(): SignaturesCustomization {
   return useContext(ViewerConfigContext).signatures;
 }
 
-export function useAnnotationsConfig(): AnnotationsCustomization {
-  return useContext(ViewerConfigContext).annotations;
+export function useConfiguredFonts(): readonly ViewerFont[] {
+  return useContext(ViewerConfigContext).fonts;
 }

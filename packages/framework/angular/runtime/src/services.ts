@@ -64,6 +64,7 @@ export class EpdfDocuments extends pluginService({
   state: documentsState,
   methods: [
     'open',
+    'canOpenFiles',
     'openAll',
     'retry',
     'rename',

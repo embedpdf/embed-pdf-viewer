@@ -142,6 +142,37 @@ describe('<Toolbar>', () => {
     expect(live('button.cmd').map((button) => button.textContent)).toEqual(['One']);
   });
 
+  it('measures a custom item that draws nothing in the measurement layer where it renders, by ctx.measure', async () => {
+    room = 200;
+    const schema: BarSchema = {
+      id: 'main',
+      sections: { center: [group('g', ['three', custom('wide', 'one')])] },
+    };
+    function Wide({ measure }: { measure: (length: number) => void }) {
+      const report = React.useRef(measure);
+      report.current = measure;
+      React.useLayoutEffect(() => report.current(500), []);
+      return <span className="wide">Wide</span>;
+    }
+    await mountToolbar(
+      <Toolbar
+        bar={schema}
+        renderCommand={renderCommand}
+        renderCustom={{
+          wide: (_variant, ctx) =>
+            ctx.layer === 'measure' ? null : <Wide measure={ctx.measure} />,
+        }}
+      />,
+    );
+    // The measurement layer holds nothing for it, so nothing there reports it as 0px wide.
+    const layer = document.querySelector('[aria-hidden="true"]')!;
+    expect([...layer.children].filter((measured) => measured.textContent === '')).toHaveLength(0);
+    // 500px don't fit in 200: the item goes into "More", as its command.
+    expect(document.querySelectorAll('.wide')).toHaveLength(0);
+    fireEvent.click(live('button[title="More"]')[0]!);
+    expect(live('[role="menu"] button').map((button) => button.textContent)).toContain('One');
+  });
+
   it('without a renderer, a custom item is a native slot holding its command, measured live', async () => {
     const schema: BarSchema = {
       id: 'main',

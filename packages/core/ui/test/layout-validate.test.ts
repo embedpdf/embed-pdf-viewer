@@ -182,6 +182,26 @@ describe('validateLayout', () => {
     ]);
   });
 
+  it('checks a panel’s present per size, its width limits and resizable', () => {
+    const wrong: LayoutData = {
+      panels: {
+        notes: {
+          present: { compact: 'overlay', medum: 'dock', expanded: 'float' } as never,
+          width: { initial: 300, min: 400, max: 320, widest: 9 } as never,
+          resizable: 'no' as never,
+        },
+        fine: { present: { compact: 'overlay' }, width: { initial: 320, min: 240, max: 480 } },
+      },
+    };
+    expect(validateLayout(wrong, { commands })).toEqual([
+      'panel "notes": present has "medum", not a size (did you mean "medium"?)',
+      'panel "notes": present.expanded "float" is not dock, overlay or sheet',
+      'panel "notes": width has "widest", not initial, min or max',
+      'panel "notes": width.min 400 is wider than width.max 320',
+      'panel "notes": resizable "no" is not true or false',
+    ]);
+  });
+
   it('says so when the layout is not an object', () => {
     expect(validateLayout(null as never, { commands })).toEqual(['the layout is not an object']);
   });

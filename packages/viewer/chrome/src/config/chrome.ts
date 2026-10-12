@@ -216,7 +216,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
   },
 
   menus: {
-    document: [['document:download', 'document:print'], ['view:fullscreen']],
+    document: [['document:open', 'document:download', 'document:print'], ['view:fullscreen']],
     view: [
       {
         titleKey: 'commands.spread.group',
@@ -242,17 +242,19 @@ export const DEFAULT_LAYOUT: LayoutData = {
     ],
   },
 
+  // Each panel's button is its `panel:<id>` command, titled and drawn as the panel is
+  // (config/panels.ts); the panels on one side take turns.
   panels: {
-    thumbnails: { side: 'start' },
-    outline: { side: 'start' },
-    attachments: { side: 'start' },
-    search: { side: 'end' },
-    comments: { side: 'end' },
-    style: { side: 'end' },
-    stamps: { side: 'end' },
-    signatures: { side: 'end' },
-    redaction: { side: 'end' },
-    measurement: { side: 'end' },
+    thumbnails: { side: 'start', titleKey: 'panels.thumbnails', icon: 'sidebar' },
+    outline: { side: 'start', titleKey: 'panels.outline', icon: 'listTree' },
+    attachments: { side: 'start', titleKey: 'panels.attachments', icon: 'paperclip' },
+    search: { side: 'end', titleKey: 'panels.search', icon: 'search' },
+    comments: { side: 'end', titleKey: 'panels.comments', icon: 'comment' },
+    style: { side: 'end', titleKey: 'panels.style', icon: 'palette' },
+    stamps: { side: 'end', titleKey: 'panels.stamps', icon: 'rubberStamp' },
+    signatures: { side: 'end', titleKey: 'panels.signatures', icon: 'signature' },
+    redaction: { side: 'end', titleKey: 'panels.redaction', icon: 'redactionSidebar' },
+    measurement: { side: 'end', titleKey: 'panels.measurement', icon: 'updateScale' },
   },
 };
 

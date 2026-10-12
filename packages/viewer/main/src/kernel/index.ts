@@ -9,7 +9,9 @@
  * that as "the word 'local' cannot appear in this directory" and the rest
  * follows.
  */
-export { EmbedPdfViewerElement, type DefaultEngineProvider } from './element';
+export { EmbedPdfViewerElement, type DefaultEngineProvider, type DoorEngine } from './element';
+// The viewer's own components, for your page: `<epdf-button>`, `<epdf-menu>`, `<epdf-menu-item>`.
+export { EpdfButtonElement, EpdfMenuElement, EpdfMenuItemElement } from './components';
 export { initViewer } from './init';
 export type { DocumentSrc, ElementConfig, LiveConfigKey, ViewerConfigBase } from './config';
 export type { MountTarget } from './init';
@@ -33,15 +35,19 @@ export {
 // lenses). This re-export list is the CDN's public-API act — see the chrome's
 // index for the curation rule.
 export {
+  ActionsToken,
   AnnotationToken,
   CommandsToken,
   DocumentsToken,
   FormToken,
   I18nToken,
   InteractionToken,
+  LinkToken,
   MeasurementToken,
   MetadataToken,
+  PageEditToken,
   RedactionToken,
+  RenderToken,
   SearchToken,
   SelectionToken,
   ShellToken,
@@ -61,8 +67,6 @@ export {
   webCryptoSigner,
 } from '@embedpdf/viewer-chrome';
 export type {
-  AnnotationFontSpec,
-  AnnotationsCustomization,
   Mark,
   SignatureMode,
   SignaturesCustomization,
@@ -77,12 +81,18 @@ export type {
   DocumentInfo,
   DocumentsCapability,
   NotAllowedMode,
+  PanelResizeEvent,
   PluginName,
+  PluginSettings,
   ResolvedCommand,
   ScopedViewer,
+  ToolbarItemContext,
+  ToolbarItemEdge,
   Unsubscribe,
   Viewer,
+  ViewerFont,
   ViewerPlugins,
+  ViewerPluginsConfig,
 } from '@embedpdf/viewer-chrome';
 export type {
   AddItemOptions,
@@ -112,6 +122,8 @@ export type {
   LayoutPanelPatch,
   LayoutSection,
   PanelPresentation,
+  PanelPresentationBySize,
+  PanelWidth,
   PathSpec,
   ReadOnlyExceptions,
   RemoveItemOptions,

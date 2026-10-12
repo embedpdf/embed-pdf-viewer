@@ -13,6 +13,7 @@ import {
   type MeasurementReadout,
 } from '@embedpdf/react/measurement';
 import { useT } from '@embedpdf/react/i18n';
+import { Dialog } from './dialog';
 import { Icon } from './icons';
 
 const control =
@@ -34,7 +35,7 @@ export function MeasurementScaleButton() {
   return (
     <button
       className={`${button} inline-flex items-center gap-1.5 whitespace-nowrap`}
-      onClick={() => surface.open({ exclusive: 'right' })}
+      onClick={() => surface.open()}
       title={t('measurement.title')}
     >
       <Icon name="updateScale" size={20} className="shrink-0" />
@@ -333,17 +334,15 @@ export function CalibrationDialog() {
     }
   };
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/40"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !busy) measurement.dismissCalibration();
+    <Dialog
+      labelledBy="measurement-calibration-title"
+      onClose={() => {
+        if (!busy) measurement.dismissCalibration();
       }}
+      className="border-border bg-surface w-96 rounded-lg border p-5 shadow-xl"
     >
       <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="measurement-calibration-title"
-        className="border-border bg-surface flex w-96 flex-col gap-4 rounded-lg border p-5 shadow-xl"
+        className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
@@ -420,6 +419,6 @@ export function CalibrationDialog() {
           </button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }

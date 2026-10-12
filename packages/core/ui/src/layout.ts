@@ -121,6 +121,23 @@ export type LayoutMenu = readonly LayoutMenuSection[];
 /** How a panel opens: beside the pages, over them, or up from the bottom. */
 export type PanelPresentation = 'dock' | 'overlay' | 'sheet';
 
+/** How a panel opens at each of the viewer's sizes. A size left out opens the default way. */
+export interface PanelPresentationBySize {
+  readonly compact?: PanelPresentation;
+  readonly medium?: PanelPresentation;
+  readonly expanded?: PanelPresentation;
+}
+
+/** A panel's width: the one it starts at, and the narrowest and widest it can be dragged to. */
+export interface PanelWidth {
+  /** In px. Default `288`. */
+  readonly initial?: number;
+  /** In px. Default `200`. */
+  readonly min?: number;
+  /** In px. Default `640`. A docked panel never takes more than half the viewer. */
+  readonly max?: number;
+}
+
 export interface LayoutPanel {
   /** Default `'end'`. */
   readonly side?: 'start' | 'end';
@@ -129,13 +146,21 @@ export interface LayoutPanel {
   readonly titleKey?: string;
   /** Its button's icon. */
   readonly icon?: string;
-  /** Default: by the viewer's size (dock when expanded, overlay when medium, sheet when compact). */
-  readonly present?: PanelPresentation;
-  /** Its width when docked, in px. Default `288`. */
-  readonly width?: number;
+  /**
+   * How it opens: the same way at every size, or per size. Default
+   * `{ compact: 'sheet', medium: 'overlay', expanded: 'dock' }`.
+   */
+  readonly present?: PanelPresentation | PanelPresentationBySize;
+  /** Its width in px (where it starts), or where it starts and how far it drags. Default `288`. */
+  readonly width?: number | PanelWidth;
+  /** Whether people can drag its edge to change its width. Default `true`. */
+  readonly resizable?: boolean;
 }
 
-/** Changes to a panel: the fields to set. */
+/**
+ * Changes to a panel: the fields to set. `present` and `width` change only what they name: a
+ * map of sizes keeps the other sizes, and a number or `{ initial }` keeps `min` and `max`.
+ */
 export type LayoutPanelPatch = Partial<LayoutPanel>;
 
 /** When the document tabs show: always, while more than one document is open, or never. */
@@ -194,6 +219,11 @@ export interface Layout {
   addPanel(id: string, panel: LayoutPanel): Layout;
   /** Change a panel's fields. */
   panel(id: string, changes: LayoutPanelPatch): Layout;
+  /**
+   * Change every panel's fields, as `panel(id, changes)` changes one: every panel the layout has
+   * so far, so a panel added after it keeps its own.
+   */
+  panels(changes: LayoutPanelPatch): Layout;
   /** Remove a panel, and its `panel:<id>` button from every bar and menu. */
   removePanel(id: string): Layout;
   /** When the document tabs show. */
@@ -247,6 +277,7 @@ function layoutOf(data: LayoutData, warnings: readonly string[]): Layout {
       next([withRecord(data, 'menus', id, sections), []]),
     addPanel: (id: string, panel: LayoutPanel) => next([withRecord(data, 'panels', id, panel), []]),
     panel: (id: string, changes: LayoutPanelPatch) => next(updatePanel(data, id, changes)),
+    panels: (changes: LayoutPanelPatch) => next([updatePanels(data, changes), []]),
     removePanel: (id: string) => next(removePanel(data, id)),
     tabs: (visibility: TabsVisibility) => next([{ ...data, tabs: visibility }, []]),
     toJSON: () => data,
@@ -610,11 +641,49 @@ function replaceItem(data: LayoutData, id: string, item: LayoutItem): Edited {
   return [{ ...data, bars, menus }, []];
 }
 
+/** A panel's `present` as a map of sizes: one way at every size, or the sizes it names. */
+export const panelPresentationsOf = (
+  present: PanelPresentation | PanelPresentationBySize,
+): PanelPresentationBySize =>
+  typeof present === 'string' ? { compact: present, medium: present, expanded: present } : present;
+
+/** A panel's `width` as its fields: a number is where it starts. */
+export const panelWidthFieldsOf = (width: number | PanelWidth): PanelWidth =>
+  typeof width === 'number' ? { initial: width } : width;
+
+/**
+ * `panel` with `changes`: each field replaced, except `present` and `width`, which change only
+ * what the change names (a map of sizes keeps the other sizes, `{ initial }` keeps the limits).
+ */
+function changedPanel(panel: LayoutPanel, changes: LayoutPanelPatch): LayoutPanel {
+  const next: Record<string, unknown> = { ...panel };
+  for (const [field, value] of Object.entries(changes)) {
+    if (value !== undefined) next[field] = value;
+  }
+  const { present, width } = changes;
+  if (typeof present === 'object' && panel.present !== undefined)
+    next.present = { ...panelPresentationsOf(panel.present), ...present };
+  if (
+    width !== undefined &&
+    panel.width !== undefined &&
+    (typeof width === 'object' || typeof panel.width === 'object')
+  )
+    next.width = { ...panelWidthFieldsOf(panel.width), ...panelWidthFieldsOf(width) };
+  return next as LayoutPanel;
+}
+
 function updatePanel(data: LayoutData, id: string, changes: LayoutPanelPatch): Edited {
   const panel = panelsOf(data)[id];
   if (!panel)
     return [data, [`panel: no panel "${id}"${didYouMean(id, Object.keys(panelsOf(data)))}`]];
-  return [withRecord(data, 'panels', id, { ...panel, ...changes }), []];
+  return [withRecord(data, 'panels', id, changedPanel(panel, changes)), []];
+}
+
+function updatePanels(data: LayoutData, changes: LayoutPanelPatch): LayoutData {
+  const panels = Object.fromEntries(
+    Object.entries(panelsOf(data)).map(([id, panel]) => [id, changedPanel(panel, changes)]),
+  );
+  return { ...data, panels };
 }
 
 function removePanel(data: LayoutData, id: string): Edited {

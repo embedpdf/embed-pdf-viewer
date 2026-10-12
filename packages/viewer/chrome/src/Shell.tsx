@@ -3,12 +3,14 @@
  * the commands + measured-toolbar system.
  *
  *   ── header socket (empty unless a child fills it) ──────────────────────
- *   ── document tabs ──────────────────────────────────────────────────────
+ *   ── document tabs (or the `tabs` region) ───────────────────────────────
  *   ── the top edge's bars, outside in (main, its mode bar) ───────────────
  *   start │ start  │                              │  end   │ end
  *   bars  │ panel  │ pages, the floating bars     │ panel  │ bars
- *         │        │ over them                    │        │
+ *         │        │ over them (with no document: │        │
+ *         │        │ the `empty` region)          │        │
  *   ── the bottom edge's bars, outside in from the bottom ─────────────────
+ *   ── footer socket (empty unless a child fills it) ──────────────────────
  *
  * The top and bottom bars run the full width; the start and end bars stand
  * between them at the viewer's edges, and a docked panel sits inside them,
@@ -43,8 +45,10 @@ import { EdgeBars, FloatingBars } from './places';
 import { AnnotationFontsProvider } from './ui/annotation-fonts';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
+import { DropToOpen } from './ui/drop-to-open';
 import { CalibrationDialog } from './ui/measurement';
-import { LeftSidebar, RightSidebar } from './ui/panels';
+import { SidePanel } from './ui/panels';
+import { PlacedComponentsHost, type PlacedComponents } from './ui/placed-components';
 import { RedactConfirmModal } from './ui/redact-confirm';
 import { useRefusalNotice } from './ui/refusal-notice';
 import { RotationBadge } from './ui/rotation-badge';
@@ -83,14 +87,22 @@ function OpeningDocuments() {
 }
 
 /**
- * The document area's lifecycle switch. A `locked` tab shows its password
- * prompt, an `error` tab its error pane — per tab (keyed by document), so
- * several can coexist and tab switching stays free. Everything else is the
- * ready-gated Stage; the gate's fallback covers `loading`.
+ * The document area's lifecycle switch. With no document open it shows the
+ * `empty` region, or nothing. A `locked` tab shows its password prompt, an
+ * `error` tab its error pane — per tab (keyed by document), so several can
+ * coexist and tab switching stays free. Everything else is the ready-gated
+ * Stage; the gate's fallback covers `loading`.
  */
 function DocumentArea({ children }: { children: ReactNode }) {
   const docId = useDocumentId();
   const status = useDocument((document) => document.status);
+  if (docId === null) {
+    return (
+      <div className="min-w-0 flex-1 overflow-auto">
+        <slot name="empty" />
+      </div>
+    );
+  }
   if (status === 'locked') return <PasswordPrompt key={docId} />;
   if (status === 'error') return <DocumentError key={docId} />;
   return <DocumentGate fallback={<OpeningDocuments />}>{children}</DocumentGate>;
@@ -109,7 +121,7 @@ function OverPages({ children }: { children: ReactNode }) {
   );
 }
 
-export function Shell() {
+export function Shell({ components }: { components?: PlacedComponents }) {
   // A shortcut or Copy that's refused says why in a notice.
   const refusals = useRefusalNotice();
   useCommandShortcuts({ onRefused: refusals.onShortcutRefused });
@@ -126,12 +138,16 @@ export function Shell() {
   // Regions render as named <slot> sockets with the built-ins as fallback —
   // light-DOM children of <embedpdf-viewer> replace them; in plain light DOM a
   // slot just displays its fallback (UA display:contents), so this package's
-  // direct React consumers see no difference. The bars are measured and fit
+  // direct React consumers see no difference. A region nobody fills shows
+  // nothing, or the viewer's own (the tabs). The bars are measured and fit
   // with zero config, and sit outside the gate: they render before any
   // document. The root measures the viewer for the layout (layout-root.tsx).
   return (
     <AnnotationFontsProvider>
       <LayoutRoot className="bg-app text-fg flex h-full flex-col">
+        {/* the viewer's own components in the page (<epdf-button>, <epdf-menu>), each drawn
+          in its own shadow root */}
+        {components && <PlacedComponentsHost components={components} />}
         {/* the user's stamp + signature libraries: restored once, persisted for
           the workspace's lifetime (workspace-scoped, like the stamp plugin) */}
         <StampLibraryStore />
@@ -148,9 +164,10 @@ export function Shell() {
         <div className="relative flex min-h-0 flex-1">
           {refusals.element}
           <EdgeBars edge="start" />
-          <div className="relative flex min-w-0 flex-1">
+          {/* a PDF dropped here opens as a new tab, as Open in the document menu does */}
+          <DropToOpen className="relative flex min-w-0 flex-1">
             <DocumentArea>
-              <LeftSidebar />
+              <SidePanel side="start" />
               <div className="relative min-w-0 flex-1">
                 {/* the armed tool's cursor: its toolbar icon as a real CSS cursor
                 (zero-lag; the hub hides it over annotations/fields/gaps) */}
@@ -209,7 +226,7 @@ export function Shell() {
                   )}
                 </Stage>
               </div>
-              <RightSidebar />
+              <SidePanel side="end" />
               <RedactConfirmModal />
               <CalibrationDialog />
               {/* signatures: plugin intents → surfaces; the dialogs they open */}
@@ -217,11 +234,14 @@ export function Shell() {
               <SignDialog />
               <SignatureMakerModal />
             </DocumentArea>
-          </div>
+          </DropToOpen>
           <EdgeBars edge="end" />
         </div>
 
         <EdgeBars edge="bottom" />
+
+        {/* The footer socket: below everything, empty until a child fills it. */}
+        <slot name="footer" />
       </LayoutRoot>
     </AnnotationFontsProvider>
   );

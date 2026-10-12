@@ -22,6 +22,10 @@ describe('menuPlacementOf', () => {
     expect(menuPlacementOf('float-bottom', 'ltr')).toBe('top-start');
   });
 
+  it('opens below a bar over a selection, away from what is selected', () => {
+    expect(menuPlacementOf('selection', 'ltr')).toBe('bottom-start');
+  });
+
   it('opens beside a start or end bar, on the side of the pages', () => {
     expect(menuPlacementOf('start', 'ltr')).toBe('right-start');
     expect(menuPlacementOf('end', 'ltr')).toBe('left-start');

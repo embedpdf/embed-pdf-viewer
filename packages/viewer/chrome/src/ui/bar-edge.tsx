@@ -6,13 +6,21 @@
  * floating bar's toward the middle of the viewer.
  *
  * A floating bar names the half of the viewer it floats in (`float-top`,
- * `float-bottom`), since its menus open toward the other half. Outside any
- * provider the edge is `'top'`, the main bar's.
+ * `float-bottom`), since its menus open toward the other half; a bar over a
+ * selection says `selection`, and its menus open below it, away from what's
+ * selected. Outside any provider the edge is `'top'`, the main bar's.
  */
 import { createContext, useContext } from 'react';
 
 /** The viewer edge a bar sits on; a floating bar names the half it floats in. */
-export type BarEdge = 'top' | 'bottom' | 'start' | 'end' | 'float-top' | 'float-bottom';
+export type BarEdge =
+  | 'top'
+  | 'bottom'
+  | 'start'
+  | 'end'
+  | 'float-top'
+  | 'float-bottom'
+  | 'selection';
 
 export const BarEdgeContext = createContext<BarEdge>('top');
 

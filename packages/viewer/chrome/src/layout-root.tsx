@@ -5,11 +5,14 @@
  * the size), a media query says whether the main pointer is a finger, and the
  * language gives the direction: together the env, and the `layout` function
  * runs again whenever it changes. The direction is the root's `dir`, so the
- * viewer reads its own language's way whatever the page around it does. Under
+ * viewer reads its own language's way whatever the page around it does. A
+ * finger as the main pointer marks the root `data-touch` (every button and
+ * menu row is then 44 px tall, styles.css), and the root keeps clear of the
+ * notch and the home bar on the edges of the screen it reaches. Under
  * the root, the bars leave out the tab of a mode whose bars show nothing and
  * the button of a menu that shows nothing; an open mode whose tab goes falls
- * back to View; a bar with a new mode gets its `mode:<mode>` command; and each
- * problem with the layout is logged once.
+ * back to View; a bar with a new mode gets its `mode:<mode>` command, and each
+ * panel its `panel:<id>`; and each problem with the layout is logged once.
  */
 import {
   useEffect,
@@ -32,6 +35,7 @@ import {
   validateLayout,
   type BarSchema,
   type Layout,
+  type LayoutData,
   type LayoutEnv,
   type MenuSection,
 } from '@embedpdf/core-ui';
@@ -53,6 +57,7 @@ import {
   sameModeSpecs,
   type ModeSpec,
 } from './config/modes';
+import { panelCommandsFor, samePanels } from './config/panels';
 import {
   DEFAULT_ENV,
   ResolvedLayoutProvider,
@@ -60,6 +65,8 @@ import {
   useLayoutOption,
   type ResolvedLayout,
 } from './config-context';
+import { useScreenEdges } from './ui/compact';
+import { safeAreaPaddingOf } from './ui/screen-edges';
 
 const COARSE_POINTER = '(pointer: coarse)';
 
@@ -170,11 +177,19 @@ export function LayoutRoot({ className, children }: { className?: string; childr
   );
 
   useModeCommands(useEqualValue(modeSpecsOf(data), sameModeSpecs));
+  usePanelCommands(useEqualValue(data.panels, samePanels));
   useModeFallback(tabs);
   useLayoutWarnings(measured === null ? null : layout);
 
+  const edges = useScreenEdges(root);
   return (
-    <div ref={root} dir={env.dir} className={className}>
+    <div
+      ref={root}
+      dir={env.dir}
+      data-touch={env.touch ? '' : undefined}
+      className={className}
+      style={safeAreaPaddingOf(edges)}
+    >
       <ResolvedLayoutProvider value={resolved}>{children}</ResolvedLayoutProvider>
     </div>
   );
@@ -188,6 +203,19 @@ function useModeCommands(specs: readonly ModeSpec[]): void {
     const definitions = modeCommandsFor(specs, (id) => commands.hasCommand(id));
     return definitions.length > 0 ? commands.registerCommands(definitions) : undefined;
   }, [commands, specs]);
+}
+
+/**
+ * Registers a `panel:<id>` command for each panel that has none, for as long as the layout has
+ * the panel; a panel whose title or icon changes gets its command again.
+ */
+function usePanelCommands(panels: LayoutData['panels']): void {
+  const commands = useCommands();
+  // Before paint, so a panel's button is there in the first frame.
+  useLayoutEffect(() => {
+    const definitions = panelCommandsFor(panels, (id) => commands.hasCommand(id));
+    return definitions.length > 0 ? commands.registerCommands(definitions) : undefined;
+  }, [commands, panels]);
 }
 
 /** Back to View when the open mode has no tab: its bars show nothing, or the layout lost it. */

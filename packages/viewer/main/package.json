@@ -82,6 +82,7 @@
   },
   "sideEffects": [
     "./src/kernel/element.ts",
+    "./src/kernel/components.ts",
     "./src/doors/*.ts",
     "./dist/*.js",
     "./dist/**/*.js"

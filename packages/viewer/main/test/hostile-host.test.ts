@@ -62,8 +62,8 @@ function hostPage(hostile: boolean): string {
     target: '#viewer',
     src: '/sample.pdf',
     theme: 'light',
-    annotations: {
-      fonts: [{ key: 'brand-sans', url: '/fonts/brand.ttf', label: 'Brand Sans', familyName: 'Brand Sans' }],
+    engine: {
+      fonts: [{ key: 'brand-sans', url: '/fonts/brand.ttf', familyName: 'Brand Sans' }],
     },
   });
 </script>

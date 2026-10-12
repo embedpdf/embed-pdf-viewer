@@ -34,7 +34,7 @@ describe('useCommand', () => {
         commands: [{ id: 'review:approve', label: 'Approve', shortcut: 'Mod+Enter', run }],
       }),
     ];
-    let command: CurrentValue<BoundCommand | null> | null = null;
+    let command: CurrentValue<BoundCommand> | null = null;
     const approve = probe(
       () => (command = useCommand('review:approve')),
       (value) => value.current,
@@ -43,14 +43,14 @@ describe('useCommand', () => {
     await kernel.documents.open(bytesInput('a'));
     flushSync();
 
-    const bound = command!.current!;
+    const bound = command!.current;
     expect(bound).toMatchObject({ label: 'Approve', enabled: true });
     expect(bound.shortcut).toBe(formatShortcut('Mod+Enter'));
     await bound.run();
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ documentId: 'a' }));
   });
 
-  it('is null for an unknown id, and follows an id given as a function', async () => {
+  it('gives an unknown id as a command that shows nothing, and follows an id given as a function', async () => {
     const seen: (string | null)[] = [];
     const { view } = await viewerWith(
       [commandsPlugin({ commands: [{ id: 'review:approve', label: 'Approve' }] })],

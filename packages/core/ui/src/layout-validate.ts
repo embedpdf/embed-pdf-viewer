@@ -59,6 +59,8 @@ const FLOAT_POSITIONS: readonly string[] = [
 ];
 const SELECTION_TARGETS: readonly string[] = ['selection', 'annotation'];
 const PRESENTATIONS: readonly string[] = ['dock', 'overlay', 'sheet'];
+const SIZES: readonly string[] = ['compact', 'medium', 'expanded'];
+const WIDTH_FIELDS: readonly string[] = ['initial', 'min', 'max'];
 const TABS: readonly string[] = ['always', 'multiple', 'never'];
 
 /**
@@ -236,17 +238,59 @@ function menuProblems(
   return problems;
 }
 
+const isWidthPx = (value: unknown): boolean =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+function presentProblems(where: string, present: unknown): string[] {
+  if (typeof present === 'string') {
+    return PRESENTATIONS.includes(present)
+      ? []
+      : [`${where}: present "${present}" is not dock, overlay or sheet`];
+  }
+  if (typeof present !== 'object' || present === null || Array.isArray(present))
+    return [`${where}: present ${JSON.stringify(present)} is not a way to open, or one per size`];
+  const problems: string[] = [];
+  for (const [size, way] of Object.entries(present)) {
+    if (!SIZES.includes(size))
+      problems.push(`${where}: present has "${size}", not a size${didYouMean(size, SIZES)}`);
+    else if (way !== undefined && !PRESENTATIONS.includes(way as string))
+      problems.push(`${where}: present.${size} "${way}" is not dock, overlay or sheet`);
+  }
+  return problems;
+}
+
+function widthProblems(where: string, width: unknown): string[] {
+  if (typeof width === 'number')
+    return isWidthPx(width) ? [] : [`${where}: width ${width} is not a width in px`];
+  if (typeof width !== 'object' || width === null || Array.isArray(width))
+    return [
+      `${where}: width ${JSON.stringify(width)} is not a width in px, or { initial, min, max }`,
+    ];
+  const problems: string[] = [];
+  const fields = width as Record<string, unknown>;
+  for (const [field, value] of Object.entries(fields)) {
+    if (!WIDTH_FIELDS.includes(field))
+      problems.push(`${where}: width has "${field}", not initial, min or max`);
+    else if (value !== undefined && !isWidthPx(value))
+      problems.push(`${where}: width.${field} ${JSON.stringify(value)} is not a width in px`);
+  }
+  if (
+    isWidthPx(fields.min) &&
+    isWidthPx(fields.max) &&
+    (fields.min as number) > (fields.max as number)
+  )
+    problems.push(`${where}: width.min ${fields.min} is wider than width.max ${fields.max}`);
+  return problems;
+}
+
 function panelProblems(where: string, panel: LayoutPanel): string[] {
   if (typeof panel !== 'object' || panel === null) return [`${where} is not a panel`];
   const problems: string[] = [];
   if (panel.side !== undefined && panel.side !== 'start' && panel.side !== 'end')
     problems.push(`${where}: side "${panel.side}" is not start or end`);
-  if (panel.present !== undefined && !PRESENTATIONS.includes(panel.present))
-    problems.push(`${where}: present "${panel.present}" is not dock, overlay or sheet`);
-  if (
-    panel.width !== undefined &&
-    (typeof panel.width !== 'number' || !Number.isFinite(panel.width) || panel.width <= 0)
-  )
-    problems.push(`${where}: width ${JSON.stringify(panel.width)} is not a width in px`);
+  if (panel.present !== undefined) problems.push(...presentProblems(where, panel.present));
+  if (panel.width !== undefined) problems.push(...widthProblems(where, panel.width));
+  if (panel.resizable !== undefined && typeof panel.resizable !== 'boolean')
+    problems.push(`${where}: resizable ${JSON.stringify(panel.resizable)} is not true or false`);
   return problems;
 }

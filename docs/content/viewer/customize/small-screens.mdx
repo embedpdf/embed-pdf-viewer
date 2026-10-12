@@ -52,8 +52,9 @@ pages, with a handle at the top.
 - A sheet that holds a list, such as the thumbnails or the search results, closes when you pick
   something, so you see where it took you.
 
-To make a panel a sheet at other sizes too, or never, set its `present`: see
-[Panels](panels#how-a-panel-opens).
+To make a panel a sheet at other sizes too, or never, set its `present`. With
+`layout.panels({ present: { compact: 'overlay' } })` no panel is a sheet on a phone: each one
+opens over the pages instead. See [Panels](panels#how-a-panel-opens).
 
 ## Touch
 

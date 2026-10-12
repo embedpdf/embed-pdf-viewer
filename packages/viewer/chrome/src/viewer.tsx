@@ -22,7 +22,13 @@
 // plugin and its UI; delete a line and the feature leaves the bundle.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Viewer as HeadlessViewer, useKernel } from '@embedpdf/react/runtime';
-import type { Engine, EngineFactory, Identity, InitialDocument } from '@embedpdf/react/runtime';
+import type {
+  CapabilityToken,
+  Engine,
+  EngineFactory,
+  Identity,
+  InitialDocument,
+} from '@embedpdf/react/runtime';
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
@@ -50,11 +56,14 @@ import { defaultCommands } from './config/commands';
 import { en } from './locales/en';
 import {
   ViewerConfigProvider,
+  type PanelResizeEvent,
   type ResolvedViewerConfig,
   type StampsCustomization,
+  type ViewerFont,
 } from './config-context';
-import type { AnnotationsCustomization, SignaturesCustomization } from './config-context';
+import type { SignaturesCustomization } from './config-context';
 import {
+  bothAllow,
   byHandSettingsOf,
   disabledSettingsOf,
   sameByHand,
@@ -63,10 +72,19 @@ import {
   type Feature,
   type ReadOnlyExceptions,
 } from './features';
-import { VIEWER_PLUGINS, createViewer, type Viewer } from './handle';
+import { VIEWER_PLUGINS, createViewer, type PluginTokens, type Viewer } from './handle';
+import {
+  readPluginsConfig,
+  settingsOver,
+  type PluginSettings,
+  type PluginsConfigRead,
+  type ViewerPluginsConfig,
+} from './plugin-settings';
 import { ICON_PATHS, type IconDef } from './ui/icons';
 import { ThemeProvider, type ThemePreference } from './ui/theme';
 import { Shell } from './Shell';
+import type { PlacedComponents } from './ui/placed-components';
+import { SlottedEdgesProvider, createSlottedEdges } from './ui/slotted-edges';
 
 /** Lazy built-in packs — a strings override for one of these wraps its loader. */
 const BUILTIN_LOADERS: Record<string, () => Promise<Locale>> = {
@@ -169,9 +187,17 @@ export interface ViewerCustomization {
    *  ask), which marks a person keeps, and script faces for typed marks. With
    *  no key, a mark placed on a field is drawn in without sealing. */
   signatures?: SignaturesCustomization;
-  /** Annotations: fonts the free-text style panel offers beyond the standard
-   *  14 — fetched, registered on the engine and mounted for the live editor. */
-  annotations?: AnnotationsCustomization;
+  /**
+   * Each plugin's settings, by the plugin's name, as its page in the headless docs lists them
+   * (`stage: { spread: 'odd' }`), over the viewer's own; and a plugin of your own as its
+   * definition (`analytics: analyticsPlugin()`), which `viewer.get('analytics')` then finds.
+   * Where the viewer's own keys set a plugin's settings too, both count and each only takes
+   * away: the plugin's `disabledCategories` and `disabledCommands` add to what `disable` and
+   * `readOnly` turn off, and its `editable` and `fillable` keep only what both allow. A list of
+   * definitions (`annotation.tools`, `commands.commands`, `i18n.locales`) adds to the viewer's.
+   * The language is `locale`'s, and `notAllowed`, when given, wins over the plugin's. Read once.
+   */
+  plugins?: ViewerPluginsConfig;
   /** Light/dark preference (string shorthand), or the full theme config with
    *  token overrides. Tokens are applied by the delivery (the custom element
    *  adopts them into its shadow root); direct consumers of this package set
@@ -187,6 +213,12 @@ export interface ViewerCustomization {
    * a switch to another tab, and `null` once the last one closes. Read once.
    */
   onDocumentChange?: (documentId: string | null) => void;
+  /**
+   * Called when the user has resized a panel, with its id and new width in px: once a drag of
+   * its edge ends, and on each arrow key there. Keep the width to start the panel at it next
+   * time (`layout.panel(id, { width: { initial } })`). Read once.
+   */
+  onPanelResize?: (event: PanelResizeEvent) => void;
 }
 
 /**
@@ -224,31 +256,45 @@ export interface FullViewerProps extends ViewerCustomization {
    *  config: the custom element passes its shadow wrapper so theming never
    *  touches the host page. Default: document.documentElement. */
   themeTarget?: HTMLElement | null;
+  /**
+   * The viewer's own components placed in the page (`<epdf-button>`, `<epdf-menu>`), which the
+   * viewer draws — a delivery concern: the custom element passes the ones inside it.
+   */
+  components?: PlacedComponents;
+  /**
+   * Fonts beyond the standard 14 for the engine (a delivery's `engine.fonts`): each is read
+   * once, registered on a local engine and mounted for the live text editor, and the style
+   * panel offers it. A cloud engine's fonts are its server's, so none are offered there.
+   */
+  fonts?: readonly ViewerFont[];
 }
 
 /**
  * Inside <HeadlessViewer>: makes the `viewer` from the live kernel and reports it, then the
  * active document: the one already active (the initial documents open with the kernel, a
- * delivery's own in `onReady`), and every change after it.
+ * delivery's own in `onReady`), and every change after it. The `viewer` is done when this
+ * unmounts, with the kernel it reaches: its listeners stop before the documents close.
  */
 function HandleBridge({
+  tokens,
   onReady,
   onDocumentChange,
-}: Pick<ViewerCustomization, 'onReady' | 'onDocumentChange'>) {
+}: Pick<ViewerCustomization, 'onReady' | 'onDocumentChange'> & { tokens: PluginTokens }) {
   const kernel = useKernel();
   // Before the first paint, so what the delivery opens on arrival (the element's `src`) is a
   // tab by the time the shell first shows.
   useLayoutEffect(() => {
-    const viewer = createViewer(kernel, VIEWER_PLUGINS);
+    const { viewer, dispose } = createViewer(kernel, tokens);
     onReady?.(viewer);
-    if (!onDocumentChange) return undefined;
-    const stop = viewer.watch(
-      () => viewer.documents.getActiveId(),
-      (documentId) => onDocumentChange(documentId),
-    );
-    const active = viewer.documents.getActiveId();
-    if (active !== null) onDocumentChange(active);
-    return stop;
+    if (onDocumentChange) {
+      viewer.watch(
+        () => viewer.documents.getActiveId(),
+        (documentId) => onDocumentChange(documentId),
+      );
+      const active = viewer.documents.getActiveId();
+      if (active !== null) onDocumentChange(active);
+    }
+    return dispose;
     // Init-only like everything else: re-fires only if the kernel changes
     // (a remount), never because a callback prop's identity churned.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -256,17 +302,49 @@ function HandleBridge({
   return null;
 }
 
+/** The fields of `values` that aren't `undefined`: what a viewer key gives a plugin's settings. */
+const definedOf = <Values extends object>(values: Values): Partial<Values> =>
+  Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== undefined),
+  ) as Partial<Values>;
+
 const sameList = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((name, index) => name === right[index]);
+
+/**
+ * What `disable` and `readOnly` turn off, with what the app's `plugins` settings turn off too:
+ * each only takes away.
+ */
+function turnedOffOf(
+  disable: ViewerCustomization['disable'],
+  readOnly: ViewerCustomization['readOnly'],
+  settings: PluginsConfigRead['settings'],
+): { readonly disabled: DisabledSettings; readonly byHand: ByHandSettings } {
+  const disabled = disabledSettingsOf(disable, readOnly);
+  const byHand = byHandSettingsOf(disable, readOnly);
+  const union = (viewers: readonly string[], apps: readonly string[] | undefined) =>
+    apps?.length ? [...new Set([...viewers, ...apps])] : viewers;
+  return {
+    disabled: {
+      disabledCategories: union(disabled.disabledCategories, settings.commands?.disabledCategories),
+      disabledCommands: union(disabled.disabledCommands, settings.commands?.disabledCommands),
+    },
+    byHand: {
+      editable: bothAllow(byHand.editable, settings.annotation?.editable ?? true),
+      fillable: bothAllow(byHand.fillable, settings.form?.fillable ?? true),
+    },
+  };
+}
 
 /**
  * Inside <HeadlessViewer>: the props that follow their value while the viewer runs. `registered`
  * is what the plugins were registered with, when the props were first read; a value that differs
  * from the last one goes to the plugin that owns it, so a theme change never undoes what the
- * app's code turned off.
+ * app's code turned off. `settings` are the app's `plugins` settings, which still count.
  */
 function FollowProps({
   registered,
+  settings,
   locale,
   disable,
   readOnly,
@@ -276,6 +354,7 @@ function FollowProps({
     readonly disabled: DisabledSettings;
     readonly byHand: ByHandSettings;
   };
+  settings: PluginsConfigRead['settings'];
   locale: string;
   disable: ViewerCustomization['disable'];
   readOnly: ViewerCustomization['readOnly'];
@@ -285,8 +364,7 @@ function FollowProps({
   const applied = useRef(registered);
   // In the render that brought the change, so the plugin has it when the prop's setter returns.
   useLayoutEffect(() => {
-    const disabled = disabledSettingsOf(disable, readOnly);
-    const byHand = byHandSettingsOf(disable, readOnly);
+    const { disabled, byHand } = turnedOffOf(disable, readOnly, settings);
     const previous = applied.current;
     applied.current = { locale, disabled, byHand };
     // What a turned-off feature made stays in the document, frozen: no one changes it by hand.
@@ -338,12 +416,17 @@ export function FullViewer({
   layout,
   stamps,
   signatures,
-  annotations,
+  plugins: pluginsConfig,
+  fonts,
   theme,
   themeTarget,
+  components,
   onReady,
   onDocumentChange,
+  onPanelResize,
 }: FullViewerProps) {
+  // Which bar each slotted toolbar item is in, for the viewer's own components inside it.
+  const [slottedEdges] = useState(createSlottedEdges);
   // Customization is init-only, like the Viewer's own engine/plugins
   // contract: the whole config resolves once from the mount-time props, so
   // inline literals — the idiomatic way to pass it — never churn plugin
@@ -370,6 +453,11 @@ export function FullViewer({
     }
     const codes = [...new Set(['en', ...Object.keys(BUILTIN_LOADERS), ...Object.keys(overrides)])];
 
+    // ── plugins: the app's settings for the built-ins, and its own plugins ──
+    const pluginsRead = readPluginsConfig(pluginsConfig);
+    const tokens: Record<string, CapabilityToken<unknown>> = { ...VIEWER_PLUGINS };
+    for (const { name, plugin } of pluginsRead.own) if (plugin.token) tokens[name] = plugin.token;
+
     return {
       commands: resolvedCommands,
       // Structure: resolved at the viewer's env by the shell's layout root.
@@ -377,10 +465,12 @@ export function FullViewer({
       icons: icons ?? {},
       stamps: stamps ?? {},
       signatures: signatures ?? {},
-      annotations: annotations ?? {},
+      fonts: fonts ?? [],
+      onPanelResize,
       i18n: { locales, loaders, codes, initial: localeCodeOf(locale, codes) },
-      disabled: disabledSettingsOf(disable, readOnly),
-      byHand: byHandSettingsOf(disable, readOnly),
+      plugins: pluginsRead,
+      tokens: tokens as PluginTokens,
+      ...turnedOffOf(disable, readOnly, pluginsRead.settings),
     };
   });
 
@@ -395,16 +485,25 @@ export function FullViewer({
     }
   }, [resolved]);
 
+  // In every build, as the layout's: a misspelled plugin name quietly loses its settings.
+  useEffect(() => {
+    for (const problem of resolved.plugins.problems) console.warn(`[embedpdf] plugins: ${problem}`);
+  }, [resolved]);
+
+  // The app's settings for each built-in plugin, from `plugins`.
+  const { settings } = resolved.plugins;
   const [plugins] = useState(() => [
-    stagePlugin({ layout: 'vertical' }), // main lens (tools engage via interactionPlugin below)
-    // Thumbnail lens over the same document: a single-column grid at a fixed small
-    // zoom, its own camera. Click a thumb to navigate the main lens; the sidebar
-    // follows the main view (see ui/panels ThumbnailList).
+    // The main lens (tools engage via interactionPlugin below).
+    stagePlugin(settingsOver<PluginSettings<'stage'>>({ layout: 'vertical' }, settings.stage)),
+    // Thumbnail lens over the same document (`thumbnails` in `plugins`): a grid at a
+    // fixed small zoom, its own camera, wrapping into as many columns as the panel's
+    // width fits. Click a thumb to navigate the main lens; the sidebar follows the
+    // main view (see ui/panels ThumbnailList).
+    // Each setting the app gives replaces the viewer's whole, as a Stage's own
+    // `updateSettings()` does: `zoom: { level: 0.2 }` is that zoom, not a mix.
     stagePlugin({
-      id: 'stage-thumbs',
-      token: ThumbsStageToken,
       layout: 'grid',
-      columns: 1, // a single-column thumbnail rail
+      columns: 'auto', // one column at the default width; more as the panel widens
       sizing: 'uniform', // equalize pages so the pixel target hits every thumb
       zoom: { pageWidth: 150 }, // thumbs are 150 screen px wide — for any document
       padding: 12,
@@ -414,20 +513,24 @@ export function FullViewer({
       scrollBehavior: 'instant',
       interaction: false, // click-to-navigate: a drag never reaches the document's tools
       zoomGestures: false, // a fixed-magnification rail: Cmd+wheel and pinch scroll it
+      ...settings.thumbnails,
+      id: 'stage-thumbs',
+      token: ThumbsStageToken,
     }),
-    renderPlugin(),
+    renderPlugin(settings.render),
     pageEditPlugin(),
-    interactionPlugin(),
+    interactionPlugin(settings.interaction),
     // Platform haptics, default-on: the Vibration API where it exists
     // (Android), a safe silent no-op elsewhere — iOS Safari included, until
     // Apple ships a haptics API. Native shells swap in their own provider
     // (`wkFeedback`) instead.
     feedbackPlugin({ provider: vibrationFeedback }),
-    selectionPlugin(),
+    selectionPlugin(settings.selection),
     // The arrow tool is a `line` preset — same subtype, an arrowhead default. This is
     // the whole integration for a new tool: one `tools` entry + a command/toolbar
     // slot (see config/commands.ts + config/chrome.ts).
     annotationPlugin({
+      ...settings.annotation,
       tools: [
         // Shapes and lines show their ghost: what a click places follows the
         // pointer (the arrow inherits the line's).
@@ -449,6 +552,8 @@ export function FullViewer({
           extends: 'stamp',
           source: { kind: 'prompt', accept: 'image/png,image/jpeg' },
         },
+        // The app's own after the viewer's: one with the same id changes it.
+        ...(settings.annotation?.tools ?? []),
       ],
       // What a turned-off feature made stays, but no one changes it by hand.
       editable: resolved.byHand.editable,
@@ -460,28 +565,34 @@ export function FullViewer({
     // stamps sidebar is the picker; placement rides annotation's armed stamp.
     // Libraries open on a local engine: the viewer's own unless the host
     // names one (a cloud viewer has to).
-    stampPlugin(
-      resolved.stamps.assetEngine ? { assetEngine: resolved.stamps.assetEngine } : undefined,
-    ),
+    stampPlugin({
+      ...settings.stamp,
+      ...(resolved.stamps.assetEngine ? { assetEngine: resolved.stamps.assetEngine } : {}),
+    }),
     // The action engine: /A and /AA trees dispatch through one policy-gated
     // executor spine, and the JavaScript switch lives here (the per-document
     // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,
     // stamp's dynamic templates evaluate in detached realms it mints).
     // Scripts ask who the user is (`identity.name`): the document's user, from
     // the viewer's identity or the token.
-    actionsPlugin({ javascript: { enabled: true } }),
+    actionsPlugin(
+      settingsOver<PluginSettings<'actions'>>({ javascript: { enabled: true } }, settings.actions),
+    ),
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
-    formPlugin({ fillable: resolved.byHand.fillable }),
+    formPlugin({ ...settings.form, fillable: resolved.byHand.fillable }),
     // Signatures: the act — a mark (a signatures-library asset) dropped on a
     // signature field signs it through the configured key, or is drawn in
     // without sealing when there is none. Marks themselves are the stamp
     // plugin's; the panel lists libraries of kind 'signatures'.
     signaturePlugin({
-      mode: resolved.signatures.mode,
-      key: resolved.signatures.key,
-      trust: resolved.signatures.trust,
-      allowCertify: resolved.signatures.allowCertify,
+      ...settings.signature,
+      ...definedOf({
+        mode: resolved.signatures.mode,
+        key: resolved.signatures.key,
+        trust: resolved.signatures.trust,
+        allowCertify: resolved.signatures.allowCertify,
+      }),
     }),
     // Links: navigable under the default pointer/pan ('link-nav'), editable
     // under the link tool — the annotation plane then owns them (select, move,
@@ -489,21 +600,25 @@ export function FullViewer({
     linkPlugin(),
     // Redaction: marking is the annotation plane's composed `redact` tool; this
     // plugin adds the pending-queue view + the destructive apply.
-    redactionPlugin(),
-    measurementPlugin(),
-    searchPlugin(),
+    redactionPlugin(settings.redaction),
+    measurementPlugin(settings.measurement),
+    searchPlugin(settings.search),
     i18nPlugin({
-      locale: resolved.i18n.initial,
       fallbackLocale: 'en',
-      locales: resolved.i18n.locales,
-      loaders: resolved.i18n.loaders,
+      ...settings.i18n,
+      locale: resolved.i18n.initial,
+      locales: [...resolved.i18n.locales, ...(settings.i18n?.locales ?? [])],
+      loaders: { ...resolved.i18n.loaders, ...settings.i18n?.loaders },
     }),
     commandsPlugin({
-      commands: resolved.commands,
+      ...settings.commands,
+      commands: [...resolved.commands, ...(settings.commands?.commands ?? [])],
       ...resolved.disabled,
       ...(notAllowed ? { notAllowed } : {}),
     }),
     shellPlugin(),
+    // The app's own plugins, under the names `viewer.get()` finds them by.
+    ...resolved.plugins.own.map(({ plugin }) => plugin),
   ]);
 
   // Structural subset of `resolved`, identity-stable across renders.
@@ -526,14 +641,21 @@ export function FullViewer({
               disabled: resolved.disabled,
               byHand: resolved.byHand,
             }}
+            settings={settings}
             locale={localeCodeOf(locale, resolved.i18n.codes)}
             disable={disable}
             readOnly={readOnly}
           />
           {(onReady || onDocumentChange) && (
-            <HandleBridge onReady={onReady} onDocumentChange={onDocumentChange} />
+            <HandleBridge
+              tokens={resolved.tokens}
+              onReady={onReady}
+              onDocumentChange={onDocumentChange}
+            />
           )}
-          <Shell />
+          <SlottedEdgesProvider value={slottedEdges}>
+            <Shell components={components} />
+          </SlottedEdgesProvider>
         </ViewerConfigProvider>
       </HeadlessViewer>
     </ThemeProvider>

@@ -58,12 +58,27 @@ const PAGES = {
   '/top.html': page(FULL),
   '/bottom.html': page(FULL, `{ layout: (layout) => layout.place('main', 'bottom') }`),
   '/start.html': page(FULL, `{ layout: (layout) => layout.place('main', 'start') }`),
-  // Too narrow for the whole main bar: the rest goes into "More".
+  // Too narrow for the whole main bar and eight more buttons, the rest goes into "More"; wider
+  // than a phone, whose menus are sheets (small-screens.test.ts).
   '/narrow-bottom.html': page(
+    'left: 0; top: 0; width: 640px; height: 700px',
+    `{
+      commands: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+        id: 'acme:extra-' + n, label: 'Extra ' + n, icon: 'link', run: () => {},
+      })),
+      layout: (layout) =>
+        [1, 2, 3, 4, 5, 6, 7, 8].reduce(
+          (each, n) => each.add('acme:extra-' + n, { to: 'main', section: 'end' }),
+          layout.place('main', 'bottom'),
+        ),
+    }`,
+  ),
+  // A viewer low in the window: no room below its top bar.
+  // A phone: every menu, "More" too, is a sheet from the bottom of the viewer.
+  '/phone-bottom.html': page(
     'left: 0; top: 0; width: 380px; height: 700px',
     `{ layout: (layout) => layout.place('main', 'bottom') }`,
   ),
-  // A viewer low in the window: no room below its top bar.
   '/low.html': page('left: 0; top: 690px; width: 1100px; height: 110px'),
   '/share.html': page('left: 0; top: 0; width: 1280px; height: 700px', SHARE),
   // The zoom menu in the main bar and a floating one, the view menu in the main bar and a rail.
@@ -267,6 +282,29 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     await tab.close();
   });
 
+  it('opens the "More" menu of a phone as a sheet from the bottom, not beside its button', async () => {
+    const tab = await open('/phone-bottom.html', 380);
+    await click(tab, 'More');
+    expect(await menusOf(tab)).toEqual([]);
+    const sheet = await tab.evaluate(() => {
+      const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+      const layer = [...root.querySelectorAll('[data-epdf-layer]')].find((each) =>
+        each.matches(':popover-open'),
+      );
+      const sheet = layer?.querySelector('[data-epdf-sheet]');
+      if (!sheet) return null;
+      const rect = sheet.getBoundingClientRect();
+      return {
+        bottom: Math.round(rect.bottom),
+        width: Math.round(rect.width),
+        rows: sheet.querySelectorAll('[role="menu"] [role^="menuitem"]').length,
+      };
+    });
+    expect(sheet).toMatchObject({ bottom: 700, width: 380 });
+    expect(sheet!.rows).toBeGreaterThan(0);
+    await tab.close();
+  });
+
   it("opens a start bar's menu beside its button, toward the pages, on either side", async () => {
     for (const direction of ['ltr', 'rtl'] as const) {
       const tab = await open('/start.html');
@@ -418,12 +456,14 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     await click(tab, 'Menu');
     const [menu] = await menusOf(tab);
     expect(menu!.rows.map((row) => [row.label, row.popup])).toEqual([
+      ['Open', null],
       ['Download', null],
       ['Share', 'menu'],
       ['Print', null],
       ['Full Screen', null],
     ]);
-    expect(await focused(tab)).toBe('Download');
+    expect(await focused(tab)).toBe('Open');
+    await press(tab, 'ArrowDown');
     await press(tab, 'ArrowDown');
     expect(await focused(tab)).toBe('Share');
 
@@ -518,6 +558,9 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
       expect(row.title).toBeTruthy();
       expect(row.title).not.toBe(row.label);
     }
+    // Opening another file needs nothing of this document's scope.
+    expect(await focused(tab)).toBe('Open');
+    await press(tab, 'ArrowDown');
     expect(await focused(tab)).toBe('Full Screen');
     await tab.close();
   });

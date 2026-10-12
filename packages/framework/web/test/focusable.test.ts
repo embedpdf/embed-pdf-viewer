@@ -51,6 +51,25 @@ describe('focusablesIn', () => {
     ]);
     expect(canTakeFocus(root.querySelector('#disabled')!)).toBe(false);
   });
+
+  it('takes what a slot shows: the page elements assigned to it, in place of its own content', () => {
+    const host = html(`
+      <span slot="item"><select id="slotted"><option>One</option></select></span>
+      <button id="in-hidden-slot" slot="tucked">Tucked</button>
+    `);
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = `
+      <button id="before">Before</button>
+      <slot name="item"><button id="fallback">Fallback</button></slot>
+      <slot name="empty"><button id="shown">Shown</button></slot>
+      <div hidden><slot name="tucked"></slot></div>
+    `;
+    expect(focusablesIn(shadow).map((element) => element.id)).toEqual([
+      'before',
+      'slotted',
+      'shown',
+    ]);
+  });
 });
 
 describe('isUnavailable', () => {

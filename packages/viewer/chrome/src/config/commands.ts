@@ -12,14 +12,16 @@
  * Wiring:
  *   zoom/pan/pointer/spread/scroll/rotate  → real Stage / Interaction / PageEdit
  *   modes                                  → shell exclusive surfaces ('mode')
- *   panels / menus / modals                → declarative shell targets
+ *   panels                                 → the layout's `panel:<id>` (panels.ts)
+ *   menus / modals                         → declarative shell targets
  *   annotate + shape tools                 → real interaction tools
  *   form tools                             → real form plugin palette (draw-to-place)
  *   insert tools                           → real stamp and signature panels +
  *                                            image/attachment click-then-pick
  *   history undo/redo                      → real History
  */
-import type { CommandDef, IconAccent } from '@embedpdf/react/commands';
+import { panelCommandOf } from '@embedpdf/core-ui';
+import { CommandsToken, type CommandDef, type IconAccent } from '@embedpdf/react/commands';
 import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
 import { StageToken, ZoomMode } from '@embedpdf/react/stage';
@@ -31,13 +33,13 @@ import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/s
 import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
 import { MeasurementToken } from '@embedpdf/react/measurement';
-import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
 import { SignatureToken } from '@embedpdf/react/signature';
 import { I18nToken } from '@embedpdf/react/i18n';
 
 import type { Feature } from '../features';
 import { openModeSurfaceOf } from './modes';
+import { openFileCommand } from './open-files';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
@@ -65,6 +67,22 @@ const sameTextRange = (left: TextRange | null, right: TextRange | null): boolean
     left.start.index === right.start.index &&
     left.end.page.objectNumber === right.end.page.objectNumber &&
     left.end.index === right.end.index);
+
+/**
+ * What a command needs to open and close the layout's panel `id`: it runs the panel's own
+ * `panel:<id>` command (config/panels.ts), so it opens only what that one may, shows only while
+ * the layout has the panel and `visible` says so, and is active while the panel is open.
+ */
+const togglesPanel = (id: string, visible?: (commandContext: Ctx) => boolean) => ({
+  run: (commandContext: Ctx) =>
+    commandContext.tryGet(CommandsToken)?.execute(panelCommandOf(id), {
+      documentId: commandContext.documentId ?? undefined,
+    }),
+  active: (commandContext: Ctx) => commandContext.tryGet(ShellToken)?.isOpen(id) ?? false,
+  visible: (commandContext: Ctx) =>
+    (commandContext.tryGet(CommandsToken)?.hasCommand(panelCommandOf(id)) ?? false) &&
+    (visible?.(commandContext) ?? true),
+});
 
 /** A measuring tool can run on the current page: it has a scale (`measurement.canMeasure`). */
 const canMeasureNow = (commandContext: Ctx): boolean => {
@@ -266,39 +284,7 @@ export const defaultCommands: CommandDef[] = [
     enabled: (commandContext) => interaction(commandContext) != null,
   },
 
-  // ── panels (declarative shell targets) ──────────────────────────────────
-  {
-    id: 'panel:thumbnails',
-    labelKey: 'commands.sidebar',
-    icon: 'sidebar',
-    categories: ['thumbnails'],
-    panel: { id: 'sidebar', exclusive: 'left' },
-  },
-  {
-    id: 'panel:search',
-    labelKey: 'commands.search',
-    icon: 'search',
-    categories: ['search'],
-    // Without it every query is refused: the panel has no job.
-    requires: ['doc.text.search'],
-    panel: { id: 'search', exclusive: 'right' },
-  },
-  {
-    id: 'panel:comments',
-    labelKey: 'commands.comment',
-    icon: 'comment',
-    categories: ['comments'],
-    // Without it there is nothing this panel could show.
-    requires: ['doc.annotate.read'],
-    panel: { id: 'comment', exclusive: 'right' },
-  },
-  {
-    id: 'panel:style',
-    labelKey: 'commands.style',
-    icon: 'palette',
-    categories: ['annotations'],
-    panel: { id: 'annotation-style', exclusive: 'right' },
-  },
+  // The panels' `panel:<id>` commands come from the layout's panels (config/panels.ts).
 
   // ── menus (declarative) ─────────────────────────────────────────────────
   {
@@ -315,6 +301,7 @@ export const defaultCommands: CommandDef[] = [
   },
 
   // ── document actions ────────────────────────────────────────────────────
+  openFileCommand,
   {
     id: 'document:download',
     labelKey: 'commands.download',
@@ -550,8 +537,7 @@ export const defaultCommands: CommandDef[] = [
     // Nothing the picker could place without it, as for every insert tool.
     requires: CREATES_ANNOTATIONS,
     // No stamp plugin → no library to show.
-    visible: (commandContext) => commandContext.tryGet(StampToken) != null,
-    panel: { id: 'stamps', exclusive: 'right' },
+    ...togglesPanel('stamps', (commandContext) => commandContext.tryGet(StampToken) != null),
   },
   // File attachment — click the spot, pick the file (the attachment provider).
   tool('tool:attachment', 'attachment', 'commands.insert.attachment', 'paperclip', {
@@ -567,9 +553,11 @@ export const defaultCommands: CommandDef[] = [
     icon: 'signature',
     categories: ['signatures.signing'],
     requires: CREATES_ANNOTATIONS,
-    visible: (commandContext) =>
-      commandContext.tryGet(StampToken) != null && commandContext.tryGet(SignatureToken) != null,
-    panel: { id: 'signatures', exclusive: 'right' },
+    ...togglesPanel(
+      'signatures',
+      (commandContext) =>
+        commandContext.tryGet(StampToken) != null && commandContext.tryGet(SignatureToken) != null,
+    ),
   },
   // Image — the click-then-pick placement: click the spot, the file dialog
   // opens (narrowed to rasters), the picture lands where you clicked. The
@@ -616,20 +604,6 @@ export const defaultCommands: CommandDef[] = [
     feature: 'redaction',
     requires: CREATES_ANNOTATIONS,
   }),
-  {
-    id: 'panel:redaction',
-    labelKey: 'commands.redact.panel',
-    icon: 'redactionSidebar',
-    categories: ['redaction'],
-    // Useful to a session that can propose marks or apply them; with neither
-    // power the panel could only display other people's pending marks. Either
-    // one is enough, which `requires` (all of them) can't say.
-    visible: (commandContext) => {
-      const redaction = commandContext.tryGet(RedactionToken);
-      return redaction ? redaction.canMark() || redaction.canApply() : true;
-    },
-    panel: { id: 'redaction', exclusive: 'right' },
-  },
 
   // ── measurement: the tools need a calibrated page right now (`canMeasure`) ──
   {
@@ -666,13 +640,6 @@ export const defaultCommands: CommandDef[] = [
     enabled: (commandContext) => commandContext.tryGet(MeasurementToken) != null,
     active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'calibrate',
     run: (commandContext) => commandContext.tryGet(MeasurementToken)?.startCalibration(),
-  },
-  {
-    id: 'panel:measurement',
-    labelKey: 'measurement.title',
-    icon: 'updateScale',
-    categories: ['measurement'],
-    panel: { id: 'measurement', exclusive: 'right' },
   },
 
   // ── annotation selection (the floating strip's verbs) ──────────────────
@@ -712,20 +679,24 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.comment',
     icon: 'comment',
     categories: ['comments'],
-    // Same 'comment' surface panel:comment toggles — `active` derives from it.
-    panel: { id: 'comment', exclusive: 'right' },
-    visible: (commandContext) =>
-      hasAnnotationSelection(commandContext) && !selectionSubtypes(commandContext).has('widget'),
+    // The comments panel, which shows the selected annotation's thread.
+    ...togglesPanel(
+      'comments',
+      (commandContext) =>
+        hasAnnotationSelection(commandContext) && !selectionSubtypes(commandContext).has('widget'),
+    ),
   },
   {
     id: 'annotation:style',
     labelKey: 'commands.style',
     icon: 'palette',
     categories: ['annotations'],
-    panel: { id: 'annotation-style', exclusive: 'right' },
     // The kind table decides: no declared editable props → no style button.
-    visible: (commandContext) =>
-      (anno(commandContext)?.selection.getProperties().properties.length ?? 0) > 0,
+    ...togglesPanel(
+      'style',
+      (commandContext) =>
+        (anno(commandContext)?.selection.getProperties().properties.length ?? 0) > 0,
+    ),
   },
   {
     // The selection becomes a reusable stamp: the engine flattens the
@@ -764,14 +735,18 @@ export const defaultCommands: CommandDef[] = [
             { documentId },
           ),
         )
-        // Open the stamps sidebar on the custom library; the panel reads the
-        // surface's open props for its picker.
-        .then(() =>
-          commandContext.tryGet(ShellToken)?.open('stamps', {
-            exclusive: 'right',
-            props: { libraryId },
-          }),
-        )
+        // Open the stamps panel on the custom library, through its own command;
+        // the panel reads its surface's props for its picker.
+        .then(async () => {
+          const shell = commandContext.tryGet(ShellToken);
+          if (!shell) return;
+          if (!shell.isOpen('stamps')) {
+            await commandContext
+              .tryGet(CommandsToken)
+              ?.execute(panelCommandOf('stamps'), { documentId });
+          }
+          shell.updateSurfaceProps('stamps', { libraryId });
+        })
         .catch((error) => console.warn('[embedpdf] stamp from selection failed', error));
     },
     // One page, no widgets (a form field is not artwork), no pending

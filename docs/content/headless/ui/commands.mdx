@@ -36,6 +36,12 @@ same command as a signal.
 `shortcut` is formatted for the user's platform: `⌘K` on a Mac, `Ctrl+K` elsewhere. The
 [toolbar](toolbar) draws commands the same way.
 
+There's always a command, so a button never checks for a missing one: an id no plugin registered
+comes back labelled with its id, neither visible nor enabled, the way a turned-off command does,
+and in development it warns once, with the closest id there is. Checking `visible` covers a
+command that's turned off, not allowed or missing. `resolveCommand(id)` is the lookup for code,
+and says `null` for an id it doesn't have.
+
 ## The standard commands
 
 `standardCommands` covers what every viewer has, with labels in [every language you load](translations):

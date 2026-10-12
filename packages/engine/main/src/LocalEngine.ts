@@ -58,6 +58,8 @@ export interface LocalEngineOptions {
  */
 export class LocalEngine implements LocalEngineContract {
   readonly [LOCAL_ENGINE_BRAND] = true;
+  /** It opens a file's own bytes, wherever they come from. */
+  readonly canOpenFiles = true;
   static fromTransport(opts: LocalEngineOptions): LocalEngine {
     return new LocalEngine(
       opts.transport,

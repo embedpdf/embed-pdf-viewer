@@ -17,7 +17,7 @@ import type {
   SettingsApi,
   Unsubscribe,
 } from '@embedpdf/core';
-import { formatShortcut } from '@embedpdf/core-ui';
+import { didYouMean, formatShortcut } from '@embedpdf/core-ui';
 
 export { CommandsToken } from './token';
 
@@ -174,16 +174,23 @@ export const resolvedCommandsEqual = (
   );
 };
 
-/** What a toolbar draws for a command id no plugin registered: disabled, with its id as the label. */
+/**
+ * What a component or a toolbar draws for a command id no plugin registered: labelled with its
+ * id, neither enabled nor visible, the way a turned-off command is.
+ */
 export const unregisteredCommand = (id: CommandId): ResolvedCommand => ({
   id,
   label: id,
   shortcuts: [],
   enabled: false,
   active: false,
-  visible: true,
+  visible: false,
   categories: [],
 });
+
+/** What a component that asks for an id no plugin registered hears, in development. */
+export const unknownCommandWarning = (id: CommandId, known: Iterable<CommandId>): string =>
+  `no command "${id}"${didYouMean(id, known)}: it shows as neither visible nor enabled`;
 
 /** A command with everything a button needs: what it shows, `run`, and its shortcut for a tooltip. */
 export interface BoundCommand extends ResolvedCommand {

@@ -217,7 +217,7 @@ describe('what a turned-off feature made stays, frozen', () => {
     const square = await create(tab, { ...SQUARE, contents: 'Check this figure' });
     await tab.evaluate(async (ref) => {
       await window.element.viewer.get('annotation').comments.reply(ref, 'Agreed');
-      window.element.viewer.get('shell').open('comment', { exclusive: 'right' });
+      window.element.viewer.get('shell').open('comments');
     }, square);
     await tab.waitForFunction(() =>
       window.element.shadowRoot!.textContent!.includes('Check this figure'),

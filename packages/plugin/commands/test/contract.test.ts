@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { boundCommandOf, unregisteredCommand } from '../src/contract';
+import { boundCommandOf, unknownCommandWarning, unregisteredCommand } from '../src/contract';
 import type { ExecuteResult, ResolvedCommand } from '../src/contract';
 
 /**
@@ -43,15 +43,26 @@ describe('boundCommandOf', () => {
 });
 
 describe('unregisteredCommand', () => {
-  it('is disabled and named by its id', () => {
+  it('is named by its id, neither enabled nor visible, like a turned-off command', () => {
     expect(unregisteredCommand('page:unknown')).toEqual({
       id: 'page:unknown',
       label: 'page:unknown',
       shortcuts: [],
       enabled: false,
       active: false,
-      visible: true,
+      visible: false,
       categories: [],
     });
+  });
+});
+
+describe('unknownCommandWarning', () => {
+  it('names the id, and the closest one there is', () => {
+    expect(unknownCommandWarning('zoom:fit-widht', ['zoom:fit-width', 'zoom:in'])).toBe(
+      'no command "zoom:fit-widht" (did you mean "zoom:fit-width"?): it shows as neither visible nor enabled',
+    );
+    expect(unknownCommandWarning('acme:nothing', ['zoom:in'])).toBe(
+      'no command "acme:nothing": it shows as neither visible nor enabled',
+    );
   });
 });

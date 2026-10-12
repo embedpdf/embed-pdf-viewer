@@ -80,7 +80,7 @@ function LanguagePicker() {
 
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);
-  if (!command?.visible) return null;
+  if (!command.visible) return null;
 
   return (
     <button type="button" className="button" disabled={!command.enabled} onClick={command.run}>

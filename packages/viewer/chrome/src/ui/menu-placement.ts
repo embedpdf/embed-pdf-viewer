@@ -23,7 +23,8 @@ export type MenuAlign = 'start' | 'end';
 /**
  * The placement of a menu opened from a button in a bar on `edge`: below a
  * top bar's button, above a bottom bar's, beside a start or end bar's (on the
- * side of the pages), and toward the middle from a floating bar.
+ * side of the pages), toward the middle from a floating bar, and below a bar
+ * over a selection, away from what's selected.
  */
 export function menuPlacementOf(
   edge: BarEdge,

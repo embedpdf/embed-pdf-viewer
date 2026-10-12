@@ -20,7 +20,7 @@ feature's plugin, and follow what happens. Inside the viewer, any component of y
 
 | Member | What it is |
 | :-- | :-- |
-| `get(name)` | A plugin's API, by its name: `viewer.get('search')`. The same object its headless hook gives you. |
+| `get(name)` | A plugin's API, by its name: `viewer.get('search')`. The same API its headless hook gives you; after the viewer is gone, its calls fail. |
 | `documents` | The documents plugin: open, close, switch, download. See [Documents](../documents). |
 | `commands` | The commands plugin: run a command, check one, turn features on and off. See [Buttons & commands](../customize/commands). |
 | `watch(read, onChange)` | Calls `onChange` whenever what `read` returns changes. Returns a function that stops it. |
@@ -99,6 +99,7 @@ its `viewer` is done: listeners stop and calls reject. A new `onReady` brings th
 
 ### Events on the element
 
-The `<embedpdf-viewer>` element fires `epdf:ready` (with `event.detail.viewer`) and
-`epdf:documentchange` (with `event.detail.documentId`), for plain HTML pages. In a framework,
-`onReady` and `onDocumentChange` are the same events.
+The `<embedpdf-viewer>` element fires `epdf:ready` (with `event.detail.viewer`),
+`epdf:documentchange` (with `event.detail.documentId`) and `epdf:panelresize` (with
+`event.detail.id` and `event.detail.width`), for plain HTML pages. In a framework, `onReady`,
+`onDocumentChange` and `onPanelResize` are the same events.

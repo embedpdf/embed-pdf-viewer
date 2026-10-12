@@ -11,7 +11,13 @@ export * from '@embedpdf/plugin-commands';
 import { computed, toValue, watch } from 'vue';
 import type { MaybeRefOrGetter, Ref } from 'vue';
 import { formatShortcut as formatKeys } from '@embedpdf/core-ui';
-import { CommandsToken, boundCommandOf, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
+import {
+  CommandsToken,
+  boundCommandOf,
+  resolvedCommandsEqual,
+  unknownCommandWarning,
+  unregisteredCommand,
+} from '@embedpdf/plugin-commands';
 import type {
   BoundCommand,
   CommandId,
@@ -22,6 +28,7 @@ import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/co
 import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
 import type { EventHook } from '@embedpdf/core';
 import { bindCommandShortcuts, isMacPlatform, standardCommandsBrowser } from '@embedpdf/web';
+import { devWarn } from './dev';
 import { useCapability, useCapabilityEvent } from './runtime/capabilities';
 import { useDocumentId, useKernelValue } from './runtime/kernel';
 import { settingsComposable } from './state';
@@ -59,12 +66,13 @@ export function formatShortcut(shortcut: string, options: { isMac?: boolean } = 
 
 /**
  * A command for this component's document (the nearest `<DocumentScope>`, else
- * the active one), as a ref: its label, icon, state, `run` and `shortcut`, or
- * `null` for an unknown id. Pass a getter to follow a prop:
- * `useCommand(() => props.id)`. The ref changes only when what the command
- * shows does.
+ * the active one), as a ref: its label, icon, state, `run` and `shortcut`. Pass
+ * a getter to follow a prop: `useCommand(() => props.id)`. The ref changes only
+ * when what the command shows does. Always a command: an id no plugin
+ * registered is labelled with its id, neither visible nor enabled, and warns
+ * once in development.
  */
-export function useCommand(id: MaybeRefOrGetter<string>): Readonly<Ref<BoundCommand | null>> {
+export function useCommand(id: MaybeRefOrGetter<string>): Readonly<Ref<BoundCommand>> {
   const commands = useCapability(CommandsToken);
   const documentId = useDocumentId();
   const resolved = useKernelValue(
@@ -73,14 +81,18 @@ export function useCommand(id: MaybeRefOrGetter<string>): Readonly<Ref<BoundComm
   );
   return computed(() => {
     const command = resolved.value;
-    if (!command) return null;
+    const requested = toValue(id);
+    if (command === null) {
+      devWarn(
+        `useCommand:${requested}`,
+        `useCommand(): ${unknownCommandWarning(requested, commands.listCommandIds())}`,
+      );
+    }
     const scope = documentId.value ?? undefined;
     return boundCommandOf(
-      command,
+      command ?? unregisteredCommand(requested),
       (commandId) => commands.execute(commandId, { documentId: scope }),
-      {
-        isMac: isMacPlatform(),
-      },
+      { isMac: isMacPlatform() },
     );
   });
 }

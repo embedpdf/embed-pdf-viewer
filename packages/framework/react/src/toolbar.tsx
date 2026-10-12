@@ -175,9 +175,12 @@ export interface ToolbarProps {
    * the host's light-DOM children project into it — the children-as-slots
    * contract. Sockets are measured live (they can't be duplicated into the
    * measurement layer: only the first same-named slot in tree order gets the
-   * projected nodes). `ctx.measure` is a new function on every render;
-   * capture it in a ref to use it in an effect. The first element of an item
-   * that takes focus is the item's stop in the toolbar's arrow-key order.
+   * projected nodes). A renderer that draws nothing (`null`) in the
+   * measurement layer (`ctx.layer === 'measure'`) is measured where it
+   * renders instead: report its length with `ctx.measure`, a new function on
+   * every render (capture it in a ref to use it in an effect). The first
+   * element of an item that takes focus is the item's stop in the toolbar's
+   * arrow-key order.
    */
   renderCustom?: Record<string, (variant: string, ctx: CustomSlotCtx) => React.ReactNode>;
   /**
@@ -789,16 +792,21 @@ export function Toolbar({
       <div aria-hidden {...INERT} style={measureLayerStyle(orientation)}>
         {layout.measured
           .filter((part) => !isExternalSlot(part))
-          .map((part) => (
-            <Measured
-              key={part.measureKey}
-              k={part.measureKey}
-              orientation={orientation}
-              onLength={onLength}
-            >
-              {renderPart(part, 'measure')}
-            </Measured>
-          ))}
+          .map((part) => {
+            const drawn = renderPart(part, 'measure');
+            // A custom item that draws nothing here is measured where it renders, by `ctx.measure`.
+            if (part.kind === 'custom' && drawn === null) return null;
+            return (
+              <Measured
+                key={part.measureKey}
+                k={part.measureKey}
+                orientation={orientation}
+                onLength={onLength}
+              >
+                {drawn}
+              </Measured>
+            );
+          })}
         <Measured
           k={toolbarMeasureKey.overflowTrigger}
           orientation={orientation}

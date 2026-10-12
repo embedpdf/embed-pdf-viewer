@@ -25,12 +25,15 @@ const element = EmbedPDF.init({
     trust: { anchors: async () => [(await signer).certificate] },
     allowCertify: true,
   },
-  // The annotation-fonts rung: fonts beyond the standard 14, fetched from
-  // this harness, registered on the engine and mounted for the live editor.
-  annotations: {
-    fonts: [
-      { key: 'roboto', url: '/fonts/Roboto-Regular.ttf', label: 'Roboto', familyName: 'Roboto' },
-    ],
+  // The engine-fonts rung: fonts beyond the standard 14, fetched from this
+  // harness, registered on the engine, mounted for the live editor, and
+  // offered in the style panel.
+  engine: {
+    fonts: [{ key: 'roboto', url: '/fonts/Roboto-Regular.ttf', familyName: 'Roboto' }],
+  },
+  // The plugins rung: a plugin's settings by its name, over the viewer's own.
+  plugins: {
+    search: { highlight: { color: '#a7f3d0' } },
   },
 });
 

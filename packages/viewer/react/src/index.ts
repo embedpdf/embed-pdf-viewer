@@ -1,3 +1,4 @@
+'use client';
 /**
  * @embedpdf/viewer-react — the full viewer as a React component, with the
  * built-in local engine (PDFium wasm in a worker) as the default.
@@ -27,6 +28,11 @@ import type { PDFViewerExtras } from './component';
 export * from '@embedpdf/viewer';
 export { PDFViewer } from './component';
 export type { PDFViewerExtras } from './component';
+export { useCommand, usePDFViewer } from './hooks';
+export { Panel, Region, ToolbarItem, useToolbarItem } from './slots';
+export type { PanelProps, RegionName, RegionProps, ToolbarItemProps } from './slots';
+export { Button, Menu, MenuItem } from './viewer-components';
+export type { ButtonProps, MenuItemProps, MenuProps } from './viewer-components';
 
 /**
  * Props on this door: `engine` is optional — omit it for the built-in local

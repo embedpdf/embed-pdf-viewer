@@ -42,9 +42,44 @@ export function isTabbable(element: Element): element is HTMLElement {
   return canTakeFocus(element) && (element as HTMLElement).tabIndex >= 0;
 }
 
-/** The elements inside `root` that can take focus, in document order. */
+/**
+ * The elements `root` shows, in order: a `<slot>` that has elements assigned shows them, and what
+ * is inside them, in place of its own content. A slot in a hidden or inert part shows nothing.
+ */
+function shownElementsIn(root: ParentNode): Element[] {
+  const shown: Element[] = [];
+  const visit = (parent: ParentNode) => {
+    for (const child of parent.children) {
+      if (child.localName === 'slot') {
+        const assigned = (child as HTMLSlotElement).assignedElements({ flatten: true });
+        if (assigned.length > 0) {
+          if (child.closest('[hidden], [inert]') !== null) continue;
+          for (const element of assigned) {
+            shown.push(element);
+            visit(element);
+          }
+          continue;
+        }
+      }
+      shown.push(child);
+      visit(child);
+    }
+  };
+  visit(root);
+  return shown;
+}
+
+/**
+ * The elements inside `root` that can take focus, in the order they show: through a `<slot>`,
+ * the page's elements the browser shows there (a web component's slotted children).
+ */
 export function focusablesIn(root: ParentNode): HTMLElement[] {
-  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(canTakeFocus);
+  if (root.querySelector('slot') === null) {
+    return [...root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(canTakeFocus);
+  }
+  return shownElementsIn(root).filter(
+    (element): element is HTMLElement => element instanceof HTMLElement && canTakeFocus(element),
+  );
 }
 
 /** The elements inside `root` that Tab stops at, in document order. */

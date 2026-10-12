@@ -6,7 +6,13 @@
 import { untrack } from 'svelte';
 import type { EventHook } from '@embedpdf/core';
 import { formatShortcut as formatKeys } from '@embedpdf/core-ui';
-import { CommandsToken, boundCommandOf, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
+import {
+  CommandsToken,
+  boundCommandOf,
+  resolvedCommandsEqual,
+  unknownCommandWarning,
+  unregisteredCommand,
+} from '@embedpdf/plugin-commands';
 import type {
   BoundCommand,
   CommandId,
@@ -22,6 +28,7 @@ import {
   useDocumentId,
   useKernelValue,
 } from '../runtime/readers.svelte';
+import { devWarn } from '../runtime/dev';
 import { settingsReader } from '../runtime/state.svelte';
 import {
   currentOf,
@@ -64,11 +71,12 @@ export function formatShortcut(shortcut: string, options: { isMac?: boolean } = 
 
 /**
  * A command for this component's document (the nearest `<DocumentScope>`, else the active one),
- * as `{ current }`: its label, icon, state, `run` and `shortcut`, or `null` for an unknown id.
- * Pass the id as a function to follow a prop: `useCommand(() => id)`. `current` changes only
- * when what the command shows does.
+ * as `{ current }`: its label, icon, state, `run` and `shortcut`. Pass the id as a function to
+ * follow a prop: `useCommand(() => id)`. `current` changes only when what the command shows
+ * does. Always a command: an id no plugin registered is labelled with its id, neither visible
+ * nor enabled, and warns once in development.
  */
-export function useCommand(id: MaybeGetter<string>): CurrentValue<BoundCommand | null> {
+export function useCommand(id: MaybeGetter<string>): CurrentValue<BoundCommand> {
   const commands = useCapability(CommandsToken);
   const documentId = useDocumentId();
   const resolved = useKernelValue(
@@ -79,10 +87,16 @@ export function useCommand(id: MaybeGetter<string>): CurrentValue<BoundCommand |
   return currentOf(
     derivedValue(() => {
       const command = resolved.current;
-      if (!command) return null;
+      const requested = valueOf(id);
+      if (command === null) {
+        devWarn(
+          `useCommand:${requested}`,
+          `useCommand(): ${unknownCommandWarning(requested, commands.listCommandIds())}`,
+        );
+      }
       const scope = documentId.current ?? undefined;
       return boundCommandOf(
-        command,
+        command ?? unregisteredCommand(requested),
         (commandId) => commands.execute(commandId, { documentId: scope }),
         { isMac: isMacPlatform() },
       );

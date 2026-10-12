@@ -1,39 +1,30 @@
 /**
  * The document tab bar: rounded-top tabs on the surface-alt strip, the active
- * tab merging into the toolbar surface below, close-× on the active tab, and a
- * + button opening a real file dialog.
+ * tab merging into the toolbar surface below, and close-× on the active tab.
+ * Opening another file is the `document:open` command (config/open-files.ts),
+ * behind the document menu's Open row and a PDF dropped on the pages.
  *
  * The kernel's document registry is the tab model: `useDocumentsState()` for
- * the tabs, `useDocuments()` for open/close/setActive; there is no separate
+ * the tabs, `useDocuments()` for close/setActive; there is no separate
  * document manager.
  */
-import { useRef } from 'react';
 import { useDocuments, useDocumentsState } from '@embedpdf/react/runtime';
-import type { OpenInput } from '@embedpdf/react/runtime';
+
 import { Icon } from './icons';
 
 export type TabBarVisibility = 'always' | 'multiple' | 'never';
 
 export function TabBar({
   visibility,
-  allowOpenFile = true,
 }: {
   /** When the tabs show: the layout's `tabs` (`tabsOf`). */
   visibility: TabBarVisibility;
-  allowOpenFile?: boolean;
 }) {
-  const { setActive, close, open } = useDocuments();
+  const { setActive, close } = useDocuments();
   const { documents: docs, activeId } = useDocumentsState();
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const shouldShow = visibility === 'always' || (visibility === 'multiple' && docs.length > 1);
   if (!shouldShow) return null;
-
-  const openFile = async (file: File) => {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const source: OpenInput = { kind: 'bytes', id: `${file.name}-${Date.now()}`, bytes };
-    await open(source, { name: file.name });
-  };
 
   return (
     <div className="bg-surface-alt flex items-end pr-2 pt-2">
@@ -96,31 +87,6 @@ export function TabBar({
             </div>
           );
         })}
-
-        {allowOpenFile && (
-          <>
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              aria-label="Open File"
-              title="Open File"
-              className="text-fg-secondary hover:bg-hover hover:text-fg mb-1.5 ml-1 flex-shrink-0 cursor-pointer rounded p-1.5 transition-colors"
-            >
-              <Icon name="plus" size={14} />
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".pdf,application/pdf"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void openFile(file);
-                event.target.value = '';
-              }}
-            />
-          </>
-        )}
       </div>
     </div>
   );

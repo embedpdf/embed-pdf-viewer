@@ -1,3 +1,4 @@
+'use client';
 /**
  * @embedpdf/viewer-react/core — the engine-agnostic React door.
  *
@@ -28,6 +29,11 @@ import { PDFViewer as PDFViewerImpl, type PDFViewerExtras } from './component';
 
 export * from '@embedpdf/viewer/core';
 export type { PDFViewerExtras } from './component';
+export { useCommand, usePDFViewer } from './hooks';
+export { Panel, Region, ToolbarItem, useToolbarItem } from './slots';
+export type { PanelProps, RegionName, RegionProps, ToolbarItemProps } from './slots';
+export { Button, Menu, MenuItem } from './viewer-components';
+export type { ButtonProps, MenuItemProps, MenuProps } from './viewer-components';
 
 /** Props on this door: `engine` is required, and only a real engine satisfies it. */
 export type PDFViewerProps = ViewerConfig & PDFViewerExtras;

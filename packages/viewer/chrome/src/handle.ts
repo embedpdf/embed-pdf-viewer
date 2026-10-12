@@ -9,6 +9,10 @@
  *
  * The chrome runs on these same capabilities, so what the viewer's own buttons can do and what
  * an app's code can do are the same by construction.
+ *
+ * A `viewer` lives as long as the viewer it reaches. Once that one unmounts, or mounts again
+ * with a new config, it is done: the listeners added through it stop, and its calls refuse with
+ * `instance-closed` (see {@link createViewer}).
  */
 import { ActionsToken, type ActionsCapability } from '@embedpdf/react/actions';
 import { AnnotationToken, type AnnotationCapability } from '@embedpdf/react/annotation';
@@ -21,7 +25,7 @@ import { MeasurementToken, type MeasurementCapability } from '@embedpdf/react/me
 import { PageEditToken, type PageEditCapability } from '@embedpdf/react/page-edit';
 import { RedactionToken, type RedactionCapability } from '@embedpdf/react/redaction';
 import { RenderToken, type RenderCapability } from '@embedpdf/react/render';
-import { DocumentsToken } from '@embedpdf/react/runtime';
+import { DocumentsToken, PluginError, isReadMember } from '@embedpdf/react/runtime';
 import type {
   CapabilityToken,
   DocumentsCapability,
@@ -35,9 +39,13 @@ import { SignatureToken, type SignatureCapability } from '@embedpdf/react/signat
 import { StageToken, type StageCapability } from '@embedpdf/react/stage';
 import { StampToken, type StampCapability } from '@embedpdf/react/stamp';
 
+import { ThumbsStageToken } from './config/stage';
+
 /** Each plugin's API, by the plugin's name: what `viewer.get(name)` returns. */
 export interface ViewerPlugins {
   readonly stage: StageCapability;
+  /** The thumbnails panel's Stage: a second lens over the same document. */
+  readonly thumbnails: StageCapability;
   readonly render: RenderCapability;
   readonly link: LinkCapability;
   readonly selection: SelectionCapability;
@@ -68,6 +76,7 @@ export const VIEWER_PLUGINS: {
   readonly [Name in PluginName]: CapabilityToken<ViewerPlugins[Name]>;
 } = {
   stage: StageToken,
+  thumbnails: ThumbsStageToken,
   render: RenderToken,
   link: LinkToken,
   selection: SelectionToken,
@@ -91,13 +100,14 @@ export const VIEWER_PLUGINS: {
 export interface ScopedViewer {
   /**
    * A plugin's API, by its name (`'search'`) or its token (`SearchToken`). Throws when the
-   * viewer has no such plugin, or when the plugin belongs to a document and none is open.
+   * viewer has no such plugin, when the plugin belongs to a document and none is open, and
+   * `instance-closed` once the viewer is done.
    */
   get<Name extends PluginName>(name: Name): ViewerPlugins[Name];
   get<Capability>(token: CapabilityToken<Capability>): Capability;
   /**
-   * Like `get`, but `null` when the plugin isn't available: none by that name, no document, or
-   * one still opening.
+   * Like `get`, but `null` when the plugin isn't available: none by that name, no document, one
+   * still opening, or the viewer is done.
    */
   tryGet<Name extends PluginName>(name: Name): ViewerPlugins[Name] | null;
   tryGet<Capability>(token: CapabilityToken<Capability>): Capability | null;
@@ -131,8 +141,107 @@ export const VIEWER_KERNEL: unique symbol = Symbol.for('@embedpdf/viewer/kernel'
 /** The plugins a viewer resolves by name: {@link VIEWER_PLUGINS}, or more. */
 export type PluginTokens = Readonly<Record<string, CapabilityToken<unknown>>>;
 
-/** Make the `viewer` from a live kernel; `plugins` are the names its `get()` takes. */
-export function createViewer(kernel: Kernel, plugins: PluginTokens): Viewer {
+/** A `viewer`, and the end of its life. */
+export interface ViewerLifetime {
+  readonly viewer: Viewer;
+  /**
+   * The viewer it reaches is gone: every listener added through the `viewer` stops, and every
+   * call refuses with `instance-closed`. Idempotent.
+   */
+  dispose(): void;
+}
+
+const GONE =
+  'this viewer is gone: it was unmounted, or mounted again with a new config. Use the viewer ' +
+  'the new onReady gives you.';
+
+/** A member that subscribes: an event (`onOpened`) or a registration (`registerTool`). */
+const SUBSCRIBES = /^(?:on|register)(?:[A-Z]|$)/;
+
+const isPlainObject = (value: unknown): value is object => {
+  if (typeof value !== 'object' || value === null) return false;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
+/**
+ * Make the `viewer` from a live kernel; `plugins` are the names its `get()` takes.
+ *
+ * Every API the `viewer` hands out (`get()`, `documents`, `commands`) is the plugin's own
+ * capability seen through a lens that ends with the viewer: while it lives, every member is the
+ * capability's; once {@link ViewerLifetime.dispose} runs, the listeners and registrations made
+ * through it are removed, a read (`get*`, `list*`, `is*`, `has*`, `can*`) throws
+ * `instance-closed`, every other call returns a promise that rejects with it, and a new
+ * subscription does nothing.
+ */
+export function createViewer(kernel: Kernel, plugins: PluginTokens): ViewerLifetime {
+  let disposed = false;
+  const subscriptions = new Set<Unsubscribe>();
+  const goneError = (capability: string) => new PluginError('instance-closed', capability, GONE);
+
+  /** Keep a subscription made through the viewer, so `dispose()` can end it. */
+  const keep = (unsubscribe: Unsubscribe): Unsubscribe => {
+    const end = () => {
+      subscriptions.delete(end);
+      unsubscribe();
+    };
+    subscriptions.add(end);
+    return end;
+  };
+
+  const lenses = new WeakMap<object, object>();
+  /** The capability (or one of its namespaces, `annotation.comments`) as the viewer hands it out. */
+  const lensOf = <Api extends object>(api: Api, capability: string): Api => {
+    const existing = lenses.get(api);
+    if (existing) return existing as Api;
+    const members = new Map<string, { readonly value: unknown; readonly member: unknown }>();
+    const memberOf = (key: string, value: (...args: unknown[]) => unknown): unknown => {
+      if (SUBSCRIBES.test(key)) {
+        return (...args: unknown[]) => {
+          if (disposed) return () => {};
+          const unsubscribe = value.apply(api, args);
+          return typeof unsubscribe === 'function' ? keep(unsubscribe as Unsubscribe) : unsubscribe;
+        };
+      }
+      if (isReadMember(key)) {
+        return (...args: unknown[]) => {
+          if (disposed) throw goneError(capability);
+          return value.apply(api, args);
+        };
+      }
+      return (...args: unknown[]) =>
+        disposed ? Promise.reject(goneError(capability)) : value.apply(api, args);
+    };
+    const read = (key: string | symbol): unknown => {
+      const value: unknown = Reflect.get(api, key, api);
+      if (typeof key === 'symbol') return value;
+      if (isPlainObject(value)) return lensOf(value, capability);
+      if (typeof value !== 'function') return value;
+      // The same function on every read, while the capability's member is the same.
+      const known = members.get(key);
+      if (known?.value === value) return known.member;
+      const member = memberOf(key, value as (...args: unknown[]) => unknown);
+      members.set(key, { value, member });
+      return member;
+    };
+    // Over an empty object rather than the capability, so a frozen capability's members can be
+    // handed out as the lens's own.
+    const lens = new Proxy(
+      {},
+      {
+        get: (_target, key) => read(key),
+        has: (_target, key) => Reflect.has(api, key),
+        ownKeys: () => Reflect.ownKeys(api),
+        getOwnPropertyDescriptor: (_target, key) => {
+          const own = Reflect.getOwnPropertyDescriptor(api, key);
+          return own && { configurable: true, enumerable: own.enumerable, value: read(key) };
+        },
+      },
+    ) as Api;
+    lenses.set(api, lens);
+    return lens;
+  };
+
   const tokenNamed = (name: string): CapabilityToken<unknown> | null =>
     Object.prototype.hasOwnProperty.call(plugins, name) ? (plugins[name] ?? null) : null;
   const tokenOf = (plugin: string | CapabilityToken<unknown>): CapabilityToken<unknown> => {
@@ -151,13 +260,16 @@ export function createViewer(kernel: Kernel, plugins: PluginTokens): Viewer {
     function get<Name extends PluginName>(name: Name): ViewerPlugins[Name];
     function get<Capability>(token: CapabilityToken<Capability>): Capability;
     function get(plugin: string | CapabilityToken<unknown>): unknown {
-      return kernel.capability(tokenOf(plugin), documentId);
+      const token = tokenOf(plugin);
+      if (disposed) throw goneError(token.name);
+      return lensOf(kernel.capability(token, documentId) as object, token.name);
     }
     function tryGet<Name extends PluginName>(name: Name): ViewerPlugins[Name] | null;
     function tryGet<Capability>(token: CapabilityToken<Capability>): Capability | null;
     function tryGet(plugin: string | CapabilityToken<unknown>): unknown {
       const token = typeof plugin === 'string' ? tokenNamed(plugin) : plugin;
-      return token ? kernel.tryCapability(token, documentId) : null;
+      const api = token && !disposed ? kernel.tryCapability(token, documentId) : null;
+      return api === null ? null : lensOf(api as object, token!.name);
     }
     return { get, tryGet };
   };
@@ -167,20 +279,23 @@ export function createViewer(kernel: Kernel, plugins: PluginTokens): Viewer {
     onChange: (value: T, previous: T) => void,
     isEqual: (left: T, right: T) => boolean = Object.is,
   ): Unsubscribe => {
+    if (disposed) return () => {};
     let previous = read();
-    return kernel.subscribe(() => {
-      const next = read();
-      if (isEqual(previous, next)) return;
-      const before = previous;
-      previous = next;
-      onChange(next, before);
-    });
+    return keep(
+      kernel.subscribe(() => {
+        const next = read();
+        if (isEqual(previous, next)) return;
+        const before = previous;
+        previous = next;
+        onChange(next, before);
+      }),
+    );
   };
 
   const viewer: Viewer = {
     ...scopedTo(undefined),
-    documents: kernel.documents,
-    commands: kernel.capability(CommandsToken),
+    documents: lensOf(kernel.documents, DocumentsToken.name),
+    commands: lensOf(kernel.capability(CommandsToken), CommandsToken.name),
     forDocument: scopedTo,
     watch,
   };
@@ -188,5 +303,11 @@ export function createViewer(kernel: Kernel, plugins: PluginTokens): Viewer {
   // slot into the viewer this kernel, so headless hooks work there. Non-enumerable, and keyed
   // by a registered symbol so a wrapper reads it without importing this package.
   Object.defineProperty(viewer, VIEWER_KERNEL, { value: kernel });
-  return viewer;
+
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const end of [...subscriptions]) end();
+  };
+  return { viewer, dispose };
 }

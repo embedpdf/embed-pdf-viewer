@@ -39,7 +39,9 @@ children-as-slots, `onReady` — and its documentation applies verbatim.
 
 ```tsx
 <CloudPDFViewer baseUrl={baseUrl} docToken={token} onReady={(viewer) => …}>
-  <MyStatusChip slot="doc-status" />
+  <ToolbarItem id="doc-status">
+    <MyStatusChip />
+  </ToolbarItem>
 </CloudPDFViewer>
 ```
 

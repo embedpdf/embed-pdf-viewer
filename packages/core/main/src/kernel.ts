@@ -1162,6 +1162,8 @@ export function createKernel(config: {
 
   const documents: DocumentsCapability = {
     open: openDocument,
+    // A file's bytes are the engine's to take or refuse: it says which.
+    canOpenFiles: () => engine.canOpenFiles,
     retry: async (id, options) => {
       const session = sessions.get(id);
       if (!session || session.phase !== 'error' || session.source === null) {

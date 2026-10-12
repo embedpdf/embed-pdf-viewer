@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The full-viewer React wrapper, end to end: <PDFViewer> config pass-through plus a children-as-slots widget — a stateful, page-CSS-styled React component projected into the measured toolbar of the Preact-compiled element.",
+  "description": "The React viewer with two components of the app inside it: a status picker in the toolbar and a tab bar of its own.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

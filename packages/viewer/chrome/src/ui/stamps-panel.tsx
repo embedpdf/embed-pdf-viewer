@@ -152,7 +152,7 @@ export function StampsPanel() {
             <select
               value={selectedId}
               onChange={(event) => setPicked(event.target.value)}
-              aria-label={t('demo.stampsTitle')}
+              aria-label={t('panels.stamps')}
               className="border-border bg-surface text-fg min-w-0 flex-1 rounded border px-2 py-1.5 text-sm"
             >
               <option value={ALL}>{t('demo.stampsAll')}</option>

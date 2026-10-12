@@ -32,7 +32,7 @@ const ebook = async (): Promise<OpenInput> => {
 // A result: its row follows the command, so it greys out the moment the command can't run.
 function Result({ id }: { id: string }) {
   const command = useCommand(id);
-  if (!command) return null;
+  if (!command.visible) return null;
 
   return (
     <li>

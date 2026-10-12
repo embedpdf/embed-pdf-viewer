@@ -1,3 +1,4 @@
+'use client';
 /**
  * @cloudpdf/viewer-react — the full viewer as a React component, wired to
  * CloudPDF.
@@ -21,10 +22,10 @@
  * libraries make the first time someone opens Stamps or Signatures.
  *
  * Everything the open viewer accepts — `layout`, `commands`, `icons`,
- * `strings`, `theme`, children-as-slots, `onReady` — works here unchanged (see
- * `@embedpdf/viewer-react`). This file adds the CloudPDF connection and the
- * document shorthands, and subtracts only `scope` and `identity`, which the
- * document's token carries.
+ * `strings`, `theme`, `plugins`, children-as-slots, `onReady`,
+ * `usePDFViewer()` — works here unchanged (see `@embedpdf/viewer-react`).
+ * This file adds the CloudPDF connection and the document shorthands, and
+ * subtracts only `scope` and `identity`, which the document's token carries.
  */
 import { resolveCloudConfig, type ViewerConfig } from '@cloudpdf/viewer/config';
 import { PDFViewer, type PDFViewerExtras } from '@embedpdf/viewer-react/core';
