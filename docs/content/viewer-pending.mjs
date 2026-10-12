@@ -9,13 +9,11 @@
  */
 export const VIEWER_PENDING = {
   index: {
-    L1: 'toolbars at the bottom, on the side, or several: bars have no place yet',
     L7: 'the phone layout: panels and menus as sheets',
-    L8: 'a menu in a bottom toolbar opens upward: menus drop down from their button',
     P2: 'the config keys the table shows: layout, disable, readOnly, theme.accent',
     T1: 'your accent color: theme.accent and the public --epdf-* tokens',
     I1: 'speaks the user language: the viewer ships English and Spanish',
-    A1: 'works with a keyboard and a screen reader: the toolbars have roles and arrow keys, the menus, panels and dialogs not yet',
+    A1: 'works with a keyboard and a screen reader: the toolbars and menus do, panels and dialogs not yet',
     H3: 'the headless hooks inside your own components',
   },
   'quick-start': {
@@ -27,7 +25,7 @@ export const VIEWER_PENDING = {
     A1: 'your button reachable with the keyboard',
   },
   setup: {
-    P2: 'the config keys in the table',
+    P2: 'plugins and theme.accent in the config',
     P3: 'ViewerConfig, and every key typed, from every framework package',
     P6: 'every framework package safe to import on the server',
     P7: 'shortcuts only in the viewer that has focus',
@@ -38,19 +36,12 @@ export const VIEWER_PENDING = {
     DOC2: 'drop a PDF, or Open in the document menu, to open it as a tab',
     DOC3: 'a document that fails shows why in its tab, with Try again',
     DOC4: 'a warning before unsaved changes are lost',
-    L12: 'tabs show while more than one document is open: layout.tabs()',
     K3: 'your Mod+S wins over the built-in shortcut',
   },
   'self-hosting': {
     P2: 'engine.fonts in the inventory: fonts are annotations.fonts today',
     P10: 'the @embedpdf/viewer/portable entry for plain esbuild',
     F4: 'plugins.stamp.standard: the stamp library is stamps.defaultLibrary today',
-  },
-  'customize/layout': {
-    L1: 'places for bars: edges, floating, along another bar, over a selection',
-    L4: 'vertical bars at start and end',
-    L5: 'floating bars, the page number among them',
-    L8: 'menus open away from their bar edge and flip',
   },
   'customize/commands': {
     K1: 'label directly, and functions that get get, viewer and documentId',
@@ -61,9 +52,9 @@ export const VIEWER_PENDING = {
     K7: 'the built-in commands the table lists',
   },
   'customize/menus': {
-    L1: 'the bars over a selection and over selected annotations',
-    L8: 'placement, flip, sheets on a phone, submenus, section titles, check marks, typeahead',
-    A1: 'arrow keys, typeahead and Escape in a menu',
+    L1: 'highlight, underline and strike out in the bar over selected text: it has Copy only',
+    L8: 'menus as sheets on a phone, with submenus sliding in over them',
+    L14: 'the bar over a selection sits above it: today it sits below',
     C3: 'Menu and MenuItem for your own menu',
   },
   'customize/panels': {
@@ -107,10 +98,8 @@ export const VIEWER_PENDING = {
   'features/annotations': {
     P2: 'plugins.annotation, engine.fonts and the other plugin settings',
     F4: 'plugins.stamp.standard and quick',
-    R7: 'comments read-only in a read-only viewer',
   },
   'features/turning-off': {
-    R7: 'the View only label',
     F1: 'the feature table matches the tree',
   },
   'features/forms-and-signatures': {
@@ -121,7 +110,7 @@ export const VIEWER_PENDING = {
   },
   'code/viewer': {
     H5: 'usePDFViewer() and the Viewer type',
-    P2: 'onReady and onDocumentChange on every framework',
+    P2: 'onReady and onDocumentChange on the Vue, Svelte and Angular wrappers, which do not exist yet',
     H6: 'after unmount, listeners stop and calls reject',
   },
   'code/plugins': {
@@ -131,10 +120,9 @@ export const VIEWER_PENDING = {
     F4: 'viewer-only settings next to the plugin settings',
   },
   'concepts/how-it-works': {
-    A1: 'menus, labeled panels and dialogs that trap focus, as the Accessibility section says',
+    A1: 'labeled panels, and dialogs that trap focus, as the Accessibility section says',
     C1: 'slots for your components: item, panel and the regions',
     H3: 'your components inside the viewer use the headless hooks',
-    L8: 'menus and tooltips in the browser top layer',
     T3: 'the parts you reach with ::part()',
     F3: 'a feature code loads the first time someone uses it',
     P6: 'the wrapper renders an empty element on the server',

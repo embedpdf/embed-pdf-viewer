@@ -168,6 +168,11 @@ export const es: Locale = {
       unknown: 'El documento no se pudo abrir.',
       close: 'Cerrar documento',
     },
+    viewOnly: {
+      label: 'Solo lectura',
+      turnedOff: 'Las herramientas que cambian este documento están desactivadas',
+      notAllowed: 'Puedes leer este documento, pero no cambiarlo',
+    },
     annotation: {
       comment: 'Comentario',
       highlight: 'Resaltado',
@@ -207,6 +212,7 @@ export const es: Locale = {
       commentsError: 'No se pudieron cargar los comentarios.',
       commentsRetry: 'Reintentar',
       commentsEmpty: 'Aún no hay comentarios. Usa la herramienta de nota para iniciar un hilo.',
+      commentsEmptyReadOnly: 'Este documento no tiene comentarios.',
       commentsAnonymous: 'Desconocido',
       commentsPage: 'Página {page}',
       commentCount: '{count} comentario',
@@ -226,6 +232,7 @@ export const es: Locale = {
       styleTitle: 'Estilo',
       empty: 'Aquí todavía no hay nada en este panel de demostración.',
       page: 'Página {current} de {total}',
+      goToPage: 'Ir a la página',
       cancel: 'Cancelar',
       pageBadge: 'pág. {page}',
       redactionTitle: 'Redacciones',

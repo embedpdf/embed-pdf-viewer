@@ -167,6 +167,12 @@ export const en: Locale = {
       unknown: 'The document could not be opened.',
       close: 'Close document',
     },
+    // The View only label in the main bar, while nothing can change the document.
+    viewOnly: {
+      label: 'View only',
+      turnedOff: 'The tools that change this document are turned off',
+      notAllowed: 'You can read this document, but not change it',
+    },
     // Annotation type names — the comment sidebar's icon tooltips. Keys match
     // the published snippet packs, so existing translations resolve.
     annotation: {
@@ -208,6 +214,7 @@ export const en: Locale = {
       commentsError: 'Comments failed to load.',
       commentsRetry: 'Retry',
       commentsEmpty: 'No comments yet. Use the note tool to start a thread.',
+      commentsEmptyReadOnly: 'No comments on this document.',
       commentsAnonymous: 'Unknown',
       commentsPage: 'Page {page}',
       commentCount: '{count} comment',
@@ -227,6 +234,7 @@ export const en: Locale = {
       styleTitle: 'Style',
       empty: 'Nothing here yet in this demo panel.',
       page: 'Page {current} of {total}',
+      goToPage: 'Go to page',
       cancel: 'Cancel',
       pageBadge: 'p. {page}',
       redactionTitle: 'Redactions',

@@ -4,10 +4,12 @@
  * One ResizeObserver on the root measures the viewer (its width, and from it
  * the size), a media query says whether the main pointer is a finger, and the
  * language gives the direction: together the env, and the `layout` function
- * runs again whenever it changes. Under the root, the bars leave out the tab of
- * a mode whose bars show nothing and the button of a menu that shows nothing;
- * an open mode whose tab goes falls back to View; a bar with a new mode gets
- * its `mode:<mode>` command; and each problem with the layout is logged once.
+ * runs again whenever it changes. The direction is the root's `dir`, so the
+ * viewer reads its own language's way whatever the page around it does. Under
+ * the root, the bars leave out the tab of a mode whose bars show nothing and
+ * the button of a menu that shows nothing; an open mode whose tab goes falls
+ * back to View; a bar with a new mode gets its `mode:<mode>` command; and each
+ * problem with the layout is logged once.
  */
 import {
   useEffect,
@@ -172,7 +174,7 @@ export function LayoutRoot({ className, children }: { className?: string; childr
   useLayoutWarnings(measured === null ? null : layout);
 
   return (
-    <div ref={root} className={className}>
+    <div ref={root} dir={env.dir} className={className}>
       <ResolvedLayoutProvider value={resolved}>{children}</ResolvedLayoutProvider>
     </div>
   );

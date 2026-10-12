@@ -28,12 +28,12 @@ import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
 import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
 import { selectionPlugin } from '@embedpdf/react/selection';
-import { annotationPlugin } from '@embedpdf/react/annotation';
+import { AnnotationToken, annotationPlugin } from '@embedpdf/react/annotation';
 import { stampPlugin } from '@embedpdf/react/stamp';
 import { measurementPlugin } from '@embedpdf/react/measurement';
 import { redactionPlugin } from '@embedpdf/react/redaction';
 import { actionsPlugin } from '@embedpdf/react/actions';
-import { formPlugin } from '@embedpdf/react/form';
+import { FormToken, formPlugin } from '@embedpdf/react/form';
 import { signaturePlugin } from '@embedpdf/react/signature';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
@@ -55,7 +55,10 @@ import {
 } from './config-context';
 import type { AnnotationsCustomization, SignaturesCustomization } from './config-context';
 import {
+  byHandSettingsOf,
   disabledSettingsOf,
+  sameByHand,
+  type ByHandSettings,
   type DisabledSettings,
   type Feature,
   type ReadOnlyExceptions,
@@ -174,6 +177,16 @@ export interface ViewerCustomization {
    *  adopts them into its shadow root); direct consumers of this package set
    *  the variables in their own CSS instead. Follows its prop. */
   theme?: ThemePreference | ThemeConfig;
+  /**
+   * Called with the `viewer` once it's live, before any document has opened: capabilities
+   * resolve from then on, and document-scoped calls wait for their document. Read once.
+   */
+  onReady?: (viewer: Viewer) => void;
+  /**
+   * Called with the active document's id whenever it changes: the first document that opens,
+   * a switch to another tab, and `null` once the last one closes. Read once.
+   */
+  onDocumentChange?: (documentId: string | null) => void;
 }
 
 /**
@@ -211,22 +224,33 @@ export interface FullViewerProps extends ViewerCustomization {
    *  config: the custom element passes its shadow wrapper so theming never
    *  touches the host page. Default: document.documentElement. */
   themeTarget?: HTMLElement | null;
-  /** Called once the workspace kernel is live, with the `viewer` (`el.viewer`
-   *  on the custom element, `onReady` on the wrappers). Capabilities resolve
-   *  from the moment this fires; document-scoped calls simply await their
-   *  document. */
-  onViewer?: (viewer: Viewer) => void;
 }
 
-/** Inside <HeadlessViewer>: makes the `viewer` from the live kernel, reports it up. */
-function HandleBridge({ onViewer }: { onViewer: (viewer: Viewer) => void }) {
+/**
+ * Inside <HeadlessViewer>: makes the `viewer` from the live kernel and reports it, then the
+ * active document: the one already active (the initial documents open with the kernel, a
+ * delivery's own in `onReady`), and every change after it.
+ */
+function HandleBridge({
+  onReady,
+  onDocumentChange,
+}: Pick<ViewerCustomization, 'onReady' | 'onDocumentChange'>) {
   const kernel = useKernel();
   // Before the first paint, so what the delivery opens on arrival (the element's `src`) is a
   // tab by the time the shell first shows.
   useLayoutEffect(() => {
-    onViewer(createViewer(kernel, VIEWER_PLUGINS));
+    const viewer = createViewer(kernel, VIEWER_PLUGINS);
+    onReady?.(viewer);
+    if (!onDocumentChange) return undefined;
+    const stop = viewer.watch(
+      () => viewer.documents.getActiveId(),
+      (documentId) => onDocumentChange(documentId),
+    );
+    const active = viewer.documents.getActiveId();
+    if (active !== null) onDocumentChange(active);
+    return stop;
     // Init-only like everything else: re-fires only if the kernel changes
-    // (a remount), never because the callback prop identity churned.
+    // (a remount), never because a callback prop's identity churned.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kernel]);
   return null;
@@ -247,7 +271,11 @@ function FollowProps({
   disable,
   readOnly,
 }: {
-  registered: { readonly locale: string; readonly disabled: DisabledSettings };
+  registered: {
+    readonly locale: string;
+    readonly disabled: DisabledSettings;
+    readonly byHand: ByHandSettings;
+  };
   locale: string;
   disable: ViewerCustomization['disable'];
   readOnly: ViewerCustomization['readOnly'];
@@ -258,8 +286,16 @@ function FollowProps({
   // In the render that brought the change, so the plugin has it when the prop's setter returns.
   useLayoutEffect(() => {
     const disabled = disabledSettingsOf(disable, readOnly);
+    const byHand = byHandSettingsOf(disable, readOnly);
     const previous = applied.current;
-    applied.current = { locale, disabled };
+    applied.current = { locale, disabled, byHand };
+    // What a turned-off feature made stays in the document, frozen: no one changes it by hand.
+    if (!sameByHand(previous.byHand.editable, byHand.editable)) {
+      kernel.settingsOf(AnnotationToken).updateSettings({ editable: byHand.editable });
+    }
+    if (!sameByHand(previous.byHand.fillable, byHand.fillable)) {
+      kernel.settingsOf(FormToken).updateSettings({ fillable: byHand.fillable });
+    }
     if (
       !sameList(previous.disabled.disabledCategories, disabled.disabledCategories) ||
       !sameList(previous.disabled.disabledCommands, disabled.disabledCommands)
@@ -305,7 +341,8 @@ export function FullViewer({
   annotations,
   theme,
   themeTarget,
-  onViewer,
+  onReady,
+  onDocumentChange,
 }: FullViewerProps) {
   // Customization is init-only, like the Viewer's own engine/plugins
   // contract: the whole config resolves once from the mount-time props, so
@@ -343,6 +380,7 @@ export function FullViewer({
       annotations: annotations ?? {},
       i18n: { locales, loaders, codes, initial: localeCodeOf(locale, codes) },
       disabled: disabledSettingsOf(disable, readOnly),
+      byHand: byHandSettingsOf(disable, readOnly),
     };
   });
 
@@ -412,6 +450,8 @@ export function FullViewer({
           source: { kind: 'prompt', accept: 'image/png,image/jpeg' },
         },
       ],
+      // What a turned-off feature made stays, but no one changes it by hand.
+      editable: resolved.byHand.editable,
     }),
     // Undo and redo of what the user changes, one history per document.
     historyPlugin(),
@@ -432,7 +472,7 @@ export function FullViewer({
     actionsPlugin({ javascript: { enabled: true } }),
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
-    formPlugin(),
+    formPlugin({ fillable: resolved.byHand.fillable }),
     // Signatures: the act — a mark (a signatures-library asset) dropped on a
     // signature field signs it through the configured key, or is drawn in
     // without sealing when there is none. Marks themselves are the stamp
@@ -481,12 +521,18 @@ export function FullViewer({
       >
         <ViewerConfigProvider value={config}>
           <FollowProps
-            registered={{ locale: resolved.i18n.initial, disabled: resolved.disabled }}
+            registered={{
+              locale: resolved.i18n.initial,
+              disabled: resolved.disabled,
+              byHand: resolved.byHand,
+            }}
             locale={localeCodeOf(locale, resolved.i18n.codes)}
             disable={disable}
             readOnly={readOnly}
           />
-          {onViewer && <HandleBridge onViewer={onViewer} />}
+          {(onReady || onDocumentChange) && (
+            <HandleBridge onReady={onReady} onDocumentChange={onDocumentChange} />
+          )}
           <Shell />
         </ViewerConfigProvider>
       </HeadlessViewer>

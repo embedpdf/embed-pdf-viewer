@@ -1,8 +1,7 @@
 /**
- * The static chrome around the toolbars: the left/right sidebars (shell
- * surfaces) and the bottom page-controls overlay. Deliberately minimal —
- * chrome-parity scope. Panels read their open state from plugin-shell; the
- * app owns their DOM.
+ * The static chrome around the toolbars: the start and end sidebars (shell
+ * surfaces). Deliberately minimal — chrome-parity scope. Panels read their
+ * open state from plugin-shell; the app owns their DOM.
  *
  * There is no built-in header: branding, a locale picker and a theme switch
  * are the embedder's chrome, not the viewer's. The frame keeps a `header`
@@ -30,7 +29,7 @@ export function LeftSidebar() {
   const sidebar = useSurface('sidebar');
   if (!sidebar.isOpen) return null;
   return (
-    <aside className="border-border-subtle bg-surface flex w-60 shrink-0 flex-col border-r">
+    <aside className="border-border-subtle bg-surface flex w-60 shrink-0 flex-col border-e">
       <div className="border-border-subtle flex items-center gap-1 border-b p-2">
         <span className="bg-accent-light text-accent rounded-md px-2 py-1 text-xs font-medium">
           {t('demo.thumbnails')}
@@ -180,7 +179,7 @@ export function RightSidebar() {
                 : style.close;
 
   return (
-    <aside className="border-border-subtle bg-surface flex w-72 shrink-0 flex-col border-l">
+    <aside className="border-border-subtle bg-surface flex w-72 shrink-0 flex-col border-s">
       <div className="border-border-subtle flex items-center justify-between border-b p-3">
         <span className="text-fg text-sm font-semibold">{t(titleKey)}</span>
         <button
@@ -207,21 +206,5 @@ export function RightSidebar() {
         <CommentsPanel key={documentId ?? 'none'} />
       )}
     </aside>
-  );
-}
-
-// ── bottom page-controls overlay ─────────────────────────────────────────────
-export function PageControls() {
-  const t = useT();
-  // the Stage cursor is a 0-based display index; people count from 1
-  const current = useStageState((state) => state.currentPageIndex + 1);
-  const total = useStageState((state) => state.pageCount);
-  if (!total) return null;
-  return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center">
-      <div className="border-border-subtle bg-elevated/95 text-fg-secondary pointer-events-auto rounded-full border px-4 py-1.5 text-sm shadow-lg backdrop-blur">
-        {t('demo.page', { params: { current, total } })}
-      </div>
-    </div>
   );
 }

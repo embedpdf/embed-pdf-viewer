@@ -171,6 +171,8 @@ function itemProblems(
 ): string[] {
   const problems: string[] = [];
   const groupIds = new Set<string>();
+  let groups = 0;
+  let dependentGroups = 0;
   for (const name of SECTION_NAMES) {
     const entries = bar[name];
     if (entries === undefined) continue;
@@ -182,6 +184,16 @@ function itemProblems(
       if (isGroupObject(entry) && entry.id !== undefined) {
         if (groupIds.has(entry.id)) problems.push(`${where}: two groups are called "${entry.id}"`);
         groupIds.add(entry.id);
+      }
+      groups++;
+      if (isGroupObject(entry) && entry.dependent !== undefined) {
+        const dependent: unknown = entry.dependent;
+        if (dependent === true) dependentGroups++;
+        else if (dependent !== false)
+          problems.push(
+            `${where}: ${entry.id === undefined ? 'a group' : `group "${entry.id}"`} has dependent ` +
+              `${JSON.stringify(dependent)}, which is not true or false`,
+          );
       }
       const seen = new Set<string>();
       for (const item of itemsOfEntry(entry) as readonly unknown[]) {
@@ -197,6 +209,8 @@ function itemProblems(
       }
     }
   }
+  if (groups > 0 && dependentGroups === groups)
+    problems.push(`${where}: every group in it is dependent, so it never shows`);
   return problems;
 }
 

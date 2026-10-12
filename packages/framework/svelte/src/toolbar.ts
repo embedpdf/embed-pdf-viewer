@@ -1,9 +1,10 @@
 /**
- * @embedpdf/svelte/toolbar — a toolbar that fits the width it has.
+ * @embedpdf/svelte/toolbar — a toolbar that fits the room it has.
  *
- * `<Toolbar>` fits a bar of commands into its width (labels become icons, groups fold, the rest
- * goes into a "More" menu) and lets you draw every part with snippets; `useStripView()` is a
- * strip that doesn't fit itself; and the schema a bar is written in comes from here too.
+ * `<Toolbar>` fits a bar of commands into its width, or its height when it's vertical (labels
+ * become icons, groups fold, the rest goes into a "More" menu), is one tab stop with arrow keys
+ * along it, and lets you draw every part with snippets; `useStripView()` is a strip that doesn't
+ * fit itself; and the schema a bar is written in comes from here too.
  */
 
 // The toolbar's vocabulary: the schema a bar is written in.

@@ -5,10 +5,11 @@
 <script lang="ts">
   import DefaultOverflowMenu from './DefaultOverflowMenu.svelte';
   import { groupMenuView } from '@embedpdf/core-ui';
+  import type { Orientation } from '@embedpdf/web';
   import type { GroupDisclosureView } from './views';
   import { ACTIVE, BORDER } from './paint';
 
-  let { view }: { view: GroupDisclosureView } = $props();
+  let { view, orientation }: { view: GroupDisclosureView; orientation: Orientation } = $props();
 
   let isOpen = $state(false);
   const someActive = $derived(view.commands.some((command) => command.active));
@@ -34,5 +35,5 @@
   >
     ▾
   </button>
-  <DefaultOverflowMenu view={menu} />
+  <DefaultOverflowMenu view={menu} {orientation} />
 </span>

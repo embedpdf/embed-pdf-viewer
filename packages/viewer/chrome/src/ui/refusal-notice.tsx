@@ -51,6 +51,7 @@ export function useRefusalNotice(): RefusalNotice {
       <div
         role="status"
         aria-live="polite"
+        data-epdf-refusal-notice=""
         className="pointer-events-none absolute inset-x-0 bottom-16 z-30 flex justify-center"
       >
         {notice && (

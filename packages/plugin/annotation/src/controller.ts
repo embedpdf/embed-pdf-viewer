@@ -6,12 +6,13 @@
  * `sync/`, `comments/` or `tools/`. How the pieces fit is in README.md.
  */
 import { composeApi } from '@embedpdf/core';
+import { isContentsEditableByHand, isTransformableByHand } from '@embedpdf/core-annotation';
 
 import { createComments } from './comments/comments';
 import { createThreadIndex } from './comments/threads';
 import { connectAnnotation } from './connect';
 import type { AnnotationHostCapability } from './host-contract';
-import { withSnap } from './model';
+import { withEditable, withSnap } from './model';
 import { createAnnotationReads } from './read/annotations';
 import { createChromeReads } from './read/chrome';
 import { createPropertyReads } from './read/properties';
@@ -37,10 +38,13 @@ export function createAnnotationController(ctx: AnnotationContext) {
   const services = createServices(ctx);
   const { events, records, view, authority, tools, behaviors, settings } = services;
 
-  // The session snaps as the settings say, and follows them when they change.
+  // The session snaps, and lets people change by hand, as the settings say,
+  // and follows them when they change.
   ctx.state.update(withSnap, settings.get().snap);
+  ctx.state.update(withEditable, settings.get().editable);
   settings.api.onSettingsChanged(({ settings: next, changed }) => {
     if (changed.includes('snap')) ctx.state.update(withSnap, next.snap);
+    if (changed.includes('editable')) ctx.state.update(withEditable, next.editable);
   });
 
   // Reads: pure projections of the model.
@@ -61,6 +65,18 @@ export function createAnnotationController(ctx: AnnotationContext) {
     await text.sendTyping();
     await services.store.whenWritten();
   };
+  // A text box, or a gesture, on an annotation the `editable` rule now freezes ends.
+  settings.api.onSettingsChanged(({ changed }) => {
+    if (!changed.includes('editable')) return;
+    const model = services.store.model();
+    const editing = model.editing === null ? undefined : model.byId[model.editing];
+    if (editing && !isContentsEditableByHand(model, editing)) void text.text.end();
+    const draft = model.draft;
+    const ids = draft && 'ids' in draft ? draft.ids : draft && 'id' in draft ? [draft.id] : [];
+    if (ids.some((id) => model.byId[id] && !isTransformableByHand(model, model.byId[id]))) {
+      services.store.commit({ type: 'cancel' });
+    }
+  });
   const links = createLinkWrites(ctx, services);
   registerOpBuilders(services);
   const crud = createCrud(ctx, services, annotations, settle);

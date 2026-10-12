@@ -159,7 +159,7 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M11 13l9 -9',
     'M15 4h5v5',
   ],
-  eye: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'],
+  eye: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0'],
   file: ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'],
   fileImport: [
     'M14 3v4a1 1 0 0 0 1 1h4',

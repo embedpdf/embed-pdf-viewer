@@ -2,16 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import type { LayoutData } from '../src/layout';
 import {
+  FLOAT_POSITIONS,
   barsAt,
+  barsFloating,
   barsInMode,
   barsOnEdge,
   barsWith,
   compileBar,
   edgeOf,
   edgeStackOf,
+  floatOf,
+  floatStackOf,
   menuOf,
   modesOf,
   omittedCommandsOf,
+  tabsOf,
   type OmissionCommand,
 } from '../src/layout-compile';
 import { normalizeBar } from '../src/schema';
@@ -259,6 +264,42 @@ describe('edgeStackOf', () => {
   });
 });
 
+describe('floating bars', () => {
+  it('reads where a place floats', () => {
+    expect(floatOf({ float: 'bottom-end' })).toBe('bottom-end');
+    expect(floatOf('top')).toBeNull();
+    expect(floatOf({ with: 'main' })).toBeNull();
+    expect(floatOf({ float: 'middle' } as never)).toBeNull();
+    expect(FLOAT_POSITIONS).toHaveLength(8);
+  });
+
+  it('lists the bars at each position in the order they were added, each with its riders', () => {
+    const floating: LayoutData = {
+      bars: {
+        pager: { place: { float: 'bottom' } },
+        zoom: { place: { float: 'bottom-end' } },
+        notes: { place: { with: 'pager' } },
+        second: { place: { float: 'bottom' } },
+        main: { place: 'top' },
+      },
+    };
+    expect(barsFloating(floating, 'bottom')).toEqual(['pager', 'second']);
+    expect(floatStackOf(floating, 'bottom')).toEqual(['pager', 'notes', 'second']);
+    expect(floatStackOf(floating, 'bottom-end')).toEqual(['zoom']);
+    expect(floatStackOf(floating, 'top')).toEqual([]);
+    // A floating bar is on no edge.
+    expect(edgeStackOf(floating, 'bottom')).toEqual([]);
+  });
+});
+
+describe('tabsOf', () => {
+  it('shows the document tabs while more than one document is open, unless the layout says', () => {
+    expect(tabsOf({})).toBe('multiple');
+    expect(tabsOf({ tabs: 'always' })).toBe('always');
+    expect(tabsOf({ tabs: 'never' })).toBe('never');
+  });
+});
+
 describe('omittedCommandsOf', () => {
   const commands = (
     visible: readonly string[],
@@ -335,5 +376,58 @@ describe('data of the wrong shape', () => {
     expect(menuOf(broken, 'document')).toEqual([]);
     expect(menuOf(broken, 'view')).toEqual([{ items: ['view:fullscreen'] }]);
     expect(omittedCommandsOf(broken, () => null)).toEqual([]);
+  });
+});
+
+describe('dependent groups in a layout', () => {
+  const history = { id: 'history', items: ['history:undo', 'history:redo'], dependent: true };
+  const withHistory: LayoutData = {
+    bars: {
+      main: {
+        place: 'top',
+        start: [['menu:edit']],
+        center: [{ id: 'modes', items: [] }],
+      },
+      annotate: {
+        place: { with: 'main' },
+        mode: 'annotate',
+        center: [['tool:highlight'], history],
+      },
+      insert: { place: { with: 'main' }, mode: 'insert', center: [['tool:stamp'], history] },
+    },
+    menus: { edit: [['history:undo', 'history:redo']] },
+  };
+  const commands =
+    (visible: readonly string[]) =>
+    (id: string): OmissionCommand => ({
+      visible: visible.includes(id),
+      menu: id === 'menu:edit' ? 'edit' : undefined,
+    });
+
+  it('compile with the group', () => {
+    expect(compileBar(withHistory, 'annotate')!.sections.center).toEqual([
+      { id: 'center-0', items: ['tool:highlight'] },
+      { id: 'history', items: ['history:undo', 'history:redo'], dependent: true },
+    ]);
+  });
+
+  it("don't hold up a mode's tab on their own", () => {
+    const shown = ['menu:edit', 'history:undo', 'history:redo', 'tool:highlight'];
+    expect(omittedCommandsOf(withHistory, commands(shown))).toEqual(['mode:insert']);
+    expect(omittedCommandsOf(withHistory, commands(['history:undo', 'history:redo']))).toEqual([
+      'mode:annotate',
+      'mode:insert',
+    ]);
+  });
+
+  it('take nothing from a menu: it has no groups, so its button stays while undo shows', () => {
+    expect(omittedCommandsOf(withHistory, commands(['menu:edit', 'history:undo']))).not.toContain(
+      'menu:edit',
+    );
+  });
+
+  it('take every mode tab, and View, once only they are left', () => {
+    const omit = new Set(omittedCommandsOf(withHistory, commands(['history:undo'])));
+    expect(compileBar(withHistory, 'main', { omit })!.sections.center).toBeUndefined();
   });
 });

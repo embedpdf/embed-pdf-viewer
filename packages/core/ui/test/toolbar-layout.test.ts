@@ -278,6 +278,30 @@ describe('layoutToolbar', () => {
   });
 });
 
+describe('layoutToolbar with dependent groups', () => {
+  const bar: BarSchema = {
+    id: 'mode',
+    sections: {
+      center: [
+        group('tools', ['hidden', 'tool:pen']),
+        group('history', ['zoom:in', 'zoom:out'], { dependent: true }),
+      ],
+    },
+  };
+
+  it('draws them beside what shows, and draws nothing, "More" included, when only they are left', () => {
+    const drawn = layout(bar, 1000);
+    expect(drawn.sections[1]!.groups.map((each) => each.id)).toEqual(['tools', 'history']);
+    const alone = layout(
+      { ...bar, sections: { center: [group('tools', ['hidden']), bar.sections.center![1]!] } },
+      10,
+    );
+    expect(alone.sections.every((section) => section.groups.length === 0)).toBe(true);
+    expect(alone.hasOverflow).toBe(false);
+    expect(alone.overflow).toEqual([]);
+  });
+});
+
 describe('groupMenuView', () => {
   it('is one section of the group’s commands, radio for tabs, running through the group', () => {
     const execute = vi.fn();

@@ -186,3 +186,27 @@ describe('validateLayout', () => {
     expect(validateLayout(null as never, { commands })).toEqual(['the layout is not an object']);
   });
 });
+
+describe('dependent groups, checked', () => {
+  it('names a dependent that is not true or false, and a bar of dependent groups only', () => {
+    const problems = validateLayout(
+      {
+        bars: {
+          main: {
+            place: 'top',
+            start: [['tool:pan'], { id: 'odd', items: ['tool:pointer'], dependent: 'yes' }],
+          },
+          alone: {
+            place: 'bottom',
+            center: [{ id: 'history', items: ['tool:highlight'], dependent: true }],
+          },
+        },
+      } as unknown as LayoutData,
+      { commands },
+    );
+    expect(problems).toEqual([
+      'bar "main": group "odd" has dependent "yes", which is not true or false',
+      'bar "alone": every group in it is dependent, so it never shows',
+    ]);
+  });
+});

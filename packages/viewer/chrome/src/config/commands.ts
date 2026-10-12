@@ -75,6 +75,11 @@ const canMeasureNow = (commandContext: Ctx): boolean => {
 // ── annotation-selection predicates (drive the floating strip's contents) ────
 const hasAnnotationSelection = (commandContext: Ctx) =>
   (anno(commandContext)?.selection.list().length ?? 0) > 0;
+/** Whether people may change every selected annotation by hand (no turned-off feature froze it). */
+const selectionEditable = (commandContext: Ctx): boolean => {
+  const annotation = anno(commandContext);
+  return (annotation?.selection.list() ?? []).every(({ ref }) => annotation!.isEditable(ref));
+};
 /** Strip items gate per subtype (comment hidden on links/widgets) through
  *  one derivation over the selected DTOs, not per-command lookups. */
 const selectionSubtypes = (commandContext: Ctx) =>
@@ -691,11 +696,15 @@ export const defaultCommands: CommandDef[] = [
     visible: hasAnnotationSelection,
     // Mirrors the engine's own authorization, which is per annotation (whose
     // it is), not the scope's: locked/unauthorized annotations keep the button
-    // visible but disabled (the engine still enforces).
+    // visible but disabled (the engine still enforces), and so do the ones a
+    // turned-off feature froze (`isEditable`).
     enabled: (commandContext) => {
       const annotation = anno(commandContext);
       const selected = annotation?.selection.list() ?? [];
-      return selected.length > 0 && selected.every(({ ref }) => annotation!.canDelete(ref));
+      return (
+        selected.length > 0 &&
+        selected.every(({ ref }) => annotation!.canDelete(ref) && annotation!.isEditable(ref))
+      );
     },
   },
   {
@@ -786,7 +795,8 @@ export const defaultCommands: CommandDef[] = [
     icon: 'group',
     categories: ['annotations'],
     run: (commandContext) => void anno(commandContext)?.selection.group(),
-    visible: (commandContext) => anno(commandContext)?.selection.canGroup() ?? false,
+    visible: (commandContext) =>
+      (anno(commandContext)?.selection.canGroup() ?? false) && selectionEditable(commandContext),
   },
   {
     id: 'annotation:ungroup',
@@ -794,7 +804,8 @@ export const defaultCommands: CommandDef[] = [
     icon: 'ungroup',
     categories: ['annotations'],
     run: (commandContext) => void anno(commandContext)?.selection.ungroup(),
-    visible: (commandContext) => anno(commandContext)?.selection.canUngroup() ?? false,
+    visible: (commandContext) =>
+      (anno(commandContext)?.selection.canUngroup() ?? false) && selectionEditable(commandContext),
   },
 
   // ── text selection (the selection strip's verbs) ────────────────────────

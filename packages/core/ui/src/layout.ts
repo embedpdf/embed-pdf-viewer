@@ -77,6 +77,11 @@ export interface LayoutGroupObject {
   readonly importance?: Importance;
   /** Its title in the "More" menu, as a translation key. */
   readonly titleKey?: string;
+  /**
+   * Show only while something in the bar that isn't dependent shows, like undo and redo beside a
+   * mode's tools. A bar with only dependent groups left is empty, and a mode's tab goes with it.
+   */
+  readonly dependent?: boolean;
 }
 
 /** A group of items, with a line between groups: an array, or an object when it needs a name or options. */

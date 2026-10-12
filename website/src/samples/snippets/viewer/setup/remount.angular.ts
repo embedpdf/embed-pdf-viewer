@@ -6,15 +6,14 @@ import { EpdfPdfViewer, type Layout } from '@embedpdf/viewer-angular';
   imports: [EpdfPdfViewer],
   template: `
     <!-- Each branch mounts its own viewer with its own config. -->
-    @if (simple()) {
-      <epdf-pdf-viewer src="/report.pdf" [layout]="simpleLayout" style="height: 100vh" />
+    @if (toolbarBelow()) {
+      <epdf-pdf-viewer src="/report.pdf" [layout]="toolbarAtBottom" style="height: 100vh" />
     } @else {
       <epdf-pdf-viewer src="/report.pdf" style="height: 100vh" />
     }
   `,
 })
 export class Report {
-  readonly simple = input(false);
-  readonly simpleLayout = (layout: Layout) =>
-    layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
+  readonly toolbarBelow = input(false);
+  readonly toolbarAtBottom = (layout: Layout) => layout.place('main', 'bottom');
 }

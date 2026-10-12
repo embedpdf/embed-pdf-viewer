@@ -9,6 +9,10 @@
    so the `theme` preference is authoritative over the OS setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* A floating bar's pill (places.tsx): on its toolbar, styles the section that holds the bar's
+   items, the toolbar's child with an item (`data-epdf-toolbar-item`) that draws something. */
+@custom-variant float-pill (& > div:has(> [data-epdf-toolbar-item]:not(:empty)));
+
 /* Semantic theme tokens — ported 1:1 from the snippet's light/dark themes
    (viewers/snippet/src/config/theme.ts). Runtime CSS variables so the theme
    switches with a class; `@theme inline` below turns each into a Tailwind

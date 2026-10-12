@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { PDFViewer, type Layout } from '@embedpdf/viewer-vue';
 
-defineProps<{ simple: boolean }>();
+defineProps<{ toolbarBelow: boolean }>();
 
-const simpleLayout = (layout: Layout) => layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
+const toolbarAtBottom = (layout: Layout) => layout.place('main', 'bottom');
 </script>
 
 <template>
   <!-- A new key mounts a new viewer with the new config. -->
   <PDFViewer
-    :key="simple ? 'simple' : 'full'"
+    :key="toolbarBelow ? 'below' : 'above'"
     src="/report.pdf"
-    :layout="simple ? simpleLayout : undefined"
+    :layout="toolbarBelow ? toolbarAtBottom : undefined"
     style="height: 100vh"
   />
 </template>

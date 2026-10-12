@@ -15,10 +15,11 @@ import { Icon } from './icons';
 export type TabBarVisibility = 'always' | 'multiple' | 'never';
 
 export function TabBar({
-  visibility = 'always',
+  visibility,
   allowOpenFile = true,
 }: {
-  visibility?: TabBarVisibility;
+  /** When the tabs show: the layout's `tabs` (`tabsOf`). */
+  visibility: TabBarVisibility;
   allowOpenFile?: boolean;
 }) {
   const { setActive, close, open } = useDocuments();

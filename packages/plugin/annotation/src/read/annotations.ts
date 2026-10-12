@@ -1,5 +1,5 @@
 import { PluginError } from '@embedpdf/core';
-import type { ModelAnnotation, Model } from '@embedpdf/core-annotation';
+import { isEditableByHand, type ModelAnnotation, type Model } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type Annotation,
@@ -129,7 +129,14 @@ export function createAnnotationReads(
     return model.editing ? (model.byId[model.editing]?.annotation ?? null) : null;
   };
 
-  const api = { get, list, isPending, getHovered };
+  /** Whether the `editable` setting lets people change it by hand. */
+  const isEditable = (ref: AnnotationRef): boolean => {
+    const model = store.model();
+    const record = model.byId[annotationKey(ref)];
+    return !!record && isEditableByHand(model, record.annotation);
+  };
+
+  const api = { get, list, isPending, getHovered, isEditable };
 
   return {
     get,

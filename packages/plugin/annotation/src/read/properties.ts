@@ -1,4 +1,5 @@
 import {
+  isEditableByHand,
   kindOf,
   linkOf,
   type Model,
@@ -15,7 +16,9 @@ import { propertyValue, propertyValues, type PropertySources } from './property-
 
 /**
  * The selection's style-panel properties, flags included, memoized by model
- * identity so a subscribed panel re-renders only when the model changed.
+ * identity so a subscribed panel re-renders only when the model changed. Only
+ * the members people may change by hand count (the `editable` setting): a
+ * selection of frozen annotations has nothing to restyle.
  */
 export function createPropertyReads(
   ctx: Pick<AnnotationContext, 'state'>,
@@ -49,7 +52,10 @@ export function createPropertyReads(
     if (cache && cache.model === model && cache.range === range) return cache.v;
     const members = model.selected
       .map((id) => model.byId[id])
-      .filter((record): record is ModelAnnotation => !!record);
+      .filter(
+        (record): record is ModelAnnotation =>
+          !!record && isEditableByHand(model, record.annotation),
+      );
     const properties = sharedProperties(members.map((record) => kindOf(record.annotation)));
     const sources = members.map((record) => sourcesOf(model, record));
     const values = sources.length ? propertyValues(properties, sources[0]!) : {};
@@ -72,9 +78,9 @@ export function createPropertyReads(
         if (rp.mixed.includes(spec.key)) mixed.push(spec.key);
       }
     }
-    const v: AnnotationProperties = { properties, values, mixed };
-    cache = { model, range, v };
-    return v;
+    const result: AnnotationProperties = { properties, values, mixed };
+    cache = { model, range, v: result };
+    return result;
   };
 
   return { activeTextRange, selectionPropertiesOf };

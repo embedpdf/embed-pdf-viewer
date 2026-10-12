@@ -6,10 +6,11 @@
   import DefaultOverflowMenu from './DefaultOverflowMenu.svelte';
   import DefaultOverflowTrigger from './DefaultOverflowTrigger.svelte';
   import { groupMenuView } from '@embedpdf/core-ui';
+  import type { Orientation } from '@embedpdf/web';
   import type { CollapsedGroupView } from './views';
   import { BORDER, SURFACE } from './paint';
 
-  let { view }: { view: CollapsedGroupView } = $props();
+  let { view, orientation }: { view: CollapsedGroupView; orientation: Orientation } = $props();
 
   let isOpen = $state(false);
   const active = $derived(view.commands.find((command) => command.active)?.id ?? '');
@@ -33,6 +34,6 @@
 {:else}
   <span style="position: relative; display: inline-flex">
     <DefaultOverflowTrigger {isOpen} toggle={() => (isOpen = !isOpen)} />
-    <DefaultOverflowMenu view={menu} />
+    <DefaultOverflowMenu view={menu} {orientation} />
   </span>
 {/if}

@@ -4,6 +4,6 @@
   // A key that's read once builds a new viewer, with the documents opened again.
   element.config = {
     ...element.config,
-    layout: (layout) => layout.remove(['tool:pan', 'menu:view'], { from: 'main' }),
+    layout: (layout) => layout.place('main', 'bottom'),
   };
 </script>

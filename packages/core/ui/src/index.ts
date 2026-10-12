@@ -65,15 +65,19 @@ export type {
   ViewerSize,
 } from './layout';
 export {
+  FLOAT_POSITIONS,
   MODES_GROUP,
   VIEW_MODE_COMMAND,
   barsAt,
+  barsFloating,
   barsInMode,
   barsOnEdge,
   barsWith,
   compileBar,
   edgeOf,
   edgeStackOf,
+  floatOf,
+  floatStackOf,
   hostOf,
   menuOf,
   modeCommandOf,
@@ -81,6 +85,7 @@ export {
   omittedCommandsOf,
   panelCommandOf,
   selectionOf,
+  tabsOf,
 } from './layout-compile';
 export type { CompileBarOptions, MenuSection, OmissionCommand } from './layout-compile';
 export { validateLayout } from './layout-validate';

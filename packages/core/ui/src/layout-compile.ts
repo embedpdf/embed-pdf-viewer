@@ -1,8 +1,8 @@
 /**
  * A layout read the way the viewer places it: the bars on an edge in their
- * order, the bars that ride along another bar or follow a selection, the modes
- * and their tabs, the menus' sections, and each bar as the {@link BarSchema} a
- * toolbar fits.
+ * order, the bars floating over the pages, the bars that ride along another bar
+ * or follow a selection, the modes and their tabs, the menus' sections, when the
+ * document tabs show, and each bar as the {@link BarSchema} a toolbar fits.
  *
  * The mode tabs are derived, never written: the group with id `modes` lists
  * View, then one tab per mode of the layout's bars, in bar order, before any
@@ -11,12 +11,14 @@
 import type {
   BarEdge,
   BarPlace,
+  FloatPosition,
   LayoutBar,
   LayoutData,
   LayoutItem,
   LayoutMenuSection,
   SectionName,
   SelectionTarget,
+  TabsVisibility,
 } from './layout';
 import {
   SECTION_NAMES,
@@ -53,6 +55,18 @@ export const panelCommandOf = (panel: string): string => `panel:${panel}`;
 
 const EDGES: readonly BarEdge[] = ['top', 'bottom', 'start', 'end'];
 
+/** Every place a bar can float over the pages: each corner, and the middle of each side. */
+export const FLOAT_POSITIONS: readonly FloatPosition[] = [
+  'top-start',
+  'top',
+  'top-end',
+  'start',
+  'end',
+  'bottom-start',
+  'bottom',
+  'bottom-end',
+];
+
 /** The layout's bars, by id, in order: the ones that are objects (`validateLayout` names the rest). */
 const barsOf = (data: LayoutData): [string, LayoutBar][] =>
   Object.entries(data.bars ?? {}).filter(
@@ -75,6 +89,16 @@ export function hostOf(place: BarPlace | undefined): string | null {
 /** What a place follows when it is over a selection, or `null`. */
 export function selectionOf(place: BarPlace | undefined): SelectionTarget | null {
   return typeof place === 'object' && place !== null && 'at' in place ? place.at : null;
+}
+
+/** Where a place floats over the pages, or `null` for a place that doesn't float. */
+export function floatOf(place: BarPlace | undefined): FloatPosition | null {
+  return typeof place === 'object' &&
+    place !== null &&
+    'float' in place &&
+    FLOAT_POSITIONS.includes(place.float)
+    ? place.float
+    : null;
 }
 
 /**
@@ -116,19 +140,39 @@ export function barsWith(data: LayoutData, host: string): string[] {
     .map(([id]) => id);
 }
 
-/**
- * Every bar drawn along an edge, from the outside in: each bar on the edge, followed by the bars
- * that ride along it (nearest first) and the bars that ride along those.
- */
-export function edgeStackOf(data: LayoutData, edge: BarEdge): string[] {
+/** `bars` in order, each followed by the bars that ride along it (nearest first), and theirs. */
+function withRiders(data: LayoutData, bars: readonly string[]): string[] {
   const stack: string[] = [];
   const visit = (id: string) => {
     if (stack.includes(id)) return;
     stack.push(id);
     for (const rider of barsWith(data, id)) visit(rider);
   };
-  for (const id of barsOnEdge(data, edge)) visit(id);
+  for (const id of bars) visit(id);
   return stack;
+}
+
+/**
+ * Every bar drawn along an edge, from the outside in: each bar on the edge, followed by the bars
+ * that ride along it (nearest first) and the bars that ride along those.
+ */
+export function edgeStackOf(data: LayoutData, edge: BarEdge): string[] {
+  return withRiders(data, barsOnEdge(data, edge));
+}
+
+/** The bars floating at `position`, in the order they were added. */
+export function barsFloating(data: LayoutData, position: FloatPosition): string[] {
+  return barsOf(data)
+    .filter(([, bar]) => floatOf(bar.place) === position)
+    .map(([id]) => id);
+}
+
+/**
+ * Every bar drawn floating at `position`, from the viewer's edge in: each bar floating there,
+ * followed by the bars that ride along it, as {@link edgeStackOf} orders an edge.
+ */
+export function floatStackOf(data: LayoutData, position: FloatPosition): string[] {
+  return withRiders(data, barsFloating(data, position));
 }
 
 /** The bars over a selection of this kind, in the order they were added. */
@@ -236,11 +280,17 @@ export function compileBar(
       if (object?.shed !== undefined) group.shed = object.shed;
       if (object?.collapse !== undefined) group.collapse = object.collapse;
       if (object?.importance !== undefined) group.importance = object.importance;
+      if (object?.dependent === true) group.dependent = true;
       groups.push(group);
     });
     if (groups.length > 0) sections[name] = groups;
   }
   return { id, sections: sections as BarSections };
+}
+
+/** When the document tabs show: as the layout says, else while more than one document is open. */
+export function tabsOf(data: LayoutData): TabsVisibility {
+  return data.tabs ?? 'multiple';
 }
 
 /** A menu section, read: its title and its command ids. */
@@ -317,9 +367,9 @@ function reachOf(data: LayoutData): LayoutReach {
 
 /**
  * The commands the bars leave out because what they lead to shows nothing: the tab of a mode
- * whose bars have nothing visible, and a button whose menu has nothing visible (or that the
- * layout has no menu for). Sorted, so two equal results compare equal; pass it to
- * {@link compileBar} as `omit`. Cheap to call on every change: what it reads of the layout is
+ * whose bars have nothing visible ({@link hasVisibleUnits}: dependent groups alone don't count),
+ * and a button whose menu has nothing visible (or that the layout has no menu for). Sorted, so
+ * two equal results compare equal; pass it to {@link compileBar} as `omit`. Cheap to call on every change: what it reads of the layout is
  * read once per layout data.
  */
 export function omittedCommandsOf(

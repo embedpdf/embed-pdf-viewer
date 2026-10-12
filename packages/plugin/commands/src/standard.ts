@@ -217,7 +217,11 @@ export function createStandardCommands(
         const annotation = context.tryGet(AnnotationToken);
         if (!annotation) return false;
         const selected = annotation.selection.list();
-        return selected.length > 0 && selected.every(({ ref }) => annotation.canDelete(ref));
+        // `isEditable`: the annotation plugin's `editable` setting lets people change it by hand.
+        return (
+          selected.length > 0 &&
+          selected.every(({ ref }) => annotation.canDelete(ref) && annotation.isEditable(ref))
+        );
       },
     },
 

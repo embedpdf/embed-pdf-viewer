@@ -92,13 +92,25 @@ export interface FormSettings {
     /** The text of a field that has no color of its own. */
     readonly color: string;
   };
+  /**
+   * Which fields people may fill in by hand: `true`, every one; `false`,
+   * none; or a list of field families (`'text'`, `'checkbox'`,
+   * `'signature'`…). A field left out draws as a read-only one does, and
+   * takes no typing, clicks or picks. Only the interface: your code still
+   * fills it in (`setValue()`, `importValues()`), and `canFill()` doesn't change.
+   */
+  readonly fillable: FillableFields;
 }
+
+/** Which fields people may fill in by hand: all, none, or those of these families. */
+export type FillableFields = boolean | readonly FormFieldFamily[];
 
 /** What the form settings are when the app registers none. */
 export const FORM_DEFAULTS: FormSettings = {
   validation: 'scripts',
   focus: { color: null },
   fields: { border: null, background: 'rgb(255 255 255 / 0.92)', color: '#1f2a44' },
+  fillable: true,
 };
 
 /** What `formPlugin(config)` takes: any of the settings, merged over the defaults. */

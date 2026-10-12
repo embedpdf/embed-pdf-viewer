@@ -15,7 +15,7 @@
  * shows Ungroup, and the ungroup verb can never strip an attached link's
  * `/IRT` (which would orphan it into an unmanaged standalone document link).
  */
-import { annotTransformable } from './flags';
+import { isTransformableByHand } from './editable';
 import { isAttachedLink } from './plane';
 import type { KindCaps } from './kinds';
 import { groupOf, kindOf } from './record';
@@ -28,7 +28,7 @@ const visualMember = (record: ModelAnnotation | undefined): boolean =>
 /**
  * The transform capabilities of a multi-target (group) selection: a group can
  * move/resize/rotate only if every member's kind allows that group op and no
- * member is locked. This is the single resolver every adapter consumes, so no
+ * member is locked or frozen by the session's `editable` rule. This is the single resolver every adapter consumes, so no
  * framework component re-derives the rule. The iso-vs-
  * aniso resize choice is computed separately, per-gesture, since it depends on
  * the live `rot` of the members, not the static caps.
@@ -45,7 +45,9 @@ export function groupCaps(model: Model, ids: Id[]): GroupCaps {
     .filter((record): record is NonNullable<typeof record> => !!record);
   if (members.length === 0) return { movable: false, resizable: false, rotatable: false };
   const ok = (pick: (caps: KindCaps) => boolean): boolean =>
-    members.every((record) => annotTransformable(record) && pick(kindOf(record.annotation).caps));
+    members.every(
+      (record) => isTransformableByHand(model, record) && pick(kindOf(record.annotation).caps),
+    );
   return {
     movable: ok((caps) => caps.groupMovable),
     resizable: ok((caps) => caps.groupResizable),

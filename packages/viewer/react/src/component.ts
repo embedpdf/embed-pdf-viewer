@@ -31,9 +31,10 @@
  * `@embedpdf/react` in them read this viewer.
  *
  * `src`, `theme`, `locale`, `disable` and `readOnly` follow their props: the
- * element changes them in place. Every other prop is read once, when the
- * viewer starts; a later change is ignored (development warns), and a new
- * `key` mounts a new viewer with it.
+ * element changes them in place. `onReady` and `onDocumentChange` call the
+ * latest prop. Every other prop is read once, when the viewer starts; a later
+ * change is ignored (development warns), and a new `key` mounts a new viewer
+ * with it.
  */
 // The headless runtime carries no engine: it gives the children the viewer's kernel.
 import { KernelProvider, type Kernel } from '@embedpdf/react/runtime';
@@ -67,12 +68,6 @@ export interface PDFViewerExtras {
   children?: ReactNode;
   /** The underlying element, if you need the imperative surface. */
   elementRef?: Ref<EmbedPdfViewerElement>;
-  /** The viewer in code, once it's live: `get(name)`, `documents`,
-   *  `commands`, `watch`. */
-  onReady?: (viewer: Viewer) => void;
-  /** The active document changed (a tab switch, an open, the last close) —
-   *  the React face of the element's `epdf:documentchange` event. */
-  onDocumentChange?: (documentId: string | null) => void;
 }
 
 /** Where the viewer keeps its kernel (`createViewer` in `@embedpdf/viewer-chrome`). */
@@ -134,6 +129,12 @@ export function PDFViewer({
   onReadyRef.current = onReady;
   const onDocumentChangeRef = useRef(onDocumentChange);
   onDocumentChangeRef.current = onDocumentChange;
+  // The callbacks reach the element once, as functions that call the latest prop: an inline
+  // callback is a new function every render, and that changes nothing.
+  const callbacks = useRef<Pick<ElementConfig, 'onReady' | 'onDocumentChange'>>({
+    onReady: (viewer) => onReadyRef.current?.(viewer),
+    onDocumentChange: (documentId) => onDocumentChangeRef.current?.(documentId),
+  });
   // Read once, like <Viewer engine/plugins>: the element boots once with the
   // first config. A later change to anything but the live props cannot mean
   // "rebuild" without dropping every open document, so it is ignored — loudly,
@@ -154,23 +155,13 @@ export function PDFViewer({
     if (!element) return;
     const onEvent = () => {
       const viewer = element.viewer;
-      if (!viewer) return;
-      setKernel(kernelOf(viewer));
-      onReadyRef.current?.(viewer);
+      if (viewer) setKernel(kernelOf(viewer));
     };
-    const onDocumentChangeEvent = (event: Event) =>
-      onDocumentChangeRef.current?.(
-        (event as CustomEvent<{ documentId: string | null }>).detail.documentId,
-      );
     element.addEventListener('epdf:ready', onEvent);
-    element.addEventListener('epdf:documentchange', onDocumentChangeEvent);
-    element.config = configRef.current;
+    element.config = { ...configRef.current, ...callbacks.current };
     // A remount-with-key that reuses a live element cannot miss the event.
     if (element.viewer) onEvent();
-    return () => {
-      element.removeEventListener('epdf:ready', onEvent);
-      element.removeEventListener('epdf:documentchange', onDocumentChangeEvent);
-    };
+    return () => element.removeEventListener('epdf:ready', onEvent);
   }, []);
 
   // The live props, after every render: the element compares them by value, so an unchanged

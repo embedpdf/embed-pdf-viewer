@@ -1,26 +1,48 @@
 <!--
-  The default "More" menu: a minimal popover under its button, which a press
-  anywhere outside it closes. A row that opens a submenu stays open; every
-  other row closes the menu after it runs.
+  The default "More" menu: a minimal popover under its button in a horizontal
+  toolbar and beside it in a vertical one. A press anywhere outside it closes
+  it, and while it's open it takes the menu keys (`attachMenuKeys`): focus on
+  its first row, the arrows, typeahead, Enter, and Escape back to its button. A
+  row that opens a submenu keeps it open; every other row closes it after it
+  runs.
 -->
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { OverflowRow } from '@embedpdf/core-ui';
-import { observeOutsidePress } from '@embedpdf/web';
+import { attachMenuKeys, focusablesIn, observeOutsidePress } from '@embedpdf/web';
+import type { Orientation } from '@embedpdf/web';
 import type { OverflowMenuView } from './views';
 import { BORDER, SURFACE } from './paint';
 
-const props = defineProps<{ view: OverflowMenuView }>();
+const props = defineProps<{ view: OverflowMenuView; orientation: Orientation }>();
 
 const menu = ref<HTMLElement | null>(null);
-watchEffect(
-  (onCleanup) => {
+// On the element and whether it's open, never on the view: the toolbar hands a new view on every
+// change, and attaching again would put focus back on the first row.
+watch(
+  [menu, () => props.view.isOpen],
+  ([element, isOpen], _previous, onCleanup) => {
+    if (!isOpen || !element) return;
     // The menu's parent holds its button too: a press on it is the button's own toggle.
-    const container = menu.value?.parentElement ?? menu.value;
-    if (!props.view.isOpen || !container) return;
-    onCleanup(observeOutsidePress(container, () => props.view.close()));
+    const container = element.parentElement ?? element;
+    const trigger =
+      focusablesIn(container).find((candidate) => !element.contains(candidate)) ?? null;
+    const close = () => props.view.close();
+    const stopOutside = observeOutsidePress(container, close);
+    const detachKeys = attachMenuKeys(element, { trigger, close });
+    onCleanup(() => {
+      stopOutside();
+      detachKeys();
+    });
   },
-  { flush: 'post' },
+  { immediate: true, flush: 'post' },
+);
+
+/** Under a horizontal toolbar's button, beside a vertical one's. */
+const placement = computed(() =>
+  props.orientation === 'vertical'
+    ? { top: 0, insetInlineStart: '100%' }
+    : { top: '100%', insetInlineEnd: 0 },
 );
 
 // Each row with its command resolved; a row whose command is unknown isn't drawn.
@@ -47,8 +69,7 @@ function choose(row: OverflowRow) {
     role="menu"
     :style="{
       position: 'absolute',
-      right: 0,
-      top: '100%',
+      ...placement,
       zIndex: 41,
       minWidth: '200px',
       padding: '4px',
@@ -67,6 +88,7 @@ function choose(row: OverflowRow) {
         :role="section.radio ? 'menuitemradio' : 'menuitem'"
         :aria-checked="section.radio ? command.active : undefined"
         :disabled="!command.enabled"
+        tabindex="-1"
         :style="{
           display: 'flex',
           width: '100%',

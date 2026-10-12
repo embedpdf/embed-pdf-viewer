@@ -16,7 +16,7 @@
  * projected here rather than hand-written — same information, one source.
  */
 import type { NormalizedBar, NormalizedGroup, NormalizedUnit } from './schema';
-import { commandOfUnit } from './schema';
+import { commandOfUnit, filterBar } from './schema';
 import type { FitResult } from './solver';
 
 export type OverflowRow =
@@ -98,7 +98,8 @@ export interface StripGroup {
  * strip anchored to a selection has no fit pressure to solve). The schema
  * declares what could appear; `visible` (the command registry's runtime truth)
  * decides what does: hidden commands drop out, groups that empty out vanish,
- * and an all-hidden bar projects to [] — "render nothing" falls out. Custom
+ * and an all-hidden bar projects to [] — "render nothing" falls out, as it
+ * does for a bar with only dependent groups left ({@link filterBar}). Custom
  * units project through their `terminal` command, same totality rule as the
  * overflow. Upgrading a strip to measured/overflowing rendering later is a
  * renderer swap (<Toolbar>), never a schema change.
@@ -107,12 +108,16 @@ export function projectStrip(
   bar: NormalizedBar,
   visible: (command: string) => boolean,
 ): StripGroup[] {
+  const shown = filterBar(bar, (unit) => {
+    const command = commandOfUnit(unit);
+    return command !== null && visible(command);
+  });
   const groups: StripGroup[] = [];
-  for (const section of bar.sections) {
+  for (const section of shown.sections) {
     for (const group of section.groups) {
       const commands = group.units
         .map(commandOfUnit)
-        .filter((command): command is string => command !== null && visible(command));
+        .filter((command): command is string => command !== null);
       if (commands.length === 0) continue;
       groups.push({ id: group.id, labelKey: group.labelKey, commands });
     }

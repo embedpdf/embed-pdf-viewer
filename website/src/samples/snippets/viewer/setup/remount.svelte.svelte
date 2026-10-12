@@ -1,13 +1,16 @@
 <script lang="ts">
   import { PDFViewer, type Layout } from '@embedpdf/viewer-svelte';
 
-  let { simple }: { simple: boolean } = $props();
+  let { toolbarBelow }: { toolbarBelow: boolean } = $props();
 
-  const simpleLayout = (layout: Layout) =>
-    layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
+  const toolbarAtBottom = (layout: Layout) => layout.place('main', 'bottom');
 </script>
 
 <!-- A new key mounts a new viewer with the new config. -->
-{#key simple}
-  <PDFViewer src="/report.pdf" layout={simple ? simpleLayout : undefined} style="height: 100vh" />
+{#key toolbarBelow}
+  <PDFViewer
+    src="/report.pdf"
+    layout={toolbarBelow ? toolbarAtBottom : undefined}
+    style="height: 100vh"
+  />
 {/key}

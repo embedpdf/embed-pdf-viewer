@@ -1,14 +1,14 @@
 import { PDFViewer, type Layout } from '@embedpdf/viewer-react';
 
-const simpleLayout = (layout: Layout) => layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
+const toolbarAtBottom = (layout: Layout) => layout.place('main', 'bottom');
 
-export function Report({ simple }: { simple: boolean }) {
+export function Report({ toolbarBelow }: { toolbarBelow: boolean }) {
   // A new key mounts a new viewer with the new config.
   return (
     <PDFViewer
-      key={simple ? 'simple' : 'full'}
+      key={toolbarBelow ? 'below' : 'above'}
       src="/report.pdf"
-      layout={simple ? simpleLayout : undefined}
+      layout={toolbarBelow ? toolbarAtBottom : undefined}
       style={{ height: '100vh' }}
     />
   );

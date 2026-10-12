@@ -215,9 +215,24 @@ Set them when you register the plugin, and change them while the app runs with
 | `fields.border`     | The edge of a field that has no border of its own                          | the viewer's accent at 55%   | `--epdf-form-field-border`     |
 | `fields.background` | Inside a field that has no background of its own                           | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
 | `fields.color`      | The check mark and text of a field that has no color of its own            | `'#1f2a44'`                    | `--epdf-form-field-color`      |
+| `fillable`          | Which fields people fill in by hand: `true`, `false`, or field families    | `true`                       | —                              |
 
 Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too,
 and a form with scripts logs a hint once.
+
+`fillable` is for the people using your app. A field it leaves out draws as a read-only field
+does, and takes no typing, clicks or picks; your code still fills it in with `setValue()` and
+`importValues()`, and `canFill(ref)` doesn't change:
+
+```ts
+formPlugin({ fillable: false }); // show the values, take no input
+form.updateSettings({ fillable: ['text', 'checkbox'] }); // only these families
+form.updateSettings({ fillable: true }); // every field again
+```
+
+The families are `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` and
+`'signature'` (signing a field is filling it in). To stop your code too, leave `doc.forms.fill` out
+of the scope (see [Permissions](#permissions)).
 
 The colors are what the viewer draws around fields; a field's own colors are saved in the PDF (see
 [Building forms](forms/building)). A CSS variable wins over the setting: see

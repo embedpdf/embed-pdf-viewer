@@ -241,3 +241,20 @@ describe('projectStrip', () => {
     ]);
   });
 });
+
+describe('projectStrip with dependent groups', () => {
+  const strip = normalizeBar({
+    id: 'strip',
+    sections: {
+      center: [
+        group('actions', ['annotation:comment']),
+        group('history', ['history:undo'], { dependent: true }),
+      ],
+    },
+  });
+
+  it('shows them beside a group that is not dependent, and projects [] without one', () => {
+    expect(projectStrip(strip, () => true).map((each) => each.id)).toEqual(['actions', 'history']);
+    expect(projectStrip(strip, (id) => id === 'history:undo')).toEqual([]);
+  });
+});

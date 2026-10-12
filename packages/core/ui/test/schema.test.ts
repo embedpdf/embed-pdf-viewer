@@ -94,3 +94,66 @@ describe('hasVisibleUnits', () => {
     expect(hasVisibleUnits(normalizeBar({ id: 'empty', sections: {} }), () => true)).toBe(false);
   });
 });
+
+describe('dependent groups', () => {
+  // A mode bar: its tools, then undo and redo, which only make sense beside them.
+  const mode = normalizeBar({
+    id: 'annotate',
+    sections: {
+      center: [
+        group('markup', ['tool:highlight', 'tool:underline']),
+        group('history', ['history:undo', 'history:redo'], { dependent: true }),
+      ],
+    },
+  });
+  const keepOnly =
+    (...commands: string[]) =>
+    (unit: { readonly key: string }) =>
+      commands.some((command) => unit.key.endsWith(`:${command}`));
+
+  it('are normalized, not dependent unless they say so', () => {
+    const [markup, history] = mode.sections[0]!.groups;
+    expect(markup!.dependent).toBe(false);
+    expect(history!.dependent).toBe(true);
+  });
+
+  it('leave the bar empty when nothing else is left', () => {
+    const keep = keepOnly('history:undo', 'history:redo');
+    expect(hasVisibleUnits(mode, keep)).toBe(false);
+    const filtered = filterBar(mode, keep);
+    expect(filtered.sections[0]!.groups.map((each) => each.units)).toEqual([[], []]);
+  });
+
+  it('show while a group that is not dependent shows', () => {
+    const keep = keepOnly('tool:highlight', 'history:undo', 'history:redo');
+    expect(hasVisibleUnits(mode, keep)).toBe(true);
+    const filtered = filterBar(mode, keep);
+    expect(filtered.sections[0]!.groups.map((each) => each.units.map((unit) => unit.key))).toEqual([
+      ['markup:tool:highlight'],
+      ['history:history:undo', 'history:history:redo'],
+    ]);
+  });
+
+  it('show beside your own component without a command, which always shows', () => {
+    const notes = normalizeBar({
+      id: 'notes',
+      sections: {
+        center: [
+          group('pad', [custom('pad')]),
+          group('history', ['history:undo'], { dependent: true }),
+        ],
+      },
+    });
+    expect(hasVisibleUnits(notes, () => true)).toBe(true);
+    expect(filterBar(notes, () => true).sections[0]!.groups[1]!.units).toHaveLength(1);
+  });
+
+  it('never show in a bar where every group is dependent', () => {
+    const alone = normalizeBar({
+      id: 'alone',
+      sections: { end: [group('history', ['history:undo'], { dependent: true })] },
+    });
+    expect(hasVisibleUnits(alone, () => true)).toBe(false);
+    expect(filterBar(alone, () => true).sections[0]!.groups[0]!.units).toEqual([]);
+  });
+});

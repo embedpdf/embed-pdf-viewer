@@ -96,6 +96,17 @@ export {
   type AnnotationFlags,
   type FlagBearer,
 } from './flags';
+// What people may change by hand: the session's `editable` rule, beside the flags.
+export {
+  editableKindOf,
+  isContentsEditableByHand,
+  isDeletableByHand,
+  isEditableByHand,
+  isTransformableByHand,
+  type EditableKind,
+  type EditableKinds,
+  type MeasurementIntent,
+} from './editable';
 // Screen-anchored (`noZoom`/`noRotate`) bodies: display-transform exemptions.
 // One projection (`anchoredGeom`) + its exact inverse (`unanchoredGeom`),
 // shared by render / hit / chrome / gestures.

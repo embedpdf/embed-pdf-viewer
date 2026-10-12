@@ -86,15 +86,15 @@ layout.addBar('review', {
 
 ## A floating toolbar
 
-A bar can float over the pages, as the page number does by default. This one puts zoom controls in
-the bottom-right corner:
+A bar can float over the pages, as the page number does by default. This one puts the zoom field,
+with its out and in buttons, in the bottom-right corner:
 
 ```js
 {
   layout: (layout) =>
     layout.addBar('zoom', {
       place: { float: 'bottom-end' },
-      center: [['zoom:out', { custom: 'zoom' }, 'zoom:in']],
+      center: [[{ custom: 'zoom' }]],
     }),
 }
 ```
@@ -176,6 +176,7 @@ A group is an array of items, or an object when it needs a name or options:
 | `items` | The items | none |
 | `collapse` | Fold into one button with a menu (`'menu'`) or a dropdown (`'select'`) when there's no room | none |
 | `importance` | Who makes room first, `1` to `5` | `3` |
+| `dependent` | Show only while something in the bar that isn't `dependent` shows, like undo and redo beside a mode's tools | `false` |
 
 A lone item in a section, like `'document:download'` above, is a group of one.
 
@@ -263,7 +264,9 @@ That's a reading room: zoom, search and download, nothing else. Which one to cho
 
 **Your own components the viewer ships**: `{ custom: 'zoom' }` (the zoom field),
 `{ custom: 'page-number' }` (the page number and count), `{ custom: 'quick-stamps' }` (the stamps
-bar of the Insert mode), `{ custom: 'measurement-scale' }` (the scale of the Measure mode).
+bar of the Insert mode), `{ custom: 'measurement-scale' }` (the scale of the Measure mode),
+`{ custom: 'view-only' }` (the [View only](../features/turning-off#read-only) label, in the main bar's
+`panels` group).
 
 **Buttons**: every command, listed with what it does on [Buttons & commands](commands#every-built-in-command).
 
@@ -271,8 +274,9 @@ bar of the Insert mode), `{ custom: 'measurement-scale' }` (the scale of the Mea
 
 A button for something the user [may not do](../features/turning-off#what-a-user-may-do), or that
 you [turned off](../features/turning-off), isn't in the bar, and a group,
-bar, mode tab or menu with nothing left disappears. Your layout stays the same: give the user the
-permission, and everything is back where you put it.
+bar, mode tab or menu with nothing left disappears. The `style` and `history` groups of the mode
+bars are `dependent`, so a mode bar left with only style, undo and redo disappears too. Your layout
+stays the same: give the user the permission, and everything is back where you put it.
 
 ### Ids are kept
 

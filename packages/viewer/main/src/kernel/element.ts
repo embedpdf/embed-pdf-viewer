@@ -22,7 +22,6 @@ import {
   themeTokenProperty,
   type FullViewerProps,
   type ThemeTokens,
-  type Unsubscribe,
   type Viewer,
 } from '@embedpdf/viewer-chrome';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
@@ -217,7 +216,6 @@ export class EmbedPdfViewerElement extends ElementBase {
   #shown: ElementConfig | null = null;
   #props: FullViewerProps | null = null;
   #viewer: Viewer | null = null;
-  #disposers: Unsubscribe[] = [];
   #srcDocument: SrcDocument | null = null;
   /** The ids of `src` documents still closing, which a new one must not take. */
   #closing = new Set<string>();
@@ -344,8 +342,6 @@ export class EmbedPdfViewerElement extends ElementBase {
   }
 
   #unmount(): void {
-    for (const dispose of this.#disposers) dispose();
-    this.#disposers = [];
     this.#viewer = null;
     this.#srcDocument = null;
     this.#closing.clear();
@@ -355,20 +351,18 @@ export class EmbedPdfViewerElement extends ElementBase {
     this.#root = null;
   }
 
-  /** Viewer arrival = the viewer is live. `epdf:ready` is the addEventListener
-   *  face of it; `epdf:documentchange` is sugar over `viewer.watch` — the one
-   *  reactivity primitive remains the viewer itself. */
-  #onViewer = (viewer: Viewer): void => {
+  /** The viewer is live: `src` opens, then `epdf:ready` and the config's `onReady` say so. */
+  #onReady = (viewer: Viewer): void => {
     this.#viewer = viewer;
-    this.#disposers.push(
-      viewer.watch(
-        () => viewer.documents.getActiveId(),
-        (documentId) =>
-          this.dispatchEvent(new CustomEvent('epdf:documentchange', { detail: { documentId } })),
-      ),
-    );
     this.#showSrc();
     this.dispatchEvent(new CustomEvent('epdf:ready', { detail: { viewer } }));
+    this.#shown?.onReady?.(viewer);
+  };
+
+  /** The active document changed: `epdf:documentchange` and the config's `onDocumentChange`. */
+  #onDocumentChange = (documentId: string | null): void => {
+    this.dispatchEvent(new CustomEvent('epdf:documentchange', { detail: { documentId } }));
+    this.#shown?.onDocumentChange?.(documentId);
   };
 
   /**
@@ -438,8 +432,10 @@ export class EmbedPdfViewerElement extends ElementBase {
       initialDocuments: documents,
       theme,
       themeTarget: this.#wrapper,
-      onViewer: this.#onViewer,
       ...customization,
+      // The element's own, which call the config's after its events.
+      onReady: this.#onReady,
+      onDocumentChange: this.#onDocumentChange,
     };
     this.#root = createRoot(this.#wrapper!);
     this.#root.render(createElement(FullViewer, this.#props));

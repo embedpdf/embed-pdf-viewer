@@ -157,3 +157,49 @@ describe('kernel: documents.openAll', () => {
     expect(kernel.documents.getActiveId()).toBe('a');
   });
 });
+
+describe('kernel: a read while a plugin is being created', () => {
+  it('finds no capability yet, and never builds the plugin twice', async () => {
+    const { engine, resolve } = controllableEngine();
+    const token = { name: 'records' };
+    let creates = 0;
+    let status: (() => string) | null = null;
+    const plugin: AnyPlugin = {
+      id: 'records',
+      scope: 'document',
+      token,
+      state: () => ({ count: 0 }),
+      create: (ctx) => {
+        creates += 1;
+        const mirror = ctx.mirror({
+          name: 'list',
+          initial: () => 0,
+          load: async () => ({ value: 1 }),
+          fold: (value: number) => value,
+        });
+        status = mirror.getStatus;
+        // A store notification from inside `create`: a listener reads the plugin meanwhile.
+        ctx.state.update((state: { count: number }) => ({ count: state.count + 1 }));
+        return { api: { getStatus: mirror.getStatus } };
+      },
+    };
+    const kernel = createKernel({ engine, plugins: [plugin] });
+    const reads: unknown[] = [];
+    kernel.subscribe(() => {
+      try {
+        reads.push(kernel.capability(token, 'a'));
+      } catch (error) {
+        reads.push((error as { code?: string }).code ?? 'threw');
+      }
+    });
+    const open = kernel.documents.open(bytesInput('a'));
+    resolve('a');
+    await open;
+    await settle();
+    expect(creates).toBe(1);
+    expect(reads).toContain('not-ready');
+    // The one instance is connected, so its mirror loaded.
+    expect(status!()).toBe('ready');
+    expect(kernel.tryCapability(token, 'a')).toBe(kernel.capability(token, 'a'));
+  });
+});

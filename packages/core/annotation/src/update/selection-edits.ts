@@ -2,10 +2,12 @@
  * Edits the toolbar applies to the whole selection: fields, text formats,
  * links, flags, quarter turns, reset rotation, delete. Each changed record's
  * change is its own engine write (`update` derives it from the change set).
+ * They are changes by hand: a record the session's `editable` rule freezes
+ * is skipped (editable.ts).
  */
 import type { AnnotationFlags, PdfLinkTarget, RichTextBody } from '@embedpdf/engine-core/runtime';
 
-import { annotDeletable, annotTransformable } from '../flags';
+import { isDeletableByHand, isEditableByHand, isTransformableByHand } from '../editable';
 import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
 import { groupUnionBounds } from '../hit';
 import { linkChildrenOf } from '../links';
@@ -18,8 +20,9 @@ import { withoutRecords } from './changes';
 type TextFormat = 'bold' | 'italic' | 'underline';
 
 /**
- * The model with `change` applied to each record of `ids` (a record listed
- * twice sees its first change). The same model when no record changes.
+ * The model with `change` applied to each record of `ids` that people may
+ * change by hand (a record listed twice sees its first change). The same
+ * model when no record changes.
  */
 function changeRecords(
   model: Model,
@@ -29,7 +32,7 @@ function changeRecords(
   let byId: Model['byId'] | null = null;
   for (const id of ids) {
     const record = (byId ?? model.byId)[id];
-    if (!record) continue;
+    if (!record || !isEditableByHand(model, record.annotation)) continue;
     const next = change(record);
     if (next === record) continue;
     byId ??= { ...model.byId };
@@ -97,7 +100,11 @@ export function setLink(model: Model, target: PdfLinkTarget | null): [Model, Eff
   const links: Id[] = [];
   for (const id of model.selected) {
     const record = model.byId[id];
-    if (!record || !annotTransformable(record) || !kindTakesLink(kindOf(record.annotation)))
+    if (
+      !record ||
+      !isTransformableByHand(model, record) ||
+      !kindTakesLink(kindOf(record.annotation))
+    )
       continue;
     if (record.annotation.subtype === 'link') links.push(id);
     else fx.push({ type: 'syncLink', id, target });
@@ -130,7 +137,9 @@ export function setFlags(
 export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[]] {
   const ids = model.selected.filter((id) => {
     const record = model.byId[id];
-    return record && annotTransformable(record) && kindOf(record.annotation).caps.rotatable;
+    return (
+      record && isTransformableByHand(model, record) && kindOf(record.annotation).caps.rotatable
+    );
   });
   if (!ids.length) return [model, []];
   // pivot: where the engine turns a single shape (`turnPivotOf`: a box's
@@ -169,7 +178,11 @@ export function resetRotation(model: Model): [Model, Effect[]] {
   let turned = false;
   for (const id of model.selected) {
     const record = byId[id];
-    if (!record || !annotTransformable(record) || !kindOf(record.annotation).caps.rotatable)
+    if (
+      !record ||
+      !isTransformableByHand(model, record) ||
+      !kindOf(record.annotation).caps.rotatable
+    )
       continue;
     const geometry = shapeOf(record.annotation);
     if (geomRotation(geometry) === 0) continue;
@@ -181,12 +194,13 @@ export function resetRotation(model: Model): [Model, Effect[]] {
 }
 
 export function deleteSelection(model: Model): [Model, Effect[]] {
-  // `locked` (and inert `/F` states) protect against deletion — only the
-  // transformable members go; the rest keep their selection, so a mixed
-  // selection deletes what it may and leaves the frozen ones visibly selected.
+  // `locked` (and inert `/F` states) and the `editable` rule protect against
+  // deletion — only the deletable members go; the rest keep their selection,
+  // so a mixed selection deletes what it may and leaves the frozen ones
+  // visibly selected.
   const deletable = model.selected.filter((id) => {
     const record = model.byId[id];
-    return !!record && annotDeletable(record);
+    return !!record && isDeletableByHand(model, record);
   });
   if (!deletable.length) return [model, []];
   // Attached link children die with their parent. They are model

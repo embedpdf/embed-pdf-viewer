@@ -37,7 +37,7 @@ You don't choose. A menu opens away from the edge its bar sits on, toward the pa
 | A bar at the bottom | Above it |
 | A bar at the start or end | Beside it, toward the pages |
 | A floating bar | Away from the corner or edge it floats at |
-| A bar over a selection | Below the bar, or above it when that's closer to the selection |
+| A bar over a selection | Away from the selection, so it never covers it, flipping when there's no room |
 
 When there's no room on that side, it opens on the other. A menu can reach past the viewer's
 edge, like a menu in any app, and it never goes off the screen. On a phone, every menu opens as a
@@ -82,8 +82,9 @@ layout.add('acme:share', { to: 'document', after: 'document:download' });
 
 ## Choices
 
-A command that's `active` shows a check mark in a menu. The view menu uses this for one page or
-two, and for the scrolling direction, so the current choice is always marked.
+A command that's `active` is marked in a menu with the accent color, like an active toolbar button.
+The view menu uses this for one page or two, and for the scrolling direction, so the current choice
+is always marked.
 
 ## Over a selection
 

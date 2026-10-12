@@ -18,6 +18,7 @@ import type {
   RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
 
+import type { EditableKinds } from './editable';
 import type { DistanceAppearance, MeasurementAppearance } from './measurement';
 import type { ShapeMeasurementAppearance } from './measurement-shape';
 import type { BoxShape } from './shapes/box';
@@ -520,6 +521,8 @@ export interface Session {
   editing: Id | null;
   /** Snapping behaviour (alignment guides + rotation). */
   snap: SnapSettings;
+  /** Which annotations people may change by hand (editable.ts): the plugin sets it from its settings. */
+  editable: EditableKinds;
 }
 
 /**

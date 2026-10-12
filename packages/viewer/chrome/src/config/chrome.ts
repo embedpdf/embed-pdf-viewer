@@ -12,12 +12,19 @@
  */
 import { createLayout, type LayoutData, type LayoutGroupObject } from '@embedpdf/core-ui';
 
-// Shared by the mode bars: plain values, so composition is just a const.
-const style: LayoutGroupObject = { id: 'style', items: ['panel:style'], importance: 4 };
+// Shared by the mode bars: plain values, so composition is just a const. Both are dependent:
+// they show beside a mode's tools, and a bar left with only them shows nothing, nor its tab.
+const style: LayoutGroupObject = {
+  id: 'style',
+  items: ['panel:style'],
+  importance: 4,
+  dependent: true,
+};
 const history: LayoutGroupObject = {
   id: 'history',
   items: ['history:undo', 'history:redo'],
   importance: 3,
+  dependent: true,
 };
 
 export const DEFAULT_LAYOUT: LayoutData = {
@@ -56,7 +63,19 @@ export const DEFAULT_LAYOUT: LayoutData = {
           titleKey: 'commands.mode.group',
         },
       ],
-      end: [{ id: 'panels', items: ['panel:search', 'panel:comments'], importance: 5 }],
+      end: [
+        {
+          id: 'panels',
+          items: [
+            // The View only label: it shows only while nothing can change the document, and
+            // draws its icon alone when there's no room.
+            { custom: 'view-only', variants: ['label', 'icon'] },
+            'panel:search',
+            'panel:comments',
+          ],
+          importance: 5,
+        },
+      ],
     },
 
     // ── the mode bars: along main, one at a time ──────────────────────────────

@@ -51,10 +51,10 @@ async function open(browser: Browser, url: string): Promise<Page> {
   await waitForDocument(tab);
   // Wait for the first page's text, then drag across the title.
   await tab.waitForTimeout(1500);
-  await tab.mouse.move(310, 240);
+  await tab.mouse.move(310, 196);
   await tab.mouse.down();
-  await tab.mouse.move(450, 240, { steps: 5 });
-  await tab.mouse.move(600, 240, { steps: 5 });
+  await tab.mouse.move(450, 196, { steps: 5 });
+  await tab.mouse.move(600, 196, { steps: 5 });
   await tab.mouse.up();
   await tab.mouse.move(0, 0);
   await frames(tab);

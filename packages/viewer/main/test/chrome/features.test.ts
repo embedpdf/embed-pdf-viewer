@@ -5,7 +5,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { disabledSettingsOf } from '../../../chrome/src/features';
+import {
+  byHandSettingsOf,
+  disabledSettingsOf,
+  leavesNothingToChange,
+} from '../../../chrome/src/features';
 
 describe('disabledSettingsOf', () => {
   it('turns nothing off without disable or readOnly', () => {
@@ -99,5 +103,57 @@ describe('disabledSettingsOf', () => {
     });
     const { disabledCategories } = disabledSettingsOf(['shapes'], true);
     expect(disabledCategories.filter((feature) => feature === 'shapes')).toHaveLength(1);
+  });
+});
+
+describe('byHandSettingsOf', () => {
+  it('lets people change everything by hand while nothing is off', () => {
+    expect(byHandSettingsOf(undefined, undefined)).toEqual({ editable: true, fillable: true });
+    // A single command turned off leaves what its feature made.
+    expect(byHandSettingsOf(['tool:square', 'search'], false)).toEqual({
+      editable: true,
+      fillable: true,
+    });
+  });
+
+  it('freezes everything with readOnly', () => {
+    expect(byHandSettingsOf(undefined, true)).toEqual({ editable: false, fillable: false });
+  });
+
+  it('freezes shapes and keeps highlights with disable: shapes', () => {
+    const { editable, fillable } = byHandSettingsOf(['shapes'], undefined);
+    expect(fillable).toBe(true);
+    expect(editable).toEqual(expect.arrayContaining(['highlight', 'free-text', 'line-dimension']));
+    for (const shape of ['square', 'circle', 'line', 'polygon', 'polyline'])
+      expect(editable).not.toContain(shape);
+  });
+
+  it('tells measurements apart from the shapes they are drawn as', () => {
+    const { editable } = byHandSettingsOf(['measurement'], undefined);
+    expect(editable).toContain('line');
+    expect(editable).not.toContain('line-dimension');
+  });
+
+  it('keeps what readOnly excepts: a form people fill in, its signature fields not', () => {
+    expect(byHandSettingsOf(undefined, { except: ['forms.filling'] })).toEqual({
+      editable: false,
+      fillable: ['text', 'checkbox', 'radio', 'combobox', 'listbox', 'pushbutton'],
+    });
+    expect(byHandSettingsOf(undefined, { except: ['annotations.highlight'] }).editable).toEqual([
+      'highlight',
+    ]);
+  });
+});
+
+describe('leavesNothingToChange', () => {
+  it('holds while every feature that changes the document is off', () => {
+    const off = (names: readonly string[]) => (feature: string) =>
+      names.some((name) => feature === name || feature.startsWith(`${name}.`));
+    expect(leavesNothingToChange(off(disabledSettingsOf(undefined, true).disabledCategories))).toBe(
+      true,
+    );
+    const filling = disabledSettingsOf(undefined, { except: ['forms.filling'] }).disabledCategories;
+    expect(leavesNothingToChange(off(filling))).toBe(false);
+    expect(leavesNothingToChange(off(['shapes']))).toBe(false);
   });
 });

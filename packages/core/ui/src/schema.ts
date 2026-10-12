@@ -71,6 +71,11 @@ export interface BarGroup {
    */
   readonly collapse?: 'menu' | 'select';
   readonly importance?: Importance;
+  /**
+   * Shows only while something that isn't dependent shows in the same bar, like undo and redo
+   * beside a mode's tools: a bar with only dependent groups left shows nothing.
+   */
+  readonly dependent?: boolean;
   readonly items: readonly BarChild[];
 }
 
@@ -158,6 +163,8 @@ export interface NormalizedGroup {
   readonly shed: boolean;
   readonly collapse?: 'menu' | 'select';
   readonly importance: Importance;
+  /** See {@link BarGroup.dependent}; the rule is {@link hasVisibleUnits}. */
+  readonly dependent: boolean;
   readonly units: readonly NormalizedUnit[];
 }
 
@@ -237,6 +244,7 @@ export function normalizeBar(bar: BarSchema): NormalizedBar {
           importance: units.some(isStandaloneUnit)
             ? PINNED
             : (group.importance ?? DEFAULT_IMPORTANCE),
+          dependent: group.dependent === true,
           units,
         };
       }),
@@ -250,32 +258,40 @@ export function normalizeBar(bar: BarSchema): NormalizedBar {
  * categories, contextual visibility) before solving — an invisible unit must
  * not consume budget or appear in the overflow. Groups that empty out vanish
  * naturally in the solver's separator math and in the projection. A custom
- * item without a command has nothing to ask `keep` about, and stays.
+ * item without a command has nothing to ask `keep` about, and stays. A bar
+ * that shows nothing ({@link hasVisibleUnits}) keeps no unit at all, so its
+ * dependent groups go too.
  */
 export function filterBar(
   bar: NormalizedBar,
   keep: (unit: NormalizedUnit) => boolean,
 ): NormalizedBar {
+  const shows = hasVisibleUnits(bar, keep);
   return {
     id: bar.id,
     sections: bar.sections.map((section) => ({
       name: section.name,
       groups: section.groups.map((group) => ({
         ...group,
-        units: group.units.filter((unit) => isStandaloneUnit(unit) || keep(unit)),
+        units: shows ? group.units.filter((unit) => isStandaloneUnit(unit) || keep(unit)) : [],
       })),
     })),
   };
 }
 
-/** Whether anything in the bar is left once `keep` (as for {@link filterBar}) has had its say. */
+/**
+ * Whether the bar shows anything once `keep` (as for {@link filterBar}) has had its say: a unit
+ * left in a group that isn't dependent. Dependent groups show only beside one, so a bar with
+ * only dependent groups left shows nothing.
+ */
 export function hasVisibleUnits(
   bar: NormalizedBar,
   keep: (unit: NormalizedUnit) => boolean,
 ): boolean {
   return bar.sections.some((section) =>
-    section.groups.some((group) =>
-      group.units.some((unit) => isStandaloneUnit(unit) || keep(unit)),
+    section.groups.some(
+      (group) =>
+        !group.dependent && group.units.some((unit) => isStandaloneUnit(unit) || keep(unit)),
     ),
   );
 }

@@ -1,7 +1,8 @@
 /**
- * @embedpdf/angular/toolbar: a toolbar that fits its width, with every part yours.
+ * @embedpdf/angular/toolbar: a toolbar that fits its width (or its height, standing up), with
+ * every part yours.
  *
- *   <epdf-toolbar [bar]>                         measures, folds, and fills a "More" menu
+ *   <epdf-toolbar [bar] [orientation]>           measures, folds, fills a "More" menu, arrow keys
  *   <ng-template epdfToolbarCommand>, …          the parts you draw (templates.ts)
  *   group(), item(), custom()                    the bar's vocabulary, from @embedpdf/core-ui
  */

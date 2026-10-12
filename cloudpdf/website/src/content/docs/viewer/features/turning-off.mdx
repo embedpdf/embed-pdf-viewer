@@ -71,9 +71,10 @@ right now (Copy needs a selection).
 | `thumbnails`, `outline` | | no |
 | `documents` | `.open`, `.download`, `.print`, `.tabs` | no |
 
-A mode tab disappears by itself when nothing in its bar is left, so `disable: ['shapes']` removes
-the Shapes tab. Annotations, comments and form values already in the document still show; only
-making and changing them goes.
+A mode tab disappears by itself when only its bar's
+[dependent groups](../customize/layout#build-a-bar), undo, redo and style, are left, so
+`disable: ['shapes']` removes the Shapes tab. Annotations, comments and form values already in the
+document still show; only making and changing them goes.
 
 `disable` and `readOnly` follow their props: change them while the viewer runs, and the tools
 disappear or come back without a reload.

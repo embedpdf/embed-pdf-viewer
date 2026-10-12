@@ -1,7 +1,7 @@
 # @embedpdf/react — ./toolbar
 
 BarChild [TypeAliasDeclaration] (from packages/core/ui/src/schema.ts): export type BarChild = BarItem | CustomItem | string;
-BarGroup [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarGroup{ readonly id: string; readonly labelKey?: string; readonly role?: 'buttons' | 'tabs'; readonly shed?: boolean; readonly collapse?: 'menu' | 'select'; readonly importance?: Importance; readonly items: readonly BarChild[]; }
+BarGroup [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarGroup{ readonly id: string; readonly labelKey?: string; readonly role?: 'buttons' | 'tabs'; readonly shed?: boolean; readonly collapse?: 'menu' | 'select'; readonly importance?: Importance; readonly dependent?: boolean; readonly items: readonly BarChild[]; }
 BarItem [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarItem{ readonly command: string; readonly variants?: readonly Variant[]; readonly importance?: Importance; }
 BarSchema [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarSchema{ readonly id: string; readonly sections: BarSections; }
 BarSections [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarSections{ readonly start?: readonly BarGroup[]; readonly center?: readonly BarGroup[]; readonly end?: readonly BarGroup[]; }
