@@ -45,12 +45,12 @@ src/content/docs/headless/annotation.mdx
 Viewer pages use the same fan-out model:
 
 ```
-src/content/docs/viewer/getting-started.mdx
-  → /docs/viewer/vanilla/getting-started
-  → /docs/viewer/react/getting-started
-  → /docs/viewer/vue/getting-started
-  → /docs/viewer/svelte/getting-started
-  → /docs/viewer/angular/getting-started
+src/content/docs/viewer/quick-start.mdx
+  → /docs/viewer/vanilla/quick-start
+  → /docs/viewer/react/quick-start
+  → /docs/viewer/vue/quick-start
+  → /docs/viewer/svelte/quick-start
+  → /docs/viewer/angular/quick-start
 ```
 
 Why per-integration URLs instead of one URL + client switcher: SEO indexes
@@ -142,6 +142,22 @@ framework, and run in `docs:check`:
   page is live for a framework when its snippets compile for it and none of the
   names its Methods, State or Events tables list is `pending`.
 
+The viewer's pages go through the same gate, for five integrations: the four frameworks and
+`vanilla`, a plain HTML page. Their snippets compile against `@embedpdf/viewer` at its source.
+A `.vanilla.html` snippet's module scripts are taken out of the page and type-checked as
+JavaScript, at the page's own line numbers. The reader's own DOM code (`event.target.value`) is
+left alone, and the CDN script resolves to the viewer. The page's elements are checked too:
+every `<embedpdf-viewer>` and `<epdf-*>` element must be declared in the viewer's types, every
+`<embedpdf-viewer>` attribute must be a config key, a `slot` must name one of the viewer's, on a
+child of the viewer, and a `<script src>` must be the CDN script or a path. The `js` and `ts`
+blocks a viewer page shows are checked against `ViewerConfig` for every integration, as the
+config is the same in each. `docs/content/scripts/viewer.mjs` holds these checks. A viewer page
+whose prose promises what the viewer doesn't do yet lists those gaps in
+`docs/content/viewer-pending.mjs`, each with why, and stays coming for every integration until
+they're removed, however little code it has. In CI, `publish-gate.mjs --strict` (the docs gate
+job in `.github/workflows/packages.yml`) fails when a check crashes or stops checking, or a
+headless page's snippets don't compile; a viewer page that's coming fails nothing.
+
 Live examples (`docs/content/samples/`) are complete apps, so every one must compile.
 `docs/content/scripts/samples.mjs` checks them straight from `docs/content`, without syncing them
 into a site or starting one, reports per framework (React with `tsc`, Angular with `ngc`, Vue
@@ -151,7 +167,12 @@ an error:
 ```sh
 pnpm --filter @embedpdf/docs-content samples          # every example
 pnpm --filter @embedpdf/docs-content samples search   # one area's examples
+pnpm --filter @embedpdf/docs-content samples viewer   # the ready-made viewer's
 ```
+
+The ready-made viewer's examples (`samples/viewer/`) compile as its snippets do: against the
+viewer at its source, for the four frameworks and `vanilla`, whose page's module scripts and
+elements are checked as a `.vanilla.html` snippet's are (`viewer.mjs`).
 
 Both checks share `scripts/compile.mjs`: each framework's compiler and options, and a run
 directory of their own in the system's temporary directory, whose `node_modules` links to the
@@ -185,6 +206,30 @@ same stylesheet, scoped to the example's class (`src/lib/sample-stylesheets.ts` 
 the Angular pass compiles in the browser (JIT), so it first applies Angular's JIT transform,
 without which `input()`, `output()`, `model()` and `viewChild()` do nothing
 (`src/lib/angular-demo-samples.ts`).
+
+### A viewer example
+
+```
+samples/viewer/<page>/<name>.vanilla.html   a plain HTML page: markup and module scripts
+samples/viewer/<page>/<name>.react.tsx      …and the four frameworks, as above
+samples/viewer/<page>/<name>.cloud.react.tsx   cloudpdf.com's own version, where a swap can't say it
+```
+
+The page shows one with `<Example name="viewer/<page>/<name>" />`, like any other. The viewer fills
+its box, so a viewer example gives it `height: 100%` and the docs give the box: a frame that suits
+the docs column, or a bigger one with `size="tall"`, or `size="wide"`, as tall and on a wide screen
+over the table of contents' column too (`src/components/docs/example.tsx`, the kit's
+`CodeExampleCard` `frame`). A page may show several: each starts its own viewer, when it scrolls
+near. Its document is a `[!doc-source]` block holding a constant (`const ebook = '…';`, in a plain
+HTML page inside its module script), which cloudpdf.com's copy gives in the cloud viewer's form.
+
+The plain HTML page loads the viewer from its CDN script, as a reader's does. Its demo
+(`src/lib/vanilla-demo-samples.ts`) is the page as a module: the markup goes into the demo's
+element, each script's imports move to the module's top and the rest runs on every mount, finding
+elements in its own demo only, and the CDN script is the site's own build of it
+(`@embedpdf/viewer/snippet` on embedpdf.com, `@cloudpdf/viewer/snippet` on cloudpdf.com). Nothing
+else may load from another origin. The viewer's demos use its packages' builds, as a reader's app
+does: rebuild a viewer package you changed before `build:demos`.
 
 The checks and the demos read the adapters' source through their workspace `exports`: Vue's
 point at `./src/<entry>.ts` as plain strings, like React's; Svelte's name the same file under

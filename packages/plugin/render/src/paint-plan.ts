@@ -142,9 +142,6 @@ export interface TilesOptions {
    * immediately. Default 150ms; 0 disables.
    */
   settleMs?: number;
-  /** Optional arrival cross-fade for tiles, in ms. Default 0 (hard pop —
-   *  clean once painting is decode-gated). */
-  fadeMs?: number;
 }
 
 /** The default pixel budget of a whole-page picture, in device pixels. */
@@ -172,7 +169,6 @@ export interface ResolvedRenderOptions {
     prefetchMargin: number;
     velocityBias: boolean;
     settleMs: number;
-    fadeMs: number;
     /** Pyramid for lattice deployments that don't advertise tiles yet. */
     fallbackPyramid: readonly number[];
   };
@@ -212,7 +208,6 @@ export function resolveRenderOptions(options: {
       prefetchMargin: tiles?.prefetch?.margin ?? 0.5,
       velocityBias: tiles?.prefetch?.velocityBias ?? true,
       settleMs: tiles?.settleMs ?? 150,
-      fadeMs: tiles?.fadeMs ?? 0,
       fallbackPyramid: DEFAULT_TILE_PYRAMID,
     },
     format: options.format,

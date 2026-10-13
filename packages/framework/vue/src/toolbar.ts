@@ -1,38 +1,21 @@
 /**
  * @embedpdf/vue/toolbar: `<Toolbar>`, which fits a bar of commands into the
- * width it has (labels become icons, groups fold, the rest goes into a "More"
- * menu) and lets you draw every part through its slots; `useStripView()` for a
- * strip that doesn't fit itself; and the schema a bar is written in.
+ * room it has, across or down (labels become icons, groups fold, the rest goes
+ * into a "More" menu), is one tab stop with arrow keys along it, and lets you
+ * draw every part through its slots; `useStripView()` for a strip that doesn't
+ * fit itself; and the schema a bar is written in.
  */
 
-// The toolbar's vocabulary: the schema a bar is written in, and the helpers that change one.
-export {
-  DEFAULT_IMPORTANCE,
-  PINNED,
-  addItem,
-  chromeHelpers,
-  custom,
-  defineChrome,
-  group,
-  item,
-  removeItems,
-  replaceItem,
-  validateChrome,
-} from '@embedpdf/core-ui';
+// The toolbar's vocabulary: the schema a bar is written in.
+export { DEFAULT_IMPORTANCE, PINNED, custom, group, item } from '@embedpdf/core-ui';
 export type {
-  AddItemSpec,
   BarChild,
   BarGroup,
   BarItem,
   BarSchema,
   BarSections,
-  ChromeHelpers,
-  ChromeSchema,
   CustomItem,
-  FrameSchema,
   Importance,
-  MenuSchema,
-  MenuSection,
   OverflowRow,
   OverflowSection,
   Variant,

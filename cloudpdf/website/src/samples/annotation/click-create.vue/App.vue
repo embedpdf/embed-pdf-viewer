@@ -10,7 +10,7 @@ import Toolbar from './Toolbar.vue';
 
 import '../click-create.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // What one click makes: a 120 × 80 rectangle, an arrow pointing down at the click, and no circle.
 const plugins = [
   stagePlugin(),

@@ -16,13 +16,13 @@ import {
   type PageFlattenResult,
   type FlattenWriteOptions,
   type PageInsertBlankOptions,
+  type SessionEventPublisher,
   type WriteOptions,
   type PagePosition,
   type PageRef,
   type PageReorderResult,
   type PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';

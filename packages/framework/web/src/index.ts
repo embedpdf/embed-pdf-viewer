@@ -25,7 +25,11 @@ export type { StyleRecord } from './css-text';
 export { copySelection, wireSelectionClipboard } from './clipboard';
 export type { ClipboardSelectionSource, SelectionClipboardOptions } from './clipboard';
 export { bindCommandShortcuts, isMacPlatform } from './command-shortcuts';
-export type { CommandShortcutOptions, ShortcutCommands } from './command-shortcuts';
+export type {
+  CommandShortcutOptions,
+  ShortcutCommands,
+  ShortcutRefusal,
+} from './command-shortcuts';
 export {
   anchoredViewOf,
   fitAnchoredRect,
@@ -146,6 +150,7 @@ export type {
 export { isUprightQuad, quadInPixels, rectInPixels, svgPoints } from './page-pixels';
 export type { PagePoint, PageQuad, PageToPixels, PixelRect } from './page-pixels';
 export { isolatePointerDown, isolateWheel } from './event-isolation';
+export { observeOutsidePress } from './outside-press';
 export {
   samePageBounds,
   sameAnnotationAnchor,
@@ -331,11 +336,36 @@ export type {
   ScrollbarTrack,
 } from './scrollbar';
 export {
-  createToolbarWidths,
+  createToolbarLengths,
+  observeContentHeight,
+  observeContentLength,
   observeContentWidth,
+  observeHeight,
+  observeLength,
   observeWidth,
   toolbarMeasureKey,
 } from './toolbar-measure';
-export type { ToolbarFitMetrics, ToolbarWidths } from './toolbar-measure';
+export type { ToolbarFitMetrics, ToolbarLengths } from './toolbar-measure';
+export { directionOf } from './orientation';
+export type { Orientation } from './orientation';
+export {
+  canTakeFocus,
+  containsFocus,
+  deepActiveElementOf,
+  focusablesIn,
+  isTabbable,
+  isUnavailable,
+  tabbablesIn,
+  usesKey,
+} from './focusable';
+export { attachRovingFocus, rovingMoveOf, rovingTargetOf } from './roving-focus';
+export type { RovingFocus, RovingFocusOptions, RovingMove } from './roving-focus';
+export { TOOLBAR_ITEM_ATTRIBUTE, attachToolbarFocus, toolbarStopsOf } from './toolbar-focus';
+export { attachMenuKeys, menuItemLabelOf, typeaheadMatchOf } from './menu-keys';
+export type { MenuKeysOptions } from './menu-keys';
+export { attachFocusTrap, moveFocusInto } from './focus-trap';
+export type { FocusTrapOptions } from './focus-trap';
+export { createSurfaceFocusFollower } from './surface-focus';
+export type { SurfaceFocusFollower, SurfaceFocusOptions } from './surface-focus';
 export { standardCommandsBrowser } from './standard-commands-platform';
 export type { StandardCommandsBrowser } from './standard-commands-platform';

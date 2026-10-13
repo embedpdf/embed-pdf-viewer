@@ -67,8 +67,8 @@
     value={(value as { end?: string } | undefined)?.end ?? 'none'}
     onchange={(event) => updateEnd(event.currentTarget.value as LineEnding)}
   >
-    {#each property.options as option (option)}
-      <option>{option}</option>
+    {#each property.options as option (option.value)}
+      <option value={option.value}>{option.label}</option>
     {/each}
   </select>
 {:else if property.control === 'choice' && property.key === 'borderStyle'}
@@ -81,8 +81,8 @@
     {#if isMixed}
       <option value="">mixed</option>
     {/if}
-    {#each property.options as option (option)}
-      <option>{option}</option>
+    {#each property.options as option (option.value)}
+      <option value={option.value}>{option.label}</option>
     {/each}
   </select>
 {:else if property.control === 'choice'}
@@ -95,8 +95,8 @@
     {#if isMixed}
       <option value="">mixed</option>
     {/if}
-    {#each property.options as option (option)}
-      <option>{option}</option>
+    {#each property.options as option (option.value)}
+      <option value={option.value}>{option.label}</option>
     {/each}
   </select>
 {:else if property.control === 'flag'}

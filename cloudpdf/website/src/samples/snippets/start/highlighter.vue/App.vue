@@ -8,7 +8,7 @@ import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { cloudEngine } from '@cloudpdf/engine';
 import HighlightButton from './HighlightButton.vue';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),

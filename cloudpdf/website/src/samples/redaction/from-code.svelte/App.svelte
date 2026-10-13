@@ -12,7 +12,7 @@
 
   import '../from-code.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   // Marking matches runs a search; marking the selected text needs a selection.
   const plugins = [
     stagePlugin(),

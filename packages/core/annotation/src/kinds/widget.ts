@@ -10,7 +10,7 @@
  */
 import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS, type AnnotationProperty, type KindCaps } from './define';
-import { BORDER_PLAIN, fontFamily, textAlign } from './fields';
+import { BORDER_PLAIN, FONT_FAMILY, TEXT_ALIGN } from './fields';
 import { widgetStyle } from './styles';
 import { fieldText } from './texts';
 
@@ -27,18 +27,49 @@ const WIDGET_CAPS: KindCaps = {
 };
 
 const BOX_FIELDS: readonly AnnotationProperty[] = [
-  { key: 'color', control: 'color', label: 'Border color' },
-  { key: 'interiorColor', control: 'color', label: 'Background' },
-  { key: 'strokeWidth', control: 'number', label: 'Border width', min: 0, max: 12, step: 0.5 },
-  { ...BORDER_PLAIN, label: 'Border style' },
+  {
+    key: 'color',
+    control: 'color',
+    label: 'Border color',
+    labelKey: 'annotation.style.borderColor',
+  },
+  {
+    key: 'interiorColor',
+    control: 'color',
+    label: 'Background',
+    labelKey: 'annotation.style.background',
+  },
+  {
+    key: 'strokeWidth',
+    control: 'number',
+    label: 'Border width',
+    labelKey: 'annotation.style.borderWidth',
+    min: 0,
+    max: 12,
+    step: 0.5,
+  },
+  { ...BORDER_PLAIN, label: 'Border style', labelKey: 'annotation.style.borderStyle' },
 ];
 
 const TEXT_FIELDS: readonly AnnotationProperty[] = [
   ...BOX_FIELDS,
-  fontFamily('Font'),
-  { key: 'fontSize', control: 'number', label: 'Font size', min: 0, max: 96, step: 1 },
-  { key: 'fontColor', control: 'color', label: 'Text color' },
-  textAlign('Alignment'),
+  FONT_FAMILY,
+  {
+    key: 'fontSize',
+    control: 'number',
+    label: 'Font size',
+    labelKey: 'annotation.style.fontSize',
+    min: 0,
+    max: 96,
+    step: 1,
+  },
+  {
+    key: 'fontColor',
+    control: 'color',
+    label: 'Text color',
+    labelKey: 'annotation.style.textColor',
+  },
+  { ...TEXT_ALIGN, label: 'Alignment', labelKey: 'annotation.style.alignment' },
 ];
 
 /** A text field. */

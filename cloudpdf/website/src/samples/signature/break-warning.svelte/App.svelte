@@ -13,7 +13,7 @@ import { localEngine } from '@embedpdf/engine';
 
   import '../break-warning.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   const assetEngine = localEngine();
   const signer = createTestSigner({ commonName: 'Ada Lovelace' });
   const plugins = [

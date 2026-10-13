@@ -337,14 +337,17 @@ export interface BuiltinToolKindMap {
 type DirectToolDef = {
   [K in ToolAuthoringKind]: Omit<AnnotationToolDef<K>, 'subtype'> & { subtype: K };
 }[ToolAuthoringKind];
+// A key a shape doesn't take is `?: undefined`, not `?: never`: without `strictNullChecks` (plain
+// JavaScript, a non-strict app) a missing `never` key can't tell the shapes apart, so the union is
+// read as one, `id: 'highlight'` widens to `string` and no shape takes it.
 type BuiltinToolOverride = {
   [I in keyof BuiltinToolKindMap]: Omit<
     AnnotationToolDef<BuiltinToolKindMap[I]>,
     'id' | 'extends' | 'subtype'
   > & {
     id: I;
-    extends?: never;
-    subtype?: never;
+    extends?: undefined;
+    subtype?: undefined;
   };
 }[keyof BuiltinToolKindMap];
 type ExtendedBuiltinToolDef = {
@@ -353,7 +356,7 @@ type ExtendedBuiltinToolDef = {
     'extends' | 'subtype'
   > & {
     extends: I;
-    subtype?: never;
+    subtype?: undefined;
   };
 }[keyof BuiltinToolKindMap];
 

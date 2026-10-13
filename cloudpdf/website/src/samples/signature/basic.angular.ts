@@ -22,7 +22,7 @@ import { createTestSigner, EpdfSignature, withSignature } from '@embedpdf/angula
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const assetEngine = localEngine();
 // A throwaway key for the demo. Bring your own with `webCryptoSigner`, a
 // service with `remoteSigner`, or a person's own with `personalSigner`.

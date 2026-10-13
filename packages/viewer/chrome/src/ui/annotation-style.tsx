@@ -20,6 +20,7 @@ import {
   useAnnotationDefaults,
   useAnnotationProperties,
   useAnnotationState,
+  type AnnotationOption,
   type AnnotationPatch,
   type AnnotationProperty,
   type BlendMode,
@@ -28,18 +29,21 @@ import {
   type LineEndings,
   type TextAlign,
 } from '@embedpdf/react/annotation';
+import { useCommands } from '@embedpdf/react/commands';
 import { useInteractionState } from '@embedpdf/react/interaction';
-import { useOptionalCapability } from '@embedpdf/react/runtime';
+import { useDocumentId, useKernelValue, useOptionalCapability } from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { useT } from '@embedpdf/react/i18n';
+import { observeOutsidePress } from '@embedpdf/web';
 import { Icon } from './icons';
 import { useAnnotationFonts } from './annotation-fonts';
 import { AnnotationFlagsSection } from './annotation-flags';
-import { FieldSettingsSection } from './field-settings';
+import { useLabel } from './labels';
 
 // ── app-level vocabulary (a viewer's decision) ────────────────────────────────
-// The engine schema says which controls to show; these lists say what the app
-// offers inside a color / font / stroke picker.
+// The schema says which controls to show, with each one's label and its
+// options' labels; these lists say what the viewer offers inside a color /
+// font / stroke picker.
 const PRESET_COLORS = [
   '#000000',
   '#5f6368',
@@ -55,12 +59,8 @@ const PRESET_COLORS = [
   '#ffffff',
 ];
 
-const FONT_OPTIONS: { v: string; label: string }[] = [
-  { v: 'helvetica', label: 'Helvetica' },
-  { v: 'helvetica-bold', label: 'Helvetica Bold' },
-  { v: 'times-roman', label: 'Times Roman' },
-  { v: 'courier', label: 'Courier' },
-];
+/** The standard fonts the picker offers, of the schema's; the registered fonts follow them. */
+const OFFERED_FONTS: readonly string[] = ['helvetica', 'helvetica-bold', 'times-roman', 'courier'];
 
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 24, 36, 48, 72];
 
@@ -70,6 +70,7 @@ type Border =
   | { kind: 'dashed'; dash: number[] }
   | { kind: 'cloudy'; intensity: number };
 
+/** The borders the picker offers: the schema's styles, a dash or a cloud in a few sizes. */
 const BORDER_OPTS: { key: string; make: () => Border }[] = [
   { key: 'solid', make: () => ({ kind: 'solid' }) },
   { key: 'dashed-6-2', make: () => ({ kind: 'dashed', dash: [6, 2] }) },
@@ -102,37 +103,9 @@ const borderFields = (border: Border): FieldValues => ({
   cloudyIntensity: border.kind === 'cloudy' ? border.intensity : null,
 });
 
-const LINE_ENDINGS: { v: LineEnding; label: string }[] = [
-  { v: 'none', label: 'None' },
-  { v: 'open-arrow', label: 'Open arrow' },
-  { v: 'closed-arrow', label: 'Closed arrow' },
-  { v: 'r-open-arrow', label: 'Reverse open' },
-  { v: 'r-closed-arrow', label: 'Reverse closed' },
-  { v: 'circle', label: 'Circle' },
-  { v: 'square', label: 'Square' },
-  { v: 'diamond', label: 'Diamond' },
-  { v: 'butt', label: 'Butt' },
-  { v: 'slash', label: 'Slash' },
-];
-
-const BLEND_MODES: { v: BlendMode; label: string }[] = [
-  { v: 'normal', label: 'Normal' },
-  { v: 'multiply', label: 'Multiply' },
-  { v: 'screen', label: 'Screen' },
-  { v: 'overlay', label: 'Overlay' },
-  { v: 'darken', label: 'Darken' },
-  { v: 'lighten', label: 'Lighten' },
-  { v: 'color-dodge', label: 'Color Dodge' },
-  { v: 'color-burn', label: 'Color Burn' },
-  { v: 'hard-light', label: 'Hard Light' },
-  { v: 'soft-light', label: 'Soft Light' },
-  { v: 'difference', label: 'Difference' },
-  { v: 'exclusion', label: 'Exclusion' },
-  { v: 'hue', label: 'Hue' },
-  { v: 'saturation', label: 'Saturation' },
-  { v: 'color', label: 'Color' },
-  { v: 'luminosity', label: 'Luminosity' },
-];
+/** The option of a choice with this value, for its label. */
+const optionOf = (options: readonly AnnotationOption[], value: string) =>
+  options.find((option) => option.value === value);
 
 // ── layout primitives ────────────────────────────────────────────────────────
 function Field({
@@ -144,11 +117,14 @@ function Field({
   mixed?: boolean;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <section className="mb-5">
       <label className="text-fg mb-2 block text-sm font-medium">
         {label}
-        {mixed && <span className="text-fg-muted ml-1.5 text-xs font-normal">(mixed)</span>}
+        {mixed && (
+          <span className="text-fg-muted ms-1.5 text-xs font-normal">{t('stylePanel.mixed')}</span>
+        )}
       </label>
       {children}
     </section>
@@ -170,6 +146,7 @@ function Swatch({
   active: boolean;
   onSelect: (color: string) => void;
 }) {
+  const t = useT();
   const style = isTransparent(color)
     ? {
         backgroundColor: '#fff',
@@ -181,7 +158,7 @@ function Swatch({
   return (
     <button
       type="button"
-      title={color}
+      title={isTransparent(color) ? t('stylePanel.transparent') : color}
       onClick={() => onSelect(color)}
       className={`border-border-strong h-5 w-5 rounded-full border ${active ? 'outline-accent outline outline-2 outline-offset-2' : ''}`}
       style={style}
@@ -239,19 +216,12 @@ function RangeSlider({
 }
 
 // ── dropdown shell (open state, outside-click, trigger + panel) ───────────────
+/** Close an open dropdown on a press outside it; the root holds its trigger too. */
 function useOutsideClose(open: boolean, close: () => void) {
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!open) return;
-    const onDoc = (event: MouseEvent) => {
-      // composedPath, not contains(event.target): at the document level an event
-      // from inside the viewer's shadow root retargets to the host element, so
-      // contains() reads every inside click as outside and unmounts the panel
-      // on mousedown — before the option's click can fire.
-      if (rootRef.current && !event.composedPath().includes(rootRef.current)) close();
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    const root = rootRef.current;
+    return open && root ? observeOutsidePress(root, close) : undefined;
   }, [open, close]);
   return rootRef;
 }
@@ -286,18 +256,23 @@ function DropdownShell({
 
 function OptionRow({
   selected,
+  title,
   onClick,
   children,
 }: {
   selected: boolean;
+  /** The option's name, for an option drawn as a picture. */
+  title?: string;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
+      title={title}
+      aria-label={title}
       onClick={onClick}
-      className={`hover:bg-hover flex w-full items-center rounded px-2 py-1.5 text-left text-sm ${selected ? 'bg-selected text-accent' : 'text-fg'}`}
+      className={`hover:bg-hover flex w-full items-center rounded px-2 py-1.5 text-start text-sm ${selected ? 'bg-selected text-accent' : 'text-fg'}`}
     >
       {children}
     </button>
@@ -346,16 +321,16 @@ function borderSvg(border: Border): ReactNode {
 
 function BorderSelect({
   value,
-  cloudy,
+  styles,
   onChange,
 }: {
   value: Border;
-  cloudy: boolean;
+  /** The border styles the kind takes, with their labels. */
+  styles: readonly AnnotationOption[];
   onChange: (border: Border) => void;
 }) {
-  const options = cloudy
-    ? BORDER_OPTS
-    : BORDER_OPTS.filter((option) => !option.key.startsWith('cloudy'));
+  const label = useLabel();
+  const options = BORDER_OPTS.filter((option) => optionOf(styles, option.make().kind));
   return (
     <DropdownShell trigger={<span className="text-fg-secondary">{borderSvg(value)}</span>}>
       {(close) =>
@@ -365,6 +340,7 @@ function BorderSelect({
             <OptionRow
               key={option.key}
               selected={borderKey(value) === option.key}
+              title={label(optionOf(styles, border.kind)!)}
               onClick={() => {
                 onChange(border);
                 close();
@@ -429,25 +405,29 @@ function LineEndingPreview({ name, side }: { name: LineEnding; side: 'start' | '
 function LineEndingSelect({
   side,
   value,
+  options,
   onChange,
 }: {
   side: 'start' | 'end';
   value: LineEnding;
+  options: readonly AnnotationOption[];
   onChange: (ending: LineEnding) => void;
 }) {
+  const label = useLabel();
   return (
     <DropdownShell trigger={<LineEndingPreview name={value} side={side} />}>
       {(close) =>
-        LINE_ENDINGS.map((option) => (
+        options.map((option) => (
           <OptionRow
-            key={option.v}
-            selected={value === option.v}
+            key={option.value}
+            selected={value === option.value}
+            title={label(option)}
             onClick={() => {
-              onChange(option.v);
+              onChange(option.value as LineEnding);
               close();
             }}
           >
-            <LineEndingPreview name={option.v} side={side} />
+            <LineEndingPreview name={option.value as LineEnding} side={side} />
           </OptionRow>
         ))
       }
@@ -458,29 +438,38 @@ function LineEndingSelect({
 // ── font family picker ───────────────────────────────────────────────────────
 function FontFamilySelect({
   value,
+  standard,
   onChange,
 }: {
   value: string;
+  /** The schema's standard fonts, with their labels. */
+  standard: readonly AnnotationOption[];
   onChange: (family: string) => void;
 }) {
-  // The standard faces plus the configured fonts that are registered and
-  // mounted (`annotations.fonts`) — a registered key is a `fontFamily` value
-  // like any standard name.
+  const label = useLabel();
+  // The standard faces the viewer offers plus the configured fonts that are
+  // registered and mounted (`engine.fonts`) — a registered key is a
+  // `fontFamily` value like any standard name, labelled by the app.
   const configured = useAnnotationFonts();
   const options = [
-    ...FONT_OPTIONS,
-    ...configured.map((font) => ({ v: font.key, label: font.label })),
+    ...standard
+      .filter((option) => OFFERED_FONTS.includes(option.value))
+      .map((option) => ({ value: option.value, label: label(option) })),
+    ...configured.map((font) => ({ value: font.key, label: font.label })),
   ];
-  const current = options.find((option) => option.v === value);
+  // A font the document uses that the picker doesn't offer still shows by its name.
+  const named = optionOf(standard, value);
+  const current =
+    options.find((option) => option.value === value)?.label ?? (named ? label(named) : value);
   return (
-    <DropdownShell trigger={<span className="text-fg text-sm">{current?.label ?? value}</span>}>
+    <DropdownShell trigger={<span className="text-fg text-sm">{current}</span>}>
       {(close) =>
         options.map((option) => (
           <OptionRow
-            key={option.v}
-            selected={option.v === value}
+            key={option.value}
+            selected={option.value === value}
             onClick={() => {
-              onChange(option.v);
+              onChange(option.value);
               close();
             }}
           >
@@ -525,13 +514,13 @@ function FontSizeCombo({ value, onChange }: { value: number; onChange: (size: nu
           }
         }}
         onClick={() => setOpen(true)}
-        className="border-border bg-surface text-fg w-full rounded border px-2 py-1.5 pr-7 text-sm"
+        className="border-border bg-surface text-fg w-full rounded border px-2 py-1.5 pe-7 text-sm"
       />
       <button
         type="button"
         tabIndex={-1}
         onClick={() => setOpen((previous) => !previous)}
-        className="absolute inset-y-0 right-1 flex items-center"
+        className="absolute inset-y-0 end-1 flex items-center"
       >
         <Icon name="chevronDown" size={16} className="text-fg-secondary" />
       </button>
@@ -558,20 +547,27 @@ function FontSizeCombo({ value, onChange }: { value: number; onChange: (size: nu
 
 function BlendModeSelect({
   value,
+  options,
+  name,
   onChange,
 }: {
   value: BlendMode;
+  options: readonly AnnotationOption[];
+  /** The field's label, the select's accessible name. */
+  name: string;
   onChange: (mode: BlendMode) => void;
 }) {
+  const label = useLabel();
   return (
     <select
       value={value}
+      aria-label={name}
       onChange={(event) => onChange(event.target.value as BlendMode)}
       className="border-border bg-surface text-fg w-full rounded border px-3 py-1.5 text-sm"
     >
-      {BLEND_MODES.map((mode) => (
-        <option key={mode.v} value={mode.v}>
-          {mode.label}
+      {options.map((mode) => (
+        <option key={mode.value} value={mode.value}>
+          {label(mode)}
         </option>
       ))}
     </select>
@@ -634,18 +630,16 @@ function FormatToggles({
   onToggle: (format: Format, on: boolean) => void;
 }) {
   const t = useT();
+  const label = useLabel();
   return (
-    <Field
-      label={t('demo.formatLabel', { fallback: 'Format' })}
-      mixed={specs.some((spec) => mixed.includes(spec.key))}
-    >
+    <Field label={t('demo.formatLabel')} mixed={specs.some((spec) => mixed.includes(spec.key))}>
       <div className="flex gap-2">
         {specs.map((spec) => {
           const active = values[spec.key] === true && !mixed.includes(spec.key);
           return (
             <Toggle
               key={spec.key}
-              title={spec.label}
+              title={label(spec)}
               active={active}
               keepFocus
               onClick={() => onToggle(spec.key, !active)}
@@ -674,12 +668,14 @@ function FieldControl({
   /** Patch each target relative to itself: one side of its line endings. */
   onChangeEach: (patchOf: (current: FieldValues) => FieldValues) => void;
 }) {
+  const t = useT();
+  const label = useLabel();
   const value = values[spec.key];
   switch (spec.key) {
     case 'color':
     case 'fontColor':
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <SwatchGrid
             value={value as string}
             onSelect={(color) => onChange({ [spec.key]: color })}
@@ -688,7 +684,7 @@ function FieldControl({
       );
     case 'interiorColor':
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <SwatchGrid
             value={value as string | null}
             allowTransparent
@@ -701,7 +697,7 @@ function FieldControl({
     case 'opacity': {
       const opacity = (value as number) ?? 1;
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <RangeSlider
             value={opacity}
             min={spec.min}
@@ -716,7 +712,7 @@ function FieldControl({
     case 'strokeWidth': {
       const strokeWidth = (value as number) ?? spec.min;
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <RangeSlider
             value={strokeWidth}
             min={spec.min}
@@ -724,13 +720,13 @@ function FieldControl({
             step={spec.step}
             onChange={(next) => onChange({ strokeWidth: next })}
           />
-          <span className="text-fg-muted text-xs">{strokeWidth}px</span>
+          <span className="text-fg-muted text-xs">{`${strokeWidth}px`}</span>
         </Field>
       );
     }
     case 'fontSize':
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <FontSizeCombo
             value={(value as number) ?? 12}
             onChange={(next) => onChange({ fontSize: next })}
@@ -739,10 +735,10 @@ function FieldControl({
       );
     case 'borderStyle':
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <BorderSelect
             value={borderOf(values)}
-            cloudy={spec.cloudy}
+            styles={spec.options}
             onChange={(border) => onChange(borderFields(border))}
           />
         </Field>
@@ -750,13 +746,14 @@ function FieldControl({
     case 'lineEndings': {
       const le = (value as LineEndings) ?? { start: 'none', end: 'none' };
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <div className="text-fg-muted mb-1.5 text-xs">Start</div>
+              <div className="text-fg-muted mb-1.5 text-xs">{t('stylePanel.lineStart')}</div>
               <LineEndingSelect
                 side="start"
                 value={le.start}
+                options={spec.options}
                 onChange={(ending) =>
                   onChangeEach((current) => ({
                     lineEndings: { ...(current.lineEndings as LineEndings), start: ending },
@@ -765,10 +762,11 @@ function FieldControl({
               />
             </div>
             <div>
-              <div className="text-fg-muted mb-1.5 text-xs">End</div>
+              <div className="text-fg-muted mb-1.5 text-xs">{t('stylePanel.lineEnd')}</div>
               <LineEndingSelect
                 side="end"
                 value={le.end}
+                options={spec.options}
                 onChange={(ending) =>
                   onChangeEach((current) => ({
                     lineEndings: { ...(current.lineEndings as LineEndings), end: ending },
@@ -782,9 +780,10 @@ function FieldControl({
     }
     case 'fontFamily':
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <FontFamilySelect
             value={(value as string) ?? 'helvetica'}
+            standard={spec.options}
             onChange={(family) => onChange({ fontFamily: family })}
           />
         </Field>
@@ -796,18 +795,21 @@ function FieldControl({
         right: 'alignRight',
       };
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <div className="flex gap-2">
-            {(['left', 'center', 'right'] as TextAlign[]).map((al) => (
-              <Toggle
-                key={al}
-                title={`Align ${al}`}
-                active={value === al}
-                onClick={() => onChange({ textAlign: al })}
-              >
-                <Icon name={alignIcon[al]} size={18} />
-              </Toggle>
-            ))}
+            {spec.options.map((option) => {
+              const al = option.value as TextAlign;
+              return (
+                <Toggle
+                  key={al}
+                  title={label(option)}
+                  active={value === al}
+                  onClick={() => onChange({ textAlign: al })}
+                >
+                  <Icon name={alignIcon[al]} size={18} />
+                </Toggle>
+              );
+            })}
           </div>
         </Field>
       );
@@ -821,9 +823,11 @@ function FieldControl({
       return null;
     case 'blendMode':
       return (
-        <Field label={spec.label} mixed={mixed}>
+        <Field label={label(spec)} mixed={mixed}>
           <BlendModeSelect
             value={(value as BlendMode) ?? 'normal'}
+            options={spec.options}
+            name={label(spec)}
             onChange={(blendMode) => onChange({ blendMode })}
           />
         </Field>
@@ -840,12 +844,11 @@ function FieldControl({
 
 // ── the panel ────────────────────────────────────────────────────────────────
 function EmptyState() {
+  const t = useT();
   return (
     <div className="text-fg-muted flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
       <Icon name="palette" size={40} className="text-fg-disabled" />
-      <p className="max-w-[180px] text-sm">
-        Pick a draw tool or select an annotation to edit its style.
-      </p>
+      <p className="max-w-[180px] text-sm">{t('stylePanel.empty')}</p>
     </div>
   );
 }
@@ -862,13 +865,21 @@ const FORMAT_BODY: Record<Format, (on: boolean) => Record<string, unknown>> = {
  * `annotation-style` surface (see ui/panels.tsx). Owns its own scroll.
  */
 export function AnnotationStylePanel() {
+  const t = useT();
   const annotation = useAnnotation();
+  const commands = useCommands();
+  const documentId = useDocumentId() ?? undefined;
   // Without a document there is no active tool; the pointer's defaults are empty.
   const activeToolId = useInteractionState((state) => state.activeToolId) ?? 'pointer';
   const selection = useAnnotationProperties();
   const tool = useAnnotationProperties(activeToolId);
   const toolDefaults = useAnnotationDefaults(activeToolId);
   const selected = useAnnotationState((state) => state.selected);
+  // The tool by its button's name: the defaults are that tool's.
+  const toolLabel = useKernelValue(
+    () => commands.resolveCommand(`tool:${activeToolId}`, documentId)?.label ?? null,
+    Object.is,
+  );
 
   const hasSel = selection.properties.length > 0;
   const { properties, values, mixed } = hasSel ? selection : tool;
@@ -898,7 +909,11 @@ export function AnnotationStylePanel() {
   // its style is frozen) still shows its flags: that's how you unlock it.
   if (fields.length === 0 && selected.length === 0) return <EmptyState />;
 
-  const context = hasSel ? `${selected.length} selected` : `${activeToolId} defaults`;
+  const context = hasSel
+    ? t('stylePanel.selected', { params: { count: selected.length } })
+    : toolLabel === null
+      ? t('stylePanel.defaults')
+      : t('stylePanel.toolDefaults', { params: { tool: toolLabel } });
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
@@ -928,8 +943,6 @@ export function AnnotationStylePanel() {
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
           style field, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
-      {/* A form field's own settings: name, tooltip, required, its family's own. */}
-      <FieldSettingsSection />
       {/* `/F` flags for whatever is selected — the live flags test surface. */}
       <AnnotationFlagsSection />
     </div>

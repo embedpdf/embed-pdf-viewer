@@ -1,20 +1,18 @@
 /**
- * Two build passes (see package.json's build script), the same split as the
+ * Two build passes of one entry (see package.json's build script), the same split as the
  * open-source viewer's:
  *
- *   1. `vite build` — `dist/config.js`, the framework-free cloud vocabulary
- *      that every @cloudpdf/viewer-<framework> wrapper imports. The local
- *      engine stays a bare import: it is loaded only when someone opens
- *      Stamps or Signatures, and the consumer's bundler must process it so the
- *      engine's bundler-resolved wasm default lands in their asset pipeline.
- *      Prebundling it would freeze that URL against this package, and Vite
+ *   1. `vite build` — `dist/index.js`, the cloud door for a bundler (`.`). Every
+ *      `@embedpdf/*` and `@cloudpdf/*` package stays an import, so the app has one
+ *      `@embedpdf/viewer/core` (the element class the door registers its engine on, and the one
+ *      each framework wrapper renders), and the local engine stamps load goes through the app's
+ *      asset pipeline. Prebundling it would freeze its wasm URL against this package, and Vite
  *      lib mode would inline the 6 MB binary as base64.
  *
- *   2. `vite build --mode snippet` — `dist/cloudpdf.js`, the finished CDN
- *      artifact. It bundles `@embedpdf/viewer/core` (the engine-agnostic
- *      entry, Preact already compiled in) plus the cloud engine. Pages render
- *      on the server; the local engine is only a lazy chunk for stamps, and
- *      its wasm is emitted as `dist/embedpdf.wasm` next to it (through
+ *   2. `vite build --mode snippet` — `dist/cloudpdf.js` (`./snippet`), the finished CDN artifact:
+ *      the same door with `@embedpdf/viewer/core` (Preact already compiled in) and the cloud
+ *      engine bundled. Pages render on the server; the local engine is only a lazy chunk for
+ *      stamps, and its wasm is emitted as `dist/embedpdf.wasm` next to it (through
  *      build/wasm-url-asset.js), so the folder is the unit of delivery.
  */
 import path from 'node:path';
@@ -22,9 +20,10 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const snippet = mode === 'snippet';
+  // One entry, two passes: `index.js` for a bundler, `cloudpdf.js` whole for a script tag.
   const entry: Record<string, string> = snippet
     ? { cloudpdf: 'src/index.ts' }
-    : { config: 'src/config.ts' };
+    : { index: 'src/index.ts' };
   return {
     resolve: {
       alias: snippet
@@ -57,9 +56,10 @@ export default defineConfig(({ mode }) => {
         fileName: (_format: string, entryName: string) => `${entryName}.js`,
       },
       rollupOptions: {
-        external: snippet
-          ? undefined
-          : (id: string) => id === '@embedpdf/engine' || id.startsWith('@embedpdf/engine/'),
+        // The npm pass leaves every package to the app's bundler, so the app has one
+        // `@embedpdf/viewer/core` (one element class, the one this door registers on) and the
+        // stamps' local engine goes through its asset pipeline.
+        external: snippet ? undefined : (id: string) => /^@(embedpdf|cloudpdf)\//.test(id),
         // The snippet's one emitted asset keeps its plain name:
         // `dist/embedpdf.wasm`, next to `cloudpdf.js`.
         output: {

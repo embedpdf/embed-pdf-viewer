@@ -1343,6 +1343,8 @@ describe('annotation-core', () => {
       vertexEditable: false,
     });
     expect(kindNamed('totally-unknown').caps.selectable).toBe(false); // unknown → read-only
+    // Drawn from its appearance, or not at all: no fields to draw it from.
+    expect(kindNamed('totally-unknown').caps.rasterOnly).toBe(true);
   });
 
   it('a markup preview renders as a live ghost via pageItems, and clears', () => {
@@ -4733,7 +4735,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
   });
 });
 
-describe('conversation plane — replies and review states never reach the page', () => {
+describe('conversation plane — replies, review states and popups never reach the page', () => {
   const at = (x: number, y: number): Shape => ({
     kind: 'box',
     box: { x, y, width: 40, height: 30 },
@@ -4770,7 +4772,25 @@ describe('conversation plane — replies and review states never reach the page'
     geometry: at(300, 10),
     annotation: stateData('accepted', 'review'),
   });
-  const model = () => modelWith([root, reply, subordinate, status]);
+  // A comment's window, past the page's right edge as Acrobat writes it, with no appearance: a
+  // record read from a file, its fields stated as the file has them.
+  const popupOf = (name: string, fields: Partial<Annotation>): ModelAnnotation =>
+    withAnnotation(annotation(name, { geometry: at(612, 10) }), {
+      subtype: 'popup',
+      parent: root.annotation.ref,
+      ...fields,
+    } as Partial<Annotation>);
+  const popup = popupOf('popup', { open: false, hasAppearance: false } as Partial<Annotation>);
+  const model = () => modelWith([root, reply, subordinate, status, popup]);
+
+  it('classifies a popup as the conversation plane, open or not', () => {
+    expect(isConversationOnly(popup)).toBe(true);
+    expect(
+      isConversationOnly(
+        popupOf('open-popup', { open: true, hasAppearance: true } as Partial<Annotation>),
+      ),
+    ).toBe(true);
+  });
 
   it('classifies replies and state annotations; group subordinates stay painted', () => {
     expect(isConversationOnly(root)).toBe(false);

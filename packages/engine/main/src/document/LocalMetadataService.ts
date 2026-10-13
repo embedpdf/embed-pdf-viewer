@@ -13,9 +13,9 @@ import {
   type MetadataPatch,
   type MetadataService,
   type MetadataUpdateResult,
+  type SessionEventPublisher,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
 import type { WorkerResultPayload } from '../worker/protocol';

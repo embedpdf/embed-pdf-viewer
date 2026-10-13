@@ -17,7 +17,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook, name: 'ebook.pdf' }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook, name: 'ebook.pdf' }] },
       withStage(),
       withRender(),
     ),

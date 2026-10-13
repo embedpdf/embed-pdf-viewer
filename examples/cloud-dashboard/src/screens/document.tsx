@@ -1,4 +1,4 @@
-import { CloudPDFViewer } from '@cloudpdf/viewer-react';
+import { PDFViewer } from '@cloudpdf/viewer-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { api } from '../api/client';
@@ -85,11 +85,11 @@ export function DocumentScreen({
 
   return (
     <div className="h-full">
-      <CloudPDFViewer
-        // Same-origin through the dev proxy — the SDK never needs an absolute
-        // engine URL in a normal deployment either.
-        baseUrl=""
-        docToken={active.token}
+      <PDFViewer
+        // Same-origin through the dev proxy, where a deployment names its own server (CloudPDF
+        // SaaS when it names none).
+        engine={{ baseUrl: '' }}
+        src={{ token: active.token }}
         style={{ height: '100%' }}
       >
         <div
@@ -110,7 +110,7 @@ export function DocumentScreen({
             Share
           </Button>
         </div>
-      </CloudPDFViewer>
+      </PDFViewer>
     </div>
   );
 }

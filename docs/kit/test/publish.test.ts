@@ -9,25 +9,51 @@ import { docsRelease, isDocsPreview, loadLivePages, type LivePages } from '../sr
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'dk-publish-'));
 afterAll(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
+const LOCAL_PAGES: LivePages['sites']['local']['pages'] = {
+  'text/search': {
+    pending: [],
+    live: { react: true, vue: false, svelte: false, angular: false },
+  },
+  'documents/saving': {
+    pending: ['print'],
+    live: { react: false, vue: false, svelte: false, angular: false },
+  },
+  'annotations/index': {
+    pending: [],
+    live: { react: false, vue: false, svelte: false, angular: true },
+  },
+  'viewer/customize/layout': {
+    pending: [],
+    live: { vanilla: false, react: true, vue: false, svelte: false, angular: false },
+  },
+  'viewer/index': {
+    pending: [],
+    live: { vanilla: true, react: true, vue: false, svelte: false, angular: false },
+  },
+  'viewer/features/index': {
+    pending: [],
+    live: { vanilla: false, react: false, vue: false, svelte: false, angular: false },
+  },
+};
+
+/** cloudpdf.com's copy of Layout doesn't compile for React yet; embedpdf.com's does. */
 const LIVE_PAGES: LivePages = {
-  pages: {
-    'text/search': {
-      pending: [],
-      live: { react: true, vue: false, svelte: false, angular: false },
-    },
-    'documents/saving': {
-      pending: ['print'],
-      live: { react: false, vue: false, svelte: false, angular: false },
-    },
-    'annotations/index': {
-      pending: [],
-      live: { react: false, vue: false, svelte: false, angular: true },
+  sites: {
+    local: { pages: LOCAL_PAGES },
+    cloud: {
+      pages: {
+        ...LOCAL_PAGES,
+        'viewer/customize/layout': {
+          pending: [],
+          live: { vanilla: false, react: false, vue: false, svelte: false, angular: false },
+        },
+      },
     },
   },
 };
 
 const release = (contentPath: string, framework: string | undefined, preview = false) =>
-  docsRelease({ contentPath, framework, preview, livePages: () => LIVE_PAGES });
+  docsRelease({ contentPath, framework, preview, livePages: () => LIVE_PAGES, engine: 'local' });
 
 describe('the publish gate', () => {
   it('shows a headless page where it is live, and holds it back where it is not', () => {
@@ -59,36 +85,80 @@ describe('the publish gate', () => {
     });
   });
 
-  it('gates only the headless docs, and never reads the status for other pages', () => {
+  it('shows a viewer page where it is live, plain HTML included, and holds it back where it is not', () => {
+    expect(release('docs/viewer/customize/layout', 'react')).toEqual({
+      live: true,
+      preview: false,
+      reactLive: true,
+    });
+    expect(release('docs/viewer/customize/layout', 'vanilla')).toEqual({
+      live: false,
+      preview: false,
+      reactLive: true,
+    });
+    expect(release('docs/viewer', 'vanilla').live).toBe(true);
+    expect(release('docs/viewer/features', 'vue')).toMatchObject({ live: false, reactLive: false });
+  });
+
+  it('reads the status of the site’s own copy', () => {
+    const onCloud = (contentPath: string, framework: string) =>
+      docsRelease({
+        contentPath,
+        framework,
+        preview: false,
+        livePages: () => LIVE_PAGES,
+        engine: 'cloud',
+      });
+    expect(onCloud('docs/viewer/customize/layout', 'react').live).toBe(false);
+    expect(release('docs/viewer/customize/layout', 'react').live).toBe(true);
+    expect(onCloud('docs/headless/text/search', 'react').live).toBe(true);
+  });
+
+  it('never takes a viewer page for the headless page of the same name', () => {
+    expect(release('docs/viewer/index', 'angular').live).toBe(false);
+    expect(release('docs/headless/annotations/index', 'angular').live).toBe(true);
+  });
+
+  it('gates only the headless and viewer docs, and never reads the status for other pages', () => {
     const unread = () => {
       throw new Error('read');
     };
-    expect(
-      docsRelease({
-        contentPath: 'docs/viewer/getting-started',
-        framework: 'vue',
-        preview: false,
-        livePages: unread,
-      }),
-    ).toEqual({ live: true, preview: false, reactLive: true });
     expect(
       docsRelease({
         contentPath: 'docs/engine/fonts',
         framework: undefined,
         preview: false,
         livePages: unread,
+        engine: 'local',
       }).live,
     ).toBe(true);
+    expect(
+      docsRelease({
+        contentPath: 'docs/engine/fonts',
+        framework: 'react',
+        preview: false,
+        livePages: unread,
+        engine: 'local',
+      }),
+    ).toEqual({ live: true, preview: false, reactLive: true });
   });
 
   it('shows every headless page on the preview site, with the banner only where production holds it back', () => {
-    const livePages = () => ({
-      pages: {
-        'text/search': { pending: [], live: { react: true, vue: false, svelte: false, angular: false } },
+    const pages = {
+      'text/search': {
+        pending: [],
+        live: { react: true, vue: false, svelte: false, angular: false },
       },
-    });
+    };
+    const livePages = () => ({ sites: { local: { pages }, cloud: { pages } } });
     const release = (framework: string) =>
-      docsRelease({ contentPath: 'docs/headless/text/search', framework, preview: true, livePages });
+      docsRelease({
+        contentPath: 'docs/headless/text/search',
+        framework,
+        preview: true,
+        livePages,
+        engine: 'local',
+      });
     expect(release('react')).toEqual({ live: true, preview: false, reactLive: true });
     expect(release('vue')).toEqual({ live: true, preview: true, reactLive: true });
   });
@@ -103,6 +173,7 @@ describe('the publish gate', () => {
         framework: 'svelte',
         preview: true,
         livePages: unread,
+        engine: 'local',
       }),
     ).toEqual({ live: true, preview: false, reactLive: true });
   });
@@ -126,18 +197,23 @@ describe('live-pages.json', () => {
   it('reads the file again once docs:check rewrites it', () => {
     const file = path.join(scratch, 'live-pages.json');
     fs.writeFileSync(file, JSON.stringify(LIVE_PAGES));
-    expect(loadLivePages(file).pages['text/search'].live.vue).toBe(false);
+    expect(loadLivePages(file).sites.local.pages['text/search'].live.vue).toBe(false);
 
-    const next: LivePages = {
-      pages: {
-        'text/search': {
-          pending: [],
-          live: { react: true, vue: true, svelte: false, angular: false },
-        },
+    const pages = {
+      'text/search': {
+        pending: [],
+        live: { react: true, vue: true, svelte: false, angular: false },
       },
     };
+    const next: LivePages = { sites: { local: { pages }, cloud: { pages } } };
     fs.writeFileSync(file, JSON.stringify(next));
     fs.utimesSync(file, new Date(), new Date(Date.now() + 5_000));
-    expect(loadLivePages(file).pages['text/search'].live.vue).toBe(true);
+    expect(loadLivePages(file).sites.local.pages['text/search'].live.vue).toBe(true);
+  });
+
+  it('says to run docs:check again when it has no status per site', () => {
+    const file = path.join(scratch, 'one-status.json');
+    fs.writeFileSync(file, JSON.stringify({ pages: {} }));
+    expect(() => loadLivePages(file)).toThrow(/docs:check/);
   });
 });

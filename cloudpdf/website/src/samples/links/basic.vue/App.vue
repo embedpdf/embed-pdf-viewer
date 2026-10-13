@@ -11,7 +11,7 @@ import AddLinks from './AddLinks.vue';
 
 import '../basic.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // The annotation plugin is only here to make the links below.
 const plugins = [
   stagePlugin(),

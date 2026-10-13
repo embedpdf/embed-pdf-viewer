@@ -10,7 +10,7 @@ SelectionCapability [InterfaceDeclaration] (from packages/plugin/selection/src/c
 SelectionChangedEvent [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionChangedEvent{ readonly range: TextRange | null; readonly pages: readonly PageRef[]; }
 SelectionClearedEvent [TypeAliasDeclaration] (from packages/plugin/selection/src/contract.ts): export type SelectionClearedEvent = Record<string, never>;
 SelectionClipboard [SvelteComponent] (from packages/framework/svelte/src/selection/SelectionClipboard.svelte): props SelectionClipboardProps
-SelectionClipboardProps [TypeAliasDeclaration] (from packages/framework/svelte/src/selection/props.ts): export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'>;
+SelectionClipboardProps [InterfaceDeclaration] (from packages/framework/svelte/src/selection/props.ts): export interface SelectionClipboardProps extends Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'>{ target?: MaybeGetter<HTMLElement | null | undefined>; }
 SelectionCommittedEvent [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionCommittedEvent{ readonly range: TextRange; }
 SelectionConfig [TypeAliasDeclaration] (from packages/plugin/selection/src/contract.ts): export type SelectionConfig = DeepPartial<SelectionSettings>;
 SelectionEndpoint [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionEndpoint{ page: PageRef; glyphQuad: Quad; advance: 1 | -1; rect: Rect; }

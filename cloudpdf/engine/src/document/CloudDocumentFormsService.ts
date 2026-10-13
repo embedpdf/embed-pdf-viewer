@@ -23,6 +23,7 @@ import {
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldUpdateResult,
+  type SessionEventPublisher,
   type SignatureAppearanceInput,
   type FormFieldValue,
   type FormImportBody,
@@ -70,7 +71,6 @@ import {
   FormCalculationsReorderResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';

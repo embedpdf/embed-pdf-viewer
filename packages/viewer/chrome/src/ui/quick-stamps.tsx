@@ -1,7 +1,7 @@
 /**
  * Quick marks in the toolbar: a row of stamp thumbnails that arm on click —
  * the checkmark, the cross, whatever the embedder configured
- * (`stamps.toolbar`: asset ids, or one library's assets). The hover ghost and
+ * (`plugins.stamp.quick`: `library:name`, `standard` for the standard stamps). The hover ghost and
  * the click placement are the annotation plugin's, exactly as from the
  * sidebar; only the picker moved. Renders nothing until the assets exist.
  * Lives in the workspace toolbar, so it reads the active document's tool.
@@ -17,19 +17,20 @@ import {
   useStampState,
   type StampAsset,
 } from '@embedpdf/react/stamp';
-import { useStampsConfig } from '../config-context';
+import { useStampSettings } from '../config-context';
 import {
   DEFAULT_LIBRARY_ID,
   ensureDefaultLibrary,
+  quickStampAssetIdOf,
   resolveStampsLocale,
 } from '../config/default-stamps';
 import { restoreStampLibrariesOnce } from './stamp-store';
-import { buttonClass } from './toolbar';
+import { buttonClass, buttonPart } from './toolbar';
 
 export function QuickStamps() {
   const t = useT();
   const stamp = useStamp();
-  const config = useStampsConfig();
+  const { standard, quick } = useStampSettings();
   const { locale } = useI18nState();
   const assets = useStampAssets();
   const documentId = useDocumentId();
@@ -39,11 +40,7 @@ export function QuickStamps() {
     null,
   );
   const armedId = useStampState((state) => state.armedAsset?.id ?? null);
-  const ids = Array.isArray(config.toolbar)
-    ? config.toolbar
-    : config.toolbar && 'library' in config.toolbar
-      ? (stamp.getLibrary(config.toolbar.library)?.assetIds ?? [])
-      : [];
+  const ids = (quick ?? []).map(quickStampAssetIdOf);
 
   // A quick mark from the built-in library needs that library loaded — the
   // one case the toolbar pays for it at boot. The user's own libraries are
@@ -52,9 +49,9 @@ export function QuickStamps() {
   useEffect(() => {
     if (!wantsDefault) return;
     restoreStampLibrariesOnce(stamp)
-      .then(() => ensureDefaultLibrary(stamp, resolveStampsLocale(locale), config.defaultLibrary))
+      .then(() => ensureDefaultLibrary(stamp, resolveStampsLocale(locale), standard))
       .catch((error) => console.error('[embedpdf] quick stamps failed:', error));
-    // `config` is init-stable; only the locale re-runs this.
+    // `standard` is read once; only the locale re-runs this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, locale, wantsDefault]);
 
@@ -97,6 +94,7 @@ function QuickStampButton({
       title={asset.label}
       aria-label={asset.label}
       aria-pressed={active || undefined}
+      part={buttonPart(active)}
       className={buttonClass(active, true)}
     >
       {url ? (

@@ -15,7 +15,7 @@ export { CloudDocumentPagesService } from './document/CloudDocumentPagesService'
 export { CloudPageHandle } from './document/CloudPageHandle';
 export { CloudPageAnnotationsService } from './document/CloudPageAnnotationsService';
 export { CloudPageRenderService } from './document/CloudPageRenderService';
-export { HttpClient } from './transport/HttpClient';
+export { CLOUDPDF_SAAS_URL, HttpClient } from './transport/HttpClient';
 export type { HttpClientOptions } from './transport/HttpClient';
 export { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export type { UnverifiedClaims } from './transport/decodeUnverifiedClaims';
@@ -44,12 +44,15 @@ import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
  * `undefined` cloud-side), so they cannot be configured from the client. This
  * is the local-vs-cloud split, surfaced in the API.
  *
+ * Without a `baseUrl` it connects to CloudPDF SaaS; your own server names itself:
+ *
  * ```ts
- * const engine = cloudEngine({ baseUrl: 'https://pdf.example.com', token });
+ * const engine = cloudEngine();                                    // CloudPDF SaaS
+ * const own = cloudEngine({ baseUrl: 'https://pdf.example.com' }); // your @cloudpdf/server
  * <Viewer engine={engine} plugins={[stagePlugin(), renderPlugin()]} />
  * ```
  */
-export function cloudEngine(opts: CloudEngineOptions): CloudEngine {
+export function cloudEngine(opts: CloudEngineOptions = {}): CloudEngine {
   return CloudEngine.fromOptions(opts);
 }
 

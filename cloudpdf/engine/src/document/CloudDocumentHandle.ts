@@ -4,6 +4,8 @@ import {
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
+  EventHub,
+  SessionEventPublisher,
   subscribeToType,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -38,7 +40,6 @@ import {
   type DocumentManifest,
   type LayerScopePlane,
 } from '@embedpdf/engine-core/wire';
-import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { CloudDocumentActionsService } from './CloudDocumentActionsService';
 import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';

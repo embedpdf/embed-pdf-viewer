@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { installFilePickerProvider, pickRequestedFile } from '../src/file-picker';
+import { installFilePickerProvider, pickFile, pickRequestedFile } from '../src/file-picker';
 import { fakeElement } from './helpers/fake-element';
 
 /** A document whose file inputs "pick" `file` when clicked (or cancel, for `null`). */
@@ -40,6 +40,57 @@ describe('pickRequestedFile', () => {
     const inputs = fileDialog(null);
     await expect(pickRequestedFile({})).resolves.toBeNull();
     expect(inputs[0]!.accept).toBe('*/*');
+  });
+});
+
+describe('pickFile', () => {
+  /** A file dialog the test closes by hand: `input` is its file input once it's open. */
+  function openDialog() {
+    const window = fakeElement();
+    const dialog = { input: null as ReturnType<typeof fakeElement> | null, window };
+    vi.stubGlobal('window', window);
+    vi.stubGlobal('document', {
+      body: { appendChild: () => undefined },
+      createElement: () => {
+        const input = fakeElement({
+          accept: '',
+          multiple: false,
+          type: '',
+          style: {},
+          files: [] as object[],
+          remove: () => undefined,
+          click: () => undefined,
+        });
+        dialog.input = input;
+        return input;
+      },
+    });
+    return dialog;
+  }
+
+  afterEach(() => vi.useRealTimers());
+
+  it('keeps a file picked after the window has its focus back', async () => {
+    vi.useFakeTimers();
+    const dialog = openDialog();
+    const picked = pickFile({ accept: '.pdf' });
+    // The dialog closes, the window has its focus back, and the picked file comes a moment later.
+    dialog.window.dispatch('focus');
+    await vi.advanceTimersByTimeAsync(1000);
+    const file = { name: 'contract.pdf' };
+    Object.assign(dialog.input!, { files: [file] });
+    dialog.input!.dispatch('change');
+    await expect(picked).resolves.toBe(file);
+  });
+
+  it('answers null once the dialog is cancelled, however long it was open', async () => {
+    vi.useFakeTimers();
+    const dialog = openDialog();
+    const picked = pickFile();
+    dialog.window.dispatch('focus');
+    await vi.advanceTimersByTimeAsync(60_000);
+    dialog.input!.dispatch('cancel');
+    await expect(picked).resolves.toBeNull();
   });
 });
 

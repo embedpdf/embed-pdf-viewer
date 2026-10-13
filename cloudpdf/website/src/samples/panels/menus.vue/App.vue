@@ -11,7 +11,7 @@ import Workspace from './Workspace.vue';
 
 import '../menus.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),

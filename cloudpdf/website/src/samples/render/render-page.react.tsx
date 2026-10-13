@@ -6,7 +6,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './render-page.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // No Stage: these pictures are plain images, rendered on demand.
 const plugins = [renderPlugin()];
 

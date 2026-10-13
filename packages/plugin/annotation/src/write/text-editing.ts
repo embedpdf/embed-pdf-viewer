@@ -103,7 +103,9 @@ export function createTextEditing(
       const id = chrome.textBoxAt(page, point, { scale, rotation, zoom });
       if (id != null) {
         store.commit({ type: 'beginTextEdit', id });
-        return true;
+        // A box whose text may not change (`lockedContents`, the `editable`
+        // setting) stays out of the editor.
+        if (store.model().editing === id) return true;
       }
       // Nothing editable here — report it so the caller can fall through to a
       // normal press instead of swallowing the gesture on a non-text annotation.

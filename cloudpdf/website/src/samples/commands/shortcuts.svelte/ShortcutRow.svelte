@@ -7,7 +7,7 @@
   const command = useCommand(() => id);
 </script>
 
-{#if command.current?.visible}
+{#if command.current.visible}
   <li class="row" data-disabled={!command.current.enabled || undefined}>
     <kbd class="key">{formatShortcut(shortcut)}</kbd>
     <span>{command.current.label}</span>

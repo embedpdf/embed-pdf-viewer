@@ -7,7 +7,7 @@ import { useMDXComponents as getMDXComponents } from '../../../../mdx-components
 
 import { PageTitle } from '@/components/docs/mdx';
 import { RouteExample, type CompiledExampleProps } from '@/components/docs/route-example';
-import { isHeadlessIntegration, type HeadlessIntegration } from '@/lib/docs-integrations';
+import { isDocsIntegration, type DocsIntegration } from '@/lib/docs-integrations';
 import { buildDocsPageMetadata, getDocsPagePresentation } from '@/lib/docs-page';
 import { docsRelease, reactVersionHref } from '@/lib/docs-release';
 import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
@@ -50,7 +50,7 @@ export default async function Page(props: PageProps) {
   const release = docsRelease(resolved.contentPath, resolved.integration);
 
   // The publish gate holds this page back for its framework: the title, and why.
-  if (!release.live && isHeadlessIntegration(resolved.integration)) {
+  if (!release.live && isDocsIntegration(resolved.integration)) {
     return (
       <Wrapper {...rest} toc={[]}>
         <PageTitle>{rest.metadata?.title}</PageTitle>
@@ -66,7 +66,7 @@ export default async function Page(props: PageProps) {
   // and snippets read and send only this route's framework's code (RouteExample).
   const framework = resolved.integration ?? null;
   const components = {
-    ...(release.preview && isHeadlessIntegration(resolved.integration)
+    ...(release.preview && isDocsIntegration(resolved.integration)
       ? { h1: withPreviewBanner(resolved.integration) }
       : {}),
     Example: (props: CompiledExampleProps) => <RouteExample {...props} framework={framework} />,
@@ -82,7 +82,7 @@ export default async function Page(props: PageProps) {
 }
 
 /** The page's title with the preview banner under it. */
-function withPreviewBanner(framework: HeadlessIntegration) {
+function withPreviewBanner(framework: DocsIntegration) {
   return function TitleWithPreviewBanner(props: HTMLAttributes<HTMLHeadingElement>) {
     return (
       <>

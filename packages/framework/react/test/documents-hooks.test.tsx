@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import * as React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, cleanup } from '@testing-library/react';
+import { act, cleanup, waitFor } from '@testing-library/react';
 import type { DocumentHandle, DocumentMetadata, Engine, PageLayout } from '@embedpdf/core';
 import { toPageRef } from '../src/runtime';
 import {
@@ -89,8 +89,10 @@ describe('useMetadataState', () => {
     );
     expect(latest(renders)).toBe(metadataState.empty);
 
+    // Nothing reads the metadata as the document opens: the hook's reading it loads it.
     await act(() => kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() }));
-    await act(() => kernel.capability(MetadataToken).refresh());
+    await waitFor(() => expect(kernel.capability(MetadataToken).getStatus()).toBe('ready'));
+    expect(renders.some((state) => (state as { status: string }).status === 'loading')).toBe(true);
     expect(latest(renders)).toEqual({
       metadata: METADATA,
       custom: { contractId: 'C-2026-114' },

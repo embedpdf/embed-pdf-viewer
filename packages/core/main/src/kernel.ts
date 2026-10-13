@@ -267,6 +267,12 @@ interface DocumentSession extends SessionRef {
   engineOp: { abort(reason?: unknown): void } | null;
   cancel: AbortController;
   capabilities: Map<AnyPlugin, unknown>;
+  /**
+   * The plugins whose `create()` is running. A read that reaches one of them meanwhile finds
+   * no capability yet, instead of building it a second time. (Listeners can't cause one: the
+   * store holds its notifications while a document's plugins are built.)
+   */
+  building: Set<AnyPlugin>;
   /** Workspace capabilities as seen from this document's scope (`PluginDef.inScope`), by token. */
   views: Map<CapabilityToken<unknown>, unknown>;
   /** `connect` halves of `create()`, run once every instance of the document is built. */
@@ -442,6 +448,7 @@ export function createKernel(config: {
       cancel,
       signal: cancel.signal,
       capabilities: new Map(),
+      building: new Set(),
       views: new Map(),
       connectors: new Map(),
       leases: new Map(),
@@ -539,7 +546,8 @@ export function createKernel(config: {
         ...core.pending,
         [session.id]: { id: session.id, name: session.name, status: 'loading' },
       },
-      order: [...core.order, session.id],
+      // A failed document opened again (`retry()`) keeps its place.
+      order: core.order.includes(session.id) ? core.order : [...core.order, session.id],
       activeId: activate || core.activeId === null ? session.id : core.activeId,
     });
   }
@@ -681,11 +689,31 @@ export function createKernel(config: {
     }
   }
 
+  /** Whether the plugin's `create()` is running for this document: it has no capability yet. */
+  const isBuilding = (plugin: AnyPlugin, session: DocumentSession): boolean =>
+    session.building.has(plugin) && !session.capabilities.has(plugin);
+
   function buildDocumentCapability(plugin: AnyPlugin, session: DocumentSession): unknown {
     let capability = session.capabilities.get(plugin);
     if (!capability) {
+      // A second instance would take the first one's state slice and mirror cells, leaving the
+      // connected one with cells it can no longer write.
+      if (session.building.has(plugin)) {
+        throw new PluginError(
+          'not-ready',
+          plugin.id,
+          `"${plugin.id}" was asked for while it is being created`,
+        );
+      }
       const ctx = createPluginContext(services, plugin, session, session.signal, session.scope);
-      const { api, connect } = plugin.create(ctx);
+      session.building.add(plugin);
+      let created: ReturnType<AnyPlugin['create']>;
+      try {
+        created = plugin.create(ctx);
+      } finally {
+        session.building.delete(plugin);
+      }
+      const { api, connect } = created;
       capability = api;
       session.connectors.set(plugin, () => {
         connect?.();
@@ -748,6 +776,7 @@ export function createKernel(config: {
     if (!provider) return null;
     const session = sessionOf(documentId);
     if (!session || (session.phase !== 'bringup' && session.phase !== 'ready')) return null;
+    if (isBuilding(provider, session)) return null;
     return buildDocumentCapability(provider, session) as T;
   }
 
@@ -761,6 +790,7 @@ export function createKernel(config: {
     if (!provider) return null;
     const session = sessionOf(documentId);
     if (!session || session.phase !== 'ready') return null;
+    if (isBuilding(provider, session)) return null;
     return buildDocumentCapability(provider, session) as T;
   }
 
@@ -904,10 +934,19 @@ export function createKernel(config: {
     }
     // Construction and connection are part of the transaction (either can
     // throw); the callbacks they register fire post-commit and are isolated
-    // by the store instead. Eager, in dependency order.
-    for (const plugin of documentScopedPlugins) {
-      buildDocumentCapability(plugin, session);
-      session.connectors.get(plugin)?.();
+    // by the store instead. Eager, in dependency order, with the store's change
+    // stream held: a `create()` writes state, and a listener told of it at once
+    // could read a plugin that isn't built yet and build it out of order,
+    // before the plugins it finds while it's created. Listeners hear of the
+    // whole bring-up in one pass, once every plugin is there.
+    const release = store.hold();
+    try {
+      for (const plugin of documentScopedPlugins) {
+        buildDocumentCapability(plugin, session);
+        session.connectors.get(plugin)?.();
+      }
+    } finally {
+      release();
     }
     session.scope.defer(session.handle!.events.subscribe((event) => bursts.last(event)));
     checkpoint(session);
@@ -926,13 +965,14 @@ export function createKernel(config: {
   async function openDocument(
     input: OpenSource,
     options?: OpenDocumentOptions,
+    slotId?: string,
   ): Promise<OpenDocumentResult> {
     const signal = options?.signal;
     if (signal?.aborted) {
       throw new PluginError('operation-cancelled', 'documents', 'the open was cancelled');
     }
     try {
-      const { session, done } = reserveAndOpen(input, options);
+      const { session, done } = reserveAndOpen(input, options, slotId);
       // Cancelling closes the document while it opens; once it's open, the signal is spent.
       const cancel = () => void session.close();
       signal?.addEventListener('abort', cancel, { once: true });
@@ -962,10 +1002,14 @@ export function createKernel(config: {
     };
   }
 
-  /** Reserve the tab slot synchronously and start the open; returns the slot id at once. */
+  /**
+   * Reserve the tab slot synchronously and start the open; returns the slot id at once.
+   * `slotId` is a failed document's tab, which `retry()` opens again in place.
+   */
   function reserveAndOpen(
     input: OpenSource,
     options?: OpenDocumentOptions,
+    slotId?: string,
   ): { session: DocumentSession; done: Promise<DocumentSession> } {
     guardUsable('documents.open()');
     const engineOptions = engineOptionsOf(options);
@@ -975,7 +1019,7 @@ export function createKernel(config: {
     //    content arrives at completion time. Fire-and-forget concurrent opens
     //    therefore keep call order as tab order.
     const requestedId =
-      typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket());
+      slotId ?? (typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket()));
     if (sessions.has(requestedId)) {
       throw new PluginError('conflict', 'documents', `document already open: ${requestedId}`);
     }
@@ -1133,6 +1177,8 @@ export function createKernel(config: {
 
   const documents: DocumentsCapability = {
     open: openDocument,
+    // A file's bytes are the engine's to take or refuse: it says which.
+    canOpenFiles: () => engine.canOpenFiles,
     retry: async (id, options) => {
       const session = sessions.get(id);
       if (!session || session.phase !== 'error' || session.source === null) {
@@ -1142,9 +1188,12 @@ export function createKernel(config: {
           `${id} didn't fail to open; nothing to retry`,
         );
       }
+      // In its own tab, which keeps its id and place; the active document stays the active one.
+      // The failed session holds nothing (its scope was released when it failed), so the new
+      // one takes its id without closing it: the tab never closes.
       const { source, openOptions } = session;
-      await session.close();
-      return openDocument(source, { ...openOptions, signal: options?.signal });
+      sessions.delete(id);
+      return openDocument(source, { ...openOptions, activate: false, signal: options?.signal }, id);
     },
     rename: (id, name) => {
       const core = store.getCore();

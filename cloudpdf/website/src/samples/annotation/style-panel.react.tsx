@@ -17,7 +17,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './style-panel.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
@@ -123,7 +123,9 @@ function Control({ property }: { property: AnnotationProperty }) {
             }}
           >
             {property.options.map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         );
@@ -147,7 +149,9 @@ function Control({ property }: { property: AnnotationProperty }) {
           >
             {isMixed && <option value="">mixed</option>}
             {property.options.map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         );
@@ -161,7 +165,9 @@ function Control({ property }: { property: AnnotationProperty }) {
         >
           {isMixed && <option value="">mixed</option>}
           {property.options.map((option) => (
-            <option key={option}>{option}</option>
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
           ))}
         </select>
       );

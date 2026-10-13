@@ -32,21 +32,16 @@ export function pickImageFile(options: PickFileOptions = {}): Promise<File | nul
     const finish = (value: File | null): void => {
       if (settled) return;
       settled = true;
-      window.removeEventListener('focus', onFocus);
       input.remove();
       resolve(value);
     };
 
-    // A window refocus means the dialog closed. Give a queued `change` a tick to
-    // win, then treat a bare refocus as a cancel — the fallback for browsers that
-    // predate the `cancel` event.
-    const onFocus = (): void => {
-      setTimeout(() => finish(null), 300);
-    };
-
+    // The dialog says how it closed: `change` with the picked file, or `cancel`, which every
+    // browser the viewer runs in fires. Nothing else is a sign: the window can get its focus back
+    // before the picked file arrives (a file in iCloud Drive or on a network drive, an app's
+    // embedded browser), and taking that for a cancel would drop the user's pick.
     input.addEventListener('change', () => finish(input.files?.[0] ?? null), { once: true });
     input.addEventListener('cancel', () => finish(null), { once: true });
-    window.addEventListener('focus', onFocus, { once: true });
 
     document.body.appendChild(input);
     input.click();

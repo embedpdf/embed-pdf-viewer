@@ -5,8 +5,8 @@ import {
   type LocalPageHandle as LocalPageHandleContract,
   type PageObjectNumber,
   type PageRef,
+  type SessionEventPublisher,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { LocalPageAnnotationsService } from './LocalPageAnnotationsService';
 import { LocalPageFormsService } from './LocalPageFormsService';

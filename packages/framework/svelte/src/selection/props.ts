@@ -1,6 +1,7 @@
 /** The props of the selection components. */
 import type { Snippet } from 'svelte';
 import type { AnchoredPlacement, SelectionClipboardOptions } from '@embedpdf/web';
+import type { MaybeGetter } from '../runtime/values.svelte';
 import type { StageTokenProp } from '../stage/stage-scope';
 
 export interface SelectionMenuProps {
@@ -18,4 +19,12 @@ export interface SelectionHandlesProps {
 }
 
 /** The props of `<SelectionClipboard>`. */
-export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'>;
+export interface SelectionClipboardProps
+  extends Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'> {
+  /**
+   * Copy only while focus is inside this element, for a page with more than one viewer. Pass a
+   * function (`() => area`, with `bind:this={area}`): copying works once the element has mounted.
+   * Default: anywhere on the page.
+   */
+  target?: MaybeGetter<HTMLElement | null | undefined>;
+}

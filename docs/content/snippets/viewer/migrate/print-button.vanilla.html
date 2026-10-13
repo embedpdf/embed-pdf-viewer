@@ -1,0 +1,37 @@
+<!-- 2.x:
+
+<button id="print">Print</button>
+<div id="pdf-viewer" style="height: 80vh"></div>
+
+<script type="module">
+  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
+
+  const container = EmbedPDF.init({
+    type: 'container',
+    target: document.getElementById('pdf-viewer'),
+    src: '/report.pdf',
+  });
+  const registry = await container.registry;
+
+  document.getElementById('print').onclick = () =>
+    registry.getPlugin('commands').provides().execute('document:print');
+</script>
+-->
+
+<button id="print" disabled>Print</button>
+<div id="viewer" style="height: 80vh"></div>
+
+<script type="module">
+  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const print = document.getElementById('print');
+
+  EmbedPDF.init({
+    target: '#viewer',
+    src: '/report.pdf',
+    onReady: (viewer) => {
+      print.disabled = false;
+      print.onclick = () => viewer.commands.execute('document:print');
+    },
+  });
+</script>

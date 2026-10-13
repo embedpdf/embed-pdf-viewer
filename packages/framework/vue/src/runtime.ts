@@ -18,6 +18,8 @@ export { epdfTheme } from './theme';
 export type { EpdfTheme } from './theme';
 
 export { default as Viewer } from './runtime/Viewer.vue';
+// A kernel someone else owns, for the components inside: the full viewer's Vue wrapper uses it.
+export { default as KernelProvider } from './runtime/KernelProvider.vue';
 export { default as DocumentGate } from './runtime/DocumentGate.vue';
 export { default as DocumentScope } from './runtime/DocumentScope.vue';
 

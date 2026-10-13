@@ -30,7 +30,7 @@ const TO_SCRIPT = { x: 458, y: 24, width: 82, height: 28 };
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfLinkLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       withStage(),
       withRender(),
       withInteraction(),

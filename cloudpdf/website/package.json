@@ -23,6 +23,11 @@
   },
   "dependencies": {
     "@cloudpdf/engine": "workspace:*",
+    "@cloudpdf/viewer": "workspace:*",
+    "@cloudpdf/viewer-angular": "workspace:*",
+    "@cloudpdf/viewer-react": "workspace:*",
+    "@cloudpdf/viewer-svelte": "workspace:*",
+    "@cloudpdf/viewer-vue": "workspace:*",
     "@embedpdf/default-stamps": "workspace:*",
     "@embedpdf/docs-kit": "workspace:*",
     "@embedpdf/engine": "workspace:*",

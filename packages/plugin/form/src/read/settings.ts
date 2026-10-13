@@ -12,23 +12,47 @@ import type { FormServices } from '../services';
 
 /** What every field has. */
 const COMMON: readonly FormFieldSetting[] = [
-  { key: 'name', control: 'text', label: 'Name' },
-  { key: 'alternateName', control: 'text', label: 'Tooltip' },
-  { key: 'required', control: 'flag', label: 'Required' },
-  { key: 'readOnly', control: 'flag', label: 'Read-only' },
-  { key: 'noExport', control: 'flag', label: "Don't export" },
+  { key: 'name', control: 'text', label: 'Name', labelKey: 'form.settings.name' },
+  { key: 'alternateName', control: 'text', label: 'Tooltip', labelKey: 'form.settings.tooltip' },
+  { key: 'required', control: 'flag', label: 'Required', labelKey: 'form.settings.required' },
+  { key: 'readOnly', control: 'flag', label: 'Read-only', labelKey: 'form.settings.readOnly' },
+  { key: 'noExport', control: 'flag', label: "Don't export", labelKey: 'form.settings.noExport' },
 ];
+
+const DEFAULT_VALUE = { label: 'Default value', labelKey: 'form.settings.defaultValue' } as const;
+const OPTIONS: FormFieldSetting = {
+  key: 'options',
+  control: 'options',
+  label: 'Options',
+  labelKey: 'form.settings.options',
+};
 
 /** What each family adds. */
 function familySettings(field: FormFieldDTO): readonly FormFieldSetting[] {
   switch (field.family) {
     case 'text':
       return [
-        { key: 'defaultValue', control: 'text', label: 'Default value' },
-        { key: 'maxLength', control: 'number', label: 'Maximum length', min: 1 },
-        { key: 'multiline', control: 'flag', label: 'Several lines' },
-        { key: 'password', control: 'flag', label: 'Password' },
-        { key: 'comb', control: 'flag', label: 'One character per box' },
+        { key: 'defaultValue', control: 'text', ...DEFAULT_VALUE },
+        {
+          key: 'maxLength',
+          control: 'number',
+          label: 'Maximum length',
+          labelKey: 'form.settings.maxLength',
+          min: 1,
+        },
+        {
+          key: 'multiline',
+          control: 'flag',
+          label: 'Several lines',
+          labelKey: 'form.settings.multiline',
+        },
+        { key: 'password', control: 'flag', label: 'Password', labelKey: 'form.settings.password' },
+        {
+          key: 'comb',
+          control: 'flag',
+          label: 'One character per box',
+          labelKey: 'form.settings.comb',
+        },
       ];
     case 'radio':
       return [
@@ -36,29 +60,45 @@ function familySettings(field: FormFieldDTO): readonly FormFieldSetting[] {
           key: 'radiosInUnison',
           control: 'flag',
           label: 'Buttons with one value turn on together',
+          labelKey: 'form.settings.radiosInUnison',
         },
-        { key: 'noToggleToOff', control: 'flag', label: 'Keep one on' },
+        {
+          key: 'noToggleToOff',
+          control: 'flag',
+          label: 'Keep one on',
+          labelKey: 'form.settings.keepOneOn',
+        },
       ];
     case 'combobox':
       return [
-        { key: 'options', control: 'options', label: 'Options' },
-        { key: 'edit', control: 'flag', label: 'Allow typing' },
+        OPTIONS,
+        {
+          key: 'edit',
+          control: 'flag',
+          label: 'Allow typing',
+          labelKey: 'form.settings.allowTyping',
+        },
         {
           key: 'defaultValue',
           control: 'choice',
-          label: 'Default value',
+          ...DEFAULT_VALUE,
           options: field.options.map((option) => option.value),
           free: field.edit,
         },
       ];
     case 'listbox':
       return [
-        { key: 'options', control: 'options', label: 'Options' },
-        { key: 'multiSelect', control: 'flag', label: 'Several choices' },
+        OPTIONS,
+        {
+          key: 'multiSelect',
+          control: 'flag',
+          label: 'Several choices',
+          labelKey: 'form.settings.multiSelect',
+        },
         {
           key: 'defaultValue',
           control: 'choices',
-          label: 'Default value',
+          ...DEFAULT_VALUE,
           options: field.options.map((option) => option.value),
         },
       ];

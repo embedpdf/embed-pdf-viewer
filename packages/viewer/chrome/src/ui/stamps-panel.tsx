@@ -8,7 +8,7 @@
  *   exact placement → each click on a page places one.
  *
  * Deliberately not a file dialog: picking arbitrary image bytes is the Image
- * tool's job (a click-then-pick tool, `insert:add-image`). The stamp button
+ * tool's job (a click-then-pick tool, `tool:image`). The stamp button
  * opens a library; a library is a set of reusable, named assets — the two
  * gestures are different, so they are different controls.
  *
@@ -28,7 +28,7 @@ import {
 } from '@embedpdf/react/stamp';
 import { useSurface } from '@embedpdf/react/shell';
 import { useI18nState, useT } from '@embedpdf/react/i18n';
-import { useStampsConfig } from '../config-context';
+import { useStampSettings } from '../config-context';
 import {
   DEFAULT_LIBRARY_ID,
   ensureDefaultLibrary,
@@ -42,8 +42,8 @@ const ALL = 'all';
 export function StampsPanel() {
   const t = useT();
   const stamp = useStamp();
-  const { defaultLibrary, sidebar } = useStampsConfig();
-  // Which catalogs this sidebar shows (`stamps.sidebar`): the plain stamps by
+  const { standard, sidebar } = useStampSettings();
+  // Which catalogs this sidebar shows (`plugins.stamp.sidebar`): the plain stamps by
   // default — never the people's marks, which have their own panel.
   const libraries = useStampLibraries({ kind: sidebar ?? ['stamps'] });
   const assets = useStampAssets();
@@ -71,7 +71,7 @@ export function StampsPanel() {
     let live = true;
     setBusy('loading');
     restoreStampLibrariesOnce(stamp)
-      .then(() => ensureDefaultLibrary(stamp, resolveStampsLocale(locale), defaultLibrary))
+      .then(() => ensureDefaultLibrary(stamp, resolveStampsLocale(locale), standard))
       .catch((error: unknown) => {
         console.error('[embedpdf] default stamps failed:', error);
         if (live) setError(t('demo.stampsError'));
@@ -80,7 +80,7 @@ export function StampsPanel() {
     return () => {
       live = false;
     };
-    // `t` and `defaultLibrary` are init-stable; only the locale re-runs this.
+    // `t` and `standard` are init-stable; only the locale re-runs this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, locale]);
 
@@ -152,7 +152,7 @@ export function StampsPanel() {
             <select
               value={selectedId}
               onChange={(event) => setPicked(event.target.value)}
-              aria-label={t('demo.stampsTitle')}
+              aria-label={t('panels.stamps')}
               className="border-border bg-surface text-fg min-w-0 flex-1 rounded border px-2 py-1.5 text-sm"
             >
               <option value={ALL}>{t('demo.stampsAll')}</option>
@@ -217,7 +217,7 @@ export function StampsPanel() {
                     type="button"
                     onClick={() => void stamp.deleteAsset(asset.id)}
                     title={t('demo.stampsRemoveStamp')}
-                    className="bg-surface border-border text-fg-muted hover:text-fg absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full border opacity-0 shadow-sm focus:opacity-100 group-hover:opacity-100"
+                    className="bg-surface border-border text-fg-muted hover:text-fg absolute end-1 top-1 grid h-5 w-5 place-items-center rounded-full border opacity-0 shadow-sm focus:opacity-100 group-hover:opacity-100"
                   >
                     <Icon name="x" size={12} />
                   </button>

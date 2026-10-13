@@ -32,11 +32,12 @@ function siteWithEveryFramework(): string {
 
 describe('collectSampleFiles', () => {
   it('collects every ready-made Viewer integration, including Vanilla JS', () => {
-    const files = collectSampleFiles('viewer/getting-started/basic');
+    const files = collectSampleFiles('viewer/quick-start/customized');
 
     expect(Object.keys(files)).toEqual(['vanilla', 'react', 'vue', 'svelte', 'angular']);
-    expect(files.vanilla?.[0]?.filename).toBe('basic.html');
-    expect(files.react?.[0]?.filename).toBe('basic.tsx');
+    expect(files.vanilla?.[0]?.filename).toBe('customized.html');
+    expect(files.vanilla?.[0]?.language).toBe('html');
+    expect(files.react?.[0]?.filename).toBe('customized.tsx');
   });
 
   it("shows an example's stylesheet as a tab after its entry", () => {
@@ -112,5 +113,40 @@ describe('one example in every framework', () => {
       ]),
     );
     expect(demos).toHaveLength(4);
+  });
+});
+
+describe("the ready-made viewer's examples", () => {
+  let site: string | undefined;
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (site) fs.rmSync(site, { recursive: true, force: true });
+  });
+
+  it('builds a demo of the plain-HTML page too, and of nothing that is only code', () => {
+    site = fs.mkdtempSync(path.join(os.tmpdir(), 'epdf-docs-samples-'));
+    const samples = path.join(site, 'src', 'samples');
+    const files = [
+      'viewer/start/first.vanilla.html',
+      'viewer/start/first.react.tsx',
+      'viewer/start/install.react.sh',
+      'viewer/start/pages.vanilla/index.html',
+      'snippets/viewer/start/first.react.tsx',
+    ];
+    for (const file of files) {
+      fs.mkdirSync(path.dirname(path.join(samples, file)), { recursive: true });
+      fs.writeFileSync(path.join(samples, file), '\n');
+    }
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const demos = discoverSampleVariants(samples, ['react', 'vanilla']);
+
+    expect(demos.map(({ name, fw }) => [name, fw]).sort()).toEqual([
+      ['viewer/start/first.react', 'react'],
+      ['viewer/start/first.vanilla', 'vanilla'],
+    ]);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('a vanilla example is one file, pages.vanilla.html'),
+    );
   });
 });

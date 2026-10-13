@@ -6,6 +6,7 @@
  * from the first frame and the new widget can be selected straight away.
  */
 import {
+  PluginError,
   toPluginError,
   type ChangeLabel,
   type OperationOptions,
@@ -16,12 +17,66 @@ import {
   writesScripts,
   type ChangeItem,
   type ChangeOp,
+  type FormFieldDTO,
+  type WidgetAnnotation,
+  type WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 
 import type { FormCapability, FormFieldResult } from '../contract';
+import { fieldByRef, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { createObjectNumbers } from '../services/object-numbers';
 import { undoLookOf } from '../sync/predict';
+import { nextInLine } from './next-in-line';
+
+/**
+ * A widget's look, as `addWidget()` copies it from the field's last widget onto the new one:
+ * the engine's widget style fields (`WIDGET_STYLE_NAMES`), and its turn.
+ */
+const LOOK = [
+  'color',
+  'interiorColor',
+  'strokeWidth',
+  'borderStyle',
+  'dashArray',
+  'fontFamily',
+  'fontSize',
+  'fontColor',
+  'textAlign',
+  'caption',
+  'checkStyle',
+  'rotation',
+] as const;
+
+const lookOf = (widget: WidgetAnnotation | undefined): Partial<WidgetPlacement> => {
+  if (!widget) return {};
+  const held = widget as unknown as Record<string, unknown>;
+  const look: Record<string, unknown> = {};
+  for (const name of LOOK)
+    if (held[name] !== undefined && held[name] !== null) look[name] = held[name];
+  return look as Partial<WidgetPlacement>;
+};
+
+/**
+ * The export value a field's new widget gets when none is given: a radio group's next free
+ * `Choice<n>` (the radio tool names its first button `Choice1`), a checkbox's own value, so
+ * the boxes check together. Other families take none.
+ */
+function exportValueFor(field: FormFieldDTO): string | undefined {
+  if (field.family === 'checkbox') return field.exportValue;
+  if (field.family !== 'radio') return undefined;
+  const taken = new Set(field.widgets.map((widget) => widget.exportValue));
+  let n = field.widgets.length + 1;
+  while (taken.has(`Choice${n}`)) n += 1;
+  return `Choice${n}`;
+}
+
+/** Whether the field's dictionary is its only widget's too, which adding a widget splits. */
+const isMerged = (field: FormFieldDTO): boolean =>
+  field.ref.kind === 'objectNumber' &&
+  field.widgets.some(
+    (widget) => widget.objectNumber === (field.ref as { objectNumber: number }).objectNumber,
+  );
 
 const MODIFY = 'doc.forms.modify';
 const SCRIPT = 'doc.forms.script';
@@ -78,9 +133,70 @@ export function createFieldWrites(
     return { field: item.field } satisfies FormFieldResult;
   };
 
+  const addWidget: FormCapability['addWidget'] = async (ref, placement = {}, options) => {
+    allow('form.addWidget', writesScripts(placement.actions));
+    const index = fields.view();
+    const field = fieldByRef(index, ref);
+    if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
+    const rows = field.widgets
+      .map((widget) => widgetRowOf(index, widget.objectNumber))
+      .filter((row): row is WidgetAnnotation => row !== null);
+    const last = rows.at(-1);
+    const page = placement.page ?? last?.page;
+    if (!page) {
+      throw new PluginError(
+        'invalid-input',
+        'form',
+        'the field shows on no page: give `page` and `rect`',
+      );
+    }
+    const size = ctx.getPage(page)?.size;
+    const onPage = rows.filter((row) => row.page.objectNumber === page.objectNumber);
+    const rect =
+      placement.rect ??
+      placement.box ??
+      (size && onPage.length > 0
+        ? nextInLine(
+            onPage.map((row) => row.box),
+            size,
+          )
+        : undefined);
+    if (!rect) {
+      throw new PluginError(
+        'invalid-input',
+        'form',
+        'no widget of the field on that page: give `rect`',
+      );
+    }
+    const exportValue = placement.exportValue ?? exportValueFor(field);
+    const split = isMerged(field);
+    const [objectNumber, splitObjectNumber] =
+      numbers.takeNow(split ? 2 : 1) ?? (await numbers.take(split ? 2 : 1));
+    const change = stage('addWidget', {
+      type: 'forms.addWidget',
+      field: field.ref,
+      placement: {
+        ...lookOf(last),
+        ...placement,
+        page,
+        ...(placement.box ? {} : { rect }),
+        ...(exportValue === undefined ? {} : { exportValue }),
+      },
+      objectNumber,
+      ...(split ? { splitObjectNumber } : {}),
+    });
+    const item = await answer<'forms.addWidget'>(change, options);
+    const widget =
+      item.widgets.find(
+        (row) => row.ref.kind === 'objectNumber' && row.ref.objectNumber === objectNumber,
+      ) ?? item.widgets.at(-1)!;
+    return { field: item.field, widget };
+  };
+
   return {
     api: {
       create,
+      addWidget,
       update: async (ref, patch, options) => {
         allow('form.update', writesScripts(patch.actions));
         const change = stage('update', { type: 'forms.update', field: ref, patch });

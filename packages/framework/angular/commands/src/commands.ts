@@ -20,12 +20,14 @@ import {
   inject,
   Injectable,
   input,
+  output,
   PLATFORM_ID,
   untracked,
   type Signal,
 } from '@angular/core';
 import {
   CapabilityBinding,
+  devWarn,
   EpdfKernelHost,
   injectKernelHost,
   pluginService,
@@ -37,8 +39,16 @@ import {
   commandsPlugin,
   CommandsToken,
   resolvedCommandsEqual,
+  unknownCommandWarning,
+  unregisteredCommand,
 } from '@embedpdf/plugin-commands';
-import type { BoundCommand, CommandsConfig, ExecuteResult } from '@embedpdf/plugin-commands';
+import type {
+  BoundCommand,
+  CommandId,
+  CommandRefusal,
+  CommandsConfig,
+  ExecuteResult,
+} from '@embedpdf/plugin-commands';
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
 import type { CommandsHostCapability } from '@embedpdf/plugin-commands/contract/host';
 import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
@@ -89,11 +99,13 @@ export class EpdfCommands extends pluginService({
 }) {
   /**
    * One command as a signal, for what shows a command and isn't a button (a row of a shortcut
-   * sheet): its label, icon and state, `run()` and `shortcut`, or `null` for an unknown id.
-   * Changes only when what the command shows does. Pass a function for an id that changes.
-   * A button uses the `epdfCommand` directive instead.
+   * sheet): its label, icon and state, `run()` and `shortcut`. Changes only when what the
+   * command shows does. Pass a function for an id that changes. A button uses the `epdfCommand`
+   * directive instead. Always a command: an id no plugin registered (or one asked for before
+   * the commands plugin is there) is labelled with its id, neither visible nor enabled, and an
+   * unknown one warns once in development.
    */
-  commandOf(id: string | (() => string)): Signal<BoundCommand | null> {
+  commandOf(id: string | (() => string)): Signal<BoundCommand> {
     const idOf = typeof id === 'function' ? id : () => id;
     const resolved = this.binding.select(
       (commands) => commands.resolveCommand(idOf()),
@@ -103,7 +115,17 @@ export class EpdfCommands extends pluginService({
     const execute = this.binding.method('execute');
     return computed(() => {
       const command = resolved();
-      return command && boundCommandOf(command, execute, { isMac: isMacPlatform() });
+      const requested = idOf();
+      const commands = this.binding.capability();
+      if (command === null && commands !== null) {
+        devWarn(
+          `commandOf:${requested}`,
+          `commandOf(): ${unknownCommandWarning(requested, commands.listCommandIds())}`,
+        );
+      }
+      return boundCommandOf(command ?? unregisteredCommand(requested), execute, {
+        isMac: isMacPlatform(),
+      });
     });
   }
 }
@@ -125,13 +147,23 @@ function shortcutCommands(host: EpdfKernelHost): Signal<CommandsHostCapability |
   ).capability;
 }
 
+/** A key whose command is turned off or not allowed, and why: what `(refused)` carries. */
+export interface RefusedShortcut {
+  readonly commandId: CommandId;
+  readonly refusal: CommandRefusal;
+}
+
 /**
  * Every command's shortcut as a working key, anywhere on the page, for the active document.
- * Keys typed into text fields are left alone, and so is a key whose command can't run now. Add
- * it next to `withCommands()`; for a page with more than one viewer, put `epdfCommandShortcuts`
- * on the element around each one instead.
+ * Keys typed into text fields are left alone, and so is a key whose command can't run right
+ * now. A command that's turned off or not allowed still takes its key, and `onRefused` says
+ * why. Add it next to `withCommands()`; for a page with more than one viewer, put
+ * `epdfCommandShortcuts` on the element around each one instead.
  */
-export function withCommandShortcuts(options?: { isMac?: boolean }): EmbedPdfFeature {
+export function withCommandShortcuts(options?: {
+  isMac?: boolean;
+  onRefused?: (commandId: CommandId, refusal: CommandRefusal) => void;
+}): EmbedPdfFeature {
   return {
     plugins: [],
     setup: () => {
@@ -139,7 +171,14 @@ export function withCommandShortcuts(options?: { isMac?: boolean }): EmbedPdfFea
       // The commands exist once the viewer's engine is there; the keys go with the viewer.
       effect((onCleanup) => {
         const current = commands();
-        if (current) onCleanup(bindCommandShortcuts(current, { isMac: options?.isMac }));
+        if (current) {
+          onCleanup(
+            bindCommandShortcuts(current, {
+              isMac: options?.isMac,
+              onRefused: options?.onRefused,
+            }),
+          );
+        }
       });
     },
   };
@@ -148,19 +187,29 @@ export function withCommandShortcuts(options?: { isMac?: boolean }): EmbedPdfFea
 /**
  * Every command's shortcut as a working key, while focus is inside this element: for a page
  * with more than one viewer, or keys that should leave the rest of the page alone. Give the
- * element a `tabindex` so a click on it gives it focus.
+ * element a `tabindex` so a click on it gives it focus. A key whose command is turned off or
+ * not allowed fires `(refused)`.
  *
- *   <div class="viewer" tabindex="0" epdfCommandShortcuts>
+ *   <div class="viewer" tabindex="0" epdfCommandShortcuts (refused)="say($event.refusal.message)">
  */
 @Directive({ selector: '[epdfCommandShortcuts]' })
 export class EpdfCommandShortcuts {
+  /** A key whose command is turned off or not allowed: say why. */
+  readonly refused = output<RefusedShortcut>();
+
   constructor() {
     const element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
     const commands = shortcutCommands(injectKernelHost('epdfCommandShortcuts'));
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
     effect((onCleanup) => {
       const current = commands();
-      if (current) onCleanup(bindCommandShortcuts(current, { target: element }));
+      if (!current) return;
+      onCleanup(
+        bindCommandShortcuts(current, {
+          target: element,
+          onRefused: (commandId, refusal) => this.refused.emit({ commandId, refusal }),
+        }),
+      );
     });
   }
 }
@@ -192,32 +241,28 @@ export class EpdfCommand {
   /** The command's id: `'zoom:in'`. */
   readonly id = input.required<string>({ alias: 'epdfCommand' });
 
-  /** The command, or `null` for an unknown id. */
-  readonly command: Signal<BoundCommand | null> = inject(EpdfCommands).commandOf(() => this.id());
-  // An unknown command shows nothing: no label, disabled and hidden.
+  /** The command; an unknown id is neither visible nor enabled, so its button is hidden. */
+  readonly command: Signal<BoundCommand> = inject(EpdfCommands).commandOf(() => this.id());
   /** What the user sees. */
-  readonly label: Signal<string> = computed(() => this.command()?.label ?? '');
+  readonly label: Signal<string> = computed(() => this.command().label);
   /** Your icon's name for it, when the command has one. */
-  readonly icon: Signal<string | undefined> = computed(() => this.command()?.icon);
+  readonly icon: Signal<string | undefined> = computed(() => this.command().icon);
   /** Its first shortcut, formatted for the platform (`'⌘K'`), or `null`. */
-  readonly shortcut: Signal<string | null> = computed(() => this.command()?.shortcut ?? null);
+  readonly shortcut: Signal<string | null> = computed(() => this.command().shortcut);
   /** Whether it can run now. */
-  readonly enabled: Signal<boolean> = computed(() => this.command()?.enabled ?? false);
+  readonly enabled: Signal<boolean> = computed(() => this.command().enabled);
   /** Whether it shows as pressed, such as the current tool. */
-  readonly active: Signal<boolean> = computed(() => this.command()?.active ?? false);
+  readonly active: Signal<boolean> = computed(() => this.command().active);
   /** Whether it shows at all. */
-  readonly visible: Signal<boolean> = computed(() => this.command()?.visible ?? false);
+  readonly visible: Signal<boolean> = computed(() => this.command().visible);
 
-  /**
-   * Run the command for this part of the template's document. Resolves `{ status }`, like
-   * `execute()`; `null` for an unknown id.
-   */
-  run(): Promise<ExecuteResult> | null {
-    return untracked(this.command)?.run() ?? null;
+  /** Run the command for this part of the template's document. Resolves `{ status }`, like `execute()`. */
+  run(): Promise<ExecuteResult> {
+    return untracked(this.command).run();
   }
 
   protected onClick(): void {
     // A command whose `run` throws reports it through `executionFailed$`.
-    this.run()?.catch(() => {});
+    this.run().catch(() => {});
   }
 }

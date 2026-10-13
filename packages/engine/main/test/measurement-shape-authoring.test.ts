@@ -173,7 +173,11 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
             const list = (
               await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list()
             ).annotations;
-            const restored = list.find((dto) => dto.nm === final.nm)!;
+            // Found by its reference (identity); the name the engine gave it survives too.
+            const restored = list.find(
+              (dto) => annotationKey(dto.ref) === annotationKey(created.ref),
+            )!;
+            expect(restored.nm).toBe(final.nm);
             expect(restored).toMatchObject({
               subtype: final.subtype,
               intent: final.intent,

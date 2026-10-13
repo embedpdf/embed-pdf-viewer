@@ -13,7 +13,8 @@ import { geomHandles, geomPainted, placeRotateKnob, pointInQuad, rectHandlesFor 
 import { cursorOnScreen, unionRect } from './rect';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
-import { annotInteractive, annotTransformable, viewable } from './flags';
+import { isTransformableByHand } from './editable';
+import { annotInteractive, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import { paintedNear, type PaintedPiece } from './painted';
 import {
@@ -77,23 +78,24 @@ export const isSelectable = (model: Model, id: Id): boolean => {
 const textBound = (record: ModelAnnotation): boolean =>
   kindOf(record.annotation).caps.anchored && shapeOf(record.annotation).kind === 'quads';
 
-/** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
+/** Can this annotation be dragged by its body to move? (`locked` and the
+ *  session's `editable` rule freeze it.) */
 export const canMove = (model: Model, id: Id): boolean => {
   const record = model.byId[id];
   return (
     !!record &&
-    annotTransformable(record) &&
+    isTransformableByHand(model, record) &&
     kindOf(record.annotation).caps.movable &&
     !textBound(record)
   );
 };
 
 /** Does this kind expose drag handles (box resize or per-vertex)? Only
- *  `locked` (and inert `/F` states) suppress them at runtime — a
+ *  `locked`, inert `/F` states and the `editable` rule suppress them at runtime — a
  *  screen-anchored body keeps its handles: `noZoom`/`noRotate` exempt it from
  *  the display transform, they don't freeze its size or vertices. */
 const hasHandles = (model: Model, record: ModelAnnotation): boolean => {
-  if (!annotTransformable(record) || textBound(record)) return false;
+  if (!isTransformableByHand(model, record) || textBound(record)) return false;
   const caps = kindOf(record.annotation).caps;
   return caps.resizable || caps.vertexEditable;
 };
@@ -232,9 +234,9 @@ export function hitTest(
       // the handles), placed on the projected selection frame so it sits exactly
       // where the chrome drew it — a screen-anchored body rotates too (the
       // gesture edits its authored tilt; `noRotate` only exempts it from the
-      // page's rotation). Locked suppresses it. `placeRotateKnob` keeps it
-      // inside `pageBox`.
-      if (kindOf(record.annotation).caps.rotatable && annotTransformable(record)) {
+      // page's rotation). Locked, or frozen by the `editable` rule, suppresses
+      // it. `placeRotateKnob` keeps it inside `pageBox`.
+      if (kindOf(record.annotation).caps.rotatable && isTransformableByHand(model, record)) {
         const frame = annotationSelectionFrame(record, view);
         const knob = placeRotateKnob(frame.corners, chromeGeometry.knobOffset, pageBox);
         if (

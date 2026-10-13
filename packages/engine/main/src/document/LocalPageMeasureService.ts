@@ -8,11 +8,12 @@ import {
   type PdfMeasure,
   type PageMeasurementViewportList,
   type PageScaleResult,
+  type SessionEventPublisher,
   type WorkerResultPayload,
   type PageRef,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
+
 import type { ScopeGuard } from '../scope';
 import type { JobQueue } from '../worker/WorkerQueue';
 

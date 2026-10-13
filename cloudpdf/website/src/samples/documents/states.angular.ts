@@ -90,7 +90,7 @@ export class OpenError {
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         initialDocuments: [
           { source: ebook, name: 'ebook.pdf' },
           { source: broken, name: 'broken.pdf', active: true },

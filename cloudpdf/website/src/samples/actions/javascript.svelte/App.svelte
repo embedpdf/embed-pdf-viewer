@@ -6,7 +6,7 @@
 
   import '../javascript.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   // JavaScript on, and two fields scripts often ask for about the user.
   const plugins = [
     actionsPlugin({

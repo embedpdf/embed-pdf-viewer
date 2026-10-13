@@ -116,7 +116,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json && node scripts/drop-entry-manifests.mjs && node scripts/check-declarations.mjs",
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json && node ../../../tooling/build/src/drop-entry-manifests.mjs && node scripts/check-declarations.mjs",
     "clean": "rimraf dist",
     "typecheck": "ngc -p tsconfig.json && tsc -p tsconfig.spec.json",
     "test": "node scripts/check-parity.mjs && vitest run"

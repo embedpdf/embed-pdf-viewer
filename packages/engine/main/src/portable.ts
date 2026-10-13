@@ -39,9 +39,18 @@ export async function loadInlineWasm(): Promise<ArrayBuffer> {
   return inflate(decodeBase64(packed));
 }
 
-/** `localEngine()` whose default wasm source is {@link loadInlineWasm}. */
+/**
+ * `localEngine()` whose default wasm source is {@link loadInlineWasm}, and
+ * whose workers start from blob: URLs: a toolchain that needs this entry
+ * cannot emit the worker files either.
+ */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
-  return siblingLocalEngine({ wasmLoader: loadInlineWasm, ...options });
+  return siblingLocalEngine({ wasmLoader: loadInlineWasm, ...inlineWorkers(), ...options });
+}
+
+/** Only where there are workers to start: elsewhere the engine and its encoder run in this thread. */
+function inlineWorkers(): Pick<LocalEngineRecipeOptions, 'worker' | 'encoderWorker'> {
+  return typeof Worker === 'undefined' ? {} : { worker: 'inline', encoderWorker: 'inline' };
 }
 
 function decodeBase64(text: string): Uint8Array {

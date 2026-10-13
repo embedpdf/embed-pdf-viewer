@@ -47,7 +47,8 @@ is still the form's: its place or look is `updateWidget()`, and deleting every b
 deletes the field. A drag of two fields and a stamp is one change: one request, and one step to
 undo. Like every change, it shows at once and the engine's answer follows.
 
-A field just placed is selected at once, before the engine answers. Without `canDesign()` nothing is
+A field just placed is selected at once, before the engine answers, and the tool goes back to
+`form-edit` rather than the default pointer, so design mode goes on. Without `canDesign()` nothing is
 lent: the fields stay fillable boxes the annotation tools leave alone.
 
 ## Change a field's settings
@@ -80,7 +81,9 @@ lent: the fields stay fillable boxes the annotation tools leave alone.
 
 `getFieldSettings(ref)` describes a field's settings for a panel you draw without knowing the
 field's family: `{ properties, values }`, each property a `key` (what `update()` takes), a `control`
-(`text`, `flag`, `number`, `choice`, `choices` or `options`) and a `label`, in display order.
+(`text`, `flag`, `number`, `choice`, `choices` or `options`), and a `label` in English with its
+translation key, `labelKey` (`form.settings.tooltip`), in display order. A `choice`'s options are
+the field's own values, shown as they are.
 
 A field's look, such as its border, background and font, belongs to its box: change it like any
 annotation's, with the [style panel](../annotations/selecting#a-style-panel), or from code with
@@ -122,6 +125,22 @@ A field placed with a tool gets a name like `text_1`; rename it in your settings
 family's settings are on [Creating form fields](/docs/engine/forms/authoring).
 
 <Example name="form/create" />
+
+### One more button for a group
+
+`addWidget(ref)` shows a field in one more place: for a radio group a new choice, for a checkbox a
+box that checks together with the others.
+
+```ts
+const { widget } = await form.addWidget(plan.ref);
+annotation.selection.set([widget.ref]); // in design mode, so it can be dragged
+```
+
+Without a place, it goes next in line: below the last button if they stand in a column, beside it
+if in a row, at the same size and the same spacing, starting a new column where the page ends. It
+looks like the field's last button, and a radio group's new choice gets the next free `Choice<n>`.
+Pass what you want instead: `form.addWidget(plan.ref, { rect, exportValue: 'yearly' })` takes
+everything an entry of `create()`'s `widgets` takes.
 
 ## Scripts and calculations
 
@@ -173,6 +192,7 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | :-------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `create(draft)`                         | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)                                                                                 |
 | `update(ref, patch)`                    | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings)                                                                      |
+| `addWidget(ref, placement?)`            | Shows a field in one more place: a radio group's next choice, a checkbox's next box. Resolves `{ field, widget }`. [One more button for a group](#one-more-button-for-a-group)                        |
 | `delete(ref)`                           | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
 | `updateWidget(widget, patch)`           | Changes one box's place or look; pass only what changes. Resolves `{ widget }`. [Change a field's settings](#change-a-fields-settings)                                                                |
 | `getFieldSettings(ref)`                 | A field's settings described for a panel: `{ properties, values }`, or `null`. [Change a field's settings](#change-a-fields-settings)                                                                 |

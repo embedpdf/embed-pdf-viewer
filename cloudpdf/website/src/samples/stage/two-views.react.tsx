@@ -7,7 +7,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './two-views.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 // A second view of the same document: its own id and token, its own zoom and layout.
 const OverviewToken = createCapabilityToken<StageCapability>('stage-overview');

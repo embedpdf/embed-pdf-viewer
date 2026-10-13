@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { group, item, custom, normalizeBar, type BarSchema } from '../src/schema';
 import { solve, type FitMetrics } from '../src/solver';
 
-/** Metrics stub: every command variant has a fixed width by variant name. */
+/** Metrics stub: every command variant has a fixed length by variant name. */
 function metrics(overrides?: {
-  unitWidths?: Record<string, Record<string, number>>;
-  collapsedWidths?: Record<string, number>;
-  triggerWidths?: Record<string, number>;
+  unitLengths?: Record<string, Record<string, number>>;
+  collapsedLengths?: Record<string, number>;
+  triggerLengths?: Record<string, number>;
   gap?: number;
   separator?: number;
   overflowTrigger?: number;
@@ -14,9 +14,9 @@ function metrics(overrides?: {
   const variantDefaults: Record<string, number> = { 'icon+label': 100, icon: 40, label: 80 };
   return {
     unit: (key, variant) =>
-      overrides?.unitWidths?.[key]?.[variant] ?? variantDefaults[variant] ?? 40,
-    groupCollapsed: (id) => overrides?.collapsedWidths?.[id] ?? 50,
-    groupTrigger: (id) => overrides?.triggerWidths?.[id] ?? 36,
+      overrides?.unitLengths?.[key]?.[variant] ?? variantDefaults[variant] ?? 40,
+    groupCollapsed: (id) => overrides?.collapsedLengths?.[id] ?? 50,
+    groupTrigger: (id) => overrides?.triggerLengths?.[id] ?? 36,
     overflowTrigger: overrides?.overflowTrigger ?? 40,
     gap: overrides?.gap ?? 10,
     separator: overrides?.separator ?? 20,
@@ -42,7 +42,7 @@ describe('solve — fitting', () => {
     expect(assignmentOf(fit, 'g:b')).toEqual({ kind: 'variant', variant: 'icon' });
     expect(fit.hasOverflow).toBe(false);
     // 100 + 40 + one gap
-    expect(fit.width).toBe(150);
+    expect(fit.length).toBe(150);
   });
 
   it('degrades variants before anything overflows', () => {
@@ -102,7 +102,7 @@ describe('solve — overflow', () => {
     expect(assignmentOf(fit, 'g:b')).toEqual({ kind: 'overflow' });
     expect(assignmentOf(fit, 'g:c')).toEqual({ kind: 'overflow' });
     expect(fit.hasOverflow).toBe(true);
-    expect(fit.width).toBeLessThanOrEqual(100);
+    expect(fit.length).toBeLessThanOrEqual(100);
   });
 
   it('accounts for the trigger via the two-pass fixpoint (fits without trigger, not with)', () => {
@@ -116,7 +116,7 @@ describe('solve — overflow', () => {
     expect(tight.hasOverflow).toBe(true);
     expect(assignmentOf(tight, 'g:b')).toEqual({ kind: 'overflow' });
     expect(assignmentOf(tight, 'g:a')).toEqual({ kind: 'overflow' });
-    expect(tight.width).toBe(40);
+    expect(tight.length).toBe(40);
   });
 
   it('never overflows pinned units — they are the floor', () => {
@@ -127,7 +127,7 @@ describe('solve — overflow', () => {
     expect(assignmentOf(fit, 'g:a')).toEqual({ kind: 'variant', variant: 'icon' });
     expect(assignmentOf(fit, 'g:b')).toEqual({ kind: 'overflow' });
     // floor exceeds budget — allowed
-    expect(fit.width).toBeGreaterThan(10);
+    expect(fit.length).toBeGreaterThan(10);
   });
 
   it('assigns every unit — visible or overflow, never lost', () => {
@@ -172,9 +172,9 @@ describe('solve — group collapse', () => {
     });
     expect(assignmentOf(collapsed, 'modes:m1')).toEqual({ kind: 'collapsed' });
     expect(collapsed.hasOverflow).toBe(false);
-    expect(collapsed.width).toBe(50);
+    expect(collapsed.length).toBe(50);
 
-    // Below the collapsed width the whole group overflows together.
+    // Below the collapsed length the whole group overflows together.
     const gone = solve(normalizedBar, metrics(), 45);
     expect(gone.groups.get('modes')).toEqual({ shedCount: 0, collapsed: true, overflowed: true });
     expect(assignmentOf(gone, 'modes:m1')).toEqual({ kind: 'overflow' });
@@ -217,7 +217,7 @@ describe('solve — shed (staged group degradation)', () => {
     expect(fit.groups.get('g')).toEqual({ shedCount: 2, collapsed: false, overflowed: false });
     // shed is group-local: no global overflow trigger appears
     expect(fit.hasOverflow).toBe(false);
-    expect(fit.width).toBe(136);
+    expect(fit.length).toBe(136);
   });
 
   it('never sheds below one visible child; without collapse, the whole group overflows at the floor', () => {
@@ -249,7 +249,7 @@ describe('solve — shed (staged group degradation)', () => {
     // earlier sheds are subsumed by the stronger collapsed state
     expect(assignmentOf(fit, 'modes:m2')).toEqual({ kind: 'collapsed' });
     expect(fit.hasOverflow).toBe(false);
-    expect(fit.width).toBe(50);
+    expect(fit.length).toBe(50);
   });
 
   it('sheds before collapsing when both are possible', () => {
@@ -316,12 +316,12 @@ describe('solve — separators and sections', () => {
     });
     // a + b + gap + separator = 40+40+10+20 = 110
     const wide = solve(normalizedBar, metrics(), 200);
-    expect(wide.width).toBe(110);
+    expect(wide.length).toBe(110);
 
     // b overflows: a + trigger + gap = 90 — no separator (g2 is empty).
     const tight = solve(normalizedBar, metrics(), 100);
     expect(assignmentOf(tight, 'g2:b')).toEqual({ kind: 'overflow' });
-    expect(tight.width).toBe(90);
+    expect(tight.length).toBe(90);
   });
 
   it('does not count separators across sections', () => {
@@ -330,12 +330,12 @@ describe('solve — separators and sections', () => {
       end: [group('g2', [item('b')])],
     });
     // 40 + 40 + gap = 90; no separator across sections.
-    expect(solve(normalizedBar, metrics(), 200).width).toBe(90);
+    expect(solve(normalizedBar, metrics(), 200).length).toBe(90);
   });
 });
 
 describe('solve — measurement gaps and determinism', () => {
-  it('flags incomplete measurements and treats them as width 0', () => {
+  it('flags incomplete measurements and treats them as length 0', () => {
     const baseMetrics = metrics();
     const partial: FitMetrics = {
       ...baseMetrics,
@@ -356,7 +356,7 @@ describe('solve — measurement gaps and determinism', () => {
     const two = solve(normalizedBar, metrics(), 137);
     expect(one.units).toEqual(two.units);
     expect(one.groups).toEqual(two.groups);
-    expect(one.width).toBe(two.width);
+    expect(one.length).toBe(two.length);
   });
 
   it('is monotone: a smaller budget never rescues an overflowed unit', () => {

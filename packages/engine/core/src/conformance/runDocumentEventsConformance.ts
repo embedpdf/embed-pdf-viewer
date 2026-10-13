@@ -4,6 +4,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import { toPageRef } from '../identity/PageRef';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 const QUAD: HighlightDraft['quadPoints'] = [
   {
@@ -239,7 +240,7 @@ export function runDocumentEventsConformance(
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

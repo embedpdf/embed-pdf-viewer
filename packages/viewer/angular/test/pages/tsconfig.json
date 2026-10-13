@@ -1,0 +1,25 @@
+{
+  // The test pages: compiled just in time in the browser (Vite builds them with esbuild, which
+  // reads the decorator options here), and checked by `ngc` with strict templates against this
+  // package's built declarations, as an app's templates are.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false
+  },
+  "include": ["./*.ts"],
+  "exclude": ["dist", "vite.config.ts"],
+  "angularCompilerOptions": {
+    "strictTemplates": true,
+    "strictInjectionParameters": true
+  }
+}

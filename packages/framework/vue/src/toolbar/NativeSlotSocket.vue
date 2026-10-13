@@ -8,18 +8,21 @@
 -->
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { observeWidth } from '@embedpdf/web';
+import { observeLength } from '@embedpdf/web';
+import type { Orientation } from '@embedpdf/web';
 
-const props = defineProps<{ name: string; measureKey: string }>();
-const emit = defineEmits<{ width: [key: string, width: number] }>();
+const props = defineProps<{ name: string; measureKey: string; orientation: Orientation }>();
+const emit = defineEmits<{ length: [key: string, length: number] }>();
 defineSlots<{ default?(): unknown }>();
 
 const socket = ref<HTMLSlotElement | null>(null);
 // A child slotted in or out resizes the socket's box, so one observer covers both.
 watch(
-  [socket, () => props.measureKey],
-  ([element, key], _previous, onCleanup) => {
-    if (element) onCleanup(observeWidth(element, (width) => emit('width', key, width)));
+  [socket, () => props.measureKey, () => props.orientation],
+  ([element, key, orientation], _previous, onCleanup) => {
+    if (element) {
+      onCleanup(observeLength(element, orientation, (length) => emit('length', key, length)));
+    }
   },
   { immediate: true, flush: 'post' },
 );

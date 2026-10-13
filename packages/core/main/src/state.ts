@@ -8,6 +8,10 @@
  *     read: (search) => ({ query: search.getQuery(), hitCount: search.getHitCount() }),
  *     empty: { query: null, hitCount: 0 },
  *   });
+ *
+ * State a plugin loads only when asked for names the verb that loads it, `ensure`: an adapter
+ * calls it once a document's capability is in scope, so reading the state is what loads it,
+ * while the read itself stays pure.
  */
 import type { CapabilityToken } from './types';
 
@@ -27,6 +31,13 @@ export interface StateDeclaration<Capability, State extends object> {
    * reader shares it.
    */
   readonly empty: State;
+  /**
+   * Start loading what `read` shows, for state the plugin loads on demand. The adapters call it
+   * whenever a hook or service starts reading a document's capability, so it must do nothing
+   * once loaded or loading (an `ensureLoaded()` verb); a failure shows in the state (its
+   * `status`), so they ignore the promise's rejection. Absent for state that is always loaded.
+   */
+  readonly ensure?: (capability: Capability) => Promise<void>;
 }
 
 /**
@@ -40,9 +51,15 @@ export function defineState<Capability, State extends object>(
   declaration: {
     readonly read: (capability: Capability) => State;
     readonly empty: NoInfer<State>;
+    readonly ensure?: (capability: NoInfer<Capability>) => Promise<void>;
   },
 ): StateDeclaration<Capability, State> {
-  return { token, read: declaration.read, empty: Object.freeze(declaration.empty) };
+  return {
+    token,
+    read: declaration.read,
+    empty: Object.freeze(declaration.empty),
+    ...(declaration.ensure ? { ensure: declaration.ensure } : {}),
+  };
 }
 
 /**

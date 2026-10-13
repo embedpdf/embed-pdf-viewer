@@ -8,6 +8,7 @@ import {
   type DigestAlgorithm,
   type DocumentSignaturesService,
   type FormFieldRef,
+  type SessionEventPublisher,
   type SignatureCancelResult,
   type SignatureCompleteInput,
   type SignatureCompleteResult,
@@ -26,7 +27,6 @@ import {
   toBase64,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';

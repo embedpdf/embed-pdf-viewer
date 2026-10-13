@@ -63,7 +63,7 @@ function fakeRender() {
     dispose: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
-  const paint = { fadeMs: 0, tiles: true };
+  const paint = { tiles: true };
   const rights = { annotations: true, formFields: true };
   const api = {
     getPaintSettings: () => paint,
@@ -214,6 +214,7 @@ describe('the tile plane', () => {
     expect(render.view.release).toHaveBeenLastCalledWith(toPageRef(2));
     expect(render.view.dispose).toHaveBeenCalledTimes(1);
   });
+
 });
 
 /** A layer that paints the page's annotations itself, as `<AnnotationLayer>` does. */

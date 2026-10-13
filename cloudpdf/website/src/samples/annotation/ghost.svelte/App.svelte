@@ -9,7 +9,7 @@
 
   import '../ghost.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   // A preview for the rectangle (off by default for tools you drag), and a fainter one for notes.
   const plugins = [
     stagePlugin(),

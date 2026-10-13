@@ -7,7 +7,9 @@ import {
   type PageRenderEncodedFormat,
 } from '@embedpdf/engine-core/runtime';
 
+import { allowWorkerUrl, createWorkerBlobUrl, startWorker } from '../trusted-types';
 import { toAbsoluteUrl } from '../wasm-source';
+import { findEncoderWorkerFile } from '../worker-files';
 import { encodeBmp } from './bmp';
 import { encoderWorkerSource } from './encoder-worker-source';
 
@@ -22,11 +24,14 @@ export interface LocalImageEncoder {
 
 /**
  * How the encoder pool's workers are delivered:
- * - `'inline'` (default): blob URL from {@link encoderWorkerSource} — zero
- *   config, needs `worker-src blob:` under a strict CSP. If the CSP blocks
- *   it, encoding degrades gracefully to the main thread (same call).
- * - a URL string: same-origin static `encoder-worker.js` (strict CSP; copy it
- *   from this package's `workers/` directory).
+ * - omitted (default): this package's `workers/encoder-worker.js`, emitted by
+ *   the consumer's bundler as a file of their build (`worker-src 'self'`);
+ *   from a blob URL of {@link encoderWorkerSource} where the scripts are on
+ *   another origin than the page. If the workers cannot start, encoding
+ *   degrades gracefully to the main thread (same call).
+ * - `'inline'`: always the blob URL (`worker-src blob:`), with the same fallback.
+ * - a URL string: same-origin static `encoder-worker.js` (copy it from this
+ *   package's `workers/` directory).
  * - a factory: full control over Worker creation.
  * - `false`: no pool — always encode on the main thread.
  */
@@ -35,7 +40,7 @@ export type EncoderWorkerSource = 'inline' | string | (() => Worker) | false;
 export interface BrowserImageEncoderOptions {
   /** Number of workers in the pool (default 2). */
   workerCount?: number;
-  /** Worker delivery — see {@link EncoderWorkerSource}. Default `'inline'`. */
+  /** Worker delivery — see {@link EncoderWorkerSource}. Default: the bundled file. */
   worker?: EncoderWorkerSource;
 }
 
@@ -51,7 +56,9 @@ type EncodeWorkerMessage =
 export class BrowserImageEncoder implements LocalImageEncoder {
   private readonly pending = new Map<string, PendingEncode>();
   private workers: Worker[] = [];
-  private workerUrl: string | null = null;
+  private blob: { url: string; revoke: () => void } | null = null;
+  /** A configured URL string, absolute; allowed as a worker URL when configured. */
+  private readonly configuredUrl: string | null;
   private nextWorker = 0;
   private nextId = 1;
   private disabledWorkerPath = false;
@@ -61,7 +68,14 @@ export class BrowserImageEncoder implements LocalImageEncoder {
    *  is still intact. */
   private poolVerified = false;
 
-  constructor(private readonly opts: BrowserImageEncoderOptions = {}) {}
+  constructor(private readonly opts: BrowserImageEncoderOptions = {}) {
+    // The literal 'inline' is a string too, and must never be fetched as the
+    // URL "/inline" (HTML: a SyntaxError that silently kills the pool).
+    const source = opts.worker;
+    this.configuredUrl =
+      typeof source === 'string' && source !== 'inline' ? toAbsoluteUrl(source) : null;
+    if (this.configuredUrl !== null) allowWorkerUrl(this.configuredUrl);
+  }
 
   async encode(
     raster: PageRaster,
@@ -95,8 +109,8 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   destroy(): void {
     for (const worker of this.workers) worker.terminate();
     this.workers = [];
-    if (this.workerUrl) URL.revokeObjectURL(this.workerUrl);
-    this.workerUrl = null;
+    this.blob?.revoke();
+    this.blob = null;
     for (const task of this.pending.values()) {
       task.reject(new EngineError(EngineErrorCode.Aborted, 'image encoder destroyed'));
     }
@@ -121,9 +135,9 @@ export class BrowserImageEncoder implements LocalImageEncoder {
           this.destroy();
           throw error;
         }
-        // The pool never worked (e.g. a CSP without `worker-src blob:`
-        // rejected the blob worker). The raster was sent as a copy, so the
-        // buffer is intact — degrade to main-thread encoding in this call.
+        // The pool never worked (a CSP that rejects the workers, a file the
+        // bundler didn't emit). The raster was sent as a copy, so the buffer
+        // is intact — degrade to main-thread encoding in this call.
         this.disabledWorkerPath = true;
         this.destroy();
         warnWorkerFallback(error);
@@ -134,17 +148,8 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   }
 
   private canUseWorkerPath(): boolean {
-    const source = this.opts.worker ?? 'inline';
-    if (source === false) return false;
-    if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') return false;
-    if (source === 'inline') {
-      return (
-        typeof Blob !== 'undefined' &&
-        typeof URL !== 'undefined' &&
-        typeof URL.createObjectURL === 'function'
-      );
-    }
-    return true;
+    if (this.opts.worker === false) return false;
+    return typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined';
   }
 
   private encodeInWorker(
@@ -220,21 +225,14 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   }
 
   private createWorker(): Worker {
-    const source = this.opts.worker ?? 'inline';
+    const source = this.opts.worker;
     if (typeof source === 'function') return source();
-    // Branch order is load-bearing: the literal 'inline' is a string, and it
-    // must resolve to the bundled blob worker — never be fetched as the URL
-    // "/inline" (which returns HTML and kills the pool with a SyntaxError,
-    // silently demoting every consumer to main-thread encoding).
-    if (source !== 'inline' && typeof source === 'string') {
-      return new Worker(toAbsoluteUrl(source));
-    }
-    if (!this.workerUrl) {
-      this.workerUrl = URL.createObjectURL(
-        new Blob([encoderWorkerSource], { type: 'text/javascript' }),
-      );
-    }
-    return new Worker(this.workerUrl);
+    if (this.configuredUrl !== null) return startWorker(this.configuredUrl);
+    const file = source === undefined ? findEncoderWorkerFile() : null;
+    if (file !== null) return startWorker(file);
+    // 'inline', or the bundled file is on another origin than the page.
+    this.blob ??= createWorkerBlobUrl(encoderWorkerSource);
+    return startWorker(this.blob.url);
   }
 }
 
@@ -244,10 +242,10 @@ function warnWorkerFallback(error: unknown): void {
   warnedWorkerFallback = true;
   console.warn(
     '[embedpdf] image encoder workers are unavailable — falling back to main-thread ' +
-      'encoding (slower under load). If your Content-Security-Policy blocks blob: ' +
-      "workers, self-host @embedpdf/engine's workers/encoder-worker.js and pass " +
-      "`encoderWorker: '/path/encoder-worker.js'` to localEngine(). " +
-      'See https://www.embedpdf.com/docs/viewer/self-hosting —',
+      'encoding (slower under load). If your bundler did not emit ' +
+      "@embedpdf/engine's workers/encoder-worker.js, or your Content-Security-Policy blocks " +
+      "the workers, serve that file yourself and pass `encoderWorker: '/path/encoder-worker.js'` " +
+      'to localEngine(). See https://www.embedpdf.com/docs/viewer/self-hosting —',
     error,
   );
 }

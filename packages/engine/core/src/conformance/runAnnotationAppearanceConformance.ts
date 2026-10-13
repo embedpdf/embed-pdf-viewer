@@ -11,6 +11,7 @@ import { isLocalPage } from '../engine/LocalPageHandle';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef, type PageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Per-fixture knowledge for the annotation appearance conformance suite. The
@@ -188,7 +189,7 @@ async function collect(
 async function openFixture(engine: Engine, opts: AnnotationAppearanceConformanceOptions) {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

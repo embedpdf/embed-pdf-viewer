@@ -30,10 +30,10 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'row',
-    '[attr.data-disabled]': "command()?.enabled ? null : ''",
-    '[style.display]': "command()?.visible ? null : 'none'",
+    '[attr.data-disabled]': "command().enabled ? null : ''",
+    '[style.display]': "command().visible ? null : 'none'",
   },
-  template: `<kbd class="key">{{ key() }}</kbd><span>{{ command()?.label }}</span>`,
+  template: `<kbd class="key">{{ key() }}</kbd><span>{{ command().label }}</span>`,
 })
 export class ShortcutRow {
   readonly commandId = input.required<string>();
@@ -89,7 +89,7 @@ export class KeyboardHelp {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       withStage(),
       withRender(),
       withInteraction(),

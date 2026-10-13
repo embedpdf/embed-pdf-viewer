@@ -40,6 +40,13 @@ group('annotate', ['tool:note', 'tool:ink'], { importance: 2 });
 `start`, `center` and `end` are the toolbar's left, middle and right. The center stays centered in the
 space the other two leave. In a right-to-left language, `start` and `end` swap sides.
 
+`orientation="vertical"` stands the toolbar on its side, for a rail beside the pages: `start`,
+`center` and `end` become its top, middle and bottom, and it fits the height you give it, so give it
+one. Every command draws at `'icon'`, so put its label in a tooltip. Groups fold and items move into
+"More" the same way, and the default menus open beside it.
+
+<Snippet name="ui/toolbar-vertical" />
+
 ## Your own items
 
 Not everything is a command: a page number input, a search box. Put a custom item in the bar and draw
@@ -86,6 +93,9 @@ children for that slot show there.
 
 </Fw>
 
+The first element in your item that takes focus is where the toolbar's arrow keys stop. The rest of
+its controls are your item's own, and a text field keeps Left and Right for its caret.
+
 ## Draw every part
 
 | Prop                    | Draws                                                                  |
@@ -102,7 +112,8 @@ children for that slot show there.
 Every prop you leave out has a plain default, so you can start with `renderCommand` and add the rest as
 you style them. `renderCollapsed` and `renderGroupTrigger` can return `undefined` for a group to leave
 it to the default. `gap` and `separatorWidth` set the spacing, and `className` and `style` go on the
-toolbar itself.
+toolbar itself. `orientation` stands it on its side ([Sections](#sections)), and `aria-label` names
+it for a screen reader when the page has more than one toolbar.
 
 </Fw>
 
@@ -110,7 +121,9 @@ toolbar itself.
 
 Every slot you leave out has a plain default, so you can start with `#command` and add the rest as
 you style them. A slot that draws nothing for a part leaves that part to the default. `gap` and
-`separator-width` set the spacing, and `class` and `style` go on the toolbar itself.
+`separator-width` set the spacing, and `class` and `style` go on the toolbar itself. `orientation`
+stands it on its side ([Sections](#sections)), and `aria-label` names it for a screen reader when the
+page has more than one toolbar.
 
 </Fw>
 
@@ -118,7 +131,9 @@ you style them. A slot that draws nothing for a part leaves that part to the def
 
 Every snippet you leave out has a plain default, so you can start with `command` and add the rest as
 you style them. A snippet you pass draws every part of its kind. `gap` and `separatorWidth` set the
-spacing, and `class` and `style` go on the toolbar itself.
+spacing, and `class` and `style` go on the toolbar itself. `orientation` stands it on its side
+([Sections](#sections)), and `aria-label` names it for a screen reader when the page has more than
+one toolbar.
 
 </Fw>
 
@@ -127,9 +142,15 @@ spacing, and `class` and `style` go on the toolbar itself.
 Every template you leave out has a plain default, so you can start with `epdfToolbarCommand` and add
 the rest as you style them. A template you give draws every part of its kind. `gap` and
 `separatorWidth` set the spacing, and a `class` or `style` on `<epdf-toolbar>` styles the toolbar
-itself.
+itself. `orientation` stands it on its side ([Sections](#sections)). `<epdf-toolbar>` is the toolbar
+to a screen reader, so an `aria-label` on it names it when the page has more than one toolbar.
 
 </Fw>
+
+Whatever you draw, the toolbar is one stop for the Tab key. The arrow keys along it move between its
+items, past disabled ones, and Home and End go to its ends. The default menus open on their first
+row: the arrow keys move, typing a letter jumps to the row that starts with it, Enter picks, and
+Escape closes the menu and puts focus back on its button.
 
 ## A toolbar per mode
 
@@ -147,6 +168,9 @@ while building a form. Keep a bar per mode and pick one from your state:
 Because the items are commands, a button disables itself when its command can't run, shows as pressed
 when it's active, and hides when the command isn't visible, with no code in the toolbar. Change a
 permission or open a document, and the toolbar follows.
+
+A group with `dependent: true`, like undo and redo, shows only while something in the bar that isn't
+dependent shows: a bar left with only those draws nothing.
 
 ### Labels in the user's language
 

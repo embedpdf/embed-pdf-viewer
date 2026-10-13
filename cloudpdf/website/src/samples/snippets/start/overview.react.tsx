@@ -3,7 +3,7 @@ import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
 export function App() {

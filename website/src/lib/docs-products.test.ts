@@ -19,7 +19,7 @@ describe('docsProductFromPath', () => {
 
 describe('docsProductHref', () => {
   it('carries a supported integration between Viewer and Headless', () => {
-    expect(docsProductHref('viewer', 'vue')).toBe('/docs/viewer/vue/getting-started');
+    expect(docsProductHref('viewer', 'vue')).toBe('/docs/viewer/vue');
     expect(docsProductHref('headless', 'vue')).toBe('/docs/headless/vue');
   });
 
@@ -28,7 +28,7 @@ describe('docsProductHref', () => {
   });
 
   it('uses the courtesy route when the current page has no integration', () => {
-    expect(docsProductHref('viewer', null)).toBe('/docs/viewer/getting-started');
+    expect(docsProductHref('viewer', null)).toBe('/docs/viewer');
     expect(docsProductHref('headless', null)).toBe('/docs/headless');
   });
 

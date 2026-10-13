@@ -165,8 +165,8 @@ Tell the viewer who the user is and what they may do, once. Every document it op
 
 - **`identity`** is who the user is. Their `displayName` becomes the author of the annotations they
   make.
-- **`scope`** is what they may do, as a list of permissions. Leave it out and they may do
-  everything; the engine reminds you once in the console.
+- **`scope`** is what they may do, as a list of permissions. Leave it out and they may do what
+  the file allows: everything, unless the PDF restricts itself, as in Acrobat.
 
 <Example name="documents/identity" />
 
@@ -211,6 +211,7 @@ the active document are on [Several documents](tabs#methods), downloading and pr
 | Method                     | What it does                                                                                                                                                               |
 | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `open(source, options?)`   | Opens a document and makes it the active one. Resolves `{ document }` once it's ready, or locked with a password; rejects when it can't be opened. [Open a document later](#open-a-document-later) |
+| `canOpenFiles()`           | Whether `open()` takes a file's bytes, such as a file the user picked, or a URL it downloads: `true` on the local engine, `false` on CloudPDF, where every document comes from your server |
 | `openAll(documents)`       | Opens several documents, as `initialDocuments` does: every tab appears at once, in order, and the one marked `active` (or the first) becomes the active one. A failure shows in that document's `status` instead of throwing. |
 | `unlock(id, { password })` | Unlocks a locked document. Rejects on a wrong password, and the document stays locked so you can ask again. [Loading, errors and passwords](#loading-errors-and-passwords) |
 | `retry(id)`                | Tries a failed document again, with the same source and options. Resolves like `open()`.                                                                                     |

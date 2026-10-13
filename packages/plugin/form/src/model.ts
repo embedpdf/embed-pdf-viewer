@@ -231,10 +231,26 @@ function withRedrawnPictures(index: FieldIndex, redrawn: readonly PlacedWidget[]
   return { ...index, pictureVersions };
 }
 
+/**
+ * A merged field split as it took a second widget: its widget half moved to a new number (one
+ * of the event's widgets), and the row at the field's own number is gone with it.
+ */
+function withoutSplitRow(index: FieldIndex, field: FormFieldDTO): FieldIndex {
+  if (field.ref.kind !== 'objectNumber') return index;
+  const own = field.ref.objectNumber;
+  if (field.widgets.some((widget) => widget.objectNumber === own)) return index;
+  const row = widgetRowOf(index, own);
+  return row ? removeWidgets(index, [{ ref: row.ref, objectNumber: own, page: row.page }]) : index;
+}
+
 function foldFormFacts(index: FieldIndex, event: DocumentEvent): FieldIndex | MirrorReload {
   switch (event.type) {
-    case 'forms.valueSet':
     case 'forms.widgetAdded':
+      return withoutSplitRow(
+        upsertWidgets(upsertFields(index, [event.field]), event.widgets),
+        event.field,
+      );
+    case 'forms.valueSet':
     case 'forms.widgetRemoved':
     case 'forms.restored':
       return upsertWidgets(upsertFields(index, [event.field]), event.widgets);

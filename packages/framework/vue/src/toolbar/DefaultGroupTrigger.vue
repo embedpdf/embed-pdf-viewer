@@ -7,10 +7,11 @@
 import { computed, ref } from 'vue';
 import DefaultOverflowMenu from './DefaultOverflowMenu.vue';
 import { groupMenuView } from '@embedpdf/core-ui';
+import type { Orientation } from '@embedpdf/web';
 import type { GroupDisclosureView } from './views';
 import { ACTIVE, BORDER } from './paint';
 
-const props = defineProps<{ view: GroupDisclosureView }>();
+const props = defineProps<{ view: GroupDisclosureView; orientation: Orientation }>();
 
 const isOpen = ref(false);
 const someActive = computed(() => props.view.commands.some((command) => command.active));
@@ -39,6 +40,6 @@ const menu = computed(() => groupMenuView(props.view, isOpen.value, () => (isOpe
     >
       ▾
     </button>
-    <DefaultOverflowMenu :view="menu" />
+    <DefaultOverflowMenu :view="menu" :orientation="orientation" />
   </span>
 </template>

@@ -12,7 +12,7 @@
  * mirror shows them (`records.view()`) into the core's `Model`.
  */
 import { initialSession, sameSession } from '@embedpdf/core-annotation';
-import type { Id, Point, Session, SnapSettings } from '@embedpdf/core-annotation';
+import type { EditableKinds, Id, Point, Session, SnapSettings } from '@embedpdf/core-annotation';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
@@ -67,7 +67,7 @@ export interface AnnotationState {
   readonly textSelection: TextSelection | null;
 }
 
-/** The initial state. The session's snapping comes from the settings (`withSnap`). */
+/** The initial state. The session's snapping and editable rule come from the settings (`withSnap`, `withEditable`). */
 export const initialAnnotationState = (): AnnotationState => ({
   session: initialSession,
   vector: {},
@@ -79,6 +79,12 @@ export const initialAnnotationState = (): AnnotationState => ({
 /** The session snaps as the settings say. */
 export const withSnap = (state: AnnotationState, snap: SnapSettings): AnnotationState =>
   state.session.snap === snap ? state : { ...state, session: { ...state.session, snap } };
+
+/** People change by hand what the settings' `editable` rule lets them. */
+export const withEditable = (state: AnnotationState, editable: EditableKinds): AnnotationState =>
+  state.session.editable === editable
+    ? state
+    : { ...state, session: { ...state.session, editable } };
 
 /* ── the session and render preferences ──────────────────────────────── */
 

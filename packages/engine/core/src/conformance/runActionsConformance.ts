@@ -4,6 +4,7 @@ import type { PdfActionNode } from '../dto/PdfAction';
 import { DocumentActionsSnapshotSchema } from '../dto/PdfAction.schema';
 import { toPageRef } from '../identity/PageRef';
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /** The script payload rides only the javascript/rendition arms. */
 function scriptOf<Destination>(node: PdfActionNode<Destination> | null | undefined): string {
@@ -344,7 +345,10 @@ async function open(
   fixture: ConformanceFixture,
 ): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
-    return engine.open({ kind: 'bytes', id: fixture.id, bytes: await fixture.bytes() });
+    return engine.open(
+      { kind: 'bytes', id: fixture.id, bytes: await fixture.bytes() },
+      EVERY_PERMISSION,
+    );
   }
   return engine.open({ kind: 'id', id: fixture.cloudId ?? fixture.id });
 }

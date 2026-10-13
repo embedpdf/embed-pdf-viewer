@@ -17,7 +17,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './shortcuts.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),
@@ -30,7 +30,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 // One row of the sheet: the key, and what it does. A command that can't run now is greyed out.
 function ShortcutRow({ id, shortcut }: { id: string; shortcut: string }) {
   const command = useCommand(id);
-  if (!command?.visible) return null;
+  if (!command.visible) return null;
 
   return (
     <li className="row" data-disabled={!command.enabled || undefined}>

@@ -48,7 +48,7 @@ export function fakeRender() {
     dispose: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
-  const paint = { fadeMs: 0, tiles: true };
+  const paint = { tiles: true };
   const rights = { annotations: true, formFields: true };
   const keyOf = (page: PageRef) => `page-${page.objectNumber}`;
   const api = {

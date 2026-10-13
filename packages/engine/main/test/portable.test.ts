@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, test } from 'vitest';
 
 import { loadInlineWasm } from '../src/portable';
-import { resolveInlineWasmSource } from '../src/wasm-source';
+import { resolveDefaultWasmSource } from '../src/wasm-source';
 
 const require = createRequire(import.meta.url);
 const shippedWasm = () =>
@@ -25,7 +25,7 @@ describe('@embedpdf/engine/portable', () => {
   });
 
   test('as a wasmLoader it is an explicit source: bytes for the worker, no URL, no sibling lookup', async () => {
-    const resolved = await resolveInlineWasmSource({ wasmLoader: loadInlineWasm });
+    const resolved = await resolveDefaultWasmSource({ wasmLoader: loadInlineWasm });
     expect(resolved.wasmUrl).toBeUndefined();
     expect(resolved.wasmBinary!.byteLength).toBe(shippedWasm().byteLength);
   });

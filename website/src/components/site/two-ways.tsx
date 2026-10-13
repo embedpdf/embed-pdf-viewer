@@ -186,31 +186,31 @@ export function TwoWays() {
                   accent="blue"
                   icon={<JsMark />}
                   label="Vanilla JS"
-                  href="/docs/viewer/vanilla/getting-started"
+                  href="/docs/viewer/vanilla/quick-start"
                 />
                 <StackChip
                   accent="blue"
                   icon={<ReactIcon />}
                   label="React"
-                  href="/docs/viewer/react/getting-started"
+                  href="/docs/viewer/react/quick-start"
                 />
                 <StackChip
                   accent="blue"
                   icon={<VueIcon />}
                   label="Vue"
-                  href="/docs/viewer/vue/getting-started"
+                  href="/docs/viewer/vue/quick-start"
                 />
                 <StackChip
                   accent="blue"
                   icon={<SvelteIcon />}
                   label="Svelte"
-                  href="/docs/viewer/svelte/getting-started"
+                  href="/docs/viewer/svelte/quick-start"
                 />
                 <StackChip
                   accent="blue"
                   icon={<AngularIcon />}
                   label="Angular"
-                  href="/docs/viewer/angular/getting-started"
+                  href="/docs/viewer/angular/quick-start"
                 />
               </>
             }

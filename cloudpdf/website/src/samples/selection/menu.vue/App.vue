@@ -17,7 +17,7 @@ import SelectTitle from './SelectTitle.vue';
 
 import '../menu.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 const PLACEMENTS = ['top', 'bottom', 'left', 'right'] as const;

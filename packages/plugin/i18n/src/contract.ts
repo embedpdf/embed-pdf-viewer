@@ -93,6 +93,16 @@ export interface TranslateOptions {
    * ```
    */
   params?: Record<string, string | number>;
+  /**
+   * Another key, read in each language that has no string for the key, before the fallback
+   * language is: a specific key in front of a general one.
+   *
+   * ```ts
+   * // a language's 'review:approve', else its 'commands.approve'
+   * t('review:approve', { fallbackKey: 'commands.approve' })
+   * ```
+   */
+  fallbackKey?: string;
   /** What to show, with its slots filled, when no language has the key; the key itself otherwise. */
   fallback?: string;
 }
@@ -119,8 +129,9 @@ export interface LocaleLoadFailedEvent {
 export interface I18nCapability extends SettingsApi<I18nSettings> {
   /**
    * A string in the current language, with `params` filled in: the app's strings for the
-   * language, then EmbedPDF's own, then the same for the fallback language, then
-   * `options.fallback`, then the key. A key no language has warns once in the console.
+   * language, then EmbedPDF's own (for the key, then `options.fallbackKey`), then the same for
+   * the fallback language, then `options.fallback`, then the key. A key no language has warns
+   * once in the console.
    */
   t(key: string, options?: TranslateOptions): string;
   /**

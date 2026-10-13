@@ -7,6 +7,7 @@ import type { CharMapAnchor } from '../text/charmap';
 import type { Engine } from '../engine/Engine';
 import { toPageRef } from '../identity/PageRef';
 import { PageTextSnapshotSchema } from '../wire/schemas';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Index-space divergence conformance: the cases where a page's character
@@ -128,7 +129,7 @@ export function runTextDivergenceConformance(
 async function openFixture(engine: Engine, opts: TextDivergenceConformanceOptions) {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

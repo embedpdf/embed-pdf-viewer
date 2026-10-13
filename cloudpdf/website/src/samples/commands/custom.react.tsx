@@ -15,7 +15,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './custom.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 // A command of your own: pressed while the pages show two at a time.
 const twoPages: CommandDef = {
@@ -39,7 +39,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);
-  if (!command?.visible) return null;
+  if (!command.visible) return null;
 
   return (
     <button

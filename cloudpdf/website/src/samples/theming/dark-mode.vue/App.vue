@@ -12,7 +12,7 @@ import ShowColors from './ShowColors.vue';
 
 import '../dark-mode.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),

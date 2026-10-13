@@ -34,6 +34,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
+    "happy-dom": "^20.11.0",
     "typescript": "^5.0.0",
     "vitest": "^2.1.9",
     "@embedpdf/tooling-build": "workspace:*"

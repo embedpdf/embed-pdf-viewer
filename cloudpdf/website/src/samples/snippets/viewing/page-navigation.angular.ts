@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
-import { EpdfStage } from '@embedpdf/angular/stage';
+import { EpdfStageRef } from '@embedpdf/angular/stage';
 
-/** Floats over the pages: put it inside `<epdf-stage>`, which it injects. */
+/** Floats over the pages: put it inside `<epdf-stage>`, the Stage it injects. */
 @Component({
   selector: 'app-page-navigation',
   template: `
@@ -13,5 +13,5 @@ import { EpdfStage } from '@embedpdf/angular/stage';
   `,
 })
 export class PageNavigation {
-  protected readonly stage = inject(EpdfStage);
+  protected readonly stage = inject(EpdfStageRef);
 }

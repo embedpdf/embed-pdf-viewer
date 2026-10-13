@@ -24,6 +24,7 @@ export const initialSession: Session = {
     rotationAngles: [0, 90, 180, 270],
     rotationThreshold: 4,
   },
+  editable: true,
 };
 
 const NO_DEFAULTS: FieldValues = {};

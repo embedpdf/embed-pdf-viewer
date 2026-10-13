@@ -1,8 +1,10 @@
 /**
  * The commands controller: the commands (from the settings, added while the
  * app runs, and from families), resolution for a document (derivations over
- * live state, safe to throw), the one way to run a command, the categories,
- * and the host-only keystroke matcher.
+ * live state, safe to throw), the one way to run a command, turning commands
+ * off (by category and one by one), what the session may run (the scope's
+ * `requires`, the plugins' checks in `allowed`), and the host-only keystroke
+ * matcher.
  *
  * Definitions hold functions, so the commands added while the app runs are a
  * map outside state; every change to it calls `ctx.notify()` so readers read
@@ -21,7 +23,6 @@ import {
   type Unsubscribe,
 } from '@embedpdf/core';
 import { matchShortcut, type KeyStroke } from '@embedpdf/core-ui';
-import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 import { ShellToken } from '@embedpdf/plugin-shell/contract';
 
 import type {
@@ -37,15 +38,19 @@ import type {
   RegisterCommandOptions,
   ResolvedCommand,
 } from './contract';
-import type { CommandsHostCapability } from './host-contract';
+import type { CommandsHostCapability, ShortcutMatch } from './host-contract';
 import {
   configuredCommands,
   registeredCommand,
   type ConfiguredCommands,
   type RegisteredCommand,
 } from './registry';
+import { createAvailability, labelOf, notAllowedMessage } from './services/availability';
+import { createTurningOff } from './write/turning-off';
 
-const panelTarget = (definition: CommandDef): { id: string; exclusive?: string } | null =>
+const panelTarget = (
+  definition: CommandDef,
+): { id: string; exclusive?: string; focus?: boolean } | null =>
   definition.panel === undefined
     ? null
     : typeof definition.panel === 'string'
@@ -54,7 +59,8 @@ const panelTarget = (definition: CommandDef): { id: string; exclusive?: string }
 
 /**
  * One command's live derivations for a document, as values a memo can
- * compare: the entry, label, accent colors, and the enabled/active/visible flags.
+ * compare: the entry, label, accent colors, the enabled/active/visible flags,
+ * and why it's disabled when the scope doesn't allow it.
  */
 type Derivations = readonly [
   entry: RegisteredCommand | null,
@@ -64,9 +70,19 @@ type Derivations = readonly [
   enabled: boolean,
   active: boolean,
   visible: boolean,
+  disabledReason: string | undefined,
 ];
 
-const NOT_REGISTERED: Derivations = [null, '', undefined, undefined, false, false, false];
+const NOT_REGISTERED: Derivations = [
+  null,
+  '',
+  undefined,
+  undefined,
+  false,
+  false,
+  false,
+  undefined,
+];
 const NO_NAMES: readonly string[] = [];
 
 const accentOf = (primary?: string, secondary?: string): IconAccent | undefined =>
@@ -196,24 +212,17 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     }
   };
 
-  /** The label: the key's string when a language has it, else `label`, else the key or the id. */
-  const labelOf = (definition: CommandDef, context: CommandContext): string => {
-    const i18n = definition.labelKey ? context.tryGet(I18nToken) : null;
-    if (i18n && definition.labelKey) {
-      return definition.label === undefined
-        ? i18n.t(definition.labelKey)
-        : i18n.t(definition.labelKey, { fallback: definition.label });
-    }
-    return definition.label ?? definition.labelKey ?? definition.id;
-  };
+  const { isTurnedOff, notAllowedKeyOf, refusalOf } = createAvailability(ctx, settings);
 
   const derivationsOf = (entry: RegisteredCommand, documentId?: string): Derivations => {
     const { definition } = entry;
     const context = commandContext(documentId);
-    const disabled = settings.get().disabledCategories;
-    const categoryOff = (definition.categories ?? []).some((category) =>
-      disabled.includes(category),
-    );
+    const label = labelOf(definition, context);
+    // Turned off hides it; not allowed hides it, or disables it with the reason.
+    const turnedOff = isTurnedOff(definition);
+    const notAllowed = turnedOff ? null : notAllowedKeyOf(definition, context);
+    const shownWhenNotAllowed = settings.get().notAllowed === 'disable';
+    const ruledOut = turnedOff || notAllowed !== null;
     // A command that opens something is active while it's open, unless it says otherwise.
     let active: boolean;
     if (definition.active) {
@@ -234,12 +243,17 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     const accent = deriveAccent(definition.iconAccent, context);
     return [
       entry,
-      labelOf(definition, context),
+      label,
       accent?.primary,
       accent?.secondary,
-      derive(definition.enabled, context, true) && !categoryOff,
+      !ruledOut && derive(definition.enabled, context, true),
       active,
-      derive(definition.visible, context, true) && !categoryOff,
+      !turnedOff &&
+        (notAllowed === null || shownWhenNotAllowed) &&
+        derive(definition.visible, context, true),
+      notAllowed !== null && shownWhenNotAllowed
+        ? notAllowedMessage(notAllowed, label, context)
+        : undefined,
     ];
   };
 
@@ -259,6 +273,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       enabled,
       active,
       visible,
+      disabledReason,
     ): ResolvedCommand | null =>
       entry && {
         id: entry.definition.id,
@@ -271,6 +286,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
         active,
         visible,
         categories: entry.definition.categories ?? [],
+        ...(disabledReason === undefined ? {} : { disabledReason }),
       },
   );
   const resolveCommand = (id: string, documentId?: string): ResolvedCommand | null =>
@@ -336,7 +352,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     const panel = panelTarget(definition);
     if (!shell) return;
     if (definition.menu) shell.toggleMenu(definition.menu);
-    else if (panel) shell.toggle(panel.id, { exclusive: panel.exclusive });
+    else if (panel) shell.toggle(panel.id, { exclusive: panel.exclusive, focus: panel.focus });
     else if (definition.modal) shell.toggle(definition.modal, { exclusive: 'modal' });
   };
 
@@ -384,7 +400,11 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     };
   };
 
-  const disabledCategories = () => settings.get().disabledCategories;
+  const turningOff = createTurningOff(
+    settings,
+    (id) => entryOf(id)?.definition ?? null,
+    isTurnedOff,
+  );
 
   const api: CommandsHostCapability = {
     ...settings.api,
@@ -414,32 +434,28 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       const resolved = resolveCommand(id, documentId);
       return !!resolved && resolved.enabled && resolved.visible;
     },
-    getDisabledCategories: disabledCategories,
-    isCategoryDisabled: (category) => disabledCategories().includes(category),
-    disableCategory: (category) => {
-      const current = disabledCategories();
-      if (current.includes(category)) return;
-      settings.api.updateSettings({ disabledCategories: [...current, category] });
+    getRefusal: (id, documentId) => {
+      const entry = entryOf(id);
+      return entry ? refusalOf(entry.definition, commandContext(documentId)) : null;
     },
-    enableCategory: (category) => {
-      const current = disabledCategories();
-      if (!current.includes(category)) return;
-      settings.api.updateSettings({
-        disabledCategories: current.filter((other) => other !== category),
-      });
-    },
-    setDisabledCategories: (categories) =>
-      settings.api.updateSettings({ disabledCategories: [...categories] }),
+    ...turningOff,
     onExecuted: executed.on,
     onExecutionFailed: executionFailed.on,
     // ── host lens ──
     matchStroke: (stroke: KeyStroke, options) => {
+      let refused: ShortcutMatch | null = null;
       for (const entry of definedCommands()) {
-        if (entry.parsed.some((shortcut) => matchShortcut(shortcut, stroke, options))) {
-          return entry.definition.id;
-        }
+        if (options.inTextField && !entry.definition.shortcutInTextFields) continue;
+        if (!entry.parsed.some((shortcut) => matchShortcut(shortcut, stroke, options))) continue;
+        const context = commandContext();
+        const refusal = refusalOf(entry.definition, context);
+        if (!refusal) return { commandId: entry.definition.id, refusal: null };
+        // A refused command takes its keys only where it would show: Delete with nothing
+        // selected stays the page's, even where deleting is turned off.
+        if (!derive(entry.definition.visible, context, true)) continue;
+        refused ??= { commandId: entry.definition.id, refusal };
       }
-      return null;
+      return refused;
     },
     getMenuTarget: (id) => {
       const entry = entryOf(id);

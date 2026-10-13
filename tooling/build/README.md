@@ -65,7 +65,11 @@ plugin authors; this file is the law for how packages BUILD.
     // consumer's bundler to compile (engine's ./worker-entry).
     "rawExports": ["./worker-entry"],
     // Condition-split dev exports (law 4). Engine family only.
-    "devExports": "development"
+    "devExports": "development",
+    // Specifiers dist keeps as written, for the consumer's resolver: a
+    // `package.json` `imports` entry whose target depends on where the code
+    // runs (engine's `#inline-transport`).
+    "neverBundle": ["#inline-transport"]
   }
 }
 ```

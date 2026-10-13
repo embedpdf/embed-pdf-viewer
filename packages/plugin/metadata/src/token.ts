@@ -11,6 +11,7 @@ export const MetadataToken = createCapabilityToken<MetadataCapability>('metadata
   promises: {
     update: true,
     refresh: true,
+    ensureLoaded: true,
     'custom.update': true,
     'custom.refresh': true,
   },

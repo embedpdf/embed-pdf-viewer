@@ -6,7 +6,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './page-labels.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 // Reserve a 26px band below every page: the label lives there, so it never
 // covers the page and keeps its size when you zoom.

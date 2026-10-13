@@ -126,7 +126,9 @@ function Control({ property }: { property: AnnotationProperty }) {
             }}
           >
             {property.options.map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         );
@@ -150,7 +152,9 @@ function Control({ property }: { property: AnnotationProperty }) {
           >
             {isMixed && <option value="">mixed</option>}
             {property.options.map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         );
@@ -164,7 +168,9 @@ function Control({ property }: { property: AnnotationProperty }) {
         >
           {isMixed && <option value="">mixed</option>}
           {property.options.map((option) => (
-            <option key={option}>{option}</option>
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
           ))}
         </select>
       );

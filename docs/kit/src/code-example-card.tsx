@@ -26,6 +26,20 @@ export type ExampleFile = {
 
 export type ExampleMode = 'default' | 'open' | 'demo' | 'code';
 
+/**
+ * How tall the live preview is: the demo's own height (`content`), or a frame of its own that the
+ * demo fills (`height: 100%`), for a demo with no height of its own, such as the ready-made viewer:
+ * `viewer` suits the docs column, `tall` a whole app. A frame is never taller than most of the
+ * screen, so the page around it still scrolls on a phone.
+ */
+export type ExampleFrame = 'content' | 'viewer' | 'tall';
+
+const FRAME_HEIGHT: Record<ExampleFrame, string> = {
+  content: '',
+  viewer: 'h-[min(560px,75svh)]',
+  tall: 'h-[min(760px,85svh)]',
+};
+
 type Tone = 'light' | 'dark';
 
 const ICON_BTN: Record<Tone, string> = {
@@ -139,11 +153,11 @@ function Collapsible({ open, children }: { open: boolean; children: ReactNode })
   );
 }
 
-/** The dotted light surface the demo sits on. */
-function PreviewSurface({ children }: { children: ReactNode }) {
+/** The dotted light surface the demo sits on, in its frame. */
+function PreviewSurface({ frame, children }: { frame: ExampleFrame; children: ReactNode }) {
   return (
     <div className="bg-white p-5 [background-image:radial-gradient(#DCE3F0_1px,transparent_1px)] [background-size:16px_16px] sm:p-6">
-      {children}
+      {frame === 'content' ? children : <div className={FRAME_HEIGHT[frame]}>{children}</div>}
     </div>
   );
 }
@@ -308,11 +322,14 @@ export function CodeExampleCard({
   files,
   demo,
   mode = 'default',
+  frame = 'content',
 }: {
   files: ExampleFile[];
   /** The live preview; receives whether the preview region is open. */
   demo?: (active: boolean) => ReactNode;
   mode?: ExampleMode;
+  /** How tall the live preview is (a framed demo fills its frame's height). */
+  frame?: ExampleFrame;
 }) {
   const [activeFile, setActiveFile] = useState(0);
   const hasDemo = Boolean(demo);
@@ -350,7 +367,7 @@ export function CodeExampleCard({
   if (mode === 'demo' || files.length === 0) {
     return (
       <div className="mt-6 overflow-hidden rounded-[14px] border border-[var(--dk-border)] shadow-[0_1px_2px_rgba(7,32,76,0.04)]">
-        <PreviewSurface>{demo?.(true)}</PreviewSurface>
+        <PreviewSurface frame={frame}>{demo?.(true)}</PreviewSurface>
       </div>
     );
   }
@@ -361,7 +378,7 @@ export function CodeExampleCard({
   return (
     <div className="mt-6 overflow-hidden rounded-[14px] border border-[var(--dk-border)] bg-white shadow-[0_1px_2px_rgba(7,32,76,0.04)]">
       <Collapsible open={previewOpen}>
-        <PreviewSurface>{demo?.(previewOpen)}</PreviewSurface>
+        <PreviewSurface frame={frame}>{demo?.(previewOpen)}</PreviewSurface>
       </Collapsible>
 
       <div

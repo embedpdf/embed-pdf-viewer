@@ -5,10 +5,10 @@
  * meanwhile. Nothing is restored from a copy taken before the change. The
  * engine answers changes in the order they were staged.
  */
-import type { DocumentEvent } from '@embedpdf/core';
+import { isPluginError, type DocumentEvent } from '@embedpdf/core';
 import { type Message, styleOf } from '@embedpdf/core-annotation';
-import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDraft, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -254,6 +254,31 @@ describe('what the capability says about a change', () => {
     expect(harness.model().order).toEqual([]);
     expect(harness.model().selected).toEqual([]);
     expect(failures.mock.calls[0]![0].refs).toEqual([newRef]);
+  });
+
+  it('a create whose values the engine refuses shows while on its way, then leaves, and rejects', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    const answer = deferred<unknown>();
+    harness.create.mockReturnValueOnce(answer.promise);
+    const draft = {
+      subtype: 'square',
+      box: { x: 10, y: 10, width: 50, height: 40 },
+      color: 'red',
+    } as unknown as AnnotationDraft;
+
+    const created = harness.capability.create(PAGE, draft);
+    // The view predicts the create without checking its values: the engine checks them.
+    const [id] = harness.model().order;
+    expect(harness.model().byId[id!]!.annotation).toMatchObject({ subtype: 'square', color: 'red' });
+    answer.reject(
+      new EngineError(EngineErrorCode.InvalidArg, "square create field 'color': not a color", {
+        details: { field: 'color' },
+      }),
+    );
+
+    await expect(created).rejects.toSatisfy((error) => isPluginError(error, 'invalid-input'));
+    expect(harness.model().order).toEqual([]);
   });
 });
 

@@ -7,7 +7,7 @@ import PageImages from './PageImages.vue';
 
 import '../render-page.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // No Stage: these pictures are plain images, rendered on demand.
 const plugins = [renderPlugin()];
 

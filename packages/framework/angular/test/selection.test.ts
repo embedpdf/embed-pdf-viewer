@@ -1,8 +1,9 @@
 /**
  * The selection binding against a real kernel: the service's State signals (empty without a
  * document, changing only with their field), its settings with and without a document, its
- * streams, `copySelection()` on the service; the layer painting through its CSS variable, over
- * the accent at 35% or the `color` setting; and the menu, shown once the selection settles.
+ * streams, `copySelection()` on the service; Ctrl/Cmd+C anywhere on the page, or only inside
+ * an element; the layer painting through its CSS variable, over the accent at 35% or the
+ * `color` setting; and the menu, shown once the selection settles.
  */
 import { Component, computed, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -21,6 +22,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   copySelection,
   EpdfSelection,
+  EpdfSelectionClipboard,
   EpdfSelectionLayer,
   EpdfSelectionMenu,
   SELECTION_DEFAULTS,
@@ -187,6 +189,50 @@ describe('EpdfSelection', () => {
     await settle();
     await expect(copySelection(selection)).resolves.toBe('234');
     expect(writeText).toHaveBeenCalledWith('234');
+  });
+});
+
+// ── copying ──
+
+describe('Ctrl/Cmd+C', () => {
+  const pressCopy = (target: EventTarget) =>
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+
+  async function selected(template: string) {
+    const writeText = vi.fn((_text: string) => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { fixture, selection } = await mountViewer(template, [EpdfSelectionClipboard]);
+    await kernelOf(fixture).documents.open(bytesInput('doc'));
+    selection.select({ page: toPageRef(5), start: 2, count: 3 });
+    await settle();
+    const byId = (id: string) => fixture.nativeElement.querySelector(`#${id}`) as HTMLElement;
+    return { writeText, byId };
+  }
+
+  it('<epdf-selection-clipboard> copies anywhere on the page', async () => {
+    const { writeText } = await selected('<epdf-selection-clipboard />');
+    pressCopy(document.body);
+    await settle();
+    expect(writeText).toHaveBeenCalledWith('234');
+  });
+
+  it('epdfSelectionClipboard copies only while focus is inside its element', async () => {
+    const { writeText, byId } = await selected(`
+      <div id="viewer" tabindex="0" epdfSelectionClipboard><span id="inside"></span></div>
+      <button id="outside"></button>
+    `);
+    byId('viewer').focus();
+    pressCopy(byId('inside'));
+    await settle();
+    expect(writeText).toHaveBeenCalledWith('234');
+
+    byId('outside').focus();
+    pressCopy(byId('outside'));
+    pressCopy(document.body);
+    await settle();
+    expect(writeText).toHaveBeenCalledTimes(1);
   });
 });
 

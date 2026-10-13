@@ -45,6 +45,37 @@ describe('translate', () => {
     expect(translate(stateWith(), 'pages', { params: { count: 0 } }).text).toBe('0 pages');
   });
 
+  it('reads the fallback key in each language that misses the key, before the fallback language', () => {
+    const sources = stateWith({
+      locales: {
+        en: { ...en, translations: { ...en.translations, 'review:approve': 'Approve it' } },
+        es,
+      },
+    });
+    // Spanish has no 'review:approve' but has the general key: Spanish wins over English.
+    expect(translate(sources, 'review:approve', { fallbackKey: 'commands.save' })).toEqual({
+      text: 'Guardar',
+      found: true,
+    });
+    // A language with the specific key shows it.
+    expect(
+      translate({ ...sources, locale: 'en' }, 'review:approve', { fallbackKey: 'commands.save' })
+        .text,
+    ).toBe('Approve it');
+    // Neither key in Spanish: the fallback language, the specific key first.
+    expect(translate(sources, 'review:approve', { fallbackKey: 'zoomLevel' }).text).toBe(
+      'Approve it',
+    );
+    expect(translate(sources, 'nope', { fallbackKey: 'zoomLevel', params: { level: 2 } })).toEqual({
+      text: 'Zoom Level (2%)',
+      found: true,
+    });
+    expect(translate(sources, 'nope', { fallbackKey: 'nothing' })).toEqual({
+      text: 'nope',
+      found: false,
+    });
+  });
+
   it('does not resolve a branch object without a count', () => {
     expect(translate(stateWith(), 'pages').found).toBe(false);
   });

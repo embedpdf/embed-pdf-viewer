@@ -5,5 +5,5 @@ import { plugins } from './pdf';
 </script>
 
 <template>
-  <Viewer :engine="() => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' })" :plugins="plugins" />
+  <Viewer :engine="() => cloudEngine()" :plugins="plugins" />
 </template>

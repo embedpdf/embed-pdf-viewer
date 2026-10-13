@@ -18,7 +18,6 @@ const props = defineProps<{
   page: PageRef;
   /** View px per page point. */
   viewScale: number;
-  fadeMs: number;
 }>();
 
 const image = ref<HTMLImageElement | null>(null);
@@ -63,7 +62,6 @@ const style = computed((): CSSProperties => {
     width: `${rect.width * scale}px`,
     height: `${rect.height * scale}px`,
     zIndex: z,
-    animation: props.fadeMs > 0 ? `epdf-tile-in ${props.fadeMs}ms ease-out` : undefined,
   };
 });
 </script>

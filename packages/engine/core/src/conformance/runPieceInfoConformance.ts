@@ -2,6 +2,7 @@ import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataCon
 import type { LocalDocumentHandle } from '../engine/LocalDocumentHandle';
 import type { LocalEngine } from '../engine/LocalEngine';
 import { toPageRef } from '../identity/PageRef';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 const APP = 'EMBD_ConformanceTest';
 const SIBLING_APP = 'EMBD_ConformanceSibling';
@@ -98,7 +99,10 @@ export function runPieceInfoConformance(
           .pieceInfo.update(APP, { name: 'Witness', subject: 'Getuige' });
         const bytes = await doc.download();
 
-        reopened = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-pi-reopen`, bytes });
+        reopened = await engine.open(
+          { kind: 'bytes', id: `${opts.fixture.id}-pi-reopen`, bytes },
+          EVERY_PERMISSION,
+        );
         const relist = await reopened.pages.list();
         const docSnap = await reopened.pieceInfo.get(APP);
         expect(docSnap!.entries.name).toEqual({ type: 'string', value: 'Standard Stamps' });
@@ -152,5 +156,5 @@ async function openFixture(
   opts: PieceInfoConformanceOptions,
 ): Promise<LocalDocumentHandle> {
   const bytes = await opts.fixture.bytes();
-  return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+  return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
 }

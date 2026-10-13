@@ -103,7 +103,7 @@ part of your build and loads from your own site; see [Setup](setup).
 
 <Engine cloud>
 
-`cloudEngine({ baseUrl })` holds an HTTP client and nothing else, so creating it at the top of a
+`cloudEngine()` holds an HTTP client and nothing else, so creating it at the top of a
 module is safe, even with server-side rendering. Every page, text and annotation call goes to your
 CloudPDF server; see [Setup](setup).
 
@@ -133,8 +133,9 @@ and `useStageState()` gives you what to show:
 
 <Fw only="angular">
 
-Every plugin has a service with its methods and its state as signals. The Stage is a component, so
-it hands both to your template through a template reference, `#stage="epdfStage"`:
+Every plugin has a service with its methods and its state as signals, and the Stage has
+`EpdfStageRef`. Next to the Stage in a template, its template reference, `#stage="epdfStage"`,
+gives you both:
 
 </Fw>
 

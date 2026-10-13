@@ -9,9 +9,9 @@ import {
   wirePack,
   type Change,
   type ChangeResult,
+  type SessionEventPublisher,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';

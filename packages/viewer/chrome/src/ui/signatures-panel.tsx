@@ -29,7 +29,7 @@ import {
   type SignatureVerdict,
   type SignerRow,
 } from '@embedpdf/react/signature';
-import { useSignaturesConfig } from '../config-context';
+import { useSignatureSettings } from '../config-context';
 import { Icon } from './icons';
 import { restoreStampLibrariesOnce } from './stamp-store';
 
@@ -41,7 +41,7 @@ export function SignaturesPanel() {
   const t = useT();
   const stamp = useStamp();
   const signature = useSignature();
-  const config = useSignaturesConfig();
+  const config = useSignatureSettings();
   const rows = useSignerRows();
   const target = useSignatureState((state) => state.target);
   const busy = useSignatureState((state) => state.busy);
@@ -385,7 +385,7 @@ function DocumentSignatures() {
                       ? signature.requestInspection(dto.field)
                       : signature.setTarget(dto.field)
                   }
-                  className={`hover:bg-hover flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
+                  className={`hover:bg-hover flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm ${
                     isTarget(dto) ? 'bg-accent-light' : ''
                   }`}
                 >
@@ -396,7 +396,7 @@ function DocumentSignatures() {
                   />
                   <span className="text-fg min-w-0 flex-1 truncate">{dto.fieldName}</span>
                   <span
-                    className={`shrink-0 text-right text-xs ${dto.signed ? verdictTone(verdict) : 'text-fg-muted'}`}
+                    className={`shrink-0 text-end text-xs ${dto.signed ? verdictTone(verdict) : 'text-fg-muted'}`}
                   >
                     {dto.signed ? verdictLabel(verdict) : t('demo.signaturesUnsigned')}
                   </span>

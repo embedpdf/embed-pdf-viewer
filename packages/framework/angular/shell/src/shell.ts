@@ -1,5 +1,5 @@
 /**
- * The shell plugin's service, feature and directive: which panels, dialogs and menus are open.
+ * The shell plugin's service, feature and directives: which panels, dialogs and menus are open.
  * The app draws them; these bind their open state to the viewer, so a command, a button and
  * your code open the same panel, and the layout can be stored and restored.
  *
@@ -7,15 +7,33 @@
  *   inject(EpdfShell)                     `openSurfaces()`, `openMenus()`, `open()`, `toggle()`, …
  *   shell.surface('comments')             one panel: `isOpen()`, `props()`, `open()`, `close()`
  *   <button epdfPanelToggle="comments">   a button that opens and closes one
+ *   <input epdfSurfaceFocus="search">     an element that takes the cursor when its panel asks
  *
  * Without a document every panel reads as closed, no menu as open, and a surface's verbs do
  * nothing, so chrome outside `*epdfDocumentGate` can use them. The service's own methods then
  * refuse with `not-ready`, like every document plugin's.
  */
-import { Directive, inject, Injectable, input, untracked, type Signal } from '@angular/core';
-import { pluginService, type EmbedPdfFeature } from '@embedpdf/angular/runtime';
+import {
+  afterRenderEffect,
+  booleanAttribute,
+  Directive,
+  ElementRef,
+  inject,
+  Injectable,
+  input,
+  untracked,
+  type Signal,
+} from '@angular/core';
+import {
+  CapabilityBinding,
+  injectDocumentScope,
+  injectKernelHost,
+  pluginService,
+  type EmbedPdfFeature,
+} from '@embedpdf/angular/runtime';
 import { shellPlugin, shellState, ShellToken } from '@embedpdf/plugin-shell';
 import type { OpenSurfaceOptions, SurfaceProps } from '@embedpdf/plugin-shell';
+import { createSurfaceFocusFollower } from '@embedpdf/web';
 
 /** One named panel, dialog or overlay of the service's document. */
 export interface EpdfSurface {
@@ -126,5 +144,50 @@ export class EpdfPanelToggle {
   toggle(): void {
     const exclusive = this.exclusive();
     this.panel.toggle(exclusive === undefined ? undefined : { exclusive });
+  }
+}
+
+/**
+ * An element of yours that takes the cursor when the panel `epdfSurfaceFocus` names asks for it:
+ * on every `open(id, { focus: true })`, a command whose panel says `focus` among them, and when
+ * the element appears while the request is up (the panel opened, or its code loaded, because of
+ * it). A plain open never moves it. `epdfSurfaceFocusSelect` selects an input's text, so typing
+ * replaces it:
+ *
+ *   <input epdfSurfaceFocus="search" epdfSurfaceFocusSelect [(ngModel)]="query" />
+ *
+ * It reads the panel of this part of the template's document.
+ */
+@Directive({ selector: '[epdfSurfaceFocus]' })
+export class EpdfSurfaceFocus {
+  /** The panel's name. */
+  readonly id = input.required<string>({ alias: 'epdfSurfaceFocus' });
+  /** Select the text of an input or a text area as it takes focus. */
+  readonly select = input(false, { alias: 'epdfSurfaceFocusSelect', transform: booleanAttribute });
+
+  constructor() {
+    // The service's own checks: a viewer above, with withShell() in it.
+    inject(EpdfShell);
+    const element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const shell = new CapabilityBinding(
+      injectKernelHost('epdfSurfaceFocus'),
+      () => ShellToken,
+      injectDocumentScope(),
+    );
+    const request = shell.select(
+      (current) => current.getSurface(this.id())?.focusRequest ?? 0,
+      0,
+      Object.is,
+    );
+    const follower = createSurfaceFocusFollower();
+    // After rendering, so an element that has just appeared is in place to take focus.
+    afterRenderEffect({
+      write: () => {
+        const current = shell.capability();
+        const value = request();
+        const select = this.select();
+        untracked(() => follower.follow(element, current, value, { select }));
+      },
+    });
   }
 }

@@ -15,7 +15,6 @@ import {
   docsIntegrationHref,
   fanoutProductFromPath,
   isDocsIntegration,
-  isHeadlessIntegration,
 } from './docs-integrations';
 import { reactVersionHref, type DocsRelease } from './docs-release';
 import { collectSampleFiles, readDocsCodeFile } from './docs-samples';
@@ -36,7 +35,7 @@ const site: DocsMarkdownSite = {
       ? collectSampleFiles(name)[integration]
       : undefined,
   readCodeFile: (codePath) => readDocsCodeFile(codePath),
-  isFramework: (value) => isHeadlessIntegration(value),
+  isFramework: (value) => isDocsIntegration(value),
   variantLabel: (integration) =>
     isDocsIntegration(integration) ? DOCS_INTEGRATION_LABELS[integration] : integration,
   resolveContentHref: (url, integration) =>
@@ -60,7 +59,7 @@ export function renderDocsMarkdown({
       ? releasedMarkdownSource({
           sourceCode: options.sourceCode,
           title: typeof options.metadata?.title === 'string' ? options.metadata.title : undefined,
-          framework: isHeadlessIntegration(options.integration) ? options.integration : undefined,
+          framework: isDocsIntegration(options.integration) ? options.integration : undefined,
           release,
           reactUrl: react ? `${SITE_ORIGIN}${react}` : null,
         })

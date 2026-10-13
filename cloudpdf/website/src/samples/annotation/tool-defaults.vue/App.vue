@@ -12,7 +12,7 @@ import StartWithThePen from './StartWithThePen.vue';
 
 import '../tool-defaults.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // The pen starts with what the reader picked last time: see RememberDefaults.vue.
 const plugins = [
   stagePlugin(),

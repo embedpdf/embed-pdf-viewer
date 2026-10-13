@@ -12,7 +12,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './switch.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // The document opens with the hand tool.
 const plugins = [
   stagePlugin(),

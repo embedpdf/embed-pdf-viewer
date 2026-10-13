@@ -7,7 +7,7 @@
 
   import '../rotate-view.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   // The pages start a quarter turn round, like a scan that came out sideways.
   const plugins = [stagePlugin({ viewRotation: 90 }), renderPlugin()];
 

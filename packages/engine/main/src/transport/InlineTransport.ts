@@ -1,8 +1,27 @@
 import type { WirePack, WorkerRequest, WorkerResponse } from '@embedpdf/engine-core/runtime';
+import {
+  createPdfRuntime,
+  type CreatePdfRuntimeOptions,
+  type PdfRuntimeModule,
+} from '@embedpdf/engine-runtime';
 import { WorkerHost } from '@embedpdf/engine-services';
-import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { Transport } from './Transport';
+import type { ResolvedWasmSource } from '../wasm-source';
+
+/**
+ * PDFium in this thread: its runtime, then the transport to it. The engine loads this module
+ * as `#inline-transport` (`package.json` `imports`) only when such an engine boots
+ * (`startInlineTransport` in `src/index.ts`): in Node as it is, and in a browser as
+ * `workers/inline-transport.js`, built from `inline-browser.ts`. Node's runtime finds its
+ * own `embedpdf.wasm` or native library, so it never asks for `defaultWasm`.
+ */
+export async function createInlineTransport(
+  options: CreatePdfRuntimeOptions = {},
+  _defaultWasm?: () => Promise<ResolvedWasmSource>,
+): Promise<InlineTransport> {
+  return new InlineTransport(await createPdfRuntime(options));
+}
 
 /**
  * Inline transport: runs the WorkerHost in the same JS thread as the queue.

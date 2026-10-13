@@ -6,6 +6,7 @@
  *   export const useSearchState = stateHook(searchState);
  *   export const useSearchSettings = settingsHook(SearchToken);
  */
+import { useEffect } from 'react';
 import { shallowEqual } from '@embedpdf/core';
 import type { CapabilityToken, SettingsOf, StateDeclaration } from '@embedpdf/core';
 import { useDocumentScope, useKernelValue } from './runtime';
@@ -23,12 +24,15 @@ export type SettingsHook<Settings> = <Selected = Settings>(
  * document (the nearest <DocumentScope>, else the active one) and returns the
  * declaration's `empty` while that document is missing or not ready, so it
  * renders anywhere. It re-renders only when a field changes: the state, or the
- * value `select` picks from it, is compared with {@link shallowEqual}.
+ * value `select` picks from it, is compared with {@link shallowEqual}. State
+ * the plugin loads on demand (the declaration's `ensure`) loads once a ready
+ * document's capability is in scope, for every document the hook reads.
  */
 export function stateHook<Capability, State extends object>(
   declaration: StateDeclaration<Capability, State>,
 ): StateHook<State> {
-  return function useDeclaredState<Selected = State>(
+  const { ensure } = declaration;
+  const useDeclaredState = function useDeclaredState<Selected = State>(
     select?: (state: State) => Selected,
   ): Selected {
     const scoped = useDocumentScope();
@@ -40,6 +44,19 @@ export function stateHook<Capability, State extends object>(
       const state = capability ? declaration.read(capability) : declaration.empty;
       return select ? select(state) : (state as unknown as Selected);
     }, shallowEqual);
+  };
+  if (!ensure) return useDeclaredState;
+  return function useLoadedState<Selected = State>(select?: (state: State) => Selected): Selected {
+    const scoped = useDocumentScope();
+    const capability = useKernelValue(
+      (kernel) => kernel.tryCapability(declaration.token, scoped ?? undefined),
+      Object.is,
+    );
+    // The state says when the load fails (its status), so the rejection has nothing to add.
+    useEffect(() => {
+      if (capability) ensure(capability).catch(() => {});
+    }, [capability]);
+    return useDeclaredState(select);
   };
 }
 

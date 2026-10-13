@@ -7,7 +7,7 @@
  * so it travels through the module graph like any other code — every bundler
  * splits it into a chunk served from the app's own origin, the CDN snippet
  * carries it as a sibling chunk in its folder, and nothing is fetched from a
- * third party. `stamps.defaultLibrary` overrides that:
+ * third party. `plugins.stamp.standard` overrides that:
  *   - `false`          → no built-in library, no request (air-gapped);
  *   - a URL template   → exactly that (`{locale}` slot), for self-hosted copies.
  *
@@ -25,7 +25,17 @@ import type { StampCapability } from '@embedpdf/react/stamp';
  *  loaded again on every first open, in the locale of that moment). */
 export const DEFAULT_LIBRARY_ID = 'embedpdf-standard';
 
-export type DefaultLibrarySource = false | string | undefined;
+/** Where the standard stamps come from: `plugins.stamp.standard` (`true` or left out: the shipped copy). */
+export type DefaultLibrarySource = boolean | string | undefined;
+
+/** The library a quick stamp's `library:name` names: `standard` is the standard stamps. */
+const STANDARD_LIBRARY_NAME = 'standard';
+
+/** The asset id a `plugins.stamp.quick` entry names: `'standard:Approved'`, or `'<library id>:<name>'`. */
+export function quickStampAssetIdOf(entry: string): string {
+  const prefix = `${STANDARD_LIBRARY_NAME}:`;
+  return entry.startsWith(prefix) ? `${DEFAULT_LIBRARY_ID}:${entry.slice(prefix.length)}` : entry;
+}
 
 /** Which shipped locale to show for the chrome's locale + the browser's. */
 export function resolveStampsLocale(chromeLocale: string): string {
@@ -62,6 +72,7 @@ export function ensureDefaultLibrary(
   source: DefaultLibrarySource,
 ): Promise<void> {
   if (source === false) return Promise.resolve();
+  const url = typeof source === 'string' ? source : undefined;
   const current = loads.get(stamp);
   if (current?.locale === locale) return current.promise;
   const run = async () => {
@@ -70,7 +81,7 @@ export function ensureDefaultLibrary(
     if (loaded?.locale === locale) return;
     if (current && !loaded) return; // removed by the user this session
     if (loaded) await stamp.deleteLibrary(DEFAULT_LIBRARY_ID);
-    await stamp.importLibrary(await defaultLibraryBytes(locale, source));
+    await stamp.importLibrary(await defaultLibraryBytes(locale, url));
   };
   const promise = run();
   loads.set(stamp, { locale, promise });

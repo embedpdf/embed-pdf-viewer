@@ -147,8 +147,8 @@ It comes from the identity in the user's token; see
 
 ## Settings
 
-Set them when you register the plugin. `snap`, `chrome` and `afterCreate` can change while the app
-runs, with `annotation.updateSettings({ … })`; `annotation.resetSettings()` goes back to what you
+Set them when you register the plugin. `snap`, `chrome`, `afterCreate` and `editable` can change
+while the app runs, with `annotation.updateSettings({ … })`; `annotation.resetSettings()` goes back to what you
 registered, and `useAnnotationSettings()` gives you the current settings.
 
 | Setting       | What it does                                                          | Page                                                        |
@@ -157,6 +157,7 @@ registered, and `useAnnotationSettings()` gives you the current settings.
 | `afterCreate` | Select a new annotation? Keep the tool active?                        | [What happens after drawing](annotations/tools#what-happens-after-drawing) |
 | `chrome`      | The selection's outline, handles and rotation handle, and their colors | [Change the handles](annotations/selecting#change-the-handles) |
 | `snap`        | Snapping to other annotations and to angles                           | [Snapping](annotations/selecting#snapping)                  |
+| `editable`    | Which annotations people may change by hand: `true`, `false`, or kinds | [What people may change](annotations/selecting#what-people-may-change) |
 
 Every color in `chrome` can also come from CSS, for dark mode or a different look per viewer: see
 [Colors & theming](ui/theming).

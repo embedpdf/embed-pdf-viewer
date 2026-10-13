@@ -241,7 +241,7 @@ export function addWidget(ctx: ChangeContext, op: Op<'forms.addWidget'>): Done {
     ...objectsOf(before),
     ...[...pages].map((page) => ({ objectNumber: page, deep: [] })),
   ]);
-  const { field, widget } = new FormMutator(ctx.runtime, ctx.session).addWidget(
+  const { field } = new FormMutator(ctx.runtime, ctx.session).addWidget(
     op.field,
     op.placement,
     ctx.signal,
@@ -250,17 +250,22 @@ export function addWidget(ctx: ChangeContext, op: Op<'forms.addWidget'>): Done {
       ...(op.splitObjectNumber !== undefined ? { splitObjectNumber: op.splitObjectNumber } : {}),
     },
   );
+  // The new widget, and a merged field's widget half at its new number: both are new to the
+  // field, and both are the answer's widgets, so a reader knows where the split one went.
   const known = new Set(before.field.widgets.map((w) => w.objectNumber));
-  const made: PendingCapture[] = field.widgets
-    .filter((w) => !known.has(w.objectNumber))
-    .map((w) => ({ objectNumber: w.objectNumber, deep: WIDGET_KEYS, before: null }));
+  const added = field.widgets.filter((w) => !known.has(w.objectNumber));
+  const made: PendingCapture[] = added.map((w) => ({
+    objectNumber: w.objectNumber,
+    deep: WIDGET_KEYS,
+    before: null,
+  }));
   const objects = captureAfter(ctx.runtime, ctx.session, [...pending, ...made]);
   return {
     item: {
       type: 'forms.addWidget',
       ...rows(ctx, {
         field,
-        meta: formMutationMeta(ctx.session.writeStamp(), [field.ref], [widget]),
+        meta: formMutationMeta(ctx.session.writeStamp(), [field.ref], added),
       }),
     },
     reverse: [revertStep('forms.removeWidget', objects, [before.objectNumber])],

@@ -13,7 +13,14 @@ import {
 import type { BoundCommand } from '../src/commands';
 import { i18nPlugin, useI18nState, useT } from '../src/i18n';
 import { epdfTheme } from '../src/theme';
-import { CounterToken, bytesInput, counterPlugin, probe, settle, viewerWith } from './counter-plugin';
+import {
+  CounterToken,
+  bytesInput,
+  counterPlugin,
+  probe,
+  settle,
+  viewerWith,
+} from './counter-plugin';
 
 /**
  * `useCommand(id)`: what a button needs, as a ref, with `run` bound to the
@@ -35,7 +42,7 @@ describe('useCommand', () => {
         commands: [{ id: 'review:approve', label: 'Approve', shortcut: 'Mod+Enter', run }],
       }),
     ];
-    let command: Readonly<Ref<BoundCommand | null>> | null = null;
+    let command: Readonly<Ref<BoundCommand>> | null = null;
     const Probe = probe(() => {
       command = useCommand('review:approve');
     });
@@ -44,20 +51,21 @@ describe('useCommand', () => {
     await settle();
 
     expect(isRef(command)).toBe(true);
-    const bound = command!.value!;
+    const bound = command!.value;
     expect(bound).toMatchObject({ label: 'Approve', enabled: true });
     expect(bound.shortcut).toBe(formatShortcut('Mod+Enter'));
     await bound.run();
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ documentId: 'a' }));
   });
 
-  it('is null for an unknown id, and follows a getter', async () => {
+  it('gives an unknown id as a command that shows nothing, and follows a getter', async () => {
     const id = ref('nope');
+    // What a button for the command shows: its label while it's visible, else nothing.
     const renders: (string | null)[] = [];
     const Probe = probe(() => {
       const command = useCommand(() => id.value);
       return () => {
-        renders.push(command.value?.label ?? null);
+        renders.push(command.value.visible ? command.value.label : null);
         return null;
       };
     });
@@ -180,7 +188,11 @@ describe('useI18nState and useT', () => {
       const t = useT();
       const { locale, direction } = useI18nState();
       return () => {
-        renders.push({ locale: locale.value, direction: direction.value, label: t('commands.zoom.in') });
+        renders.push({
+          locale: locale.value,
+          direction: direction.value,
+          label: t('commands.zoom.in'),
+        });
         return null;
       };
     });

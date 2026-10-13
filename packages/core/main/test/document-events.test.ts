@@ -73,6 +73,7 @@ function fakeEngine(initialPages: PageLayout[]): { engine: Engine; events: FakeE
     close: () => AbortablePromise.resolveValue<void>(undefined),
   } as unknown as DocumentHandle;
   const engine: Engine = {
+    canOpenFiles: true,
     open: () => AbortablePromise.resolveValue(handle),
     destroy: () => AbortablePromise.resolveValue<void>(undefined),
   };

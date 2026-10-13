@@ -8,7 +8,7 @@
 
   import '../layer.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), metadataPlugin()];
 
   // The original stays as it is: the document opens with a layer over it, and the changes go there.

@@ -7,6 +7,7 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { measureFromKnownLength, measurementReadout } from '../measure';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /** Shared numerical, persistence and calibration contract for local and HTTP engines. */
 export function runMeasurementConformance(
@@ -24,7 +25,10 @@ export function runMeasurementConformance(
     });
     const open = async () =>
       opts.openKind === 'bytes'
-        ? engine.open({ kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() })
+        ? engine.open(
+            { kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() },
+            EVERY_PERMISSION,
+          )
         : engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
     const scale = measureFromKnownLength(100, { value: 3, unit: 'm' });
     const vertices = [
@@ -130,7 +134,10 @@ export function runMeasurementConformance(
         const bytes = opts.openKind === 'bytes' ? await doc.download() : undefined;
         await doc.close();
         doc = bytes
-          ? await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-saved`, bytes })
+          ? await engine.open(
+              { kind: 'bytes', id: `${opts.fixture.id}-saved`, bytes },
+              EVERY_PERMISSION,
+            )
           : await open();
         const page = doc.page((await doc.pages.list()).pages[0].ref);
         const list = (await page.annotations.list()).annotations;

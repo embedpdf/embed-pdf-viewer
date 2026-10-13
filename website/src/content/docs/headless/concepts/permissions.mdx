@@ -93,8 +93,11 @@ when one needs something else:
 Code that opens documents itself passes the same options to
 `documents.open(source, { scope, identity })`.
 
-Leave `scope` out and the user may do everything, with a warning in the console. That's handy while
-you build, but pass the scope your users will really get, so the checks show you the UI they'll see.
+Leave `scope` out and the user may do what the file allows, as in Acrobat: everything, unless the
+PDF has restrictions of its own, such as no printing. That's `pdf.permissions` plus what no PDF
+flag governs: downloading, importing annotations and form data, running and submitting a form,
+certifying the document, and putting annotations and fields in any group. Pass the scope your users will really get, so the
+checks show you the UI they'll see.
 
 <CloudPdfCallout
   title="Limits that hold on the server"

@@ -81,7 +81,9 @@ function setLink(event: Event) {
     :value="lineEnd"
     @change="setLineEnd"
   >
-    <option v-for="option in property.options" :key="option">{{ option }}</option>
+    <option v-for="option in property.options" :key="option.value" :value="option.value">
+      {{ option.label }}
+    </option>
   </select>
   <select
     v-else-if="property.control === 'choice' && property.key === 'borderStyle'"
@@ -91,7 +93,9 @@ function setLink(event: Event) {
     @change="setBorder"
   >
     <option v-if="isMixed" value="">mixed</option>
-    <option v-for="option in property.options" :key="option">{{ option }}</option>
+    <option v-for="option in property.options" :key="option.value" :value="option.value">
+      {{ option.label }}
+    </option>
   </select>
   <select
     v-else-if="property.control === 'choice'"
@@ -101,7 +105,9 @@ function setLink(event: Event) {
     @change="update(valueOf($event))"
   >
     <option v-if="isMixed" value="">mixed</option>
-    <option v-for="option in property.options" :key="option">{{ option }}</option>
+    <option v-for="option in property.options" :key="option.value" :value="option.value">
+      {{ option.label }}
+    </option>
   </select>
   <input
     v-else-if="property.control === 'flag'"

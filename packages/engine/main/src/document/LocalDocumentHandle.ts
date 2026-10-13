@@ -4,6 +4,8 @@ import {
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
+  EventHub,
+  SessionEventPublisher,
   wirePack,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -28,7 +30,6 @@ import {
   type WorkingSetPage,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
-import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
 import type { ScopeGuard } from '../scope';

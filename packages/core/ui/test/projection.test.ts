@@ -34,21 +34,21 @@ describe('projectOverflow', () => {
       id: 'main',
       sections: {
         start: [
-          group('workspace', [
-            item('panel:sidebar', { importance: 5 }), // pinned — stays in the bar
-            item('page:settings'),
+          group('view', [
+            item('panel:thumbnails', { importance: 5 }), // pinned — stays in the bar
+            item('menu:view'),
           ]),
         ],
         center: [
-          group('zoom', [custom('zoom-controls', 'zoom:menu', { variants: ['inline'] })]),
-          group('tools', ['pan:toggle', 'pointer:toggle']),
+          group('zoom', [custom('zoom', 'menu:zoom', { variants: ['inline'] })]),
+          group('tools', ['tool:pan', 'tool:pointer']),
         ],
       },
     });
     const resolve: ResolveMenuTarget = (id) =>
       ({
-        'page:settings': { menu: 'page-settings' },
-        'zoom:menu': { menu: 'zoom' },
+        'menu:view': { menu: 'view' },
+        'menu:zoom': { menu: 'zoom' },
       })[id] ?? {};
 
     // Budget forces everything non-pinned into overflow: pinned icon (40) +
@@ -60,19 +60,19 @@ describe('projectOverflow', () => {
       {
         labelKey: undefined,
         role: undefined,
-        rows: [{ type: 'submenu', command: 'page:settings', menu: 'page-settings' }],
+        rows: [{ type: 'submenu', command: 'menu:view', menu: 'view' }],
       },
       {
         labelKey: undefined,
         role: undefined,
-        rows: [{ type: 'submenu', command: 'zoom:menu', menu: 'zoom' }],
+        rows: [{ type: 'submenu', command: 'menu:zoom', menu: 'zoom' }],
       },
       {
         labelKey: undefined,
         role: undefined,
         rows: [
-          { type: 'command', command: 'pan:toggle' },
-          { type: 'command', command: 'pointer:toggle' },
+          { type: 'command', command: 'tool:pan' },
+          { type: 'command', command: 'tool:pointer' },
         ],
       },
     ]);
@@ -134,17 +134,17 @@ describe('projectOverflow', () => {
     const bar = normalizeBar({
       id: 'b',
       sections: {
-        start: [group('zoom', [custom('zoom-controls', 'zoom:menu', { importance: 1 })])],
+        start: [group('zoom', [custom('zoom', 'menu:zoom', { importance: 1 })])],
         end: [group('other', [item('keep', { importance: 5 })])],
       },
     });
-    // 89 < zoom-controls + keep + gap (90): the low-importance custom item sheds.
+    // 89 < zoom + keep + gap (90): the low-importance custom item sheds.
     const fit = solve(bar, metrics, 89);
     expect(projectOverflow(bar, fit, () => ({ menu: 'zoom' }))).toEqual([
       {
         labelKey: undefined,
         role: undefined,
-        rows: [{ type: 'submenu', command: 'zoom:menu', menu: 'zoom' }],
+        rows: [{ type: 'submenu', command: 'menu:zoom', menu: 'zoom' }],
       },
     ]);
   });
@@ -198,7 +198,7 @@ describe('projectStrip', () => {
   // The annotation strip: actions + a separated danger group, visibility
   // decided per-command by the registry (group only when groupable, …).
   const strip = normalizeBar({
-    id: 'annotation-strip',
+    id: 'annotation',
     sections: {
       center: [
         group('actions', ['annotation:comment', 'annotation:style', 'annotation:group']),
@@ -233,11 +233,28 @@ describe('projectStrip', () => {
     const bar = normalizeBar({
       id: 'b',
       sections: {
-        start: [group('g', [custom('zoom-controls', 'zoom:menu'), 'zoom:in'])],
+        start: [group('g', [custom('zoom', 'menu:zoom'), 'zoom:in'])],
       },
     });
     expect(projectStrip(bar, () => true)).toEqual([
-      { id: 'g', labelKey: undefined, commands: ['zoom:menu', 'zoom:in'] },
+      { id: 'g', labelKey: undefined, commands: ['menu:zoom', 'zoom:in'] },
     ]);
+  });
+});
+
+describe('projectStrip with dependent groups', () => {
+  const strip = normalizeBar({
+    id: 'strip',
+    sections: {
+      center: [
+        group('actions', ['annotation:comment']),
+        group('history', ['history:undo'], { dependent: true }),
+      ],
+    },
+  });
+
+  it('shows them beside a group that is not dependent, and projects [] without one', () => {
+    expect(projectStrip(strip, () => true).map((each) => each.id)).toEqual(['actions', 'history']);
+    expect(projectStrip(strip, (id) => id === 'history:undo')).toEqual([]);
   });
 });

@@ -4,6 +4,7 @@
  *   withShell()                            the plugin, for provideEmbedPdf()
  *   inject(EpdfShell), shell.surface(id)   the open panels and menus, as signals and calls
  *   <button epdfPanelToggle="comments">    a button that opens and closes a panel
+ *   <input epdfSurfaceFocus="search">      an element that takes the cursor when its panel asks
  */
 
 // The plugin's types and helpers, so app code has one import for the feature.

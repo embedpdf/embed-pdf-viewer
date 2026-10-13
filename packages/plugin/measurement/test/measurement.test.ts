@@ -364,6 +364,28 @@ describe('page viewports from the engine', () => {
     expect(measurement.getPageScale(PAGE).error).toBeUndefined();
   });
 
+  it('drops a read the closing document cut short, writing nothing once it closed', async () => {
+    const { ctx, service } = harness({ engine: true });
+    await settle();
+    let fail: (error: Error) => void = () => {};
+    service.listViewports.mockImplementationOnce(
+      () => new Promise((_resolve, reject) => (fail = reject)),
+    );
+    ctx.emitDocumentEvent({
+      type: 'pages.scaleSet',
+      page: PAGE,
+      meta: { affectedPages: [], cacheDelta: null },
+      origin: REMOTE_ORIGIN,
+    } as never);
+    await settle();
+    await ctx.dispose();
+    // The kernel reports a write into a closed instance (`instance-closed`); none may come.
+    const written = vi.spyOn(ctx.state, 'update');
+    fail(new Error('document closed'));
+    await settle();
+    expect(written).not.toHaveBeenCalled();
+  });
+
   it('rejects loading a page that is not in the document', async () => {
     const { measurement } = harness({ engine: true });
     await expect(measurement.ensureLoaded(toPageRef(99))).rejects.toMatchObject({

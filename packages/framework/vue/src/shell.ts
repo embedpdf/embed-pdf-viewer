@@ -12,11 +12,12 @@
 
 // One line per feature: registration travels with the UI.
 export * from '@embedpdf/plugin-shell';
-import { toValue } from 'vue';
+import { toValue, watch } from 'vue';
 import type { MaybeRefOrGetter, Ref } from 'vue';
 import { ShellToken, shellState } from '@embedpdf/plugin-shell';
 import type { OpenSurfaceOptions, ShellCapability, SurfaceProps } from '@embedpdf/plugin-shell';
 import type { EventHook } from '@embedpdf/core';
+import { createSurfaceFocusFollower, type SurfaceFocusOptions } from '@embedpdf/web';
 import {
   useCapability,
   useCapabilityEvent,
@@ -79,4 +80,34 @@ export function useSurface(id: MaybeRefOrGetter<string>): SurfaceHandle {
     close: () => shell.value?.close(toValue(id)),
     toggle: (options?: OpenSurfaceOptions) => shell.value?.toggle(toValue(id), options),
   });
+}
+
+export type { SurfaceFocusOptions };
+
+/**
+ * Put the cursor in an element when the surface `id` asks for it: on every
+ * `open(id, { focus: true })`, a command whose panel says `focus` among them, and
+ * when the element mounts while the request is up (the panel opened, or its code
+ * loaded, because of it). A plain open never moves it. `element` is a template
+ * ref (`useTemplateRef('field')`); `select` selects an input's text, so typing
+ * replaces it. Reads the surface of this subtree's document.
+ */
+export function useSurfaceFocus(
+  id: MaybeRefOrGetter<string>,
+  element: MaybeRefOrGetter<HTMLElement | null | undefined>,
+  options: SurfaceFocusOptions = {},
+): void {
+  const shell = useOptionalCapability(ShellToken);
+  const request = useOptionalSelector(
+    ShellToken,
+    (current) => current.getSurface(toValue(id))?.focusRequest ?? 0,
+    0,
+  );
+  const follower = createSurfaceFocusFollower();
+  // After the DOM updates, so an element that has just mounted is there to take focus.
+  watch(
+    () => [toValue(element) ?? null, shell.value, request.value] as const,
+    ([target, current, value]) => follower.follow(target, current, value, options),
+    { flush: 'post', immediate: true },
+  );
 }

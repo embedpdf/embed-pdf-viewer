@@ -9,7 +9,7 @@ import Views from './Views.vue';
 
 import '../two-views.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 const plugins = [
   stagePlugin(), // the main view

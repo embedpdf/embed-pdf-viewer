@@ -9,7 +9,7 @@ import SearchWithOptions from './SearchWithOptions.vue';
 
 import '../options.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };

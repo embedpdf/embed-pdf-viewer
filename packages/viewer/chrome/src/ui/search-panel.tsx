@@ -26,7 +26,9 @@ import {
 } from '@embedpdf/react/search';
 import type { SearchHit, SearchQuery, SearchSnippet } from '@embedpdf/react/search';
 import { useT } from '@embedpdf/react/i18n';
+import { useSurfaceFocus } from '@embedpdf/react/shell';
 import { Icon } from './icons';
+import { useCloseOnPick } from './panel-frame';
 import { buttonClass } from './toolbar';
 
 const DEBOUNCE_MS = 300;
@@ -56,7 +58,7 @@ function Checkbox({
           type="checkbox"
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
-          className="border-border bg-surface checked:border-accent checked:bg-accent peer h-4 w-4 shrink-0 appearance-none rounded-[3px] border transition-colors"
+          className="border-border bg-surface checked:border-accent checked:bg-accent rounded-xs peer h-4 w-4 shrink-0 appearance-none border transition-colors"
         />
         <svg
           viewBox="0 0 24 24"
@@ -123,6 +125,8 @@ export function SearchPanel() {
   const search = useSearch();
   const { query, status, hitCount, activeHitIndex } = useSearchState();
   const hits = useSearchHits();
+  // A sheet or an overlay closes once a match is picked, so you see it on its page.
+  const closeOnPick = useCloseOnPick();
 
   // `query` is the document-scoped stored search (survives the sidebar
   // closing). The box is a controlled draft that starts from it; the panel is
@@ -133,6 +137,8 @@ export function SearchPanel() {
   const [wholeWord, setWholeWord] = useState(() => query?.wholeWord ?? false);
   const [regex, setRegex] = useState(() => query?.regex ?? false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Find and the Search button ask for the cursor: it goes in the field, the text selected.
+  useSurfaceFocus('search', inputRef, { select: true });
 
   // The draft is a SearchQuery — same shape the engine matches on.
   const draftQuery: SearchQuery = { text: draft, regex, matchCase, wholeWord };
@@ -171,7 +177,7 @@ export function SearchPanel() {
       <div className="p-3">
         {/* input: magnifier + clear */}
         <div className="relative">
-          <div className="text-fg-muted pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+          <div className="text-fg-muted pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2.5">
             <Icon name="search" size={16} />
           </div>
           <input
@@ -180,7 +186,7 @@ export function SearchPanel() {
             value={draft}
             placeholder={t('demo.searchPlaceholder')}
             onChange={(event) => setDraft(event.target.value)}
-            className={`bg-surface text-fg w-full rounded-md border py-1.5 pl-8 pr-9 text-sm outline-none focus:ring-1 ${
+            className={`bg-surface text-fg w-full rounded-md border py-1.5 pe-9 ps-8 text-sm outline-none focus:ring-1 ${
               validation.ok
                 ? 'border-border focus:border-accent focus:ring-accent'
                 : 'border-red-400 focus:border-red-400 focus:ring-red-400'
@@ -193,7 +199,7 @@ export function SearchPanel() {
                 setDraft('');
                 inputRef.current?.focus();
               }}
-              className="text-fg-muted hover:text-fg-secondary absolute inset-y-0 right-0 flex items-center pr-2.5"
+              className="text-fg-muted hover:text-fg-secondary absolute inset-y-0 end-0 flex items-center pe-2.5"
             >
               <Icon name="x" size={16} />
             </button>
@@ -228,19 +234,19 @@ export function SearchPanel() {
               <div className="flex items-center">
                 <button
                   type="button"
-                  title="Previous"
+                  title={t('demo.searchPrevious')}
                   className={buttonClass(false)}
                   onClick={() => search.previousHit()}
                 >
-                  <Icon name="chevronLeft" size={20} />
+                  <Icon name="chevronLeft" size={20} className="rtl:-scale-x-100" />
                 </button>
                 <button
                   type="button"
-                  title="Next"
+                  title={t('demo.searchNext')}
                   className={buttonClass(false)}
                   onClick={() => search.nextHit()}
                 >
-                  <Icon name="chevronRight" size={20} />
+                  <Icon name="chevronRight" size={20} className="rtl:-scale-x-100" />
                 </button>
               </div>
             )}
@@ -261,7 +267,10 @@ export function SearchPanel() {
                   key={index}
                   hit={hit}
                   active={index === activeHitIndex}
-                  onClick={() => search.goToHit(index)}
+                  onClick={() => {
+                    search.goToHit(index);
+                    closeOnPick();
+                  }}
                 />
               ))}
             </div>

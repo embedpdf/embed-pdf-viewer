@@ -8,7 +8,7 @@
 
   import '../run-from-code.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), actionsPlugin()];
 
   const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };

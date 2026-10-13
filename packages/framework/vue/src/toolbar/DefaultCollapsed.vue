@@ -7,10 +7,11 @@ import { computed, ref } from 'vue';
 import DefaultOverflowMenu from './DefaultOverflowMenu.vue';
 import DefaultOverflowTrigger from './DefaultOverflowTrigger.vue';
 import { groupMenuView } from '@embedpdf/core-ui';
+import type { Orientation } from '@embedpdf/web';
 import type { CollapsedGroupView } from './views';
 import { BORDER, SURFACE } from './paint';
 
-const props = defineProps<{ view: CollapsedGroupView }>();
+const props = defineProps<{ view: CollapsedGroupView; orientation: Orientation }>();
 
 const active = computed(() => props.view.commands.find((command) => command.active)?.id ?? '');
 
@@ -46,6 +47,6 @@ function onChange(event: Event) {
   </select>
   <span v-else :style="{ position: 'relative', display: 'inline-flex' }">
     <DefaultOverflowTrigger :is-open="isOpen" @toggle="isOpen = !isOpen" />
-    <DefaultOverflowMenu :view="menu" />
+    <DefaultOverflowMenu :view="menu" :orientation="orientation" />
   </span>
 </template>

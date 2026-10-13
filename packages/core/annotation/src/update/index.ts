@@ -16,7 +16,7 @@
  *   text.ts                     free-text typing
  *   session.ts                  the session itself: defaults, forget
  */
-import { annotContentsEditable } from '../flags';
+import { isContentsEditableByHand } from '../editable';
 import { expandGroups } from '../group';
 import { isSelectable } from '../hit';
 import { annotationPatchBetween, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
@@ -107,6 +107,7 @@ const SESSION_FIELDS = {
   hitMargin: true,
   editing: true,
   snap: true,
+  editable: true,
 } satisfies Record<keyof Session, true>;
 
 const SESSION_KEYS = Object.keys(SESSION_FIELDS) as (keyof Session)[];
@@ -121,6 +122,7 @@ const sessionOf = (model: Model): Session => ({
   hitMargin: model.hitMargin,
   editing: model.editing,
   snap: model.snap,
+  editable: model.editable,
 });
 
 /** True when every session field is the same value: a message that changed nothing. */
@@ -247,9 +249,10 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
       // this fires at enter/leave cadence only.
       return model.hovered === message.id ? [model, []] : [{ ...model, hovered: message.id }, []];
     case 'beginTextEdit':
-      // `lockedContents` (or an inert `/F` state) blocks entering text edit —
-      // the geometry gates don't apply here: locked-only contents still edit.
-      return model.byId[message.id] && annotContentsEditable(model.byId[message.id]!)
+      // `lockedContents` (or an inert `/F` state) blocks entering text edit, and
+      // so does the `editable` rule; the geometry gates don't apply here:
+      // locked-only contents still edit.
+      return model.byId[message.id] && isContentsEditableByHand(model, model.byId[message.id]!)
         ? [{ ...model, editing: message.id, selected: [message.id], draft: null }, []]
         : [model, []];
     case 'setText':

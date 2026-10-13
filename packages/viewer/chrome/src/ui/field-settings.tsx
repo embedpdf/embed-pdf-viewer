@@ -1,13 +1,20 @@
 /**
- * The style panel's Field section: the settings of the one field whose widget
- * is selected in design mode, as the form plugin describes them
- * (`getFieldSettings`), written with `form.update()`. Nothing here knows a
- * field family: the description says what to draw.
+ * A field's settings, as the form plugin describes them (`getFieldSettings`),
+ * written with `form.update()`: the form designer's sidebar shows them for the
+ * selected field. Nothing here knows a field family: the description says what
+ * to draw.
  */
-import { FormToken, type FormFieldPatch, type FormFieldSetting } from '@embedpdf/react/form';
+import {
+  FormToken,
+  type FormFieldDTO,
+  type FormFieldPatch,
+  type FormFieldSetting,
+} from '@embedpdf/react/form';
 import { useT } from '@embedpdf/react/i18n';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { useEffect, useState } from 'react';
+
+import { useLabel } from './labels';
 
 const inputClass = 'border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm';
 
@@ -17,24 +24,20 @@ interface Option {
   readonly value: string;
 }
 
-export function FieldSettingsSection() {
-  const t = useT();
+/** The field's settings, each with the control its description names. */
+export function FieldSettings({ field }: { field: FormFieldDTO }) {
   const form = useOptionalCapability(FormToken);
-  const field = useOptionalSelector(FormToken, (capability) => capability.getSelectedField(), null);
   const settings = useOptionalSelector(
     FormToken,
-    (capability) => (field ? capability.getFieldSettings(field.ref) : null),
+    (capability) => capability.getFieldSettings(field.ref),
     null,
   );
-  if (!form || !field || !settings || !form.canDesign()) return null;
+  if (!form || !settings || !form.canDesign()) return null;
   const write = (patch: Record<string, unknown>) =>
     void form.update(field.ref, patch as FormFieldPatch).catch(() => undefined);
 
   return (
-    <div className="border-border-subtle mt-4 border-t pt-4">
-      <p className="text-fg-muted mb-3 text-[11px] font-semibold uppercase tracking-wide">
-        {t('demo.fieldSettingsTitle')}
-      </p>
+    <div>
       {settings.properties.map((spec) => (
         <SettingControl
           key={`${spec.key}:${spec.control}`}
@@ -61,6 +64,7 @@ function SettingControl({
   onChange: (value: unknown) => void;
 }) {
   const t = useT();
+  const label = useLabel();
   switch (spec.control) {
     case 'flag':
       return (
@@ -70,12 +74,12 @@ function SettingControl({
             checked={value === true}
             onChange={(event) => onChange(event.target.checked)}
           />
-          {spec.label}
+          {label(spec)}
         </label>
       );
     case 'text':
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <CommittedInput
             key={fieldKey}
             value={typeof value === 'string' ? value : ''}
@@ -85,7 +89,7 @@ function SettingControl({
       );
     case 'number':
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <CommittedInput
             key={fieldKey}
             type="number"
@@ -98,7 +102,7 @@ function SettingControl({
       );
     case 'choice':
       return spec.free ? (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <CommittedInput
             key={fieldKey}
             list={`${fieldKey}-choices`}
@@ -112,7 +116,7 @@ function SettingControl({
           </datalist>
         </Setting>
       ) : (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <select
             className={inputClass}
             value={typeof value === 'string' ? value : ''}
@@ -130,7 +134,7 @@ function SettingControl({
     case 'choices': {
       const chosen = new Set(Array.isArray(value) ? (value as string[]) : []);
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           {spec.options.map((option) => (
             <label key={option} className="text-fg mb-1 flex items-center gap-2 text-sm">
               <input
@@ -152,7 +156,7 @@ function SettingControl({
     }
     case 'options':
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <OptionsEditor
             key={fieldKey}
             options={Array.isArray(value) ? (value as Option[]) : []}

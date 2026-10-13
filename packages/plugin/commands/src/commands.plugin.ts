@@ -35,5 +35,6 @@ export const commandsPlugin = (config?: CommandsConfig) =>
       execute: (id, options) =>
         commands.execute(id, { ...options, documentId: options?.documentId ?? documentId }),
       canExecute: (id, target = documentId) => commands.canExecute(id, target),
+      getRefusal: (id, target = documentId) => commands.getRefusal(id, target),
     }),
   });

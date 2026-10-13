@@ -12,11 +12,12 @@ import type {
   DeepPartial,
   EventHook,
   OperationOptions,
+  Permission,
   PluginErrorInfo,
   SettingsApi,
   Unsubscribe,
 } from '@embedpdf/core';
-import { formatShortcut } from '@embedpdf/core-ui';
+import { didYouMean, formatShortcut } from '@embedpdf/core-ui';
 
 export { CommandsToken } from './token';
 
@@ -67,8 +68,37 @@ export interface CommandDef {
   readonly iconAccent?: (context: CommandContext) => IconAccent | null;
   /** A key such as `'Mod+K'` (`Mod` is Cmd on a Mac, Ctrl elsewhere), or a list of them. */
   readonly shortcut?: string | readonly string[];
-  /** Groups you can turn off together: a command in a disabled category is hidden and disabled. */
+  /**
+   * Whether its shortcut also runs while the cursor is in a text field where the shortcuts
+   * listen (a search box, a comment), as the viewer's Find does. Default false: a key typed in
+   * a field is the field's.
+   */
+  readonly shortcutInTextFields?: boolean;
+  /**
+   * The features it belongs to, so turning one off turns it off: `['annotations.highlight']`.
+   * Turning off a feature turns off every feature under it, on whole dotted parts: `annotations`
+   * covers `annotations.highlight`, not `annotationsExtra`.
+   */
   readonly categories?: readonly string[];
+  /**
+   * The scope permissions it needs, such as `'doc.annotate.modify'`, checked against its
+   * document. Without them it's hidden, or shown disabled with its reason under the
+   * `notAllowed: 'disable'` setting. With no document open there is nothing to check.
+   */
+  readonly requires?: readonly Permission[];
+  /**
+   * Whether the session may run it, from the plugins' `can*` checks
+   * (`documents.canPrint()`), for a command whose permission is a plugin's to know. When it
+   * says no, the command isn't allowed, as with `requires`. Asked only while a document is
+   * open; one that throws allows it.
+   */
+  readonly allowed?: (context: CommandContext) => boolean;
+  /**
+   * The translation key of the sentence that says why `allowed` refused it, with `{label}` for
+   * its label: `'commands.notAllowed.doc-print'`. Without it, or a string for it,
+   * `commands.notAllowed.default`.
+   */
+  readonly notAllowedKey?: string;
 
   // ── what the command opens ───────────────────────────────────────────────
   // A command that opens a panel, menu or dialog says so instead of opening
@@ -76,8 +106,13 @@ export interface CommandDef {
   // is open, and a button can show that it opens a menu.
   /** Opens and closes a menu of yours, by its id. */
   readonly menu?: string;
-  /** Opens and closes a panel, closing the others with the same `exclusive` tag. */
-  readonly panel?: string | { readonly id: string; readonly exclusive?: string };
+  /**
+   * Opens and closes a panel, closing the others with the same `exclusive` tag. With `focus`,
+   * opening it asks for the cursor (the shell's `open(id, { focus: true })`).
+   */
+  readonly panel?:
+    | string
+    | { readonly id: string; readonly exclusive?: string; readonly focus?: boolean };
   /** Opens and closes a dialog; one dialog is open at a time. */
   readonly modal?: string;
 
@@ -119,6 +154,22 @@ export interface ResolvedCommand {
   readonly active: boolean;
   readonly visible: boolean;
   readonly categories: readonly string[];
+  /**
+   * Why it's disabled, as a sentence for its tooltip: set when the scope doesn't allow it and
+   * the `notAllowed` setting is `'disable'`.
+   */
+  readonly disabledReason?: string;
+}
+
+/**
+ * Why a command won't run whatever the moment: it's turned off in this viewer
+ * (`disabledCategories`, `disabledCommands`), or the scope doesn't allow it (`requires`).
+ * A command that only can't run right now (`enabled`, `visible`) has no refusal.
+ */
+export interface CommandRefusal {
+  readonly reason: 'turned-off' | 'not-allowed';
+  /** A sentence for the user, translated through the i18n plugin when it's there. */
+  readonly message: string;
 }
 
 /**
@@ -141,21 +192,29 @@ export const resolvedCommandsEqual = (
     left.enabled === right.enabled &&
     left.active === right.active &&
     left.visible === right.visible &&
+    left.disabledReason === right.disabledReason &&
     left.shortcuts.length === right.shortcuts.length &&
     left.shortcuts.every((shortcut, index) => shortcut === right.shortcuts[index])
   );
 };
 
-/** What a toolbar draws for a command id no plugin registered: disabled, with its id as the label. */
+/**
+ * What a component or a toolbar draws for a command id no plugin registered: labelled with its
+ * id, neither enabled nor visible, the way a turned-off command is.
+ */
 export const unregisteredCommand = (id: CommandId): ResolvedCommand => ({
   id,
   label: id,
   shortcuts: [],
   enabled: false,
   active: false,
-  visible: true,
+  visible: false,
   categories: [],
 });
+
+/** What a component that asks for an id no plugin registered hears, in development. */
+export const unknownCommandWarning = (id: CommandId, known: Iterable<CommandId>): string =>
+  `no command "${id}"${didYouMean(id, known)}: it shows as neither visible nor enabled`;
 
 /** A command with everything a button needs: what it shows, `run`, and its shortcut for a tooltip. */
 export interface BoundCommand extends ResolvedCommand {
@@ -190,14 +249,29 @@ export function boundCommandOf(
 export interface CommandsSettings {
   /** The commands your viewer has. A later definition with an id that's taken replaces the earlier one. */
   readonly commands: readonly (CommandDef | CommandFamily)[];
-  /** Categories turned off: their commands are hidden and disabled wherever they appear. */
+  /**
+   * Categories turned off, with every category under them: their commands are hidden and
+   * refused wherever they appear.
+   */
   readonly disabledCategories: readonly string[];
+  /** Commands turned off one by one, by id: hidden and refused wherever they appear. */
+  readonly disabledCommands: readonly CommandId[];
+  /**
+   * What a command the scope doesn't allow does: `'hide'` leaves it out, `'disable'` shows it
+   * disabled, with the reason in its `disabledReason`.
+   */
+  readonly notAllowed: NotAllowedMode;
 }
+
+/** How a command shows when the scope doesn't allow it: hidden, or disabled with its reason. */
+export type NotAllowedMode = 'hide' | 'disable';
 
 /** What the commands settings are when the app registers none. */
 export const COMMANDS_DEFAULTS: CommandsSettings = {
   commands: [],
   disabledCategories: [],
+  disabledCommands: [],
+  notAllowed: 'hide',
 };
 
 /** What `commandsPlugin(config)` takes: any of the settings, merged over the defaults. */
@@ -270,24 +344,39 @@ export interface CommandsCapability extends SettingsApi<CommandsSettings> {
   /**
    * Run a command; resolves once its `run` has, with `{ status: 'executed' }` and
    * `onExecuted`, or `{ status: 'rejected', reason }` for a command that is unknown, hidden or
-   * disabled. A `run` that throws fires `onExecutionFailed` and rejects with its `PluginError`;
+   * disabled (a command turned off is hidden). A `run` that throws fires `onExecutionFailed` and rejects with its `PluginError`;
    * the signal rejects `operation-cancelled`.
    */
   execute(id: CommandId, options?: ExecuteOptions): Promise<ExecuteResult>;
   /** Whether a command can run now: it exists, and is enabled and visible. */
   canExecute(id: CommandId, documentId?: string): boolean;
+  /**
+   * Why a command won't run whatever the moment: it's turned off, or not allowed for its
+   * document. `null` when it may run (or only can't right now), and for an unknown id.
+   */
+  getRefusal(id: CommandId, documentId?: string): CommandRefusal | null;
 
-  // ── categories ──
+  // ── turning commands off ──
   /** The categories turned off. */
   getDisabledCategories(): readonly string[];
-  /** Whether a category is turned off. */
+  /** Whether a category is turned off: it, or a category it's under (`annotations` for `annotations.highlight`). */
   isCategoryDisabled(category: string): boolean;
-  /** Turn a category off: the `disabledCategories` setting gains it. */
+  /** Turn a category off, with every category under it: the `disabledCategories` setting gains it. */
   disableCategory(category: string): void;
   /** Turn a category on again. */
   enableCategory(category: string): void;
   /** Replace the categories that are off. */
   setDisabledCategories(categories: readonly string[]): void;
+  /** The commands turned off one by one. */
+  getDisabledCommands(): readonly CommandId[];
+  /** Whether a command is turned off: by its id, or through one of its categories. */
+  isCommandDisabled(id: CommandId): boolean;
+  /** Turn one command off: the `disabledCommands` setting gains it. */
+  disableCommand(id: CommandId): void;
+  /** Turn a command on again; it stays off while one of its categories is. */
+  enableCommand(id: CommandId): void;
+  /** Replace the commands that are off one by one. */
+  setDisabledCommands(ids: readonly CommandId[]): void;
 
   // ── events ──
   /** A command ran. */

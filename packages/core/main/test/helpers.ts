@@ -46,6 +46,7 @@ export function makeHandle(id: string, pages: PageLayout[] = [page(1, 0)]): Docu
 
 export function immediateEngine(handles: Record<string, DocumentHandle> = {}): Engine {
   return {
+    canOpenFiles: true,
     open: (input: { id?: string }) => {
       const id = input.id ?? 'doc';
       return Promise.resolve(handles[id] ?? makeHandle(id));

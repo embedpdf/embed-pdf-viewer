@@ -9,7 +9,7 @@
 
   import '../accent.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
   const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];

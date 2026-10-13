@@ -50,15 +50,17 @@ export function createWidgetPictures(
   );
   return {
     epoch: (page) => epochOn(page.objectNumber),
-    render: (page, scale, signal) =>
-      render
-        ? render.renderAppearances(page, {
+    render: (page, scale, signal) => {
+      const renderer = render();
+      return renderer
+        ? renderer.renderAppearances(page, {
             family: 'widgets',
             scale,
             items: itemsOn(page.objectNumber),
             ...(signal ? { signal } : {}),
           })
-        : Promise.resolve(NO_PICTURES),
+        : Promise.resolve(NO_PICTURES);
+    },
     versionOf: (widget) =>
       widget.kind === 'objectNumber' ? pictureVersionOf(fields.get(), widget.objectNumber) : 0,
   };

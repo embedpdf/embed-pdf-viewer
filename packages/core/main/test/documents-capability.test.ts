@@ -130,6 +130,27 @@ describe('open()', () => {
   });
 });
 
+describe('canOpenFiles()', () => {
+  it('is true with an engine that opens a file’s bytes, in a document’s scope too', async () => {
+    const kernel = createKernel({ engine: immediateEngine(), plugins: [] });
+    expect(kernel.documents.canOpenFiles()).toBe(true);
+    await kernel.documents.open(bytesInput('a'));
+    expect(kernel.capability(DocumentsToken, 'a').canOpenFiles()).toBe(true);
+  });
+
+  it('is false with an engine that opens only what a server holds, whose open() refuses a file', async () => {
+    // The cloud engine's answer to bytes.
+    const open = vi.fn(async () => {
+      throw new Error("the engine opens 'token', 'id' or 'share'");
+    });
+    const engine = { canOpenFiles: false, open, destroy: async () => {} } as unknown as Engine;
+    const kernel = createKernel({ engine, plugins: [] });
+    expect(kernel.documents.canOpenFiles()).toBe(false);
+    await expect(kernel.documents.open(bytesInput('a'))).rejects.toBeDefined();
+    expect(kernel.documents.get('a')?.status).toBe('error');
+  });
+});
+
 describe('the viewer’s scope and identity', () => {
   it('every document opens with them, unless it has its own, which replace them', async () => {
     const open = vi.fn(async (input: { id: string }, _options?: object) => makeHandle(input.id));

@@ -12,9 +12,10 @@
  *     the snapshot plus react's way of knowing when it changed.
  *   - <Anchored> renders at the projected position, flips to the other
  *     side and stays inside the view once it knows its size (unless
- *     pinned), isolates pointer events, and portals when the space demands
- *     it. On a page that isn't shown it renders nothing and doesn't follow
- *     the camera at all (see {@link ShownPages}).
+ *     pinned), says where it sits in `data-placement`, isolates pointer
+ *     events, and portals when the space demands it. On a page that isn't
+ *     shown it renders nothing and doesn't follow the camera at all (see
+ *     {@link ShownPages}).
  *
  * The scheduling law (this is what keeps menus glued to the content): a
  * state-driven projection change (the Stage camera) reaches consumers as a
@@ -134,6 +135,9 @@ export interface AnchoredProps {
  * is in scope. Projection runs during render from the shared pure helper.
  * Once the content's size is measured, it flips to the opposite side when
  * the chosen one has no room, and stays inside the view, unless `pinned`.
+ * Its wrapper's `data-placement` is where it sits now: `placement`, or the
+ * opposite side after a flip, so what opens from the content can open away
+ * from the box.
  * Pointer isolation keeps a click inside anchored UI from reaching the
  * surface's own listener (which would read it as a click outside).
  *
@@ -200,6 +204,7 @@ function PlacedAnchored({
   const node = (
     <div
       ref={setElement}
+      data-placement={pos.placement}
       style={{
         position: projector.space === 'client' ? 'fixed' : 'absolute',
         left: pos.left,

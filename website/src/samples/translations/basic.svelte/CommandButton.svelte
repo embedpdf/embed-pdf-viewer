@@ -6,7 +6,7 @@
   const command = useCommand(() => id);
 </script>
 
-{#if command.current?.visible}
+{#if command.current.visible}
   {@const cmd = command.current}
   <button type="button" class="button" disabled={!cmd.enabled} onclick={cmd.run}>
     {cmd.label}

@@ -10,6 +10,7 @@ import { deletedAttachmentOf } from '../mutation/AttachmentMutationResults';
 import { AttachmentCreateResultSchema, AttachmentListSchema } from '../wire/schemas';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import { toPageRef } from '../identity/PageRef';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Attachment conformance suite. Fixture requirement: a document whose
@@ -332,11 +333,14 @@ export function runAttachmentConformance(
 
   async function openFixture(engine: Engine, options: ConformanceOptions): Promise<DocumentHandle> {
     if (options.openKind === 'bytes') {
-      return engine.open({
-        kind: 'bytes',
-        id: options.fixture.id,
-        bytes: await options.fixture.bytes(),
-      });
+      return engine.open(
+        {
+          kind: 'bytes',
+          id: options.fixture.id,
+          bytes: await options.fixture.bytes(),
+        },
+        EVERY_PERMISSION,
+      );
     }
     return engine.open({ kind: 'id', id: options.fixture.cloudId ?? options.fixture.id });
   }

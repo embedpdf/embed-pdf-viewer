@@ -5,6 +5,7 @@
  *
  *   node scripts/samples.mjs                every example; exit 1 on an error
  *   node scripts/samples.mjs search stage   only the examples of these areas
+ *   node scripts/samples.mjs viewer         only the ready-made viewer's
  *   node scripts/samples.mjs --root <dir>   a site's synced copy instead (`src/samples`)
  *
  * Unlike a snippet, an example is a complete app that runs on its page, so every one must compile:
@@ -13,10 +14,15 @@
  * (`strictTemplates`) and Svelte ones with `svelte-check`. Each run gets its own directory
  * (`compile.mjs`), so several checks of different areas can run at the same time.
  *
+ * The ready-made viewer's examples (`samples/viewer/`) compile as the snippet check compiles the
+ * viewer's snippets: against `@embedpdf/viewer` at its source, for the four frameworks and
+ * `vanilla`, a plain HTML page (`<name>.vanilla.html`), whose module scripts are taken out of the
+ * page and checked as JavaScript, and whose elements are checked against the viewer's
+ * (`viewer.mjs`).
+ *
  * By default it checks examples as they are written, for the local engine. A site checks what it
  * ships with `--root src/samples` (its `check:samples`): the synced copy, the cloud form included,
- * in every framework. The ready-made viewer's samples (`samples/viewer/`) belong to the viewer
- * docs, and a synced copy's `snippets/` to the snippet check.
+ * in every framework. A synced copy's `snippets/` belong to the snippet check.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,21 +36,28 @@ import {
   removeRunDirectory,
   runDirectory,
   toPosix,
+  VIEWER_INTEGRATIONS,
   walk,
   writeTsconfig,
 } from './compile.mjs';
+import { ENGINES } from '../engines.mjs';
+import { addMarkupErrors, stageVanilla } from './viewer.mjs';
 
 /** Where the examples are: here, or a site's synced copy (`--root`). */
 let samplesRoot = path.join(contentRoot, 'samples');
 
-/** The viewer docs' samples, and a synced copy's snippets: not examples. */
-const NOT_EXAMPLES = new Set(['viewer', 'snippets']);
+/** A synced copy's snippets: not examples. */
+const NOT_EXAMPLES = new Set(['snippets']);
+
+/** The ready-made viewer's examples, which compile against the viewer, in five integrations. */
+const VIEWER = 'viewer';
 
 /**
  * How each framework's examples are named: one file, `<name>.<framework>.<ext>`, or a directory
- * of them, `<name>.<framework>/` with `App.<ext>` first. The tsconfig compiles exactly those.
+ * of them, `<name>.<framework>/` with `App.<ext>` first. A plain-HTML page is one file. The
+ * tsconfig compiles exactly those.
  */
-const EXTENSIONS = { react: 'tsx', vue: 'vue', svelte: 'svelte', angular: 'ts' };
+const EXTENSIONS = { react: 'tsx', vue: 'vue', svelte: 'svelte', angular: 'ts', vanilla: 'html' };
 
 const include = (framework) => [
   `**/*.${framework}.${EXTENSIONS[framework]}`,
@@ -75,19 +88,111 @@ function areasToCheck(argv) {
 }
 
 /**
- * Copy every area's examples to `root`, so an example's relative imports work wherever they point,
- * with a tsconfig for one framework. Only the areas being checked report errors.
+ * Copy the areas a pass compiles (every headless area, or the viewer's) to `root`, so an
+ * example's relative imports work wherever they point, with a tsconfig for one framework. Only
+ * the areas being checked report errors.
  */
-function stage(framework, root) {
+function stage(framework, root, { viewer = false } = {}) {
   fs.cpSync(samplesRoot, root, {
     recursive: true,
-    filter: (source) => !NOT_EXAMPLES.has(path.relative(samplesRoot, source).split(path.sep)[0]),
+    filter: (source) => {
+      const relative = path.relative(samplesRoot, source);
+      // The directory itself, and the files beside the areas (`samples-env.d.ts`).
+      if (!relative || (!relative.includes(path.sep) && fs.statSync(source).isFile())) return true;
+      const area = relative.split(path.sep)[0];
+      return !NOT_EXAMPLES.has(area) && (area === VIEWER) === viewer;
+    },
   });
-  writeTsconfig(framework, root, include(framework));
+  writeTsconfig(framework, root, include(framework), {}, { viewer });
 }
 
 /** Where a staged file came from, as the docs name it: `samples/search/search-box.react.tsx`. */
 const sourceName = (root, file) => toPosix(path.join('samples', path.relative(root, file)));
+
+/** One framework's compile: how many examples, its errors (`{ where, message }`), or why not. */
+async function checkFramework(framework, areas, runRoot, { viewer }) {
+  const examples = new Set(
+    areas
+      .flatMap((area) => walk(path.join(samplesRoot, area)))
+      .map((file) => exampleOf(file, framework))
+      .filter(Boolean),
+  );
+  if (examples.size === 0) return null;
+  const root = path.join(runRoot, `${viewer ? 'viewer-' : ''}${framework}`);
+  const inArea = (file) => areas.includes(path.relative(root, file).split(path.sep)[0]);
+  stage(framework, root, { viewer });
+  const result = await compile(framework, root, inArea);
+  if (!result.tool) return { examples: examples.size, ...result };
+  // A compiler that can't narrow to the areas reports on every example: keep theirs.
+  const errors = result.diagnostics
+    .filter(({ file }) => !file || inArea(file))
+    .map(({ file, line, column, message }) => ({
+      where: file ? `${sourceName(root, file)}:${line}:${column}` : '(compiler options)',
+      message,
+    }));
+  return { examples: examples.size, tool: result.tool, errors };
+}
+
+/**
+ * The viewer's plain-HTML examples, compiled as the snippet check compiles the viewer's plain-HTML
+ * snippets (`viewer.mjs`): each module script on its own at the page's line numbers, and the
+ * elements and attributes the page uses, against its site's viewer. A per-site page
+ * (`<name>.cloud.vanilla.html`) is its site's; the others are the site's whose copy this is
+ * (`viewer.mjs` tells), embedpdf.com's as written.
+ */
+async function checkVanilla(runRoot) {
+  const pages = walk(path.join(samplesRoot, VIEWER))
+    .map((file) => toPosix(path.relative(samplesRoot, file)))
+    .filter((file) => /\.vanilla(\.|\/)/.test(file));
+  if (pages.length === 0) return null;
+  const directories = pages.filter((file) => !file.endsWith('.vanilla.html'));
+  if (directories.length) {
+    return {
+      examples: pages.length,
+      tool: 'the example check',
+      errors: directories.map((file) => ({
+        where: `samples/${file}`,
+        message: 'a plain-HTML example is one page: `<name>.vanilla.html`',
+      })),
+    };
+  }
+  const bySite = Map.groupBy(pages, (file) => {
+    const flavor = file.match(/\.(\w+)\.vanilla\.html$/)?.[1];
+    return flavor && ENGINES[flavor] ? flavor : null;
+  });
+  const errors = [];
+  let tool = null;
+  for (const [engine, files] of bySite) {
+    const examples = files.map((file) => ({
+      file,
+      name: file.replace(/\.vanilla\.html$/, ''),
+      framework: 'vanilla',
+    }));
+    const root = path.join(runRoot, `viewer-vanilla${engine ? `-${engine}` : ''}`);
+    const staged = stageVanilla(examples, new Map(), root, samplesRoot, engine ? { engine } : {});
+    writeTsconfig('vanilla', root, ['**/*.ts', '**/*.js'], {}, { viewer: true });
+    const result = await compile('vanilla', root);
+    if (!result.tool) return { examples: pages.length, ...result };
+    tool = result.tool;
+    for (const { file, line, column, message } of result.diagnostics) {
+      const origin = file && staged.origins.get(file);
+      const at = origin ? staged.locate.get(file)(line, column) : null;
+      if (at) errors.push({ where: `samples/${origin}:${at.line}:${at.column}`, message });
+      else {
+        const own = file ? `${toPosix(path.relative(root, file))}:${line}` : '(compiler options)';
+        errors.push({ where: `the check's own ${own}`, message });
+      }
+    }
+    const markup = { tool, bySnippet: new Map() };
+    addMarkupErrors(markup, staged.markup);
+    for (const [file, list] of markup.bySnippet) {
+      for (const { line, column, message } of list) {
+        errors.push({ where: `samples/${file}:${line}:${column}`, message });
+      }
+    }
+  }
+  return { examples: pages.length, tool, errors };
+}
 
 export async function checkSamples(argv = []) {
   const started = performance.now();
@@ -97,37 +202,39 @@ export async function checkSamples(argv = []) {
     argv = argv.filter((_, index) => index !== rootFlag && index !== rootFlag + 1);
   }
   const areas = areasToCheck(argv);
-  const inArea = (root, file) => areas.includes(path.relative(root, file).split(path.sep)[0]);
+  const headless = areas.filter((area) => area !== VIEWER);
+  const viewer = areas.includes(VIEWER) ? [VIEWER] : [];
   const runRoot = runDirectory('embedpdf-samples');
   let failed = false;
+  const report = (label, outcome) => {
+    if (!outcome) return;
+    if (!outcome.tool) {
+      failed = true;
+      console.error(`  ${label} not checked: ${outcome.reason}`);
+      return;
+    }
+    const { examples, errors, tool } = outcome;
+    console.log(
+      `  ${label} ${examples} examples, ${errors.length ? `${errors.length} errors` : 'all compile'} (${tool})`,
+    );
+    for (const { where, message } of errors) console.error(`    ${where}  ${message}`);
+    failed ||= errors.length > 0;
+  };
   try {
-    for (const framework of FRAMEWORKS) {
-      const label = FRAMEWORK_LABELS[framework];
-      const examples = new Set(
-        areas
-          .flatMap((area) => walk(path.join(samplesRoot, area)))
-          .map((file) => exampleOf(file, framework))
-          .filter(Boolean),
-      );
-      if (examples.size === 0) continue;
-      const root = path.join(runRoot, framework);
-      stage(framework, root);
-      const result = await compile(framework, root, (file) => inArea(root, file));
-      if (!result.tool) {
-        failed = true;
-        console.error(`  ${label.padEnd(8)} not checked: ${result.reason}`);
-        continue;
+    if (headless.length) {
+      for (const framework of FRAMEWORKS) {
+        const outcome = await checkFramework(framework, headless, runRoot, { viewer: false });
+        report(FRAMEWORK_LABELS[framework].padEnd(8), outcome);
       }
-      // A compiler that can't narrow to the areas reports on every example: keep theirs.
-      const errors = result.diagnostics.filter(({ file }) => !file || inArea(root, file));
-      console.log(
-        `  ${label.padEnd(8)} ${examples.size} examples, ${errors.length ? `${errors.length} errors` : 'all compile'} (${result.tool})`,
-      );
-      for (const { file, line, column, message } of errors) {
-        const where = file ? `${sourceName(root, file)}:${line}:${column}` : '(compiler options)';
-        console.error(`    ${where}  ${message}`);
+    }
+    if (viewer.length) {
+      for (const integration of VIEWER_INTEGRATIONS) {
+        const outcome =
+          integration === 'vanilla'
+            ? await checkVanilla(runRoot)
+            : await checkFramework(integration, viewer, runRoot, { viewer: true });
+        report(`Viewer, ${FRAMEWORK_LABELS[integration]}`.padEnd(18), outcome);
       }
-      failed ||= errors.length > 0;
     }
   } finally {
     removeRunDirectory(runRoot);

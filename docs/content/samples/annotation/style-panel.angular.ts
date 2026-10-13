@@ -67,8 +67,10 @@ const ebook = async (): Promise<OpenInput> => {
         </span>
       } @else if (property.control === 'choice' && property.key === 'lineEndings') {
         <select #end class="select" aria-label="Line end" (change)="setLineEnd(end.value)">
-          @for (option of property.options; track option) {
-            <option [selected]="option === lineEnd()">{{ option }}</option>
+          @for (option of property.options; track option.value) {
+            <option [value]="option.value" [selected]="option.value === lineEnd()">
+              {{ option.label }}
+            </option>
           }
         </select>
       } @else if (property.control === 'choice' && property.key === 'borderStyle') {
@@ -81,8 +83,13 @@ const ebook = async (): Promise<OpenInput> => {
           @if (isMixed()) {
             <option value="" selected>mixed</option>
           }
-          @for (option of property.options; track option) {
-            <option [selected]="!isMixed() && option === borderStyle()">{{ option }}</option>
+          @for (option of property.options; track option.value) {
+            <option
+              [value]="option.value"
+              [selected]="!isMixed() && option.value === borderStyle()"
+            >
+              {{ option.label }}
+            </option>
           }
         </select>
       } @else if (property.control === 'choice') {
@@ -95,8 +102,10 @@ const ebook = async (): Promise<OpenInput> => {
           @if (isMixed()) {
             <option value="" selected>mixed</option>
           }
-          @for (option of property.options; track option) {
-            <option [selected]="!isMixed() && option === shown()">{{ option }}</option>
+          @for (option of property.options; track option.value) {
+            <option [value]="option.value" [selected]="!isMixed() && option.value === shown()">
+              {{ option.label }}
+            </option>
           }
         </select>
       } @else if (property.control === 'flag') {

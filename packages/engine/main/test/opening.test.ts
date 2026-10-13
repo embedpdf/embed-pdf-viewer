@@ -7,7 +7,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import type { DocumentHandle, OpenInput } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, EngineError, EngineErrorCode } from '../src/index';
 
@@ -102,6 +102,92 @@ describe('the file’s own restrictions', () => {
       expect(doc.security.allows('doc.text.copy')).toBe(true);
       await doc.close();
     });
+  });
+});
+
+describe('without a scope', () => {
+  /** What no PDF flag governs, which the file never takes away. */
+  const UNFLAGGED = [
+    'doc.download',
+    'doc.download.flattened',
+    'doc.annotate.import',
+    'doc.forms.import',
+    'doc.forms.script',
+    'doc.forms.submit',
+    'doc.sign.certify',
+  ] as const;
+
+  test('a document allows what the file allows: everything, for a file without restrictions', async () => {
+    await withEngine(async (engine) => {
+      const doc = await engine.open({ kind: 'bytes', bytes: await plain() });
+      for (const capability of [
+        'doc.print',
+        'doc.print.high',
+        'doc.text.copy',
+        'doc.annotate.modify',
+        'doc.forms.modify',
+        'doc.pages.modify',
+        'doc.redact',
+        ...UNFLAGGED,
+      ] as const) {
+        expect(doc.security.allows(capability), capability).toBe(true);
+      }
+      await doc.close();
+    });
+  });
+
+  test('a protected file keeps its restrictions, and the owner password lifts them', async () => {
+    await withEngine(async (engine) => {
+      const doc = await engine.open(
+        { kind: 'bytes', bytes: await encrypted() },
+        { password: '1234' },
+      );
+      expect(doc.security.allows('doc.print')).toBe(false);
+      expect(doc.security.allows('doc.text.copy')).toBe(false);
+      // Finding and selecting text aren't copying it, as in Acrobat.
+      expect(doc.security.allows('doc.text.search')).toBe(true);
+      expect(doc.security.allows('doc.text.select')).toBe(true);
+      for (const capability of UNFLAGGED) {
+        expect(doc.security.allows(capability), capability).toBe(true);
+      }
+
+      await doc.security.unlock({ password: '5678', mode: 'owner' });
+      expect(doc.security.allows('doc.print')).toBe(true);
+      expect(doc.security.allows('doc.text.copy')).toBe(true);
+      await doc.close();
+    });
+  });
+
+  test('the USCIS Form I-140 as published: found and selected, not copied, its pages kept', async () => {
+    // Its flags allow printing, commenting and filling in; not copying or changing pages.
+    await withEngine(async (engine) => {
+      const bytes = new Uint8Array(await readFile(fixture('uscis-i-140-protected.pdf')));
+      const doc = await engine.open({ kind: 'bytes', bytes });
+      const allows = (capability: Parameters<typeof doc.security.allows>[0]) =>
+        doc.security.allows(capability);
+      expect([allows('doc.text.search'), allows('doc.text.select')]).toEqual([true, true]);
+      expect([allows('doc.text.copy'), allows('doc.content.copy')]).toEqual([false, false]);
+      expect([
+        allows('doc.print'),
+        allows('doc.annotate.modify'),
+        allows('doc.forms.fill'),
+      ]).toEqual([true, true, true]);
+      expect([allows('doc.pages.assemble'), allows('doc.forms.modify')]).toEqual([false, false]);
+      await doc.close();
+    });
+  });
+
+  test('says nothing in the console', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await withEngine(async (engine) => {
+        const doc = await engine.open({ kind: 'bytes', bytes: await plain() });
+        await doc.close();
+      });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

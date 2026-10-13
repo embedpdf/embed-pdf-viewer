@@ -14,6 +14,7 @@ import {
   type ChangeOp,
   type ChangeResult,
   type PageCoordinates,
+  type SessionEventPublisher,
   type WireAnnotationResources,
   type WireResourceMap,
   type WriteOptions,
@@ -25,7 +26,6 @@ import {
   wirePaths,
   type LayerScopePlane,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';

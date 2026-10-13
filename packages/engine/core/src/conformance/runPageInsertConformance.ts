@@ -4,6 +4,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Page insert conformance. `pages.insert` is a required member — this suite
@@ -100,11 +101,14 @@ export function runPageInsertConformance(
         await doc.pages.insert(single);
         const bytes = await doc.download();
 
-        reopened = await engine.open({
-          kind: 'bytes',
-          id: `${opts.fixture.id}-insert-reopen`,
-          bytes,
-        });
+        reopened = await engine.open(
+          {
+            kind: 'bytes',
+            id: `${opts.fixture.id}-insert-reopen`,
+            bytes,
+          },
+          EVERY_PERMISSION,
+        );
         const after = await reopened.pages.list();
         expect(after.pageCount).toBe(before.pageCount + 1);
       } finally {
@@ -163,7 +167,7 @@ export function runPageInsertConformance(
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

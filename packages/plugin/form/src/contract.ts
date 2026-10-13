@@ -34,6 +34,7 @@ import type {
   PageRef,
   WidgetAnnotation,
   WidgetPatch,
+  WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions/contract';
 
@@ -92,13 +93,25 @@ export interface FormSettings {
     /** The text of a field that has no color of its own. */
     readonly color: string;
   };
+  /**
+   * Which fields people may fill in by hand: `true`, every one; `false`,
+   * none; or a list of field families (`'text'`, `'checkbox'`,
+   * `'signature'`…). A field left out draws as a read-only one does, and
+   * takes no typing, clicks or picks. Only the interface: your code still
+   * fills it in (`setValue()`, `importValues()`), and `canFill()` doesn't change.
+   */
+  readonly fillable: FillableFields;
 }
+
+/** Which fields people may fill in by hand: all, none, or those of these families. */
+export type FillableFields = boolean | readonly FormFieldFamily[];
 
 /** What the form settings are when the app registers none. */
 export const FORM_DEFAULTS: FormSettings = {
   validation: 'scripts',
   focus: { color: null },
   fields: { border: null, background: 'rgb(255 255 255 / 0.92)', color: '#1f2a44' },
+  fillable: true,
 };
 
 /** What `formPlugin(config)` takes: any of the settings, merged over the defaults. */
@@ -168,21 +181,44 @@ export type FormFieldFlagSetting =
  * text. `flag`: on or off. `number`: a whole number from `min`, or none
  * (`null`). `choice`: one of `options`, or any text when `free`. `choices`:
  * any of `options`. `options`: the field's options, each a label and a value.
+ * `options` of a `choice` or `choices` are the field's own values, the
+ * document's words, shown as they are.
+ *
+ * `label` is the English name and `labelKey` its translation key
+ * (`form.settings.tooltip`): a panel shows `t(setting.labelKey, { fallback:
+ * setting.label })`, as the annotation kinds' style properties read.
  */
 export type FormFieldSetting =
-  | { readonly key: 'name' | 'alternateName'; readonly control: 'text'; readonly label: string }
-  | { readonly key: FormFieldFlagSetting; readonly control: 'flag'; readonly label: string }
+  | {
+      readonly key: 'name' | 'alternateName';
+      readonly control: 'text';
+      readonly label: string;
+      readonly labelKey: string;
+    }
+  | {
+      readonly key: FormFieldFlagSetting;
+      readonly control: 'flag';
+      readonly label: string;
+      readonly labelKey: string;
+    }
   | {
       readonly key: 'maxLength';
       readonly control: 'number';
       readonly label: string;
+      readonly labelKey: string;
       readonly min: number;
     }
-  | { readonly key: 'defaultValue'; readonly control: 'text'; readonly label: string }
+  | {
+      readonly key: 'defaultValue';
+      readonly control: 'text';
+      readonly label: string;
+      readonly labelKey: string;
+    }
   | {
       readonly key: 'defaultValue';
       readonly control: 'choice';
       readonly label: string;
+      readonly labelKey: string;
       readonly options: readonly string[];
       readonly free: boolean;
     }
@@ -190,9 +226,15 @@ export type FormFieldSetting =
       readonly key: 'defaultValue';
       readonly control: 'choices';
       readonly label: string;
+      readonly labelKey: string;
       readonly options: readonly string[];
     }
-  | { readonly key: 'options'; readonly control: 'options'; readonly label: string };
+  | {
+      readonly key: 'options';
+      readonly control: 'options';
+      readonly label: string;
+      readonly labelKey: string;
+    };
 
 /**
  * What a settings panel shows for one field: its settings in display order,
@@ -207,6 +249,12 @@ export interface FormFieldSettings {
 /** What `create()`, `update()` and `removeWidget()` resolve: the field as it is now. */
 export interface FormFieldResult {
   readonly field: FormFieldDTO;
+}
+
+/** What `addWidget()` resolves: the field as it is now, and its new widget. */
+export interface FormWidgetAddResult {
+  readonly field: FormFieldDTO;
+  readonly widget: WidgetAnnotation;
 }
 
 /** Which fields `export()` takes, each whole. Without either, every field. */
@@ -436,6 +484,22 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    * taken, a radio button without its export value).
    */
   create(draft: FormFieldDraft, options?: OperationOptions): Promise<FormFieldResult>;
+  /**
+   * Show a field in one more place: a new widget, placed and styled as `create()`'s
+   * `widgets` take them, every part optional. It looks like the field's last widget unless
+   * you say otherwise. A radio group's new button gets the next free `Choice<n>` as its
+   * value, and a checkbox's new box the field's own, so the boxes check together. Without a
+   * `rect` it goes next in line after the field's widgets on the page (`page`, else the last
+   * widget's): below them while they stand in a column, beside them while they stand in a
+   * row, the same size and the same step; where that leaves the page, a new column (or row)
+   * beside them. Fires `onFieldUpdated`. Rejects `permission-denied` without
+   * `doc.forms.modify`, `not-found` for a field the form doesn't have.
+   */
+  addWidget(
+    ref: FormFieldRef,
+    placement?: Partial<WidgetPlacement>,
+    options?: OperationOptions,
+  ): Promise<FormWidgetAddResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */
   update(
     ref: FormFieldRef,

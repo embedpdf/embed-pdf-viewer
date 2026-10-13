@@ -307,7 +307,8 @@
     "@embedpdf/core-ui": "workspace:*",
     "@embedpdf/web": "workspace:*",
     "@embedpdf/plugin-actions": "workspace:*",
-    "@embedpdf/plugin-measurement": "workspace:*"
+    "@embedpdf/plugin-measurement": "workspace:*",
+    "esm-env": "^1.2.2"
   },
   "peerDependencies": {
     "svelte": "^5.29.0"

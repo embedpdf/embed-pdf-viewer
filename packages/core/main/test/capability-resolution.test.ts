@@ -157,3 +157,95 @@ describe('kernel: documents.openAll', () => {
     expect(kernel.documents.getActiveId()).toBe('a');
   });
 });
+
+describe("kernel: listeners while a document's plugins are built", () => {
+  it("hear of a create()'s writes once every plugin is built, and the plugin is built once", async () => {
+    const { engine, resolve } = controllableEngine();
+    const token = { name: 'records' };
+    let creates = 0;
+    let status: (() => string) | null = null;
+    const plugin: AnyPlugin = {
+      id: 'records',
+      scope: 'document',
+      token,
+      state: () => ({ count: 0 }),
+      create: (ctx) => {
+        creates += 1;
+        const mirror = ctx.mirror({
+          name: 'list',
+          initial: () => 0,
+          load: async () => ({ value: 1 }),
+          fold: (value: number) => value,
+        });
+        status = mirror.getStatus;
+        // A store write from inside `create`: a listener reading the plugin at once would find
+        // it half-built.
+        ctx.state.update((state: { count: number }) => ({ count: state.count + 1 }));
+        return { api: { getStatus: mirror.getStatus } };
+      },
+    };
+    const kernel = createKernel({ engine, plugins: [plugin] });
+    const reads: unknown[] = [];
+    kernel.subscribe(() => {
+      try {
+        reads.push(kernel.capability(token, 'a'));
+      } catch (error) {
+        reads.push((error as { code?: string }).code ?? 'threw');
+      }
+    });
+    const open = kernel.documents.open(bytesInput('a'));
+    resolve('a');
+    await open;
+    await settle();
+    expect(creates).toBe(1);
+    // The listener never read it half-built.
+    expect(reads).not.toContain('not-ready');
+    // The one instance is connected, so its mirror loaded.
+    expect(status!()).toBe('ready');
+    expect(kernel.tryCapability(token, 'a')).toBe(kernel.capability(token, 'a'));
+  });
+
+  it('never build a plugin before the ones it finds while it is created', async () => {
+    const { engine, resolve } = controllableEngine();
+    const earlier = { name: 'annotation' };
+    const later = { name: 'form' };
+    // The earlier plugin writes state as it's created; the later one looks for it as it's
+    // created, as the form plugin looks for the annotation plugin.
+    const annotation: AnyPlugin = {
+      id: 'annotation',
+      scope: 'document',
+      token: earlier,
+      state: () => ({ ready: false }),
+      create: (ctx) => {
+        ctx.state.update(() => ({ ready: true }));
+        return { api: { kind: 'annotation' } };
+      },
+    };
+    let found: unknown = 'not created';
+    const form: AnyPlugin = {
+      id: 'form',
+      scope: 'document',
+      token: later,
+      optional: [earlier],
+      create: (ctx) => {
+        found = ctx.tryGet(earlier);
+        return { api: { kind: 'form' } };
+      },
+    };
+    const kernel = createKernel({ engine, plugins: [annotation, form] });
+    // A listener that reads the later plugin on every change, as the commands plugin reads
+    // the form plugin to say whether a command may run.
+    kernel.subscribe(() => {
+      try {
+        kernel.capability(later, 'a');
+      } catch {
+        // not open yet
+      }
+    });
+    const open = kernel.documents.open(bytesInput('a'));
+    resolve('a');
+    await open;
+    await settle();
+    expect(found).toEqual({ kind: 'annotation' });
+  });
+});

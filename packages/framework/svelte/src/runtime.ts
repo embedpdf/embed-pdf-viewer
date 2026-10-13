@@ -1,10 +1,11 @@
 /**
  * @embedpdf/svelte/runtime — the generic binding.
  *
- * `<Viewer>` owns the kernel; the readers turn its one change stream into Svelte reactivity and
- * resolve capabilities against the document in scope (the active one, or a `<DocumentScope>`'s),
- * with a stand-in while there is none; the page context is the seam every layer draws through.
- * Every plugin binding is built from these. How to add one: this package's README.
+ * `<Viewer>` owns the kernel, and `<KernelProvider>` gives a subtree a kernel someone else owns;
+ * the readers turn its one change stream into Svelte reactivity and resolve capabilities against
+ * the document in scope (the active one, or a `<DocumentScope>`'s), with a stand-in while there is
+ * none; the page context is the seam every layer draws through. Every plugin binding is built from
+ * these. How to add one: this package's README.
  */
 
 // Registration travels with the UI: the kernel's types, tokens and helpers come from here too.
@@ -14,9 +15,15 @@ export * from '@embedpdf/core';
 export { mountWebFont, saveFile } from '@embedpdf/web';
 
 export { default as Viewer } from './runtime/Viewer.svelte';
+export { default as KernelProvider } from './runtime/KernelProvider.svelte';
 export { default as DocumentGate } from './runtime/DocumentGate.svelte';
 export { default as DocumentScope } from './runtime/DocumentScope.svelte';
-export type { DocumentGateProps, DocumentScopeProps, ViewerProps } from './runtime/props';
+export type {
+  DocumentGateProps,
+  DocumentScopeProps,
+  KernelProviderProps,
+  ViewerProps,
+} from './runtime/props';
 
 export { useKernel } from './runtime/binding.svelte';
 export {

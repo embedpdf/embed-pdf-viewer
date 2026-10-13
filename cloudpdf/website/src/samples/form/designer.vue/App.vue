@@ -11,7 +11,7 @@ import FieldPalette from './FieldPalette.vue';
 
 import '../designer.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // Building forms needs the annotation plugin: in design mode, fields are boxes like any annotation.
 const plugins = [
   stagePlugin(),

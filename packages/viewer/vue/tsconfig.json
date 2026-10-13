@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "jsx": "preserve",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
+  },
+  "vueCompilerOptions": {
+    "strictTemplates": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

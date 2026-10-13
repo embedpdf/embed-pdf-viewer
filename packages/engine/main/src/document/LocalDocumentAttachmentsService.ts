@@ -13,9 +13,9 @@ import {
   type AttachmentList,
   type AttachmentRef,
   type DocumentAttachmentsService,
+  type SessionEventPublisher,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';

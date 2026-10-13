@@ -10,6 +10,7 @@
  * value per field. Called with a selector, it returns the value the selector picks as
  * `{ current }`, compared field by field so a fresh object passes nothing on until a field changes.
  */
+import { untrack } from 'svelte';
 import { shallowEqual } from '@embedpdf/core';
 import type { CapabilityToken, Kernel, SettingsOf, StateDeclaration } from '@embedpdf/core';
 import { documentScopeOf, useKernelBinding, type KernelBinding } from './binding.svelte';
@@ -64,17 +65,41 @@ export function readRecord<Record extends object, Selected>(
 }
 
 /**
+ * Load state the plugin loads on demand (`ensure`) for each capability the reader comes to read:
+ * once a ready document's capability is in scope, and again for the next document's.
+ */
+function ensureWhileRead<Capability>(
+  binding: KernelBinding,
+  token: CapabilityToken<Capability>,
+  ensure: (capability: Capability) => Promise<void>,
+): void {
+  const scoped = documentScopeOf();
+  let ensured: Capability | null = null;
+  $effect(() => {
+    binding.track();
+    const capability = binding.kernel.tryCapability(token, scoped() ?? undefined);
+    if (!capability || capability === ensured) return;
+    ensured = capability;
+    // The state says when the load fails (its status), so the rejection has nothing to add.
+    untrack(() => ensure(capability).catch(() => {}));
+  });
+}
+
+/**
  * Turn a state declaration into its reader. It reads this subtree's document (the nearest
  * `<DocumentScope>`, else the active one) and gives the declaration's `empty` while that
- * document is missing or not ready, so it works anywhere.
+ * document is missing or not ready, so it works anywhere. State the plugin loads on demand
+ * (the declaration's `ensure`) loads once a ready document's capability is in scope.
  */
 export function stateReader<Capability, State extends object>(
   declaration: StateDeclaration<Capability, State>,
 ): StateReader<State> {
   const keys = Object.keys(declaration.empty) as (keyof State)[];
+  const { ensure } = declaration;
   return function useDeclaredState<Selected>(select?: (state: State) => Selected) {
     const binding = useKernelBinding();
     const whole = declaredState(binding, declaration.token, declaration.read, declaration.empty);
+    if (ensure) ensureWhileRead(binding, declaration.token, ensure);
     return readRecord(whole, keys, select);
   } as StateReader<State>;
 }

@@ -1,6 +1,6 @@
 # The TypeScript packages gate: typecheck, tests and the contract checks for
-# packages/**, examples/**, website and tooling/**. Called by ci.yml (the
-# umbrella that owns the PR gate); never triggered on its own.
+# packages/**, examples/**, website and tooling/**, and the docs gate. Called by
+# ci.yml (the umbrella that owns the PR gate); never triggered on its own.
 #
 # Turbo does the scoping: with the cache restored (local cache dir below,
 # remote cache when TURBO_TOKEN/TURBO_TEAM are configured), an unchanged
@@ -101,6 +101,48 @@ jobs:
           --filter='./examples/**'
           --filter='./website'
           --filter='./tooling/**'
+
+  # The docs gate (docs/conventions/docs-architecture.md): every docs page's snippets, and the
+  # code a viewer page shows, compiled against the packages in this commit, per framework, and
+  # which pages are live (docs/content/scripts/publish-gate.mjs). A viewer page that doesn't
+  # compile yet is held back on the site and fails nothing here; the job fails when a check
+  # crashes or stops checking, or a headless page stops compiling (`--strict`).
+  docs:
+    name: docs gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      # The snippets read every package at its source, except the engine runtime's types, which
+      # only its build has; the build inlines the wasm32 runtime, hydrated from the shelf.
+      - name: Fetch engine runtime payload
+        run: pnpm --filter @embedpdf/engine-runtime fetch:payload wasm32
+        env:
+          EPDF_PAYLOAD_WAIT_MINUTES: '30'
+      - name: Build the engine runtime
+        run: pnpm turbo run build --filter=@embedpdf/engine-runtime
+      - name: Test the docs checks
+        run: node --test docs/content/scripts/*.test.mjs
+      - name: Snippets and live pages
+        run: node docs/content/scripts/publish-gate.mjs --strict
+      - name: Keep the status
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: docs-gate-status
+          path: |
+            docs/content/generated/snippet-status.json
+            docs/content/generated/live-pages.json
+          if-no-files-found: ignore
 
   contract:
     name: contract

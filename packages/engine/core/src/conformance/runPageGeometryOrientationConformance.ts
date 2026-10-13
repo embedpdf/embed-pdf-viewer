@@ -12,6 +12,7 @@ import type { Engine } from '../engine/Engine';
 import { toPageRef } from '../identity/PageRef';
 import { pageQuadBounds } from '../pageSpace/helpers';
 import { PageGeometrySnapshotSchema } from '../wire/schemas';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /** Absolute tolerance for coordinate assertions (points). */
 const COORD_TOLERANCE = 1e-3;
@@ -208,7 +209,7 @@ function rotationClose(a: number, b: number, tolerance: number): boolean {
 async function openFixture(engine: Engine, opts: PageGeometryOrientationOptions) {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

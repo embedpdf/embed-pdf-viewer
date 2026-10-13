@@ -6,6 +6,7 @@
 -->
 <script setup lang="ts">
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
+import type { Orientation } from '@embedpdf/web';
 import DefaultCollapsed from './DefaultCollapsed.vue';
 import DefaultCommand from './DefaultCommand.vue';
 import DefaultGroupTrigger from './DefaultGroupTrigger.vue';
@@ -16,9 +17,11 @@ const props = defineProps<{
   part: ToolbarPart;
   /** `'live'` in the visible row, `'measure'` in the hidden measurement layer. */
   layer: 'live' | 'measure';
+  /** Which way the toolbar runs: what a socket measures along, and where a default menu opens. */
+  orientation: Orientation;
 }>();
 
-const emit = defineEmits<{ width: [key: string, width: number] }>();
+const emit = defineEmits<{ length: [key: string, length: number] }>();
 
 defineSlots<{
   command?(props: { command: ResolvedCommand; variant: string; run: () => void }): unknown;
@@ -26,15 +29,15 @@ defineSlots<{
     name: string;
     variant: string;
     layer: 'live' | 'measure';
-    measure: (width: number) => void;
+    measure: (length: number) => void;
   }): unknown;
   collapsed?(props: { view: CollapsedGroupView }): unknown;
   'group-trigger'?(props: { view: GroupDisclosureView }): unknown;
 }>();
 
-/** A custom item reporting its own width, under its key. */
-const measure = (width: number) => {
-  if (props.part.kind === 'custom') emit('width', props.part.measureKey, width);
+/** A custom item reporting its own length, under its key. */
+const measure = (length: number) => {
+  if (props.part.kind === 'custom') emit('length', props.part.measureKey, length);
 };
 </script>
 
@@ -71,7 +74,8 @@ const measure = (width: number) => {
     v-else-if="part.kind === 'custom'"
     :name="part.name"
     :measure-key="part.measureKey"
-    @width="(key, width) => emit('width', key, width)"
+    :orientation="orientation"
+    @length="(key, length) => emit('length', key, length)"
   >
     <slot
       v-if="part.terminal"
@@ -85,10 +89,10 @@ const measure = (width: number) => {
   </NativeSlotSocket>
 
   <slot v-else-if="part.kind === 'collapsed'" name="collapsed" :view="part.view">
-    <DefaultCollapsed :view="part.view" />
+    <DefaultCollapsed :view="part.view" :orientation="orientation" />
   </slot>
 
   <slot v-else name="group-trigger" :view="part.view">
-    <DefaultGroupTrigger :view="part.view" />
+    <DefaultGroupTrigger :view="part.view" :orientation="orientation" />
   </slot>
 </template>

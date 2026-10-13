@@ -14,7 +14,7 @@ import ArmBar from './ArmBar.vue';
 
 import '../click-to-sign.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const assetEngine = localEngine();
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 const plugins = [

@@ -24,6 +24,12 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * `engine-core/test/scope-parity.test.ts` (commit 17) locks this in.
  */
 export interface Engine {
+  /**
+   * Whether `open()` takes a file's own bytes (`{ kind: 'bytes' }`), such as a file someone
+   * picked on their computer. The local engine does; the cloud engine opens only the documents
+   * your server holds (`'id'`, `'token'`, `'share'`).
+   */
+  readonly canOpenFiles: boolean;
   open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle>;
   destroy(): AbortablePromise<void>;
 }

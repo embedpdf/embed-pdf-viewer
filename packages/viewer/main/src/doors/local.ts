@@ -11,14 +11,17 @@
  * is in this graph, this door's `engine` field is optional and also accepts its
  * plain-data options bag (self-hosted wasm, strict-CSP worker URLs). Builds
  * that always inject their own engine import `@embedpdf/viewer/core` instead
- * and never pull the local engine in.
+ * and never pull the local engine in; toolchains that can't emit the engine's
+ * files import `@embedpdf/viewer/portable` (doors/portable.ts).
  *
  * No wasm default is passed: inside an app bundler this artifact has no
  * reliable location, so the engine's own sibling-first resolution applies.
  */
+import { localEngine } from '@embedpdf/engine';
+
 import { registerLocalEngine } from '../local/register';
 
-registerLocalEngine();
+registerLocalEngine(localEngine);
 
 export * from '../local/surface';
 export { default } from '../local/surface';

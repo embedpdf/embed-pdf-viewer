@@ -8,6 +8,7 @@ import {
   type ChangeAnalysis,
   type DigestAlgorithm,
   type DocumentSignaturesService,
+  type SessionEventPublisher,
   type WriteOptions,
   type FormFieldRef,
   type SignatureCancelResult,
@@ -18,7 +19,6 @@ import {
   type SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
 
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
 import type { JobQueue } from '../worker/WorkerQueue';

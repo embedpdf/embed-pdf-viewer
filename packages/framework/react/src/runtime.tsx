@@ -64,6 +64,8 @@ import type { PageViewDemand } from '@embedpdf/plugin-render/contract';
 import { browserClock } from '@embedpdf/web';
 import type { PageContext } from '@embedpdf/web';
 
+import { isDev } from './dev';
+
 const KernelCtx = createContext<Kernel | null>(null);
 /** The document a subtree is bound to. null => use the active document. */
 const DocumentScopeCtx = createContext<string | null>(null);
@@ -72,6 +74,20 @@ export function useKernel(): Kernel {
   const kernel = useContext(KernelCtx);
   if (!kernel) throw new Error('useKernel must be used within <Viewer>/<EmbedPDF>');
   return kernel;
+}
+
+export interface KernelProviderProps {
+  kernel: Kernel;
+  children?: React.ReactNode;
+}
+/**
+ * Give a subtree a kernel someone else created and owns, so every hook in it
+ * works against that kernel. The full viewer's wrapper puts the children it
+ * slots into the viewer inside one. The provider never starts or destroys the
+ * kernel; `<Viewer>` is the component that owns one.
+ */
+export function KernelProvider({ kernel, children }: KernelProviderProps) {
+  return <KernelCtx.Provider value={kernel}>{children}</KernelCtx.Provider>;
 }
 
 export const shallowArray = <T,>(left: readonly T[], right: readonly T[]): boolean =>
@@ -466,7 +482,7 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
   const latestSettings = useRef(settings);
   latestSettings.current = settings;
   const warned = useRef(false);
-  if (process.env.NODE_ENV !== 'production' && !warned.current) {
+  if (isDev() && !warned.current) {
     if (initial.current.engine !== engine || initial.current.plugins !== plugins) {
       warned.current = true;
       console.warn(

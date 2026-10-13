@@ -6,7 +6,7 @@
   const command = useCommand(() => id);
 </script>
 
-{#if command.current?.visible}
+{#if command.current.visible}
   {@const cmd = command.current}
   <button onclick={cmd.run} disabled={!cmd.enabled} aria-pressed={cmd.active}>
     <Icon name={cmd.icon} />

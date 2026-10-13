@@ -95,9 +95,11 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 ### Which links never run
 
-A website link opens only with `http`, `https`, `mailto` or `tel`. Links that would start a program
-or open another file on the user's computer are never followed, and a link's JavaScript runs only
-when the [actions plugin](../documents/actions) has JavaScript turned on.
+A website link opens only with `http`, `https`, `mailto` or `tel`. An address without one opens on
+`https` when it starts with `//` or `www.`; any other, such as `/help` or `page2.html`, is relative
+to the document and opens nothing, so a link can never open a page of your own app. Links that
+would start a program or open another file on the user's computer are never followed, and a link's
+JavaScript runs only when the [actions plugin](../documents/actions) has JavaScript turned on.
 
 ### Links while editing annotations
 

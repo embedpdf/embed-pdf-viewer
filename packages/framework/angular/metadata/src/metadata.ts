@@ -14,7 +14,7 @@
 import { Injectable, type Signal } from '@angular/core';
 import { pluginService, type EmbedPdfFeature } from '@embedpdf/angular/runtime';
 import type { CustomMetadata, DocumentMetadata, ResourceStatus } from '@embedpdf/angular/runtime';
-import { metadataPlugin, MetadataToken } from '@embedpdf/plugin-metadata';
+import { metadataPlugin, metadataState, MetadataToken } from '@embedpdf/plugin-metadata';
 import type {
   CustomMetadataCapability,
   CustomMetadataResyncedEvent,
@@ -44,7 +44,8 @@ export interface EpdfCustomMetadata {
 
 /**
  * The metadata of the document in scope (`[epdfDocumentScope]`), else the active one: the
- * standard fields as `fields()`, their load state as `status()`, `update()`, `refresh()`, the
+ * standard fields as `fields()`, their load state as `status()`, `update()`, `refresh()`,
+ * `ensureLoaded()` (the service calls it for the document it reads), the
  * check `canUpdate()`, the streams `updated$` and `resynced$`, and your own fields as `custom`.
  * With no document the signals read null and `'idle'`, and every call refuses with `not-ready`.
  */
@@ -53,7 +54,9 @@ export class EpdfMetadata extends pluginService({
   name: 'EpdfMetadata',
   feature: 'withMetadata()',
   token: MetadataToken,
-  methods: ['update', 'refresh', 'canUpdate', 'getSnapshot', 'getStatus'],
+  // Reading the fields loads them: nothing reads them as a document opens.
+  ensure: metadataState.ensure,
+  methods: ['update', 'refresh', 'ensureLoaded', 'canUpdate', 'getSnapshot', 'getStatus'],
   events: ['onUpdated', 'onResynced'],
 }) {
   /** Every standard field (`title`, `author`, …), or null until it has loaded. */

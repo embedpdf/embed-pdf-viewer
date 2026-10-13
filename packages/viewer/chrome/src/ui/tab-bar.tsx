@@ -1,48 +1,56 @@
 /**
  * The document tab bar: rounded-top tabs on the surface-alt strip, the active
- * tab merging into the toolbar surface below, close-× on the active tab, and a
- * + button opening a real file dialog.
+ * tab merging into the toolbar surface below, and close-× on the active tab.
+ * Opening another file is the `document:open` command (config/open-files.ts),
+ * behind the document menu's Open row and a PDF dropped on the pages. A tab
+ * with unsaved changes asks before it closes; a failed one says why on its
+ * warning sign.
  *
  * The kernel's document registry is the tab model: `useDocumentsState()` for
- * the tabs, `useDocuments()` for open/close/setActive; there is no separate
+ * the tabs, `useDocuments()` for close/setActive; there is no separate
  * document manager.
  */
-import { useRef } from 'react';
-import { useDocuments, useDocumentsState } from '@embedpdf/react/runtime';
-import type { OpenInput } from '@embedpdf/react/runtime';
+import { useT } from '@embedpdf/react/i18n';
+import { useDocuments, useDocumentsState, type DocumentInfo } from '@embedpdf/react/runtime';
+import { useState } from 'react';
+
+import { errorReasonKeyOf } from './document-boot';
 import { Icon } from './icons';
+import { CloseUnsavedDialog } from './unsaved-changes';
 
 export type TabBarVisibility = 'always' | 'multiple' | 'never';
 
 export function TabBar({
-  visibility = 'always',
-  allowOpenFile = true,
+  visibility,
 }: {
-  visibility?: TabBarVisibility;
-  allowOpenFile?: boolean;
+  /** When the tabs show: the layout's `tabs` (`tabsOf`). */
+  visibility: TabBarVisibility;
 }) {
-  const { setActive, close, open } = useDocuments();
-  const { documents: docs, activeId } = useDocumentsState();
-  const fileInput = useRef<HTMLInputElement>(null);
+  const { setActive, close } = useDocuments();
+  const { documents, activeId } = useDocumentsState();
+  const t = useT();
+  // The tab that asks before it closes: its document's id, and the name it shows.
+  const [closing, setClosing] = useState<{ id: string; name: string } | null>(null);
 
-  const shouldShow = visibility === 'always' || (visibility === 'multiple' && docs.length > 1);
+  const shouldShow = visibility === 'always' || (visibility === 'multiple' && documents.length > 1);
   if (!shouldShow) return null;
 
-  const openFile = async (file: File) => {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const source: OpenInput = { kind: 'bytes', id: `${file.name}-${Date.now()}`, bytes };
-    await open(source, { name: file.name });
+  const closeTab = (document: DocumentInfo, name: string) => {
+    if (document.hasUnsavedChanges) setClosing({ id: document.id, name });
+    else void close(document.id);
   };
 
   return (
     <div className="bg-surface-alt flex items-end pr-2 pt-2">
       <div className="flex flex-1 items-end overflow-x-auto pl-4">
-        {docs.map((doc) => {
-          const isActive = activeId === doc.id;
+        {documents.map((document) => {
+          const isActive = activeId === document.id;
+          const name =
+            document.name ?? t('tabs.untitled', { params: { id: document.id.slice(0, 8) } });
           return (
             <div
-              key={doc.id}
-              onClick={() => setActive(doc.id)}
+              key={document.id}
+              onClick={() => setActive(document.id)}
               role="tab"
               part={isActive ? 'tab tab-active' : 'tab'}
               tabIndex={0}
@@ -50,7 +58,7 @@ export function TabBar({
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  setActive(doc.id);
+                  setActive(document.id);
                 }
               }}
               className={`group relative flex min-w-[120px] max-w-[240px] cursor-pointer items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-medium transition-all ${
@@ -61,32 +69,37 @@ export function TabBar({
             >
               {/* lifecycle glyphs — the tab exists from the moment open()
                   was called; these show what its document is doing */}
-              {doc.status === 'loading' && (
+              {document.status === 'loading' && (
                 <span
                   className="border-border-subtle border-t-accent h-3 w-3 flex-shrink-0 animate-spin rounded-full border"
-                  aria-label="Loading"
+                  aria-label={t('tabs.loading')}
                 />
               )}
-              {doc.status === 'locked' && (
+              {document.status === 'locked' && (
                 <Icon name="lock" size={13} className="text-fg-muted flex-shrink-0" />
               )}
-              {doc.status === 'error' && (
-                <Icon name="alertTriangle" size={13} className="flex-shrink-0 text-red-500" />
+              {document.status === 'error' && (
+                <span
+                  className="flex flex-shrink-0"
+                  role="img"
+                  aria-label={t(errorReasonKeyOf(document.error))}
+                  title={t(errorReasonKeyOf(document.error))}
+                >
+                  <Icon name="alertTriangle" size={13} className="text-red-500" />
+                </span>
               )}
-              <span className="min-w-0 flex-1 truncate">
-                {doc.name ?? `Document ${doc.id.slice(0, 8)}`}
-              </span>
+              <span className="min-w-0 flex-1 truncate">{name}</span>
 
               {/* close — on the active tab, and never the last document
                   (an empty workspace is designable, but not this demo's goal) */}
-              {isActive && docs.length > 1 && (
+              {isActive && documents.length > 1 && (
                 <button
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    void close(doc.id);
+                    closeTab(document, name);
                   }}
-                  aria-label={`Close ${doc.name ?? 'document'}`}
+                  aria-label={t('tabs.close', { params: { name } })}
                   className="hover:bg-hover flex-shrink-0 cursor-pointer rounded-full p-1 opacity-100 transition-all"
                 >
                   <Icon name="x" size={14} />
@@ -95,32 +108,17 @@ export function TabBar({
             </div>
           );
         })}
-
-        {allowOpenFile && (
-          <>
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              aria-label="Open File"
-              title="Open File"
-              className="text-fg-secondary hover:bg-hover hover:text-fg mb-1.5 ml-1 flex-shrink-0 cursor-pointer rounded p-1.5 transition-colors"
-            >
-              <Icon name="plus" size={14} />
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".pdf,application/pdf"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void openFile(file);
-                event.target.value = '';
-              }}
-            />
-          </>
-        )}
       </div>
+      {closing && (
+        <CloseUnsavedDialog
+          name={closing.name}
+          onCancel={() => setClosing(null)}
+          onClose={() => {
+            setClosing(null);
+            void close(closing.id);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,11 +1,19 @@
 {
   "toolchain": "esbuild (plain, esm + splitting)",
+  "workerSrc": "'self'",
   "dist": "dist",
   "variants": [
     {
       "name": "esbuild+portable",
       "toolchain": "esbuild + `@embedpdf/engine/portable` (zero config)",
+      "workerSrc": "'self' blob:",
       "script": "matrix:build:portable"
+    },
+    {
+      "name": "esbuild+viewer/portable",
+      "toolchain": "esbuild + `@embedpdf/viewer/portable`, the whole viewer (zero config)",
+      "workerSrc": "'self' blob:",
+      "script": "matrix:build:viewer"
     }
   ]
 }

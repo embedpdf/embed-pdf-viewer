@@ -6,7 +6,7 @@ import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };

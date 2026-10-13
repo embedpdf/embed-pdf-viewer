@@ -1,19 +1,34 @@
 import fs from 'node:fs';
 
+import type { DocsEngine } from './axis';
+
 /**
  * The publish gate: a headless page is live for a framework once its snippets compile for it and
- * it names nothing pending in `docs/content/reference.mjs`. `docs:check` works that out on every
- * build (`docs/content/scripts/publish-gate.mjs`) and writes
+ * it names nothing pending in `docs/content/reference.mjs`; a viewer page once its snippets and
+ * the code it shows compile, for each framework and for plain HTML (`vanilla`). `docs:check`
+ * works that out on every build (`docs/content/scripts/publish-gate.mjs`) and writes
  * `docs/content/generated/live-pages.json`; this module reads it for a site.
  *
  * A page that isn't live shows its title and why (`UnreleasedNotice` in `./release.tsx`), and
  * stays out of search, `llms.txt` and search engines. The preview site shows every page; one that
  * production holds back carries a banner under its title.
+ *
+ * Each site has its own status, by the engine its docs are for (`local` is embedpdf.com, `cloud`
+ * cloudpdf.com): the pages it has, and the code they show there, so a cloud snippet that doesn't
+ * compile holds back cloudpdf.com's page only.
  */
 
 export type LivePages = {
-  /** Per page (`text/search`, `annotations/index`): what holds it back, and where it's live. */
-  pages: Record<string, { pending: string[]; live: Record<string, boolean> }>;
+  sites: Record<
+    DocsEngine,
+    {
+      /**
+       * Per page (`text/search`, `annotations/index`, and the viewer's `viewer/setup`): what holds
+       * it back, and where it's live.
+       */
+      pages: Record<string, { pending: string[]; live: Record<string, boolean> }>;
+    }
+  >;
 };
 
 /** What a docs route shows. */
@@ -37,7 +52,7 @@ export function isDocsPreview(env: Record<string, string | undefined> = process.
 
 const loaded = new Map<string, { modified: number; livePages: LivePages }>();
 
-/** A site's `live-pages.json`, read again only when `docs:check` rewrites it. */
+/** The `live-pages.json` the sites share, read again only when `docs:check` rewrites it. */
 export function loadLivePages(file: string): LivePages {
   let modified: number;
   try {
@@ -49,36 +64,52 @@ export function loadLivePages(file: string): LivePages {
   }
   const cached = loaded.get(file);
   if (cached?.modified === modified) return cached.livePages;
-  const livePages = JSON.parse(fs.readFileSync(file, 'utf8')) as LivePages;
-  loaded.set(file, { modified, livePages });
-  return livePages;
+  const livePages = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<LivePages>;
+  if (!livePages.sites) {
+    throw new Error(`${file} has no status per site: run \`pnpm docs:check\` again.`);
+  }
+  loaded.set(file, { modified, livePages: livePages as LivePages });
+  return livePages as LivePages;
 }
 
-/** `docs/headless/text/search` → `text/search`; an index page is `annotations/index`. */
-function pageName(contentPath: string, pages: LivePages['pages']): string {
-  const rest = contentPath.replace(/^\/?docs\/headless\/?/, '');
-  if (!rest) return 'index';
-  return rest in pages ? rest : `${rest}/index`;
+/** The docs the gate decides for: the headless pages, and the viewer's. */
+const GATED = /^\/?docs\/(headless|viewer)(\/|$)/;
+
+/**
+ * `docs/headless/text/search` → `text/search`, `docs/viewer/customize/layout` →
+ * `viewer/customize/layout`; an index page is `annotations/index`, `viewer/index`.
+ */
+function pageName(contentPath: string, pages: LivePages['sites'][DocsEngine]['pages']): string {
+  const [, product, rest] = contentPath.match(/^\/?docs\/(headless|viewer)\/?(.*)$/) ?? [];
+  const prefix = product === 'viewer' ? 'viewer/' : '';
+  if (!rest) return `${prefix}index`;
+  const name = `${prefix}${rest}`;
+  return name in pages ? name : `${name}/index`;
 }
 
 /**
  * What a docs route shows: its page, or the notice that it isn't released for this framework.
- * Only headless pages are gated. `livePages` is read only when the gate decides, so the preview
- * site never needs `docs:check` to have run.
+ * Headless and viewer pages are gated, by the status of the site's own copy (`engine`, the
+ * site's binding). `livePages` is read only when the gate decides, so the preview site never
+ * needs `docs:check` to have run.
  */
 export function docsRelease({
   contentPath,
   framework,
   preview,
   livePages,
+  engine,
 }: {
-  /** The route's content source: `docs/headless/text/search`. */
+  /** The route's content source: `docs/headless/text/search`, `docs/viewer/setup`. */
   contentPath: string;
   framework: string | undefined;
   preview: boolean;
   livePages: () => LivePages;
+  /** The site's engine binding (`DOCS_SITE.engine`): `local` is embedpdf.com, `cloud` cloudpdf.com. */
+  engine: DocsEngine;
 }): DocsRelease {
-  if (!/^\/?docs\/headless(\/|$)/.test(contentPath) || !framework) {
+  const pagesOf = () => livePages().sites[engine]?.pages ?? {};
+  if (!GATED.test(contentPath) || !framework) {
     return { live: true, preview: false, reactLive: true };
   }
   if (preview) {
@@ -86,14 +117,14 @@ export function docsRelease({
     // file (`docs:check` hasn't run), there's nothing to mark.
     let released = true;
     try {
-      const { pages } = livePages();
+      const pages = pagesOf();
       released = pages[pageName(contentPath, pages)]?.live[framework] === true;
     } catch {
       released = true;
     }
     return { live: true, preview: !released, reactLive: true };
   }
-  const { pages } = livePages();
+  const pages = pagesOf();
   // A page added since `docs:check` last ran waits for the next check.
   const page = pages[pageName(contentPath, pages)];
   return {

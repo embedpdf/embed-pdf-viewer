@@ -66,7 +66,6 @@ export const RENDER_DEFAULTS: RenderSettings = {
     bleed: 1,
     prefetch: { margin: 0.5, velocityBias: true },
     settleMs: 150,
-    fadeMs: 0,
   },
   format: undefined,
   quality: undefined,

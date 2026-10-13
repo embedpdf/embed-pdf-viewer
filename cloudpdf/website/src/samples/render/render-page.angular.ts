@@ -25,7 +25,7 @@ interface Thumbnail {
   // No Stage: these pictures are plain images, rendered on demand.
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       withRender(),
     ),
   ],

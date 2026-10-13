@@ -179,6 +179,8 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     getRevision: (id) => (known(id) ? meta.revision : -1),
     canDownload: () => true,
     canPrint: () => true,
+    // A test context opens nothing.
+    canOpenFiles: () => false,
     open: unsupported('open'),
     retry: unsupported('retry'),
     rename: unsupported('rename'),

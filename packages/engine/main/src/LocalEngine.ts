@@ -6,6 +6,7 @@ import {
   decodePdfBits,
   EngineError,
   EngineErrorCode,
+  generateUuid,
   LOCAL_ENGINE_BRAND,
   PermissionDenied,
   wirePack,
@@ -14,7 +15,6 @@ import {
   type OpenInput,
   type OpenOptions,
 } from '@embedpdf/engine-core/runtime';
-import { generateUuid } from '@embedpdf/engine-services';
 
 import { LocalDocumentHandle } from './document/LocalDocumentHandle';
 import { OBJECT_NUMBER_POOL_SIZE } from './document/LocalObjectNumberPool';
@@ -58,6 +58,8 @@ export interface LocalEngineOptions {
  */
 export class LocalEngine implements LocalEngineContract {
   readonly [LOCAL_ENGINE_BRAND] = true;
+  /** It opens a file's own bytes, wherever they come from. */
+  readonly canOpenFiles = true;
   static fromTransport(opts: LocalEngineOptions): LocalEngine {
     return new LocalEngine(
       opts.transport,

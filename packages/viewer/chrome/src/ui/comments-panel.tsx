@@ -11,6 +11,7 @@ import {
   type CommentThreadView,
 } from '@embedpdf/react/annotation';
 import { StageToken } from '@embedpdf/react/stage';
+import { useCommands, useCommandsSettings } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
 import { commentIconAccent, commentTypeConfig } from './comment-config';
@@ -32,7 +33,9 @@ import { commentIconAccent, commentTypeConfig } from './comment-config';
  * Every action routes through the `comments` verbs — plain annotation writes
  * on the one optimistic pipeline — and every control is gated by
  * `permissionsFor`, the engine's own collab-resolver mirrors: what shows here
- * is what the engine will allow.
+ * is what the engine will allow. With writing turned off (`comments.writing`,
+ * which `readOnly` turns off) the threads are only read: no composer, no
+ * status, no edit and no delete.
  */
 
 const REVIEW_STATES = ['none', 'accepted', 'rejected', 'cancelled', 'completed'] as const;
@@ -44,8 +47,17 @@ const dateLabel = (iso: string | null): string => {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
+/** Whether people write here: the `comments.writing` feature is on. */
+function useWriting(): boolean {
+  const commands = useCommands();
+  // Read again whenever what's turned off changes.
+  useCommandsSettings((settings) => settings.disabledCategories);
+  return !commands.isCategoryDisabled('comments.writing');
+}
+
 export function CommentsPanel() {
   const t = useT();
+  const writing = useWriting();
   const status = useAnnotationState((state) => state.status);
   const comments = useComments();
   const threads = useCommentThreads();
@@ -120,7 +132,14 @@ export function CommentsPanel() {
       </Empty>
     );
   }
-  if (threads.length === 0) return <Empty icon="comment" text={t('demo.commentsEmpty')} />;
+  if (threads.length === 0) {
+    return (
+      <Empty
+        icon="comment"
+        text={t(writing ? 'demo.commentsEmpty' : 'demo.commentsEmptyReadOnly')}
+      />
+    );
+  }
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
@@ -146,6 +165,7 @@ export function CommentsPanel() {
                   <ThreadCard
                     key={key}
                     view={view}
+                    writing={writing}
                     selected={selectedThreadKey === key}
                     onSelect={() => goTo(view)}
                     cardRef={(element) => {
@@ -182,11 +202,14 @@ function Empty({
 
 function ThreadCard({
   view,
+  writing,
   selected,
   onSelect,
   cardRef,
 }: {
   view: CommentThreadView;
+  /** Whether people write here; without it the thread is only read. */
+  writing: boolean;
   selected: boolean;
   onSelect: () => void;
   cardRef: (element: HTMLLIElement | null) => void;
@@ -196,9 +219,9 @@ function ThreadCard({
   const [reply, setReply] = useState('');
   const root = view.root.ref;
   const perms = {
-    canDeleteThread: comments.canDeleteThread(root),
-    canSetStatus: comments.canSetStatus(root),
-    canReply: comments.canReply(root),
+    canDeleteThread: writing && comments.canDeleteThread(root),
+    canSetStatus: writing && comments.canSetStatus(root),
+    canReply: writing && comments.canReply(root),
   };
   const config = commentTypeConfig(view.root);
   const status = view.review.mine?.state ?? 'none';
@@ -233,7 +256,7 @@ function ThreadCard({
               <span className="text-fg truncate text-sm font-medium">
                 {view.root.author ?? t('demo.commentsAnonymous')}
               </span>
-              <span className="text-fg-muted ml-auto shrink-0 text-xs">
+              <span className="text-fg-muted ms-auto shrink-0 text-xs">
                 {dateLabel(view.root.modifiedAt ?? view.root.createdAt)}
               </span>
             </div>
@@ -263,71 +286,77 @@ function ThreadCard({
           annotationRef={view.root.ref}
           text={view.root.contents ?? ''}
           deletable={false}
+          writing={writing}
         />
 
         {view.replies.length > 0 && (
           <div className="border-border-subtle flex flex-col gap-2 border-t pt-2">
             {view.replies.map((replyDto) => (
-              <Reply key={annotationKey(replyDto.ref)} dto={replyDto} />
+              <Reply key={annotationKey(replyDto.ref)} dto={replyDto} writing={writing} />
             ))}
           </div>
         )}
 
-        <div className="border-border-subtle flex flex-col gap-1.5 border-t pt-2">
-          {perms.canSetStatus && (
-            <label
-              className="text-fg-muted flex items-center gap-2 text-xs"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {t('demo.commentsStatus')}
-              <select
-                value={status}
-                onChange={(event) => void comments.setStatus(view.root.ref, event.target.value)}
-                className="border-border bg-surface text-fg flex-1 rounded-md border px-1.5 py-1 text-xs outline-none"
+        {(perms.canSetStatus || perms.canReply) && (
+          <div className="border-border-subtle flex flex-col gap-1.5 border-t pt-2">
+            {perms.canSetStatus && (
+              <label
+                className="text-fg-muted flex items-center gap-2 text-xs"
+                onClick={(event) => event.stopPropagation()}
               >
-                {REVIEW_STATES.map((state) => (
-                  <option key={state} value={state}>
-                    {statusLabel(t, state)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {perms.canReply && (
-            <div className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
-              <input
-                type="text"
-                value={reply}
-                placeholder={
-                  view.root.contents || view.replies.length
-                    ? t('demo.commentsReplyPlaceholder')
-                    : t('demo.commentsAddPlaceholder')
-                }
-                onChange={(event) => setReply(event.target.value)}
-                onKeyDown={(event) => event.key === 'Enter' && sendReply()}
-                className="border-border bg-surface text-fg focus:border-accent w-full min-w-0 flex-1 rounded-md border px-2 py-1 text-sm outline-none"
-              />
-              <button
-                type="button"
-                onClick={sendReply}
-                disabled={!reply.trim()}
-                className="text-accent disabled:text-fg-muted grid h-7 w-7 shrink-0 place-items-center rounded-md"
-                title={t('demo.commentsReply')}
+                {t('demo.commentsStatus')}
+                <select
+                  value={status}
+                  onChange={(event) => void comments.setStatus(view.root.ref, event.target.value)}
+                  className="border-border bg-surface text-fg flex-1 rounded-md border px-1.5 py-1 text-xs outline-none"
+                >
+                  {REVIEW_STATES.map((state) => (
+                    <option key={state} value={state}>
+                      {statusLabel(t, state)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {perms.canReply && (
+              <div
+                className="flex items-center gap-1.5"
+                onClick={(event) => event.stopPropagation()}
               >
-                <Icon name="arrowForwardUp" size={16} />
-              </button>
-            </div>
-          )}
-        </div>
+                <input
+                  type="text"
+                  value={reply}
+                  placeholder={
+                    view.root.contents || view.replies.length
+                      ? t('demo.commentsReplyPlaceholder')
+                      : t('demo.commentsAddPlaceholder')
+                  }
+                  onChange={(event) => setReply(event.target.value)}
+                  onKeyDown={(event) => event.key === 'Enter' && sendReply()}
+                  className="border-border bg-surface text-fg focus:border-accent w-full min-w-0 flex-1 rounded-md border px-2 py-1 text-sm outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={sendReply}
+                  disabled={!reply.trim()}
+                  className="text-accent disabled:text-fg-muted grid h-7 w-7 shrink-0 place-items-center rounded-md"
+                  title={t('demo.commentsReply')}
+                >
+                  <Icon name="arrowForwardUp" size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </li>
   );
 }
 
-function Reply({ dto }: { dto: Annotation }) {
+function Reply({ dto, writing }: { dto: Annotation; writing: boolean }) {
   const t = useT();
   return (
-    <div className="border-border-subtle ml-1 border-l-2 pl-2">
+    <div className="border-border-subtle ms-1 border-s-2 ps-2">
       <div className="flex items-baseline gap-2">
         <span className="text-fg-secondary text-xs font-medium">
           {dto.author ?? t('demo.commentsAnonymous')}
@@ -336,26 +365,28 @@ function Reply({ dto }: { dto: Annotation }) {
           {dateLabel(dto.modifiedAt ?? dto.createdAt)}
         </span>
       </div>
-      <CommentBody annotationRef={dto.ref} text={dto.contents ?? ''} deletable />
+      <CommentBody annotationRef={dto.ref} text={dto.contents ?? ''} deletable writing={writing} />
     </div>
   );
 }
 
-/** One comment's text with inline edit (own, unlocked) and delete (replies). */
+/** One comment's text with inline edit (own, unlocked) and delete (replies), while people write. */
 function CommentBody({
   annotationRef,
   text,
   deletable,
+  writing,
 }: {
   annotationRef: AnnotationRef;
   text: string;
   deletable: boolean;
+  writing: boolean;
 }) {
   const t = useT();
   const comments = useComments();
   const perms = {
-    canEditText: comments.canSetText(annotationRef),
-    canDelete: comments.canDelete(annotationRef),
+    canEditText: writing && comments.canSetText(annotationRef),
+    canDelete: writing && comments.canDelete(annotationRef),
   };
   const [draft, setDraft] = useState<string | null>(null);
 

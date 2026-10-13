@@ -18,10 +18,7 @@
   import { useKernelValue, useOptionalCapability } from '../runtime/readers.svelte';
   import TileImage from './TileImage.svelte';
 
-  let { layers, fadeMs }: { layers: PageLayerOptions; fadeMs: number } = $props();
-
-  const TILE_FADE_KEYFRAMES =
-    '<style>@keyframes epdf-tile-in { from { opacity: 0 } to { opacity: 1 } }</style>';
+  let { layers }: { layers: PageLayerOptions } = $props();
 
   const page = usePage();
   const render = useOptionalCapability(RenderToken);
@@ -79,16 +76,10 @@
     style:width="{page.transform.contentWidth}px"
     style:height="{page.transform.contentHeight}px"
   >
-    {#if fadeMs > 0}
-      <!-- In the markup, not in a component stylesheet, so it arrives with the tiles wherever
-           the page is mounted. A constant, never user content. -->
-      {@html TILE_FADE_KEYFRAMES}
-    {/if}
     {#each plan.current.paint as source (source.key)}
       <TileImage
         {source}
         viewScale={page.transform.viewScale}
-        {fadeMs}
         onPainted={() => view?.markPainted(pageRef, source.key)}
         onUnpainted={() => view?.markUnpainted(pageRef, source.key)}
       />

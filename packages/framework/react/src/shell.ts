@@ -12,10 +12,11 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-shell';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { ShellToken, shellState } from '@embedpdf/plugin-shell';
 import type { OpenSurfaceOptions, ShellCapability, SurfaceProps } from '@embedpdf/plugin-shell';
 import type { EventHook } from '@embedpdf/core';
+import { createSurfaceFocusFollower, type SurfaceFocusOptions } from '@embedpdf/web';
 import {
   useCapability,
   useCapabilityEvent,
@@ -74,4 +75,32 @@ export function useSurface(id: string): SurfaceHandle {
     }),
     [shell, id, isOpen, props],
   );
+}
+
+export type { SurfaceFocusOptions };
+
+/**
+ * Put the cursor in `ref`'s element when the surface `id` asks for it: on every
+ * `open(id, { focus: true })`, a command whose panel says `focus` among them, and
+ * when the element mounts while the request is up (the panel opened, or its code
+ * loaded, because of it). A plain open never moves it. `select` selects an input's
+ * text, so typing replaces it. Reads the surface of this subtree's document; use
+ * it in the component that renders the element.
+ */
+export function useSurfaceFocus(
+  id: string,
+  ref: RefObject<HTMLElement | null>,
+  options: SurfaceFocusOptions = {},
+): void {
+  const shell = useOptionalCapability(ShellToken);
+  const request = useOptionalSelector(
+    ShellToken,
+    (current) => current.getSurface(id)?.focusRequest ?? 0,
+    0,
+  );
+  const [follower] = useState(createSurfaceFocusFollower);
+  const select = options.select ?? false;
+  // After every render, so an element that has just appeared is seen, and after the layout
+  // effects, so a panel's frame has placed and shown it (a sheet's layer is hidden until then).
+  useEffect(() => follower.follow(ref.current, shell, request, { select }));
 }

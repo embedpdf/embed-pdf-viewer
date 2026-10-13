@@ -201,13 +201,17 @@ module.exports = [
     // The two-door invariant, enforced (docs/conventions/packages.md and
     // packages/viewer/*/src/component.*).
     //
-    // A framework wrapper's component module must stay engine-blind: the local
+    // A framework wrapper's shared modules must stay engine-blind: the local
     // PDFium engine enters a consumer's bundle through a runtime import of the
-    // `.` door, and if that import sits in the shared component then both doors
+    // `.` door, and if that import sits in a module both doors share then both
     // carry it and the cloud build's "no wasm" promise is silently gone. Types
     // are free — they vanish at compile time — so the boundary is exactly
-    // `import type`.
-    files: ['packages/viewer/*/src/component.{ts,tsx}'],
+    // `import type`. Only the door entries import the viewer itself.
+    files: [
+      'packages/viewer/{react,vue,svelte}/src/**/*.{ts,tsx}',
+      'packages/viewer/angular/component/src/**/*.ts',
+    ],
+    ignores: ['packages/viewer/*/src/index.ts', 'packages/viewer/*/src/core.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
@@ -230,8 +234,8 @@ module.exports = [
     // The CloudPDF tree renders server-side by definition — "no wasm in your
     // bundle" is the product — so it must never reach for the local-engine
     // door. `@embedpdf/viewer` and `@embedpdf/viewer-<fw>` bundle PDFium;
-    // their `/core` subpaths do not. (A bare `*` glob does not cross `/`, so
-    // the `/core` doors stay allowed.)
+    // their `/core` subpaths do not. A regex names the bare packages only: a
+    // glob pattern also matches every path under a package, `/core` included.
     files: ['cloudpdf/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
@@ -239,11 +243,11 @@ module.exports = [
         {
           patterns: [
             {
-              group: ['@embedpdf/viewer', '@embedpdf/viewer-*'],
+              regex: '^@embedpdf/viewer(-[a-z]+)?$',
               message:
                 'the cloud tree must not bundle the local PDFium engine: import the ' +
-                'engine-agnostic door instead (`@embedpdf/viewer/core`, ' +
-                '`@embedpdf/viewer-react/core`, …) and inject cloudEngine().',
+                'engine-agnostic door (`@embedpdf/viewer/core`) and the wrappers\' door-blind ' +
+                'parts (`@embedpdf/viewer-react/component`, …), and register the cloud engine.',
             },
           ],
         },

@@ -667,7 +667,14 @@ export interface DocumentsCapability {
    */
   open(source: OpenSource, options?: OpenDocumentOptions): Promise<OpenDocumentResult>;
   /**
-   * Open a failed document (`status: 'error'`) again, with the same source and options.
+   * Whether `open()` can open a file from the user's computer (its bytes, or a URL the viewer
+   * downloads): the engine's `canOpenFiles`. True with the local engine; false with the cloud
+   * engine, whose documents come from your server.
+   */
+  canOpenFiles(): boolean;
+  /**
+   * Open a failed document (`status: 'error'`) again, with the same source and options, in its
+   * own tab: it keeps its id and its place, and the active document stays the active one.
    * Resolves like `open()`. Rejects `invalid-input` for a document that didn't fail.
    */
   retry(id: string, options?: OperationOptions): Promise<OpenDocumentResult>;

@@ -7,7 +7,7 @@ const command = useCommand(() => props.id);
 </script>
 
 <template>
-  <li v-if="command?.visible" class="row" :data-disabled="!command.enabled || undefined">
+  <li v-if="command.visible" class="row" :data-disabled="!command.enabled || undefined">
     <kbd class="key">{{ formatShortcut(shortcut) }}</kbd>
     <span>{{ command.label }}</span>
   </li>

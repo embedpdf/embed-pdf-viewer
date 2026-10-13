@@ -10,6 +10,7 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
 import type { Engine } from '../engine/Engine';
 import type { PageBox } from '../geometry/pageSpace';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 export interface AnnotationDeclarationFixture {
   /** Stable id used for the local engine; cloud uses its own id. */
@@ -704,7 +705,10 @@ async function openFixture(
   fixture: AnnotationDeclarationFixture,
 ): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
-    return engine.open({ kind: 'bytes', id: fixture.id, bytes: await fixture.bytes() });
+    return engine.open(
+      { kind: 'bytes', id: fixture.id, bytes: await fixture.bytes() },
+      EVERY_PERMISSION,
+    );
   }
   return engine.open({ kind: 'id', id: fixture.cloudId ?? fixture.id });
 }

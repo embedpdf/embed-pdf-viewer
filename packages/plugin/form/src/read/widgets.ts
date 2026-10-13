@@ -5,14 +5,19 @@
  * folded in, and the widget hit test.
  */
 import { memoByKey } from '@embedpdf/core';
-import type { FormFieldDTO, PageRef } from '@embedpdf/engine-core/runtime';
+import type { FormFieldDTO, FormFieldFamily, PageRef } from '@embedpdf/engine-core/runtime';
 
+import type { FillableFields } from '../contract';
 import type { FormHostCapability } from '../host-contract';
 import { pageWidgetsOf, widgetAt, type Box, type ShownWidget, type WidgetHit } from '../model';
 import type { FormContext, FormServices } from '../services';
 import { fillItems, type FormWidgetItem } from './fill-items';
 
 const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
+
+/** Whether the `fillable` setting lets people fill in a field of this family by hand. */
+const isFillableByHand = (fillable: FillableFields, family: FormFieldFamily): boolean =>
+  typeof fillable === 'boolean' ? fillable : fillable.includes(family);
 const NOTHING_SHOWN: readonly ShownWidget[] = Object.freeze([]);
 
 export function createWidgetReads(
@@ -42,13 +47,21 @@ export function createWidgetReads(
     return widgetAt(fields.view(), widgetsOn(page.objectNumber), point);
   };
 
-  // A field the user may not fill in (a signature field: sign) has its
-  // widgets `disabled`, the same flag a field's read-only flag sets, so the
-  // controls never offer a write the engine would refuse.
+  // A field the user may not fill in (a signature field: sign), or one the
+  // `fillable` setting leaves out, has its widgets `disabled`, the same flag a
+  // field's read-only flag sets, so the controls never offer a write the
+  // engine would refuse, nor one the app turned off.
+  const fillable = (): FillableFields => ctx.settings().get().fillable;
   const mayWrite = (field: FormFieldDTO): boolean =>
-    field.family === 'signature' ? rights.maySign(field) : rights.mayFill(field);
+    isFillableByHand(fillable(), field.family) &&
+    (field.family === 'signature' ? rights.maySign(field) : rights.mayFill(field));
   const widgetsOfPage = memoByKey(
-    (pageObjectNumber: number) => [fields.view(), widgetsOn(pageObjectNumber), rights.key()],
+    (pageObjectNumber: number) => [
+      fields.view(),
+      widgetsOn(pageObjectNumber),
+      rights.key(),
+      fillable(),
+    ],
     (pageObjectNumber, index, widgets): readonly FormWidgetItem[] =>
       fillItems(index, pageObjectNumber, widgets, mayWrite),
   );

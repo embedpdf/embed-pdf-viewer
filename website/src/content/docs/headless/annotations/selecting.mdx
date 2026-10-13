@@ -94,7 +94,7 @@ shows both:
 | :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
 | `'color'`       | A color picker. `null` means no color.                                                                         |                      |
 | `'number'`      | A slider or a number input.                                                                                    | `min`, `max`, `step` |
-| `'choice'`      | A list, such as fonts or line endings.                                                                         | `options`            |
+| `'choice'`      | A list, such as fonts or line endings. Each option is `{ value, label, labelKey }`: write `value`, show `label`. | `options`            |
 | `'flag'`        | An on/off switch, such as `locked` or `print`.                                                                 |                      |
 | `'text'`        | A text input, such as a redaction's label.                                                                     |                      |
 | `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
@@ -112,6 +112,15 @@ await annotation.selection.update((member) =>
 
 The same properties drive a panel for a tool's defaults; see
 [Let people change the defaults](tools#let-people-change-the-defaults).
+
+### In the user's language
+
+Each property has a `label` in English and a `labelKey` to translate it, and so does each option:
+`annotation.style.stroke`, `annotation.flags.noView`, `annotation.lineEndings.openArrow`. With the
+[i18n plugin](../ui/translations), show `t(property.labelKey, { fallback: property.label })`, and
+give your languages strings for the keys; without a string for a key, the English shows. A key names
+the wording, not the field: `color` is `annotation.style.stroke` on a rectangle and
+`annotation.style.outline` on a redaction mark, so each kind keeps its own word.
 
 ## Change the handles
 
@@ -250,6 +259,29 @@ await annotation.text.end();
 `annotation.text.getEditing()` is the box being typed in, or `null`. How fonts and formatting work
 is on [Rich text](../concepts/rich-text).
 
+## What people may change
+
+`editable` says which annotations people may change by hand. One it leaves out can still be
+selected, hovered, read and commented on, but it has no handles, doesn't move, turn or take typing,
+the style panel has nothing for it, and `selection.update()` and `selection.delete()` leave it as
+it is:
+
+```ts
+annotationPlugin({ editable: ['highlight', 'ink'] }); // only highlights and drawings change
+
+annotation.updateSettings({ editable: false }); // nothing changes by hand, while the app runs
+annotation.updateSettings({ editable: true }); // everything again, the default
+```
+
+The list names kinds by their `subtype`. A measurement goes by its `intent` instead
+(`'line-dimension'`, `'polyline-dimension'` or `'polygon-dimension'`), so `['line']` keeps
+measurements still and `['line-dimension']` lets only them change. `annotation.isEditable(ref)` says
+whether people may change one.
+
+It's only about people: your code still changes any annotation with `update()` and `delete()`, and
+`canUpdate(ref)` and `canDelete(ref)` stay the same. To stop your code too, leave the permission out
+of the [scope](../concepts/permissions).
+
 ## Shapes with many points
 
 A polygon or a polyline takes a click per point, and a double-click ends it. While it's being drawn,
@@ -293,6 +325,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `draft.finish()`, `draft.cancel()`                         | Ends the shape and creates it, as a double-click does, or drops it                                                               |
 | `text.begin(ref)`, `text.end()`                            | Starts typing in a text box, as a double-click does, or stops and saves what was typed. [Edit text](#edit-text)                  |
 | `text.toggleFormat(format)`                                | Turns `'bold'`, `'italic'` or `'underline'` on or off, for the selected words or the whole box                                   |
+| `isEditable(ref)`                                          | Whether people may change this annotation by hand, as the `editable` setting says. [What people may change](#what-people-may-change) |
 | `cancel()`                                                 | Stops a drag, or a polygon in progress. [Keyboard](#keyboard)                                                                    |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
@@ -331,6 +364,8 @@ Changes to the annotations themselves are on [Events, saving & sharing](saving#e
 
 People can select a `locked` annotation, but not move, resize, turn or delete it, and
 `lockedContents` stops them from changing its text. A `hidden` annotation can't be selected at all.
+The `editable` setting does what `locked` does without writing the flag into the PDF: see
+[What people may change](#what-people-may-change).
 
 ### Touch
 

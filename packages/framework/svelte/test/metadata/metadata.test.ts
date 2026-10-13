@@ -1,5 +1,5 @@
 import { flushSync } from 'svelte';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ActionsToken, actionsPlugin } from '../../src/actions';
 import {
   MetadataToken,
@@ -39,9 +39,11 @@ describe('useMetadataState', () => {
     const { kernel } = await viewerWith(plugins, Probes, { probes: [state] }, metadataEngine);
     expect(latest(state.seen)).toEqual(metadataState.empty);
 
+    // Nothing reads the metadata as the document opens: the reader's reading it loads it.
     await kernel.documents.open(bytesInput('doc'));
-    await kernel.capability(MetadataToken).refresh();
+    await vi.waitFor(() => expect(kernel.capability(MetadataToken).getStatus()).toBe('ready'));
     flushSync();
+    expect(state.seen.some((seen) => (seen as { status: string }).status === 'loading')).toBe(true);
     expect(latest(state.seen)).toEqual({ metadata: METADATA, custom: CUSTOM, status: 'ready' });
   });
 

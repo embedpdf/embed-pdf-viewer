@@ -20,6 +20,23 @@ describe('negotiateLocale', () => {
     expect(negotiateLocale(['fr', 'en'], ['de', 'fr-CA'])).toBe('fr');
   });
 
+  it('matches a dialect only in the same script: Taiwan and Hong Kong write Traditional Chinese', () => {
+    const available = ['en', 'zh-CN'];
+    expect(negotiateLocale(available, ['zh-TW'])).toBeNull();
+    expect(negotiateLocale(available, ['zh-HK', 'en'])).toBe('en');
+    expect(negotiateLocale(available, ['zh'])).toBe('zh-CN');
+    expect(negotiateLocale(available, ['zh-SG'])).toBe('zh-CN');
+    expect(negotiateLocale(['zh-CN', 'zh-TW'], ['zh-HK'])).toBe('zh-TW');
+    expect(negotiateLocale(['zh'], ['zh-Hant'])).toBeNull();
+    expect(negotiateLocale(['sr'], ['sr-Latn'])).toBeNull();
+  });
+
+  it('still narrows a pseudo-locale, and matches a private tag it cannot read exactly', () => {
+    expect(negotiateLocale(['en'], ['en-XA'])).toBe('en');
+    expect(negotiateLocale(['x-acme', 'en'], ['x-acme'])).toBe('x-acme');
+    expect(negotiateLocale(['en', 'x-acme'], ['x-acme-test'])).toBe('x-acme');
+  });
+
   it('returns null when nothing matches', () => {
     expect(negotiateLocale(['en'], ['ja', 'ko'])).toBeNull();
   });

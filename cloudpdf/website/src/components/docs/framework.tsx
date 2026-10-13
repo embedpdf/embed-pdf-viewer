@@ -1,37 +1,25 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { useDocsIntegration } from '@embedpdf/docs-kit';
 import type { ReactNode } from 'react';
 
-import {
-  DEFAULT_PRODUCT_INTEGRATION,
-  headlessIntegrationFromPath,
-  type HeadlessIntegration,
-} from '@/lib/docs-integrations';
+import type { DocsIntegration } from '@/lib/docs-integrations';
 
-/**
- * The pathname is the single source of truth for the active framework
- * (docs/conventions/docs-architecture.md): /docs/headless/<fw>/… — no provider
- * threading, correct during SSR, and every component derives it the same
- * way. Same contract as the EmbedPDF site.
- */
-export function useFramework(): HeadlessIntegration {
-  const pathname = usePathname();
-  return headlessIntegrationFromPath(pathname) ?? DEFAULT_PRODUCT_INTEGRATION.headless;
-}
-
-/** Renders children only on the given frameworks' pages. Rare by design —
- * prose should be framework-neutral; heavy use means the page belongs in the
- * explicit per-framework fork set (install/SSR). */
+/** Renders children only on the given integrations' pages. The pathname says
+ * which (docs/conventions/docs-architecture.md): /docs/headless/<fw>/… or
+ * /docs/viewer/<integration>/…, `vanilla` included on a viewer page. Rare by
+ * design — prose should be framework-neutral; heavy use means the page belongs
+ * in the explicit per-framework fork set (install/SSR). Same contract as the
+ * EmbedPDF site. */
 export function Fw({
   only,
   children,
 }: {
-  only: HeadlessIntegration | HeadlessIntegration[];
+  only: DocsIntegration | DocsIntegration[];
   children: ReactNode;
 }) {
-  const fw = useFramework();
+  const integration = useDocsIntegration();
   const list = Array.isArray(only) ? only : [only];
-  if (!list.includes(fw)) return null;
+  if (!list.includes(integration)) return null;
   return <>{children}</>;
 }

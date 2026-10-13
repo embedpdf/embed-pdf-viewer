@@ -7,14 +7,26 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-commands';
-import { useEffect, useMemo, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { formatShortcut as formatKeys } from '@embedpdf/core-ui';
-import { CommandsToken, boundCommandOf, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
-import type { BoundCommand, CommandsCapability } from '@embedpdf/plugin-commands';
+import {
+  CommandsToken,
+  boundCommandOf,
+  resolvedCommandsEqual,
+  unknownCommandWarning,
+  unregisteredCommand,
+} from '@embedpdf/plugin-commands';
+import type {
+  BoundCommand,
+  CommandId,
+  CommandRefusal,
+  CommandsCapability,
+} from '@embedpdf/plugin-commands';
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
 import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
 import type { EventHook } from '@embedpdf/core';
 import { bindCommandShortcuts, isMacPlatform, standardCommandsBrowser } from '@embedpdf/web';
+import { devWarn } from './dev';
 import { useCapability, useCapabilityEvent, useDocumentId, useKernelValue } from './runtime';
 import { settingsHook } from './state';
 
@@ -38,7 +50,10 @@ export function useCommandsEvent<T>(
   useCapabilityEvent(CommandsToken, select, handler);
 }
 
-/** The commands settings (`commands`, `disabledCategories`), with or without a document. Takes a selector. */
+/**
+ * The commands settings (`commands`, `disabledCategories`, `disabledCommands`, `notAllowed`),
+ * with or without a document. Takes a selector.
+ */
 export const useCommandsSettings = settingsHook(CommandsToken);
 
 /** A shortcut as a tooltip shows it, for this platform: `'⌘K'` on a Mac, `'Ctrl+K'` elsewhere. */
@@ -48,44 +63,56 @@ export function formatShortcut(shortcut: string, options: { isMac?: boolean } = 
 
 /**
  * A command for this component's document (the nearest <DocumentScope>, else the active one):
- * its label, icon, state, `run` and `shortcut`. Re-renders when any of them changes; `null` for
- * an unknown id.
+ * its label, icon, state, `run` and `shortcut`. Re-renders when any of them changes. Always a
+ * command: an id no plugin registered is labelled with its id, neither visible nor enabled, and
+ * warns once in development.
  */
-export function useCommand(id: string): BoundCommand | null {
+export function useCommand(id: string): BoundCommand {
   const commands = useCapability(CommandsToken);
   const documentId = useDocumentId() ?? undefined;
   const resolved = useKernelValue(
     () => commands.resolveCommand(id, documentId),
     resolvedCommandsEqual,
   );
+  if (resolved === null) {
+    devWarn(`useCommand:${id}`, `useCommand(): ${unknownCommandWarning(id, commands.listCommandIds())}`);
+  }
   return useMemo(
     () =>
-      resolved &&
-      boundCommandOf(resolved, (commandId) => commands.execute(commandId, { documentId }), {
-        isMac: isMacPlatform(),
-      }),
-    [resolved, commands, documentId],
+      boundCommandOf(
+        resolved ?? unregisteredCommand(id),
+        (commandId) => commands.execute(commandId, { documentId }),
+        { isMac: isMacPlatform() },
+      ),
+    [resolved, commands, documentId, id],
   );
 }
 
 /**
  * Turn every command's shortcut into a working key, for the active document. Call it once, near
  * the top of your viewer. Keys typed into text fields are left alone, and so is a key whose
- * command can't run now. The keys work anywhere on the page; with `target`, only while focus is
- * inside that element, for a page with more than one viewer.
+ * command can't run right now. A command that's turned off or not allowed still takes its key,
+ * and `onRefused` says why. The keys work anywhere on the page; with `target`, only while focus
+ * is inside that element, for a page with more than one viewer.
  */
 export function useCommandShortcuts(options?: {
   isMac?: boolean;
   target?: RefObject<HTMLElement | null>;
+  onRefused?: (commandId: CommandId, refusal: CommandRefusal) => void;
 }): void {
   const commands = useCapability(CommandsHostToken);
   const isMac = options?.isMac;
   const target = options?.target;
+  // The latest callback, so a new function each render doesn't bind the keys again.
+  const onRefused = useRef(options?.onRefused);
+  onRefused.current = options?.onRefused;
   useEffect(() => {
-    if (!target) return bindCommandShortcuts(commands, { isMac });
+    const report = (commandId: CommandId, refusal: CommandRefusal) =>
+      onRefused.current?.(commandId, refusal);
+    if (!target) return bindCommandShortcuts(commands, { isMac, onRefused: report });
     // The element mounts before this effect runs, so its ref is set by now.
     return target.current
-      ? bindCommandShortcuts(commands, { isMac, target: target.current })
+      ? bindCommandShortcuts(commands, { isMac, target: target.current, onRefused: report })
       : undefined;
   }, [commands, isMac, target]);
 }

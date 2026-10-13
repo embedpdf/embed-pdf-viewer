@@ -107,6 +107,7 @@ export type {
 import { devWarn } from './dev';
 import { usePaintsPagePart } from './page-layers';
 import { useAnnotationSettings } from './annotation-hooks';
+import { INERT } from './inert';
 import {
   shallowArray,
   useCapability,
@@ -756,11 +757,6 @@ function useRendererBehaviors(
     return release;
   }, [anno, renderers]);
 }
-
-/** React 18 spells the `inert` attribute as a string spread; it disables
- *  pointer and focus for the whole subtree: a renderer that only draws can
- *  never take the pointer. */
-const INERT = { inert: '' } as Record<string, string>;
 
 /**
  * Draws a page's annotations, the selection's outline and handles, the tool's

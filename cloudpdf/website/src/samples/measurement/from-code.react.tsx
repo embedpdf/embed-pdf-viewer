@@ -11,7 +11,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './from-code.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),

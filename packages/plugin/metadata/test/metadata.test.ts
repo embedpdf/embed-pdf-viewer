@@ -20,7 +20,8 @@ const everyBoxIsTheCrop = (crop: { left: number; bottom: number; right: number; 
 /**
  * The metadata plugin through the real kernel: the Info dict is a mirror that
  * changes only from loads and confirmed `metadata.updated` events, whoever
- * caused them, and a load that races a newer confirmed value never wins.
+ * caused them, and a load that races a newer confirmed value never wins. It is
+ * read on demand: nothing reads it when a document opens.
  */
 
 const META = (over: Partial<DocumentMetadata> = {}): DocumentMetadata => ({
@@ -130,17 +131,25 @@ describe('model', () => {
 });
 
 describe('metadata controller', () => {
-  it('seeds through load(): idle → loading → ready', async () => {
+  it('reads nothing as a document opens; ensureLoaded(): idle → loading → ready', async () => {
     const doc = fakeDocument();
     const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
+    await tick();
+    expect(doc.reads).toHaveLength(0);
+    expect(api.getStatus()).toBe('idle');
+    const loading = [api.ensureLoaded(), api.ensureLoaded()];
     expect(api.getStatus()).toBe('loading');
     expect(api.getSnapshot()).toBeNull();
+    expect(doc.reads).toHaveLength(1);
     doc.reads[0].resolve(META({ title: 'seed' }));
-    await tick();
+    await Promise.all(loading);
     expect(api.getStatus()).toBe('ready');
+    expect(api.custom.getStatus()).toBe('ready');
+    await api.ensureLoaded();
+    expect(doc.reads).toHaveLength(1);
     expect(api.getSnapshot()?.title).toBe('seed');
     expect(api.getSnapshot()).toBe(api.getSnapshot()); // reference-stable
     await kernel.destroy();
@@ -154,6 +163,7 @@ describe('metadata controller', () => {
     const api = kernel.capability(MetadataToken, 'doc');
     const seen: string[] = [];
     api.onUpdated((event) => seen.push(`${event.origin.kind}:${event.metadata.title}`));
+    void api.ensureLoaded();
 
     doc.emit({
       type: 'metadata.updated',
@@ -180,6 +190,7 @@ describe('metadata controller', () => {
     const resynced = vi.fn();
     api.onUpdated(updated);
     api.onResynced(resynced);
+    void api.ensureLoaded();
     doc.reads[0].resolve(META({ title: 'seed' }));
     await tick();
     expect(resynced).toHaveBeenCalledWith({ metadata: META({ title: 'seed' }) });
@@ -193,8 +204,9 @@ describe('metadata controller', () => {
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
+    const loading = api.ensureLoaded();
     doc.reads[0].resolve(META());
-    await tick();
+    await loading;
 
     const order: string[] = [];
     api.onUpdated((event) =>
@@ -264,7 +276,9 @@ describe('metadata controller', () => {
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
-    await tick();
+    await expect(api.ensureLoaded()).rejects.toSatisfy((error) =>
+      isPluginError(error, 'permission-denied'),
+    );
     expect(api.getStatus()).toBe('forbidden');
     await expect(api.refresh()).rejects.toSatisfy((error) =>
       isPluginError(error, 'permission-denied'),
@@ -278,6 +292,7 @@ describe('metadata controller', () => {
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
+    api.ensureLoaded().catch(() => {});
     const closing = kernel.documents.close('doc');
     doc.reads[0].resolve(META({ title: 'late' }));
     await closing;
@@ -296,6 +311,7 @@ describe('custom metadata', () => {
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
+    void api.ensureLoaded();
     await tick();
     expect(api.custom.getStatus()).toBe('ready');
     expect(api.custom.getSnapshot()).toEqual({ reviewedBy: 'dana' });
@@ -309,6 +325,7 @@ describe('custom metadata', () => {
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
+    void api.ensureLoaded();
     await tick();
 
     const order: string[] = [];
@@ -350,8 +367,11 @@ describe('metadataState', () => {
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
+    expect(metadataState.read(api).status).toBe('idle');
+    // Reading the state is what loads it: the adapters call `ensure` for their reader.
+    const loading = metadataState.ensure!(api);
     doc.reads[0].resolve(META({ title: 'seed' }));
-    await tick();
+    await loading;
     const state = metadataState.read(api);
     expect(state).toEqual({
       metadata: META({ title: 'seed' }),

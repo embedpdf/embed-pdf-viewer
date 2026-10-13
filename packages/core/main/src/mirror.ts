@@ -17,7 +17,8 @@
  *
  * The load protocol:
  *   1. The mirror subscribes to the event stream when it is created.
- *   2. The first load starts once the plugin is connected.
+ *   2. The first load starts once the plugin is connected, or, for a mirror
+ *      `onDemand`, when something asks for it (`ensureLoaded()`, `refresh()`).
  *   3. Events that arrive while a load runs are queued, then replayed after
  *      the loaded value lands, skipping events the snapshot already contains
  *      (`origin.serverId <= cursor`). Replaying confirmed records in arrival
@@ -73,6 +74,12 @@ export interface MirrorSpec<V> {
   /** False: status `forbidden` and no engine read. Asked before every load. */
   readonly readable?: () => boolean;
   /**
+   * Load only when asked: the mirror stays `idle`, folding confirmed events into its value,
+   * until `ensureLoaded()` or `refresh()` runs. For data nothing needs when a document opens.
+   * Without it, the first load starts once the plugin is connected.
+   */
+  readonly onDemand?: true;
+  /**
    * Read the whole value. `cursor` is the newest server event the snapshot
    * already contains (cloud engines); omit it when the engine has none.
    */
@@ -115,6 +122,11 @@ export interface Mirror<V> {
   view(): V;
   /** `idle` until the first load starts; stays `ready` while a reload runs. */
   getStatus(): ResourceStatus;
+  /**
+   * Load unless it is loaded or loading: a load in flight is shared, and a loaded mirror
+   * resolves at once. After a failed load it tries again. Rejects when the load fails.
+   */
+  ensureLoaded(): Promise<void>;
   /** Reload everything. Joins a running load; rejects when the load fails. */
   refresh(): Promise<void>;
   /**
@@ -341,10 +353,12 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       result = spec.fold(cell.read().value, event);
     } catch (error) {
       env.report(error);
-      reloadInBackground();
+      if (!spec.onDemand || started) reloadInBackground();
       return;
     }
     if (isReload(result)) {
+      // An on-demand mirror nobody has asked for reads everything fresh when someone does.
+      if (spec.onDemand && !started) return;
       const pages = result[RELOAD];
       const keptFor = keepUntilRead(event, fullLoads);
       if (pages === 'all' || !spec.loadPages) {
@@ -437,6 +451,11 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       get: () => cell.read().value,
       view,
       getStatus: () => cell.read().status,
+      ensureLoaded: () => {
+        if (running) return running;
+        if (cell.read().status === 'ready') return Promise.resolve();
+        return refresh();
+      },
       refresh,
       async settled() {
         while (running || pageReloads.size > 0) {
@@ -445,7 +464,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
       },
     },
     start() {
-      if (!started) reloadInBackground();
+      if (!started && !spec.onDemand) reloadInBackground();
     },
   };
 }

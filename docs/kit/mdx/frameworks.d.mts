@@ -1,9 +1,12 @@
 export type Framework = 'react' | 'vue' | 'svelte' | 'angular';
+export type Integration = Framework | 'vanilla';
 export type NameContext = 'name' | 'prop' | 'state' | 'event';
 export type NameSpot = { context: NameContext; owner?: string };
 
 export const FRAMEWORKS: readonly Framework[];
 export const FRAMEWORK_LABELS: Record<Framework, string>;
+export const INTEGRATIONS: readonly Integration[];
+export const INTEGRATION_LABELS: Record<Integration, string>;
 export const FRAMEWORK_WORDS: Record<
   'hook' | 'hooks' | 'rerenders' | 'props' | 'renderFunction',
   Record<Framework, string>
@@ -16,7 +19,8 @@ export function frameworkName(
   owner?: string,
 ): string;
 export function frameworkFromPath(pathname: string): Framework;
-export function frameworkHref(href: string, framework: Framework): string;
+export function integrationFromPath(pathname: string): Integration;
+export function frameworkHref(href: string, framework: Integration): string;
 export function inlineCodeContexts(tree: unknown): Map<unknown, NameSpot>;
 export function remarkFrameworkNames(): (tree: unknown, file?: unknown) => void;
 export function stateIntroParts(

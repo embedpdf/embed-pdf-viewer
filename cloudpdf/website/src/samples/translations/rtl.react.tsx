@@ -9,7 +9,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './rtl.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 const en: Locale = {
   code: 'en',
@@ -42,7 +42,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);
-  if (!command?.visible) return null;
+  if (!command.visible) return null;
 
   return (
     <button type="button" className="button" disabled={!command.enabled} onClick={command.run}>

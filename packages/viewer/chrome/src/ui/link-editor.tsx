@@ -79,24 +79,34 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
+          aria-label={t('panel.close')}
+          title={t('panel.close')}
           className="text-fg-muted hover:bg-hover grid h-6 w-6 place-items-center rounded"
         >
           <Icon name="x" size={14} />
         </button>
       </div>
       <div className="mb-2 flex gap-1.5">
-        <ModeToggle title="Link to a URL" active={mode === 'uri'} onClick={() => setMode('uri')}>
-          URL
+        <ModeToggle
+          title={t('linkEditor.toUrl')}
+          active={mode === 'uri'}
+          onClick={() => setMode('uri')}
+        >
+          {t('linkEditor.url')}
         </ModeToggle>
-        <ModeToggle title="Link to a page" active={mode === 'page'} onClick={() => setMode('page')}>
-          Page
+        <ModeToggle
+          title={t('linkEditor.toPage')}
+          active={mode === 'page'}
+          onClick={() => setMode('page')}
+        >
+          {t('linkEditor.page')}
         </ModeToggle>
       </div>
       {mode === 'uri' ? (
         <input
           type="url"
           className={inputCls}
-          placeholder="https://…"
+          placeholder={t('linkEditor.urlPlaceholder')}
           autoFocus
           value={uri}
           onChange={(event) => setUri(event.target.value)}
@@ -107,7 +117,7 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
           type="number"
           min={1}
           className={inputCls}
-          placeholder="Page number"
+          placeholder={t('linkEditor.pagePlaceholder')}
           autoFocus
           value={pageNo}
           onChange={(event) => setPageNo(event.target.value)}
@@ -119,7 +129,7 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
         className="bg-accent text-on-accent mt-2.5 w-full rounded px-2 py-1.5 text-sm font-medium"
         onClick={apply}
       >
-        {value == null ? 'Add link' : 'Update link'}
+        {value == null ? t('linkEditor.add') : t('linkEditor.update')}
       </button>
     </div>
   );

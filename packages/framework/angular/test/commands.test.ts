@@ -85,9 +85,10 @@ describe('[epdfCommand]', () => {
     await fixture.whenStable();
     const known = fixture.nativeElement.querySelector('#known') as HTMLButtonElement;
     const unknown = fixture.nativeElement.querySelector('#unknown') as HTMLButtonElement;
+    // An unknown id is a command named by it, neither visible nor enabled: a hidden button.
     expect(unknown.hidden).toBe(true);
     expect(unknown.disabled).toBe(true);
-    expect(unknown.textContent).toBe('');
+    expect(unknown.textContent).toBe('nope');
 
     state.enabled = false;
     state.active = true;
@@ -141,7 +142,11 @@ describe('EpdfCommands', () => {
     state.enabled = false;
     await kernel.documents.open(bytesInput('c'));
     expect(approve()?.enabled).toBe(false);
-    expect(commands.commandOf('nope')()).toBeNull();
+    expect(commands.commandOf('nope')()).toMatchObject({
+      label: 'nope',
+      visible: false,
+      enabled: false,
+    });
   });
 
   it('has the events as streams, and the settings', async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import type { AnnotationDraft } from '../../src/annotation/kinds';
-import { pdfResolveAnnotationDraft } from '../../src/annotation/resolve';
+import { pdfResolveAnnotationDraft } from '../../src/validation';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import { pdfQuarterTurnBox, quarterTurnOf } from '../../src/geometry/convert';
 import type { PdfRect } from '../../src/geometry/primitives';

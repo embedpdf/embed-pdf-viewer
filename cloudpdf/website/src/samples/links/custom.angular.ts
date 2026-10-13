@@ -36,7 +36,7 @@ const TO_WEBSITE = { x: 250, y: 24, width: 190, height: 28 };
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       withStage(),
       withRender(),
       withInteraction(),

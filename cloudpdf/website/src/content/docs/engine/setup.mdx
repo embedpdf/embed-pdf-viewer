@@ -24,10 +24,11 @@ Create one engine when your app starts and share it everywhere:
 // pdf.ts
 import { cloudEngine } from '@cloudpdf/engine';
 
-export const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+export const engine = cloudEngine();
 ```
 
-Creating the engine makes no request. One engine holds any number of open documents, each with
+It connects to CloudPDF SaaS; your own server goes in `baseUrl` (see Options). Creating the engine
+makes no request. One engine holds any number of open documents, each with
 its own token. Close each document when you're done with it (`doc.close()`), and keep the engine
 for the life of your app.
 
@@ -49,7 +50,7 @@ to open a document and what goes in a token.
 
 | Option    | What it does                                                                       |
 | :-------- | :--------------------------------------------------------------------------------- |
-| `baseUrl` | Your CloudPDF server.                                                              |
+| `baseUrl` | Your own CloudPDF server. CloudPDF SaaS when left out.                             |
 | `token`   | A token for every document this engine opens, when you don't pass one to `open()`. |
 | `fetch`   | Your own `fetch`, for example to add headers or to test.                           |
 | `onRetry` | Called when the engine retries a request the server was too busy for (see below).  |
@@ -62,7 +63,6 @@ anything; `onRetry` lets you see it happen:
 
 ```ts
 const engine = cloudEngine({
-  baseUrl: 'https://pdf.example.com',
   onRetry: ({ path, code, attempt, waitMs }) => {
     console.debug(`retrying ${path} after ${code} (attempt ${attempt}, waited ${waitMs} ms)`);
   },

@@ -1,0 +1,31 @@
+<!-- 2.x:
+
+<div id="pdf-viewer" style="height: 100vh"></div>
+
+<script type="module">
+  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
+
+  const container = EmbedPDF.init({
+    type: 'container',
+    target: document.getElementById('pdf-viewer'),
+    src: '/report.pdf',
+    theme: { preference: 'dark' },
+    disabledCategories: ['redaction', 'document-print'],
+  });
+  container.registry.then((registry) => console.log('ready', registry));
+</script>
+-->
+
+<div id="viewer" style="height: 100vh"></div>
+
+<script type="module">
+  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  EmbedPDF.init({
+    target: '#viewer',
+    src: '/report.pdf',
+    theme: 'dark',
+    disable: ['redaction', 'documents.print'],
+    onReady: (viewer) => console.log('ready', viewer),
+  });
+</script>

@@ -1,4 +1,5 @@
 {
   "toolchain": "Parcel 2",
+  "workerSrc": "'self'",
   "dist": "dist"
 }

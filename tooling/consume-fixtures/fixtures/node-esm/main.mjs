@@ -24,9 +24,14 @@ import * as reactAnnotation from '@embedpdf/react/annotation';
 import * as cloudSdk from '@cloudpdf/sdk';
 import * as cloudEngine from '@cloudpdf/engine';
 
+// A React component is a function, or the object `forwardRef` / `memo` returns.
+const isComponent = (value) =>
+  typeof value === 'function' ||
+  (typeof value === 'object' && value !== null && '$$typeof' in value);
+
 ok(typeof AbortablePromise === 'function', 'engine-core/runtime AbortablePromise');
 ok(typeof engine.localEngine === 'function', 'engine localEngine');
-ok(typeof Viewer === 'function', 'react runtime Viewer');
+ok(isComponent(Viewer), 'react runtime Viewer');
 for (const [label, ns] of Object.entries({
   geometry,
   kernel,

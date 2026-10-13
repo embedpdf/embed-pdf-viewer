@@ -158,8 +158,12 @@ export const pdfPermissions = (): 'pdf.permissions' => 'pdf.permissions';
  *
  * This is the one reading of the bits: the scope resolver and the
  * permission advisory both use it. It follows what Acrobat allows on a
- * file with these bits, which is broader than ISO 32000 in one place:
- * bit 4 ("changing the document") also allows filling in and signing.
+ * file with these bits, which is broader than ISO 32000 in two places:
+ * bit 4 ("changing the document") also allows filling in and signing, and
+ * bit 5 ("copying text and graphics") governs taking the text out, not
+ * finding or selecting it: Acrobat finds and selects text in a file that
+ * forbids copying. A search's snippets reproduce the text, so they need
+ * `doc.text.copy`.
  */
 export function materializePdfPermissions(b: PdfBits): DocCapability[] {
   const out = new Set<DocCapability>();
@@ -171,11 +175,12 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
   // PDF bit 6 governs writes, not visibility.
   out.add('doc.annotate.read');
   out.add('doc.forms.read');
+  // Finding and selecting text are too: bit 5 governs taking it out.
+  out.add('doc.text.search');
+  out.add('doc.text.select');
 
   if (b.bit5) {
-    out.add('doc.text.select');
     out.add('doc.text.copy');
-    out.add('doc.text.search');
     out.add('doc.content.copy');
   }
   if (b.bit3) out.add('doc.print');

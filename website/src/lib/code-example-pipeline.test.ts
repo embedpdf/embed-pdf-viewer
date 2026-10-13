@@ -29,11 +29,16 @@ async function compile(element: 'Example' | 'Snippet', name: string) {
 
 describe('code example pipeline', () => {
   it('stores every Viewer integration, and leaves the page only a reference', async () => {
-    const { names, attribute } = await compile('Example', 'viewer/getting-started/basic');
+    const { names, attribute } = await compile('Example', 'viewer/quick-start/customized');
 
-    // No code in the compiled page: just where it is and who has a version.
-    expect(names).toEqual(['name', 'codeKey', 'codeFrameworks']);
-    expect(attribute('codeKey')).toMatch(/^viewer\/getting-started\/basic\.[0-9a-f]{16}$/);
+    // No code in the compiled page: just where it is, who has a version, and which have a demo
+    // (once the demos are built).
+    expect(names.filter((name) => name !== 'demosByFramework')).toEqual([
+      'name',
+      'codeKey',
+      'codeFrameworks',
+    ]);
+    expect(attribute('codeKey')).toMatch(/^viewer\/quick-start\/customized\.[0-9a-f]{16}$/);
     expect(attribute('codeFrameworks')).toBe('vanilla,react,vue,svelte,angular');
 
     for (const framework of ['vanilla', 'react', 'vue', 'svelte', 'angular']) {
@@ -44,8 +49,33 @@ describe('code example pipeline', () => {
     // Highlighting every sample is real work (~4s); the default 5s budget flakes under a loaded matrix.
   }, 30_000);
 
+  it("keeps the page's bigger preview for the card", async () => {
+    const node = {
+      type: 'mdxJsxFlowElement',
+      name: 'Example',
+      attributes: [
+        { type: 'mdxJsxAttribute', name: 'name', value: 'viewer/quick-start/customized' },
+        { type: 'mdxJsxAttribute', name: 'size', value: 'wide' },
+      ],
+      children: [],
+    };
+    const tree = { type: 'root', children: [node] };
+    remarkCodeExample()(tree);
+    await rehypeCodeExample({ panelsDir })(tree);
+
+    expect(node.attributes.find((attr) => attr.name === 'size')?.value).toBe('wide');
+  }, 30_000);
+
+  it('stores every Viewer integration of a Viewer snippet', async () => {
+    const { attribute } = await compile('Snippet', 'viewer/start/first');
+
+    expect(attribute('codeFrameworks')).toBe('vanilla,react,vue,svelte,angular');
+    const files = readCodePanel(panelsDir, attribute('codeKey')!, 'vanilla');
+    expect(files[0].highlightedCode).toContain('embedpdf-viewer');
+  }, 30_000);
+
   it("reads back only the route's framework", async () => {
-    const { attribute } = await compile('Example', 'viewer/getting-started/basic');
+    const { attribute } = await compile('Example', 'viewer/quick-start/customized');
     const shown = routeCodePanels({
       dir: panelsDir,
       codeKey: attribute('codeKey'),

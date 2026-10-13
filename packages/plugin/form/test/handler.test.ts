@@ -90,12 +90,12 @@ function makeAnnotation(afterCreate = { select: true, tool: 'stay', editText: tr
 const interactionFor = (
   toolId: string,
   claimed = false,
-  activateDefaultTool = () => {},
+  activateTool: (id: string) => void = () => {},
 ): InteractionHostCapability =>
   ({
     getActiveToolId: () => toolId,
     hasCursorClaim: () => claimed,
-    activateDefaultTool,
+    activateTool,
   }) as unknown as InteractionHostCapability;
 
 const sample = (over: Partial<PointerSample>): PointerSample => ({
@@ -257,24 +257,25 @@ describe('form place handler', () => {
     expect(selects).toEqual([{ kind: 'objectNumber', objectNumber: 42, page: PAGE_REF }]);
   });
 
-  it('follows the annotation afterCreate setting: no selection, back to the default tool', async () => {
+  it('follows the annotation afterCreate setting: no selection, back to the design tool', async () => {
     const { form } = makeForm();
     const { annotation, selects } = makeAnnotation({
       select: false,
       tool: 'default',
       editText: true,
     });
-    const activateDefaultTool = vi.fn();
+    const activateTool = vi.fn();
     const handler = createPlaceHandler(
       form,
-      interactionFor('form-text', false, activateDefaultTool),
+      interactionFor('form-text', false, activateTool),
       annotation,
     );
     handler.onDown(at('down', 100, 100));
     handler.onUp?.(at('up', 100, 100));
     await flush();
     expect(selects).toHaveLength(0);
-    expect(activateDefaultTool).toHaveBeenCalledTimes(1);
+    // Design's resting tool, not the default pointer, which fills and would end design.
+    expect(activateTool.mock.calls).toEqual([['form-edit']]);
   });
 
   it('a radio button stands for Choice1, a dropdown starts with two options', async () => {

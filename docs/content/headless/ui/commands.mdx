@@ -36,6 +36,12 @@ same command as a signal.
 `shortcut` is formatted for the user's platform: `⌘K` on a Mac, `Ctrl+K` elsewhere. The
 [toolbar](toolbar) draws commands the same way.
 
+There's always a command, so a button never checks for a missing one: an id no plugin registered
+comes back labelled with its id, neither visible nor enabled, the way a turned-off command does,
+and in development it warns once, with the closest id there is. Checking `visible` covers a
+command that's turned off, not allowed or missing. `resolveCommand(id)` is the lookup for code,
+and says `null` for an id it doesn't have.
+
 ## The standard commands
 
 `standardCommands` covers what every viewer has, with labels in [every language you load](translations):
@@ -62,8 +68,12 @@ of your viewer:</Fw><Fw only="angular">Add it to `provideEmbedPdf()`, next to `w
 
 <Snippet name="ui/command-shortcuts" />
 
-It ignores keys typed into text fields, runs commands for the active document, and does nothing for a
-command that's disabled. <Fw only={['react', 'vue', 'svelte']}>With more than one viewer on a page, pass `target`, a ref to the element
+It ignores keys typed into text fields, except a command's whose `shortcutInTextFields` is `true`
+(a Find that should work from the search box too), runs commands for the active document, and leaves a key alone
+when its command can't run right now. A command that's [turned off](#turn-features-off) or [not
+allowed](#commands-and-permissions) still takes its key, so the browser doesn't do something else with
+it (`Mod+P` printing the page), and `onRefused(commandId, refusal)` tells you why: `refusal.message`
+is a sentence to show. <Fw only={['react', 'vue', 'svelte']}>With more than one viewer on a page, pass `target`, a ref to the element
 around one: its keys then work only while focus is inside it.</Fw><Fw only="angular">With more than one viewer on a page, leave
 `withCommandShortcuts()` out and put the `epdfCommandShortcuts` directive on the element around one
 (`<div tabindex="0" epdfCommandShortcuts>`): its keys then work only while focus is inside it.</Fw> `Mod` means Cmd on a Mac and Ctrl elsewhere. A help sheet lists
@@ -101,11 +111,13 @@ A disabled command is still in the results, so show it greyed out.
 | `label`       | What the user sees, or `labelKey` for a [translated](translations) label         |
 | `icon`        | Your icon's name; your buttons turn it into an icon                              |
 | `shortcut`    | A key such as `'Mod+K'`, or a list of them                                       |
+| `shortcutInTextFields` | `true`: its shortcut runs while the cursor is in a text field too        |
 | `enabled`     | When it can run, as a function of the viewer's state                             |
 | `active`      | When it shows as pressed, such as the current tool                               |
 | `visible`     | When it shows at all                                                             |
 | `run`         | What it does                                                                     |
-| `categories`  | Groups you can turn off together                                                 |
+| `requires`    | The [permissions](../concepts/permissions) it needs, such as `'doc.annotate.modify'`. Without them, it's hidden. |
+| `categories`  | The features it belongs to, so you can [turn them off](#turn-features-off) together, such as `['annotations.highlight']` |
 | `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
 
 `enabled`, `active` and `visible` get the viewer's state through `get(Token)`, and are asked again
@@ -113,14 +125,18 @@ whenever anything changes, so a button is always right without events or effects
 
 ## Turn features off
 
-Put commands in categories, and turn a whole category off: its commands are hidden and disabled,
-wherever they appear. The `disabledCategories` [setting](#settings) turns categories off from the start,
-and while the app runs:
+Put commands in categories, and turn a whole category off: its commands are hidden and refused,
+wherever they appear. A category turns off every category under it, on whole dotted parts:
+`annotations` also turns off `annotations.highlight`. The `disabledCategories` [setting](#settings)
+turns categories off from the start, and while the app runs:
 
 ```ts
-commands.disableCategory('annotate');
-commands.enableCategory('annotate');
+commands.disableCategory('annotations');
+commands.enableCategory('annotations');
 ```
+
+Turn off one command the same way, with `disableCommand(id)` and the `disabledCommands` setting. A
+command that's turned off is refused by `execute()` too, and its shortcut does nothing.
 
 A command of your own, a category switch, and a command run from code when the document opens:
 
@@ -135,15 +151,19 @@ Everything `useCommands()` gives you.
 | `execute(id, { args?, documentId? })`                                    | Runs a command. Resolves `{ status, reason? }`: `'executed'`, or `'rejected'` with why. A `run` that throws rejects. [Run a command from code](#run-a-command-from-code) |
 | `canExecute(id, documentId?)`                                            | Whether a command can run now: it's registered, enabled and visible                                                                                 |
 | `resolveCommand(id, documentId?)`                                        | A command as a button shows it: label, icon, shortcuts, and whether it's enabled, active and visible. `null` for an unknown id. <Fw only={['react', 'vue', 'svelte']}>In a component, use `useCommand(id)`.</Fw><Fw only="angular">In a template, use the `epdfCommand` directive.</Fw> [Show a command](#show-a-command) |
+| `getRefusal(id, documentId?)`                                           | Why a command won't run whatever the moment, as `{ reason, message }`: `'turned-off'` or `'not-allowed'`, with a sentence for the user. `null` when it may run, or can't only right now, and for an unknown id |
 | `listCommands(documentId?)`                                              | Every command, resolved the same way, in the order they were added                                                                                  |
 | `searchCommands(query, documentId?)`                                     | The visible commands whose label or id contains the query. [A command palette](#a-command-palette)                                                  |
 | `listShortcuts()`                                                        | Every shortcut with its command, as `{ commandId, shortcut }`, for a keyboard help sheet. [Keyboard shortcuts](#keyboard-shortcuts)                 |
 | `registerCommand(command, { replace? })`, `registerCommands(commands, { replace? })` | Adds one command, or several, while the app runs, and returns a function that removes them. An id that's taken is refused unless you pass `replace: true`. [Define a command](#define-a-command) |
 | `getCommand(id)`, `hasCommand(id)`                                       | A command as you defined it, or `null`; whether it's registered                                                                                      |
 | `listCommandIds()`                                                       | Every command's id, in the order they were added                                                                                                     |
-| `disableCategory(category)`, `enableCategory(category)`                  | Turns a category off, or on again. [Turn features off](#turn-features-off)                                                                          |
+| `disableCategory(category)`, `enableCategory(category)`                  | Turns a category off, with every category under it, or on again. [Turn features off](#turn-features-off)                                            |
 | `setDisabledCategories(categories)`                                      | Replaces the list of categories that are off                                                                                                         |
-| `getDisabledCategories()`, `isCategoryDisabled(category)`                | The categories that are off; whether one is                                                                                                          |
+| `getDisabledCategories()`, `isCategoryDisabled(category)`                | The categories that are off; whether one is, itself or through a category it's under                                                                |
+| `disableCommand(id)`, `enableCommand(id)`                                | Turns one command off, or on again. [Turn features off](#turn-features-off)                                                                         |
+| `setDisabledCommands(ids)`                                               | Replaces the list of commands that are off one by one                                                                                                |
+| `getDisabledCommands()`, `isCommandDisabled(id)`                         | The commands that are off one by one; whether a command is off, by its id or through one of its categories                                          |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useCommandsSettings()`. [Settings](#settings) |
 
 Leave out `documentId`, and a command runs and resolves for the document in scope: the one a
@@ -160,7 +180,9 @@ Set them when you register the plugin, and change them while the app runs with
 | Setting              | What it does                                          | Default |
 | :------------------- | :---------------------------------------------------- | :------ |
 | `commands`           | The commands your viewer has                          | none    |
-| `disabledCategories` | Categories that start turned off                      | none    |
+| `disabledCategories` | Categories that start turned off, with every category under them | none    |
+| `disabledCommands`   | Commands that start turned off, by id                 | none    |
+| `notAllowed`         | What a command the scope doesn't allow does: `'hide'` leaves it out, `'disable'` shows it disabled with `disabledReason` | `'hide'` |
 
 ## Events
 
@@ -176,5 +198,11 @@ Set them when you register the plugin, and change them while the app runs with
 
 ### Commands and permissions
 
-A command's `enabled` is where permission checks go: `({ get }) => get(AnnotationToken).canCreate()`.
-The standard commands already check theirs.
+A command that needs a permission says so with `requires: ['doc.annotate.modify']`. When the user
+doesn't have it, the command isn't visible, so its buttons and menu rows are gone, and its shortcut
+does nothing. With the `notAllowed: 'disable'` setting it shows disabled instead, and the resolved
+command's `disabledReason` says why, for its tooltip: the i18n string for
+`commands.notAllowed.<permission>` (dots and colons as dashes, such as
+`commands.notAllowed.doc-print`), else `commands.notAllowed.default`. Keep `enabled` for what can't
+run right now, such as **Copy** with nothing selected. The standard commands already say what they
+need.

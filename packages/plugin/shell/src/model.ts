@@ -1,7 +1,7 @@
 /**
- * The shell's state: which surfaces are open (with their exclusivity tag and
- * props) and the stack of open menus. Every function below is a pure
- * transition; the controller applies them with `ctx.state.update`.
+ * The shell's state: which surfaces are open (with their exclusivity tag,
+ * props and focus requests) and the stack of open menus. Every function below
+ * is a pure transition; the controller applies them with `ctx.state.update`.
  */
 import type { OpenSurfaceOptions, ShellSnapshot, SurfaceProps } from './contract';
 
@@ -10,6 +10,8 @@ export interface SurfaceRecord {
   readonly open: boolean;
   readonly exclusive?: string;
   readonly props?: SurfaceProps;
+  /** Raised by every open that asks for focus; every way of closing sets it back to 0. */
+  readonly focusRequest: number;
 }
 
 export interface ShellState {
@@ -20,6 +22,13 @@ export interface ShellState {
 
 export const initialShellState = (): ShellState => ({ surfaces: {}, openMenus: [] });
 
+/** A surface closed: no longer open, and no request for focus left. */
+const closed = (surface: SurfaceRecord): SurfaceRecord => ({
+  ...surface,
+  open: false,
+  focusRequest: 0,
+});
+
 /** Close every open surface that shares the exclusivity tag, except `keepId`. */
 function closeExclusive(
   surfaces: ShellState['surfaces'],
@@ -29,7 +38,7 @@ function closeExclusive(
   const next: Record<string, SurfaceRecord> = {};
   for (const [id, surface] of Object.entries(surfaces)) {
     const closes = surface.open && surface.exclusive === exclusive && id !== keepId;
-    next[id] = closes ? { ...surface, open: false } : surface;
+    next[id] = closes ? closed(surface) : surface;
   }
   return next;
 }
@@ -38,14 +47,21 @@ export function openSurface(state: ShellState, id: string, options: OpenSurfaceO
   const surfaces = options.exclusive
     ? closeExclusive(state.surfaces, options.exclusive, id)
     : { ...state.surfaces };
-  surfaces[id] = { open: true, exclusive: options.exclusive, props: options.props };
+  // A closed surface's request is 0, so only an open one carries a count forward.
+  const asked = state.surfaces[id]?.focusRequest ?? 0;
+  surfaces[id] = {
+    open: true,
+    exclusive: options.exclusive,
+    props: options.props,
+    focusRequest: options.focus ? asked + 1 : asked,
+  };
   return { ...state, surfaces };
 }
 
 export function closeSurface(state: ShellState, id: string): ShellState {
   const surface = state.surfaces[id];
   if (!surface?.open) return state;
-  return { ...state, surfaces: { ...state.surfaces, [id]: { ...surface, open: false } } };
+  return { ...state, surfaces: { ...state.surfaces, [id]: closed(surface) } };
 }
 
 export function toggleSurface(state: ShellState, id: string, options?: OpenSurfaceOptions): ShellState {
@@ -62,7 +78,7 @@ export function closeAllSurfaces(state: ShellState): ShellState {
   if (!Object.values(state.surfaces).some((surface) => surface.open)) return state;
   const surfaces: Record<string, SurfaceRecord> = {};
   for (const [id, surface] of Object.entries(state.surfaces)) {
-    surfaces[id] = surface.open ? { ...surface, open: false } : surface;
+    surfaces[id] = surface.open ? closed(surface) : surface;
   }
   return { ...state, surfaces };
 }
@@ -85,6 +101,19 @@ export function closeAllMenus(state: ShellState): ShellState {
   return state.openMenus.length === 0 ? state : { ...state, openMenus: [] };
 }
 
+/** What a snapshot holds: the state without the focus requests, which are moments. */
+export function snapshotOf(state: ShellState): ShellSnapshot {
+  const surfaces: Record<string, ShellSnapshot['surfaces'][string]> = {};
+  for (const [id, { focusRequest: _focusRequest, ...surface }] of Object.entries(state.surfaces)) {
+    surfaces[id] = surface;
+  }
+  return { surfaces, openMenus: state.openMenus };
+}
+
 export function applySnapshot(_state: ShellState, snapshot: ShellSnapshot): ShellState {
-  return { surfaces: { ...snapshot.surfaces }, openMenus: [...snapshot.openMenus] };
+  const surfaces: Record<string, SurfaceRecord> = {};
+  for (const [id, surface] of Object.entries(snapshot.surfaces)) {
+    surfaces[id] = { ...surface, focusRequest: 0 };
+  }
+  return { surfaces, openMenus: [...snapshot.openMenus] };
 }

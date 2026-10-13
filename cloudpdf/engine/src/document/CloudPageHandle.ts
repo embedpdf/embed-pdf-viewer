@@ -3,8 +3,8 @@ import type {
   PageLayerRights,
   PageLayout,
   PageRef,
+  SessionEventPublisher,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { CloudPageAnnotationsService } from './CloudPageAnnotationsService';

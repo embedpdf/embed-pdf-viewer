@@ -8,7 +8,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './thumbnail-strip.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 // The strip is a second view of the document, with its own token and settings.
 const ThumbsToken = createCapabilityToken<StageCapability>('stage-thumbs');

@@ -7,7 +7,6 @@
  * publishes for each step (`sync/signatures.ts`), for every session alike.
  */
 import { PluginError, type OperationOptions } from '@embedpdf/core';
-import { certificateCommonName, sign as signDocument } from '@embedpdf/core-signature';
 import type {
   DocumentHandle,
   FormFieldRef,
@@ -90,6 +89,9 @@ export function createSigning(
     if (options?.signal?.aborted) throw cancelled(options.signal);
     return withBusy(async () => {
       const doc = sealUnlessCancelled(options?.signal);
+      // The cryptography loads the first time someone signs.
+      const { certificateCommonName, sign: signDocument } =
+        await import('@embedpdf/core-signature');
       const key = await resolveKey(input.key);
       // The certificate's subject is the default /Name; the caller's facts win.
       const subject =

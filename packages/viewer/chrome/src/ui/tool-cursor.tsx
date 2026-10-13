@@ -30,8 +30,9 @@
 import { useInteractionState, useToolCursor } from '@embedpdf/react/interaction';
 import { useAnnotation, useAnnotationDefaults } from '@embedpdf/react/annotation';
 import { TOOL_ICONS } from '../config/commands';
-import { ICON_PATHS } from './icons';
-import type { IconAccent, PathSpec } from './icons';
+import { useCustomIcons } from '../config-context';
+import { iconPathsOf } from './icons';
+import type { IconAccent, IconDef, PathSpec } from './icons';
 
 const SIZE = 40;
 const HOTSPOT = { x: 8, y: 28 };
@@ -43,8 +44,12 @@ const PLACE_GREEN = '#34a853';
 /** The icon's paths as SVG markup — the string twin of `<Icon>`'s render loop
  *  (same fill/stroke slot rules), with a white halo pass underneath so the
  *  glyph stays readable over page content. */
-function iconGlyph(name: string, accent?: IconAccent): string | null {
-  const paths = ICON_PATHS[name];
+function iconGlyph(
+  name: string,
+  accent: IconAccent | undefined,
+  custom: Readonly<Record<string, IconDef>>,
+): string | null {
+  const paths = iconPathsOf(name, custom);
   if (!paths) return null;
   const halo: string[] = [];
   const draw: string[] = [];
@@ -98,8 +103,13 @@ function actionGlyph(glyph: Glyph): string {
   );
 }
 
-function cursorSvg(glyph: Glyph, icon: string, accent?: IconAccent): string {
-  const iconMarkup = iconGlyph(icon, accent);
+function cursorSvg(
+  glyph: Glyph,
+  icon: string,
+  accent: IconAccent | undefined,
+  custom: Readonly<Record<string, IconDef>>,
+): string {
+  const iconMarkup = iconGlyph(icon, accent, custom);
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" ` +
     `viewBox="0 0 ${SIZE} ${SIZE}" fill="none" stroke-linecap="round" stroke-linejoin="round">` +
@@ -130,6 +140,8 @@ export function ArmedToolCursor() {
   const activeToolId = useInteractionState((state) => state.activeToolId) ?? 'pointer';
   // Live accent: a `tools.updateDefaults` recolor re-renders us and rebuilds the cursor.
   const defaults = useAnnotationDefaults(activeToolId);
+  // Your icon of the tool's name, when you gave one: the button shows it too.
+  const custom = useCustomIcons();
   // What a click places follows the pointer: the cursor carries no icon.
   const ghostFollows = Boolean(useAnnotation().tools.get(activeToolId)?.ghost);
   const entry = ghostFollows ? undefined : TOOL_ICONS[activeToolId];
@@ -147,7 +159,7 @@ export function ArmedToolCursor() {
           cursors: Object.fromEntries(
             Object.entries(GLYPHS).map(([keyword, glyph]) => [
               keyword,
-              { svg: cursorSvg(glyph, entry.icon, accent), hotspot: HOTSPOT },
+              { svg: cursorSvg(glyph, entry.icon, accent, custom), hotspot: HOTSPOT },
             ]),
           ),
         }

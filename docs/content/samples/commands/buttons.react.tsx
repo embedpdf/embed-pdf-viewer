@@ -20,7 +20,7 @@ const ebook = async (): Promise<OpenInput> => {
 // One button, drawn from its command: the label, the shortcut, and whether it can run now.
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);
-  if (!command?.visible) return null;
+  if (!command.visible) return null;
 
   return (
     <button

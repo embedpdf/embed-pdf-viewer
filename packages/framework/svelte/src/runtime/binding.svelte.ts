@@ -7,7 +7,8 @@
  * subscribes for the kernel's whole life, so a reader works the same inside a template, an effect
  * or an event handler.
  *
- * `<Viewer>` puts the binding in context; `<DocumentScope>` puts the document a subtree talks to.
+ * `<Viewer>` puts the binding in context (`<KernelProvider>` too, for a kernel it doesn't own);
+ * `<DocumentScope>` puts the document a subtree talks to.
  */
 import { getContext, hasContext, setContext, untrack } from 'svelte';
 import type { Kernel } from '@embedpdf/core';
@@ -38,30 +39,35 @@ export class KernelBinding {
 const KERNEL = Symbol('embedpdf.kernel');
 const DOCUMENT_SCOPE = Symbol('embedpdf.document-scope');
 
-/** What `<Viewer>` provides: the binding, once its kernel exists. */
+/** What `<Viewer>` and `<KernelProvider>` provide: the binding, once the kernel exists. */
 export interface KernelHolder {
   readonly binding: KernelBinding | null;
 }
 
-/** For `<Viewer>`: provide the kernel to everything inside it. */
+/** For `<Viewer>` and `<KernelProvider>`: provide the kernel to everything inside it. */
 export function setKernelHolder(holder: KernelHolder): void {
   setContext(KERNEL, holder);
 }
 
 /**
- * The binding of the nearest `<Viewer>`. Everything inside a viewer is created after its kernel,
- * so the binding is there whenever a component inside asks.
+ * The binding of the nearest `<Viewer>` or `<KernelProvider>`. Everything inside one is created
+ * after its kernel, so the binding is there whenever a component inside asks.
  */
 export function useKernelBinding(): KernelBinding {
   // Untracked: the binding never changes for a component's lifetime, so nothing re-runs on it.
   const binding = hasContext(KERNEL)
     ? untrack(() => getContext<KernelHolder>(KERNEL).binding)
     : null;
-  if (!binding) throw new Error('[embedpdf] This must be used inside <Viewer>.');
+  if (!binding) {
+    throw new Error('[embedpdf] This must be used inside <Viewer> or <KernelProvider>.');
+  }
   return binding;
 }
 
-/** The kernel of the nearest `<Viewer>`: for code that needs it whole (`onReady` gives it too). */
+/**
+ * The kernel of the nearest `<Viewer>` or `<KernelProvider>`: for code that needs it whole
+ * (`onReady` gives it too).
+ */
 export function useKernel(): Kernel {
   return useKernelBinding().kernel;
 }

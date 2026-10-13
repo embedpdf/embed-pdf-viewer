@@ -17,25 +17,30 @@ import type { FormContext } from './context';
 import type { FormSiblings } from './siblings';
 
 export function createScriptingSeam(ctx: FormContext, siblings: FormSiblings) {
-  const actionsHost = siblings.actions;
-  const realm = actionsHost?.scriptRealm ?? null;
-  const pipeline = realm
-    ? createFormScriptingController({
-        document: () => ctx.document(),
-        transaction: realm.transaction.bind(realm),
-        budget: realm.budget,
-      })
-    : null;
-  if (pipeline) ctx.cleanup(() => pipeline.dispose());
+  // The pipeline over the actions plugin's realm, made the first time one is there.
+  let pipeline: FormScriptingController | null = null;
+  const pipelineOf = (): FormScriptingController | null => {
+    if (pipeline) return pipeline;
+    const realm = siblings.actions()?.scriptRealm ?? null;
+    if (!realm) return null;
+    const made = createFormScriptingController({
+      document: () => ctx.document(),
+      transaction: realm.transaction.bind(realm),
+      budget: realm.budget,
+    });
+    ctx.cleanup(() => made.dispose());
+    pipeline = made;
+    return made;
+  };
   const settings = ctx.settings();
   const controller = (): FormScriptingController | null =>
-    settings.get().validation === 'scripts' ? pipeline : null;
+    settings.get().validation === 'scripts' ? pipelineOf() : null;
 
   // A one-shot developer hint: a form with scripts and no realm fills without them.
   let warnedNoRealm = false;
   const scriptsFor = (form: FieldIndex): FormScriptingController | null => {
     if (!formHasScripts(form)) return null;
-    if (!realm && !warnedNoRealm && settings.get().validation === 'scripts') {
+    if (!pipelineOf() && !warnedNoRealm && settings.get().validation === 'scripts') {
       warnedNoRealm = true;
       console.warn(
         "[form] this form has scripts, but they don't run: add the actions plugin with " +
@@ -65,7 +70,7 @@ export function createScriptingSeam(ctx: FormContext, siblings: FormSiblings) {
     /** Script results (UI effects, diagnostics, errors) are surfaced through the
      *  actions plugin, with the origin that caused them. */
     surface: (result: ScriptCommitSurface, origin: ActionOrigin): void => {
-      actionsHost?.surfaceScriptCommit(result, { origin, realm: 'document' });
+      siblings.actions()?.surfaceScriptCommit(result, { origin, realm: 'document' });
     },
   };
 }

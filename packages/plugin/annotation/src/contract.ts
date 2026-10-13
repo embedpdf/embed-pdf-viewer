@@ -24,6 +24,7 @@ import type {
 import type {
   AnnotationProperty,
   CreationDraftAnchor,
+  EditableKinds,
   FieldValues,
   KindName,
   Rect,
@@ -82,14 +83,18 @@ export type {
 } from '@embedpdf/engine-core/runtime';
 export type {
   AnnotationFlags,
+  AnnotationOption,
   AnnotationProperty,
   BlendMode,
   ClickCreate,
+  EditableKind,
+  EditableKinds,
   FieldValues,
   FlagKey,
   HandleRole,
   LineEnding,
   LineEndings,
+  MeasurementIntent,
   SnapSettings,
   TextAlign,
 } from '@embedpdf/core-annotation';
@@ -209,9 +214,9 @@ export interface AfterCreateSettings {
 
 /**
  * The annotation settings: what `annotationPlugin(config)` registers over
- * {@link ANNOTATION_DEFAULTS}. `snap`, `chrome` and `afterCreate` change for
- * every open document with `updateSettings()`; `tools` is read when a
- * document opens (add a tool to an open one with `tools.register()`).
+ * {@link ANNOTATION_DEFAULTS}. `snap`, `chrome`, `afterCreate` and `editable`
+ * change for every open document with `updateSettings()`; `tools` is read
+ * when a document opens (add a tool to an open one with `tools.register()`).
  */
 export interface AnnotationSettings {
   /**
@@ -224,6 +229,15 @@ export interface AnnotationSettings {
   readonly chrome: ChromeSettings;
   /** Snapping to other annotations and the page while moving, and to angles while turning. */
   readonly snap: SnapSettings;
+  /**
+   * Which annotations people may change by hand: `true`, every one; `false`,
+   * none; or a list of the kinds they may, by subtype (`'highlight'`), a
+   * measurement by its intent (`'line-dimension'`). One left out can still be
+   * selected, read and commented on, but not moved, resized, turned,
+   * restyled, typed in or deleted. Only the interface: your code still
+   * changes it, and `canUpdate()` and `canDelete()` don't change.
+   */
+  readonly editable: EditableKinds;
 }
 
 /** What the annotation settings are when the app registers none. */
@@ -255,6 +269,7 @@ export const ANNOTATION_DEFAULTS: AnnotationSettings = {
     rotationAngles: [0, 90, 180, 270],
     rotationThreshold: 4,
   },
+  editable: true,
 };
 
 /** What `annotationPlugin(config)` takes: any of the settings, merged over the defaults. */
@@ -906,6 +921,12 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
   canUpdate(ref: AnnotationRef): boolean;
   /** Whether the user may delete this annotation: its permission and its own `locked` flag. */
   canDelete(ref: AnnotationRef): boolean;
+  /**
+   * Whether the `editable` setting lets people change this annotation by
+   * hand; `false` for one the document doesn't have. Whether a change would
+   * succeed is `canUpdate()` and `canDelete()`.
+   */
+  isEditable(ref: AnnotationRef): boolean;
   /** Stop a drag, or a polygon in progress. */
   cancel(): void;
 

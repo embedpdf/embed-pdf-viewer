@@ -1,4 +1,4 @@
-import { h, shallowRef } from 'vue';
+import { h, ref, shallowRef } from 'vue';
 import type { Component } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enableAutoUnmount } from '@vue/test-utils';
@@ -12,6 +12,7 @@ import { PageView } from '../src/page-view';
 import { DocumentGate, makePageContext, providePage, toPageRef } from '../src/runtime';
 import {
   SELECTION_DEFAULTS,
+  SelectionClipboard,
   SelectionHandles,
   SelectionLayer,
   SelectionMenu,
@@ -29,7 +30,8 @@ import { probe, settle as flush, viewerWith } from './counter-plugin';
  * The selection composables and components against a real kernel: the
  * declared state, the settings with and without a document, the highlight
  * painted through its CSS variable (over the `color` setting, or the accent
- * when it's unset), the menu on a page view, and the grips on a Stage.
+ * when it's unset), the menu on a page view, the grips on a Stage, and
+ * Ctrl/Cmd+C copying from inside a target only.
  */
 
 const box = { x: 0, y: 0, width: 600, height: 800 };
@@ -316,5 +318,40 @@ describe('<SelectionHandles>', () => {
       expect.stringContaining('<SelectionHandles> renders nothing here'),
     ]);
     expect(document.querySelector('[style*="grab"]')).toBeNull();
+  });
+});
+
+describe('<SelectionClipboard>', () => {
+  const pressCopy = (target: EventTarget) =>
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+
+  it('with a target, copies on Ctrl/Cmd+C while focus is inside it, and leaves the page alone', async () => {
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const Viewer = probe(() => {
+      const area = ref<HTMLElement | null>(null);
+      return () =>
+        h('div', { ref: area, 'data-testid': 'viewer', tabindex: -1 }, [
+          h(SelectionClipboard, { target: area }),
+        ]);
+    });
+    const { kernel, wrapper } = await mount(() => h(Viewer));
+    const selection = await open(kernel);
+    selection.select({ page: toPageRef(5), start: 1, count: 3 });
+    await settle();
+
+    const area = wrapper.find('[data-testid="viewer"]').element as HTMLElement;
+    area.focus();
+    pressCopy(area);
+    await settle();
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0][0]).toBe(await selection.readText());
+
+    area.blur();
+    pressCopy(document.body);
+    await settle();
+    expect(writeText).toHaveBeenCalledTimes(1);
   });
 });

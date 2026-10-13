@@ -35,7 +35,8 @@ import { placed } from './frame';
 import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
-import { annotTransformable, viewable } from './flags';
+import { isTransformableByHand } from './editable';
+import { viewable } from './flags';
 import {
   anchoredGeom,
   anchoredScale,
@@ -503,13 +504,14 @@ function placeSelectionKnob(
   );
   if (selection.length === 1) {
     const record = model.byId[selection[0]];
-    // No knob for a locked (frozen) annotation — the same gate hitTest
+    // No knob for a locked or frozen annotation — the same gate hitTest
     // applies, so the drawn knob is always grabbable and vice versa. A
     // screen-anchored body keeps its knob: rotating edits its authored tilt
     // (`noRotate` only exempts it from the page's rotation). The obb takes
     // the projected stroke width (`effStyle`) — with the raw width, the knob
     // drifts off the outline as zoom grows.
-    if (!kindOf(record.annotation).caps.rotatable || !annotTransformable(record)) return null;
+    if (!kindOf(record.annotation).caps.rotatable || !isTransformableByHand(model, record))
+      return null;
     const frame = effectiveSelectionFrame(model, record.id, geomOf(record.id), view);
     return placeRotateKnob(frame.corners, knobOffset, pageBox);
   }
@@ -652,13 +654,13 @@ export function chrome(
       nodes.push({ kind: 'outline', rect: unionRect(frame.corners) });
     }
     // handles for kinds that resize (box) or vertex-edit; anchored/markup show
-    // a bare outline — and so do locked (frozen) annotations, the same gate
+    // a bare outline — and so do locked or frozen annotations, the same gate
     // hitTest applies. Screen-anchored bodies keep their handles, placed on
     // the projected geometry (`geometry`), so they sit exactly where hitTest grabs
     // them. `geomHandles` already places them on the rotated box; `rot`
     // additionally tilts each handle glyph so it rides the box's orientation.
     // Suppressed during a live rotate (`rd`) — guides own that mode.
-    if (!rd && annotTransformable(record) && (caps.resizable || caps.vertexEditable)) {
+    if (!rd && isTransformableByHand(model, record) && (caps.resizable || caps.vertexEditable)) {
       const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
       const dragged =
         model.draft?.kind === 'handle' && model.draft.id === record.id ? model.draft.handle : null;

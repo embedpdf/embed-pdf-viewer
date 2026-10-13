@@ -97,8 +97,11 @@ jobs:
       - name: Engine v3 parity demo (local vs cloud)
         run: pnpm --filter @embedpdf/example-engine-runtime-demo run engine:node
 
+  # The built viewer in a browser. packages.yml runs the same suite through turbo
+  # for every change in the viewer's build graph (its plugins, core, and the React
+  # and web adapters included), with the runner's Chrome.
   snippet:
-    name: CDN snippet from a foreign origin
+    name: the viewer in a browser
     needs: build-runtime
     if: ${{ !cancelled() && needs.build-runtime.result != 'failure' }}
     runs-on: ubuntu-latest
@@ -116,13 +119,18 @@ jobs:
         with:
           name: engine-runtime-wasm32
           path: packages/engine/runtime/npm/wasm32
-      - name: Build the viewer and everything it bundles
-        run: pnpm turbo run build --filter=@embedpdf/viewer
       - name: Install a browser for Playwright
         run: pnpm --filter @embedpdf/viewer exec playwright-core install --with-deps chromium
-      # The built dist/embedpdf.js loaded as a native ES module from another
-      # origin, exactly as the docs show it: must render, must fetch every
-      # sibling (worker chunk, embedpdf.wasm, lazy chunks) from its own
-      # folder, must not touch any other origin.
-      - name: Snippet cross-origin test
+      - name: Build the viewer and everything it bundles
+        id: build
+        run: pnpm turbo run build --filter=@embedpdf/viewer
+      # Every test under packages/viewer/main/test, the browser ones against
+      # dist: snippet-cross-origin (dist/embedpdf.js imported from another
+      # origin renders and fetches nothing from anywhere else), strict-csp (no
+      # violation of the published policy, same-origin and from a CDN),
+      # hostile-host (host page CSS changes no pixel) and theming. They run
+      # after a failed build too: it writes dist before its declaration step,
+      # so a declaration error doesn't hide their results (the job still fails).
+      - name: Viewer tests in a browser
+        if: ${{ !cancelled() && steps.build.outcome != 'skipped' }}
         run: pnpm --filter @embedpdf/viewer test

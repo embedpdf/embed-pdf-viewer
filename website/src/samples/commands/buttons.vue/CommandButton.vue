@@ -8,7 +8,7 @@ const command = useCommand(() => props.id);
 
 <template>
   <button
-    v-if="command?.visible"
+    v-if="command.visible"
     type="button"
     class="button"
     :title="command.label"

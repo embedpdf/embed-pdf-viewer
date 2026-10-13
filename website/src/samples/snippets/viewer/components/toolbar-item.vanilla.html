@@ -1,0 +1,19 @@
+<embedpdf-viewer id="viewer" src="/contract-v3.pdf" style="height: 100vh">
+  <select slot="item:versions" class="versions" id="versions">
+    <option value="/contract-v3.pdf">Version 3</option>
+    <option value="/contract-v2.pdf">Version 2</option>
+  </select>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const viewer = document.getElementById('viewer');
+  viewer.config = {
+    layout: (layout) =>
+      layout.add({ custom: 'versions', command: 'acme:versions' }, { to: 'main', section: 'start' }),
+  };
+  document.getElementById('versions').addEventListener('change', (event) => {
+    viewer.src = event.target.value;
+  });
+</script>

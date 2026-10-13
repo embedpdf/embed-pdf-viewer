@@ -43,7 +43,7 @@ const page = usePage();
 // The layer is a host of the render plugin: it paints conformed sources. The
 // host lens is the same runtime token, typed wider.
 const render = useOptionalCapability(RenderToken);
-const NO_PAINT: PaintSettings = { fadeMs: 0, tiles: false };
+const NO_PAINT: PaintSettings = { tiles: false };
 // The same object until a setting it reads changes.
 const settings = useOptionalSelector(RenderToken, (lens) => lens.getPaintSettings(), NO_PAINT);
 
@@ -134,5 +134,5 @@ watch(
       pointerEvents: 'none',
     }"
   />
-  <TilePlane v-if="tiles && settings.tiles && layers" :layers="layers" :fade-ms="settings.fadeMs" />
+  <TilePlane v-if="tiles && settings.tiles && layers" :layers="layers" />
 </template>

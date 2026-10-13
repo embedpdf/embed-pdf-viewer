@@ -39,6 +39,7 @@ import {
   AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
 } from '../wire/schemas';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Per-fixture knowledge the mutation harness needs. The shared fixture
@@ -2644,7 +2645,7 @@ async function openFixture(
 ): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

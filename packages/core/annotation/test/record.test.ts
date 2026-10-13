@@ -913,7 +913,7 @@ describe('record — every field a kind takes writes only fields its engine kind
           },
         };
       case 'icon':
-        return { type: 'setFields', patches: { [id]: { icon: spec.options[1] } } };
+        return { type: 'setFields', patches: { [id]: { icon: spec.options[1]!.value } } };
       default:
         return { type: 'setFields', patches: { [id]: { [spec.key]: VALUES[spec.key] } } };
     }
@@ -961,7 +961,7 @@ describe('record — every field a kind takes writes only fields its engine kind
                 },
               }
             : {}),
-          ...(spec.key === 'icon' ? { icon: spec.options[0] } : {}),
+          ...(spec.key === 'icon' ? { icon: spec.options[0]!.value } : {}),
           ...(subtype === 'link' ? { link: null } : {}),
           flags: DRAWN_FLAGS,
           source: 'baked',

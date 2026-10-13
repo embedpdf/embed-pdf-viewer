@@ -38,7 +38,7 @@ interface FormWidgetItemBase {
   box: Box;
   /** How the widget looks in the PDF. */
   look: FormWidgetLook;
-  /** A read-only field, no permission to fill, or a write on its way: draw it, don't take input. */
+  /** A read-only field, no permission to fill, filling it turned off (`fillable`), or a write on its way: draw it, don't take input. */
   disabled: boolean;
   /** Accessible name: the field's tooltip (`/TU`) when it has one, else its full name. */
   label: string;

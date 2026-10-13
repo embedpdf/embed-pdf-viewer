@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  generateUuid,
   type DocumentHandle,
   type Engine,
   type OpenInput,
@@ -13,7 +14,6 @@ import {
   wirePaths,
   type DocumentHead,
 } from '@embedpdf/engine-core/wire';
-import { generateUuid } from '@embedpdf/engine-services';
 
 import { CloudDocumentHandle } from './document/CloudDocumentHandle';
 import { CloudDocumentSecurityService } from './document/CloudDocumentSecurityService';
@@ -37,6 +37,8 @@ export class CloudEngine implements Engine {
     return new CloudEngine(new HttpClient(opts));
   }
 
+  /** It opens the documents your server holds, never a file's bytes. */
+  readonly canOpenFiles = false;
   private destroyed = false;
   /** The documents this engine opened and nobody closed yet. */
   private readonly handles = new Set<CloudDocumentHandle>();

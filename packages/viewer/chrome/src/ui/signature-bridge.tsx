@@ -2,7 +2,7 @@
  * The signature plugin's UI intents → shell surfaces. The plugin owns the
  * act and says what happened; the chrome decides what opens:
  *
- *   target  (a "sign here" click)      → the signatures panel, right side
+ *   target  (a "sign here" click)      → the signatures panel
  *   ask     (mode 'ask' met a field)   → the sign dialog (modal)
  *   inspect (a signed field clicked)   → the validation popover
  *
@@ -16,7 +16,7 @@ export function SignatureBridge() {
   useSignatureEvent(
     (signature) => signature.onTargetChanged,
     (event) => {
-      if (event.field) shell.open('signatures', { exclusive: 'right' });
+      if (event.field) shell.open('signatures');
     },
   );
   useSignatureEvent(
@@ -34,7 +34,7 @@ export function SignatureBridge() {
   // The notice lives in the signatures panel; make sure it is seen.
   useSignatureEvent(
     (signature) => signature.onInvalidationPredicted,
-    () => shell.open('signatures', { exclusive: 'right' }),
+    () => shell.open('signatures'),
   );
   return null;
 }

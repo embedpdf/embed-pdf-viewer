@@ -1,10 +1,13 @@
+/**
+ * Signers over WebCrypto keys. A signer signs with WebCrypto alone; the certificate and CMS code
+ * (PKI.js) is imported inside the functions that need it, so a viewer that only configures a
+ * signer loads that code the first time someone signs.
+ */
 import type { DigestAlgorithm } from '@embedpdf/engine-core/runtime';
+
 import type { RawSigner, RawSignatureAlgorithm } from '../cms/build';
-import { ensureEngine } from '../cms/engine';
-import { buildTimestampToken } from '../cms/timestamp';
-import type { CmsSigner } from '../sign';
 import { WEBCRYPTO_HASH } from '../cms/oids';
-import { selfSignedCertificate } from './self-signed';
+import type { CmsSigner } from '../sign';
 
 /**
  * A `RawSigner` over a WebCrypto private key: the key never leaves the
@@ -86,7 +89,7 @@ export async function createTestSigner(
     hash?: 'sha256' | 'sha384' | 'sha512';
   } = {},
 ): Promise<TestSigner> {
-  ensureEngine();
+  const { selfSignedCertificate } = await import('./self-signed');
   const hash = options.hash ?? 'sha256';
   const keys = await generateSigningKeyPair(options.algorithm ?? 'RSA-PKCS1-v1_5', hash, true);
   const certificate = await selfSignedCertificate({
@@ -120,6 +123,7 @@ export async function createTestTimestampAuthority(
   const authority = await createTestSigner({
     commonName: options.commonName ?? 'EmbedPDF test timestamp authority',
   });
+  const { buildTimestampToken } = await import('../cms/timestamp');
   return {
     kind: 'cms',
     certificate: authority.certificate,

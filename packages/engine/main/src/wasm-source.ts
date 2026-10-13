@@ -1,39 +1,40 @@
 /**
  * Where does `embedpdf.wasm` come from?
  *
- * The wasm binary is the one runtime-fetched asset of the local engine.
- * Everything else (the worker code) travels through the module graph, so it
- * never needs bundler asset handling — but the 6 MB binary is fetched at
- * runtime from a plain URL, resolved here on the main thread (the worker
- * never guesses) in a fixed precedence order:
+ * The 6 MB binary is fetched at runtime from a plain URL, resolved here on
+ * the main thread (the worker never guesses) in a fixed precedence order:
  *
  *   1. `wasmBinary`  — caller-supplied bytes, zero network (air-gapped).
  *   2. `wasmUrl`     — exact URL.
  *   3. `assetsUrl`   — base directory; `embedpdf.wasm` is appended.
  *   4. the default   — depends on how the worker itself is delivered:
- *      - inline blob worker (the zero-config path): Sibling-first. The
- *        bundler-resolved URL from `@embedpdf/engine-runtime-wasm32/wasm-url`
- *        (the wasm ships inside the consumer's own build), with the
- *        version-pinned jsDelivr URL as a fetch-failure-only fallback. A blob
- *        worker has no meaningful location, so both URLs are resolved here on
- *        the main thread and must be absolute.
- *      - a real worker URL / caller-built worker: nothing is sent, and the
- *        Emscripten glue resolves `embedpdf.wasm` as a sibling of the worker
- *        script (`import.meta.url`). Copying `embedpdf-worker.js` and
- *        `embedpdf.wasm` into one directory is a complete self-host setup, and
- *        bundler-emitted workers (Vite `?worker`) keep their bundler-managed
- *        asset next to the worker chunk.
+ *      - the bundled worker file or a blob worker (the zero-config paths):
+ *        the bundler-resolved URL from `@embedpdf/engine-runtime-wasm32/wasm-url`
+ *        (the wasm ships inside the consumer's own build). Neither worker has
+ *        the wasm beside it (a bundler renames the files; a blob URL has no
+ *        location), so the URL is resolved here and must be absolute.
+ *      - a configured worker URL / caller-built worker: nothing is sent, and
+ *        the Emscripten glue resolves `embedpdf.wasm` as a sibling of the
+ *        worker script. Copying `embedpdf-worker.js` and `embedpdf.wasm` into
+ *        one directory is a complete self-host setup, and bundler-emitted
+ *        workers (Vite `?worker`) keep their bundler-managed asset next to
+ *        the worker chunk.
  */
 
 /**
- * How to deliver a Web Worker:
- * - `'inline'` (default): spawn from a blob URL built from the worker source
- *   string shipped inside this package. Zero configuration in any bundler and
- *   on any CDN; requires `worker-src blob:` under a strict CSP.
- * - a URL string: a same-origin static worker file (strict-CSP setups — copy
- *   it from this package's `workers/` directory).
- * - a `Worker` or `() => Worker`: full control (bundler-native
- *   `new Worker(new URL(...))`, custom worker builds, shared lifecycles).
+ * How to deliver the engine's Web Worker:
+ * - omitted (default): this package's `workers/embedpdf-worker.js`, emitted
+ *   by the consumer's bundler as a file of their build, so `worker-src 'self'`
+ *   covers it. Where the scripts are on another origin than the page (the
+ *   viewer from a CDN), a browser refuses that worker, so it starts from a
+ *   blob: URL instead (`worker-src blob:`).
+ * - `'inline'`: always the blob: URL, built from the worker source string
+ *   shipped inside this package — for toolchains that cannot emit the file
+ *   (`@embedpdf/engine/portable` passes it).
+ * - a URL string: a same-origin static worker file, copied from this
+ *   package's `workers/` directory.
+ * - a `Worker` or `() => Worker`: full control (custom worker builds, shared
+ *   lifecycles).
  */
 export type WorkerSource = 'inline' | string | Worker | (() => Worker);
 
@@ -61,11 +62,11 @@ export interface ResolvedWasmSource {
 
 /**
  * Resolve the caller's wasm options into what the worker init carries.
- * Explicit sources only — the inline blob worker's bundler-resolved default
- * lives in {@link resolveInlineWasmSource}; every other worker delivery
- * self-resolves the wasm as a sibling of the worker script when no explicit
- * source is given (hence the empty result). A `wasmLoader` is explicit too,
- * but asynchronous: see {@link resolveWasmSourceAsync}.
+ * Explicit sources only — the default for the package's own worker
+ * deliveries lives in {@link resolveDefaultWasmSource}; a configured or
+ * caller-built worker self-resolves the wasm as a sibling of the worker
+ * script when no explicit source is given (hence the empty result). A
+ * `wasmLoader` is explicit too, but asynchronous: see {@link resolveWasmSourceAsync}.
  */
 export function resolveWasmSource(options: WasmSourceOptions): ResolvedWasmSource {
   if (options.wasmBinary !== undefined) {
@@ -92,9 +93,11 @@ export async function resolveWasmSourceAsync(
 }
 
 /**
- * Resolve the wasm source for the inline blob worker, which cannot
- * self-resolve (a blob URL has no meaningful location). Explicit options
- * win; otherwise the default is the sibling the consumer's bundler emitted:
+ * Resolve the wasm source for the package's own worker deliveries (the
+ * bundled file and the blob), which cannot self-resolve: a bundler renames
+ * the worker file, and a blob URL has no meaningful location. Explicit
+ * options win; otherwise the default is the sibling the consumer's bundler
+ * emitted:
  * `@embedpdf/engine-runtime-wasm32/wasm-url`, a static
  * `new URL('./lib/embedpdf.wasm', import.meta.url)` that webpack, Vite,
  * Rspack, Parcel, and Turbopack resolve at build time, shipping the wasm
@@ -108,7 +111,7 @@ export async function resolveWasmSourceAsync(
  * No CDN is ever contacted: a request that leaves the app's origin is
  * something the app configures, never something the engine decides.
  */
-export async function resolveInlineWasmSource(
+export async function resolveDefaultWasmSource(
   options: WasmSourceOptions,
 ): Promise<ResolvedWasmSource> {
   const explicit = resolveWasmSource(options);

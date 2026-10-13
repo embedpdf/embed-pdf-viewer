@@ -4,7 +4,9 @@
  *   config/chrome.ts `strips.annotation`  declares what may appear
  *   each command's visible/enabled        decides which items show
  *   <AnnotationMenu>                      solves where (camera transform,
- *                                         rotate-knob dodging, pointer isolation)
+ *                                         rotate-knob dodging, pointer isolation):
+ *                                         above the selection, below it without
+ *                                         room above
  *
  * useStripView is the live intersection: hidden commands drop out, empty
  * groups vanish, null when nothing applies. Mounted in the Stage `overlay`
@@ -16,8 +18,11 @@ import { useSurface } from '@embedpdf/react/shell';
 import { useStripView } from '@embedpdf/react/toolbar';
 import { useT } from '@embedpdf/react/i18n';
 import { useStripSchema } from '../config-context';
-import { LinkEditorCard } from './link-editor';
+import { lazyComponent } from './lazy';
 import { StripBar } from './strip-bar';
+
+// The link editor loads the first time someone edits a link.
+const LinkEditorCard = lazyComponent(() => import('./link-editor').then((ui) => ui.LinkEditorCard));
 
 export function AnnotationStrip() {
   const t = useT();
@@ -33,7 +38,7 @@ export function AnnotationStrip() {
   }, [selection.length, editor.isOpen]);
   if (!view) return null;
   return (
-    <AnnotationMenu placement="bottom" gap={15}>
+    <AnnotationMenu placement="top" gap={15}>
       {editor.isOpen ? (
         <LinkEditorCard onClose={editor.close} />
       ) : (

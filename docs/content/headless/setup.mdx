@@ -118,10 +118,11 @@ PDFium boots in a Web Worker in the background.
 // pdf.ts
 import { cloudEngine } from '@cloudpdf/engine';
 
-export const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+export const engine = cloudEngine();
 ```
 
-`baseUrl` is your CloudPDF server. Creating the engine makes no request.
+It connects to CloudPDF SaaS. Your own server names itself:
+`cloudEngine({ baseUrl: 'https://pdf.example.com' })`. Creating the engine makes no request.
 
 </Engine>
 
@@ -324,7 +325,7 @@ engine option is in the engine's [Setup](/docs/engine/setup#options).
 >
 
 Move a headless viewer to CloudPDF by changing one line: `localEngine()` becomes
-`cloudEngine({ baseUrl })`. Your plugins, components and <Word of="hooks" /> stay as they are.
+`cloudEngine()`. Your plugins, components and <Word of="hooks" /> stay as they are.
 Files stay on your server, the first page shows without downloading the PDF, and fonts, limits and
 storage are the server's to configure.
 

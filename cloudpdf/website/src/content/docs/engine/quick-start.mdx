@@ -53,10 +53,11 @@ you don't have to wait for anything here.
 ```ts
 import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+const engine = cloudEngine();
 ```
 
-`baseUrl` is your CloudPDF server. Creating the engine makes no request yet.
+It connects to CloudPDF SaaS. Your own server names itself:
+`cloudEngine({ baseUrl: 'https://pdf.example.com' })`. Creating the engine makes no request yet.
 
 </Engine>
 

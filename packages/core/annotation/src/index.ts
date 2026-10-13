@@ -75,6 +75,8 @@ export {
   type RichTextRange,
   type RichTextStyleDelta,
 } from './richtext';
+// The CSS family the browser draws an annotation's font with.
+export { STANDARD_FONT_STACKS, cssFontFamilyForFont, mountedFontFamily } from './font-css';
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
 export { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
 export { linkChildrenOf, linkOf } from './links';
@@ -94,6 +96,17 @@ export {
   type AnnotationFlags,
   type FlagBearer,
 } from './flags';
+// What people may change by hand: the session's `editable` rule, beside the flags.
+export {
+  editableKindOf,
+  isContentsEditableByHand,
+  isDeletableByHand,
+  isEditableByHand,
+  isTransformableByHand,
+  type EditableKind,
+  type EditableKinds,
+  type MeasurementIntent,
+} from './editable';
 // Screen-anchored (`noZoom`/`noRotate`) bodies: display-transform exemptions.
 // One projection (`anchoredGeom`) + its exact inverse (`unanchoredGeom`),
 // shared by render / hit / chrome / gestures.
@@ -114,6 +127,7 @@ export {
   kindNamed,
   NO_CAPS,
   type AnnotationKind,
+  type AnnotationOption,
   type AnnotationProperty,
   type FlagKey,
   type KindCaps,

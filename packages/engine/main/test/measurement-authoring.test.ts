@@ -165,7 +165,9 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         const layeredAnnotations = (
           await layered.page(toPageRef(pageObjectNumber)).annotations.list()
         ).annotations;
-        expect(layeredAnnotations.find((a) => a.nm === savedName)).toMatchObject({
+        // Found by its reference (identity); the name the engine gave it survives too.
+        expect(layeredAnnotations.find((a) => annotationKey(a.ref) === createdId)).toMatchObject({
+          nm: savedName,
           contents: '16.00 ft',
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
@@ -185,7 +187,8 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       try {
         const reopenedPageObjectNumber = (await reopened.pages.list()).pages[0].ref.objectNumber;
         const list = await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list();
-        const restored = list.annotations.find((a) => a.nm === savedName)!;
+        const restored = list.annotations.find((a) => annotationKey(a.ref) === createdId)!;
+        expect(restored.nm).toBe(savedName);
         expect(restored).toMatchObject({
           intent: 'line-dimension',
           contents: '16.00 ft',

@@ -9,7 +9,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './accent.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 // The characters of the cover's title.

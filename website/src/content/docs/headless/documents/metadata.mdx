@@ -13,7 +13,8 @@ A PDF carries information about itself: a title, an author, when it was made. Re
 <Snippet name="documents/title-field" />
 
 What `useMetadataState()` gives you updates by itself: after your own changes, and on a shared
-document, after someone else's.
+document, after someone else's. Nothing is read when a document opens: the metadata loads the
+first time something asks for it, so a document nobody shows the properties of costs nothing.
 
 ## Read
 
@@ -31,9 +32,24 @@ document, after someone else's.
 | `modifiedAt` | When it was last changed, as an ISO date                    |
 | `trapped`    | A print-shop setting: `'true'`, `'false'` or `'unknown'`, never `null` |
 
-`status` says whether the metadata is still loading (`'loading'`), there (`'ready'`), or not
-allowed (`'forbidden'`). Every field `useMetadataState()` gives you, and every status, is listed
-under [State](#state).
+`status` says whether the metadata hasn't been asked for yet (`'idle'`), is loading
+(`'loading'`), is there (`'ready'`), or is not allowed (`'forbidden'`). Reading the state is what
+asks: <Fw only={['react', 'vue', 'svelte']}>`useMetadataState()`</Fw><Fw only="angular">`EpdfMetadata`</Fw>
+loads the metadata of the document it reads, so its first answer is `'loading'`. Show that while
+it lasts, the way you show any other load:
+
+```ts
+const title = status === 'ready' ? (metadata?.title ?? 'Untitled') : 'Loading…';
+```
+
+From code, `ensureLoaded()` reads it and resolves once it's there:
+
+```ts
+await metadata.ensureLoaded();
+const author = metadata.getSnapshot()?.author;
+```
+
+Every field `useMetadataState()` gives you, and every status, is listed under [State](#state).
 
 <Example name="metadata/properties" />
 
@@ -78,6 +94,7 @@ Everything `useMetadata()` gives you.
 | :------------------------------ | :---------------------------------------------------------------------------------------------------------------------------- |
 | `update(changes)`               | Changes the standard fields you pass; `null` removes one. Resolves `{ metadata }`, the fields after the change. [Change](#change) |
 | `custom.update(changes)`        | Changes your own fields: a string sets one, `null` removes it, the rest stay. Resolves `{ custom }`. [Your own fields](#your-own-fields) |
+| `ensureLoaded()`                | Reads the standard fields and your own from the file, unless they're loaded or loading. Resolves once they're there. [Read](#read) |
 | `refresh()`, `custom.refresh()` | Reads the standard fields, or your own, from the file again. Rarely needed: they stay up to date by themselves.               |
 | `canUpdate()`                   | Whether changing the standard fields and your own ones is allowed. [Permissions](#permissions)                                |
 
@@ -91,7 +108,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | :--------- | :-------------------------------------------------------------------------- | :------------------------------------------------------- |
 | `metadata` | Every standard field, as listed under [Read](#read), or `null` until it has loaded | `getSnapshot()`                                   |
 | `custom`   | Your own fields, as `{ name: value }`, or `null` until they have loaded     | `custom.getSnapshot()`                                   |
-| `status`   | `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`                | `getStatus()`, or `custom.getStatus()` for your own fields |
+| `status`   | `'idle'` until something asks for it, then `'loading'`, `'ready'`, `'forbidden'` or `'error'` | `getStatus()`, or `custom.getStatus()` for your own fields |
 
 ## Events
 
@@ -100,7 +117,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | Event               | Fires when                                                                        | Carries                                        |
 | :------------------ | :-------------------------------------------------------------------------------- | :--------------------------------------------- |
 | `onUpdated`         | The standard fields changed, by you or by someone else                            | `metadata`, `previous`, `changedKeys`, `origin` |
-| `onResynced`        | The standard fields were loaded from the file: when it opens, after `refresh()`, or to catch up after a lost connection | `metadata` |
+| `onResynced`        | The standard fields were loaded from the file: the first time they're asked for, after `refresh()`, or to catch up after a lost connection | `metadata` |
 | `custom.onUpdated`  | Your own fields changed                                                           | `custom`, `previous`, `changedKeys`, `origin`  |
 | `custom.onResynced` | Your own fields were loaded from the file                                         | `custom`                                       |
 

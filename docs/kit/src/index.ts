@@ -45,6 +45,7 @@ export {
   StateIntroText,
   Word,
   useDocsFramework,
+  useDocsIntegration,
 } from './framework';
 export * as mdast from './mdast';
 export {
@@ -64,5 +65,10 @@ export {
   UnreleasedNotice,
   unreleasedSentence,
 } from './release';
-export { CodeExampleCard, type ExampleFile, type ExampleMode } from './code-example-card';
+export {
+  CodeExampleCard,
+  type ExampleFile,
+  type ExampleFrame,
+  type ExampleMode,
+} from './code-example-card';
 export { CodeExample } from './code-example';

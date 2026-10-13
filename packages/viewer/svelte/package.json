@@ -1,0 +1,89 @@
+{
+  "name": "@embedpdf/viewer-svelte",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Svelte wrapper for the full viewer: the PDFViewer component around the embedpdf-viewer custom element. Your own components (ToolbarItem, Panel, Region) are light-DOM children the viewer shows in its slots while they stay in your Svelte tree (your context, your CSS). The viewer inside is the Preact-compiled artifact.",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./core": {
+      "types": "./src/core.ts",
+      "svelte": "./src/core.ts",
+      "default": "./src/core.ts"
+    },
+    "./component": {
+      "types": "./src/parts.ts",
+      "svelte": "./src/parts.ts",
+      "default": "./src/parts.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "svelte-package --input src --output dist && node ../../../tooling/build/src/fully-specify-imports.mjs && node ../../../tooling/build/src/check-framework-package.mjs",
+    "clean": "rimraf dist",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json --threshold error && svelte-check --tsconfig ./test/tsconfig.json --threshold error",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/svelte": "workspace:*",
+    "@embedpdf/viewer": "workspace:*",
+    "esm-env": "^1.2.2"
+  },
+  "peerDependencies": {
+    "svelte": "^5.29.0"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "@sveltejs/package": "^2.5.0",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
+    "@types/node": "^22.0.0",
+    "playwright-core": "^1.63.0",
+    "svelte": "^5.39.5",
+    "svelte-check": "^4.3.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^2.1.9"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/core.ts",
+    "./dist/index.js",
+    "./dist/core.js"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "svelte": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./core": {
+        "types": "./dist/core.d.ts",
+        "svelte": "./dist/core.js",
+        "default": "./dist/core.js"
+      },
+      "./component": {
+        "types": "./dist/parts.d.ts",
+        "svelte": "./dist/parts.js",
+        "default": "./dist/parts.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/viewer/svelte"
+  }
+}

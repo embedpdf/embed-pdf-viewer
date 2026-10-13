@@ -40,10 +40,12 @@ export interface EpdfToolbarCustomContext {
   /** `'live'` in the toolbar, `'measure'` in the hidden layer that measures every variant. */
   layer: 'live' | 'measure';
   /**
-   * Report the item's width yourself, for content the hidden layer can't draw. The toolbar
-   * measures what the template draws without it.
+   * Report the item's length yourself (its width, or its height in a vertical toolbar), for
+   * content the hidden layer can't draw. The toolbar measures what the template draws without
+   * it; a template that draws nothing in the hidden layer (`layer === 'measure'`) is measured
+   * where it renders, by what it reports here.
    */
-  measure: (width: number) => void;
+  measure: (length: number) => void;
 }
 
 /**
@@ -91,7 +93,8 @@ export class EpdfToolbarCommandTemplate {
 /**
  * An item of your own, by the name `custom(name, command)` gave it in the bar. Without one, the
  * item is a `<slot name>`: inside a shadow root your element's children of that `slot` go
- * there; elsewhere it shows its command's button.
+ * there; elsewhere it shows its command's button. The first element of the item that takes
+ * focus is its stop in the toolbar's arrow-key order.
  */
 @Directive({ selector: 'ng-template[epdfToolbarCustom]' })
 export class EpdfToolbarCustomTemplate {
@@ -137,8 +140,8 @@ export class EpdfToolbarGroupTriggerTemplate {
 }
 
 /**
- * The line between two groups. Without it: a 1px line. Tell the toolbar its width with
- * `[separatorWidth]` when yours is wider.
+ * The line between two groups. Without it: a 1px line across the toolbar. Tell the toolbar its
+ * thickness with `[separatorWidth]` when yours is thicker.
  */
 @Directive({ selector: 'ng-template[epdfToolbarSeparator]' })
 export class EpdfToolbarSeparatorTemplate {
@@ -158,7 +161,7 @@ export class EpdfToolbarOverflowTriggerTemplate {
   }
 }
 
-/** The "More" menu, drawn under its button. Without it: a plain popover. */
+/** The "More" menu, under its button (beside it, standing up). Without it: a plain popover. */
 @Directive({ selector: 'ng-template[epdfToolbarOverflowMenu]' })
 export class EpdfToolbarOverflowMenuTemplate {
   readonly template = inject<TemplateRef<EpdfToolbarViewContext<OverflowMenuView>>>(TemplateRef);

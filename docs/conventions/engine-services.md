@@ -73,6 +73,19 @@ server worker threads. It should own:
 
 Feature behavior belongs in `features/`, not in worker adapters.
 
+This package runs where PDFium runs: in the engine's worker, the server's worker threads, or the
+page itself when there is no `Worker`. A page's main thread never imports it otherwise. The
+local engine imports it, with `@embedpdf/engine-runtime`, only in
+`packages/engine/main/src/transport/InlineTransport.ts`, loaded with `import()` when an engine
+boots in the page (`packages/engine/main/test/entry-graph.test.ts` checks it). What both engines
+need beside a document handle, such as `EventHub`, lives in `@embedpdf/engine-core/runtime`.
+The checks it runs before a write (a write's values against its kind's schema, the import
+planners) come from `@embedpdf/engine-core/validation`, the entry built with zod; the page's
+entries reach no zod (`packages/engine/core/test/entry-graph.test.ts`). A write is prepared,
+checked and derived; a viewer predicts it with the same preparation and derivation without
+schema validation, and the check only accepts or refuses, so this package writes what the viewer
+predicted or refuses it.
+
 ## Mutation safety
 
 - Every job whose effect is `write` or `contentWrite` runs as one layer transaction, begun and ended

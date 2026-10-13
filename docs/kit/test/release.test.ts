@@ -20,6 +20,19 @@ describe('a page the publish gate holds back', () => {
     expect(html).toContain('href="/docs/headless/react/text/search"');
   });
 
+  it('names plain HTML on a viewer page', () => {
+    const html = renderToStaticMarkup(
+      createElement(UnreleasedNotice, {
+        framework: 'vanilla',
+        reactHref: '/docs/viewer/react/customize/layout',
+      }),
+    );
+    expect(html).toContain(
+      'This page describes EmbedPDF 3.0 for Vanilla JS, which isn&#x27;t released yet.',
+    );
+    expect(html).toContain('href="/docs/viewer/react/customize/layout"');
+  });
+
   it('has no link without a live React version', () => {
     const html = renderToStaticMarkup(createElement(UnreleasedNotice, { framework: 'angular' }));
     expect(html).not.toContain('<a');

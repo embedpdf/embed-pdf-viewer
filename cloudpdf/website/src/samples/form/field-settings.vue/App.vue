@@ -11,7 +11,7 @@ import FieldSettings from './FieldSettings.vue';
 
 import '../field-settings.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),

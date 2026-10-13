@@ -7,21 +7,28 @@
 -->
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
-  import { observeWidth } from '@embedpdf/web';
+  import { observeLength, type Orientation } from '@embedpdf/web';
 
   let {
     name,
-    onWidth,
+    orientation,
+    onLength,
     children,
-  }: { name: string; onWidth: (width: number) => void; children?: Snippet } = $props();
+  }: {
+    name: string;
+    orientation: Orientation;
+    onLength: (length: number) => void;
+    children?: Snippet;
+  } = $props();
 
   let socket: HTMLElement | undefined = $state();
 
   // A child slotted in or out resizes the socket's box, so one observer covers both.
   $effect(() => {
     const element = socket;
+    const along = orientation;
     if (!element) return;
-    return untrack(() => observeWidth(element, (width) => onWidth(width)));
+    return untrack(() => observeLength(element, along, (length) => onLength(length)));
   });
 </script>
 
