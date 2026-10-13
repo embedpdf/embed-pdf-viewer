@@ -21,6 +21,9 @@ English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Japanese, 
 (Simplified), Korean, Arabic and Hebrew. Each one loads only when it's needed. For Arabic and
 Hebrew, the viewer is right-to-left: the bars mirror, and `start` and `end` swap sides.
 
+A language matches in its own script: readers of Traditional Chinese (`zh-TW`, `zh-HK`) see English,
+not Simplified Chinese, until there are strings for `zh-TW`.
+
 ## Change a word
 
 A built-in button's label has the command's id as its key. Give a new one, per language:
@@ -49,6 +52,14 @@ Give a command a `labelKey` instead of a `label`, and its words per language:
 ```
 
 Panels and mode bars take a `titleKey` the same way, for their title.
+
+The style panel's words have keys too: each property and option by what it says
+(`annotation.style.stroke`, `annotation.flags.noView`, `annotation.lineEndings.openArrow`), and a
+form field's settings by theirs (`form.settings.tooltip`). Change one like any other word:
+
+```js
+{ strings: { en: { 'annotation.style.stroke': 'Line' } } }
+```
 
 ## A language of your own
 

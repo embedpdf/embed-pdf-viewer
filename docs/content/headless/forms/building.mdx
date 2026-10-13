@@ -78,7 +78,9 @@ lent: the fields stay fillable boxes the annotation tools leave alone.
 
 `getFieldSettings(ref)` describes a field's settings for a panel you draw without knowing the
 field's family: `{ properties, values }`, each property a `key` (what `update()` takes), a `control`
-(`text`, `flag`, `number`, `choice`, `choices` or `options`) and a `label`, in display order.
+(`text`, `flag`, `number`, `choice`, `choices` or `options`), and a `label` in English with its
+translation key, `labelKey` (`form.settings.tooltip`), in display order. A `choice`'s options are
+the field's own values, shown as they are.
 
 A field's look, such as its border, background and font, belongs to its box: change it like any
 annotation's, with the [style panel](../annotations/selecting#a-style-panel), or from code with

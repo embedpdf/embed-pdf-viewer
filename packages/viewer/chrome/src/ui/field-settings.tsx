@@ -9,6 +9,8 @@ import { useT } from '@embedpdf/react/i18n';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { useEffect, useState } from 'react';
 
+import { useLabel } from './labels';
+
 const inputClass = 'border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm';
 
 /** One option of a dropdown or a list, as its settings hold it. */
@@ -61,6 +63,7 @@ function SettingControl({
   onChange: (value: unknown) => void;
 }) {
   const t = useT();
+  const label = useLabel();
   switch (spec.control) {
     case 'flag':
       return (
@@ -70,12 +73,12 @@ function SettingControl({
             checked={value === true}
             onChange={(event) => onChange(event.target.checked)}
           />
-          {spec.label}
+          {label(spec)}
         </label>
       );
     case 'text':
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <CommittedInput
             key={fieldKey}
             value={typeof value === 'string' ? value : ''}
@@ -85,7 +88,7 @@ function SettingControl({
       );
     case 'number':
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <CommittedInput
             key={fieldKey}
             type="number"
@@ -98,7 +101,7 @@ function SettingControl({
       );
     case 'choice':
       return spec.free ? (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <CommittedInput
             key={fieldKey}
             list={`${fieldKey}-choices`}
@@ -112,7 +115,7 @@ function SettingControl({
           </datalist>
         </Setting>
       ) : (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <select
             className={inputClass}
             value={typeof value === 'string' ? value : ''}
@@ -130,7 +133,7 @@ function SettingControl({
     case 'choices': {
       const chosen = new Set(Array.isArray(value) ? (value as string[]) : []);
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           {spec.options.map((option) => (
             <label key={option} className="text-fg mb-1 flex items-center gap-2 text-sm">
               <input
@@ -152,7 +155,7 @@ function SettingControl({
     }
     case 'options':
       return (
-        <Setting label={spec.label}>
+        <Setting label={label(spec)}>
           <OptionsEditor
             key={fieldKey}
             options={Array.isArray(value) ? (value as Option[]) : []}

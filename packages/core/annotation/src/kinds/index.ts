@@ -40,6 +40,7 @@ export {
   defineKind,
   NO_CAPS,
   type AnnotationKind,
+  type AnnotationOption,
   type AnnotationProperty,
   type FlagKey,
   type KindCaps,

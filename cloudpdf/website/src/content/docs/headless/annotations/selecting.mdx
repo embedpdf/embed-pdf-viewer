@@ -94,7 +94,7 @@ shows both:
 | :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
 | `'color'`       | A color picker. `null` means no color.                                                                         |                      |
 | `'number'`      | A slider or a number input.                                                                                    | `min`, `max`, `step` |
-| `'choice'`      | A list, such as fonts or line endings.                                                                         | `options`            |
+| `'choice'`      | A list, such as fonts or line endings. Each option is `{ value, label, labelKey }`: write `value`, show `label`. | `options`            |
 | `'flag'`        | An on/off switch, such as `locked` or `print`.                                                                 |                      |
 | `'text'`        | A text input, such as a redaction's label.                                                                     |                      |
 | `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
@@ -112,6 +112,15 @@ await annotation.selection.update((member) =>
 
 The same properties drive a panel for a tool's defaults; see
 [Let people change the defaults](tools#let-people-change-the-defaults).
+
+### In the user's language
+
+Each property has a `label` in English and a `labelKey` to translate it, and so does each option:
+`annotation.style.stroke`, `annotation.flags.noView`, `annotation.lineEndings.openArrow`. With the
+[i18n plugin](../ui/translations), show `t(property.labelKey, { fallback: property.label })`, and
+give your languages strings for the keys; without a string for a key, the English shows. A key names
+the wording, not the field: `color` is `annotation.style.stroke` on a rectangle and
+`annotation.style.outline` on a redaction mark, so each kind keeps its own word.
 
 ## Change the handles
 

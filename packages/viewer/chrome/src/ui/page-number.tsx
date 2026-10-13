@@ -9,8 +9,11 @@ import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { StageToken, useStageState } from '@embedpdf/react/stage';
 import { useEffect, useRef, useState } from 'react';
 
-/** Stands in for the number while the sentence around it is translated, so it can split there. */
-const NUMBER_SLOT = '';
+/**
+ * Stands in for the number while the sentence around it is translated, so it can split there:
+ * a private-use character no language writes, spelled as an escape so no tool drops it.
+ */
+export const NUMBER_SLOT = '\uE000';
 
 export function PageNumber() {
   const t = useT();

@@ -3,7 +3,8 @@
  * Table 167). Select any annotation(s) and toggle flags. Flags are
  * properties like any other: the reads come from `useAnnotationProperties()`
  * (a flag the selection disagrees on is `mixed`, an indeterminate checkbox),
- * and the writes go through `selection.update({ locked: true })`.
+ * each named as the schema names it, and the writes go through
+ * `selection.update({ locked: true })`. The hint under each is the viewer's.
  *
  * Things to try:
  *   - `locked`: the selection keeps its outline but loses handles/knob; move,
@@ -21,24 +22,24 @@ import {
   useAnnotationProperties,
   type AnnotationFlags,
 } from '@embedpdf/react/annotation';
+import { useT } from '@embedpdf/react/i18n';
 import { useEffect, useRef } from 'react';
 
-const FLAG_ROWS: { key: keyof AnnotationFlags; label: string; hint: string }[] = [
-  { key: 'print', label: 'Print', hint: 'Include when the page is printed' },
-  { key: 'hidden', label: 'Hidden', hint: 'Gone everywhere: screen, clicks, print' },
-  { key: 'noView', label: 'No view', hint: 'Hidden on screen, may still print' },
-  {
-    key: 'toggleNoView',
-    label: 'Toggle no view',
-    hint: 'Reveal a no-view annotation while selected',
-  },
-  { key: 'readOnly', label: 'Read only', hint: 'Visible but not clickable' },
-  { key: 'locked', label: 'Locked', hint: 'No move / resize / delete / restyle' },
-  { key: 'lockedContents', label: 'Locked contents', hint: 'Text cannot change; geometry can' },
-  { key: 'noZoom', label: 'No zoom', hint: 'Screen-constant size (anchored top-left)' },
-  { key: 'noRotate', label: 'No rotate', hint: 'Stays upright when the page rotates' },
-  { key: 'invisible', label: 'Invisible', hint: 'Legacy: hide unknown subtypes' },
-];
+import { useLabel } from './labels';
+
+/** What each flag does, in a few words under its name: the hint's key. */
+const FLAG_HINTS: Readonly<Record<keyof AnnotationFlags, string>> = {
+  print: 'annotationFlags.print',
+  hidden: 'annotationFlags.hidden',
+  noView: 'annotationFlags.noView',
+  toggleNoView: 'annotationFlags.toggleNoView',
+  readOnly: 'annotationFlags.readOnly',
+  locked: 'annotationFlags.locked',
+  lockedContents: 'annotationFlags.lockedContents',
+  noZoom: 'annotationFlags.noZoom',
+  noRotate: 'annotationFlags.noRotate',
+  invisible: 'annotationFlags.invisible',
+};
 
 function FlagRow({
   label,
@@ -76,24 +77,27 @@ function FlagRow({
 /** The `/F` flags of the current selection, live-editable. Renders nothing
  *  when nothing is selected (the style panel shows its tool defaults then). */
 export function AnnotationFlagsSection() {
+  const t = useT();
+  const label = useLabel();
   const annotation = useAnnotation();
   const { properties, values, mixed } = useAnnotationProperties();
-  if (!properties.length) return null;
+  const flags = properties.filter((property) => property.control === 'flag');
+  if (!flags.length) return null;
   const valueOf = (key: keyof AnnotationFlags): boolean | null =>
     mixed.includes(key) ? null : values[key] === true;
   return (
     <section className="border-border mt-2 border-t pt-4">
       <p className="text-fg-muted mb-2 text-[11px] font-semibold uppercase tracking-wide">
-        Flags (/F)
+        {t('annotationFlags.title')}
       </p>
       <div className="flex flex-col">
-        {FLAG_ROWS.map((row) => (
+        {flags.map((flag) => (
           <FlagRow
-            key={row.key}
-            label={row.label}
-            hint={row.hint}
-            value={valueOf(row.key)}
-            onToggle={(next) => void annotation.selection.update({ [row.key]: next })}
+            key={flag.key}
+            label={label(flag)}
+            hint={t(FLAG_HINTS[flag.key])}
+            value={valueOf(flag.key)}
+            onToggle={(next) => void annotation.selection.update({ [flag.key]: next })}
           />
         ))}
       </div>

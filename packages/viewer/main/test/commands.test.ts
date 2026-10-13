@@ -252,6 +252,14 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('buttons and commands', 
     await frames(tab);
     const field = tab.locator('embedpdf-viewer [role="dialog"] input');
     await field.waitFor({ state: 'visible', timeout: 10_000 });
+    // The sentence reads around the field: "Page [3] of 8".
+    const sentence = await tab.evaluate(() =>
+      [...window.element.shadowRoot!.querySelector('[role="dialog"] label')!.childNodes]
+        .map((node) => (node.nodeType === Node.TEXT_NODE ? node.textContent : '[ ]'))
+        .join('')
+        .trim(),
+    );
+    expect(sentence).toMatch(/^Page \[ \] of \d+$/);
     await field.fill('2');
     await field.press('Enter');
     await tab.waitForFunction(() => window.element.viewer.get('stage').getCurrentPageIndex() === 1);

@@ -11,9 +11,7 @@ import { useId, useState } from 'react';
 
 import { GO_TO_PAGE_DIALOG } from '../config/commands';
 import { Dialog } from './dialog';
-
-/** Stands in for the number while the sentence around it is translated, so it can split there. */
-const NUMBER_SLOT = '';
+import { NUMBER_SLOT } from './page-number';
 
 export function GoToPageDialog() {
   const surface = useSurface(GO_TO_PAGE_DIALOG);

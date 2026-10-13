@@ -83,6 +83,7 @@ export type {
 } from '@embedpdf/engine-core/runtime';
 export type {
   AnnotationFlags,
+  AnnotationOption,
   AnnotationProperty,
   BlendMode,
   ClickCreate,

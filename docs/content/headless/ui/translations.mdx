@@ -15,7 +15,8 @@ them while the app runs. Register it with the user's language:
 <Snippet name="ui/save-button" />
 
 `negotiateLocale` picks the best language you have for what the browser asks, such as `nl` for a
-browser set to `nl-BE`. A language in `loaders` is loaded the first time someone switches to it, so
+browser set to `nl-BE`, within the script it's written in: `zh-TW` doesn't get `zh-CN`, since
+Taiwan writes Traditional Chinese and `zh-CN` is Simplified. A language in `loaders` is loaded the first time someone switches to it, so
 your bundle carries only the one you start with.
 
 ## Strings

@@ -2,7 +2,7 @@ import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { boxFamily, familyChosenBy, quadsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
-import { FILL, fontFamily, OPACITY, textAlign } from './fields';
+import { FILL, FONT_FAMILY, OPACITY, TEXT_ALIGN } from './fields';
 import { redactStyle } from './styles';
 import { labelText } from './texts';
 
@@ -36,13 +36,26 @@ export const redact = defineKind({
     hasFill: true,
   },
   properties: [
-    { key: 'color', control: 'color', label: 'Outline' },
+    { key: 'color', control: 'color', label: 'Outline', labelKey: 'annotation.style.outline' },
     FILL,
     OPACITY,
-    { key: 'overlayText', control: 'text', label: 'Label' },
-    fontFamily('Label font'),
-    { key: 'fontSize', control: 'number', label: 'Label size', min: 0, max: 96, step: 1 },
-    { key: 'fontColor', control: 'color', label: 'Label color' },
-    textAlign('Align'),
+    { key: 'overlayText', control: 'text', label: 'Label', labelKey: 'annotation.style.label' },
+    { ...FONT_FAMILY, label: 'Label font', labelKey: 'annotation.style.labelFont' },
+    {
+      key: 'fontSize',
+      control: 'number',
+      label: 'Label size',
+      labelKey: 'annotation.style.labelSize',
+      min: 0,
+      max: 96,
+      step: 1,
+    },
+    {
+      key: 'fontColor',
+      control: 'color',
+      label: 'Label color',
+      labelKey: 'annotation.style.labelColor',
+    },
+    TEXT_ALIGN,
   ],
 });

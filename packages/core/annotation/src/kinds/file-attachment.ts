@@ -1,10 +1,15 @@
 import { boxFamily } from '../shapes';
-import { defineKind, NO_CAPS } from './define';
+import { defineKind, NO_CAPS, type AnnotationOption } from './define';
 import { COLOR, OPACITY } from './fields';
 import { iconStyle } from './styles';
 
 /** The `/Name` icons an attachment can show: the engine's `FileAttachmentIcon` names. */
-const FILE_ATTACHMENT_ICONS = ['push-pin', 'paperclip', 'graph', 'tag'] as const;
+const FILE_ATTACHMENT_ICONS: readonly AnnotationOption[] = [
+  { value: 'push-pin', label: 'Push pin', labelKey: 'annotation.attachmentIcons.pushPin' },
+  { value: 'paperclip', label: 'Paperclip', labelKey: 'annotation.attachmentIcons.paperclip' },
+  { value: 'graph', label: 'Graph', labelKey: 'annotation.attachmentIcons.graph' },
+  { value: 'tag', label: 'Tag', labelKey: 'annotation.attachmentIcons.tag' },
+];
 
 /**
  * An embedded file shown as an icon (`/FileAttachment`): the note's fixed
@@ -25,7 +30,13 @@ export const fileAttachment = defineKind({
     noRotate: true,
   },
   properties: [
-    { key: 'icon', control: 'choice', label: 'Icon', options: FILE_ATTACHMENT_ICONS },
+    {
+      key: 'icon',
+      control: 'choice',
+      label: 'Icon',
+      labelKey: 'annotation.style.icon',
+      options: FILE_ATTACHMENT_ICONS,
+    },
     COLOR,
     OPACITY,
   ],

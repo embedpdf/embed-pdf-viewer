@@ -1,10 +1,13 @@
 /**
  * The viewer's languages: every pack has exactly the English pack's keys, with the same `{name}`
- * slots in each string; Arabic and Hebrew read right to left; and the app's `strings` change a
- * language, or add one that reads the way its code says.
+ * slots in each string; the English pack names the style panel's properties and options as the
+ * annotation kinds do; Arabic and Hebrew read right to left; Traditional Chinese isn't given
+ * Simplified; and the app's `strings` change a language, or add one that reads the way its code
+ * says.
  */
 import { describe, expect, it } from 'vitest';
 
+import { KINDS, propertiesOf } from '@embedpdf/core-annotation';
 import type { Locale, TranslationDictionary } from '@embedpdf/plugin-i18n';
 
 import {
@@ -82,6 +85,26 @@ describe('the language packs', () => {
   });
 });
 
+describe('the style labels', () => {
+  it('are in the English pack under their keys, as the annotation kinds say them', () => {
+    const english = stringsOf(en.translations);
+    const differing: string[] = [];
+    for (const kind of Object.values(KINDS)) {
+      for (const property of propertiesOf(kind)) {
+        const labels = [property, ...('options' in property ? property.options : [])];
+        for (const { label, labelKey } of labels) {
+          if (english.get(labelKey) !== label) {
+            differing.push(
+              `${kind.name}: ${labelKey} is "${english.get(labelKey)}", not "${label}"`,
+            );
+          }
+        }
+      }
+    }
+    expect(differing).toEqual([]);
+  });
+});
+
 describe('directionOf', () => {
   it('reads right to left for a code whose script does', () => {
     expect(directionOf('fa')).toBe('rtl');
@@ -133,6 +156,15 @@ describe('localesOf', () => {
     expect(localeCodeOf('zh-Hans', codes)).toBe('zh-CN');
     expect(localeCodeOf('pt-BR', codes)).toBe('pt');
     expect(localeCodeOf('tlh', codes)).toBe('en');
+  });
+
+  it('shows English to readers of Traditional Chinese, until there is a pack in it', () => {
+    const { codes } = localesOf();
+    expect(localeCodeOf('zh-TW', codes)).toBe('en');
+    expect(localeCodeOf('zh-HK', codes)).toBe('en');
+    expect(localeCodeOf('zh-Hant', codes)).toBe('en');
+    expect(localeCodeOf('zh', codes)).toBe('zh-CN');
+    expect(localeCodeOf('zh-SG', codes)).toBe('zh-CN');
   });
 
   it('changes English in place', () => {

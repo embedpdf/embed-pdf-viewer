@@ -323,6 +323,10 @@ describe('design through lending', () => {
         'password',
         'comb',
       ]);
+      // Each label has its translation key, as a panel reads it.
+      for (const setting of settings.properties) {
+        expect(setting.labelKey).toMatch(/^form\.settings\.[a-zA-Z]+$/);
+      }
       expect(settings.values).toMatchObject({ name: 'name', required: false, maxLength: null });
       const written = form.update(NAME, { required: true, maxLength: 8 });
       expect(form.getFieldSettings(NAME)!.values).toMatchObject({ required: true, maxLength: 8 });

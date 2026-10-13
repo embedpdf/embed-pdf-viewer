@@ -23,12 +23,22 @@ export type FlagKey =
   | 'lockedContents';
 
 /**
+ * One choice of a `choice` property, as a picker shows it: the value it
+ * writes, and its name, `label` in English and `labelKey` to translate it
+ * (`annotation.lineEndings.openArrow`).
+ */
+export interface AnnotationOption {
+  readonly value: string;
+  readonly label: string;
+  readonly labelKey: string;
+}
+
+/**
  * One property a style panel edits, as a UI contract: which field, edited
- * with which control, labelled what by default. A panel switches on
- * `control` (or on `key`, for a richer editor of its own), reads
- * `values[property.key]` and writes `{ [property.key]: value }`, so each
- * kind's list is its property schema, kept in the library so every consumer
- * gets it for free.
+ * with which control, labelled what. A panel switches on `control` (or on
+ * `key`, for a richer editor of its own), reads `values[property.key]` and
+ * writes `{ [property.key]: value }`, so each kind's list is its property
+ * schema, kept in the library so every consumer gets it for free.
  *
  * `key` is the engine's field name, with three exceptions: the border's
  * `borderStyle` reads and writes `borderStyle`, `dashArray` and
@@ -36,19 +46,26 @@ export type FlagKey =
  * body's formatting; and `link` is an attached link, not a field of the
  * annotation.
  *
- * `label` is a default (English) display name: apps with translations map
- * `key`s to their own strings and ignore it. Array order is display order.
+ * `label` is the English name and `labelKey` its translation key: a panel
+ * shows `t(property.labelKey, { fallback: property.label })`, as a command's
+ * label reads. The key names the wording, not the field, since one field is
+ * called different things by different kinds: `color` is
+ * `annotation.style.stroke` on a shape and `annotation.style.outline` on a
+ * redaction mark. A `choice` property's options carry the same pair. Array
+ * order is display order.
  */
 export type AnnotationProperty =
   | {
       readonly key: 'color' | 'interiorColor' | 'fontColor';
       readonly control: 'color';
       readonly label: string;
+      readonly labelKey: string;
     }
   | {
       readonly key: 'opacity' | 'strokeWidth' | 'fontSize';
       readonly control: 'number';
       readonly label: string;
+      readonly labelKey: string;
       readonly min: number;
       readonly max: number;
       readonly step: number;
@@ -59,7 +76,8 @@ export type AnnotationProperty =
       readonly key: 'borderStyle';
       readonly control: 'choice';
       readonly label: string;
-      readonly options: readonly string[];
+      readonly labelKey: string;
+      readonly options: readonly AnnotationOption[];
       readonly cloudy: boolean;
     }
   /** A value from a list: line endings, a font, an alignment, a blend mode, an icon. */
@@ -67,24 +85,41 @@ export type AnnotationProperty =
       readonly key: 'lineEndings' | 'fontFamily' | 'textAlign' | 'blendMode' | 'icon';
       readonly control: 'choice';
       readonly label: string;
-      readonly options: readonly string[];
+      readonly labelKey: string;
+      readonly options: readonly AnnotationOption[];
     }
   /** One of the annotation's flags, on or off. */
-  | { readonly key: FlagKey; readonly control: 'flag'; readonly label: string }
+  | {
+      readonly key: FlagKey;
+      readonly control: 'flag';
+      readonly label: string;
+      readonly labelKey: string;
+    }
   /** Free text, such as a redaction's label. */
-  | { readonly key: 'overlayText'; readonly control: 'text'; readonly label: string }
+  | {
+      readonly key: 'overlayText';
+      readonly control: 'text';
+      readonly label: string;
+      readonly labelKey: string;
+    }
   /** Bold, italic or underline of a text box: the body's formatting, or,
    *  while the text editor has a range, that range's runs. */
   | {
       readonly key: 'bold' | 'italic' | 'underline';
       readonly control: 'textFormat';
       readonly label: string;
+      readonly labelKey: string;
       readonly format: 'bold' | 'italic' | 'underline';
     }
   /** Where it links to (a website or a page). Declared by the link kind (its
    *  own target) and by every kind that may carry an attached link; kinds
    *  that omit it (widgets, caret, redaction…) can't be links. */
-  | { readonly key: 'link'; readonly control: 'link'; readonly label: string };
+  | {
+      readonly key: 'link';
+      readonly control: 'link';
+      readonly label: string;
+      readonly labelKey: string;
+    };
 
 /** Orthogonal capability flags. Static data — the annotation's `/F` flags are
  *  the runtime overrides (a locked annotation is never transformable, a hidden

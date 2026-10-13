@@ -1,6 +1,6 @@
 import { textBoxFamily } from '../shapes';
 import { defineKind, NO_CAPS, type AnnotationProperty, type KindCaps } from './define';
-import { fontFamily, LINKABLE, OPACITY, textAlign } from './fields';
+import { FONT_FAMILY, LINKABLE, OPACITY, TEXT_ALIGN } from './fields';
 import { strokedStyle } from './styles';
 import { bodyText } from './texts';
 
@@ -20,17 +20,61 @@ const TEXT_BOX_CAPS: KindCaps = {
 
 // The font first (the text is what it is for), then the box's background and border.
 const TEXT_BOX_FIELDS: readonly AnnotationProperty[] = [
-  fontFamily('Font'),
-  { key: 'fontSize', control: 'number', label: 'Font size', min: 4, max: 96, step: 1 },
-  { key: 'fontColor', control: 'color', label: 'Text color' },
-  { key: 'bold', control: 'textFormat', label: 'Bold', format: 'bold' },
-  { key: 'italic', control: 'textFormat', label: 'Italic', format: 'italic' },
-  { key: 'underline', control: 'textFormat', label: 'Underline', format: 'underline' },
-  textAlign('Align'),
+  FONT_FAMILY,
+  {
+    key: 'fontSize',
+    control: 'number',
+    label: 'Font size',
+    labelKey: 'annotation.style.fontSize',
+    min: 4,
+    max: 96,
+    step: 1,
+  },
+  {
+    key: 'fontColor',
+    control: 'color',
+    label: 'Text color',
+    labelKey: 'annotation.style.textColor',
+  },
+  {
+    key: 'bold',
+    control: 'textFormat',
+    label: 'Bold',
+    labelKey: 'annotation.style.bold',
+    format: 'bold',
+  },
+  {
+    key: 'italic',
+    control: 'textFormat',
+    label: 'Italic',
+    labelKey: 'annotation.style.italic',
+    format: 'italic',
+  },
+  {
+    key: 'underline',
+    control: 'textFormat',
+    label: 'Underline',
+    labelKey: 'annotation.style.underline',
+    format: 'underline',
+  },
+  TEXT_ALIGN,
   OPACITY,
-  { key: 'interiorColor', control: 'color', label: 'Background' },
-  { key: 'color', control: 'color', label: 'Border' },
-  { key: 'strokeWidth', control: 'number', label: 'Border width', min: 0, max: 12, step: 0.5 },
+  {
+    key: 'interiorColor',
+    control: 'color',
+    label: 'Background',
+    labelKey: 'annotation.style.background',
+  },
+  { key: 'color', control: 'color', label: 'Border', labelKey: 'annotation.style.border' },
+  {
+    key: 'strokeWidth',
+    control: 'number',
+    label: 'Border width',
+    labelKey: 'annotation.style.borderWidth',
+    min: 0,
+    max: 12,
+    step: 0.5,
+  },
   LINKABLE,
 ];
 

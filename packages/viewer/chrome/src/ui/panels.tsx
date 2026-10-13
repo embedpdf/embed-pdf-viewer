@@ -167,6 +167,7 @@ function OpenPanel({
 // lens; the rail follows the main view. Read-only — no page edits
 // (rotate/move/delete), just the page bitmap and its number.
 function ThumbnailList() {
+  const t = useT();
   const main = useStage(); // the main lens
   const thumbs = useStage(ThumbsStageToken); // the sidebar lens
   const currentPage = useStageState((state) => state.currentPageIndex);
@@ -190,7 +191,7 @@ function ThumbnailList() {
               main.goToPage(page.pageIndex);
               closeOnPick();
             }}
-            title={`Page ${page.pageIndex + 1}`}
+            title={t('thumbnails.page', { params: { page: page.pageIndex + 1 } })}
             // The current page in the accent with a tint around it, the others in a light line.
             className={`box-border cursor-pointer rounded ${
               page.pageIndex === currentPage

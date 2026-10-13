@@ -180,21 +180,44 @@ export type FormFieldFlagSetting =
  * text. `flag`: on or off. `number`: a whole number from `min`, or none
  * (`null`). `choice`: one of `options`, or any text when `free`. `choices`:
  * any of `options`. `options`: the field's options, each a label and a value.
+ * `options` of a `choice` or `choices` are the field's own values, the
+ * document's words, shown as they are.
+ *
+ * `label` is the English name and `labelKey` its translation key
+ * (`form.settings.tooltip`): a panel shows `t(setting.labelKey, { fallback:
+ * setting.label })`, as the annotation kinds' style properties read.
  */
 export type FormFieldSetting =
-  | { readonly key: 'name' | 'alternateName'; readonly control: 'text'; readonly label: string }
-  | { readonly key: FormFieldFlagSetting; readonly control: 'flag'; readonly label: string }
+  | {
+      readonly key: 'name' | 'alternateName';
+      readonly control: 'text';
+      readonly label: string;
+      readonly labelKey: string;
+    }
+  | {
+      readonly key: FormFieldFlagSetting;
+      readonly control: 'flag';
+      readonly label: string;
+      readonly labelKey: string;
+    }
   | {
       readonly key: 'maxLength';
       readonly control: 'number';
       readonly label: string;
+      readonly labelKey: string;
       readonly min: number;
     }
-  | { readonly key: 'defaultValue'; readonly control: 'text'; readonly label: string }
+  | {
+      readonly key: 'defaultValue';
+      readonly control: 'text';
+      readonly label: string;
+      readonly labelKey: string;
+    }
   | {
       readonly key: 'defaultValue';
       readonly control: 'choice';
       readonly label: string;
+      readonly labelKey: string;
       readonly options: readonly string[];
       readonly free: boolean;
     }
@@ -202,9 +225,15 @@ export type FormFieldSetting =
       readonly key: 'defaultValue';
       readonly control: 'choices';
       readonly label: string;
+      readonly labelKey: string;
       readonly options: readonly string[];
     }
-  | { readonly key: 'options'; readonly control: 'options'; readonly label: string };
+  | {
+      readonly key: 'options';
+      readonly control: 'options';
+      readonly label: string;
+      readonly labelKey: string;
+    };
 
 /**
  * What a settings panel shows for one field: its settings in display order,
