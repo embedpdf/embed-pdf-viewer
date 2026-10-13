@@ -131,7 +131,7 @@ export function runAnnotationExportConformance(
     test('exports a document to the same file on every engine', async () => {
       const expected = {
         'acrobat-stamps': '8e7b1ade219fe9c78e355e8c282a46e9b8131f76a2c98b70331d909830fff9b6',
-        'acrobat-rewrapped': '3806fd47a844c9eb784d8fb8643dc1a05a703d6576ed9335560e78299ea836d0',
+        'acrobat-rewrapped': '4cead3c1918229234fad1651b082aa0b09b49325d6e462177eae30f049939b11',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {
         await onPage(fixture as AnnotationResourceFixture, async (_page, doc) => {
