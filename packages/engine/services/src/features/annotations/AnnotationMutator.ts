@@ -5,7 +5,6 @@ import {
   appearanceImpactOf,
   authorizeAnnotationDelete,
   authorizeAnnotationUpdate,
-  pdfResolveAnnotationPatch,
   deletedWith,
   EngineError,
   EngineErrorCode,
@@ -24,6 +23,7 @@ import {
   PdfAnnotationSubtypeCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
+import { pdfResolveAnnotationPatch } from '@embedpdf/engine-core/validation';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { pdfPageCountOf } from './internal/write/stampDrawing';
@@ -199,14 +199,18 @@ export class AnnotationMutator {
         index,
         readContextFor(this.session, this.fonts),
       );
+      // Read as a list reads it, its field joined: a field the patch sends
+      // back as it reads is then no change (a checkbox's `checkStyle`).
+      joinWidgetFieldNumbers(this.runtime, this.session, [currentDto]);
       const actor = authorizeAnnotationUpdate(
         authority,
         currentDto,
         (patch as { groupId?: string | null }).groupId,
       );
 
-      // What the patch means, stated whole: the one resolution a viewer's
-      // pending view shares (`applyAnnotationPatch`). The writers below write
+      // What the patch means, stated whole and checked against its kind: the
+      // resolution a viewer's pending view shares (`applyAnnotationPatch`),
+      // which runs it without schema validation. The writers below write
       // exactly this.
       assertCaptionMetadataWritable(fn, annotPtr, currentDto, patch);
       patch = pdfResolveAnnotationPatch(currentDto, patch, {

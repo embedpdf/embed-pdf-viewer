@@ -18,6 +18,19 @@ export interface PdfOriginSize {
 }
 
 /**
+ * Whether `value` is a rect: `left`, `bottom`, `right` and `top`, each a finite number. A rect
+ * with `Infinity` or `NaN` in it places nothing, so every write refuses one: here on the page,
+ * and by `PdfRectSchema` and `PageBoxSchema` in the engine and on the wire.
+ */
+export function isFinitePdfRect(value: unknown): value is PdfRect {
+  if (typeof value !== 'object' || value === null) return false;
+  const { left, bottom, right, top } = value as Record<string, unknown>;
+  return [left, bottom, right, top].every(
+    (edge) => typeof edge === 'number' && Number.isFinite(edge),
+  );
+}
+
+/**
  * Normalize a `PdfRect` to the y-up invariant (`left <= right`, `bottom <= top`),
  * regardless of how the PDF ordered the corners (a `/Rect` array or `FS_RECTF`
  * may carry them in any order). The enforcement point for the "PdfRect is always

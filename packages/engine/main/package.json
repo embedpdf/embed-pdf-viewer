@@ -26,7 +26,15 @@
       "default": "./workers/embedpdf-worker.source.js"
     },
     "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
-    "./workers/encoder-worker.js": "./workers/encoder-worker.js"
+    "./workers/encoder-worker.js": "./workers/encoder-worker.js",
+    "./workers/inline-transport.node.js": "./workers/inline-transport.node.js"
+  },
+  "imports": {
+    "#inline-transport": {
+      "node": "./workers/inline-transport.node.js",
+      "browser": "./workers/inline-transport.js",
+      "default": "./workers/inline-transport.node.js"
+    }
   },
   "scripts": {
     "build": "node scripts/build-workers.mjs && epdf-build",
@@ -94,7 +102,8 @@
         "default": "./workers/embedpdf-worker.source.js"
       },
       "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
-      "./workers/encoder-worker.js": "./workers/encoder-worker.js"
+      "./workers/encoder-worker.js": "./workers/encoder-worker.js",
+      "./workers/inline-transport.node.js": "./workers/inline-transport.node.js"
     }
   },
   "epdf": {
@@ -102,9 +111,13 @@
       "./worker-entry",
       "./worker-source",
       "./workers/embedpdf-worker.js",
-      "./workers/encoder-worker.js"
+      "./workers/encoder-worker.js",
+      "./workers/inline-transport.node.js"
     ],
     "devExports": "development",
+    "neverBundle": [
+      "#inline-transport"
+    ],
     "conditions": {
       ".": {
         "es2020": "./dist/portable.js"

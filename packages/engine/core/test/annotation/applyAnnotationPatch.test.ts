@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import type { Annotation } from '../../src/annotation/kinds';
+import type { Annotation, AnnotationPatch } from '../../src/annotation/kinds';
+import { pdfAnnotationOf, pdfAnnotationPatchOf } from '../../src/pageSpace/annotations';
 import { applyAnnotationPatch, resolveAnnotationPatch } from '../../src/pageSpace/helpers';
+import { pdfResolveAnnotationPatch } from '../../src/validation';
 
 const base = {
   ref: {
@@ -106,13 +108,40 @@ describe('applyAnnotationPatch', () => {
     expect(next.subtype === 'square' && next.box.x).toBeCloseTo(10.1, 9);
   });
 
-  test('a patch the engine would refuse throws, as the engine does', () => {
+  test('a patch the engine refuses without its schemas throws, as the engine does', () => {
     expect(() => applyAnnotationPatch(square, { subtype: 'circle' } as never)).toThrow(
       expect.objectContaining({ code: 'InvalidArg' }),
     );
     expect(() => applyAnnotationPatch(square, { fontSize: 12 } as never)).toThrow(
       expect.objectContaining({ code: 'InvalidArg' }),
     );
+  });
+
+  test('predicts values the engine refuses, which the engine refuses at its door', () => {
+    const patch = { color: 'red', strokeWidth: -1 } as unknown as AnnotationPatch;
+    // The page predicts without the schemas: the change shows, and leaves when refused.
+    expect(applyAnnotationPatch(square, patch)).toMatchObject({ color: 'red', strokeWidth: -1 });
+    const page = { left: 0, bottom: 0, right: 600, top: 800 };
+    expect(() =>
+      pdfResolveAnnotationPatch(
+        pdfAnnotationOf(square, page, () => page),
+        pdfAnnotationPatchOf({ ...patch, subtype: 'square' } as AnnotationPatch, page, () => page),
+      ),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'color' } }));
+  });
+
+  test('a value only a read has, sent back unchanged, is dropped on the page as in the engine', () => {
+    // Another app's beveled border: a read has it, a write can't make it.
+    const beveled = { ...square, borderStyle: 'beveled' } as unknown as Annotation;
+    const patch = { borderStyle: 'beveled', color: '#00ff00' } as unknown as AnnotationPatch;
+    const page = { left: 0, bottom: 0, right: 600, top: 800 };
+    expect(resolveAnnotationPatch(beveled, patch)).toEqual({ subtype: 'square', color: '#00ff00' });
+    expect(
+      pdfResolveAnnotationPatch(
+        pdfAnnotationOf(beveled, page, () => page),
+        pdfAnnotationPatchOf({ ...patch, subtype: 'square' } as AnnotationPatch, page, () => page),
+      ),
+    ).toEqual({ subtype: 'square', color: '#00ff00' });
   });
 });
 

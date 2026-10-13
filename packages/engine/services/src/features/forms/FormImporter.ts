@@ -13,13 +13,15 @@ import {
   isNoOpWrite,
   type PdfCoordinates,
   pdfFormFieldDraftOf,
-  planFormImport,
-  planFormValuesImport,
-  type PlannedValueWrite,
   toPageRef,
   type WidgetFlags,
   type WireFormBundle,
 } from '@embedpdf/engine-core/runtime';
+import {
+  planFormImport,
+  planFormValuesImport,
+  type PlannedValueWrite,
+} from '@embedpdf/engine-core/validation';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FormMutator } from './FormMutator';

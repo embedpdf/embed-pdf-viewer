@@ -28,6 +28,11 @@
       "import": "./dist/runtime.js",
       "require": "./dist/runtime.cjs"
     },
+    "./validation": {
+      "development": "./src/validation.ts",
+      "import": "./dist/validation.js",
+      "require": "./dist/validation.cjs"
+    },
     "./wire": {
       "development": "./src/wire.ts",
       "import": "./dist/wire.js",
@@ -38,6 +43,7 @@
   "scripts": {
     "build": "epdf-build",
     "clean": "rimraf dist",
+    "generate": "node --experimental-transform-types --disable-warning=ExperimentalWarning --import ./scripts/register-source.mjs scripts/generate-kind-facts.ts",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
     "test": "vitest run",
@@ -91,6 +97,10 @@
       "./runtime": {
         "import": "./dist/runtime.js",
         "require": "./dist/runtime.cjs"
+      },
+      "./validation": {
+        "import": "./dist/validation.js",
+        "require": "./dist/validation.cjs"
       },
       "./wire": {
         "import": "./dist/wire.js",

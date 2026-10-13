@@ -1,7 +1,6 @@
 import {
   assertAnnotationBundleManifest,
   pdfAnnotationDraftOf,
-  planAnnotationImport,
   toPageRef,
   type AnnotationActor,
   type BundleLimits,
@@ -13,6 +12,7 @@ import {
   type WireAnnotationResources,
   type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
+import { planAnnotationImport } from '@embedpdf/engine-core/validation';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { AnnotationBatchApplier, type BatchCreate } from './AnnotationBatchApplier';

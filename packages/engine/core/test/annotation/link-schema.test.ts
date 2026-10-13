@@ -6,7 +6,7 @@ import type {
   PdfCoordinates,
   PdfLinkTarget,
 } from '../../src/shared';
-import { pdfResolveAnnotationPatch } from '../../src/shared';
+import { pdfResolveAnnotationPatch } from '../../src/validation';
 import {
   AnnotationDraftSchema,
   AnnotationPatchSchema,

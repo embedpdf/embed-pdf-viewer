@@ -80,7 +80,8 @@ const RESET_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbo
  * by the engine's own rules (`fieldAfterValue`, `fieldAfterReset`,
  * `widgetsAfterDisplay`, `formFieldOfDraft`, `formFieldAfter`,
  * `widgetAfterPatch`): what the fields and their widgets hold after it. An op
- * the engine would refuse shows nothing; its refusal takes the change away.
+ * those rules refuse shows nothing; one whose values only the engine's schemas
+ * refuse shows until the engine's refusal takes the change away.
  * A create shows once it names its numbers; taking a widget out of its field
  * shows once the engine answers.
  *

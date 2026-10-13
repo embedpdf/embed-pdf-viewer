@@ -10,7 +10,7 @@ import { toPageRef } from '../../src/identity/PageRef';
 import { DEFAULT_BUNDLE_LIMITS } from '../../src/transfer/bundleLimits';
 import type { FormBundle } from '../../src/transfer/FormBundle';
 import { formExportRowsOf } from '../../src/transfer/formExport';
-import { planFormImport, planFormValuesImport } from '../../src/transfer/formImport';
+import { planFormImport, planFormValuesImport } from '../../src/transfer/planFormImport';
 import { FormTransfer } from '../../src/transfer/FormTransfer';
 
 const page = toPageRef(3);

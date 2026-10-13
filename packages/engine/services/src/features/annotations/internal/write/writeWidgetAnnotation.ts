@@ -224,7 +224,7 @@ export function applyWidgetDraft(
  * An update's `box` and `rotation`, each kept when left out (`rotation:
  * null` or `0` turns the widget upright about its middle). A `rect` never
  * gets here: the update resolved it into the box it places
- * (`checkAnnotationPatch`).
+ * (`pdfPrepareAnnotationPatch`).
  */
 function applyWidgetBoxPatch(
   fn: PdfFunctions,
@@ -269,7 +269,7 @@ export function applyWidgetPatch(
         "writing a widget's actions requires the runtime and the document on the write context",
       );
     }
-    // A read's actions sent back unchanged never get here (`checkAnnotationPatch`).
+    // A read's actions sent back unchanged never get here (`pdfPrepareAnnotationPatch`).
     writeWidgetActions(ctx.runtime, ctx.docPtr, annotPtr, patch.actions as never);
   }
 }

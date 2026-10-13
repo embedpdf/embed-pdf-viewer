@@ -1,10 +1,10 @@
 import {
   assertAnnotationResources,
-  pdfResolveAnnotationDraft,
   type AnnotationDraft,
   type WireAnnotationResources,
   type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
+import { pdfResolveAnnotationDraft } from '@embedpdf/engine-core/validation';
 
 import type { AnnotationWriteContext } from '../write/annotationWriteContext';
 import { preflightDraft } from '../write/annotationWriterRegistry';
@@ -19,9 +19,10 @@ export function prepareCreate(
   resources: WireAnnotationResources | undefined,
   ctx: AnnotationWriteContext,
 ): AnnotationDraft<PdfCoordinates> {
-  // What the draft means, stated whole: the one resolution a viewer's
-  // pending create shares (`annotationOfDraft`). A change set carries
-  // `reply` and a popup's `parent` beside the draft.
+  // What the draft means, stated whole and checked against its kind: the
+  // resolution a viewer's pending create shares (`annotationOfDraft`), which
+  // runs it without schema validation. A change set carries `reply` and a
+  // popup's `parent` beside the draft.
   const resolved = pdfResolveAnnotationDraft(draft, {
     linked: ['reply', 'parent'],
     describeFont: ctx.describeRegisteredFont,

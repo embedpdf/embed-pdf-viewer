@@ -14,6 +14,11 @@
  *   - embedpdf-worker.source.js  the same bundle as a string module, for the
  *                              blob: delivery (`worker: 'inline'`, and the
  *                              viewer loaded from another origin than the page).
+ *   - inline-transport.js      the engine with no worker, in a browser: the
+ *                              same host and glue as one self-contained module,
+ *                              imported (`#inline-transport`) only when an
+ *                              engine boots in the page's own thread.
+ *     inline-transport.node.js the same module for Node, its packages imported.
  *   - encoder-worker.js        the image-encoder worker, emitted verbatim from
  *                              src/render/encoder-worker-source.ts so the blob
  *                              and file deliveries can never drift.
@@ -72,6 +77,44 @@ fs.writeFileSync(
     `declare const source: string;\nexport default source;\n`,
 );
 
+// ── engine in this thread: the no-worker fallback ──────────────────────────
+// What `#inline-transport` (package.json `imports`) names. A browser gets one
+// self-contained file, as the worker is: the engine host, PDFium's runtime,
+// the schemas and zod inlined, no bare import and no asset reference left, so
+// an app's bundler only copies it into a lazy chunk and never sees a package
+// behind it. The wasm's location comes from the engine (src/index.ts), so the
+// glue's own `import.meta.url` goes, as in the worker. Node gets the module as
+// it is, its packages imported (dist's CommonJS build imports it with
+// `import()` too).
+await esbuild.build({
+  entryPoints: [path.join(packageRoot, 'src', 'transport', 'inline-browser.ts')],
+  outfile: path.join(workersDir, 'inline-transport.js'),
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target: 'es2020',
+  minify: true,
+  legalComments: 'none',
+  define: { 'import.meta.url': 'self.location.href' },
+  // Where this file runs in Node anyway (a resolver that asked for `browser` alone), it hands
+  // over to the Node build. The path is joined at run time and annotated, so no bundler follows
+  // it; a banner, because the minifier drops comments.
+  banner: {
+    js:
+      'const loadNodeBuild = () => import(/* webpackIgnore: true */ /* @vite-ignore */ ' +
+      "['@embedpdf/engine', 'workers', 'inline-transport.node.js'].join('/'));",
+  },
+});
+await esbuild.build({
+  entryPoints: [path.join(packageRoot, 'src', 'transport', 'InlineTransport.ts')],
+  outfile: path.join(workersDir, 'inline-transport.node.js'),
+  bundle: true,
+  packages: 'external',
+  format: 'esm',
+  platform: 'node',
+  target: 'es2022',
+});
+
 // ── encoder worker: the shared source string, verbatim ──────────────────────
 const encoderBundle = await esbuild.build({
   entryPoints: [path.join(packageRoot, 'src', 'render', 'encoder-worker-source.ts')],
@@ -94,5 +137,6 @@ const size = (file) => `${(fs.statSync(path.join(workersDir, file)).size / 1024)
 console.log(
   `[build-workers] embedpdf-worker.js ${size('embedpdf-worker.js')}, ` +
     `embedpdf-worker.source.js ${size('embedpdf-worker.source.js')}, ` +
+    `inline-transport.js ${size('inline-transport.js')}, ` +
     `encoder-worker.js ${size('encoder-worker.js')}`,
 );

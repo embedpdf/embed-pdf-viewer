@@ -6,8 +6,8 @@ import {
   type RichTextDocumentInput,
 } from '../../dto/RichText';
 import type { Coordinates } from '../../pageSpace/coordinates';
-import type { KindFields } from '../declaration';
-import { declarationOf, type Annotation, type AnnotationPatch } from '../kinds';
+import { kindFactsOf } from '../kind-facts';
+import type { Annotation, AnnotationPatch } from '../kinds';
 
 /**
  * A resolved patch's fields as a read spells them. Most fields read as they
@@ -73,13 +73,13 @@ export function applyResolvedPatch<A extends Annotation<Coordinates>>(
   current: A,
   resolved: AnnotationPatch<Coordinates>,
 ): A {
-  const fields: KindFields = declarationOf(current.subtype)?.fields ?? {};
+  const owners = kindFactsOf(current.subtype)?.owners ?? {};
   const read = current as unknown as Record<string, unknown>;
   const next: Record<string, unknown> = { ...read };
   for (const [name, value] of Object.entries(resolved)) {
     if (name === 'subtype' || value === undefined) continue;
     // Fields the engine owns, stamps or keeps as found are accepted and ignored.
-    if (fields[name]?.traits.owner !== 'data') continue;
+    if (owners[name] !== 'data') continue;
     next[name] = readValueOf(name, value, read[name]);
   }
   return { ...next, ...followingReads(current, resolved) } as unknown as A;
@@ -96,7 +96,8 @@ function followingReads(
 ): Record<string, unknown> {
   if (current.subtype !== 'link' || resolved.subtype !== 'link') return {};
   const target = resolved.target;
-  // A read-only target reached here only sent back unchanged: nothing moves.
+  // A target a write can't make moves no action: sent back unchanged it is
+  // kept, and the engine refuses a changed one.
   if (target === undefined || (target !== null && target.kind !== 'uri' && target.kind !== 'goto'))
     return {};
   const { activate: _replaced, ...others } = current.actions ?? {};

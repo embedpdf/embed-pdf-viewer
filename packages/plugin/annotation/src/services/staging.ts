@@ -179,9 +179,10 @@ const notFound = (ref: AnnotationRef): PluginError =>
   new PluginError('not-found', 'annotation', `no annotation ${annotationKey(ref)}`);
 
 /**
- * One stated change as its op, checked by the engine's own rules against
- * `current`: what shows is what the engine will write, and a change it
- * would refuse throws. `live`: the record draws live from now on.
+ * One stated change as its op, resolved by the engine's own rules against
+ * `current`: what shows is what the engine will write, and a change those
+ * rules refuse throws. The engine checks the values against its schemas when
+ * the change reaches it. `live`: the record draws live from now on.
  */
 export function checkedOpOf(
   change: StoreChange,
@@ -226,8 +227,8 @@ export function checkedOpOf(
   const noFields = Object.keys(change.patch).every((name) => name === 'subtype');
   // A patch that says nothing, with no bytes, is no write at all.
   if (noFields && !change.resources) return { id, op: null };
-  // The engine's resolve rules, run now: a patch it would refuse throws
-  // before anything shows.
+  // The engine's resolve rules, run now: a patch they refuse throws before
+  // anything shows. Values its schemas refuse show until the engine answers.
   resolveAnnotationPatch(stored.dto, change.patch);
   const record = recordOf(id);
   return {

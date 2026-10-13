@@ -79,6 +79,12 @@ local engine imports it, with `@embedpdf/engine-runtime`, only in
 `packages/engine/main/src/transport/InlineTransport.ts`, loaded with `import()` when an engine
 boots in the page (`packages/engine/main/test/entry-graph.test.ts` checks it). What both engines
 need beside a document handle, such as `EventHub`, lives in `@embedpdf/engine-core/runtime`.
+The checks it runs before a write (a write's values against its kind's schema, the import
+planners) come from `@embedpdf/engine-core/validation`, the entry built with zod; the page's
+entries reach no zod (`packages/engine/core/test/entry-graph.test.ts`). A write is prepared,
+checked and derived; a viewer predicts it with the same preparation and derivation without
+schema validation, and the check only accepts or refuses, so this package writes what the viewer
+predicted or refuses it.
 
 ## Mutation safety
 

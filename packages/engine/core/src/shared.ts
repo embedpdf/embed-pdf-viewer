@@ -316,11 +316,9 @@ export type {
   AnnotationImportDrop,
   AnnotationImportOptions,
   AnnotationImportBody,
-  AnnotationImportPlan,
   AnnotationImportResult,
-  PlannedAnnotation,
 } from './transfer/annotationImport';
-export { annotationImportFacts, planAnnotationImport } from './transfer/annotationImport';
+export { annotationImportFacts } from './transfer/annotationImport';
 export { closeExportSelection } from './transfer/exportSelection';
 export { mapPageRefs, pageRefsIn } from './transfer/pageRefs';
 export {
@@ -345,25 +343,15 @@ export type {
   FormImportDrop,
   FormImportDropReason,
   FormImportOptions,
-  FormImportPlan,
   FormImportResult,
   FormValuesImportBody,
   FormValuesImportDrop,
   FormValuesImportDropReason,
   FormValuesImportOptions,
   FormValuesImportResult,
-  FormValuesImportTarget,
-  PlannedFormField,
-  PlannedValueWrite,
   WidgetFlags,
 } from './transfer/formImport';
-export {
-  formImportFacts,
-  formValuesImportFacts,
-  planFormImport,
-  planFormValuesImport,
-  WIDGET_FLAG_NAMES,
-} from './transfer/formImport';
+export { formImportFacts, formValuesImportFacts, WIDGET_FLAG_NAMES } from './transfer/formImport';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
 // file-attachment kind and the document-level attachments service.
@@ -530,15 +518,12 @@ export {
   UNBAKED_KINDS,
 } from './annotation/appearance';
 export { pdfAppearanceTurnOf } from './annotation/appearanceTurn';
-export { assertAnnotationDraft } from './annotation/checkWrite';
 export { DRAWN_RECT_KINDS } from './annotation/shapeForRect';
 export {
   annotationPatchBetween,
   assertDeclaredFields,
   assertRichTextAgreement,
   mergeAnnotationPatch,
-  pdfResolveAnnotationDraft,
-  pdfResolveAnnotationPatch,
   resolveMeasurementDraft,
   touchesCaption,
   type DraftResolveOptions,
