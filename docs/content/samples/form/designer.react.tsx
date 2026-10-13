@@ -60,7 +60,7 @@ function FieldPalette() {
   // The pointer fills the form in; every other tool here designs it.
   const filling = activeToolId === 'pointer';
 
-  if (!form.canDesign()) return <p className="readout">This document's form can't be changed.</p>;
+  if (!form.canDesign()) return <p className="readout">This document’s form can’t be changed.</p>;
 
   return (
     <div className="toolbar">

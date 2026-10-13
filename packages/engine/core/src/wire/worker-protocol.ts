@@ -111,8 +111,8 @@ export type WorkerJobId = number;
 /**
  * What a job does to its document: part of every job request's definition,
  * so the one fact has one home. The worker queue keeps each document's jobs
- * in the order this asks for (the page residency plan, §10.5), and the worker
- * closes parsed pages a write may have changed.
+ * in the order this asks for, and the worker closes parsed pages a write may
+ * have changed.
  *
  * - `read`: changes nothing. It sees every write asked before it, and may see
  *   one asked after it.

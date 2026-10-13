@@ -645,7 +645,7 @@ describe('the view a render is for, and its priority', () => {
 describe('what a picture draws', () => {
   it('left out, it draws what the session may read; asking for more is refused', async () => {
     const fixture = await boot({ allows: (capability) => capability !== 'doc.annotate.read' });
-    void fixture.render.renderPage(toPageRef(11), { width: 100 });
+    const page = fixture.render.renderPage(toPageRef(11), { width: 100 });
     expect(fixture.imageCalls[0]!.options).toMatchObject({
       includeAnnotations: false,
       includeFormFields: true,
@@ -654,12 +654,21 @@ describe('what a picture draws', () => {
       fixture.render.renderPage(toPageRef(11), { width: 100, includeAnnotations: true }),
     ).rejects.toMatchObject({ code: 'permission-denied' });
     // A layer that paints the form fields leaves them out: the page alone.
-    void fixture.render.renderSource(toPageRef(22), { scale: 1, includeFormFields: false });
+    const layer = fixture.render.renderSource(toPageRef(22), {
+      scale: 1,
+      includeFormFields: false,
+    });
     expect(fixture.imageCalls[1]!.options).toMatchObject({
       includeAnnotations: false,
       includeFormFields: false,
     });
+    // Neither render is answered: closing the document ends both.
+    const closed = Promise.all([
+      expect(page).rejects.toMatchObject({ code: 'instance-closed' }),
+      expect(layer).rejects.toMatchObject({ code: 'instance-closed' }),
+    ]);
     await fixture.kernel.destroy();
+    await closed;
   });
 
   it('tells a view what the session may read, as the same object until it changes', async () => {

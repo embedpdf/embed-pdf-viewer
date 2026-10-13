@@ -1,5 +1,5 @@
 /**
- * Which job the queue sends next (the page residency plan, §10.5).
+ * Which job the queue sends next.
  *
  * Correctness first: each document keeps the order its jobs' effects ask for,
  * and a runtime write keeps the order of every job. A job may run once nothing

@@ -2079,7 +2079,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        parent?: AnnotationPatchPopup.Parent | undefined;
+        parent?: (CloudPDF.AnnotationRef | null) | undefined;
         open?: boolean | undefined;
     }
 
@@ -2123,7 +2123,5 @@ export namespace AnnotationPatch {
             } as const;
             export type Type = (typeof Type)[keyof typeof Type];
         }
-
-        export type Parent = CloudPDF.AnnotationRef | CloudPDF.AnnotationRef | null;
     }
 }

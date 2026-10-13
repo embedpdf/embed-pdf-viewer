@@ -61,6 +61,7 @@ describe('EventHub: delivery contract', () => {
     publisher.publishWrite('op-1', init, init);
 
     expect(events).toHaveLength(2);
+    // Every event here is a write's; only `stream.desynced` has no origin.
     expect(events.map((event) => ('origin' in event ? event.origin : null))).toMatchObject([
       {
         kind: 'local',

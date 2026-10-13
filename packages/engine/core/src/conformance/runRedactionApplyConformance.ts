@@ -120,6 +120,48 @@ export function runRedactionApplyConformance(
       }
     });
 
+    test('annotations scope applies several marks of a page together and leaves its others', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        if (!doc.redaction) return;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
+        const mark = (x: number) =>
+          page.annotations.create({
+            subtype: 'redact',
+            rect: { x, y: 20, width: 40, height: 30 },
+            interiorColor: '#000000',
+          } satisfies RedactDraft);
+        const first = await mark(10);
+        const kept = await mark(70);
+        const last = await mark(130);
+        // Under the first mark: collateral of the apply.
+        await page.annotations.create({
+          subtype: 'highlight',
+          quadPoints: [
+            {
+              upperLeft: { x: 15, y: 25 },
+              upperRight: { x: 45, y: 25 },
+              lowerLeft: { x: 15, y: 45 },
+              lowerRight: { x: 45, y: 45 },
+            },
+          ],
+        } satisfies HighlightDraft);
+
+        const result = await doc.redaction.apply({
+          annotations: [last.annotation.ref, first.annotation.ref],
+        });
+        expect(result.results).toHaveLength(1);
+        expect(result.results[0].status).toBe('applied');
+        expect(result.results[0].removedAnnotationCount).toBe(1);
+        const left = (await page.annotations.list()).annotations;
+        expect(left.map((annotation) => annotation.subtype)).toEqual(['redact']);
+        expect(left[0].ref).toEqual(kept.annotation.ref);
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('a label fitted to its region (fontSize 0) is burned in', async () => {
       const doc = await openFixture(engine, opts);
       try {

@@ -94,9 +94,9 @@ export function createView(
    *   - one this session creates: drawn as a new record is, with no raster
    *     from the engine yet;
    *   - a confirmed one: its predicted annotation, drawn as the change says
-   *     (core `drawnAfter`, the engine's verdict on it): as before, its raster
-   *     moved, or live. Its appearance version and authority stay the
-   *     engine's.
+   *     (core `drawnAfter`, the engine's verdict on it): its raster moved, or
+   *     live, as with no change pending. Its appearance version and
+   *     authority stay the engine's.
    */
   const predictedRecord = (
     shown: AnnotationRecord,

@@ -1,9 +1,8 @@
 /**
  * Where a job is on screen, and how soon it runs: the pure half of the
- * engine's scheduling (the page residency plan, §10.4 and §10.5). The views
- * say what they show (`WorkingSetPage`); a job's place follows from its page,
- * the part of the page it's about, and the view it serves. Nothing here names
- * a request kind or a plugin.
+ * engine's scheduling. The views say what they show (`WorkingSetPage`); a
+ * job's place follows from its page, the part of the page it's about, and the
+ * view it serves. Nothing here names a request kind or a plugin.
  */
 import type { CallPriority, WorkingSetPage } from './facts';
 import type { PageBox } from '../geometry/pageSpace';

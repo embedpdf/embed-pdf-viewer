@@ -140,7 +140,7 @@ groups:
   ruby:
     generators:
       - name: fern-ruby-sdk
-        version: 1.21.1
+        version: 1.28.1
         output:
           location: local-file-system
           path: ../sdks/ruby

@@ -18462,19 +18462,12 @@
               "importedBy": {},
               "actions": {},
               "parent": {
-                "anyOf": [
+                "allOf": [
                   {
                     "$ref": "#/components/schemas/AnnotationRef"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/components/schemas/AnnotationRef"
-                      }
-                    ],
-                    "nullable": true
                   }
-                ]
+                ],
+                "nullable": true
               },
               "open": {
                 "type": "boolean"

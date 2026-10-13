@@ -80,7 +80,10 @@ export function integrationForProduct(
 export const DOCS_ENTRY_TOPIC = { viewer: '', headless: '' } as const;
 
 /** The concrete entry URL of a fanned-out product for one integration. */
-export function docsEntryHref(product: 'viewer' | 'headless', integration: DocsIntegration): string {
+export function docsEntryHref(
+  product: 'viewer' | 'headless',
+  integration: DocsIntegration,
+): string {
   const topic = DOCS_ENTRY_TOPIC[product];
   return `/docs/${product}/${integration}${topic ? `/${topic}` : ''}`;
 }

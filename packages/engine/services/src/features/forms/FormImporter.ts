@@ -87,7 +87,7 @@ export class FormImporter {
   ) {}
 
   /**
-   * The design: each field the plan keeps, created with its widgets on
+   * The design: each field `planFormImport` keeps, created with its widgets on
    * their mapped pages, their flags, and, with `values`, the value the
    * bundle holds; then the calculation order among them, appended to the
    * form's in bundle order; then who made and filled each, restored or

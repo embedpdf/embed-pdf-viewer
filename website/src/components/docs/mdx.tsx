@@ -1,5 +1,12 @@
 import type { MDXComponents } from 'mdx/types';
-import { FrameworkLink, FwCode, FwVariant, Framework, StateIntroText, Word } from '@embedpdf/docs-kit';
+import {
+  FrameworkLink,
+  FwCode,
+  FwVariant,
+  Framework,
+  StateIntroText,
+  Word,
+} from '@embedpdf/docs-kit';
 import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
 import { CloudPdfCallout } from './cloudpdf-callout';

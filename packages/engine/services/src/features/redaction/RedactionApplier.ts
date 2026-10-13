@@ -11,9 +11,10 @@ import {
   subtypeFromCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
+import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
+import { withPointerTable } from '../../runtime/memory/pointers';
 import { I32_BYTES, readI32 } from '../../runtime/memory/structs';
 import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
@@ -180,7 +181,7 @@ export class RedactionApplier {
     const { fn, mem } = this.runtime;
     const hasRedactions = this.pageHasRedactAnnotations(pagePtr);
     return withScratch(mem, I32_BYTES, (countPtr) => {
-      const ok = fn.EPDFPage_ApplyRedactions(pagePtr, countPtr);
+      const ok = fn.EPDFPage_ApplyRedactions(pagePtr, NULL_PTR, 0, countPtr);
       if (!ok) {
         // Native false is overloaded: it means either "no redact annotations"
         // or that applying one failed. Distinguish those cases before the
@@ -210,30 +211,33 @@ export class RedactionApplier {
     return false;
   }
 
+  /**
+   * Applies `refs` in one native call: their regions are redacted together,
+   * so an image under several of them is read and written once.
+   */
   private applyRefsOnPage(
     pagePtr: Ptr,
     refs: AnnotationRef[],
   ): { status: 'applied'; removed: number } {
     const { fn, mem } = this.runtime;
+    const annotPtrs: Ptr[] = [];
     let removed = 0;
-    for (const ref of refs) {
-      // Re-resolve at apply time: an earlier apply on this page may have
-      // removed collateral annotations, and names stay valid across that
-      // (the page was promoted first).
-      const annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
-      try {
-        const ok = withScratch(mem, I32_BYTES, (countPtr) => {
-          const applied = fn.EPDFAnnot_ApplyRedaction(pagePtr, annotPtr, countPtr);
-          if (applied) removed += readI32(mem, countPtr) >>> 0;
+    try {
+      for (const ref of refs) {
+        annotPtrs.push(resolveAnnotPtr(this.runtime, this.session, pagePtr, ref));
+      }
+      const ok = withPointerTable(this.runtime, annotPtrs, (table, count) =>
+        withScratch(mem, I32_BYTES, (countPtr) => {
+          const applied = fn.EPDFPage_ApplyRedactions(pagePtr, table, count, countPtr);
+          if (applied) removed = readI32(mem, countPtr) >>> 0;
           return applied;
-        });
-        if (!ok) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            'native redaction apply failed after preflight',
-          );
-        }
-      } finally {
+        }),
+      );
+      if (!ok) {
+        throw new EngineError(EngineErrorCode.Unknown, 'native redaction apply failed after preflight');
+      }
+    } finally {
+      for (const annotPtr of annotPtrs) {
         fn.FPDFPage_CloseAnnot(annotPtr);
       }
     }

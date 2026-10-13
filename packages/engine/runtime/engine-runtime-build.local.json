@@ -3,12 +3,12 @@
   "sha": "local",
   "artifacts": {
     "wasm32": {
-      "url": "file:///Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-wasm32-69e229992.tar.gz",
-      "sha256": "083ef8e2df3b8d5a2c2ab8b77c575ce5e2fae59f573526d877e2b3c67bcbe1f2"
+      "url": "file:///Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-wasm32-7d08de4e1.tar.gz",
+      "sha256": "674f9629867239a2ab4cfa59d65d0791b1f4feedd1f0ef268bf260a558fdb590"
     },
     "darwin-arm64": {
-      "url": "file:///Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-darwin-arm64-69e229992.tar.gz",
-      "sha256": "e7846c1de377881820fd78e1df52a9c21f37ac52c1c1959ae08ef6cd513247a7"
+      "url": "file:///Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-darwin-arm64-b33fa892d.tar.gz",
+      "sha256": "d9f19b8919d67cfee21ff99e8254c3b04476dffb530d6bdc38af982cdf8d532b"
     }
   }
 }

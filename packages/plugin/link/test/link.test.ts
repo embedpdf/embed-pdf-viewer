@@ -307,8 +307,9 @@ describe('following a link', () => {
   it('opens a website through the framework’s opener, and reports one it won’t open', async () => {
     const harness = await boot();
     const opened: string[] = [];
+    // An opener that opens web addresses only: any other scheme is reported.
     const stop = harness.link.registerUriOpener((uri) => {
-      if (uri.startsWith('javascript:')) return false;
+      if (!/^https?:/i.test(uri)) return false;
       opened.push(uri);
       return true;
     });

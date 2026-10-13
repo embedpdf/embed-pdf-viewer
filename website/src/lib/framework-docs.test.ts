@@ -26,7 +26,12 @@ const PAGES = process.env.FRAMEWORK_DOCS_PAGES
   : fs
       .readdirSync(HEADLESS, { recursive: true, encoding: 'utf8' })
       .filter((file) => file.endsWith('.mdx'))
-      .map((file) => file.replace(/\.mdx$/, '').split(path.sep).join('/'))
+      .map((file) =>
+        file
+          .replace(/\.mdx$/, '')
+          .split(path.sep)
+          .join('/'),
+      )
       .sort();
 
 /** What gives another framework away, on each framework's page. */
@@ -36,7 +41,12 @@ const REACT_BLOCK = /^\s*```(tsx|jsx)\b/gm;
 const JSX_PROP = /\bon[A-Z]\w*=\{/g;
 
 const OTHER_FRAMEWORKS: Record<Framework, RegExp[]> = {
-  react: [/@embedpdf\/(vue|svelte|angular)\b/g, /\binject\(Epdf/g, /\bv-(if|for|model)\b/g, /\{#(if|each|snippet)\b/g],
+  react: [
+    /@embedpdf\/(vue|svelte|angular)\b/g,
+    /\binject\(Epdf/g,
+    /\bv-(if|for|model)\b/g,
+    /\{#(if|each|snippet)\b/g,
+  ],
   vue: [
     /@embedpdf\/(react|svelte|angular)\b/g,
     /\binject\(Epdf/g,
@@ -108,7 +118,9 @@ describe('headless pages written for each framework', () => {
   for (const framework of FRAMEWORKS) {
     it(`a page held back for ${framework} shows only ${framework}`, () => {
       for (const page of PAGES) {
-        expect(leaks(page, markdownFor(page, framework, heldBack(framework)), framework)).toEqual([]);
+        expect(leaks(page, markdownFor(page, framework, heldBack(framework)), framework)).toEqual(
+          [],
+        );
       }
     });
   }

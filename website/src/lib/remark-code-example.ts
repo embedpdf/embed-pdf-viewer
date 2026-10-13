@@ -50,8 +50,7 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
           (attr: any) => attr.type === 'mdxJsxAttribute' && attr.name === 'name',
         );
         if (typeof nameAttr?.value !== 'string') return;
-        const sampleName =
-          node.name === 'Snippet' ? `snippets/${nameAttr.value}` : nameAttr.value;
+        const sampleName = node.name === 'Snippet' ? `snippets/${nameAttr.value}` : nameAttr.value;
         const byFramework = collectSampleFiles(sampleName, githubBaseUrl);
         // For rehype-code-example, which highlights the files, stores them under the sample's
         // name and leaves the page only a reference to them (docs-kit `mdx/code-panels`).

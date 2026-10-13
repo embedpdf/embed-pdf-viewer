@@ -95,7 +95,7 @@ describe('WorkerQueue', () => {
     );
     expect(sent.map((request) => request.kind)).toEqual(['close', 'pages.workingSet']);
 
-    answer(sent[0]!.jobId); // the slot frees: the waiting job goes next, as before
+    answer(sent[0]!.jobId); // the slot frees, and the waiting job goes next
     expect(sent[2]).toEqual(
       expect.objectContaining({ kind: 'close', effect: 'close', docId: 'waiting' }),
     );

@@ -88,7 +88,7 @@ export interface FieldGroupsConformanceOptions {
 
 const PAGE = toPageRef(3);
 const field = (name: string): FormFieldRef => ({ kind: 'fqn', name });
-/** A DER SEQUENCE: what a completion takes as a CMS, without judging it. */
+/** A DER `SEQUENCE`: what a completion takes as a CMS, without judging it. */
 const PLACEHOLDER_CMS = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02]);
 
 export function runFieldGroupsConformance(

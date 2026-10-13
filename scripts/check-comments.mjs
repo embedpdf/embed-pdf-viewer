@@ -57,7 +57,7 @@ const ACRONYMS = new Set(
     'OCR XOR OOM PII PHP FYI RPS CSPRNG SPKI NNN VCL AEAD IETF TSAN ARN KDF WAF NAT README CGROUP AD SC ' +
     'SELECT INSERT UPDATE INTEGER BIGINT UNIQUE NULL TABLE CREATE CONFLICT TEXT LISTEN NOTIFY ' +
     'FCL RS ES ULID TOC SH SB GKE GCE REALPATH AWSPROD AES GCM ' +
-    'CTA FNV XYZ VPC JSONL MPU YYYY MM MVCC WAL RDS AATL XHTML SOF NFKD BSD BGRA UCS CPVT FQN CAFE'
+    'CTA FNV XYZ VPC JSONL MPU YYYY MM MVCC WAL RDS AATL XHTML SOF NFKD BSD BGRA UCS CPVT FQN CAFE AFM'
   ).split(/\s+/),
 );
 
@@ -99,7 +99,11 @@ const RULES = [
   {
     id: 'caps-emphasis',
     test: (line) => {
-      const withoutCode = line.replace(/`[^`]*`/g, ' ').replace(/\/[A-Z][A-Za-z]*/g, ' ');
+      // Code (`x`, {@link X}) and PDF names (/Name) are not emphasis.
+      const withoutCode = line
+        .replace(/`[^`]*`/g, ' ')
+        .replace(/\{@link(?:code|plain)?\s[^}]*\}/g, ' ')
+        .replace(/\/[A-Z][A-Za-z]*/g, ' ');
       const words = withoutCode.match(/\b[A-Z][A-Z]+\b/g) ?? [];
       return words.some((word) => !ACRONYMS.has(word) && !/\d|_/.test(word));
     },

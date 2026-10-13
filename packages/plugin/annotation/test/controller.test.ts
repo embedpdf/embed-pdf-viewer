@@ -36,7 +36,6 @@ const ref = (annotObjectNumber: number): AnnotationRef => ({
 const base = (annotObjectNumber: number) => ({
   ref: ref(annotObjectNumber),
   page: PAGE,
-  identityQuality: 'durable' as const,
   hasAppearance: true,
   appearanceState: null,
   nm: null,

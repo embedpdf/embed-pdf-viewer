@@ -3,7 +3,7 @@
  *
  * A save point is the layer saved to bytes before an action runs, so that a
  * failed action can be thrown away and the document reopened from base + save
- * point (see platform docs/plans/2026-10-04-optimistic-writes-forms-history.md).
+ * point.
  * This measures, as the layer grows: a normal small edit, taking a save point
  * (`downloadLayer`, the layer only), and the reopen a failed action would need.
  *
