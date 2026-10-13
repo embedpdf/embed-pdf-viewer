@@ -66,6 +66,18 @@
     "@embedpdf/viewer-react#typecheck": {
       "dependsOn": ["^build", "build"]
     },
+    "@embedpdf/viewer-angular#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-react#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-svelte#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-vue#test": {
+      "dependsOn": ["^build", "build"]
+    },
     "@embedpdf/engine#test": {
       "dependsOn": ["^build"],
       "inputs": [

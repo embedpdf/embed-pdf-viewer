@@ -13,5 +13,9 @@ export default defineConfig({
     // widens it for the same reason (sibling packages under turbo in CI).
     // Serial files cost a few seconds.
     fileParallelism: false,
+    // Under turbo in CI every package's tests run at once, and a real engine's work there takes
+    // longer than the 5 s default.
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
 });

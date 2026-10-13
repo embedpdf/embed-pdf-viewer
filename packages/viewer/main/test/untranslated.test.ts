@@ -5,10 +5,11 @@
  * string the viewer writes itself, or a library's label shown without its key, comes out
  * unwrapped, and the test names it and where it showed. What isn't the viewer's to translate is
  * let through: text without letters (numbers, colours), units and scales (cm², 1/8 in = 1 ft),
- * what the document says (its file
- * name, its form fields' names, tooltips and options), keys (key caps and a shortcut's keys),
- * and the names the stamp and signature-font libraries give (in their own languages). A string
- * split around a control (the pager's "⟦Page [3] of 8⟧") counts as wrapped by either bracket.
+ * what the document says (its file name, its form fields' names, tooltips and options, and the
+ * text its pages draw: a field's painted value or caption, an annotation's label), keys (key caps
+ * and a shortcut's keys), and the names the stamp and signature-font libraries give (in their own
+ * languages). A string split around a control (the pager's "⟦Page [3] of 8⟧") counts as wrapped by
+ * either bracket.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -130,6 +131,9 @@ const unwrapped = async (tab: Page): Promise<string[]> =>
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const parent = node.parentElement;
         if (!parent || parent.closest('style, script, template')) continue;
+        // The page's drawings: SVG text is a field's painted value or caption, or an annotation's
+        // label or caption, the document's words.
+        if (parent.closest('text')) continue;
         // An option shows while its select does; the browser draws it.
         if (!shown(parent.tagName === 'OPTION' ? parent.closest('select') : parent)) continue;
         const text = (node.textContent ?? '').trim();
