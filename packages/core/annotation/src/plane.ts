@@ -17,10 +17,11 @@
  *     `/State`/`/StateModel`. Review-status metadata about their target,
  *     never a visual of their own (foreign producers usually flag them
  *     hidden, but classification never relies on flags).
- *   - §12.5.6.14 popups — the window a markup annotation's comment shows in.
- *     The comments UI is that window, as Acrobat draws its own and ignores
- *     a popup's appearance: a popup is never painted, open or not, wherever
- *     its rect sits (producers put it in the page's margin, or past it).
+ *   - ISO 32000 §12.5.6.14 popups — the window a markup annotation's
+ *     comment shows in. The comments UI is that window, as Acrobat draws its
+ *     own and ignores a popup's appearance: a popup is never painted, open or
+ *     not, wherever its rect sits (producers put it in the page's margin, or
+ *     past it).
  */
 import type { ModelAnnotation } from './types';
 
