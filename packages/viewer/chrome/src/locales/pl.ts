@@ -149,6 +149,7 @@ export const pl: Locale = {
         last: 'Ostatnia strona',
         goTo: 'Przejdź do strony',
       },
+      find: 'Znajdź',
       shortcuts: 'Skróty klawiaturowe',
       notAllowed: {
         default: 'Działanie niedozwolone: {label}',

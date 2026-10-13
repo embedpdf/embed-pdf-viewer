@@ -149,6 +149,7 @@ export const nl: Locale = {
         last: 'Laatste pagina',
         goTo: 'Ga naar pagina',
       },
+      find: 'Zoeken',
       shortcuts: 'Sneltoetsen',
       notAllowed: {
         default: '{label} is niet toegestaan',

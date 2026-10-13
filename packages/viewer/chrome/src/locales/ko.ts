@@ -149,6 +149,7 @@ export const ko: Locale = {
         last: '마지막 페이지',
         goTo: '페이지로 이동',
       },
+      find: '찾기',
       shortcuts: '키보드 단축키',
       notAllowed: {
         default: '{label} 기능은 허용되지 않습니다',

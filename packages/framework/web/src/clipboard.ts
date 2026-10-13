@@ -7,6 +7,7 @@
  * stays a pure DOM utility with no EmbedPDF dependencies (the selection
  * capability satisfies {@link ClipboardSelectionSource} as-is).
  */
+import { containsFocus } from './focusable';
 import { isFromTextField } from './text-field-event';
 
 /** The slice of the selection capability clipboard wiring needs. */
@@ -29,8 +30,9 @@ export interface SelectionClipboardOptions {
    */
   prefetch?: boolean;
   /**
-   * Where to listen (default `document`). An element takes the keys and copies only while
-   * focus is inside it, for a page with more than one viewer.
+   * Whose keys and copies these are (default `document`, the whole page). An element takes
+   * them only while focus is inside it, for a page with more than one viewer; a copy from the
+   * browser's Edit menu included, which reaches the page's body when nothing is selected there.
    */
   target?: Document | HTMLElement;
   /**
@@ -55,7 +57,9 @@ const PREFETCH_DEBOUNCE_MS = 150;
  *
  * A selection the user may not copy is never copied by either path, nor by
  * the browser: the key and the copy are prevented, and `onRefused` says so.
- * Keys and copies in a text field are the field's, and left alone.
+ * Keys and copies in a text field are the field's, and left alone. With an
+ * element as `target`, only the keys and copies made while focus is inside it
+ * are its own.
  *
  * Returns the unwire function. Mount once per document view (not per page).
  */
@@ -64,6 +68,10 @@ export function wireSelectionClipboard(
   options: SelectionClipboardOptions = {},
 ): () => void {
   const target = options.target ?? document;
+  // The document hears every copy, Edit → Copy's among them, which goes to the body when the
+  // page has no DOM selection (the viewer draws its own); `isOurs` keeps the target's own.
+  const doc = target.ownerDocument ?? (target as Document);
+  const isOurs = (): boolean => target === doc || containsFocus(target as HTMLElement);
   const prefetch = options.prefetch ?? true;
   let cached: string | null = null;
   let generation = 0;
@@ -102,9 +110,10 @@ export function wireSelectionClipboard(
     options.onRefused?.();
   };
 
-  // A copy or a key in a text field (the search box, a comment) is the field's own.
+  // A copy or a key while focus is elsewhere is someone else's; one in a text field (the
+  // search box, a comment) is the field's own.
   const onCopy = (event: ClipboardEvent): void => {
-    if (isFromTextField(event)) return;
+    if (!isOurs() || isFromTextField(event)) return;
     if (isRefused()) return refuse(event);
     if (cached == null || cached === '' || !selection.hasSelection()) return;
     event.clipboardData?.setData('text/plain', cached);
@@ -119,6 +128,7 @@ export function wireSelectionClipboard(
       event.altKey ||
       // A command shortcut for the same key took it already.
       event.defaultPrevented ||
+      !isOurs() ||
       isFromTextField(event)
     ) {
       return;
@@ -133,16 +143,14 @@ export function wireSelectionClipboard(
     void copySelection(selection); // instant when prefetched; still inside user activation
   };
 
-  // A document and an element dispatch `copy` and `keydown` with the same event types.
-  const events = target as Pick<HTMLElement, 'addEventListener' | 'removeEventListener'>;
-  events.addEventListener('copy', onCopy);
-  events.addEventListener('keydown', onKeyDown);
+  doc.addEventListener('copy', onCopy);
+  doc.addEventListener('keydown', onKeyDown);
   return () => {
     offCommit();
     offChange();
     if (timer) clearTimeout(timer);
-    events.removeEventListener('copy', onCopy);
-    events.removeEventListener('keydown', onKeyDown);
+    doc.removeEventListener('copy', onCopy);
+    doc.removeEventListener('keydown', onKeyDown);
   };
 }
 

@@ -150,6 +150,7 @@ export const fr: Locale = {
         last: 'Dernière page',
         goTo: 'Aller à la page',
       },
+      find: 'Rechercher',
       shortcuts: 'Raccourcis clavier',
       notAllowed: {
         default: '{label} : action non autorisée',

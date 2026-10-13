@@ -1,7 +1,7 @@
 /**
  * The layout's panels as commands: every panel gets `panel:<id>`, titled and
- * drawn as the panel says, the built-in ones turned off with their feature;
- * the default layout lists every built-in panel on its side, with a title in
+ * drawn as the panel says, the built-in ones turned off with their feature,
+ * and search brings Find; the default layout lists every built-in panel on its side, with a title in
  * every language the viewer ships.
  */
 import { createLayout } from '@embedpdf/core-ui';
@@ -75,11 +75,36 @@ describe('panelCommandsFor', () => {
     expect(categoriesOf('panel:comments')).toEqual(['comments']);
     expect(categoriesOf('panel:style')).toEqual(['annotations']);
     expect(categoriesOf('panel:signatures')).toEqual(['signatures']);
-    // Whether the session may search is the search plugin's to say, and Ctrl/Cmd+F opens it.
+    // Whether the session may search is the search plugin's to say; its button puts the
+    // cursor in the field, and Ctrl/Cmd+F is Find's.
     const search = commands.find((command) => command.id === 'panel:search');
     expect(search?.requires).toBeUndefined();
     expect(search?.notAllowedKey).toBe('commands.notAllowed.doc-text-search');
-    expect(search?.shortcut).toBe('Mod+F');
+    expect(search?.panel).toEqual({ id: 'search', focus: true });
+    expect(search?.shortcut).toBeUndefined();
+  });
+
+  it('brings Find with a search panel: Ctrl/Cmd+F, from text fields too, with the same check', () => {
+    const commands = panelCommandsFor(DEFAULT_LAYOUT.panels, () => false);
+    const search = commands.find((command) => command.id === 'panel:search')!;
+    const find = commands.find((command) => command.id === 'search:find');
+    expect(find).toMatchObject({
+      labelKey: 'commands.find',
+      shortcut: 'Mod+F',
+      shortcutInTextFields: true,
+      categories: ['search'],
+      notAllowedKey: 'commands.notAllowed.doc-text-search',
+      allowed: search.allowed,
+    });
+    // A layout without search has no Find, and your own Find wins over the built-in one.
+    expect(
+      panelCommandsFor({ notes: { title: 'Notes' } }, () => false).map((command) => command.id),
+    ).toEqual(['panel:notes']);
+    expect(
+      panelCommandsFor(DEFAULT_LAYOUT.panels, (id) => id === 'search:find').map(
+        (command) => command.id,
+      ),
+    ).not.toContain('search:find');
   });
 
   it("follows a panel's own title over the built-in one", () => {

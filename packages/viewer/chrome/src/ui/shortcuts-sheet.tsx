@@ -35,7 +35,7 @@ const GROUPS: readonly { readonly titleKey: string; readonly areas: readonly str
   { titleKey: 'shortcuts.document', areas: ['document'] },
   {
     titleKey: 'shortcuts.viewing',
-    areas: ['page', 'zoom', 'view', 'panel', 'menu', 'mode', 'help'],
+    areas: ['page', 'zoom', 'view', 'search', 'panel', 'menu', 'mode', 'help'],
   },
   {
     titleKey: 'shortcuts.editing',

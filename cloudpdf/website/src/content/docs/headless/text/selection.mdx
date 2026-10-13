@@ -102,6 +102,17 @@ copy](../concepts/permissions) isn't copied by the keys or by the browser's Copy
 <Fw only={['react', 'svelte']}>`onRefused` is called</Fw><Fw only="vue">it emits `refused`</Fw><Fw only="angular">`(refused)` fires</Fw>,
 so you can say so.
 
+<Fw only="react">With more than one viewer on a page, pass `target`, a ref to the element around one:
+Ctrl+C and the Copy menu then copy its selection only while focus is inside it, and the page keeps
+its own copying everywhere else.</Fw><Fw only="vue">With more than one viewer on a page, pass `target`, a template ref to the element
+around one: Ctrl+C and the Copy menu then copy its selection only while focus is inside it, and the
+page keeps its own copying everywhere else.</Fw><Fw only="svelte">With more than one viewer on a page, pass `target`, the element around one as a
+function (`target={() => area}`): Ctrl+C and the Copy menu then copy its selection only while focus
+is inside it, and the page keeps its own copying everywhere else.</Fw><Fw only="angular">With more than one viewer on a page, put the `epdfSelectionClipboard`
+directive on the element around one (`<div tabindex="0" epdfSelectionClipboard>`) in place of
+`<epdf-selection-clipboard />`: Ctrl+C and the Copy menu then copy its selection only while focus is
+inside it, and the page keeps its own copying everywhere else.</Fw>
+
 <Example name="selection/copy" />
 
 > **Try it:** select other text: the line above the pages shows what `readText()` reads once the

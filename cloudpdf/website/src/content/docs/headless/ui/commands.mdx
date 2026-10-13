@@ -70,7 +70,8 @@ of your viewer:</Fw><Fw only="angular">Add it to `provideEmbedPdf()`, next to `w
 
 <Snippet name="ui/command-shortcuts" />
 
-It ignores keys typed into text fields, runs commands for the active document, and leaves a key alone
+It ignores keys typed into text fields, except a command's whose `shortcutInTextFields` is `true`
+(a Find that should work from the search box too), runs commands for the active document, and leaves a key alone
 when its command can't run right now. A command that's [turned off](#turn-features-off) or [not
 allowed](#commands-and-permissions) still takes its key, so the browser doesn't do something else with
 it (`Mod+P` printing the page), and `onRefused(commandId, refusal)` tells you why: `refusal.message`
@@ -112,6 +113,7 @@ A disabled command is still in the results, so show it greyed out.
 | `label`       | What the user sees, or `labelKey` for a [translated](translations) label         |
 | `icon`        | Your icon's name; your buttons turn it into an icon                              |
 | `shortcut`    | A key such as `'Mod+K'`, or a list of them                                       |
+| `shortcutInTextFields` | `true`: its shortcut runs while the cursor is in a text field too        |
 | `enabled`     | When it can run, as a function of the viewer's state                             |
 | `active`      | When it shows as pressed, such as the current tool                               |
 | `visible`     | When it shows at all                                                             |

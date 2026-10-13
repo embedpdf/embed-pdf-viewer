@@ -48,7 +48,9 @@ import {
 import { createAvailability, labelOf, notAllowedMessage } from './services/availability';
 import { createTurningOff } from './write/turning-off';
 
-const panelTarget = (definition: CommandDef): { id: string; exclusive?: string } | null =>
+const panelTarget = (
+  definition: CommandDef,
+): { id: string; exclusive?: string; focus?: boolean } | null =>
   definition.panel === undefined
     ? null
     : typeof definition.panel === 'string'
@@ -350,7 +352,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     const panel = panelTarget(definition);
     if (!shell) return;
     if (definition.menu) shell.toggleMenu(definition.menu);
-    else if (panel) shell.toggle(panel.id, { exclusive: panel.exclusive });
+    else if (panel) shell.toggle(panel.id, { exclusive: panel.exclusive, focus: panel.focus });
     else if (definition.modal) shell.toggle(definition.modal, { exclusive: 'modal' });
   };
 
@@ -443,6 +445,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     matchStroke: (stroke: KeyStroke, options) => {
       let refused: ShortcutMatch | null = null;
       for (const entry of definedCommands()) {
+        if (options.inTextField && !entry.definition.shortcutInTextFields) continue;
         if (!entry.parsed.some((shortcut) => matchShortcut(shortcut, stroke, options))) continue;
         const context = commandContext();
         const refusal = refusalOf(entry.definition, context);

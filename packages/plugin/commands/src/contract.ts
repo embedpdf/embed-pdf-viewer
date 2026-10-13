@@ -69,6 +69,12 @@ export interface CommandDef {
   /** A key such as `'Mod+K'` (`Mod` is Cmd on a Mac, Ctrl elsewhere), or a list of them. */
   readonly shortcut?: string | readonly string[];
   /**
+   * Whether its shortcut also runs while the cursor is in a text field where the shortcuts
+   * listen (a search box, a comment), as the viewer's Find does. Default false: a key typed in
+   * a field is the field's.
+   */
+  readonly shortcutInTextFields?: boolean;
+  /**
    * The features it belongs to, so turning one off turns it off: `['annotations.highlight']`.
    * Turning off a feature turns off every feature under it, on whole dotted parts: `annotations`
    * covers `annotations.highlight`, not `annotationsExtra`.
@@ -100,8 +106,13 @@ export interface CommandDef {
   // is open, and a button can show that it opens a menu.
   /** Opens and closes a menu of yours, by its id. */
   readonly menu?: string;
-  /** Opens and closes a panel, closing the others with the same `exclusive` tag. */
-  readonly panel?: string | { readonly id: string; readonly exclusive?: string };
+  /**
+   * Opens and closes a panel, closing the others with the same `exclusive` tag. With `focus`,
+   * opening it asks for the cursor (the shell's `open(id, { focus: true })`).
+   */
+  readonly panel?:
+    | string
+    | { readonly id: string; readonly exclusive?: string; readonly focus?: boolean };
   /** Opens and closes a dialog; one dialog is open at a time. */
   readonly modal?: string;
 

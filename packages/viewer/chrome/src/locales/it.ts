@@ -149,6 +149,7 @@ export const it: Locale = {
         last: 'Ultima pagina',
         goTo: 'Vai alla pagina',
       },
+      find: 'Trova',
       shortcuts: 'Scorciatoie da tastiera',
       notAllowed: {
         default: '{label}: azione non consentita',

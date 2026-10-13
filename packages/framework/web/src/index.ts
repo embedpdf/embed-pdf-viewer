@@ -350,6 +350,7 @@ export { directionOf } from './orientation';
 export type { Orientation } from './orientation';
 export {
   canTakeFocus,
+  containsFocus,
   deepActiveElementOf,
   focusablesIn,
   isTabbable,
@@ -362,7 +363,9 @@ export type { RovingFocus, RovingFocusOptions, RovingMove } from './roving-focus
 export { TOOLBAR_ITEM_ATTRIBUTE, attachToolbarFocus, toolbarStopsOf } from './toolbar-focus';
 export { attachMenuKeys, menuItemLabelOf, typeaheadMatchOf } from './menu-keys';
 export type { MenuKeysOptions } from './menu-keys';
-export { attachFocusTrap } from './focus-trap';
+export { attachFocusTrap, moveFocusInto } from './focus-trap';
 export type { FocusTrapOptions } from './focus-trap';
+export { createSurfaceFocusFollower } from './surface-focus';
+export type { SurfaceFocusFollower, SurfaceFocusOptions } from './surface-focus';
 export { standardCommandsBrowser } from './standard-commands-platform';
 export type { StandardCommandsBrowser } from './standard-commands-platform';

@@ -2,8 +2,8 @@
 /**
  * The clipboard wiring: a selection the user may not copy is refused on Ctrl/Cmd+C and on a
  * copy, and said so (against a fake document); with an element as its target, it takes keys
- * and copies only from inside that element, and reads the DOM selection from the element's
- * root (against happy-dom).
+ * and copies only while focus is inside that element, Edit → Copy's at the body included, and
+ * reads the DOM selection from the element's root (against happy-dom).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -151,10 +151,14 @@ describe('wireSelectionClipboard with an element as target', () => {
     document.body.innerHTML = '';
   });
 
-  /** A viewer's root with a page inside, a field inside, and a button on the page outside. */
+  /**
+   * Two viewers' roots, each with a page inside and the first with a field inside, and a button
+   * on the page outside.
+   */
   function page() {
     document.body.innerHTML = `
       <div id="viewer" tabindex="-1"><div id="pages"></div><input id="search" /></div>
+      <div id="other" tabindex="-1"><div id="other-pages"></div></div>
       <button id="outside">Page button</button>
     `;
     const byId = (id: string) => document.getElementById(id)!;
@@ -163,12 +167,13 @@ describe('wireSelectionClipboard with an element as target', () => {
     return { byId, writeText };
   }
 
-  it('copies on Ctrl/Cmd+C and on a copy from inside it, and leaves the page outside alone', async () => {
+  it('copies on Ctrl/Cmd+C and on a copy while focus is inside it, and leaves the page alone', async () => {
     const { byId, writeText } = page();
     const { selection, commit } = committedSelection();
     const unwire = wireSelectionClipboard(selection, { target: byId('viewer') });
     await commit();
 
+    byId('viewer').focus();
     expect(pressCopy(byId('pages')).defaultPrevented).toBe(false);
     await settle();
     expect(writeText).toHaveBeenCalledWith('selected text');
@@ -177,6 +182,7 @@ describe('wireSelectionClipboard with an element as target', () => {
     expect(inside.event.defaultPrevented).toBe(true);
 
     writeText.mockClear();
+    byId('outside').focus();
     pressCopy(byId('outside'));
     const outside = copyFrom(byId('outside'));
     await settle();
@@ -185,10 +191,47 @@ describe('wireSelectionClipboard with an element as target', () => {
     expect(outside.event.defaultPrevented).toBe(false);
 
     unwire();
+    byId('viewer').focus();
     pressCopy(byId('pages'));
     expect(copyFrom(byId('pages')).setData).not.toHaveBeenCalled();
     await settle();
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("answers Edit → Copy, which reaches the page's body, while focus is inside it", async () => {
+    const { byId } = page();
+    const { selection, commit } = committedSelection();
+    wireSelectionClipboard(selection, { target: byId('viewer') });
+    await commit();
+
+    byId('pages').tabIndex = -1;
+    byId('pages').focus();
+    const menu = copyFrom(document.body);
+    expect(menu.setData).toHaveBeenCalledWith('text/plain', 'selected text');
+    expect(menu.event.defaultPrevented).toBe(true);
+
+    byId('outside').focus();
+    const elsewhere = copyFrom(document.body);
+    expect(elsewhere.setData).not.toHaveBeenCalled();
+    expect(elsewhere.event.defaultPrevented).toBe(false);
+  });
+
+  it('gives each of two viewers only the keys and copies made while focus is in it', async () => {
+    const { byId, writeText } = page();
+    const first = committedSelection();
+    const second = committedSelection();
+    vi.mocked(second.selection.readText).mockResolvedValue('other text');
+    wireSelectionClipboard(first.selection, { target: byId('viewer') });
+    wireSelectionClipboard(second.selection, { target: byId('other') });
+    await first.commit();
+    await second.commit();
+
+    byId('other').focus();
+    pressCopy(byId('other-pages'));
+    await settle();
+    expect(writeText.mock.calls).toEqual([['other text']]);
+    const copy = copyFrom(document.body);
+    expect(copy.setData.mock.calls).toEqual([['text/plain', 'other text']]);
   });
 
   it('leaves a key or a copy in a text field inside it to the field', async () => {
@@ -197,6 +240,7 @@ describe('wireSelectionClipboard with an element as target', () => {
     wireSelectionClipboard(selection, { target: byId('viewer') });
     await commit();
 
+    byId('search').focus();
     pressCopy(byId('search'));
     const copy = copyFrom(byId('search'));
     await settle();
@@ -218,6 +262,7 @@ describe('wireSelectionClipboard with an element as target', () => {
     await commit();
 
     // Text selected in the shadow root: the browser copies it, and the copy event answers.
+    shadow.getElementById('viewer')!.focus();
     pressCopy(shadow.getElementById('pages')!);
     await settle();
     expect(writeText).not.toHaveBeenCalled();

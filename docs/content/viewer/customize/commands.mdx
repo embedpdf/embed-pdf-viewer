@@ -35,6 +35,7 @@ and `Ctrl`+`Enter` (`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
 | `label` | What people see, or `labelKey` for a [translated](translations) label |
 | `icon` | An icon's name: the viewer's or [your own](#icons) |
 | `shortcut` | A key, such as `'Mod+Shift+S'`, or a list of keys. `Mod` is `Cmd` on a Mac and `Ctrl` elsewhere. |
+| `shortcutInTextFields` | `true`: its shortcut works in a text field in the viewer too, as Find's does |
 | `run` | What it does |
 | `enabled` | When it can run. When it can't, its button is greyed out. |
 | `active` | When it shows as pressed, or checked in a menu |
@@ -127,8 +128,11 @@ it instead: `disable: ['acme:approve']`.
 
 ## Keyboard shortcuts
 
-A command's `shortcut` works while focus is anywhere inside the viewer, except in a text field.
-`?` opens a sheet with every shortcut. Your shortcut wins over a built-in one with the same keys.
+A command's `shortcut` works while focus is anywhere inside the viewer, except in a text field,
+unless the command says `shortcutInTextFields: true`, as Find (`search:find`, `Ctrl`/`Cmd`+`F`)
+does. `?` opens a sheet with every shortcut. Your shortcut wins over a built-in one with the same
+keys. Copying works the same way: `Ctrl`/`Cmd`+`C`, and Copy in the browser's Edit menu, copy the
+viewer's selected text only while focus is inside it, so the page keeps its own copying.
 
 ## Run a command from code
 
@@ -162,6 +166,7 @@ can't run now.
 | `tool:distance`, `tool:perimeter`, `tool:area`, `measurement:calibrate` | Measure |
 | `mode:view`, `mode:annotate`, `mode:shapes`, `mode:insert`, `mode:form`, `mode:redact`, `mode:measure` | Switch mode |
 | `panel:<id>` | Open or close a [panel](panels) |
+| `search:find` | Open search with the cursor in its field (`Ctrl`/`Cmd`+`F`), with a search panel in the layout |
 | `history:undo`, `history:redo` | Undo and redo |
 | `selection:copy`, `selection:highlight`, `selection:underline`, `selection:strikeout` | Act on selected text |
 | `annotation:comment`, `annotation:style`, `annotation:link`, `annotation:group`, `annotation:ungroup`, `annotation:delete` | Act on selected annotations |

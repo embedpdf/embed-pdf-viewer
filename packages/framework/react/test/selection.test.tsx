@@ -232,7 +232,7 @@ describe('<SelectionClipboard>', () => {
     );
   }
 
-  it('with a target, copies on Ctrl/Cmd+C from inside it, and leaves the page outside alone', async () => {
+  it('with a target, copies on Ctrl/Cmd+C while focus is inside it, and leaves the page alone', async () => {
     const writeText = vi.fn(async (_text: string) => {});
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     const { kernel } = await mount(<Viewer />);
@@ -240,11 +240,14 @@ describe('<SelectionClipboard>', () => {
     act(() => selection.select({ page: toPageRef(5), start: 1, count: 3 }));
     await settle();
 
-    pressCopy(document.querySelector('[data-testid="viewer"]')!);
+    const area = document.querySelector<HTMLElement>('[data-testid="viewer"]')!;
+    area.focus();
+    pressCopy(area);
     await settle();
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(writeText.mock.calls[0][0]).toBe(await selection.readText());
 
+    area.blur();
     pressCopy(document.body);
     await settle();
     expect(writeText).toHaveBeenCalledTimes(1);

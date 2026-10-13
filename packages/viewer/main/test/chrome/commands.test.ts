@@ -173,7 +173,7 @@ describe('a command with a built-in id', () => {
     expect(viewerCommands.isYours('document:download')).toBe(false);
     expect(viewerCommands.over(search!)).toMatchObject({
       id: 'panel:search',
-      panel: 'search',
+      panel: { id: 'search', focus: true },
       labelKey: 'panels.search',
       shortcut: 'Mod+K',
       categories: ['search'],
@@ -191,15 +191,17 @@ describe('a shortcut of yours', () => {
     );
     const download = viewerCommands.commands.find((command) => command.id === 'document:download');
     expect(download?.shortcut).toEqual([]);
-    // A panel's built-in key goes the same way.
-    const [search] = panelCommandsFor({ search: DEFAULT_LAYOUT.panels!.search! }, () => false);
+    // The key of a command the layout brings goes the same way: Find's, with the search panel.
+    const find = panelCommandsFor({ search: DEFAULT_LAYOUT.panels!.search! }, () => false).find(
+      (command) => command.id === 'search:find',
+    );
     const claiming = resolveViewerCommands(
       [],
       [{ id: 'acme:find', label: 'Find', shortcut: 'Cmd+F' }],
       scope,
       { isMac: true },
     );
-    expect(claiming.over(search!).shortcut).toEqual([]);
+    expect(claiming.over(find!).shortcut).toEqual([]);
 
     const engine = { destroy: async () => {} } as unknown as Engine;
     const kernel = createKernel({
@@ -288,6 +290,7 @@ describe('the built-in commands', () => {
         'selection:highlight',
         'annotation:stamp-from-selection',
         'panel:search',
+        'search:find',
         'panel:comments',
         'panel:stamps',
         'panel:redaction',

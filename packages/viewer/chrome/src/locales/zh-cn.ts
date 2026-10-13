@@ -149,6 +149,7 @@ export const zhCN: Locale = {
         last: '最后一页',
         goTo: '转到页面',
       },
+      find: '查找',
       shortcuts: '键盘快捷键',
       notAllowed: {
         default: '不允许使用“{label}”',

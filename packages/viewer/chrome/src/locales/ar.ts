@@ -150,6 +150,7 @@ export const ar: Locale = {
         last: 'الصفحة الأخيرة',
         goTo: 'الانتقال إلى الصفحة',
       },
+      find: 'بحث',
       shortcuts: 'اختصارات لوحة المفاتيح',
       notAllowed: {
         default: '{label}: غير مسموح',

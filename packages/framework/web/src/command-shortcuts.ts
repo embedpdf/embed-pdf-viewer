@@ -1,8 +1,8 @@
 /**
  * Keyboard shortcuts for commands: one `keydown` listener runs the command a
  * key matches. Matching is the commands plugin's; what this module adds is the
- * browser's part: the platform, keys typed into text fields, and the default
- * action a shortcut replaces. Structurally typed, so it needs no EmbedPDF
+ * browser's part: the platform, whether a key was typed into a text field, and
+ * the default action a shortcut replaces. Structurally typed, so it needs no EmbedPDF
  * package (the commands host capability satisfies {@link ShortcutCommands}).
  */
 import { isFromTextField } from './text-field-event';
@@ -17,10 +17,13 @@ export interface ShortcutRefusal {
 
 /** The part of the commands capability shortcuts need. */
 export interface ShortcutCommands {
-  /** The command a keystroke's shortcut names, with its refusal when it's refused, or `null`. */
+  /**
+   * The command a keystroke's shortcut names, with its refusal when it's refused, or `null`.
+   * With `inTextField`, only a command that runs from text fields.
+   */
   matchStroke(
     stroke: KeyboardEvent,
-    options: { isMac: boolean },
+    options: { isMac: boolean; inTextField: boolean },
   ): { readonly commandId: string; readonly refusal: ShortcutRefusal | null } | null;
   canExecute(id: string): boolean;
   execute(id: string): Promise<unknown>;
@@ -41,7 +44,8 @@ export const isMacPlatform = (): boolean =>
 
 /**
  * Run a command when its shortcut is pressed, and return the function that stops listening.
- * Keys typed into a text field are left alone. A command that's turned off or not allowed
+ * Keys typed into a text field are left alone, except a command's that says it runs from text
+ * fields (`shortcutInTextFields`, as Find does). A command that's turned off or not allowed
  * still takes its key, so the browser doesn't do something else with it (Cmd+P printing the
  * page), and `onRefused` says why. A key whose command only can't run right now keeps its
  * browser default.
@@ -54,8 +58,8 @@ export function bindCommandShortcuts(
   const target = options.target ?? window;
   const onKeyDown = (event: Event) => {
     const stroke = event as KeyboardEvent;
-    if (stroke.defaultPrevented || isFromTextField(stroke)) return;
-    const match = commands.matchStroke(stroke, { isMac });
+    if (stroke.defaultPrevented) return;
+    const match = commands.matchStroke(stroke, { isMac, inTextField: isFromTextField(stroke) });
     if (!match) return;
     if (match.refusal) {
       stroke.preventDefault();

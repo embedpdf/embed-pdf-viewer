@@ -26,6 +26,7 @@ import {
 } from '@embedpdf/react/search';
 import type { SearchHit, SearchQuery, SearchSnippet } from '@embedpdf/react/search';
 import { useT } from '@embedpdf/react/i18n';
+import { useSurfaceFocus } from '@embedpdf/react/shell';
 import { Icon } from './icons';
 import { useCloseOnPick } from './panel-frame';
 import { buttonClass } from './toolbar';
@@ -136,6 +137,8 @@ export function SearchPanel() {
   const [wholeWord, setWholeWord] = useState(() => query?.wholeWord ?? false);
   const [regex, setRegex] = useState(() => query?.regex ?? false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Find and the Search button ask for the cursor: it goes in the field, the text selected.
+  useSurfaceFocus('search', inputRef, { select: true });
 
   // The draft is a SearchQuery — same shape the engine matches on.
   const draftQuery: SearchQuery = { text: draft, regex, matchCase, wholeWord };

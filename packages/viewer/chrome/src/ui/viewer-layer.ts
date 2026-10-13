@@ -11,8 +11,8 @@
 import {
   attachFocusTrap,
   deepActiveElementOf,
+  moveFocusInto,
   observeClientGeometry,
-  tabbablesIn,
 } from '@embedpdf/web';
 
 import { screenEdgesOf, windowSizeOf, type ScreenEdges } from './screen-edges';
@@ -105,20 +105,10 @@ export interface HeldFocus {
   release(): void;
 }
 
-/** Move focus into `container`: to its first control, else to the container itself. */
-function focusInto(container: HTMLElement): void {
-  const first = tabbablesIn(container)[0];
-  if (first) {
-    first.focus();
-    return;
-  }
-  if (!container.hasAttribute('tabindex')) container.tabIndex = -1;
-  container.focus();
-}
-
 /**
- * Hold the keyboard in `container` until released: focus moves into it (to `initialFocus`, else
- * its first control), Tab and Shift+Tab stay inside it, and Escape calls `onEscape`. With
+ * Hold the keyboard in `container` until released: focus moves into it unless it's there
+ * already (to `initialFocus`, else its first control), so a field that took the cursor as it
+ * appeared keeps it; Tab and Shift+Tab stay inside it, and Escape calls `onEscape`. With
  * `trap: false` Tab moves on past it, as it does past anything else in the viewer. Releasing
  * gives focus back to what had it before, unless the user has moved it elsewhere: a press on
  * the pages, which puts focus on the viewer's root, doesn't count.
@@ -143,8 +133,7 @@ export function holdFocus(
   container.addEventListener('keydown', onKeyDown);
   let releaseTrap: (() => void) | null = null;
   if (options.trap === false) {
-    if (options.initialFocus) options.initialFocus.focus();
-    else focusInto(container);
+    moveFocusInto(container, options.initialFocus);
   } else {
     releaseTrap = attachFocusTrap(container, {
       initialFocus: options.initialFocus,

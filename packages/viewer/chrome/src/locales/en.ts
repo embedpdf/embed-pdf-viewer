@@ -142,6 +142,7 @@ export const en: Locale = {
         last: 'Last Page',
         goTo: 'Go to Page',
       },
+      find: 'Find',
       shortcuts: 'Keyboard Shortcuts',
       // Why a command isn't there, by the permission the scope leaves out
       // (dots and colons as dashes); `{label}` is the command's label.

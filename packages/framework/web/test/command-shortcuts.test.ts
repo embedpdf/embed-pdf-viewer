@@ -28,16 +28,21 @@ function fakeTarget() {
   };
 }
 
-/** Commands named by their key: enabled or not right now, and some refused for good. */
+/**
+ * Commands named by their key: enabled or not right now, some refused for good, and some that
+ * run from text fields, as the commands plugin matches them.
+ */
 function commandsWith(
   enabled: Record<string, boolean>,
   refusals: Record<string, ShortcutRefusal> = {},
+  inTextFields: readonly string[] = [],
 ): ShortcutCommands & {
   execute: ReturnType<typeof vi.fn>;
 } {
   return {
-    matchStroke: (stroke) =>
-      stroke.key in enabled || stroke.key in refusals
+    matchStroke: (stroke, { inTextField }) =>
+      (stroke.key in enabled || stroke.key in refusals) &&
+      (!inTextField || inTextFields.includes(stroke.key))
         ? { commandId: stroke.key, refusal: refusals[stroke.key] ?? null }
         : null,
     canExecute: (id) => enabled[id] ?? false,
@@ -64,6 +69,17 @@ describe('bindCommandShortcuts', () => {
     const edited = target.press('ArrowRight', { tagName: 'DIV', isContentEditable: true });
     expect(commands.execute).not.toHaveBeenCalled();
     for (const event of [copy, typed, edited]) expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('runs a command that says it runs from text fields when its key is typed in one', () => {
+    const target = fakeTarget();
+    const commands = commandsWith({ f: true, ArrowRight: true }, {}, ['f']);
+    bindCommandShortcuts(commands, { isMac: true, target });
+    const find = target.press('f', { tagName: 'INPUT' });
+    const caret = target.press('ArrowRight', { tagName: 'INPUT' });
+    expect(commands.execute.mock.calls).toEqual([['f']]);
+    expect(find.preventDefault).toHaveBeenCalled();
+    expect(caret.preventDefault).not.toHaveBeenCalled();
   });
 
   it('takes the key of a command that is turned off or not allowed, and says why', () => {

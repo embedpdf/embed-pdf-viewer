@@ -149,6 +149,7 @@ export const pt: Locale = {
         last: 'Última página',
         goTo: 'Ir para a página',
       },
+      find: 'Localizar',
       shortcuts: 'Atalhos de teclado',
       notAllowed: {
         default: 'Ação não permitida: {label}',

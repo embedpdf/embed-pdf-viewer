@@ -23,16 +23,27 @@ export interface SurfaceState {
   readonly exclusive?: string;
   /** Opaque props passed at open (e.g. which annotation a style panel edits). */
   readonly props?: SurfaceProps;
+  /**
+   * How many opens asked for focus since the surface opened: 0 when none did, and again once it
+   * closes. A rise is the moment the cursor moves into the surface; it is not state to keep, so
+   * snapshots leave it out.
+   */
+  readonly focusRequest: number;
 }
 
 export interface OpenSurfaceOptions {
   readonly exclusive?: string;
   readonly props?: SurfaceProps;
+  /**
+   * Ask for the cursor: raises the surface's `focusRequest` by one, also when it is open already,
+   * so the element that follows it takes focus.
+   */
+  readonly focus?: boolean;
 }
 
 /** Everything the shell holds — serializable, for persist and restore. */
 export interface ShellSnapshot {
-  readonly surfaces: Readonly<Record<string, Omit<SurfaceState, 'id'>>>;
+  readonly surfaces: Readonly<Record<string, Omit<SurfaceState, 'id' | 'focusRequest'>>>;
   /** Open dropdown menus, in opening order (last = topmost). */
   readonly openMenus: readonly string[];
 }
@@ -67,13 +78,14 @@ export interface ShellCapability {
   listOpenSurfaces(): readonly SurfaceState[];
   /**
    * Open a surface. `exclusive` closes the other open surfaces of that group,
-   * and `props` travel with it. Fires `onSurfaceOpened`, and `onSurfaceClosed`
-   * for each surface it closes.
+   * `props` travel with it, and `focus` raises its `focusRequest`, also when
+   * it is open already. Fires `onSurfaceOpened` when it was closed, and
+   * `onSurfaceClosed` for each surface it closes.
    */
   open(id: string, options?: OpenSurfaceOptions): void;
   /** Close a surface. Fires `onSurfaceClosed` when it was open. */
   close(id: string): void;
-  /** Open a closed surface, or close an open one. */
+  /** Open a closed surface, with `options` as `open` takes them, or close an open one. */
   toggle(id: string, options?: OpenSurfaceOptions): void;
   /** Change a surface's props without reopening it. */
   updateSurfaceProps(id: string, props: SurfaceProps): void;
@@ -95,9 +107,12 @@ export interface ShellCapability {
   closeAllMenus(): void;
 
   // ── persistence ──
-  /** Everything the plugin holds, as plain data you can store. */
+  /** Everything the plugin holds, as plain data you can store; `focusRequest` is left out. */
   getSnapshot(): ShellSnapshot;
-  /** Put back what `getSnapshot()` returned. Fires the events of what opens and closes. */
+  /**
+   * Put back what `getSnapshot()` returned, every `focusRequest` at 0. Fires the events of what
+   * opens and closes.
+   */
   applySnapshot(snapshot: ShellSnapshot): void;
 
   // ── events ──

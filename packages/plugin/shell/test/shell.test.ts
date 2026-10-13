@@ -73,4 +73,81 @@ describe('shell', () => {
     expect(shell.isOpen('sidebar')).toBe(true);
     expect(log).toEqual(['+file', '+edit', '-file', '-edit', '+edit']);
   });
+
+  it('raises a focus request on every open that asks, including on a surface already open', () => {
+    const shell = harness();
+    const opened: string[] = [];
+    shell.onSurfaceOpened((event) => opened.push(event.id));
+    shell.open('search');
+    expect(shell.getSurface('search')?.focusRequest).toBe(0);
+    shell.open('search', { focus: true });
+    expect(shell.getSurface('search')?.focusRequest).toBe(1);
+    // The cursor moves again without anything opening: no event, a new surface read.
+    const before = shell.getSurface('search');
+    shell.open('search', { focus: true });
+    expect(shell.getSurface('search')?.focusRequest).toBe(2);
+    expect(shell.getSurface('search')).not.toBe(before);
+    expect(shell.listOpenSurfaces()[0]?.focusRequest).toBe(2);
+    // An open that doesn't ask leaves the count alone.
+    shell.open('search', { props: { q: 'x' } });
+    expect(shell.getSurface('search')?.focusRequest).toBe(2);
+    expect(opened).toEqual(['search']);
+  });
+
+  it('raises it when a toggle opens, and clears it on every way of closing', () => {
+    const shell = harness();
+    const requestOf = (id: string) => shell.getSurface(id)?.focusRequest;
+
+    shell.toggle('search', { focus: true });
+    expect(requestOf('search')).toBe(1);
+    shell.toggle('search', { focus: true });
+    expect({ open: shell.isOpen('search'), request: requestOf('search') }).toEqual({
+      open: false,
+      request: 0,
+    });
+
+    shell.open('search', { focus: true });
+    shell.close('search');
+    expect(requestOf('search')).toBe(0);
+
+    shell.open('search', { exclusive: 'end', focus: true });
+    shell.open('comments', { exclusive: 'end', focus: true });
+    expect(requestOf('search')).toBe(0);
+    expect(requestOf('comments')).toBe(1);
+
+    shell.open('thumbnails', { focus: true });
+    shell.closeAll();
+    expect([requestOf('comments'), requestOf('thumbnails')]).toEqual([0, 0]);
+
+    // Opening again after a close starts over from 0.
+    shell.open('thumbnails', { focus: true });
+    expect(requestOf('thumbnails')).toBe(1);
+  });
+
+  it('leaves focus requests out of snapshots, and puts surfaces back at 0', () => {
+    const shell = harness();
+    shell.open('search', { focus: true, props: { q: 'a' } });
+    const snapshot = shell.getSnapshot();
+    expect(snapshot).toEqual({
+      surfaces: { search: { open: true, exclusive: undefined, props: { q: 'a' } } },
+      openMenus: [],
+    });
+    expect(shell.getSnapshot()).toBe(snapshot);
+
+    shell.open('search', { focus: true });
+    shell.applySnapshot(snapshot);
+    expect(shell.getSurface('search')).toEqual({
+      id: 'search',
+      open: true,
+      exclusive: undefined,
+      props: { q: 'a' },
+      focusRequest: 0,
+    });
+    // Stored data that carries one anyway doesn't bring it back.
+    shell.applySnapshot({
+      surfaces: { notes: { open: true, focusRequest: 4 } as never },
+      openMenus: [],
+    });
+    expect(shell.getSurface('notes')?.focusRequest).toBe(0);
+  });
 });

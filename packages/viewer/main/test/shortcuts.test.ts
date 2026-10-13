@@ -2,7 +2,7 @@
  * Keyboard shortcuts reach a viewer only while focus is inside it: with two viewers on a page
  * one key press runs in one of them, and the page keeps its keys everywhere else. A press on
  * the pages puts focus inside. Your shortcut wins over a built-in one with the same keys; `?`
- * opens the sheet with every shortcut; Ctrl/Cmd+F opens search, Ctrl/Cmd+O opens a file, and
+ * opens the sheet with every shortcut; Ctrl/Cmd+F opens search (Find), Ctrl/Cmd+O opens a file, and
  * Delete removes the selected annotations.
  *
  * Runs against the built snippet (`pnpm build` first).
@@ -192,7 +192,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('keyboard shortcuts', ()
     );
     expect(rows['Print']).toEqual([mod('P')]);
     expect(rows['Open']).toEqual([mod('O')]);
-    expect(rows['Search']).toEqual([mod('F')]);
+    expect(rows['Find']).toEqual([mod('F')]);
     expect(rows['Zoom In']).toEqual([mod('='), isMac ? '⌘Num +' : 'Ctrl+Num +']);
     expect(rows['Delete']).toEqual(isMac ? ['⌦', '⌫'] : ['Delete', 'Backspace']);
     expect(rows['Keyboard Shortcuts']).toEqual(['?']);

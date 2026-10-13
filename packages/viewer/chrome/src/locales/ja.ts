@@ -149,6 +149,7 @@ export const ja: Locale = {
         last: '最後のページ',
         goTo: 'ページへ移動',
       },
+      find: '検索',
       shortcuts: 'キーボードショートカット',
       notAllowed: {
         default: '{label}は許可されていません',

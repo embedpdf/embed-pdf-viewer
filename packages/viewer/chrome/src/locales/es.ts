@@ -149,6 +149,7 @@ export const es: Locale = {
         last: 'Última página',
         goTo: 'Ir a la página',
       },
+      find: 'Buscar',
       shortcuts: 'Atajos de teclado',
       notAllowed: {
         default: '{label} no está permitido',

@@ -150,6 +150,7 @@ export const he: Locale = {
         last: 'העמוד האחרון',
         goTo: 'עבור לעמוד',
       },
+      find: 'חיפוש',
       shortcuts: 'קיצורי מקלדת',
       notAllowed: {
         default: '{label}: לא מותר',

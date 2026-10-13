@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   canTakeFocus,
+  containsFocus,
   deepActiveElementOf,
   focusablesIn,
   isUnavailable,
@@ -117,5 +118,26 @@ describe('deepActiveElementOf', () => {
     const inside = shadow.querySelector('button')!;
     inside.focus();
     expect(deepActiveElementOf(document)).toBe(inside);
+  });
+});
+
+describe('containsFocus', () => {
+  it('sees focus inside through a shadow root, and in a control slotted into one', () => {
+    const host = html('<button id="slotted" slot="bar">Slotted</button>');
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = '<div id="viewer"><button>Inside</button><slot name="bar"></slot></div>';
+    const viewer = shadow.getElementById('viewer')!;
+    const outside = html('<button>Outside</button>').querySelector('button')!;
+
+    shadow.querySelector('button')!.focus();
+    expect(containsFocus(viewer)).toBe(true);
+    // Its parent is the host, outside the viewer; the slot it shows in is inside. happy-dom
+    // assigns it to the slot but has no `assignedSlot`, which browsers give it.
+    const slotted = document.getElementById('slotted')!;
+    Object.defineProperty(slotted, 'assignedSlot', { value: shadow.querySelector('slot') });
+    slotted.focus();
+    expect(containsFocus(viewer)).toBe(true);
+    outside.focus();
+    expect(containsFocus(viewer)).toBe(false);
   });
 });

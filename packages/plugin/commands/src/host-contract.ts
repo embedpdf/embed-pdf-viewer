@@ -22,9 +22,13 @@ export interface CommandsHostCapability extends CommandsCapability {
   /**
    * The command whose shortcut a keystroke matches, for the active document, or `null`. Of
    * several with the same keys, one that isn't refused wins; a refused one counts only while
-   * its `visible` says it would show.
+   * its `visible` says it would show. With `inTextField` (the key was typed in one), only a
+   * command whose `shortcutInTextFields` says so matches.
    */
-  matchStroke(stroke: KeyStroke, options: { isMac: boolean }): ShortcutMatch | null;
+  matchStroke(
+    stroke: KeyStroke,
+    options: { isMac: boolean; inTextField?: boolean },
+  ): ShortcutMatch | null;
   /** The menu a command opens, for the "More" menu's nested menus; `null` for an unknown id. */
   getMenuTarget(id: CommandId): { menu?: string } | null;
 }

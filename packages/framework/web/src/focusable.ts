@@ -99,6 +99,24 @@ export function deepActiveElementOf(doc: Document): Element | null {
 }
 
 /**
+ * Whether the element with focus is `container` or inside it, as the page shows it: through
+ * shadow roots, and from an element slotted into a shadow root to its slot, so a control
+ * slotted into a viewer counts as inside the viewer, as its keys do.
+ */
+export function containsFocus(container: Element): boolean {
+  let node: Node | null = deepActiveElementOf(container.ownerDocument);
+  while (node) {
+    if (node === container) return true;
+    node =
+      (node as Partial<Element>).assignedSlot ??
+      node.parentNode ??
+      (node as Partial<ShadowRoot>).host ??
+      null;
+  }
+  return false;
+}
+
+/**
  * Whether a control says it can't be used now, through `disabled` or
  * `aria-disabled="true"`: the keyboard models pass over it.
  */

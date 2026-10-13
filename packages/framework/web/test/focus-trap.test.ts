@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { attachFocusTrap } from '../src/focus-trap';
+import { attachFocusTrap, moveFocusInto } from '../src/focus-trap';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -98,5 +98,47 @@ describe('attachFocusTrap', () => {
     expect(document.activeElement).toBe(byId('name'));
     releaseOuter();
     expect(document.activeElement).toBe(byId('opener'));
+  });
+
+  it('leaves focus on a control inside that has it already, and comes back to it', () => {
+    const byId = page();
+    byId('save').focus();
+    attachFocusTrap(byId('dialog'));
+    expect(document.activeElement).toBe(byId('save'));
+    byId('behind').focus();
+    expect(document.activeElement).toBe(byId('save'));
+  });
+
+  it('leaves it there over the control it names too', () => {
+    const byId = page();
+    byId('save').focus();
+    attachFocusTrap(byId('dialog'), { initialFocus: byId('name') });
+    expect(document.activeElement).toBe(byId('save'));
+  });
+});
+
+describe('moveFocusInto', () => {
+  it('moves focus to the control named, else the first Tab stops at, unless it is inside', () => {
+    const byId = page();
+    moveFocusInto(byId('dialog'));
+    expect(document.activeElement).toBe(byId('name'));
+    byId('save').focus();
+    moveFocusInto(byId('dialog'));
+    expect(document.activeElement).toBe(byId('save'));
+    byId('opener').focus();
+    moveFocusInto(byId('dialog'), byId('save'));
+    expect(document.activeElement).toBe(byId('save'));
+  });
+
+  it('sees focus inside through a shadow root', () => {
+    document.body.innerHTML =
+      '<div id="panel"><div id="host"></div></div><button id="out">Out</button>';
+    const host = document.getElementById('host')!;
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = '<input id="field" />';
+    const field = shadow.getElementById('field') as HTMLInputElement;
+    field.focus();
+    moveFocusInto(document.getElementById('panel')!);
+    expect(shadow.activeElement).toBe(field);
   });
 });

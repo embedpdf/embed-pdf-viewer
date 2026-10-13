@@ -1,6 +1,7 @@
 import { createCapabilityToken } from '@embedpdf/core';
 import { createTestContext } from '@embedpdf/core/testing';
 import { I18nToken } from '@embedpdf/plugin-i18n/contract';
+import { ShellToken } from '@embedpdf/plugin-shell/contract';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -168,6 +169,37 @@ describe('execution', () => {
     commands.onExecutionFailed((event) => failures.push(event.error.message));
     await expect(commands.execute('broken')).rejects.toMatchObject({ capability: 'commands' });
     expect(failures).toEqual(['boom']);
+  });
+});
+
+describe('what a command opens', () => {
+  it('toggles its panel with its group, asking for focus when the panel says so', async () => {
+    const toggle = vi.fn();
+    const shell = { toggle, isOpen: () => false, isMenuOpen: () => false };
+    const ctx = createTestContext({
+      id: 'commands',
+      settings: {
+        defaults: COMMANDS_DEFAULTS,
+        registered: {
+          commands: [
+            { id: 'panel:search', label: 'Search', panel: { id: 'search', focus: true } },
+            { id: 'panel:notes', label: 'Notes', panel: { id: 'notes', exclusive: 'end' } },
+            { id: 'panel:outline', label: 'Outline', panel: 'outline' },
+          ],
+        },
+      },
+      doc: null,
+      capabilities: [[ShellToken, shell as never]],
+    });
+    const commands = ctx.connect(createCommandsController(ctx));
+    await commands.execute('panel:search');
+    await commands.execute('panel:notes');
+    await commands.execute('panel:outline');
+    expect(toggle.mock.calls).toEqual([
+      ['search', { exclusive: undefined, focus: true }],
+      ['notes', { exclusive: 'end', focus: undefined }],
+      ['outline', { exclusive: undefined, focus: undefined }],
+    ]);
   });
 });
 
@@ -395,6 +427,35 @@ describe('permissions', () => {
       refusal: null,
     });
     expect(commands.matchStroke(stroke('k'), options)).toBeNull();
+  });
+
+  it('matches a key typed in a text field only for a command that runs from text fields', () => {
+    const stroke = (key: string) => ({
+      key,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+    });
+    const commands = harnessWith(
+      {
+        commands: [
+          { id: 'search:find', label: 'Find', shortcut: 'Mod+F', shortcutInTextFields: true },
+          { id: 'document:download', label: 'Download', shortcut: 'Mod+S' },
+        ],
+      },
+      securityWithout(),
+    );
+    const inTextField = { isMac: false, inTextField: true };
+    expect(commands.matchStroke(stroke('f'), inTextField)).toEqual({
+      commandId: 'search:find',
+      refusal: null,
+    });
+    expect(commands.matchStroke(stroke('s'), inTextField)).toBeNull();
+    expect(commands.matchStroke(stroke('s'), { isMac: false })).toEqual({
+      commandId: 'document:download',
+      refusal: null,
+    });
   });
 
   it('refuses a command its allowed check says no to, with the sentence its key names', async () => {

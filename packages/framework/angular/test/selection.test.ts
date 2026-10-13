@@ -221,12 +221,14 @@ describe('Ctrl/Cmd+C', () => {
   it('epdfSelectionClipboard copies only while focus is inside its element', async () => {
     const { writeText, byId } = await selected(`
       <div id="viewer" tabindex="0" epdfSelectionClipboard><span id="inside"></span></div>
-      <span id="outside"></span>
+      <button id="outside"></button>
     `);
+    byId('viewer').focus();
     pressCopy(byId('inside'));
     await settle();
     expect(writeText).toHaveBeenCalledWith('234');
 
+    byId('outside').focus();
     pressCopy(byId('outside'));
     pressCopy(document.body);
     await settle();
