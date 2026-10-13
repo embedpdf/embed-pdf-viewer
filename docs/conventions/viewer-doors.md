@@ -33,9 +33,9 @@ Unqualified `kernel/`, `local/`, and `doors/` paths below are relative to
    `@cloudpdf/engine`), never in shared code.
 
 4. **Doors never import doors.** Two deliveries that share a surface share a
-   module, not each other — that is why `local/surface.ts` exists and the npm
-   and snippet doors both re-export it, differing only in the wasm default they
-   register.
+   module, not each other — that is why `local/surface.ts` exists and the npm,
+   portable and snippet doors all re-export it, differing only in the engine
+   entry and the wasm default they register.
 
 5. **The implementation sits at the widest type; doors narrow by assignment.**
    Parameter types are contravariant, so a function taking the wider config
@@ -69,7 +69,7 @@ path stays opaque and runtime-checked on purpose; typed config belongs at
 packages/viewer/main/src/
   kernel/     door-blind: element, config base, init, public surface
   local/      the built-in engine's vocabulary + registration (not an entry)
-  doors/      entries only — local.ts, core.ts, snippet.ts
+  doors/      entries only — local.ts, portable.ts, core.ts, snippet.ts
 ```
 
 Every framework wrapper is the same three files, in this order:

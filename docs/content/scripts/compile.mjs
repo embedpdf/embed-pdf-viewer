@@ -127,6 +127,7 @@ function viewerPaths() {
   const doors = path.join(repoRoot, 'packages/viewer/main/src/doors');
   return {
     '@embedpdf/viewer': [path.join(doors, 'local.ts')],
+    '@embedpdf/viewer/portable': [path.join(doors, 'portable.ts')],
     '@embedpdf/viewer/core': [path.join(doors, 'core.ts')],
     '@embedpdf/viewer/snippet': [path.join(doors, 'snippet.ts')],
     [VIEWER_CDN_URL]: [path.join(doors, 'snippet.ts')],

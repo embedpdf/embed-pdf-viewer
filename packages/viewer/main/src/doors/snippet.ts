@@ -23,10 +23,12 @@
  * are, under `worker-src 'self'`; from a CDN, where a browser refuses a worker
  * of another origin, the engine starts them from blob: URLs instead.
  */
+import { localEngine } from '@embedpdf/engine';
 import wasmUrl from '@embedpdf/engine-runtime-wasm32/embedpdf.wasm?url&no-inline';
+
 import { registerLocalEngine } from '../local/register';
 
-registerLocalEngine({ wasmUrl });
+registerLocalEngine(localEngine, { wasmUrl });
 
 export * from '../local/surface';
 export { default } from '../local/surface';

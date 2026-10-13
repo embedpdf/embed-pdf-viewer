@@ -15,6 +15,9 @@
  *      pipeline — that is what makes <PDFViewer> zero-config in Next/Vite.
  *      Prebundling the engine would freeze that URL against this package
  *      instead, and Vite lib mode would inline the 6 MB binary as base64.
+ *      The same pass builds `dist/portable.js`, the door that imports
+ *      `@embedpdf/engine/portable` instead (external too), for toolchains
+ *      that can't emit those files, and `dist/core.js`.
  *
  *   2. `vite build --mode snippet` — the CDN artifact (`dist/embedpdf.js`),
  *      fully self-contained: engine bundled, `embedpdf.wasm` emitted into
@@ -51,7 +54,11 @@ export default defineConfig(({ mode }) => {
   // the local door ships as index.js, the engine-agnostic one as core.js.
   const entry: Record<string, string> = snippet
     ? { embedpdf: 'src/doors/snippet.ts' }
-    : { index: 'src/doors/local.ts', core: 'src/doors/core.ts' };
+    : {
+        index: 'src/doors/local.ts',
+        portable: 'src/doors/portable.ts',
+        core: 'src/doors/core.ts',
+      };
   return {
     // The snippet's folder carries the engine's worker files beside embedpdf.wasm
     // (build/worker-files.ts); the npm pass leaves them to the consumer's bundler.
@@ -108,13 +115,16 @@ export default defineConfig(({ mode }) => {
         // bare import for the consumer's bundler — the engine (whose wasm and
         // worker files must land in the consumer's asset pipeline), core, the
         // plugins, `@embedpdf/web`, `@embedpdf/default-stamps/library`. The
-        // consumer then loads ONE copy of each, shared with its own headless
+        // consumer then loads one copy of each, shared with its own headless
         // adapter: capabilities are looked up by token identity, so a second
         // copy of a plugin would be a different plugin. Only the packages
         // compiled to Preact here stay inside: `@embedpdf/react` (the chrome's
         // copy, not the app's) and `@embedpdf/viewer-chrome`. The snippet pass
         // bundles everything: its folder is the unit of delivery.
         external: snippet ? undefined : isSharedPackage,
+        // Nothing here imports an external for its side effects, so one whose bindings all went
+        // unused is dropped, not left as a bare `import '…'` (esbuild warns about those).
+        treeshake: { moduleSideEffects: 'no-external' },
         // Chunks land in chunks/, imported relatively from the entry —
         // relocatable as a folder. The snippet's one emitted asset keeps its
         // plain name: `dist/embedpdf.wasm`, the documented sibling.

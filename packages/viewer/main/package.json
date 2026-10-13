@@ -12,6 +12,10 @@
       "types": "./dist/doors/local.d.ts",
       "default": "./dist/index.js"
     },
+    "./portable": {
+      "types": "./dist/doors/portable.d.ts",
+      "default": "./dist/portable.js"
+    },
     "./core": {
       "types": "./dist/doors/core.d.ts",
       "default": "./dist/core.js"

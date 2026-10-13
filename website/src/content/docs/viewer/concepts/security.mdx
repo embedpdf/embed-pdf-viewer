@@ -57,7 +57,8 @@ so `worker-src 'self'` covers them. Two builds can't, and start the workers from
 need `worker-src blob:`:
 
 - **Angular**, which loads the engine's portable build;
-- **plain esbuild**, with `@embedpdf/viewer/portable`.
+- **plain esbuild**, which needs that build too: see
+  [Self-hosting](../self-hosting#the-engines-webassembly).
 
 To keep `worker-src 'self'` there, copy the two worker files to your site and point the viewer at
 them: see [Self-hosting](../self-hosting#workers-and-content-security-policy).
@@ -82,8 +83,9 @@ untrusted:
 
 - **Scripts** in a PDF, for form checks and calculations, run in a sandbox with no access to your
   page, its cookies or the network. Turn them off with `plugins: { actions: { javascript: { enabled: false } } }`.
-- **Links** open only after the user clicks them, and only `http`, `https` and `mailto` links.
-  `javascript:` and `file:` links do nothing.
+- **Links** open only after the user clicks them, and only `http`, `https`, `mailto` and `tel`
+  links. `javascript:` and `file:` links do nothing, and so does a link relative to the document,
+  such as `/account`, which would otherwise open a page of your own app.
 - **Form submissions** never send anything by themselves. A form's submit button tells your code,
   and you decide where the data goes. See [Actions & scripts](/docs/headless/documents/actions).
 

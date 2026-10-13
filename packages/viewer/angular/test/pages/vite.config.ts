@@ -17,7 +17,14 @@ const viewerDist = join(repo, 'packages/viewer/main/dist');
 const wrapperDist = join(repo, 'packages/viewer/angular/dist/fesm2022');
 
 /** The pages, by name: `<name>.html` next to this file. */
-export const PAGES = ['hooks', 'live-props', 'components', 'viewer-code', 'zoom'] as const;
+export const PAGES = [
+  'hooks',
+  'live-props',
+  'components',
+  'viewer-code',
+  'zoom',
+  'quick-start',
+] as const;
 
 export default defineConfig({
   root: here,

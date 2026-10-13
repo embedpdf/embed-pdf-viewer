@@ -30,6 +30,11 @@ Beside every zero-config row, an app may declare documented opt-ins in its
 - `angular+portable`, `esbuild+portable` — `@embedpdf/engine/portable`: the
   wasm as a lazy JS chunk of the app, for toolchains that cannot emit it as an
   asset. Zero configuration; costs the same over the wire, no streaming compile.
+- `esbuild+viewer/portable` — the whole viewer from `@embedpdf/viewer/portable`,
+  the entry Self-hosting gives plain esbuild, through `probe/viewer.js`: it opens
+  a PDF served beside the page and waits for a page to show, opens the stamps
+  panel until the standard stamps are in, and saves a signature typed in each
+  default handwriting font, checking that the saved PDF embeds the font.
 
 The `wasm delivery` column tells the two apart: `emitted asset` or
 `inline chunk`. `Off-origin` must always read `none` — a request that leaves
@@ -49,7 +54,7 @@ beside that policy:
 
 - `workerSrc` (required): `'self'` where the bundler emits the engine's worker
   files; `'self' blob:` where the build starts them from `blob:` URLs, which is
-  the portable engine (Angular, `esbuild+portable`).
+  the portable engine (Angular, `esbuild+portable`, `esbuild+viewer/portable`).
 - `trustedTypes`: the bundler's own Trusted Types policies, added to
   `trusted-types` (webpack and Rspack load lazy chunks through
   `output.trustedTypes`; Next's webpack build creates `nextjs#bundler`).

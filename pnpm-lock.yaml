@@ -2789,6 +2789,9 @@ importers:
       '@embedpdf/bundler-probe':
         specifier: workspace:*
         version: link:../../probe
+      '@embedpdf/viewer':
+        specifier: workspace:*
+        version: link:../../../../packages/viewer/main
     devDependencies:
       esbuild:
         specifier: ^0.25.0

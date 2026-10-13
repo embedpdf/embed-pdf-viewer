@@ -25,7 +25,7 @@ settings are `localEngine()` options.
 | What                                  | Where it comes from by default                                                                                                              | Setting                              |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | `embedpdf.wasm` (the engine, ~6.4 MB) | Emitted by your bundler as an asset of your build, streamed from your origin. Under Angular, a lazy JavaScript chunk of your build instead. | `engine.assetsUrl`, `engine.wasmUrl`, `engine.wasmBinary` |
-| The engine worker                     | A file of your build, next to the WebAssembly, emitted by your bundler. From a CDN, a `blob:` URL instead (see below).                      | `engine.worker`                      |
+| The engine worker                     | A file of your build, next to the WebAssembly, emitted by your bundler. From a CDN or with the engine's portable build (Angular, plain esbuild), a `blob:` URL instead (see below). | `engine.worker`                      |
 | The image-encoder worker              | The same, with a main-thread fallback.                                                                                                      | `engine.encoderWorker`               |
 | Fonts                                 | None are fetched unless you configure them.                                                                                                 | `engine.fonts`, `engine.fallbackFonts` |
 | The standard stamps                   | A lazy JavaScript chunk of your build (`@embedpdf/default-stamps`).                                                                         | `plugins.stamp.standard`             |
@@ -76,12 +76,33 @@ asset instead, copy the file with one `angular.json` entry and say where it is:
 Under pnpm, add `@embedpdf/engine-runtime-wasm32` to your own dependencies so
 that path exists; npm and yarn hoist it for you.
 
-**Plain esbuild** cannot emit the asset and has no condition to route on.
-Import the portable entry instead:
+**Plain esbuild** emits neither the asset nor the engine's workers, and has no
+condition to route on. Use the engine's portable build, as Angular does: the
+WebAssembly comes as a lazy chunk of your build, and both workers start from
+`blob:` URLs, so the policy needs `worker-src blob:` (see below).
+
+<Fw only="vanilla">
+
+Import the portable entry in place of `@embedpdf/viewer`. It's the same viewer,
+with that engine:
 
 ```ts
 import '@embedpdf/viewer/portable';
 ```
+
+</Fw>
+
+<Fw only={['react', 'vue', 'svelte', 'angular']}>
+
+Add `@embedpdf/engine` to your dependencies and give the viewer that engine:
+
+```js
+import { localEngine } from '@embedpdf/engine/portable';
+
+const config = { engine: () => localEngine() };
+```
+
+</Fw>
 
 **Explicit sources** win over every default and never fall back to anything:
 
@@ -111,9 +132,9 @@ finds the WebAssembly as its own sibling:
 }
 ```
 
-`encoderWorker: false` encodes images on the main thread instead. Builds that can't emit worker
-files (Angular, plain esbuild with the portable entry) start both workers from `blob:` URLs unless
-you set these two.
+`encoderWorker: false` encodes images on the main thread instead. With the engine's portable
+build (Angular, plain esbuild), both workers start from `blob:` URLs unless you set these two; the
+WebAssembly still comes from your build, so the two worker files are all you copy.
 WebAssembly itself needs `script-src 'wasm-unsafe-eval'`. The whole policy is
 on [Security & CSP](concepts/security).
 

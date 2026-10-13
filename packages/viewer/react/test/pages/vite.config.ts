@@ -15,7 +15,7 @@ const repo = resolve(here, '../../../../..');
 const viewerDist = join(repo, 'packages/viewer/main/dist');
 
 /** The pages, by name: `<name>.html` next to this file. */
-export const PAGES = ['hooks', 'live-props', 'components', 'viewer-code'] as const;
+export const PAGES = ['hooks', 'live-props', 'components', 'viewer-code', 'quick-start'] as const;
 
 export default defineConfig({
   root: here,

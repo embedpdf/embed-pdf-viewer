@@ -1,7 +1,8 @@
 /**
  * The addresses a PDF's link or URI action may open: the web, mail and phone numbers. Every other
  * scheme, `javascript:` and `file:` above all, opens nothing, from a link's anchor and from the
- * actions plugin's default UI adapter alike.
+ * actions plugin's default UI adapter alike; so does an address relative to the document, which
+ * read against the page around the viewer would open the app's own pages.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +16,7 @@ const OPENS = [
   'mailto:someone@example.com',
   'tel:+15551234567',
   '//example.com/scheme-relative',
+  'www.example.com',
 ];
 
 const OPENS_NOTHING = [
@@ -28,6 +30,14 @@ const OPENS_NOTHING = [
   'intent://scan#Intent;scheme=zxing;end',
   'acrobat:open',
   '',
+  // Relative to the document: never read against the host page.
+  'account/delete?id=1',
+  '/admin',
+  '../settings',
+  './help',
+  'page2.html',
+  '?tab=billing',
+  '#top',
 ];
 
 afterEach(() => vi.unstubAllGlobals());
@@ -37,8 +47,15 @@ describe('sanitizeExternalUri', () => {
     for (const uri of OPENS) expect(sanitizeExternalUri(uri), uri).not.toBeNull();
   });
 
-  it('refuses every other scheme', () => {
+  it('refuses every other scheme, and an address relative to the document', () => {
     for (const uri of OPENS_NOTHING) expect(sanitizeExternalUri(uri), uri).toBeNull();
+  });
+
+  it('opens an address without a scheme on https, as an address bar does', () => {
+    expect(sanitizeExternalUri('//example.com/a')).toBe('https://example.com/a');
+    expect(sanitizeExternalUri('www.example.com')).toBe('https://www.example.com');
+    expect(sanitizeExternalUri(' WWW.example.com/a?b=1 ')).toBe('https://WWW.example.com/a?b=1');
+    expect(sanitizeExternalUri('https://example.com/a')).toBe('https://example.com/a');
   });
 });
 

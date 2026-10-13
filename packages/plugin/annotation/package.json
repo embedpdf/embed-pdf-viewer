@@ -44,7 +44,7 @@
   "scripts": {
     "build": "epdf-build",
     "clean": "rimraf dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p test/tools/plain-js/tsconfig.json && tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

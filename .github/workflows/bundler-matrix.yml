@@ -5,7 +5,7 @@ name: Bundler matrix
 # docs/content/viewer/concepts/security.mdx, without a request leaving the
 # app's origin? tooling/bundler-matrix builds one minimal app per bundler,
 # runs the same probe in each, and prints the truth table; the run fails on
-# any off-origin request or policy violation. Heavy (eleven production
+# any off-origin request or policy violation. Heavy (twelve production
 # builds, a browser), so it runs nightly and on demand, not on every push.
 
 on:
@@ -48,8 +48,8 @@ jobs:
         with:
           name: engine-runtime-wasm32
           path: packages/engine/runtime/npm/wasm32
-      - name: Build the engine and the default stamps
-        run: pnpm turbo run build --filter=@embedpdf/engine --filter=@embedpdf/default-stamps
+      - name: Build the engine, the default stamps and the viewer
+        run: pnpm turbo run build --filter=@embedpdf/engine --filter=@embedpdf/default-stamps --filter=@embedpdf/viewer...
       - name: Install a browser for Playwright
         run: pnpm --filter @embedpdf/bundler-matrix exec playwright-core install --with-deps chromium
       - name: Run the matrix

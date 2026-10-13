@@ -56,9 +56,19 @@ engine runs on your server instead, and pages arrive as images.
 
 ## What loads when
 
-The toolbar and panels show at once, while the engine starts in the background. The pages show as
-soon as the document is open. A feature's code loads the first time someone uses it: a viewer that's
-only read never loads the form builder, the signature dialogs or the annotation tools.
+The toolbar shows at once, while the engine starts in the background, and the pages show as soon as
+the document is open. Every feature's plugin starts with the viewer, so the annotation tools are
+ready for the first click.
+
+The features' panels and dialogs, such as search, comments, stamps or the signature dialogs, aren't
+part of that first load. Once the document shows, the viewer fetches them in the background while
+the browser is idle, one at a time, so each opens at once; one opened before then loads right
+away. A few heavier parts wait until they're used:
+
+- the signature checks, until a signature is checked;
+- the standard stamps, until Stamps opens;
+- the handwriting fonts, until someone types a signature;
+- each language, until it's chosen.
 
 ## Good to know
 

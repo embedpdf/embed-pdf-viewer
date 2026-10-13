@@ -82,8 +82,12 @@ while the viewer runs.
 
 ## Good to know
 
-### Not in your bundle
+### What loads when
 
-A feature you disable is still in the viewer's code, but its code loads only when it's first
-used. A viewer that's only ever read never loads the annotation tools, the form builder or the
-signature dialogs.
+A feature you disable is still in the viewer's code: `disable` changes what people see, not what
+you ship. The first load stays small another way. Each feature's panels and dialogs are files of
+their own, which the viewer fetches in the background once the document shows, so they open at
+once. The heavier parts wait until they're used: the signature checks until a signature is
+checked, the standard stamps until Stamps opens, the handwriting fonts until someone types a
+signature, and each language until it's chosen. [How it works](concepts/how-it-works#what-loads-when)
+has the whole order.

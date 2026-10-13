@@ -45,7 +45,7 @@ Give a command a `labelKey` instead of a `label`, and its words per language:
 
 ```js
 {
-  commands: [{ id: 'acme:send', labelKey: 'acme.send', icon: 'send', run: send }],
+  commands: [{ id: 'acme:send', labelKey: 'acme.send', icon: 'signature', run: send }],
   strings: {
     en: { 'acme.send': 'Send for signature' },
     nl: { 'acme.send': 'Verstuur ter ondertekening' },
@@ -66,7 +66,8 @@ form field's settings by theirs (`form.settings.tooltip`). Change one like any o
 ## A language of your own
 
 Give `strings` for a language the viewer doesn't have, and it becomes one of its languages. Anything
-you don't translate falls back to English:
+you don't translate shows in English, or in the plugins' own words where they have that language
+(in Swedish, the zoom, page and copy buttons):
 
 ```js
 {
