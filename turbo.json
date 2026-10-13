@@ -57,6 +57,12 @@
     "@embedpdf/viewer#test": {
       "dependsOn": ["build"]
     },
+    "@embedpdf/viewer-angular#typecheck": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-react#typecheck": {
+      "dependsOn": ["^build", "build"]
+    },
     "@embedpdf/engine#test": {
       "dependsOn": ["^build"],
       "inputs": [

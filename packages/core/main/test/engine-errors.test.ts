@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { toPluginError } from '../src/errors';
 
-const codeOf = (code: string) => toPluginError('probe', new EngineError(code, 'failed')).code;
+const codeOf = (code: EngineErrorCode) => toPluginError('probe', new EngineError(code, 'failed')).code;
 
 describe('an engine error as a plugin error', () => {
   it("blames the input only when it's the input", () => {
