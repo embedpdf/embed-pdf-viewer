@@ -4,7 +4,7 @@ import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { encodePageKey, toPageRef, type PageRef } from '../../src/identity/PageRef';
 import type { AnnotationBundle } from '../../src/transfer/AnnotationBundle';
-import { planAnnotationImport } from '../../src/transfer/annotationImport';
+import { planAnnotationImport } from '../../src/transfer/planAnnotationImport';
 import type { BundleImportPages, BundleImportTarget } from '../../src/transfer/bundle';
 
 const box = { x: 10, y: 10, width: 30, height: 20 };

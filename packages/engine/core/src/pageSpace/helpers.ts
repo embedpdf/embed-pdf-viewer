@@ -24,13 +24,13 @@ import {
   type DraftContext,
 } from '../annotation/resolve/annotationOfDraft';
 import {
-  pdfResolveAnnotationDraft,
+  pdfPredictAnnotationDraft,
   type DraftResolveOptions,
 } from '../annotation/resolve/resolveAnnotationDraft';
-import { pdfResolveRectCommand } from '../annotation/checkWrite';
+import { pdfResolveRectCommand } from '../annotation/resolve/rectCommand';
 import { applyResolvedPatch } from '../annotation/resolve/applyAnnotationPatch';
 import {
-  pdfResolveAnnotationPatch,
+  pdfPredictAnnotationPatch,
   type ResolveOptions,
 } from '../annotation/resolve/resolveAnnotationPatch';
 import { DRAWN_RECT_KINDS, pdfShapeForRect, shapeFieldsOf } from '../annotation/shapeForRect';
@@ -285,22 +285,26 @@ export function resolveRectCommand(
 const mirrorEveryPage: VisibleBoxOf = () => MIRROR;
 
 /**
- * The patch the engine writes for `patch` on `current`: its subtype filled
- * in, checked against its kind, and every field that follows from it stated.
- * A drawn kind's new `rect` becomes the shape fields that put it there, a
- * note's standard review state brings its state model, a free text's
- * contents and rich text follow each other, a callout's line stays attached
- * to its moved box, and a measurement's label follows its points and scale.
- * Values `patch` gives come back as given.
+ * The patch the engine writes for `patch` on `current`, as a viewer predicts
+ * it: its subtype filled in, and every field that follows from it stated. A
+ * drawn kind's new `rect` becomes the shape fields that put it there, values
+ * sent back as read are dropped, a note's standard review state brings its
+ * state model, a free text's contents and rich text follow each other, a
+ * callout's line stays attached to its moved box, and a measurement's label
+ * follows its points and scale. Values `patch` gives come back as given.
  *
- * Throws `InvalidArg` for a patch the engine would refuse.
+ * Throws `InvalidArg` for what the engine refuses without its schemas: a
+ * field the kind doesn't declare, a changed subtype or name, a rect with a
+ * new shape or that isn't finite, and where nothing can follow. The engine
+ * checks the values against the kind's schema when the update reaches it,
+ * and refuses there what this lets through.
  */
 export function resolveAnnotationPatch(
   current: Annotation,
   patch: AnnotationPatch,
   options: ResolveOptions = {},
 ): AnnotationPatch {
-  const resolved = pdfResolveAnnotationPatch(
+  const resolved = pdfPredictAnnotationPatch(
     pdfAnnotationOf(current, MIRROR, mirrorEveryPage),
     pdfAnnotationPatchOf(
       { ...patch, subtype: patch.subtype ?? current.subtype } as AnnotationPatch,
@@ -336,20 +340,24 @@ export function applyAnnotationPatch<A extends Annotation>(
 }
 
 /**
- * The draft the engine writes for `draft`: checked against its kind, and
- * every field that follows from it stated. A note's standard review state
- * brings its state model, a free text's rich text and contents follow each
- * other, and a measurement's label follows its points and scale. Fields left
- * out stay out: the kind's defaults (`ANNOTATION_DEFAULTS`) say what they
- * read back. Values `draft` gives come back as given.
+ * The draft the engine writes for `draft`, as a viewer predicts it: every
+ * field that follows from it stated. A box kind placed by its `rect` states
+ * its `box`, a note's standard review state brings its state model, a free
+ * text's rich text and contents follow each other, and a measurement's label
+ * follows its points and scale. Fields left out stay out: the kind's
+ * defaults (`ANNOTATION_DEFAULTS`) say what they read back. Values `draft`
+ * gives come back as given.
  *
- * Throws `InvalidArg` for a draft the engine would refuse.
+ * Throws `InvalidArg` for what the engine refuses without its schemas: a
+ * field the kind doesn't declare, a box kind it can't place, and where
+ * nothing can follow. The engine checks the values against the kind's schema
+ * when the create reaches it, and refuses there what this lets through.
  */
 export function resolveAnnotationDraft(
   draft: AnnotationDraft,
   options: DraftResolveOptions = {},
 ): AnnotationDraft {
-  const resolved = pdfResolveAnnotationDraft(
+  const resolved = pdfPredictAnnotationDraft(
     pdfAnnotationDraftOf(draft, MIRROR, mirrorEveryPage),
     options,
   );
@@ -366,7 +374,9 @@ export function resolveAnnotationDraft(
  * The annotation the engine will read back after creating `draft`: what a
  * viewer shows while the create is on its way. `context` says what the draft
  * doesn't: the ref and place it will have, who creates it, and, for a kind
- * whose `rect` the engine works out from its drawing, that box.
+ * whose `rect` the engine works out from its drawing, that box. The draft is
+ * resolved as `resolveAnnotationDraft` does it, without the engine's schema
+ * check: a create the engine refuses leaves the view when it answers.
  */
 export function annotationOfDraft(
   draft: AnnotationDraft,

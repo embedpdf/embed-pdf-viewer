@@ -1,7 +1,11 @@
 import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
-import { normalizePdfRect, pdfQuarterTurnBox, quarterTurnOf } from '../../geometry/convert';
-import { PdfRectSchema } from '../../geometry/schemas';
+import {
+  isFinitePdfRect,
+  normalizePdfRect,
+  pdfQuarterTurnBox,
+  quarterTurnOf,
+} from '../../geometry/convert';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { ANNOTATION_FIELD_SPACES } from '../field-spaces';
 import type { AnnotationDraft } from '../kinds';
@@ -22,8 +26,9 @@ export type PlacedDraft<Draft> = Draft extends { box?: infer Box }
  * `rect` is worked out from it as ever, so a read sent back as a create
  * places the copy by its box.
  *
- * Refused with `InvalidArg`: a create with neither, and a `rect` at another
- * angle, where many boxes stand in the same rect.
+ * Refused with `InvalidArg`: a create with neither, a `rect` that isn't four
+ * finite numbers, and a `rect` at another angle, where many boxes stand in
+ * the same rect.
  */
 export function boxDraftFollows(
   draft: AnnotationDraft<PdfCoordinates>,
@@ -38,14 +43,11 @@ export function boxDraftFollows(
       { details: { field: 'box' } },
     );
   }
-  const rect = PdfRectSchema.safeParse(given.rect);
-  if (!rect.success) {
+  if (!isFinitePdfRect(given.rect)) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `${draft.subtype} create field 'rect': not a rect`,
-      {
-        details: { field: 'rect' },
-      },
+      `${draft.subtype} create field 'rect': not a rect of finite numbers`,
+      { details: { field: 'rect' } },
     );
   }
   const rotation = given.rotation ?? 0;
@@ -60,6 +62,6 @@ export function boxDraftFollows(
   const { rect: _placed, ...rest } = draft as AnnotationDraft<PdfCoordinates> & { rect?: unknown };
   return {
     ...rest,
-    box: pdfQuarterTurnBox(normalizePdfRect(rect.data), turn),
+    box: pdfQuarterTurnBox(normalizePdfRect(given.rect), turn),
   } as AnnotationDraft<PdfCoordinates>;
 }

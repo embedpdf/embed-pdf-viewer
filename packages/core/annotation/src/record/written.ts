@@ -90,7 +90,9 @@ export function annotationOfNew(
  * `annotation` after `patch`, as the engine reads it back: the patch applied
  * by the engine's own rules, and the fields the engine works out as its
  * verdict on the change says (the table at the top of this file). Throws, as
- * the engine would refuse it, for a patch the annotation doesn't take.
+ * the engine does, for a patch its rules refuse without its schemas
+ * (`resolveAnnotationPatch`); values only the schemas refuse are applied, and
+ * the engine refuses them when the patch reaches it.
  */
 export function annotationAfter(annotation: Annotation, patch: AnnotationPatch): Annotation {
   const after = applyAnnotationPatch(annotation, patch);

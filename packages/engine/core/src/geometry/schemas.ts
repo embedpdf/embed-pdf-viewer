@@ -36,11 +36,12 @@ export const CalloutLineSchema: z.ZodType<CalloutLine> = z.union([
 /** `/InkList` — an array of strokes, each an array of points. */
 export const InkListSchema: z.ZodType<InkList> = z.array(z.array(PdfPointSchema));
 
+/** A rect's edges are finite, as `isFinitePdfRect` checks them on the page. */
 export const PdfRectSchema: z.ZodType<PdfRect> = z.object({
-  left: z.number(),
-  bottom: z.number(),
-  right: z.number(),
-  top: z.number(),
+  left: z.number().finite(),
+  bottom: z.number().finite(),
+  right: z.number().finite(),
+  top: z.number().finite(),
 });
 
 export const PdfSizeSchema: z.ZodType<PdfSize> = z.object({
@@ -69,11 +70,12 @@ export const PagePointSchema: z.ZodType<PagePoint> = z.object({
   y: z.number(),
 });
 
+/** A box is finite, as a rect is (`PdfRectSchema`). */
 export const PageBoxSchema: z.ZodType<PageBox> = z.object({
-  x: z.number(),
-  y: z.number(),
-  width: z.number().nonnegative(),
-  height: z.number().nonnegative(),
+  x: z.number().finite(),
+  y: z.number().finite(),
+  width: z.number().finite().nonnegative(),
+  height: z.number().finite().nonnegative(),
 });
 
 export const PageQuadSchema: z.ZodType<PageQuad> = z.object({

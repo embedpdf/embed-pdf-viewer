@@ -1,6 +1,6 @@
 import type { Coordinates } from '../../pageSpace/coordinates';
-import type { KindFields } from '../declaration';
-import { declarationOf, type Annotation, type AnnotationPatch } from '../kinds';
+import { kindFactsOf } from '../kind-facts';
+import type { Annotation, AnnotationPatch } from '../kinds';
 import { applyResolvedPatch } from './applyAnnotationPatch';
 
 /** Exact deep equality: the same value, or arrays and objects whose members are. */
@@ -34,11 +34,11 @@ export function annotationPatchBetween<C extends Coordinates>(
 ): AnnotationPatch<C> {
   const patch: Record<string, unknown> = {};
   if (before === after) return patch as AnnotationPatch<C>;
-  const fields: KindFields = declarationOf(after.subtype)?.fields ?? {};
+  const owners = kindFactsOf(after.subtype)?.owners ?? {};
   const was = before as unknown as Record<string, unknown>;
   const now = after as unknown as Record<string, unknown>;
-  for (const [name, spec] of Object.entries(fields)) {
-    if (spec.traits.owner !== 'data' || sameValue(was[name], now[name])) continue;
+  for (const [name, owner] of Object.entries(owners)) {
+    if (owner !== 'data' || sameValue(was[name], now[name])) continue;
     // A field `after` doesn't have any more is removed.
     patch[name] = now[name] === undefined ? null : now[name];
   }

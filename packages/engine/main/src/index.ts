@@ -395,7 +395,7 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
  */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
   const boot = runsInThisThread(options)
-    ? { spawn: () => startInlineTransport(options.runtime), lazyOptions: {} }
+    ? { spawn: () => startInlineTransport(options.runtime, options), lazyOptions: {} }
     : workerBoot(options.worker, options);
   const transport = new LazyTransport(async () => {
     // Spawn and font fetches run in parallel; nothing queued by the caller can
@@ -437,11 +437,17 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
  * The transport to PDFium in this thread. Its module holds the engine host and
  * the runtime, the bulk of the engine's code, and is imported only here, when
  * such an engine boots: the main thread of a page whose engine runs in a
- * worker never downloads them.
+ * worker never downloads them. In a browser it is one self-contained file
+ * (`#inline-transport`, `src/transport/inline-browser.ts`), so an app's
+ * bundler never resolves the packages behind it, and its wasm is resolved
+ * here, from `wasm`, as a worker's is.
  */
-async function startInlineTransport(runtime: CreatePdfRuntimeOptions = {}): Promise<Transport> {
-  const { createInlineTransport } = await import('./transport/InlineTransport');
-  return createInlineTransport(runtime);
+async function startInlineTransport(
+  runtime: CreatePdfRuntimeOptions = {},
+  wasm: WasmSourceOptions = {},
+): Promise<Transport> {
+  const { createInlineTransport } = await import('#inline-transport');
+  return createInlineTransport(runtime, () => resolveDefaultWasmSource(wasm));
 }
 
 /**

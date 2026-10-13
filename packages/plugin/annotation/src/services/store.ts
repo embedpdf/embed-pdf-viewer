@@ -188,8 +188,9 @@ export interface AnnotationStore {
   ): Commit;
   /**
    * Show changes stated in code at once, as one change, exactly like a
-   * gesture's. Throws, before anything shows, for a change the engine would
-   * refuse, a record the view doesn't have, or, when the document's pool is
+   * gesture's. Throws, before anything shows, for a change the engine refuses
+   * without its schemas (`resolveAnnotationPatch`), a record the view doesn't
+   * have, or, when the document's pool is
    * out of object numbers, a create (`applyWhenNumbered` waits for them).
    * `select`: the records it names are selected as they show.
    */

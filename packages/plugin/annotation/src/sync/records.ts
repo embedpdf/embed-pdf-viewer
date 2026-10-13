@@ -183,7 +183,8 @@ export function foldRecords(
  * The annotation a create writes, as the engine reads it back. The
  * annotations it links to (the one it answers, the one a popup shows) are the
  * engine's to look up as it writes: it is read without them, then they are
- * stated. Throws for a draft the engine would refuse.
+ * stated. Throws for a draft the engine refuses without its schemas
+ * (`annotationOfDraft`); one whose values it refuses shows until it answers.
  */
 export function annotationOfCreate(draft: AnnotationDraft, ref: AnnotationRef): Annotation {
   const { reply, parent, ...fields } = draft as AnnotationDraft & {

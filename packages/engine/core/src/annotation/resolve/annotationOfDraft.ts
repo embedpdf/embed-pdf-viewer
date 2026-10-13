@@ -8,7 +8,8 @@ import type { Coordinates } from '../../pageSpace/coordinates';
 import { UNBAKED_KINDS } from '../appearance';
 import { annotationDefaultsOf } from '../defaults';
 import type { DescribeFont } from '../fontFaces';
-import { declarationOf, type AnnotationDraft, type Annotation } from '../kinds';
+import { kindFactsOf } from '../kind-facts';
+import type { AnnotationDraft, Annotation } from '../kinds';
 import { actionTreeOf, readValueOf } from './applyAnnotationPatch';
 
 /** Who the engine stamps as creating an annotation, and when. */
@@ -71,12 +72,11 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
   context: DraftContext,
 ): Annotation<C> {
   const subtype = resolved.subtype;
-  const fields = declarationOf(subtype)?.fields ?? {};
+  const owners = kindFactsOf(subtype)?.owners ?? {};
   const defaults = annotationDefaultsOf(subtype);
   const given = resolved as unknown as Record<string, unknown>;
   const read: Record<string, unknown> = { subtype };
-  for (const [name, field] of Object.entries(fields)) {
-    const owner = (field as { traits: { owner: string } }).traits.owner;
+  for (const [name, owner] of Object.entries(owners)) {
     if (owner === 'data' && given[name] !== undefined) {
       read[name] = readValueOf(name, given[name], undefined);
     } else if (owner === 'data') {

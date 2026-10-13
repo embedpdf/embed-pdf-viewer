@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
+import type { AnnotationDraft } from '../../src/annotation/kinds';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
+import { pdfAnnotationDraftOf } from '../../src/pageSpace/annotations';
 import { annotationOfDraft, resolveAnnotationDraft } from '../../src/pageSpace/helpers';
+import { pdfResolveAnnotationDraft } from '../../src/validation';
 
 const page = { kind: 'objectNumber', objectNumber: 3 } as const;
 const ref: AnnotationRef = { kind: 'objectNumber', page, objectNumber: 41 };
@@ -77,5 +80,20 @@ describe('annotationOfDraft', () => {
         state: 'escalated',
       }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
+  });
+
+  test('predicts a draft whose values the engine refuses, which the engine refuses at its door', () => {
+    const draft = {
+      subtype: 'square',
+      box,
+      color: 'red',
+      opacity: 2,
+    } as unknown as AnnotationDraft;
+    // The page predicts without the schemas: the create shows, and leaves when refused.
+    expect(annotationOfDraft(draft, { ref })).toMatchObject({ color: 'red', opacity: 2 });
+    const page = { left: 0, bottom: 0, right: 600, top: 800 };
+    expect(() => pdfResolveAnnotationDraft(pdfAnnotationDraftOf(draft, page, () => page))).toThrow(
+      expect.objectContaining({ code: 'InvalidArg', details: { field: 'color' } }),
+    );
   });
 });
