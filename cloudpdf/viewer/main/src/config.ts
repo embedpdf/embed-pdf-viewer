@@ -16,58 +16,42 @@
 import {
   cloudEngine,
   type CloudEngineOptions,
-  type OpenInputShare,
+  type OpenInput,
   type TokenSource,
 } from '@cloudpdf/engine';
 import type {
+  DocumentEntry as ViewerDocumentEntry,
   EngineFactory,
-  InitialDocument,
-  StampsCustomization,
   ViewerConfig as EngineViewerConfig,
+  ViewerPluginsConfig,
 } from '@embedpdf/viewer/core';
 
 /**
- * @deprecated `{ kind: 'share' }` is a standard `OpenInput` kind now
- * (`OpenInputShare` from `@cloudpdf/engine`), understood by
- * `engine.open()` directly. Note the grant passphrase field is
- * `sharePassword` (was `password` on the old viewer-only type).
+ * A CloudPDF document, in the three ways the engine opens one: with a document token your
+ * backend creates for the user, which names the document; by its id, which the engine's
+ * `token` (or this one) must allow; or with a share link from the dashboard (`shr_…`), with
+ * its passphrase when it has one. A token is a string, or a function that gives a fresh one
+ * when the old one runs out.
  */
-export type CloudShareSource = OpenInputShare;
+export type DocumentSrc =
+  | { readonly token: TokenSource }
+  | { readonly id: string; readonly token?: TokenSource }
+  | { readonly shareToken: string; readonly sharePassword?: string };
 
-/**
- * @deprecated Cloud share sources are part of the standard `OpenInput`
- * union, so the ordinary `InitialDocument` from `@embedpdf/viewer/core`
- * already admits them. Use it directly.
- */
-export type CloudInitialDocument = InitialDocument;
+/** One of the documents `documents` opens, each in a tab of its own. */
+export type DocumentEntry = ViewerDocumentEntry<DocumentSrc>;
 
-/** The cloud connection, plus the document shorthands. */
+/** The cloud connection, and the documents it opens. */
 export interface CloudSource extends CloudEngineOptions {
-  /** Sugar: open one document by its doc-scoped JWT (`open({ kind: 'token' })`). */
-  docToken?: TokenSource;
-  /** Sugar: open one document by cloud docId — the engine-level `token` must
-   *  authorize it (`open({ kind: 'id' })`). */
-  docId?: string;
-  /**
-   * Sugar: open one document by its public share token (`shr_…`, from
-   * the dashboard's embed snippet) — `open({ kind: 'share' })`. The
-   * engine exchanges it for a short-lived session JWT and silently
-   * re-exchanges near expiry — revoking or editing the share on the
-   * server retargets every embedded copy at the next renewal. No
-   * backend required. For multiple documents, use `documents` with
-   * `{ kind: 'share' }` sources instead.
-   */
-  shareToken?: string;
-  /** Passphrase for a protected `shareToken`. */
-  sharePassword?: string;
-  /** Full control, exactly as the open-source viewer takes it — one tab per
-   *  entry, each with its own source, including `{ kind: 'share' }` entries
-   *  (a standard OpenInput kind the cloud engine resolves itself). Wins over
-   *  the `docToken`/`docId`/`shareToken` shorthands. */
-  documents?: InitialDocument[];
-  /** Stamps, exactly as the open-source viewer takes them, except that
-   *  `assetEngine` defaults to a local engine loaded on first use. */
-  stamps?: StampsCustomization;
+  /** One document: `{ token }`, `{ id }` or `{ shareToken }`. Follows its prop: another one
+   *  opens in its place, and `null` closes it. */
+  src?: DocumentSrc | null;
+  /** Several documents, each in a tab, with their names, passwords and the one that shows
+   *  first. With these, `src` is ignored. Read once. */
+  documents?: readonly DocumentEntry[];
+  /** Each plugin's settings, exactly as the open-source viewer takes them, except that
+   *  `stamp.assetEngine` defaults to a local engine loaded on first use. */
+  plugins?: ViewerPluginsConfig;
 }
 
 /**
@@ -80,6 +64,21 @@ export interface ViewerConfig
     Omit<EngineViewerConfig, 'engine' | 'src' | 'documents' | 'scope' | 'identity'>,
     CloudSource {}
 
+/** What the cloud engine opens for a `src`: `{ kind: 'token' }`, `{ kind: 'id' }` or `{ kind: 'share' }`. */
+function openInputOf(src: DocumentSrc): OpenInput {
+  if ('shareToken' in src) {
+    return {
+      kind: 'share',
+      shareToken: src.shareToken,
+      ...(src.sharePassword !== undefined ? { sharePassword: src.sharePassword } : {}),
+    };
+  }
+  if ('id' in src) {
+    return { kind: 'id', id: src.id, ...(src.token !== undefined ? { token: src.token } : {}) };
+  }
+  return { kind: 'token', token: src.token };
+}
+
 /**
  * The engine stamp libraries and signature marks open in. The cloud engine
  * renders the pages, but a stamp library is a PDF that is cut into stamps and
@@ -90,7 +89,7 @@ export interface ViewerConfig
 const localAssetEngine = () => import('@embedpdf/engine').then((engine) => engine.localEngine());
 
 /**
- * Split cloud options into the engine seam, the initial documents, and
+ * Split cloud options into the engine seam, the documents, and
  * everything else — so a door is one call:
  *
  * ```ts
@@ -99,13 +98,13 @@ const localAssetEngine = () => import('@embedpdf/engine').then((engine) => engin
  * ```
  *
  * The engine comes back as a thunk, which is what gives the viewer ownership of
- * its lifetime: created on mount, destroyed on unmount. `stamps` comes back
- * with a local `assetEngine` unless you named one.
+ * its lifetime: created on mount, destroyed on unmount. `plugins` comes back
+ * with a local `plugins.stamp.assetEngine` unless you named one.
  *
- * Document sources need no lowering here: `{ kind: 'share' }` is part of the
- * standard `OpenInput` union and the cloud engine resolves it itself
- * (exchange, renewal, revocation-at-renewal). This module only expands the
- * one-document shorthands.
+ * `src` and each entry of `documents` come back as what the engine opens
+ * (`openInputOf`), which the viewer opens as it is; `src` still follows its
+ * prop. The cloud engine resolves a share link itself (exchange, renewal,
+ * revocation-at-renewal).
  *
  * The return type is deliberately inferred. The destructuring below is the only
  * statement of what this module consumes, so what passes through in `rest` and
@@ -120,12 +119,9 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     fetch: fetchFn,
     docAffinityHeader,
     onRetry,
-    docToken,
-    docId,
-    shareToken,
-    sharePassword,
+    src,
     documents,
-    stamps,
+    plugins,
     ...rest
   } = options;
 
@@ -140,26 +136,13 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
   } satisfies CloudEngineOptions & Record<keyof CloudEngineOptions, unknown>;
   const engine: EngineFactory = () => cloudEngine(engineOptions);
 
-  const initialDocuments: InitialDocument[] = documents ?? [
-    ...(docToken !== undefined ? [{ source: { kind: 'token' as const, token: docToken } }] : []),
-    ...(shareToken !== undefined
-      ? [
-          {
-            source: {
-              kind: 'share' as const,
-              shareToken,
-              ...(sharePassword !== undefined ? { sharePassword } : {}),
-            },
-          },
-        ]
-      : []),
-    ...(docId !== undefined ? [{ source: { kind: 'id' as const, id: docId } }] : []),
-  ];
-
   return {
     ...rest,
     engine,
-    documents: initialDocuments,
-    stamps: { assetEngine: localAssetEngine, ...stamps },
+    ...(src !== undefined ? { src: src && openInputOf(src) } : {}),
+    ...(documents !== undefined
+      ? { documents: documents.map((entry) => ({ ...entry, src: openInputOf(entry.src) })) }
+      : {}),
+    plugins: { ...plugins, stamp: { assetEngine: localAssetEngine, ...plugins?.stamp } },
   };
 }

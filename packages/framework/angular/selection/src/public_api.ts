@@ -7,6 +7,7 @@
  *   <epdf-selection-menu>         your menu next to the selection, inside <epdf-stage>
  *   <epdf-selection-handles>      the handles a finger drags, inside <epdf-stage>
  *   <epdf-selection-clipboard>    Ctrl+C and the browser's Copy menu
+ *   <div epdfSelectionClipboard>  the same, only while focus is inside that element
  *   copySelection(selection)      the selected text to the clipboard, from your own button
  */
 

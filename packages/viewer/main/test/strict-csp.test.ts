@@ -4,7 +4,10 @@
  * in the two ways its folder is served: from the page's own origin
  * (`worker-src 'self'`), and from a CDN (the CDN's origin added to
  * `script-src` and `connect-src`, and `worker-src blob:`). A page must render,
- * and not one `securitypolicyviolation` may fire.
+ * and not one `securitypolicyviolation` may fire. In both, a signature typed in
+ * each default handwriting font is saved with its font: the fonts come as lazy
+ * chunks of the viewer's folder and go to the engine as bytes, so the policy
+ * needs no `font-src`.
  *
  * Runs against the built artifact (`pnpm build` first). Needs a Chromium:
  * Playwright's own (`npx playwright-core install chromium`, what CI does) or a
@@ -15,7 +18,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, type Browser } from 'playwright-core';
+import { chromium, type Browser, type Page } from 'playwright-core';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(here, '..', 'dist');
@@ -159,15 +162,71 @@ function pageRendered(): boolean {
   );
 }
 
+/** The default handwriting fonts, by their labels, and the name each embeds as. */
+const SIGNATURE_FONTS = [
+  { label: 'Allura', embedded: 'Allura' },
+  { label: 'Great Vibes', embedded: 'GreatVibes' },
+  { label: 'Caveat', embedded: 'Caveat' },
+];
+
+/**
+ * Types a signature in each default handwriting font and saves it, as a person does in the
+ * signature maker, and reports, per font, whether the saved library embeds the font.
+ */
+async function typeSignatures(page: Page): Promise<Record<string, boolean>> {
+  const embedded: Record<string, boolean> = {};
+  for (const font of SIGNATURE_FONTS) {
+    const person = `Ada ${font.embedded}`;
+    await page.evaluate(() =>
+      (document.querySelector('embedpdf-viewer') as unknown as { viewer: any }).viewer
+        .get('shell')
+        .open('signature-maker', { exclusive: 'modal' }),
+    );
+    const dialog = page.locator('embedpdf-viewer [role="dialog"]');
+    await dialog.waitFor({ timeout: 10_000 });
+    await dialog.getByRole('button', { name: 'Type' }).first().click();
+    await dialog.locator('input').first().fill(person);
+    await dialog.locator('select').first().selectOption({ label: font.label });
+    await dialog.getByPlaceholder('Type your name').first().fill(person);
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    const library = await page.waitForFunction(
+      (name) =>
+        (document.querySelector('embedpdf-viewer') as unknown as { viewer: any }).viewer
+          .get('stamp')
+          .listLibraries({ kind: 'signatures' })
+          .find(
+            (each: { name: string; assetIds: string[] }) =>
+              each.name === name && each.assetIds.length > 0,
+          )?.id ?? null,
+      person,
+      { timeout: 20_000 },
+    );
+    embedded[font.label] = await page.evaluate(
+      async ({ id, name }) => {
+        const viewer = (document.querySelector('embedpdf-viewer') as unknown as { viewer: any })
+          .viewer;
+        const bytes: Uint8Array = await viewer.get('stamp').exportLibrary(id);
+        const text = new TextDecoder('latin1').decode(bytes);
+        return (
+          new RegExp(`/FontName\\s*/[A-Z]{6}\\+${name}`).test(text) && text.includes('/FontFile2')
+        );
+      },
+      { id: await library.jsonValue(), name: font.embedded },
+    );
+  }
+  return embedded;
+}
+
 /**
  * Opens `url`, waits until a page has rendered (or, for the harness's own check, until a
- * violation is reported) and a moment more for late work (the thumbnails, the encoder workers),
- * and reports what happened.
+ * violation is reported), does what `act` does there, waits a moment more for late work (the
+ * thumbnails, the encoder workers), and reports what happened.
  */
-async function openViewer(
+async function openViewer<Acted = undefined>(
   browser: Browser,
   url: string,
   until: 'rendered' | 'violation' = 'rendered',
+  act?: (page: Page) => Promise<Acted>,
 ) {
   const page = await browser.newPage();
   const violations: string[] = [];
@@ -216,9 +275,10 @@ async function openViewer(
     }
     await page.waitForTimeout(100);
   }
+  const acted = act ? await act(page) : undefined;
   await page.waitForTimeout(1500);
   await page.close();
-  return { violations, errors, failures, requests, workers };
+  return { violations, errors, failures, requests, workers, acted };
 }
 
 describe('the viewer under the strict policy', () => {
@@ -256,15 +316,19 @@ describe('the viewer under the strict policy', () => {
     expect(result.violations.join('\n')).toMatch(directive);
   });
 
-  it("renders from the page's own origin with worker-src 'self', and nothing violates the policy", async () => {
+  it("renders from the page's own origin with worker-src 'self', types a signature in each default font, and nothing violates the policy", async () => {
     const assets = pageAssets('/embedpdf/embedpdf.js');
     for (const [path, asset] of filesOf(dist, '/embedpdf')) assets.set(path, asset);
     const site = await serve(assets, { 'content-security-policy': policyText(STRICT_POLICY) });
     servers.push(site.server);
 
-    const result = await openViewer(browser, `${site.origin}/`);
+    const result = await openViewer(browser, `${site.origin}/`, 'rendered', typeSignatures);
 
     expect(result.violations).toEqual([]);
+    expect(result.acted).toEqual({ Allura: true, 'Great Vibes': true, Caveat: true });
+    expect(
+      result.requests.filter((request) => /\/chunks\/(allura|great-vibes|caveat)-/.test(request)),
+    ).toHaveLength(3);
     expect(result.workers).toContain(`${site.origin}/embedpdf/embedpdf-worker.js`);
     expect(result.workers.every((worker) => worker.startsWith(`${site.origin}/embedpdf/`))).toBe(
       true,
@@ -278,7 +342,7 @@ describe('the viewer under the strict policy', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('renders from a CDN with the CDN variant (worker-src blob:), and nothing violates the policy', async () => {
+  it('renders from a CDN with the CDN variant (worker-src blob:), types a signature in each default font, and nothing violates the policy', async () => {
     // What a public CDN sends: the folder, with CORS, and no policy of its own.
     const cdn = await serve(filesOf(dist, ''), { 'access-control-allow-origin': '*' });
     servers.push(cdn.server);
@@ -293,9 +357,15 @@ describe('the viewer under the strict policy', () => {
     });
     servers.push(site.server);
 
-    const result = await openViewer(browser, `${site.origin}/`);
+    const result = await openViewer(browser, `${site.origin}/`, 'rendered', typeSignatures);
 
     expect(result.violations).toEqual([]);
+    expect(result.acted).toEqual({ Allura: true, 'Great Vibes': true, Caveat: true });
+    expect(
+      result.requests.filter((request) =>
+        new RegExp(`^${cdn.origin}/chunks/(allura|great-vibes|caveat)-`).test(request),
+      ),
+    ).toHaveLength(3);
     expect(result.workers.length).toBeGreaterThan(0);
     expect(result.workers.every((worker) => worker.startsWith('blob:'))).toBe(true);
     const foreign = result.requests.filter(

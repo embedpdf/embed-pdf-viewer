@@ -12,7 +12,8 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createPdfRuntime } from '@embedpdf/engine-runtime';
-import { InlineTransport, LazyTransport, LocalEngine, type Transport } from '../src/index';
+import { LazyTransport, LocalEngine, type Transport } from '../src/index';
+import { InlineTransport } from '../src/transport/InlineTransport';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(

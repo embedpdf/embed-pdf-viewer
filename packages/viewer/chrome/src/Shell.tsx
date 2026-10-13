@@ -32,12 +32,14 @@ import { useCommandShortcuts } from '@embedpdf/react/commands';
 import { FormLayer } from '@embedpdf/react/form';
 import { useT } from '@embedpdf/react/i18n';
 import { LinkLayer } from '@embedpdf/react/link';
+import { useMeasurementState } from '@embedpdf/react/measurement';
 import { RenderLayer } from '@embedpdf/react/render';
 import { DocumentGate, useDocument, useDocumentId } from '@embedpdf/react/runtime';
 import { SearchLayer } from '@embedpdf/react/search';
 import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/react/selection';
+import { useSurface } from '@embedpdf/react/shell';
 import { Scrollbar, Stage } from '@embedpdf/react/stage';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 import { useLayoutEnv, useResolvedLayout } from './config-context';
 import { LayoutRoot } from './layout-root';
@@ -46,20 +48,45 @@ import { AnnotationFontsProvider } from './ui/annotation-fonts';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
 import { DropToOpen } from './ui/drop-to-open';
-import { CalibrationDialog } from './ui/measurement';
+import { GoToPageDialog } from './ui/go-to-page';
+import { FeaturePrefetch, lazyComponent } from './ui/lazy';
 import { SidePanel } from './ui/panels';
 import { PlacedComponentsHost, type PlacedComponents } from './ui/placed-components';
-import { RedactConfirmModal } from './ui/redact-confirm';
 import { useRefusalNotice } from './ui/refusal-notice';
 import { RotationBadge } from './ui/rotation-badge';
 import { SelectionStrip } from './ui/selection-strip';
-import { SignDialog } from './ui/sign-dialog';
+import { ShortcutsSheet } from './ui/shortcuts-sheet';
 import { SignatureBridge } from './ui/signature-bridge';
-import { SignatureInspector } from './ui/signature-inspector';
-import { SignatureMakerModal } from './ui/signature-maker';
 import { StampLibraryStore } from './ui/stamp-store';
 import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
+import { LeaveWarning } from './ui/unsaved-changes';
+
+// The dialogs and the inspector of a feature: each loads the first time it opens.
+const useRedactConfirmOpen = () => useSurface('redact-confirm').isOpen;
+const useCalibrating = () => useMeasurementState((state) => state.calibrationRequest !== null);
+const useSignDialogOpen = () => useSurface('signature-sign').isOpen;
+const useSignatureMakerOpen = () => useSurface('signature-maker').isOpen;
+const useSignatureInspectorOpen = () => useSurface('signature-inspector').isOpen;
+const RedactConfirmModal = lazyComponent(
+  () => import('./ui/redact-confirm').then((ui) => ui.RedactConfirmModal),
+  { shownWhile: useRedactConfirmOpen },
+);
+const CalibrationDialog = lazyComponent(
+  () => import('./ui/measurement').then((ui) => ui.CalibrationDialog),
+  { shownWhile: useCalibrating },
+);
+const SignDialog = lazyComponent(() => import('./ui/sign-dialog').then((ui) => ui.SignDialog), {
+  shownWhile: useSignDialogOpen,
+});
+const SignatureMakerModal = lazyComponent(
+  () => import('./ui/signature-maker').then((ui) => ui.SignatureMakerModal),
+  { shownWhile: useSignatureMakerOpen },
+);
+const SignatureInspector = lazyComponent(
+  () => import('./ui/signature-inspector').then((ui) => ui.SignatureInspector),
+  { shownWhile: useSignatureInspectorOpen },
+);
 
 /** The document tabs, as the layout says: always, while more than one document is open, or never. */
 function DocumentTabs() {
@@ -124,7 +151,11 @@ function OverPages({ children }: { children: ReactNode }) {
 export function Shell({ components }: { components?: PlacedComponents }) {
   // A shortcut or Copy that's refused says why in a notice.
   const refusals = useRefusalNotice();
-  useCommandShortcuts({ onRefused: refusals.onShortcutRefused });
+  // The keys and copies reach this viewer only while focus is inside it (its own components,
+  // and yours slotted into it), so two viewers on a page never both take one, and the page
+  // keeps its own.
+  const root = useRef<HTMLDivElement>(null);
+  useCommandShortcuts({ target: root, onRefused: refusals.onShortcutRefused });
   // Click-then-pick tools (stamp, file attachment) → click a page → file dialog
   // opens → the file lands where you clicked. One line: the default provider is
   // the built-in file picker honouring each tool's `accept` filter (swap it for
@@ -144,13 +175,15 @@ export function Shell({ components }: { components?: PlacedComponents }) {
   // document. The root measures the viewer for the layout (layout-root.tsx).
   return (
     <AnnotationFontsProvider>
-      <LayoutRoot className="bg-app text-fg flex h-full flex-col">
+      <LayoutRoot rootRef={root} className="bg-app text-fg flex h-full flex-col outline-none">
         {/* the viewer's own components in the page (<epdf-button>, <epdf-menu>), each drawn
           in its own shadow root */}
         {components && <PlacedComponentsHost components={components} />}
         {/* the user's stamp + signature libraries: restored once, persisted for
           the workspace's lifetime (workspace-scoped, like the stamp plugin) */}
         <StampLibraryStore />
+        {/* leaving the page asks first while a document has unsaved changes */}
+        <LeaveWarning />
         {/* The header socket. The chrome ships NO header of its own — branding,
           locale pickers and theme switches are the embedder's chrome, not the
           viewer's — so this renders nothing until a child fills the slot. */}
@@ -172,10 +205,10 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                 {/* the armed tool's cursor: its toolbar icon as a real CSS cursor
                 (zero-lag; the hub hides it over annotations/fields/gaps) */}
                 <ArmedToolCursor />
-                {/* ctrl/cmd+C and native Edit→Copy for the text selection —
-                prefetches on commit so the copy event answers synchronously.
-                Renders nothing; mount ONCE per document view. */}
-                <SelectionClipboard onRefused={refusals.onCopyRefused} />
+                {/* ctrl/cmd+C and native Edit→Copy for the text selection, while focus is
+                inside the viewer — prefetches on commit so the copy event answers
+                synchronously. Renders nothing; mount once per document view. */}
+                <SelectionClipboard target={root} onRefused={refusals.onCopyRefused} />
                 <Stage
                   overlay={
                     <OverPages>
@@ -197,7 +230,7 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                     </OverPages>
                   }
                   className="h-full w-full"
-                  style={{ background: 'var(--ep-canvas)', direction: 'ltr' }}
+                  style={{ background: 'var(--epdf-canvas)', direction: 'ltr' }}
                 >
                   {() => (
                     <>
@@ -229,8 +262,12 @@ export function Shell({ components }: { components?: PlacedComponents }) {
               <SidePanel side="end" />
               <RedactConfirmModal />
               <CalibrationDialog />
+              <GoToPageDialog />
+              <ShortcutsSheet />
               {/* signatures: plugin intents → surfaces; the dialogs they open */}
               <SignatureBridge />
+              {/* once a document shows: the features' panels and dialogs, fetched while idle */}
+              <FeaturePrefetch />
               <SignDialog />
               <SignatureMakerModal />
             </DocumentArea>

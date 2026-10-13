@@ -12,6 +12,7 @@ import {
   type AttachmentList,
   type AttachmentRef,
   type DocumentAttachmentsService,
+  type SessionEventPublisher,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -20,7 +21,6 @@ import {
   AttachmentListSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';

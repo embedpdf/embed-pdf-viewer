@@ -32,6 +32,7 @@ export type {
 } from './events/DocumentEvent';
 export type { DocumentEventStream } from './events/DocumentEventStream';
 export { subscribeToType } from './events/DocumentEventStream';
+export { EventHub, SessionEventPublisher } from './events/EventHub';
 export { changeEvents } from './events/changeEvents';
 export {
   advisoryFromPdfBits,

@@ -71,8 +71,11 @@ export class EpdfPdfViewer extends EpdfPdfViewerBase {
   readonly config = input<Partial<ViewerConfig>>();
   /** The engine: an `Engine`, or a function that makes one, which the viewer then owns. Read once. */
   readonly engine: InputSignal<ViewerConfig['engine']> = input.required<ViewerConfig['engine']>();
-  /** One document: a URL, a `File`, or bytes. Another one opens in its place; `null` closes it. */
+  /** One document: what the engine opens. Another one opens in its place; `null` closes it. */
   readonly src: InputSignal<ViewerConfig['src'] | undefined> = input<ViewerConfig['src']>();
+  /** Several documents, with their names and passwords; with these, `src` is ignored. Read once. */
+  readonly documents: InputSignal<ViewerConfig['documents'] | undefined> =
+    input<ViewerConfig['documents']>();
   /** What the user may do, as permissions, in every document. Read once. */
   readonly scope: InputSignal<ViewerConfig['scope'] | undefined> = input<ViewerConfig['scope']>();
   /** Who the user is, for comments and signatures. Read once. */
@@ -84,6 +87,7 @@ export class EpdfPdfViewer extends EpdfPdfViewerBase {
     ...definedOf({
       engine: this.engine(),
       src: this.src(),
+      documents: this.documents(),
       scope: this.scope(),
       identity: this.identity(),
     }),

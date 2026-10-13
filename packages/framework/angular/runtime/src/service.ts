@@ -10,7 +10,7 @@
  * that document, else the active one. Its methods are looked up when they're called, so a
  * method kept in a field acts on the document current at that moment.
  */
-import { computed, inject, type Signal } from '@angular/core';
+import { computed, effect, inject, untracked, type Signal } from '@angular/core';
 import type {
   CapabilityToken,
   EventHook,
@@ -89,6 +89,12 @@ export interface PluginServiceSpec<
   readonly token: CapabilityToken<Capability>;
   /** The plugin's State table (`defineState`): each field becomes a signal of the same name. */
   readonly state?: StateDeclaration<Capability, State>;
+  /**
+   * For a plugin that loads its state on demand: the verb that loads it (its declaration's
+   * `ensure`), called once a ready document's capability is in scope, for every document the
+   * service comes to read. Taken from `state` when the spec has one.
+   */
+  readonly ensure?: (capability: Capability) => Promise<void>;
   /** The plugin's Methods table: each becomes a method of the same name. */
   readonly methods: readonly Method[];
   /** The plugin's events: `onCompleted` becomes the stream `completed$`. */
@@ -155,6 +161,15 @@ export function pluginService<
         for (const field of Object.keys(state.empty) as (keyof State & string)[]) {
           members[field] = computed(() => whole()[field]);
         }
+      }
+
+      const ensure = spec.ensure ?? spec.state?.ensure;
+      if (ensure) {
+        effect(() => {
+          const capability = binding.capability();
+          // The state says when the load fails (its status), so the rejection has nothing to add.
+          if (capability) untracked(() => ensure(capability).catch(() => {}));
+        });
       }
 
       for (const name of spec.methods) members[name as string] = binding.method(name);

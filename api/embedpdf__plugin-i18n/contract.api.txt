@@ -11,5 +11,5 @@ LocaleInfo [InterfaceDeclaration]: export interface LocaleInfo{ readonly code: s
 LocaleLoadFailedEvent [InterfaceDeclaration]: export interface LocaleLoadFailedEvent{ readonly locale: string; readonly error: PluginErrorInfo; }
 LocaleLoader [TypeAliasDeclaration]: export type LocaleLoader = () => Promise<Locale>;
 TextDirection [TypeAliasDeclaration]: export type TextDirection = 'ltr' | 'rtl';
-TranslateOptions [InterfaceDeclaration]: export interface TranslateOptions{ params?: Record<string, string | number>; fallback?: string; }
+TranslateOptions [InterfaceDeclaration]: export interface TranslateOptions{ params?: Record<string, string | number>; fallbackKey?: string; fallback?: string; }
 TranslationDictionary [InterfaceDeclaration]: export interface TranslationDictionary{ readonly [key: string]: string | TranslationDictionary; }

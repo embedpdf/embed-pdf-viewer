@@ -10,7 +10,7 @@
  */
 import { shallowEqual } from '@embedpdf/core';
 import type { CapabilityToken, SettingsOf, StateDeclaration } from '@embedpdf/core';
-import type { Ref } from 'vue';
+import { watch, type Ref } from 'vue';
 import { useDocumentScope, useKernelValue } from './runtime/kernel';
 import { fieldRefs } from './runtime/refs';
 import type { FieldRefs } from './runtime/refs';
@@ -34,17 +34,31 @@ export interface SettingsComposable<Settings extends object> {
  * document (the nearest `<DocumentScope>`, else the active one) and reads the
  * declaration's `empty` while that document is missing or not ready, so it
  * works anywhere. A ref updates only when its value changes: the state, or the
- * value `select` picks from it, is compared with {@link shallowEqual}.
+ * value `select` picks from it, is compared with {@link shallowEqual}. State the
+ * plugin loads on demand (the declaration's `ensure`) loads once a ready
+ * document's capability is in scope, for every document the composable reads.
  */
 export function stateComposable<Capability, State extends object>(
   declaration: StateDeclaration<Capability, State>,
 ): StateComposable<State> {
   function useDeclaredState(): FieldRefs<State>;
-  function useDeclaredState<Selected>(
-    select: (state: State) => Selected,
-  ): Readonly<Ref<Selected>>;
+  function useDeclaredState<Selected>(select: (state: State) => Selected): Readonly<Ref<Selected>>;
   function useDeclaredState<Selected>(select?: (state: State) => Selected) {
     const scope = useDocumentScope();
+    const { ensure } = declaration;
+    if (ensure) {
+      const capability = useKernelValue((kernel) =>
+        kernel.tryCapability(declaration.token, scope.value ?? undefined),
+      );
+      // The state says when the load fails (its status), so the rejection has nothing to add.
+      watch(
+        capability,
+        (current) => {
+          if (current) ensure(current).catch(() => {});
+        },
+        { immediate: true },
+      );
+    }
     // Resolved on every read: a document that closes reads as `empty` from
     // then on, never through its closed capability.
     const value = useKernelValue((kernel) => {
@@ -52,7 +66,9 @@ export function stateComposable<Capability, State extends object>(
       const state = capability ? declaration.read(capability) : declaration.empty;
       return select ? select(state) : state;
     }, shallowEqual);
-    return select ? value : fieldRefs(value as Readonly<Ref<State>>, Object.keys(declaration.empty));
+    return select
+      ? value
+      : fieldRefs(value as Readonly<Ref<State>>, Object.keys(declaration.empty));
   }
   return useDeclaredState;
 }

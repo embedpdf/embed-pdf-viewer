@@ -177,6 +177,10 @@ export function foldFormEvent(
    created, inside `create`.
 2. **Load after connect.** The first load starts right after the plugin's
    `connect` has run, so capabilities that `readable` or `load` use exist.
+   A spec with `onDemand: true` waits instead: the mirror stays `idle`,
+   folding confirmed events, until `ensureLoaded()` or `refresh()` asks for
+   its first load, for data nothing needs when a document opens. A resync or a
+   fold's `reload()` before then reads nothing; the first load reads it all.
 3. **Queue during a load.** Events that arrive while a full load runs are
    queued. When the load lands, the queued events are replayed in arrival
    order, skipping those the snapshot already contains
@@ -232,13 +236,14 @@ interface MirrorChange<V> {
 
 ### Status and control
 
-| Member        | Behavior                                                                                                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `get()`       | The value the engine confirmed.                                                                                                                                          |
-| `view()`      | What the user sees: `get()` with this session's pending changes replayed on top through `predict`. `get()` when the spec has no `predict`.                               |
-| `getStatus()` | `idle` until the first load starts, `loading` while it runs, then `ready`. Stays `ready` while a reload runs. `forbidden` or `error` after a failed load or page reload. |
-| `refresh()`   | Reload everything. Joins a running load; rejects when the load fails.                                                                                                    |
-| `settled()`   | Resolves once no load or page reload runs, including reloads started while it waits. Never rejects.                                                                      |
+| Member           | Behavior                                                                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get()`          | The value the engine confirmed.                                                                                                                                          |
+| `view()`         | What the user sees: `get()` with this session's pending changes replayed on top through `predict`. `get()` when the spec has no `predict`.                               |
+| `getStatus()`    | `idle` until the first load starts, `loading` while it runs, then `ready`. Stays `ready` while a reload runs. `forbidden` or `error` after a failed load or page reload. |
+| `ensureLoaded()` | Load unless loaded or loading: shares a load in flight, resolves at once when loaded, tries again after a failed load. Rejects when the load fails.                      |
+| `refresh()`      | Reload everything. Joins a running load; rejects when the load fails.                                                                                                    |
+| `settled()`      | Resolves once no load or page reload runs, including reloads started while it waits. Never rejects.                                                                      |
 
 A capability usually passes these through: `getStatus: metadata.getStatus`,
 `refresh: () => metadata.refresh()`.

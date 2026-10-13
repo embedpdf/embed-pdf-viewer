@@ -11,6 +11,7 @@ import {
   type AnnotationResourceRole,
   type AnnotationCreateOptions,
   type AnnotationUpdateOptions,
+  type SessionEventPublisher,
   type WireAnnotationResources,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
@@ -43,7 +44,6 @@ import {
   annotationAppearancesImageOptionsToWire,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { parseAppearanceForm } from './appearanceForm';
 import { buildAnnotationMutationForm } from './buildMutationForm';

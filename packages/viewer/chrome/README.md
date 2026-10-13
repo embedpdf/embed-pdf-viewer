@@ -293,21 +293,25 @@ DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 ```tsx
 theme={{
   preference: 'system',
-  tokens: { accent: '#7c3aed', surface: '#fdfcff' }, // both modes
-  dark: { accent: '#a78bfa' },                       // dark overrides
+  accent: '#7c3aed',                            // both modes
+  tokens: { surface: '#fdfcff', radius: '4px' }, // both modes
+  dark: { accent: '#a78bfa' },                  // dark only
 }}
 ```
 
-Token names are the variables in `styles.css` without their prefix. The
-light and dark themes set EmbedPDF's own theming variables (`--epdf-accent`,
-`--epdf-scrollbar-thumb`, `--epdf-toolbar-*`, the headless docs' "Colors &
-theming" list), so `accent` themes the pages and the chrome together: the
-chrome's hover, pressed and tinted shades are mixed from it. Every other name
-is one of the chrome's own `--ep-*` tokens. The prefixes exist because custom
-properties inherit through shadow boundaries, so unprefixed names could
-collide with the host page. The custom element adopts the overrides into its
-shadow root; direct consumers of this package just set the variables in their
-own CSS.
+The tokens are `THEME_TOKENS` (`ui/theme.tsx`): `accent`, `background`,
+`surface`, `surface-raised`, `text`, `text-muted`, `border`, `hover`,
+`canvas`, `radius` and `font`, each the CSS variable `--epdf-<name>`.
+`styles.css` declares them on the viewer's root with a default for each mode,
+and every other shade the chrome draws with is mixed from them in its
+`@theme inline` block, so the Tailwind classes (`bg-surface`, `text-fg`,
+`border-border-subtle`, `rounded-md`) follow them. `accent` is the same
+variable the pages read (the headless docs' "Colors & theming"), so it themes
+the pages and the chrome together. A variable the page sets on the element or
+around it wins over the config and the defaults: the sheet reads the page's
+value on the host first. The custom element adopts the config's tokens into
+its shadow root (`themeTokenCss`); direct consumers of this package set the
+variables in their own CSS.
 
 ### Restyle — reshape built-ins with page CSS
 
@@ -322,9 +326,10 @@ embedpdf-viewer::part(tab-active) {
 }
 ```
 
-The v1 part vocabulary — public API, grown by demand, never speculatively:
-`toolbar`, `toolbar-button(-active)`, `mode-tab(-active)`, `tab(-active)`,
-`menu`, `menu-item(-active)`.
+The part vocabulary is public API, grown by demand: `toolbar` (every bar,
+the floating ones' pill and the bars over a selection), `toolbar-button(-active)`,
+`mode-tab(-active)`, `tab(-active)`, `menu`, `menu-item(-active)`, `panel`
+and `panel-header`.
 
 ### Signatures — sign with a mark, through a key you bring
 
@@ -335,7 +340,9 @@ field to sign it — or click anywhere else to drop it as a stamp, as Preview
 does. A "sign here" click on an unsigned field targets it; the next mark
 picked goes in. The Form tab authors signature fields.
 
-What placing a mark on a field does is the `signatures` config:
+What placing a mark on a field does is the signature plugin's settings, in
+`plugins.signature`, next to the two the viewer adds (`kinds`, `fonts`); the
+standard and quick stamps are the viewer's settings in `plugins.stamp`:
 
 ```tsx
 import {
@@ -346,33 +353,36 @@ import {
 
 <FullViewer
   engine={engine}
-  signatures={{
-    // The key: your own (`webCryptoSigner`), a signing service
-    // (`remoteSigner`), or one self-signed identity per person kept in the
-    // browser (`personalSigner`). Without a key the mark is only DRAWN
-    // into the field — nothing is sealed.
-    key: () =>
-      personalSigner({
-        subject: 'Ada Lovelace',
-        store: indexedDbKeyStore('acme-keys'),
-      }),
-    // Anchors a reader trusts; none → "valid, signer not trusted" at best.
-    trust: { anchors: async () => [rootCertificateDer] },
-    // 'sign' (default with a key) | 'visual' (default without) | 'ask' (a dialog first)
-    mode: 'ask',
-    allowCertify: true, // offer a certification (first signature) in the dialog
-    kinds: ['signature'], // no initials
-    fonts: [
-      {
-        key: 'great-vibes',
-        url: '/fonts/GreatVibes.ttf',
-        label: 'Great Vibes',
-      },
-    ], // typed marks
-  }}
-  stamps={{
-    sidebar: ['stamps'], // library kinds the stamps sidebar lists
-    toolbar: ['embedpdf-standard:Check', 'embedpdf-standard:Cross'], // quick marks in the Insert bar
+  plugins={{
+    signature: {
+      // The key: your own (`webCryptoSigner`), a signing service
+      // (`remoteSigner`), or one self-signed identity per person kept in the
+      // browser (`personalSigner`). Without a key the mark is only drawn
+      // into the field: nothing is sealed.
+      key: () =>
+        personalSigner({
+          subject: 'Ada Lovelace',
+          store: indexedDbKeyStore('acme-keys'),
+        }),
+      // Anchors a reader trusts; none → "valid, signer not trusted" at best.
+      trust: { anchors: async () => [rootCertificateDer] },
+      // 'sign' (default with a key) | 'visual' (default without) | 'ask' (a dialog first)
+      mode: 'ask',
+      allowCertify: true, // offer a certification (first signature) in the dialog
+      kinds: ['signature'], // no initials
+      fonts: [
+        {
+          key: 'great-vibes',
+          url: '/fonts/GreatVibes.ttf',
+          label: 'Great Vibes',
+        },
+      ], // typed marks
+    },
+    stamp: {
+      standard: true, // the standard stamps, from your own build (a URL, or false for none)
+      sidebar: ['stamps'], // library kinds the stamps sidebar lists
+      quick: ['standard:Approved', 'standard:Rejected'], // quick marks in the Insert bar
+    },
   }}
 />;
 ```

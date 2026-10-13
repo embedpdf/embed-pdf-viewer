@@ -62,8 +62,8 @@ export const openFileCommand: CommandDef = {
   id: OPEN_COMMAND_ID,
   labelKey: 'commands.open',
   icon: 'fileImport',
-  // No Ctrl/Cmd+O yet: shortcuts listen on the whole page until they reach only the viewer that
-  // has focus (P7), and the page's own key must stay the page's. Ctrl/Cmd+F waits for the same.
+  // The key reaches the viewer only while focus is inside it: elsewhere it's the page's own.
+  shortcut: 'Mod+O',
   categories: ['documents.open'],
   // Where the engine opens only the documents a server holds, there is no Open, and its key
   // keeps the browser's own meaning.

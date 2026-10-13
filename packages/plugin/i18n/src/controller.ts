@@ -67,9 +67,11 @@ export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>
   const warned = new Set<string>();
   const translateKey = (key: string, options?: TranslateOptions): string => {
     const result = translate(sources(), key, options);
-    if (!result.found && options?.fallback === undefined && !warned.has(key)) {
-      warned.add(key);
-      console.warn(`[i18n] missing translation "${key}" (locale: ${state().locale})`);
+    const missing =
+      options?.fallbackKey === undefined ? `"${key}"` : `"${key}" or "${options.fallbackKey}"`;
+    if (!result.found && options?.fallback === undefined && !warned.has(missing)) {
+      warned.add(missing);
+      console.warn(`[i18n] missing translation ${missing} (locale: ${state().locale})`);
     }
     return result.text;
   };

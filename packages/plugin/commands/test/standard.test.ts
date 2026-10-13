@@ -145,11 +145,17 @@ describe('standard commands', () => {
     const documents = {
       download: vi.fn(async () => bytes),
       get: () => ({ name: 'contract' }),
+      canDownload: () => true,
+      canPrint: () => false,
     };
     const context = contextWith(new Map([[DocumentsToken, documents]]));
-    // The scope's say is `requires`: the commands plugin hides them without it.
-    expect(command('document:download').requires).toEqual(['doc.download']);
-    expect(command('document:print').requires).toEqual(['doc.print']);
+    // The documents' own checks say whether the session may: the commands plugin hides them
+    // when they say no, with the permission's sentence.
+    expect(command('document:download').requires).toBeUndefined();
+    expect(command('document:download').allowed?.(context)).toBe(true);
+    expect(command('document:print').allowed?.(context)).toBe(false);
+    expect(command('document:download').notAllowedKey).toBe('commands.notAllowed.doc-download');
+    expect(command('document:print').notAllowedKey).toBe('commands.notAllowed.doc-print');
     expect(command('document:download').enabled?.(context)).toBe(true);
     expect(command('document:print').enabled?.({ ...context, documentId: null })).toBe(false);
     await command('document:download').run?.(context);

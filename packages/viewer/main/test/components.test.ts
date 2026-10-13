@@ -464,9 +464,9 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
           .find((candidate) => candidate.getAttribute('title') === title)!;
         return button.tabIndex;
       }, title);
-    expect(await zoomButton('Zoom out')).toBe(-1);
-    expect(await zoomButton('Zoom in')).toBe(-1);
-    expect(await zoomButton('Zoom options')).toBe(-1);
+    expect(await zoomButton('Zoom Out')).toBe(-1);
+    expect(await zoomButton('Zoom In')).toBe(-1);
+    expect(await zoomButton('Zoom')).toBe(-1);
 
     await tab.evaluate(() => {
       const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
@@ -477,12 +477,12 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
 
     await tab.evaluate(() => {
       const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
-      [...root.querySelectorAll<HTMLElement>('[data-bar="main"] button[title="Zoom in"]')]
+      [...root.querySelectorAll<HTMLElement>('[data-bar="main"] button[title="Zoom In"]')]
         .find((button) => !button.closest('[aria-hidden="true"]'))!
         .focus();
     });
     await tab.keyboard.press('ArrowLeft');
-    expect((await focused(tab)).title).toBe('Zoom out');
+    expect((await focused(tab)).title).toBe('Zoom Out');
     await tab.close();
   });
 });

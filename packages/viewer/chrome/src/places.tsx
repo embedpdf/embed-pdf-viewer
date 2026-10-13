@@ -29,7 +29,7 @@ import { useCommands } from '@embedpdf/react/commands';
 import { useDocumentId, useKernelValue, useOptionalSelector } from '@embedpdf/react/runtime';
 import { ShellToken } from '@embedpdf/react/shell';
 import { isolatePointerDown } from '@embedpdf/web';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { openModeSurfaceOf } from './config/modes';
 import { useLayoutEnv, useResolvedLayout } from './config-context';
@@ -82,8 +82,8 @@ function EdgeBar({ id, edge, rides }: { id: string; edge: LayoutEdge; rides: boo
   return (
     <BarEdgeProvider value={edge}>
       <div
-        // `toolbar` is the main bar's part name, which page CSS reaches.
-        part={id === 'main' ? 'toolbar' : undefined}
+        // Every bar is the `toolbar` part, which page CSS reaches through `::part()`.
+        part="toolbar"
         data-bar={id}
         className={`border-border flex shrink-0 ${
           vertical ? 'flex-col px-2 py-4' : 'items-center px-4 py-2'
@@ -146,6 +146,9 @@ const STACK_CLASS: Record<FloatPosition, string> = {
   'bottom-end': 'bottom-5 flex-col-reverse',
 };
 
+/** The toolbar's sections, in the order the headless toolbar draws them. */
+const SECTION_ORDER: readonly SectionName[] = ['start', 'center', 'end'];
+
 /**
  * A floating bar opens its menus toward the other half of the viewer; one in the middle of a side
  * opens them downward.
@@ -180,6 +183,16 @@ function FloatingBar({ id, position }: { id: string; position: FloatPosition }) 
   useEffect(() => (drawn && lane.current ? isolatePointerDown(lane.current) : undefined), [drawn]);
   const { size } = useLayoutEnv();
   const hidden = useHiddenWhileScrolling(hidesWhileScrolling(bar, size), lane);
+  // The pill, the bar's `toolbar` part, is the section of the toolbar that holds the bar. The
+  // headless toolbar draws its sections first, in order and without attributes of ours, and
+  // keeps the same elements while it's there: naming them once it has drawn them is enough.
+  useLayoutEffect(() => {
+    const sections = lane.current?.querySelectorAll(':scope > [role="toolbar"] > div');
+    sections?.forEach((section, index) => {
+      if (SECTION_ORDER[index] === ALIGN_OF[position]) section.setAttribute('part', 'toolbar');
+      else section.removeAttribute('part');
+    });
+  }, [drawn, position]);
   if (!drawn) return null;
   return (
     <BarEdgeProvider value={edgeOfFloat(position)}>

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import * as React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup } from '@testing-library/react';
 import { pageTransform } from '@embedpdf/core-geometry';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/core';
@@ -8,6 +8,7 @@ import { interactionPlugin } from '../src/interaction';
 import { makePageContext, PageProvider, toPageRef } from '../src/runtime';
 import {
   SELECTION_DEFAULTS,
+  SelectionClipboard,
   SelectionLayer,
   SelectionToken,
   selectionPlugin,
@@ -19,9 +20,10 @@ import type { SelectionConfig } from '../src/selection';
 import { viewerWith } from './counter-plugin';
 
 /**
- * The selection hooks and layer against a real kernel: the declared state, the
- * settings with and without a document, and the highlight painted through its
- * CSS variable, over the `color` setting or the accent when it's unset.
+ * The selection hooks and components against a real kernel: the declared state,
+ * the settings with and without a document, the highlight painted through its
+ * CSS variable (over the `color` setting, or the accent when it's unset), and
+ * Ctrl/Cmd+C copying from inside a target only.
  */
 
 const box = { x: 0, y: 0, width: 600, height: 800 };
@@ -212,5 +214,39 @@ describe('<SelectionLayer>', () => {
 
     act(() => selection.updateSettings({ color: 'rgb(0 0 255 / 0.3)' }));
     expect(polygons()[0].style.fill).toBe('var(--epdf-text-selection, rgb(0 0 255 / 0.3))');
+  });
+});
+
+describe('<SelectionClipboard>', () => {
+  const pressCopy = (target: EventTarget) =>
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+
+  function Viewer() {
+    const area = React.useRef<HTMLDivElement>(null);
+    return (
+      <div ref={area} data-testid="viewer" tabIndex={-1}>
+        <SelectionClipboard target={area} />
+      </div>
+    );
+  }
+
+  it('with a target, copies on Ctrl/Cmd+C from inside it, and leaves the page outside alone', async () => {
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { kernel } = await mount(<Viewer />);
+    const selection = await open(kernel);
+    act(() => selection.select({ page: toPageRef(5), start: 1, count: 3 }));
+    await settle();
+
+    pressCopy(document.querySelector('[data-testid="viewer"]')!);
+    await settle();
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0][0]).toBe(await selection.readText());
+
+    pressCopy(document.body);
+    await settle();
+    expect(writeText).toHaveBeenCalledTimes(1);
   });
 });

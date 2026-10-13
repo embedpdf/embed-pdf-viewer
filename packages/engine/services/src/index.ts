@@ -22,11 +22,6 @@ export {
   normalizeU32,
 } from './shared/securityPermissions';
 
-// Engine-shell shared: the in-process DocumentEventStream implementation.
-// Lives on the main thread next to the DocumentHandle (not in the worker
-// tiers): the engine that performs a mutation publishes at confirmation time.
-export { EventHub, SessionEventPublisher } from './events/EventHub';
-
 // Tier 2: document session
 export { DocumentSession } from './document-session/DocumentSession';
 export { BaseDocumentRegistry } from './document-session/lifecycle/BaseDocumentRegistry';

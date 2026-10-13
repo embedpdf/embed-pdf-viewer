@@ -3,7 +3,9 @@
  * edge and flip or move to stay on screen, sit in the browser's top layer so
  * nothing around them clips them, take the menu keys (arrows, typeahead,
  * Escape back to the button), mark the current choice in the accent look, open a
- * submenu beside its row, and say why a row can't run.
+ * submenu beside its row, and say why a row can't run. The bars over selected
+ * text and a selected annotation sit above it, below it without room, and
+ * open their menus away from it.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -215,6 +217,87 @@ const click = async (tab: Page, label: string, scope = '') => {
   await frames(tab);
 };
 
+/** Drag across the line of text at `y`, from `from` to `to`. */
+async function selectText(tab: Page, y: number, from: number, to: number): Promise<void> {
+  await tab.mouse.move(from, y);
+  await tab.mouse.down();
+  await tab.mouse.move((from + to) / 2, y, { steps: 5 });
+  await tab.mouse.move(to, y, { steps: 5 });
+  await tab.mouse.up();
+  await frames(tab);
+}
+
+/** The selected text's highlight on the screen, top to bottom. */
+const highlightOf = (tab: Page) =>
+  tab.evaluate(() => {
+    const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+    const rects = [...root.querySelectorAll<SVGElement>('svg polygon')]
+      .filter((polygon) => polygon.style.fill.includes('--epdf-text-selection'))
+      .map((polygon) => polygon.getBoundingClientRect());
+    return rects.length === 0
+      ? null
+      : {
+          top: Math.min(...rects.map((rect) => rect.top)),
+          bottom: Math.max(...rects.map((rect) => rect.bottom)),
+        };
+  });
+
+/** The bar over the selection: the bar the page's anchored UI holds, and where it says it sits. */
+const selectionBarOf = (tab: Page) =>
+  tab.evaluate(() => {
+    const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+    const bar = [...root.querySelectorAll('[role="toolbar"]')].find((element) =>
+      element.parentElement?.hasAttribute('data-placement'),
+    );
+    if (!bar) return null;
+    const rect = bar.getBoundingClientRect();
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      placement: bar.parentElement!.getAttribute('data-placement'),
+    };
+  });
+
+/** Make a square on the first page at page `y` from code, select it with a click, and say where it is. */
+async function selectSquareAt(tab: Page, y: number): Promise<Box> {
+  const box = await tab.evaluate(async (top) => {
+    const viewer = (window as unknown as { element: { viewer: any } }).element.viewer;
+    const { annotation } = await viewer.get('annotation').create(0, {
+      subtype: 'square',
+      box: { x: 120, y: top, width: 160, height: 100 },
+      // Filled, so a click inside it lands on it.
+      interiorColor: '#ffcc00',
+    });
+    const rect = viewer.get('annotation').get(annotation.ref).rect;
+    const onScreen = viewer.get('stage').pageRectToViewport(0, rect);
+    // The main view: the largest box that takes the pointer for the pages.
+    const views = [
+      ...document.querySelector('embedpdf-viewer')!.shadowRoot!.querySelectorAll('div'),
+    ]
+      .filter((element) => element.style.touchAction === 'none')
+      .map((element) => element.getBoundingClientRect())
+      .sort((left, right) => right.width * right.height - left.width * left.height);
+    const origin = views[0]!;
+    return {
+      left: origin.left + onScreen.x,
+      top: origin.top + onScreen.y,
+      right: origin.left + onScreen.x + onScreen.width,
+      bottom: origin.top + onScreen.y + onScreen.height,
+    };
+  }, y);
+  await frames(tab);
+  await tab.mouse.click((box.left + box.right) / 2, (box.top + box.bottom) / 2);
+  await tab.waitForFunction(() =>
+    [
+      ...document
+        .querySelector('embedpdf-viewer')!
+        .shadowRoot!.querySelectorAll('[role="toolbar"]'),
+    ].some((bar) => bar.parentElement?.hasAttribute('data-placement')),
+  );
+  await frames(tab);
+  return box;
+}
+
 const press = async (tab: Page, key: string) => {
   await tab.keyboard.press(key);
   await frames(tab);
@@ -234,8 +317,9 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     await host?.close();
   });
 
-  const open = async (path: string, width = 1280): Promise<Page> => {
-    const tab = await browser.newPage({ viewport: { width, height: 800 } });
+  const open = async (path: string, width = 1280, touch = false): Promise<Page> => {
+    // `hasTouch` makes a finger the main way of pointing (`pointer: coarse`); the mouse still drags.
+    const tab = await browser.newPage({ viewport: { width, height: 800 }, hasTouch: touch });
     await tab.goto(`${host.origin}${path}`);
     await waitForDocument(tab);
     await frames(tab);
@@ -491,14 +575,14 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
 
   it('opens a menu two bars name only at the button pressed', async () => {
     const tab = await open('/twice.html');
-    await click(tab, 'Zoom options', '[data-bar="zoom"]');
+    await click(tab, 'Zoom', '[data-bar="zoom"]');
     let menus = await menusOf(tab);
-    let pressed = await buttonOf(tab, 'Zoom options', '[data-bar="zoom"]');
+    let pressed = await buttonOf(tab, 'Zoom', '[data-bar="zoom"]');
     expect(menus.length).toBe(1);
     // The floating bar is in the bottom half: its menu opens upward, from its own button.
     expect(menus[0]!.box.bottom).toBeLessThanOrEqual(pressed!.top);
     expect(pressed!.expanded).toBe('true');
-    expect((await buttonOf(tab, 'Zoom options', '[data-bar="main"]'))!.expanded).toBe('false');
+    expect((await buttonOf(tab, 'Zoom', '[data-bar="main"]'))!.expanded).toBe('false');
 
     await click(tab, 'View Controls', '[data-bar="main"]');
     menus = await menusOf(tab);
@@ -527,23 +611,72 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     await tab.close();
   });
 
-  it('opens a menu from the bar over selected text below it, away from the selection', async () => {
+  it('sits above selected text, and opens its menus above it, away from the selection', async () => {
     const tab = await open('/selection.html');
     await tab.waitForTimeout(1500);
-    await tab.mouse.move(310, 196);
-    await tab.mouse.down();
-    await tab.mouse.move(450, 196, { steps: 5 });
-    await tab.mouse.move(600, 196, { steps: 5 });
-    await tab.mouse.up();
-    await frames(tab);
+    // The "Start here" line, low on the first page: room above it.
+    await selectText(tab, 554, 125, 360);
+    const text = await highlightOf(tab);
+    const bar = await selectionBarOf(tab);
+    expect(text, 'the selected text').not.toBeNull();
+    expect(bar?.placement).toBe('top');
+    expect(bar!.bottom).toBeLessThanOrEqual(text!.top);
     const share = await buttonOf(tab, 'Share');
     expect(share, 'the Share button in the selection bar').not.toBeNull();
-    expect(share!.top).toBeGreaterThan(196);
     await click(tab, 'Share');
     const [menu] = await menusOf(tab);
     expect(menu).toBeDefined();
     expect(menu!.rows.map((row) => row.label)).toEqual(['Copy link']);
+    expect(menu!.box.bottom).toBeLessThanOrEqual(share!.top);
+    await tab.close();
+  });
+
+  it("keeps clear of the selection's handles on a touch screen", async () => {
+    const gapOver = async (touch: boolean) => {
+      const tab = await open('/selection.html', 1280, touch);
+      await tab.waitForTimeout(1500);
+      await selectText(tab, 554, 125, 360);
+      const text = await highlightOf(tab);
+      const bar = await selectionBarOf(tab);
+      await tab.close();
+      return text!.top - bar!.bottom;
+    };
+    // Each handle's 12 px head and the 14 px a finger grabs around it, beyond the usual 12 px.
+    expect(Math.round(await gapOver(false))).toBe(12);
+    expect(Math.round(await gapOver(true))).toBe(12 + 12 + 14);
+  });
+
+  it('sits below selected text without room above it, and opens its menus below it', async () => {
+    const tab = await open('/selection.html');
+    await tab.waitForTimeout(1500);
+    // The document's title, just under the main bar: no room above it for the bar.
+    await selectText(tab, 196, 310, 600);
+    const text = await highlightOf(tab);
+    const bar = await selectionBarOf(tab);
+    expect(bar?.placement).toBe('bottom');
+    expect(bar!.top).toBeGreaterThanOrEqual(text!.bottom);
+    const share = await buttonOf(tab, 'Share');
+    await click(tab, 'Share');
+    const [menu] = await menusOf(tab);
     expect(menu!.box.top).toBeGreaterThanOrEqual(share!.bottom);
+    await tab.close();
+  });
+
+  it('sits above a selected annotation, and below one at the top of the view', async () => {
+    const tab = await open('/selection.html');
+    await tab.waitForTimeout(1500);
+    // Mid-page, with room above and below it.
+    const middle = await selectSquareAt(tab, 150);
+    const above = await selectionBarOf(tab);
+    expect(above?.placement).toBe('top');
+    // Clear of the annotation, and of the handle that turns it, which sits above it.
+    expect(above!.bottom).toBeLessThan(middle.top - 15);
+    await press(tab, 'Escape');
+
+    const top = await selectSquareAt(tab, 4);
+    const below = await selectionBarOf(tab);
+    expect(below?.placement).toBe('bottom');
+    expect(below!.top).toBeGreaterThanOrEqual(top.bottom);
     await tab.close();
   });
 

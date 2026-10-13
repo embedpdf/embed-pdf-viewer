@@ -1,8 +1,22 @@
 import type { WirePack, WorkerRequest, WorkerResponse } from '@embedpdf/engine-core/runtime';
+import {
+  createPdfRuntime,
+  type CreatePdfRuntimeOptions,
+  type PdfRuntimeModule,
+} from '@embedpdf/engine-runtime';
 import { WorkerHost } from '@embedpdf/engine-services';
-import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { Transport } from './Transport';
+
+/**
+ * PDFium in this thread: its runtime, then the transport to it. The engine imports this module
+ * only when such an engine boots (`startInlineTransport` in `src/index.ts`).
+ */
+export async function createInlineTransport(
+  options: CreatePdfRuntimeOptions = {},
+): Promise<InlineTransport> {
+  return new InlineTransport(await createPdfRuntime(options));
+}
 
 /**
  * Inline transport: runs the WorkerHost in the same JS thread as the queue.

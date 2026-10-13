@@ -13,7 +13,14 @@ export { EmbedPdfViewerElement, type DefaultEngineProvider, type DoorEngine } fr
 // The viewer's own components, for your page: `<epdf-button>`, `<epdf-menu>`, `<epdf-menu-item>`.
 export { EpdfButtonElement, EpdfMenuElement, EpdfMenuItemElement } from './components';
 export { initViewer } from './init';
-export type { DocumentSrc, ElementConfig, LiveConfigKey, ViewerConfigBase } from './config';
+export type {
+  DocumentEntry,
+  DocumentSrc,
+  ElementConfig,
+  ElementSrc,
+  LiveConfigKey,
+  ViewerConfigBase,
+} from './config';
 export type { MountTarget } from './init';
 
 // The engine seam's contract types, from the package that owns them — the
@@ -55,7 +62,7 @@ export {
   StageToken,
   StampToken,
 } from '@embedpdf/viewer-chrome';
-// Signatures: the signer ports a `signatures` config names — the same one
+// Signatures: the signer ports `plugins.signature.key` names — the same one
 // import as the chrome (`personalSigner` keeps a self-signed identity in the
 // browser; `webCryptoSigner` / `remoteSigner` bring the embedder's key).
 export {
@@ -68,12 +75,13 @@ export {
 } from '@embedpdf/viewer-chrome';
 export type {
   Mark,
+  SignatureFont,
   SignatureMode,
-  SignaturesCustomization,
   SignerPort,
   SignFieldInput,
-  StampsCustomization,
   TrustPort,
+  ViewerSignatureSettings,
+  ViewerStampSettings,
 } from '@embedpdf/viewer-chrome';
 export type {
   CapabilityToken,
@@ -98,13 +106,15 @@ export type {
   AddItemOptions,
   BarEdge,
   BarPlace,
+  CommandContext,
   CommandDef,
   Feature,
   FloatPosition,
   IconDef,
+  IconName,
+  IconPaths,
   Identity,
   Importance,
-  InitialDocument,
   Layout,
   LayoutBar,
   LayoutCommandItem,
@@ -130,8 +140,11 @@ export type {
   SectionName,
   SelectionTarget,
   TabsVisibility,
+  ThemeConfig,
   ThemeMode,
   ThemePreference,
+  ThemeToken,
+  ThemeTokens,
   Variant,
   ViewerCustomization,
   ViewerSize,

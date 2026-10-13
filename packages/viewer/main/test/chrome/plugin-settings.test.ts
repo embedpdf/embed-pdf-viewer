@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { quickStampAssetIdOf } from '../../../chrome/src/config/default-stamps';
 import { bothAllow } from '../../../chrome/src/features';
 import {
   isPluginDefinition,
@@ -21,7 +22,30 @@ const analyticsPlugin = () => ({
 
 describe('readPluginsConfig', () => {
   it('reads nothing from no config', () => {
-    expect(readPluginsConfig(undefined)).toEqual({ settings: {}, own: [], problems: [] });
+    expect(readPluginsConfig(undefined)).toEqual({
+      settings: {},
+      viewer: { stamp: {}, signature: {} },
+      own: [],
+      problems: [],
+    });
+  });
+
+  it("takes the viewer's own stamp and signature settings out of the plugins'", () => {
+    const assetEngine = () => Promise.reject(new Error('unused'));
+    const key = () => Promise.reject(new Error('unused'));
+    const fonts = [{ key: 'great-vibes', url: '/fonts/GreatVibes.ttf', label: 'Great Vibes' }];
+    const read = readPluginsConfig({
+      stamp: { standard: false, quick: ['standard:Approved'], assetEngine, previewWidth: 128 },
+      signature: { kinds: ['signature'], fonts, key, mode: 'ask' },
+    });
+    expect(read.viewer).toEqual({
+      stamp: { standard: false, quick: ['standard:Approved'] },
+      signature: { kinds: ['signature'], fonts },
+    });
+    // What each plugin's factory gets: its own settings, and nothing of the viewer's.
+    expect(read.settings.stamp).toEqual({ assetEngine, previewWidth: 128 });
+    expect(read.settings.signature).toEqual({ key, mode: 'ask' });
+    expect(read.problems).toEqual([]);
   });
 
   it("takes a built-in plugin's settings by its name", () => {
@@ -64,6 +88,13 @@ describe('readPluginsConfig', () => {
       'the link plugin takes no settings',
       "the stage plugin's settings are an object",
     ]);
+  });
+});
+
+describe('quickStampAssetIdOf', () => {
+  it('names the standard stamps standard, and every other library by its id', () => {
+    expect(quickStampAssetIdOf('standard:Approved')).toBe('embedpdf-standard:Approved');
+    expect(quickStampAssetIdOf('embedpdf-custom:#abc')).toBe('embedpdf-custom:#abc');
   });
 });
 
@@ -118,6 +149,26 @@ export const pluginsConfigs: ViewerConfig[] = [
       analytics: analyticsPlugin(),
     },
   },
+  // The viewer's own settings next to a plugin's, as Annotations and Forms & signatures write them.
+  {
+    plugins: {
+      stamp: {
+        standard: 'https://files.example.com/stamps/{locale}.pdf',
+        quick: ['standard:Approved', 'standard:Rejected'],
+      },
+      signature: {
+        mode: 'ask',
+        allowCertify: true,
+        kinds: ['signature'],
+        fonts: [{ key: 'great-vibes', url: '/fonts/GreatVibes.ttf', label: 'Great Vibes' }],
+      },
+    },
+  },
+  { plugins: { stamp: { standard: false } } },
+  // @ts-expect-error -- the stamps are `plugins.stamp`
+  { stamps: { defaultLibrary: false } },
+  // @ts-expect-error -- a kind of mark the viewer doesn't keep
+  { plugins: { signature: { kinds: ['stamp'] } } },
   // @ts-expect-error -- a setting the stage plugin doesn't have
   { plugins: { stage: { spred: 'odd' } } },
   // @ts-expect-error -- the link plugin takes no settings

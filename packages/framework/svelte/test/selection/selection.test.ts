@@ -1,5 +1,5 @@
 import { flushSync } from 'svelte';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent } from '@testing-library/svelte';
 import type { CapabilityToken, DocumentHandle, Engine, Kernel, PageLayout } from '@embedpdf/core';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
@@ -17,6 +17,7 @@ import {
   useSelectionState,
 } from '../../src/selection';
 import type { SelectionConfig } from '../../src/selection';
+import ClipboardArea from '../fixtures/ClipboardArea.svelte';
 import LayerPages from '../fixtures/LayerPages.svelte';
 import { pageContext } from '../fixtures/page-context';
 import Probes from '../fixtures/Probes.svelte';
@@ -28,7 +29,8 @@ import { latest, viewerWith } from '../fixtures/viewer';
  * The selection readers and components against a real kernel: the declared state, the settings
  * with and without a document, the highlight painted through its CSS variable (over the `color`
  * setting, or the accent when it's unset), the menu over a settled selection in a `<PageView>`,
- * and the handles in a Stage's overlay, whose press never reaches the Stage.
+ * the handles in a Stage's overlay, whose press never reaches the Stage, and Ctrl/Cmd+C copying
+ * from inside a target only.
  */
 
 const box = { x: 0, y: 0, width: 600, height: 800 };
@@ -269,5 +271,35 @@ describe('<SelectionHandles>', () => {
       .addEventListener('pointerdown', (event) => stagePresses.push(event));
     await fireEvent.pointerDown(handles()[0]!, { clientX: 10, clientY: 10, pointerId: 1 });
     expect(stagePresses).toHaveLength(0);
+  });
+});
+
+describe('<SelectionClipboard>', () => {
+  const pressCopy = (target: EventTarget) =>
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+
+  it('with a target, copies on Ctrl/Cmd+C from inside it, and leaves the page outside alone', async () => {
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { kernel, view } = await viewerWith(
+      [interactionPlugin(), selectionPlugin()],
+      ClipboardArea,
+      {},
+      selectionEngine(),
+    );
+    const selection = await open(kernel);
+    selection.select({ page: toPageRef(5), start: 1, count: 3 });
+    await settle();
+
+    pressCopy(view.getByTestId('area'));
+    await settle();
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0]![0]).toBe(await selection.readText());
+
+    pressCopy(document.body);
+    await settle();
+    expect(writeText).toHaveBeenCalledTimes(1);
   });
 });

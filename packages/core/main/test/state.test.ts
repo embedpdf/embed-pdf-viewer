@@ -34,6 +34,28 @@ describe('defineState', () => {
     expect(Object.isFrozen(searchState.empty)).toBe(true);
   });
 
+  it('keeps the verb that loads state loaded on demand, and has none otherwise', async () => {
+    const loads: string[] = [];
+    const searchState = defineState(SearchToken, {
+      read: (search) => ({ query: search.getQuery() }),
+      empty: { query: null },
+      ensure: async (search) => {
+        loads.push(search.getQuery() ?? '');
+      },
+    });
+    await searchState.ensure!({
+      getQuery: () => 'pdf',
+      getStatus: () => 'idle',
+      getHitCount: () => 0,
+    });
+    expect(loads).toEqual(['pdf']);
+    const alwaysLoaded = defineState(SearchToken, {
+      read: (search) => ({ query: search.getQuery() }),
+      empty: { query: null },
+    });
+    expect('ensure' in alwaysLoaded).toBe(false);
+  });
+
   it('takes the state type from read, not from empty', () => {
     const searchState = defineState(SearchToken, {
       read: (search) => ({ query: search.getQuery(), status: search.getStatus() }),

@@ -5,7 +5,7 @@
  * `onValidated` fires where one completes. Re-judging after an edit waits
  * for a pause: a pen stroke is many events, one analysis.
  */
-import { validateSignatures, type SignatureVerdict } from '@embedpdf/core-signature';
+import type { SignatureVerdict } from '@embedpdf/core-signature';
 
 import type { SignatureValidateOptions } from '../contract';
 import { setVerdicts } from '../model';
@@ -24,6 +24,11 @@ export function createValidation(
     options?: SignatureValidateOptions,
   ): Promise<readonly SignatureVerdict[]> => {
     if (!ctx.doc.signatures) return [];
+    // The cryptography loads the first time a signature is checked.
+    const { validateSignatures } = await ctx.cancellable(
+      options?.signal,
+      import('@embedpdf/core-signature'),
+    );
     const verdicts = await ctx.cancellable(
       options?.signal,
       validateSignatures(ctx.doc, {

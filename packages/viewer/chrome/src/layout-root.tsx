@@ -12,7 +12,10 @@
  * the root, the bars leave out the tab of a mode whose bars show nothing and
  * the button of a menu that shows nothing; an open mode whose tab goes falls
  * back to View; a bar with a new mode gets its `mode:<mode>` command, and each
- * panel its `panel:<id>`; and each problem with the layout is logged once.
+ * panel its `panel:<id>`, with a command of yours of the same id merged over
+ * it; and each problem with the layout is logged once. The root takes focus on
+ * a press anywhere in the viewer that lands on nothing focusable (the pages),
+ * so the viewer's keys reach it from there.
  */
 import {
   useEffect,
@@ -63,10 +66,12 @@ import {
   ResolvedLayoutProvider,
   stripOf,
   useLayoutOption,
+  useViewerCommands,
   type ResolvedLayout,
 } from './config-context';
 import { useScreenEdges } from './ui/compact';
 import { safeAreaPaddingOf } from './ui/screen-edges';
+import { FOCUS_ROOT_ATTRIBUTE } from './ui/viewer-layer';
 
 const COARSE_POINTER = '(pointer: coarse)';
 
@@ -113,9 +118,19 @@ function useMeasuredEnv(root: RefObject<HTMLElement | null>): LayoutEnv | null {
 /**
  * The viewer's root: a `<div>` the layout is measured on, providing the resolved layout to
  * everything inside it. Its children render once per change of their own, not per resize.
+ * `rootRef`, when given, is set to the root.
  */
-export function LayoutRoot({ className, children }: { className?: string; children: ReactNode }) {
-  const root = useRef<HTMLDivElement>(null);
+export function LayoutRoot({
+  className,
+  rootRef,
+  children,
+}: {
+  className?: string;
+  rootRef?: RefObject<HTMLDivElement>;
+  children: ReactNode;
+}) {
+  const ownRoot = useRef<HTMLDivElement>(null);
+  const root = rootRef ?? ownRoot;
   const measured = useMeasuredEnv(root);
   // The first render, before the root is measured, lays out as a wide viewer; the measured
   // env replaces it before the browser paints.
@@ -185,6 +200,9 @@ export function LayoutRoot({ className, children }: { className?: string; childr
   return (
     <div
       ref={root}
+      // Focusable but not a Tab stop: a press on the pages gives the viewer focus.
+      tabIndex={-1}
+      {...{ [FOCUS_ROOT_ATTRIBUTE]: '' }}
       dir={env.dir}
       data-touch={env.touch ? '' : undefined}
       className={className}
@@ -195,27 +213,43 @@ export function LayoutRoot({ className, children }: { className?: string; childr
   );
 }
 
-/** Registers a command for each mode that has none, for as long as the layout has the mode. */
+/**
+ * Registers a command for each mode that has none, for as long as the layout has the mode, with
+ * a command of yours of the same id merged over it.
+ */
 function useModeCommands(specs: readonly ModeSpec[]): void {
   const commands = useCommands();
+  const yours = useViewerCommands();
   // Before paint, so a new mode's tab is there in the first frame.
   useLayoutEffect(() => {
-    const definitions = modeCommandsFor(specs, (id) => commands.hasCommand(id));
-    return definitions.length > 0 ? commands.registerCommands(definitions) : undefined;
-  }, [commands, specs]);
+    const definitions = modeCommandsFor(
+      specs,
+      (id) => commands.hasCommand(id) && !yours.isYours(id),
+    ).map(yours.over);
+    return definitions.length > 0
+      ? commands.registerCommands(definitions, { replace: true })
+      : undefined;
+  }, [commands, specs, yours]);
 }
 
 /**
  * Registers a `panel:<id>` command for each panel that has none, for as long as the layout has
- * the panel; a panel whose title or icon changes gets its command again.
+ * the panel, with a command of yours of the same id merged over it; a panel whose title or icon
+ * changes gets its command again.
  */
 function usePanelCommands(panels: LayoutData['panels']): void {
   const commands = useCommands();
+  const yours = useViewerCommands();
   // Before paint, so a panel's button is there in the first frame.
   useLayoutEffect(() => {
-    const definitions = panelCommandsFor(panels, (id) => commands.hasCommand(id));
-    return definitions.length > 0 ? commands.registerCommands(definitions) : undefined;
-  }, [commands, panels]);
+    const definitions = panelCommandsFor(
+      panels,
+      (id) => commands.hasCommand(id) && !yours.isYours(id),
+    ).map(yours.over);
+    return definitions.length > 0
+      ? commands.registerCommands(definitions, { replace: true })
+      : undefined;
+  }, [commands, panels, yours]);
 }
 
 /** Back to View when the open mode has no tab: its bars show nothing, or the layout lost it. */

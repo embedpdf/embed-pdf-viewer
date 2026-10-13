@@ -84,7 +84,7 @@ export function SignatureInspector() {
   const row = (label: string, value: string, className = 'text-fg') => (
     <div className="flex items-baseline justify-between gap-3 text-xs">
       <span className="text-fg-muted">{label}</span>
-      <span className={`text-right ${className}`}>{value}</span>
+      <span className={`text-end ${className}`}>{value}</span>
     </div>
   );
 
@@ -162,7 +162,7 @@ export function SignatureInspector() {
       </Anchored>
     );
   }
-  return <div className="absolute right-4 top-4 z-40">{card}</div>;
+  return <div className="absolute end-4 top-4 z-40">{card}</div>;
 }
 
 /** The signed revision — the exact bytes the signature covers — as a file. */

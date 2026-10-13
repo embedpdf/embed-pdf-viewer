@@ -23,6 +23,7 @@ import {
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldUpdateResult,
+  type SessionEventPublisher,
   type SignatureAppearanceInput,
   type FormWidgetLinkResult,
   type FormWidgetDeleteResult,
@@ -48,7 +49,6 @@ import {
   type FieldWriteAction,
 } from '@embedpdf/engine-core/runtime';
 
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import { ownedResources, transferableResources } from './bundleResources';
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';

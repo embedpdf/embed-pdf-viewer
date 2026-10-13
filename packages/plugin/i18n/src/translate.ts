@@ -75,17 +75,20 @@ const stringIn = (
   resolveNode(lookup(embedpdfStringsFor(code), key), code, params);
 
 /**
- * A key's string: in the current language, then in the fallback language, then
- * `options.fallback` (with its slots filled too), then the key itself.
+ * A key's string: in the current language (the key, then `options.fallbackKey`), then the same in
+ * the fallback language, then `options.fallback` (with its slots filled too), then the key itself.
  */
 export function translate(
   sources: TranslationSources,
   key: string,
   options?: TranslateOptions,
 ): TranslateResult {
-  const text =
-    stringIn(sources, sources.locale, key, options?.params) ??
-    stringIn(sources, sources.fallbackLocale, key, options?.params);
+  const params = options?.params;
+  const fallbackKey = options?.fallbackKey;
+  const inLanguage = (code: string) =>
+    stringIn(sources, code, key, params) ??
+    (fallbackKey === undefined ? undefined : stringIn(sources, code, fallbackKey, params));
+  const text = inLanguage(sources.locale) ?? inLanguage(sources.fallbackLocale);
   if (text !== undefined) return { text: interpolate(text, options?.params), found: true };
   if (options?.fallback !== undefined)
     return { text: interpolate(options.fallback, options.params), found: false };

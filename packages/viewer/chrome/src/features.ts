@@ -11,8 +11,8 @@
 import type { EditableKind, EditableKinds } from '@embedpdf/react/annotation';
 import type { FillableFields, FormFieldFamily } from '@embedpdf/react/form';
 
-/** Every built-in feature and its parts. */
-const FEATURE_PARTS = {
+/** Every built-in feature and its parts: the names `disable` takes, as All features lists them. */
+export const FEATURE_PARTS = {
   annotations: ['highlight', 'markup', 'drawing', 'text', 'notes', 'links'],
   shapes: [],
   stamps: [],
@@ -43,7 +43,7 @@ export interface ReadOnlyExceptions {
 }
 
 /** The features that change the document: what `readOnly` turns off. */
-const READ_ONLY_FEATURES: readonly Feature[] = [
+export const READ_ONLY_FEATURES: readonly Feature[] = [
   'annotations',
   'shapes',
   'stamps',

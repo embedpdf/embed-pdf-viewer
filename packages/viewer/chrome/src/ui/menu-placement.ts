@@ -21,22 +21,34 @@ export type MenuDirection = 'ltr' | 'rtl';
 export type MenuAlign = 'start' | 'end';
 
 /**
+ * Where a bar over a selection sits: above what's selected, or below it when
+ * there's no room above.
+ */
+export type SelectionBarSide = 'above' | 'below';
+
+/**
  * The placement of a menu opened from a button in a bar on `edge`: below a
  * top bar's button, above a bottom bar's, beside a start or end bar's (on the
- * side of the pages), toward the middle from a floating bar, and below a bar
- * over a selection, away from what's selected.
+ * side of the pages), toward the middle from a floating bar, and from a bar
+ * over a selection on the side the bar sits (`selectionBar`), away from
+ * what's selected.
  */
 export function menuPlacementOf(
   edge: BarEdge,
   direction: MenuDirection,
   align: MenuAlign = 'start',
+  selectionBar: SelectionBarSide = 'above',
 ): AnchoredPlacement {
   if (edge === 'start' || edge === 'end') {
     // A vertical bar: its start is its top in either direction.
     const onLeft = (edge === 'start') === (direction === 'ltr');
     return `${onLeft ? 'right' : 'left'}-${align}`;
   }
-  const side = edge === 'bottom' || edge === 'float-bottom' ? 'top' : 'bottom';
+  const opensUp =
+    edge === 'bottom' ||
+    edge === 'float-bottom' ||
+    (edge === 'selection' && selectionBar === 'above');
+  const side = opensUp ? 'top' : 'bottom';
   // A horizontal bar starts on the left, or on the right in a right-to-left language.
   const physical = (align === 'start') === (direction === 'ltr') ? 'start' : 'end';
   return `${side}-${physical}`;

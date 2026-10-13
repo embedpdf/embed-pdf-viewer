@@ -47,6 +47,7 @@ import {
   submenuPlacementOf,
   type MenuAlign,
   type MenuDirection,
+  type SelectionBarSide,
 } from './menu-placement';
 import { Sheet } from './sheet';
 import { useLayoutEnv, useMenu } from '../config-context';
@@ -79,6 +80,15 @@ const triggerOf = (holder: HTMLElement, menu: HTMLElement): HTMLElement | null =
   [...holder.querySelectorAll<HTMLElement>('[aria-haspopup]')].find(
     (candidate) => !menu.contains(candidate),
   ) ?? null;
+
+/**
+ * Where the bar over a selection that `element` is in sits now: its anchored wrapper says so
+ * in `data-placement` (`Anchored` in `@embedpdf/react`), `bottom…` once it went below.
+ */
+const selectionBarSideOf = (element: Element): SelectionBarSide =>
+  element.closest('[data-placement]')?.getAttribute('data-placement')?.startsWith('bottom')
+    ? 'below'
+    : 'above';
 
 const boxOf = (element: Element): AnchoredRect => {
   const rect = element.getBoundingClientRect();
@@ -244,7 +254,14 @@ function OpenMenu({ children, onClose, align = 'start' }: MenuPopoverProps) {
     if (!menu || !holder) return;
     return openMenu(menu, holder, {
       placement: (direction) =>
-        nested ? submenuPlacementOf(direction) : menuPlacementOf(edge, direction, align),
+        nested
+          ? submenuPlacementOf(direction)
+          : menuPlacementOf(
+              edge,
+              direction,
+              align,
+              edge === 'selection' ? selectionBarSideOf(holder) : undefined,
+            ),
       nested,
       close: () => close.current(),
     });
@@ -539,7 +556,7 @@ const ROLE_OF: Readonly<Record<Choice, string>> = {
 };
 
 const ROW_BASE =
-  'flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left text-sm outline-none transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-40';
+  'flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-start text-sm outline-none transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-40';
 
 /** A row, the pointer over it and the keyboard on it: the neutral hover look. */
 const ROW_CLASS = `${ROW_BASE} text-fg-secondary hover:bg-hover focus-visible:bg-hover aria-disabled:hover:bg-transparent`;

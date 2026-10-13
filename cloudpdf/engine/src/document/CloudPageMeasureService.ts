@@ -8,6 +8,7 @@ import {
   type PdfMeasure,
   type PageMeasurementViewportList,
   type PageScaleResult,
+  type SessionEventPublisher,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -15,7 +16,7 @@ import {
   PageScaleResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';

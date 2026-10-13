@@ -34,11 +34,6 @@ const page = (config: string) => `<!doctype html><html><head><meta charset="utf-
   import EmbedPDF from '/embedpdf.js';
   window.heard = [];
   window.readyViewers = [];
-  const sample = async () => ({
-    kind: 'bytes',
-    id: 'sample',
-    bytes: new Uint8Array(await (await fetch('/sample.pdf')).arrayBuffer()),
-  });
   window.element = EmbedPDF.init({
     target: '#viewer',
     onReady: (viewer) => {
@@ -57,7 +52,7 @@ const page = (config: string) => `<!doctype html><html><head><meta charset="utf-
 
 const PAGES = {
   '/src.html': page("{ src: '/sample.pdf' }"),
-  '/documents.html': page("{ documents: [{ name: 'Sample', source: sample }] }"),
+  '/documents.html': page("{ documents: [{ src: '/sample.pdf', name: 'Sample' }] }"),
 };
 
 /** What a page of this test keeps on `window`. */

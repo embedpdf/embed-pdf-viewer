@@ -8,7 +8,7 @@
   `copySelection(useSelection())` from its click handler instead.
 -->
 <script setup lang="ts">
-import { watch } from 'vue';
+import { toValue, watch, type MaybeRefOrGetter } from 'vue';
 import { SelectionToken } from '@embedpdf/plugin-selection';
 import { wireSelectionClipboard } from '@embedpdf/web';
 import { useOptionalCapability } from '../runtime/capabilities';
@@ -22,6 +22,12 @@ const props = withDefaults(
      * Ctrl+C / Cmd+C copies, a moment later.
      */
     prefetch?: boolean;
+    /**
+     * Copy only while focus is inside this element (a template ref), for a
+     * page with more than one viewer. Copying works once it has mounted.
+     * Default: anywhere on the page.
+     */
+    target?: MaybeRefOrGetter<HTMLElement | null | undefined>;
   }>(),
   { prefetch: true },
 );
@@ -31,15 +37,21 @@ const emit = defineEmits<{
 }>();
 
 const selection = useOptionalCapability(SelectionToken);
-// Wired again for another document, or when `prefetch` changes.
+// Wired again for another document, or when `prefetch` or `target` changes.
 watch(
-  [selection, () => props.prefetch],
-  ([lens, prefetch], _previous, onCleanup) => {
-    if (lens) {
-      onCleanup(wireSelectionClipboard(lens, { prefetch, onRefused: () => emit('refused') }));
-    }
+  [selection, () => props.prefetch, () => toValue(props.target)],
+  ([lens, prefetch, target], _previous, onCleanup) => {
+    // A target that hasn't mounted yet wires nothing; its ref being set runs this again.
+    if (!lens || (props.target !== undefined && !target)) return;
+    onCleanup(
+      wireSelectionClipboard(lens, {
+        prefetch,
+        target: target ?? undefined,
+        onRefused: () => emit('refused'),
+      }),
+    );
   },
-  { immediate: true },
+  { immediate: true, flush: 'post' },
 );
 </script>
 

@@ -5,7 +5,7 @@
  * @Component({
  *   imports: [CloudPdfViewer],
  *   template: `
- *     <cloudpdf-viewer baseUrl="https://api.cloudpdf.com" [docToken]="token" style="height: 100vh" />
+ *     <cloudpdf-viewer baseUrl="https://api.cloudpdf.com" [src]="{ token }" style="height: 100vh" />
  *   `,
  * })
  * ```
@@ -19,8 +19,9 @@
  *
  * Everything the open viewer takes (`layout`, `commands`, `icons`, `strings`, `theme`, `plugins`,
  * your templates, `(ready)`, `EpdfPdfViewerRef`) works here unchanged (see
- * `@embedpdf/viewer-angular`). This file adds the CloudPDF connection and the document
- * shorthands, and leaves out `src`, `scope` and `identity`, which the document's token carries.
+ * `@embedpdf/viewer-angular`). This file adds the CloudPDF connection and names the documents in
+ * the cloud's words (`src` as `{ token }`, `{ id }` or `{ shareToken }`), and leaves out `scope`
+ * and `identity`, which the document's token carries.
  */
 import {
   ChangeDetectionStrategy,
@@ -43,17 +44,23 @@ import {
 // The open viewer's whole vocabulary rides along, so a cloud app imports one package.
 export * from '@embedpdf/viewer-angular/core';
 export { resolveCloudConfig } from '@cloudpdf/viewer/config';
-// The cloud's `ViewerConfig`, in place of the one `export *` brings: one name per door.
-export type { CloudSource, ViewerConfig } from '@cloudpdf/viewer/config';
+// The cloud's `ViewerConfig` and its documents, in place of the ones `export *` brings: one name
+// per door.
+export type {
+  CloudSource,
+  DocumentEntry,
+  DocumentSrc,
+  ViewerConfig,
+} from '@cloudpdf/viewer/config';
 
 /** The input of the cloud config's key `Key`. */
 type CloudInput<Key extends keyof ViewerConfig> = InputSignal<ViewerConfig[Key] | undefined>;
 
 /**
  * `<cloudpdf-viewer>`: the full viewer, its pages rendered by a CloudPDF server. `baseUrl` is
- * the server, and `docToken`, `docId` or `shareToken` the document (or `documents`, for several);
- * every other key of the open viewer's config is an input as on `<epdf-pdf-viewer>`, or give
- * them with `[config]`. The connection and the documents are read once, when the viewer starts.
+ * the server, and `src` the document (or `documents`, for several); every other key of the open
+ * viewer's config is an input as on `<epdf-pdf-viewer>`, or give them with `[config]`. The
+ * connection and `documents` are read once, when the viewer starts; `src` follows its input.
  */
 @Component({
   selector: 'cloudpdf-viewer',
@@ -72,16 +79,16 @@ export class CloudPdfViewer extends EpdfPdfViewerBase {
   readonly token: CloudInput<'token'> = input<ViewerConfig['token']>();
   /** A `fetch` of your own, for every request the engine makes. */
   readonly fetch: CloudInput<'fetch'> = input<ViewerConfig['fetch']>();
-  /** One document, by its document token. */
-  readonly docToken: CloudInput<'docToken'> = input<ViewerConfig['docToken']>();
-  /** One document, by its id; the engine's `token` must allow it. */
-  readonly docId: CloudInput<'docId'> = input<ViewerConfig['docId']>();
-  /** One document, by its share token (`shr_…`), as the dashboard's embed snippet gives it. */
-  readonly shareToken: CloudInput<'shareToken'> = input<ViewerConfig['shareToken']>();
-  /** The passphrase of a protected `shareToken`. */
-  readonly sharePassword: CloudInput<'sharePassword'> = input<ViewerConfig['sharePassword']>();
+  /**
+   * One document: `{ token }` (a document token), `{ id }` (the engine's `token` must allow it)
+   * or `{ shareToken }` (a share link from the dashboard). Another one opens in its place;
+   * `null` closes it.
+   */
+  readonly src: CloudInput<'src'> = input<ViewerConfig['src']>();
+  /** Several documents, with their names and passwords; with these, `src` is ignored. Read once. */
+  readonly documents: CloudInput<'documents'> = input<ViewerConfig['documents']>();
 
-  /** The engine, documents and stamps, made from the cloud options when the viewer starts. */
+  /** The engine, documents and plugins, made from the cloud options when the viewer starts. */
   private atStart: ReturnType<typeof resolveCloudConfig<ViewerConfig>> | null = null;
 
   protected readonly elementConfig: Signal<ElementConfig> = computed(() => {
@@ -90,18 +97,16 @@ export class CloudPdfViewer extends EpdfPdfViewerBase {
       ...definedOf({
         token: this.token(),
         fetch: this.fetch(),
-        docToken: this.docToken(),
-        docId: this.docId(),
-        shareToken: this.shareToken(),
-        sharePassword: this.sharePassword(),
+        src: this.src(),
+        documents: this.documents(),
       }),
       ...this.sharedConfig(),
       baseUrl: this.baseUrl(),
     });
-    // Read once, like every key that isn't live: the engine, documents and stamps stay the ones
+    // Read once, like every key that isn't live: the engine, documents and plugins stay the ones
     // the viewer started with, while the live keys pass through.
     this.atStart ??= resolved;
-    const { engine, documents, stamps } = this.atStart;
-    return { ...resolved, engine, documents, stamps };
+    const { engine, documents, plugins } = this.atStart;
+    return { ...resolved, engine, documents, plugins };
   });
 }

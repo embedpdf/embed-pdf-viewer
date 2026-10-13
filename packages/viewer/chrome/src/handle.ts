@@ -22,6 +22,7 @@ import { I18nToken, type I18nCapability } from '@embedpdf/react/i18n';
 import { InteractionToken, type InteractionCapability } from '@embedpdf/react/interaction';
 import { LinkToken, type LinkCapability } from '@embedpdf/react/link';
 import { MeasurementToken, type MeasurementCapability } from '@embedpdf/react/measurement';
+import { MetadataToken, type MetadataCapability } from '@embedpdf/react/metadata';
 import { PageEditToken, type PageEditCapability } from '@embedpdf/react/page-edit';
 import { RedactionToken, type RedactionCapability } from '@embedpdf/react/redaction';
 import { RenderToken, type RenderCapability } from '@embedpdf/react/render';
@@ -57,6 +58,8 @@ export interface ViewerPlugins {
   readonly form: FormCapability;
   readonly signature: SignatureCapability;
   readonly pageEdit: PageEditCapability;
+  /** The document's title, author and your own fields; `ensureLoaded()` reads them. */
+  readonly metadata: MetadataCapability;
   readonly actions: ActionsCapability;
   readonly documents: DocumentsCapability;
   readonly interaction: InteractionCapability;
@@ -88,6 +91,7 @@ export const VIEWER_PLUGINS: {
   form: FormToken,
   signature: SignatureToken,
   pageEdit: PageEditToken,
+  metadata: MetadataToken,
   actions: ActionsToken,
   documents: DocumentsToken,
   interaction: InteractionToken,
@@ -310,4 +314,37 @@ export function createViewer(kernel: Kernel, plugins: PluginTokens): ViewerLifet
     for (const end of [...subscriptions]) end();
   };
   return { viewer, dispose };
+}
+
+/**
+ * The `viewer` of the kernel a viewer runs on now: one per kernel, made once it has started
+ * (before anything renders), and done when it goes. Your commands reach it as `viewer`, and
+ * `onReady` gets the same one.
+ */
+export interface ViewerSlot {
+  /** The `viewer` for this kernel: made the first time, the same one after that. */
+  attach(kernel: Kernel): Viewer;
+  /** The `viewer` now, or `null` before a kernel has started and after it went. */
+  current(): Viewer | null;
+  /** This kernel went: its `viewer` is done. Another kernel's stays. */
+  release(kernel: Kernel): void;
+}
+
+export function createViewerSlot(plugins: PluginTokens): ViewerSlot {
+  let held: { readonly kernel: Kernel; readonly lifetime: ViewerLifetime } | null = null;
+  return {
+    attach: (kernel) => {
+      if (held?.kernel !== kernel) {
+        held?.lifetime.dispose();
+        held = { kernel, lifetime: createViewer(kernel, plugins) };
+      }
+      return held.lifetime.viewer;
+    },
+    current: () => held?.lifetime.viewer ?? null,
+    release: (kernel) => {
+      if (held?.kernel !== kernel) return;
+      held.lifetime.dispose();
+      held = null;
+    },
+  };
 }

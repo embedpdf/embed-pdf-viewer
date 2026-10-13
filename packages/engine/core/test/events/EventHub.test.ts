@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
-import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
+
+import type { DocumentEvent } from '../../src/events/DocumentEvent';
+import { EventHub, SessionEventPublisher } from '../../src/events/EventHub';
 
 function metadataEvent(
   serverId: number | null = null,
@@ -18,7 +19,7 @@ function metadataEvent(
       modifiedAt: null,
       trapped: 'unknown',
     },
-    meta: { affectedPages: [], cacheDelta: null },
+    meta: { affectedPages: [], cacheDelta: null, opId: 'op-0', undoable: true },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId },
   };
 }
@@ -60,7 +61,7 @@ describe('EventHub: delivery contract', () => {
     publisher.publishWrite('op-1', init, init);
 
     expect(events).toHaveLength(2);
-    expect(events.map((event) => event.origin)).toMatchObject([
+    expect(events.map((event) => ('origin' in event ? event.origin : null))).toMatchObject([
       {
         kind: 'local',
         sessionId: 'session-x',

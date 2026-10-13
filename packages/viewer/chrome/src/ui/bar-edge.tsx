@@ -7,8 +7,9 @@
  *
  * A floating bar names the half of the viewer it floats in (`float-top`,
  * `float-bottom`), since its menus open toward the other half; a bar over a
- * selection says `selection`, and its menus open below it, away from what's
- * selected. Outside any provider the edge is `'top'`, the main bar's.
+ * selection says `selection`, and its menus open on the side the bar sits,
+ * above or below what's selected, away from it. Outside any provider the edge
+ * is `'top'`, the main bar's.
  */
 import { createContext, useContext } from 'react';
 

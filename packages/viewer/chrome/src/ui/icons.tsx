@@ -1,8 +1,8 @@
 /**
  * Icon set — Tabler-style stroke icons as path data, rendered by one <Icon>
- * component. Names match the snippet's icon registry so command `icon` ids
- * carry over verbatim. Stroke-based (currentColor); a few glyphs carry filled
- * sub-paths, marked `fill: true`.
+ * component. Stroke-based (currentColor); a few glyphs carry filled sub-paths,
+ * marked `fill: true`. The names are API: a command's `icon` names one, and an
+ * icon of yours with the same name replaces it everywhere it shows.
  *
  * Accent slots: a tool glyph tags the sub-paths that preview the tool's
  * drawing defaults — `stroke`/`fill: 'primary' | 'secondary'` paint from the
@@ -29,9 +29,25 @@ export type PathSpec =
       fillOpacity?: number;
     };
 
-/** A registrable icon: 24×24 stroke path data (Tabler/Lucide-style), exactly
- *  the shape of the built-in set — user icons are not a lesser kind. */
-export type IconDef = readonly PathSpec[];
+/** An icon's path data: a string is one path, an array several. */
+export type IconPaths = string | readonly PathSpec[];
+
+/**
+ * An icon of yours: 24 × 24 path data drawn as a line (Tabler and Lucide icons paste in as
+ * they are), or `{ paths, fill: true }` to fill the paths instead of drawing their outline.
+ */
+export type IconDef = IconPaths | { readonly paths: IconPaths; readonly fill?: boolean };
+
+const isPathList = (paths: IconDef): paths is readonly PathSpec[] => Array.isArray(paths);
+
+/** An icon's paths as the renderer draws them: filled ones carry `fill: true`. */
+export function pathsOfIcon(icon: IconDef): readonly PathSpec[] {
+  if (typeof icon === 'string') return [icon];
+  if (isPathList(icon)) return icon;
+  const paths = typeof icon.paths === 'string' ? [icon.paths] : icon.paths;
+  if (!icon.fill) return paths;
+  return paths.map((path) => (typeof path === 'string' ? { d: path, fill: true } : path));
+}
 
 /** The two tintable slots — structurally identical to plugin-commands'
  *  IconAccent, kept local so the icon set stays dependency-free. */
@@ -48,7 +64,7 @@ const measurementOutline: PathSpec[] = [
   },
 ];
 
-export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
+export const ICON_PATHS = {
   ruler: ['M3 8h18v8H3z', 'M7 8v4M11 8v2M15 8v4M19 8v2'],
   distance: [
     { d: 'M5 12H19', stroke: 'primary', strokeDasharray: '2 2' },
@@ -529,9 +545,26 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M15 3h1a2 2 0 0 1 2 2v1',
   ],
   zoomOut: ['M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', 'M9 12l6 0'],
-};
+} satisfies Record<string, readonly PathSpec[]>;
 
+/** The name of one of the viewer's own icons. */
 export type IconName = keyof typeof ICON_PATHS;
+
+const BUILT_IN_ICONS: Readonly<Record<string, readonly PathSpec[]>> = ICON_PATHS;
+
+/** Whether the viewer has an icon by this name of its own. */
+export const hasIcon = (name: string): name is IconName =>
+  Object.prototype.hasOwnProperty.call(BUILT_IN_ICONS, name);
+
+/** The paths an icon name draws: yours, else the viewer's own; `null` for neither. */
+export function iconPathsOf(
+  name: string,
+  custom: Readonly<Record<string, IconDef>>,
+): readonly PathSpec[] | null {
+  const own = Object.prototype.hasOwnProperty.call(custom, name) ? custom[name] : undefined;
+  if (own !== undefined) return pathsOfIcon(own);
+  return hasIcon(name) ? BUILT_IN_ICONS[name]! : null;
+}
 
 export interface IconProps {
   name: string;
@@ -549,8 +582,7 @@ export interface IconProps {
 export function Icon({ name, size = 20, strokeWidth = 2, className, title, accent }: IconProps) {
   // Registry semantics: user icons are additive and a colliding name wins —
   // re-skinning a built-in glyph is a supported move, not an accident.
-  const custom = useCustomIcons();
-  const paths = custom[name] ?? ICON_PATHS[name];
+  const paths = iconPathsOf(name, useCustomIcons());
   if (!paths) return null;
   return (
     <svg
@@ -590,5 +622,3 @@ export function Icon({ name, size = 20, strokeWidth = 2, className, title, accen
     </svg>
   );
 }
-
-export const hasIcon = (name: string): boolean => name in ICON_PATHS;

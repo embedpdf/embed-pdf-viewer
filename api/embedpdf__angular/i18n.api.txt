@@ -14,7 +14,7 @@ LocaleLoadFailedEvent [InterfaceDeclaration] (from packages/plugin/i18n/src/cont
 LocaleLoader [TypeAliasDeclaration] (from packages/plugin/i18n/src/contract.ts): export type LocaleLoader = () => Promise<Locale>;
 TextDirection [TypeAliasDeclaration] (from packages/plugin/i18n/src/contract.ts): export type TextDirection = 'ltr' | 'rtl';
 Translate [TypeAliasDeclaration] (from packages/framework/angular/i18n/src/i18n.ts): export type Translate = (key: string, options?: TranslateOptions) => string;
-TranslateOptions [InterfaceDeclaration] (from packages/plugin/i18n/src/contract.ts): export interface TranslateOptions{ params?: Record<string, string | number>; fallback?: string; }
+TranslateOptions [InterfaceDeclaration] (from packages/plugin/i18n/src/contract.ts): export interface TranslateOptions{ params?: Record<string, string | number>; fallbackKey?: string; fallback?: string; }
 TranslationDictionary [InterfaceDeclaration] (from packages/plugin/i18n/src/contract.ts): export interface TranslationDictionary{ readonly [key: string]: string | TranslationDictionary; }
 i18nPlugin [VariableDeclaration] (from packages/plugin/i18n/src/i18n.plugin.ts): i18nPlugin = (config?: I18nConfig) => definePlugin({ id: 'i18n', scope: 'workspace', token: I18nToken, state: initialI18nState, settings:{ defaults: I18N_DEFAULTS, registered: config} , create: createI18nController, } )
 i18nState [VariableDeclaration] (from packages/plugin/i18n/src/state.ts): i18nState = defineState(I18nToken, { read: (i18n) => ({ locale: i18n.getLocale(), direction: i18n.getDirection(), locales: i18n.listLocales(), loading: i18n.getLoadingLocale(), } ), empty:{ locale: 'en', direction: 'ltr', locales: [], loading: null} , } )

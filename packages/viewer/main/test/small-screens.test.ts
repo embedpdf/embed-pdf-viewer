@@ -1,7 +1,8 @@
 /**
  * The viewer on a phone, and with a finger: menus open as sheets from the
  * bottom of the viewer, a submenu slides in over its menu and goes back, a
- * sheet closes on a tap above it, Escape or a drag down its handle; the page
+ * sheet closes on a tap above it, Escape or a drag down its handle; the mode
+ * tabs after the first fold behind a chevron; the page
  * number hides while the pages scroll; every button and menu row is 44 px
  * tall when the main pointer is a finger; the viewer keeps clear of the
  * notch where it reaches the screen's edge; and the dialogs hold focus until
@@ -302,6 +303,49 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('small screens', () => {
     await tab.mouse.up();
     await frames(tab);
     expect(await sheetsOf(tab)).toEqual([]);
+    await tab.close();
+  });
+
+  it('folds the mode tabs after the first behind a chevron, marked while the open mode is there', async () => {
+    const modeTabs = (tab: Page) =>
+      tab.evaluate(() =>
+        [
+          ...document
+            .querySelector('embedpdf-viewer')!
+            .shadowRoot!.querySelectorAll('[data-bar="main"] [part~="mode-tab"]'),
+        ]
+          .filter((button) => !button.closest('[aria-hidden="true"]'))
+          .map((button) => ({
+            label: button.textContent || null,
+            chevron: button.getAttribute('aria-haspopup') === 'menu',
+            open: button.getAttribute('part')!.includes('mode-tab-active'),
+          })),
+      );
+    const tab = await open('/whole.html');
+    expect(await modeTabs(tab)).toEqual([
+      { label: 'View', chevron: false, open: true },
+      { label: null, chevron: true, open: false },
+    ]);
+
+    const chevron = await tab.evaluate(() => {
+      const button = [
+        ...document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelectorAll('[data-bar="main"] [part~="mode-tab"][aria-haspopup]'),
+      ].find((candidate) => !candidate.closest('[aria-hidden="true"]'))!;
+      const rect = button.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+    });
+    await clickBox(tab, chevron, 'the chevron');
+    await settle(tab);
+    const [sheet] = await sheetsOf(tab);
+    expect(sheet!.menus[0]!.rows).toEqual(expect.arrayContaining(['Annotate', 'Shapes']));
+    await clickBox(tab, await rowOf(tab, 'Annotate'), 'the Annotate row');
+    await settle(tab);
+    expect(await modeTabs(tab)).toEqual([
+      { label: 'View', chevron: false, open: false },
+      { label: null, chevron: true, open: true },
+    ]);
     await tab.close();
   });
 

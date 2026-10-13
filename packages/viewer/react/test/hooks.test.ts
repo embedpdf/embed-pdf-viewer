@@ -1,7 +1,8 @@
 /**
  * The app's own headless hooks inside the viewer (`pages/hooks.tsx`): a search box of the
  * app's, in a toolbar item, searches with `useSearch()` and follows `useSearchState()`, and the
- * viewer's own search plugin, highlights and panel hold the same search.
+ * viewer's own search plugin, highlights and panel hold the same search. The footer's title,
+ * from `useMetadataState()`, loads the metadata the viewer reads nothing of as it opens.
  */
 import type { Browser, Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -30,6 +31,19 @@ describe('headless hooks inside the viewer', () => {
   afterAll(async () => {
     await browser?.close();
     await host?.close();
+  });
+
+  it('loads the metadata when the app’s component reads it: loading, then the title', async () => {
+    await page
+      .locator('[data-check="title"][data-status="ready"]')
+      .waitFor({ state: 'attached', timeout: 15_000 });
+    expect(await page.locator('[data-check="title"]').textContent()).toBe(
+      'Form I-140, Immigrant Petition for Alien Workers',
+    );
+    const statuses = await page.evaluate(
+      () => (window.__viewerCheck as HooksRecord).metadataStatuses,
+    );
+    expect(statuses.slice(-2)).toEqual(['loading', 'ready']);
   });
 
   it('shares one copy of the search plugin with the app', async () => {

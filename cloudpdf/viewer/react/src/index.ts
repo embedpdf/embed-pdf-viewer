@@ -8,7 +8,7 @@
  *
  * <CloudPDFViewer
  *   baseUrl="https://api.cloudpdf.com"
- *   docToken={token}
+ *   src={{ token }}
  *   style={{ height: '100vh' }}
  * />
  * ```
@@ -24,8 +24,9 @@
  * Everything the open viewer accepts — `layout`, `commands`, `icons`,
  * `strings`, `theme`, `plugins`, children-as-slots, `onReady`,
  * `usePDFViewer()` — works here unchanged (see `@embedpdf/viewer-react`).
- * This file adds the CloudPDF connection and the document shorthands, and
- * subtracts only `scope` and `identity`, which the document's token carries.
+ * This file adds the CloudPDF connection and names the documents in the cloud's
+ * words, and subtracts only `scope` and `identity`, which the document's token
+ * carries.
  */
 import { resolveCloudConfig, type ViewerConfig } from '@cloudpdf/viewer/config';
 import { PDFViewer, type PDFViewerExtras } from '@embedpdf/viewer-react/core';
@@ -36,19 +37,24 @@ import { createElement, useState } from 'react';
 export * from '@embedpdf/viewer-react/core';
 export { resolveCloudConfig } from '@cloudpdf/viewer/config';
 // The cloud's `ViewerConfig`, in place of the one `export *` brings: one name per door.
-export type { CloudSource, ViewerConfig } from '@cloudpdf/viewer/config';
+export type {
+  CloudSource,
+  DocumentEntry,
+  DocumentSrc,
+  ViewerConfig,
+} from '@cloudpdf/viewer/config';
 
 /**
- * The cloud connection and document shorthands, plus every viewer option except
- * `engine` (this door supplies it), `src` (a cloud document is named by
- * `docToken`/`docId`, not by URL), and `scope`/`identity` (the token carries them).
+ * The cloud connection and its documents (`src` as `{ token }`, `{ id }` or
+ * `{ shareToken }`), plus every viewer option except `engine` (this door
+ * supplies it) and `scope`/`identity` (the token carries them).
  */
 export type CloudPDFViewerProps = ViewerConfig & PDFViewerExtras;
 
 export function CloudPDFViewer(props: CloudPDFViewerProps) {
-  // The engine, documents and stamps are made from the cloud options once, when the viewer
+  // The engine, documents and plugins are made from the cloud options once, when the viewer
   // starts, like every prop that isn't live; the live ones pass through on every render.
   const [started] = useState(() => resolveCloudConfig(props));
-  const { engine, documents, stamps } = started;
-  return createElement(PDFViewer, { ...resolveCloudConfig(props), engine, documents, stamps });
+  const { engine, documents, plugins } = started;
+  return createElement(PDFViewer, { ...resolveCloudConfig(props), engine, documents, plugins });
 }

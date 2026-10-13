@@ -89,7 +89,7 @@ export function DocumentScreen({
         // Same-origin through the dev proxy — the SDK never needs an absolute
         // engine URL in a normal deployment either.
         baseUrl=""
-        docToken={active.token}
+        src={{ token: active.token }}
         style={{ height: '100%' }}
       >
         <div

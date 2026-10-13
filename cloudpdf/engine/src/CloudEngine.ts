@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  generateUuid,
   type DocumentHandle,
   type Engine,
   type OpenInput,
@@ -13,7 +14,6 @@ import {
   wirePaths,
   type DocumentHead,
 } from '@embedpdf/engine-core/wire';
-import { generateUuid } from '@embedpdf/engine-services';
 
 import { CloudDocumentHandle } from './document/CloudDocumentHandle';
 import { CloudDocumentSecurityService } from './document/CloudDocumentSecurityService';

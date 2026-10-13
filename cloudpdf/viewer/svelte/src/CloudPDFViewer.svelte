@@ -16,10 +16,10 @@
 
   let { element = $bindable(null), children, ...props }: CloudPDFViewerProps = $props();
 
-  // The engine, documents and stamps are made from the cloud options once, when the viewer starts,
+  // The engine, documents and plugins are made from the cloud options once, when the viewer starts,
   // like every prop that isn't live; the rest passes through as the props change.
-  const { engine, documents, stamps } = untrack(() => resolveCloudConfig(props));
+  const { engine, documents, plugins } = untrack(() => resolveCloudConfig(props));
   const options = $derived(resolveCloudConfig(props));
 </script>
 
-<PDFViewer {...options} {engine} {documents} {stamps} {children} bind:element />
+<PDFViewer {...options} {engine} {documents} {plugins} {children} bind:element />

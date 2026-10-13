@@ -546,7 +546,8 @@ export function createKernel(config: {
         ...core.pending,
         [session.id]: { id: session.id, name: session.name, status: 'loading' },
       },
-      order: [...core.order, session.id],
+      // A failed document opened again (`retry()`) keeps its place.
+      order: core.order.includes(session.id) ? core.order : [...core.order, session.id],
       activeId: activate || core.activeId === null ? session.id : core.activeId,
     });
   }
@@ -955,13 +956,14 @@ export function createKernel(config: {
   async function openDocument(
     input: OpenSource,
     options?: OpenDocumentOptions,
+    slotId?: string,
   ): Promise<OpenDocumentResult> {
     const signal = options?.signal;
     if (signal?.aborted) {
       throw new PluginError('operation-cancelled', 'documents', 'the open was cancelled');
     }
     try {
-      const { session, done } = reserveAndOpen(input, options);
+      const { session, done } = reserveAndOpen(input, options, slotId);
       // Cancelling closes the document while it opens; once it's open, the signal is spent.
       const cancel = () => void session.close();
       signal?.addEventListener('abort', cancel, { once: true });
@@ -991,10 +993,14 @@ export function createKernel(config: {
     };
   }
 
-  /** Reserve the tab slot synchronously and start the open; returns the slot id at once. */
+  /**
+   * Reserve the tab slot synchronously and start the open; returns the slot id at once.
+   * `slotId` is a failed document's tab, which `retry()` opens again in place.
+   */
   function reserveAndOpen(
     input: OpenSource,
     options?: OpenDocumentOptions,
+    slotId?: string,
   ): { session: DocumentSession; done: Promise<DocumentSession> } {
     guardUsable('documents.open()');
     const engineOptions = engineOptionsOf(options);
@@ -1004,7 +1010,7 @@ export function createKernel(config: {
     //    content arrives at completion time. Fire-and-forget concurrent opens
     //    therefore keep call order as tab order.
     const requestedId =
-      typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket());
+      slotId ?? (typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket()));
     if (sessions.has(requestedId)) {
       throw new PluginError('conflict', 'documents', `document already open: ${requestedId}`);
     }
@@ -1173,9 +1179,12 @@ export function createKernel(config: {
           `${id} didn't fail to open; nothing to retry`,
         );
       }
+      // In its own tab, which keeps its id and place; the active document stays the active one.
+      // The failed session holds nothing (its scope was released when it failed), so the new
+      // one takes its id without closing it: the tab never closes.
       const { source, openOptions } = session;
-      await session.close();
-      return openDocument(source, { ...openOptions, signal: options?.signal });
+      sessions.delete(id);
+      return openDocument(source, { ...openOptions, activate: false, signal: options?.signal }, id);
     },
     rename: (id, name) => {
       const core = store.getCore();

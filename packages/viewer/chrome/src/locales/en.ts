@@ -1,9 +1,10 @@
 import type { Locale } from '@embedpdf/react/i18n';
 
 /**
- * English pack. Strings belong to the product, not the plugins — the
- * `commands.*` keys match the published snippet translation packs, so existing
- * translations resolve; `demo.*` is this example's own chrome.
+ * English pack: the viewer's words, and the source every other pack translates key for key,
+ * with the same `{name}` slots (`packages/viewer/main/test/chrome/locales.test.ts` checks it).
+ * A new string gets its key here and in every other pack. The `commands.*` keys match
+ * EmbedPDF's own command strings, so those translations resolve too.
  */
 export const en: Locale = {
   code: 'en',
@@ -134,6 +135,14 @@ export const en: Locale = {
       },
       undo: 'Undo',
       redo: 'Redo',
+      page: {
+        next: 'Next Page',
+        previous: 'Previous Page',
+        first: 'First Page',
+        last: 'Last Page',
+        goTo: 'Go to Page',
+      },
+      shortcuts: 'Keyboard Shortcuts',
       // Why a command isn't there, by the permission the scope leaves out
       // (dots and colons as dashes); `{label}` is the command's label.
       notAllowed: {
@@ -162,10 +171,29 @@ export const en: Locale = {
     },
     // The drop target over the pages while a PDF is dragged over them.
     dropToOpen: { label: 'Drop a PDF to open it' },
+    // A document that couldn't be opened: why, by its error, in its tab and on its pane.
     documentError: {
       title: 'Couldn’t open document',
       unknown: 'The document could not be opened.',
+      notFound: 'The file wasn’t found.',
+      notAllowed: 'You don’t have access to this document.',
+      damaged: 'This file isn’t a PDF, or it’s damaged.',
+      unsupported: 'This viewer can’t open this kind of document.',
+      retry: 'Try again',
       close: 'Close document',
+    },
+    // The document tabs.
+    tabs: {
+      close: 'Close {name}',
+      loading: 'Loading',
+      untitled: 'Document {id}',
+    },
+    // Closing a tab whose document has changes that weren't downloaded.
+    closeUnsaved: {
+      title: 'Close without saving?',
+      body: '“{name}” has changes that weren’t downloaded. They’ll be lost.',
+      cancel: 'Cancel',
+      close: 'Close without saving',
     },
     // The View only label in the main bar, while nothing can change the document.
     viewOnly: {
@@ -180,6 +208,15 @@ export const en: Locale = {
     menu: {
       back: 'Back',
     },
+    // The keyboard shortcuts sheet (`?`): its groups of commands.
+    shortcuts: {
+      document: 'Document',
+      viewing: 'Viewing',
+      editing: 'Editing',
+      other: 'Other',
+    },
+    // The Go to Page dialog's button.
+    goToPage: { go: 'Go' },
     // The built-in panels' titles, which are their buttons' labels too.
     panels: {
       thumbnails: 'Thumbnails',
@@ -226,6 +263,8 @@ export const en: Locale = {
       searchSearching: 'Searching…',
       searchResults: '{count} results found',
       searchNoResults: 'No results',
+      searchPrevious: 'Previous result',
+      searchNext: 'Next result',
       searchPage: 'Page {page}',
       commentsForbidden: 'You don\u2019t have access to comments on this document.',
       commentsLoading: 'Loading comments…',

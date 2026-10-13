@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatShortcut, matchShortcut, parseShortcut, type KeyStroke } from '../src/shortcuts';
+import {
+  formatShortcut,
+  matchShortcut,
+  parseShortcut,
+  sameShortcut,
+  type KeyStroke,
+} from '../src/shortcuts';
 
 const stroke = (partial: Partial<KeyStroke> & { key: string }): KeyStroke => ({
   ctrlKey: false,
@@ -96,5 +102,17 @@ describe('formatShortcut', () => {
     expect(formatShortcut('Delete', { isMac: false })).toBe('Delete');
     expect(formatShortcut('Mod+NumpadAdd', { isMac: false })).toBe('Ctrl+Num +');
     expect(formatShortcut('F1', { isMac: false })).toBe('F1');
+  });
+});
+
+describe('sameShortcut', () => {
+  it('says two shortcuts are the same keys on this platform, whatever their spelling', () => {
+    expect(sameShortcut('Mod+S', 'mod+s', { isMac: false })).toBe(true);
+    expect(sameShortcut('Mod+S', 'Ctrl+S', { isMac: false })).toBe(true);
+    expect(sameShortcut('Mod+S', 'Ctrl+S', { isMac: true })).toBe(false);
+    expect(sameShortcut('Mod+S', 'Cmd+S', { isMac: true })).toBe(true);
+    expect(sameShortcut('Shift+Mod+Z', 'Mod+Shift+z', { isMac: true })).toBe(true);
+    expect(sameShortcut('Mod+Z', 'Shift+Mod+Z', { isMac: true })).toBe(false);
+    expect(sameShortcut('Delete', 'Backspace', { isMac: true })).toBe(false);
   });
 });

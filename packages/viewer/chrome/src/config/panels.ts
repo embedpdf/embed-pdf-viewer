@@ -4,11 +4,14 @@
  * `title` or `titleKey`, its `icon`). Which side a panel is on is the layout's
  * too; the panels on one side take turns where they're drawn (ui/panels.tsx).
  * The built-in panels add what their commands need: the feature that turns
- * them off, what the scope must allow, and when there is something to show.
+ * them off, whether the session may use them (the owning plugin's `can*`
+ * check), when there is something to show, and search's shortcut.
  */
 import { panelCommandOf, type LayoutData, type LayoutPanel } from '@embedpdf/core-ui';
+import { AnnotationToken } from '@embedpdf/react/annotation';
 import type { CommandDef } from '@embedpdf/react/commands';
 import { RedactionToken } from '@embedpdf/react/redaction';
+import { SearchToken } from '@embedpdf/react/search';
 import { SignatureToken } from '@embedpdf/react/signature';
 import { StampToken } from '@embedpdf/react/stamp';
 
@@ -32,7 +35,7 @@ export function panelsOnSide(data: LayoutData, side: PanelSide): string[] {
 }
 
 /** What a built-in panel's command adds to the layout's panel. */
-type PanelCommandFacts = Pick<CommandDef, 'requires' | 'visible'> & {
+type PanelCommandFacts = Pick<CommandDef, 'allowed' | 'notAllowedKey' | 'visible' | 'shortcut'> & {
   readonly categories: readonly Feature[];
 };
 
@@ -43,16 +46,33 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
   ['outline', { categories: ['outline'], visible: () => false }],
   ['attachments', { categories: ['attachments'], visible: () => false }],
   // Without it every query is refused: the panel has no job.
-  ['search', { categories: ['search'], requires: ['doc.text.search'] }],
+  [
+    'search',
+    {
+      categories: ['search'],
+      shortcut: 'Mod+F',
+      allowed: (commandContext) => commandContext.tryGet(SearchToken)?.canSearch() ?? true,
+      notAllowedKey: 'commands.notAllowed.doc-text-search',
+    },
+  ],
   // Without it there is nothing this panel could show.
-  ['comments', { categories: ['comments'], requires: ['doc.annotate.read'] }],
+  [
+    'comments',
+    {
+      categories: ['comments'],
+      allowed: (commandContext) => commandContext.tryGet(AnnotationToken)?.canRead() ?? true,
+      notAllowedKey: 'commands.notAllowed.doc-annotate-read',
+    },
+  ],
   ['style', { categories: ['annotations'] }],
   // The stamp libraries are the stamp plugin's: without it there is nothing to pick.
   [
     'stamps',
     {
       categories: ['stamps'],
-      requires: ['annotations:create'],
+      allowed: (commandContext) =>
+        commandContext.tryGet(StampToken)?.canPlace(commandContext.documentId ?? undefined) ?? true,
+      notAllowedKey: 'commands.notAllowed.annotations-create',
       visible: (commandContext) => commandContext.tryGet(StampToken) != null,
     },
   ],
@@ -66,13 +86,12 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
     },
   ],
   // Useful to a session that can propose marks or apply them; with neither power the panel
-  // could only show other people's pending marks. Either one is enough, which `requires` (all
-  // of them) can't say.
+  // could only show other people's pending marks.
   [
     'redaction',
     {
       categories: ['redaction'],
-      visible: (commandContext) => {
+      allowed: (commandContext) => {
         const redaction = commandContext.tryGet(RedactionToken);
         return redaction ? redaction.canMark() || redaction.canApply() : true;
       },

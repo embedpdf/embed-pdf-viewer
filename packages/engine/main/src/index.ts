@@ -19,7 +19,7 @@ import {
   type WorkerRequest,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
-import { createPdfRuntime, type CreatePdfRuntimeOptions } from '@embedpdf/engine-runtime';
+import type { CreatePdfRuntimeOptions } from '@embedpdf/engine-runtime';
 
 import type { LocalFontService } from './fonts/LocalFontService';
 import { LocalEngine, type LocalEngineOptions } from './LocalEngine';
@@ -29,7 +29,6 @@ import {
   type LocalImageEncoder,
 } from './render/BrowserImageEncoder';
 import { BrowserWorkerTransport, watchWorkerReady } from './transport/BrowserWorkerTransport';
-import { InlineTransport } from './transport/InlineTransport';
 import { LazyTransport, type LazyTransportOptions } from './transport/LazyTransport';
 import type { Transport } from './transport/Transport';
 import { allowWorkerUrl, createWorkerBlobUrl, startWorker } from './trusted-types';
@@ -55,7 +54,6 @@ export * from '@embedpdf/engine-core/public';
 export { LocalEngine } from './LocalEngine';
 export type { LocalEngineOptions } from './LocalEngine';
 export type { Transport } from './transport/Transport';
-export { InlineTransport } from './transport/InlineTransport';
 export { BrowserWorkerTransport } from './transport/BrowserWorkerTransport';
 export { LazyTransport } from './transport/LazyTransport';
 export type { WorkerRequest, WorkerResponse } from './worker/protocol';
@@ -86,9 +84,7 @@ export interface CreateLocalEngineOptions extends Omit<LocalEngineOptions, 'tran
  * first operation, inside the engine's {@link LazyTransport}.
  */
 export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEngine {
-  const transport = new LazyTransport(
-    async () => new InlineTransport(await createPdfRuntime(opts.runtime ?? {})),
-  );
+  const transport = new LazyTransport(() => startInlineTransport(opts.runtime));
   return LocalEngine.fromTransport({
     transport,
     concurrency: opts.concurrency,
@@ -399,11 +395,7 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
  */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
   const boot = runsInThisThread(options)
-    ? {
-        spawn: async (): Promise<Transport> =>
-          new InlineTransport(await createPdfRuntime(options.runtime ?? {})),
-        lazyOptions: {},
-      }
+    ? { spawn: () => startInlineTransport(options.runtime), lazyOptions: {} }
     : workerBoot(options.worker, options);
   const transport = new LazyTransport(async () => {
     // Spawn and font fetches run in parallel; nothing queued by the caller can
@@ -439,6 +431,17 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
     signedDocumentPolicy: options.signedDocumentPolicy,
   });
   return engine;
+}
+
+/**
+ * The transport to PDFium in this thread. Its module holds the engine host and
+ * the runtime, the bulk of the engine's code, and is imported only here, when
+ * such an engine boots: the main thread of a page whose engine runs in a
+ * worker never downloads them.
+ */
+async function startInlineTransport(runtime: CreatePdfRuntimeOptions = {}): Promise<Transport> {
+  const { createInlineTransport } = await import('./transport/InlineTransport');
+  return createInlineTransport(runtime);
 }
 
 /**

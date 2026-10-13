@@ -256,7 +256,7 @@ function ThreadCard({
               <span className="text-fg truncate text-sm font-medium">
                 {view.root.author ?? t('demo.commentsAnonymous')}
               </span>
-              <span className="text-fg-muted ml-auto shrink-0 text-xs">
+              <span className="text-fg-muted ms-auto shrink-0 text-xs">
                 {dateLabel(view.root.modifiedAt ?? view.root.createdAt)}
               </span>
             </div>
@@ -356,7 +356,7 @@ function ThreadCard({
 function Reply({ dto, writing }: { dto: Annotation; writing: boolean }) {
   const t = useT();
   return (
-    <div className="border-border-subtle ml-1 border-l-2 pl-2">
+    <div className="border-border-subtle ms-1 border-s-2 ps-2">
       <div className="flex items-baseline gap-2">
         <span className="text-fg-secondary text-xs font-medium">
           {dto.author ?? t('demo.commentsAnonymous')}

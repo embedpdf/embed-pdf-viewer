@@ -28,8 +28,11 @@ export interface SelectionClipboardOptions {
    * pass false to make copying strictly on-demand.
    */
   prefetch?: boolean;
-  /** Event target to listen on. Defaults to `document`. */
-  target?: Document;
+  /**
+   * Where to listen (default `document`). An element takes the keys and copies only while
+   * focus is inside it, for a page with more than one viewer.
+   */
+  target?: Document | HTMLElement;
   /**
    * Called when Ctrl/Cmd+C or a copy (Edit → Copy) meets a selection the user may not copy.
    * The browser's own copy is prevented either way; this is where to say so.
@@ -125,20 +128,32 @@ export function wireSelectionClipboard(
     if (!selection.hasSelection() || !selection.canCopy()) return;
     // A live DOM selection means the browser will dispatch `copy` itself and
     // our synchronous handler answers — don't double-write.
-    const dom = target.getSelection?.();
+    const dom = domSelectionOf(target);
     if (dom && !dom.isCollapsed) return;
     void copySelection(selection); // instant when prefetched; still inside user activation
   };
 
-  target.addEventListener('copy', onCopy);
-  target.addEventListener('keydown', onKeyDown);
+  // A document and an element dispatch `copy` and `keydown` with the same event types.
+  const events = target as Pick<HTMLElement, 'addEventListener' | 'removeEventListener'>;
+  events.addEventListener('copy', onCopy);
+  events.addEventListener('keydown', onKeyDown);
   return () => {
     offCommit();
     offChange();
     if (timer) clearTimeout(timer);
-    target.removeEventListener('copy', onCopy);
-    target.removeEventListener('keydown', onKeyDown);
+    events.removeEventListener('copy', onCopy);
+    events.removeEventListener('keydown', onKeyDown);
   };
+}
+
+/**
+ * The DOM selection the browser copies from: the target's root's (its shadow root, where the
+ * browser keeps one there, or its document), else its owner document's.
+ */
+function domSelectionOf(target: Document | HTMLElement): Selection | null {
+  const root = target.getRootNode() as Partial<Pick<Document, 'getSelection'>>;
+  if (typeof root.getSelection === 'function') return root.getSelection();
+  return target.ownerDocument?.getSelection() ?? null;
 }
 
 /**

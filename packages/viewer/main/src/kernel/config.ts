@@ -8,21 +8,42 @@
  * here: each door declares its own (see ../doors and ../local), because a
  * config type may only promise what its door's imports actually deliver.
  */
+import { PluginError } from '@embedpdf/core';
+import type { OpenInput } from '@embedpdf/engine-core/runtime';
 import type { InitialDocument, ViewerCustomization } from '@embedpdf/viewer-chrome';
 
 /** One document for `src`: a URL, a `File` (or any `Blob`), or the PDF's bytes. */
 export type DocumentSrc = string | Blob | ArrayBuffer | Uint8Array;
 
+/** One of the documents `documents` opens, each in a tab of its own. */
+export interface DocumentEntry<Src = DocumentSrc> {
+  /** The document: a URL, a `File`, or bytes. */
+  readonly src: Src;
+  /** What its tab shows; the file's name when left out. */
+  readonly name?: string;
+  /** Its password, if it has one: nobody is asked for it. */
+  readonly password?: string;
+  /** Show this one first; without one marked, the first document shows. */
+  readonly active?: boolean;
+}
+
 /** Everything a delivery needs except the engine seam — the part every door
- *  agrees on. Doors extend this and add their own `engine` field. */
-export interface ViewerConfigBase extends ViewerCustomization {
+ *  agrees on. Doors extend this and add their own `engine` field, and a door
+ *  whose engine opens other documents names them as its `Src`. */
+export interface ViewerConfigBase<Src = DocumentSrc> extends ViewerCustomization {
   /** One document: a URL, a `File`, or bytes. Follows its prop: another one
    *  opens in its place, and `null` closes it. */
-  src?: DocumentSrc | null;
-  /** Full control: several documents, names, passwords, the active tab.
-   *  With these, `src` is ignored. */
-  documents?: InitialDocument[];
+  src?: Src | null;
+  /** Several documents, each in a tab, with their names, passwords and the one
+   *  that shows first. With these, `src` is ignored. Read once. */
+  documents?: readonly DocumentEntry<Src>[];
 }
+
+/**
+ * What the element opens: a URL, a file or bytes, or an engine's open input as it is (a
+ * `{ kind: 'token' }` a cloud door made of its own `src`, or what an engine of your own takes).
+ */
+export type ElementSrc = DocumentSrc | OpenInput;
 
 /**
  * The config as the element sees it — a courier's view.
@@ -34,9 +55,10 @@ export interface ViewerConfigBase extends ViewerCustomization {
  * whichever provider its door registered (see element.ts `engineOf`). Typing it
  * narrower would either forbid a legal door vocabulary or advertise one that a
  * different door cannot honour — the lie we removed from `init()` and
- * `<PDFViewer>`, which are where typed config belongs.
+ * `<PDFViewer>`, which are where typed config belongs. Its documents are the
+ * widest too: what any door's `src` becomes ({@link ElementSrc}).
  */
-export interface ElementConfig extends ViewerConfigBase {
+export interface ElementConfig extends ViewerConfigBase<ElementSrc> {
   engine?: unknown;
 }
 
@@ -80,18 +102,44 @@ export function sameConfigValue(left: unknown, right: unknown): boolean {
 }
 
 /** The keys whose values differ between two configs (see {@link sameConfigValue}). */
-export function changedConfigKeys(previous: ViewerConfigBase, next: ViewerConfigBase): string[] {
+export function changedConfigKeys(previous: ElementConfig, next: ElementConfig): string[] {
   const before = previous as Readonly<Record<string, unknown>>;
   const after = next as Readonly<Record<string, unknown>>;
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
   return [...keys].filter((key) => !sameConfigValue(before[key], after[key]));
 }
 
+/**
+ * Download a URL `src`. Its tab says why when the server says no: the file isn't there
+ * (`not-found`), or the download failed.
+ */
 const fetchBytes = async (url: string, signal: AbortSignal): Promise<Uint8Array> => {
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`[embedpdf] failed to fetch ${url}: ${response.status}`);
+  if (!response.ok) {
+    throw new PluginError(
+      response.status === 404 ? 'not-found' : 'operation-failed',
+      'documents',
+      `couldn't download ${url} (HTTP ${response.status})`,
+    );
+  }
   return new Uint8Array(await response.arrayBuffer());
 };
+
+/** `%PDF`, which a PDF has in its first 1024 bytes, as PDFium looks for it. */
+const PDF_HEADER = [0x25, 0x50, 0x44, 0x46];
+
+/** Whether bytes are a PDF's, by its header: a web page or an image a URL gave instead isn't. */
+function isPdf(bytes: Uint8Array): boolean {
+  const end = Math.min(bytes.length - PDF_HEADER.length, 1024);
+  for (let start = 0; start <= end; start++) {
+    if (PDF_HEADER.every((byte, index) => bytes[start + index] === byte)) return true;
+  }
+  return false;
+}
+
+/** Whether a `src` is an engine's open input, which opens as it is. */
+export const isOpenInput = (src: ElementSrc): src is OpenInput =>
+  typeof src === 'object' && 'kind' in src;
 
 /** What a `src` document's tab shows: the file's name without `.pdf`. */
 function nameOfSrc(src: DocumentSrc): string {
@@ -104,35 +152,81 @@ function nameOfSrc(src: DocumentSrc): string {
   return name.replace(/\.pdf$/i, '') || 'Document';
 }
 
-/** The id a `src` document asks for, before it's made unique: its URL, or its file's name. */
-export const idOfSrc = (src: DocumentSrc): string =>
+/**
+ * The id a `src` document asks for, before it's made unique: its URL, its file's name, or the
+ * id an open input names. An open input that names none gets its id from the engine.
+ */
+export const idOfSrc = (src: ElementSrc): string =>
   typeof src === 'string'
     ? src
-    : typeof File !== 'undefined' && src instanceof File
-      ? src.name
-      : 'document';
+    : isOpenInput(src)
+      ? 'id' in src && typeof src.id === 'string'
+        ? src.id
+        : 'document'
+      : typeof File !== 'undefined' && src instanceof File
+        ? src.name
+        : 'document';
 
 /**
  * A `src` as a document to open, under the id given: its tab appears at once, named after the
  * file, and the bytes are read (a URL fetched) under the loading tab, which stops the fetch when
- * the tab closes first.
+ * the tab closes first; bytes that aren't a PDF's fail as `invalid-input`. An open input opens
+ * as it is, once `after` settles: a document of the same id still closing would refuse it, and
+ * only the engine knows which document it names.
  */
-export function documentFromSrc(src: DocumentSrc, id: string): InitialDocument {
+export function documentFromSrc(
+  src: ElementSrc,
+  id: string,
+  after: Promise<unknown> = Promise.resolve(),
+): InitialDocument {
+  if (isOpenInput(src)) {
+    return {
+      source: async () => {
+        await after;
+        return src;
+      },
+    };
+  }
+  const name = nameOfSrc(src);
   return {
-    name: nameOfSrc(src),
-    source: async (signal) => ({
-      kind: 'bytes',
-      id,
+    name,
+    source: async (signal) => {
       // Given bytes go as a view: the engine copies a view, where it would move a buffer to
       // its worker and leave the app's own copy empty for the next open.
-      bytes:
+      const bytes =
         typeof src === 'string'
           ? await fetchBytes(src, signal)
           : src instanceof Blob
             ? new Uint8Array(await src.arrayBuffer())
-            : new Uint8Array(src),
-    }),
+            : new Uint8Array(src);
+      // Said here, where it's known: the engine says only that it couldn't open the file.
+      if (!isPdf(bytes)) throw new PluginError('invalid-input', 'documents', `${name} isn't a PDF`);
+      return { kind: 'bytes', id, bytes };
+    },
   };
+}
+
+/**
+ * The `documents` entries as the documents to open, in order: each under an id of its own (the
+ * second of one URL gets `#2` after it), named as given or after its file, with its password,
+ * and the first one marked `active` showing first. An open input opens as it is.
+ */
+export function initialDocumentsOf(
+  entries: readonly DocumentEntry<ElementSrc>[],
+): InitialDocument[] {
+  const taken = new Set<string>();
+  const freeId = (wanted: string): string => {
+    let id = wanted;
+    for (let index = 2; taken.has(id); index++) id = `${wanted}#${index}`;
+    taken.add(id);
+    return id;
+  };
+  return entries.map(({ src, name, password, active }) => ({
+    ...(isOpenInput(src) ? { source: src } : documentFromSrc(src, freeId(idOfSrc(src)))),
+    ...(name !== undefined ? { name } : {}),
+    ...(password !== undefined ? { password } : {}),
+    ...(active ? { active } : {}),
+  }));
 }
 
 /**

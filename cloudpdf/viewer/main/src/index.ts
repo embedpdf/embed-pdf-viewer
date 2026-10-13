@@ -8,7 +8,7 @@
  *   CloudPDF.init({
  *     target: '#viewer',
  *     baseUrl: 'https://api.cloudpdf.com',
- *     docToken: '<doc-scoped JWT>',
+ *     src: { token: '<doc-scoped JWT>' },
  *   });
  * </script>
  * ```
@@ -36,9 +36,9 @@ export type { CloudEngineOptions } from '@cloudpdf/engine';
 export { exchangeShareToken, shareSessionSource, ShareExchangeError } from '@cloudpdf/engine';
 export type { ShareSession, ShareExchangeOptions } from '@cloudpdf/engine';
 export { resolveCloudConfig } from './config';
-// The cloud's `ViewerConfig`, in place of the engine-agnostic one `export *` brings: one name
-// per door (docs/conventions/viewer-doors.md).
-export type { CloudSource, CloudShareSource, CloudInitialDocument, ViewerConfig } from './config';
+// The cloud's `ViewerConfig` and its documents, in place of the engine-agnostic ones `export *`
+// brings: one name per door (docs/conventions/viewer-doors.md).
+export type { CloudSource, DocumentEntry, DocumentSrc, ViewerConfig } from './config';
 
 export interface CloudInitOptions extends ViewerConfig, MountTarget {}
 

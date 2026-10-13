@@ -16,7 +16,7 @@ import { bytesInput, immediateEngine, makeHandle } from './helpers';
  * The mirror load protocol, one test per rule: subscribe first, load after
  * connect, queue and replay past the cursor, degrade on failure, reload on
  * resync events and throwing folds, coalesce reloads, respect `readable`,
- * and stop writing when the instance closes.
+ * load on demand when asked to, and stop writing when the instance closes.
  */
 
 type Records = Readonly<Record<string, string>>;
@@ -80,6 +80,7 @@ function setup(options: {
   readable?: () => boolean;
   fold?: (value: Records, event: DocumentEvent) => Records | ReturnType<typeof reload>;
   loadPages?: () => Promise<(value: Records) => Records>;
+  onDemand?: true;
 }) {
   const ctx = createTestContext({ id: 'probe' });
   const loads = options.loads ?? [];
@@ -96,6 +97,7 @@ function setup(options: {
     load,
     fold: options.fold ?? foldRecords,
     loadPages: options.loadPages,
+    onDemand: options.onDemand,
     changed: (change) => changes.push(change),
   });
   return { ctx, mirror, load, changes };
@@ -113,6 +115,51 @@ describe('ctx.mirror', () => {
     first.resolve({ value: { a: 'A' } });
     await settle();
     expect(mirror.get()).toEqual({ a: 'A' });
+    expect(mirror.getStatus()).toBe('ready');
+  });
+
+  it('loads on demand only once asked, sharing the load in flight', async () => {
+    const first = deferred<{ value: Records }>();
+    const { ctx, mirror, load, changes } = setup({ loads: [first], onDemand: true });
+    ctx.connect({ api: null });
+    await settle();
+    expect(load).not.toHaveBeenCalled();
+    expect(mirror.getStatus()).toBe('idle');
+    // Until then it folds what happens, and a resync or a reload request reads nothing.
+    ctx.emitDocumentEvent(upserted('a', 'early'));
+    ctx.emitDocumentEvent(desynced);
+    await settle();
+    expect(load).not.toHaveBeenCalled();
+    expect(mirror.get()).toEqual({ a: 'early' });
+    expect(mirror.getStatus()).toBe('idle');
+
+    const asked = [mirror.ensureLoaded(), mirror.ensureLoaded()];
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(mirror.getStatus()).toBe('loading');
+    first.resolve({ value: { a: 'A', b: 'B' } });
+    await Promise.all(asked);
+    expect(mirror.get()).toEqual({ a: 'A', b: 'B' });
+    expect(mirror.getStatus()).toBe('ready');
+    expect(changes.at(-1)?.cause).toBe('load');
+    // Loaded: asking again reads nothing.
+    await mirror.ensureLoaded();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('tries an on-demand load again after it failed', async () => {
+    const loads = [deferred<{ value: Records }>(), deferred<{ value: Records }>()];
+    const { ctx, mirror, load } = setup({ loads: [...loads], onDemand: true });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    ctx.connect({ api: null });
+    const failed = mirror.ensureLoaded();
+    loads[0].reject(new Error('offline'));
+    await expect(failed).rejects.toThrow('offline');
+    expect(mirror.getStatus()).toBe('error');
+    const retried = mirror.ensureLoaded();
+    loads[1].resolve({ value: { a: 'A' } });
+    await retried;
+    spy.mockRestore();
+    expect(load).toHaveBeenCalledTimes(2);
     expect(mirror.getStatus()).toBe('ready');
   });
 

@@ -149,7 +149,7 @@ function Field({
     <section className="mb-5">
       <label className="text-fg mb-2 block text-sm font-medium">
         {label}
-        {mixed && <span className="text-fg-muted ml-1.5 text-xs font-normal">(mixed)</span>}
+        {mixed && <span className="text-fg-muted ms-1.5 text-xs font-normal">(mixed)</span>}
       </label>
       {children}
     </section>
@@ -291,7 +291,7 @@ function OptionRow({
     <button
       type="button"
       onClick={onClick}
-      className={`hover:bg-hover flex w-full items-center rounded px-2 py-1.5 text-left text-sm ${selected ? 'bg-selected text-accent' : 'text-fg'}`}
+      className={`hover:bg-hover flex w-full items-center rounded px-2 py-1.5 text-start text-sm ${selected ? 'bg-selected text-accent' : 'text-fg'}`}
     >
       {children}
     </button>
@@ -519,13 +519,13 @@ function FontSizeCombo({ value, onChange }: { value: number; onChange: (size: nu
           }
         }}
         onClick={() => setOpen(true)}
-        className="border-border bg-surface text-fg w-full rounded border px-2 py-1.5 pr-7 text-sm"
+        className="border-border bg-surface text-fg w-full rounded border px-2 py-1.5 pe-7 text-sm"
       />
       <button
         type="button"
         tabIndex={-1}
         onClick={() => setOpen((previous) => !previous)}
-        className="absolute inset-y-0 right-1 flex items-center"
+        className="absolute inset-y-0 end-1 flex items-center"
       >
         <Icon name="chevronDown" size={16} className="text-fg-secondary" />
       </button>

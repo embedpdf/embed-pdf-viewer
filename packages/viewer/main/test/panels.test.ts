@@ -108,7 +108,10 @@ const click = async (tab: Page, selector: string, label: string) => {
       const element = [...root.querySelectorAll<HTMLElement>(within)].find(
         (candidate) =>
           !candidate.closest('[aria-hidden="true"]') &&
-          (candidate.getAttribute('aria-label') === name || candidate.textContent?.trim() === name),
+          (candidate.getAttribute('aria-label') === name ||
+            candidate.textContent?.trim() === name ||
+            // A menu row: its label, beside the shortcut it shows.
+            candidate.querySelector('.truncate')?.textContent === name),
       );
       if (!element) return null;
       const rect = element.getBoundingClientRect();
@@ -202,7 +205,11 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panels', () => {
         ...document
           .querySelector('embedpdf-viewer')!
           .shadowRoot!.querySelectorAll('[role="menu"] [role="menuitemradio"]'),
-      ].map((row) => ({ label: row.textContent, checked: row.getAttribute('aria-checked') })),
+      ].map((row) => ({
+        // The label, without the shortcut the row shows beside it.
+        label: row.querySelector('.truncate')?.textContent ?? row.textContent,
+        checked: row.getAttribute('aria-checked'),
+      })),
     );
     expect(rows).toContainEqual({ label: 'Comments', checked: 'true' });
     expect(rows).toContainEqual({ label: 'Search', checked: 'false' });

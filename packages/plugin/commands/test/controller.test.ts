@@ -396,6 +396,102 @@ describe('permissions', () => {
     });
     expect(commands.matchStroke(stroke('k'), options)).toBeNull();
   });
+
+  it('refuses a command its allowed check says no to, with the sentence its key names', async () => {
+    let canPrint = false;
+    const checked: CommandDef = {
+      id: 'document:print',
+      label: 'Print',
+      allowed: () => canPrint,
+      notAllowedKey: 'commands.notAllowed.doc-print',
+    };
+    const thrown: CommandDef = {
+      id: 'acme:thrown',
+      label: 'Thrown',
+      allowed: () => {
+        throw new Error('no plugin');
+      },
+    };
+    const general: CommandDef = { id: 'acme:general', label: 'Send', allowed: () => false };
+    const strings = { 'commands.notAllowed.doc-print': "Printing isn't allowed" };
+    const hidden = harnessWith(
+      { commands: [checked, thrown, general] },
+      securityWithout(),
+      strings,
+    );
+    expect(hidden.resolveCommand('document:print')).toMatchObject({
+      visible: false,
+      enabled: false,
+    });
+    expect(hidden.resolveCommand('acme:thrown')).toMatchObject({ visible: true, enabled: true });
+    expect(hidden.getRefusal('document:print')).toEqual({
+      reason: 'not-allowed',
+      message: "Printing isn't allowed",
+    });
+    expect(hidden.getRefusal('acme:general')).toEqual({
+      reason: 'not-allowed',
+      message: "Send isn't allowed",
+    });
+    expect(hidden.getRefusal('acme:thrown')).toBeNull();
+    expect(hidden.getRefusal('acme:unknown')).toBeNull();
+    await expect(hidden.execute('document:print')).resolves.toEqual({
+      status: 'rejected',
+      reason: 'hidden',
+    });
+
+    const disabled = harnessWith(
+      { commands: [checked], notAllowed: 'disable' },
+      securityWithout(),
+      strings,
+    );
+    expect(disabled.resolveCommand('document:print')).toMatchObject({
+      visible: true,
+      enabled: false,
+      disabledReason: "Printing isn't allowed",
+    });
+    canPrint = true;
+    expect(disabled.getRefusal('document:print')).toBeNull();
+    // With no document there is no session to ask.
+    canPrint = false;
+    expect(harnessWith({ commands: [checked] }, null).getRefusal('document:print')).toBeNull();
+  });
+
+  it('says a turned-off command is turned off, before whether it is allowed', () => {
+    const commands = harnessWith(
+      { commands: [print], disabledCommands: ['document:print'] },
+      securityWithout('doc.print'),
+    );
+    expect(commands.getRefusal('document:print')).toEqual({
+      reason: 'turned-off',
+      message: "Print isn't available",
+    });
+  });
+
+  it('lets a key through when its refused command would not show: Delete with nothing selected', () => {
+    let selected = false;
+    const commands = harnessWith(
+      {
+        commands: [
+          {
+            id: 'annotation:delete',
+            label: 'Delete',
+            shortcut: 'Delete',
+            categories: ['annotations'],
+            visible: () => selected,
+          },
+        ],
+        disabledCategories: ['annotations'],
+      },
+      securityWithout(),
+    );
+    const press = { key: 'Delete', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false };
+    expect(commands.matchStroke(press, { isMac: false })).toBeNull();
+    selected = true;
+    expect(commands.matchStroke(press, { isMac: false })).toEqual({
+      commandId: 'annotation:delete',
+      refusal: { reason: 'turned-off', message: "Delete isn't available" },
+    });
+  });
 });
 
 describe('settings', () => {
@@ -440,12 +536,16 @@ describe('settings', () => {
 });
 
 describe('labels', () => {
-  /** An i18n stand-in that knows one key. */
+  /** An i18n stand-in that knows the keys it's given, in one language. */
   const i18nWith = (strings: Record<string, string>) => ({
-    t: (key: string, options?: { fallback?: string }) => strings[key] ?? options?.fallback ?? key,
+    t: (key: string, options?: { fallbackKey?: string; fallback?: string }) =>
+      strings[key] ??
+      (options?.fallbackKey === undefined ? undefined : strings[options.fallbackKey]) ??
+      options?.fallback ??
+      key,
   });
 
-  it('shows the translated label, then the plain label, then the key or the id', async () => {
+  it('shows the string under the id, then the translated label, then the plain label, then the id', async () => {
     const { createKernel, definePlugin } = await import('@embedpdf/core');
     const { I18nToken } = await import('@embedpdf/plugin-i18n/contract');
     type I18n = import('@embedpdf/plugin-i18n/contract').I18nCapability;
@@ -454,7 +554,13 @@ describe('labels', () => {
     const i18n = definePlugin({
       id: 'i18n',
       token: I18nToken,
-      create: () => ({ api: i18nWith({ 'commands.save': 'Opslaan' }) as unknown as I18n }),
+      create: () => ({
+        api: i18nWith({
+          'commands.save': 'Opslaan',
+          'review:reject': 'Afwijzen',
+          'acme:send': 'Versturen',
+        }) as unknown as I18n,
+      }),
     });
     const kernel = createKernel({
       engine: {} as never,
@@ -466,6 +572,9 @@ describe('labels', () => {
             { id: 'open', labelKey: 'commands.open', label: 'Open' },
             { id: 'close', labelKey: 'commands.close' },
             { id: 'review:approve' },
+            // The string under the id wins over the label's key, for this command only.
+            { id: 'review:reject', labelKey: 'commands.save', label: 'Reject' },
+            { id: 'acme:send', label: 'Send' },
           ],
         }),
       ],
@@ -475,7 +584,7 @@ describe('labels', () => {
       .capability(CommandsToken)
       .listCommands()
       .map((command) => command.label);
-    expect(labels).toEqual(['Opslaan', 'Open', 'commands.close', 'review:approve']);
+    expect(labels).toEqual(['Opslaan', 'Open', 'close', 'review:approve', 'Afwijzen', 'Versturen']);
     await kernel.destroy();
   });
 });

@@ -12,6 +12,7 @@ import {
   type MetadataService,
   type MetadataUpdateResult,
   type MutationMeta,
+  type SessionEventPublisher,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -21,7 +22,6 @@ import {
   MetadataUpdateResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';

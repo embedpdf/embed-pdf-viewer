@@ -7,7 +7,7 @@ so opening and reading a document is HTTPS API traffic only. The one exception
 is stamps: a stamp library is a PDF that is cut into stamps in the browser, so
 the first time someone opens Stamps or Signatures the viewer loads the local
 engine (`embedpdf.wasm`, shipped in the same folder). Pass
-`stamps: { assetEngine }` to supply your own.
+`plugins: { stamp: { assetEngine } }` to supply your own.
 
 ## Usage
 
@@ -19,13 +19,15 @@ engine (`embedpdf.wasm`, shipped in the same folder). Pass
   CloudPDF.init({
     target: '#viewer',
     baseUrl: 'https://api.cloudpdf.com',
-    docToken: '<doc-scoped JWT>',
+    src: { token: '<doc-scoped JWT>' },
   });
 </script>
 ```
 
-- `docToken` opens one document by its doc-scoped JWT.
-- `docId` opens by cloud document id (the engine-level `token` must authorize it).
+- `src` is the document: `{ token }` with a document token your backend
+  creates, `{ id }` when the engine-level `token` already allows it, or
+  `{ shareToken }` with a share link. `documents` opens several, as entries of
+  `{ src, name, password, active }`.
 - Every customization option of the open-source viewer — the layout,
   commands, icons, themes, locales — rides along verbatim; see the
   [EmbedPDF docs](https://www.embedpdf.com/docs) for the vocabulary.

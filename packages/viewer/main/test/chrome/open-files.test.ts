@@ -50,12 +50,12 @@ const pdf = (name: string) =>
   });
 
 describe('document:open', () => {
-  it('is there with an engine that opens files, with no key of its own yet', async () => {
+  it('is there with an engine that opens files, on Ctrl/Cmd+O', async () => {
     const { kernel, commands } = await viewerWith(true);
     expect(commands.resolveCommand('document:open')).toMatchObject({
       visible: true,
       enabled: true,
-      shortcuts: [],
+      shortcuts: ['Mod+O'],
       categories: ['documents.open'],
     });
     expect(commands.canExecute('document:open')).toBe(true);

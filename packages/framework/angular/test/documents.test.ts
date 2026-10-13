@@ -89,6 +89,7 @@ describe('EpdfMetadata', () => {
     expect(metadata.custom.fields()).toBeNull();
     expect(metadata.custom.status()).toBe('idle');
 
+    // Nothing reads the metadata as the document opens: the service's reading it loads it.
     await kernelOf(fixture).documents.open(bytesInput('a'));
     await settle();
     expect(metadata.fields()).toEqual({ ...METADATA, title: 'Q2 Proposal 1' });

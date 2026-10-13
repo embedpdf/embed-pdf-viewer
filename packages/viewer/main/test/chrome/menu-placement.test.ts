@@ -22,8 +22,10 @@ describe('menuPlacementOf', () => {
     expect(menuPlacementOf('float-bottom', 'ltr')).toBe('top-start');
   });
 
-  it('opens below a bar over a selection, away from what is selected', () => {
-    expect(menuPlacementOf('selection', 'ltr')).toBe('bottom-start');
+  it('opens from a bar over a selection on the side the bar sits, away from what is selected', () => {
+    expect(menuPlacementOf('selection', 'ltr')).toBe('top-start');
+    expect(menuPlacementOf('selection', 'ltr', 'start', 'above')).toBe('top-start');
+    expect(menuPlacementOf('selection', 'rtl', 'start', 'below')).toBe('bottom-end');
   });
 
   it('opens beside a start or end bar, on the side of the pages', () => {

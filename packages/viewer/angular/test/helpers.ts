@@ -80,9 +80,15 @@ export async function launchChromium(): Promise<Browser> {
 /**
  * Errors with a cause outside the wrapper, which a test doesn't fail on: the measurement plugin
  * writes its state after the viewer closed it, when a page's viewports load ends with the
- * document gone (gap K8).
+ * document gone (gap K8). And the engine's own notice, three console lines, when instantiating its
+ * WebAssembly takes a while, as it does with several browsers starting at once (gap K9).
  */
-const KNOWN = [/\[kernel\] PluginError: a state update after the instance closed/];
+const KNOWN = [
+  /\[kernel\] PluginError: a state update after the instance closed/,
+  /^console: still waiting on run dependencies:$/,
+  /^console: dependency: wasm-instantiate$/,
+  /^console: \(end of list\)$/,
+];
 
 /**
  * What went wrong in a page: uncaught errors, console errors and failed requests, as they come.

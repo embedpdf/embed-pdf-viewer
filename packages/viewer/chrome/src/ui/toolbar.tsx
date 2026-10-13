@@ -3,7 +3,7 @@
  * The app owns the pixels; ui-core owns the physics (measure → solve →
  * overflow). Nothing here knows about breakpoints or widths.
  */
-import { MeasurementScaleButton } from './measurement';
+import { MeasurementScaleButton } from './measurement-scale';
 import { useEffect, useState } from 'react';
 import { VIEW_MODE_COMMAND, groupMenuView, type CustomItem } from '@embedpdf/core-ui';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
@@ -37,6 +37,17 @@ const BTN_DISABLED = 'cursor-not-allowed opacity-50 hover:bg-transparent hover:r
 
 export const buttonClass = (active: boolean, enabled = true): string =>
   `${BTN_BASE} ${active ? BTN_ACTIVE : BTN_HOVER} ${enabled ? '' : BTN_DISABLED}`;
+
+/**
+ * The part name of a button in a bar, for page CSS through `::part()`: `toolbar-button`, and
+ * `toolbar-button-active` too while it's pressed or its menu is open. Part names are public, as
+ * the Theming page lists them.
+ */
+export const buttonPart = (active: boolean): string =>
+  active ? 'toolbar-button toolbar-button-active' : 'toolbar-button';
+
+/** The part name of a mode tab: `mode-tab`, and `mode-tab-active` too for the open mode. */
+const modeTabPart = (active: boolean): string => (active ? 'mode-tab mode-tab-active' : 'mode-tab');
 
 // ── the TabButton recipe (the underline) ──────────────────────────────────────
 const TAB_BASE =
@@ -73,14 +84,7 @@ export function CommandButton({
       aria-label={cmd.label}
       // A command the scope doesn't allow, shown under `notAllowed: 'disable'`, says why.
       title={cmd.disabledReason ?? cmd.label}
-      // Shadow parts — the restyle door: page CSS reaches these via
-      // `embedpdf-viewer::part(toolbar-button)` etc. Part names are public
-      // API; the vocabulary is deliberately small (see README).
-      part={
-        isTab
-          ? `mode-tab${active ? ' mode-tab-active' : ''}`
-          : `toolbar-button${active ? ' toolbar-button-active' : ''}`
-      }
+      part={isTab ? modeTabPart(active) : buttonPart(active)}
       className={isTab ? tabClass(active, cmd.enabled) : buttonClass(active, cmd.enabled)}
     >
       {isTab ? (
@@ -88,7 +92,7 @@ export function CommandButton({
       ) : variant === 'icon+label' ? (
         <span className="flex items-center whitespace-nowrap text-sm">
           {cmd.icon && (
-            <Icon name={cmd.icon} size={20} accent={cmd.iconAccent} className="mr-1.5 shrink-0" />
+            <Icon name={cmd.icon} size={20} accent={cmd.iconAccent} className="me-1.5 shrink-0" />
           )}
           <span>{cmd.label}</span>
         </span>
@@ -116,7 +120,11 @@ const ARROW_STOP = { [TOOLBAR_ITEM_ATTRIBUTE]: '', className: 'contents' } as Re
 >;
 
 function ZoomControls() {
+  const t = useT();
   const commands = useCommands();
+  const zoomIn = useCommand('zoom:in');
+  const zoomOut = useCommand('zoom:out');
+  const zoomMenu = useCommand('menu:zoom');
   const shell = useOptionalCapability(ShellToken);
   const stage = useOptionalCapability(StageToken);
   // Null-safe: the zoom strip is main-toolbar chrome, mounted before any
@@ -147,8 +155,8 @@ function ZoomControls() {
               type="text"
               inputMode="numeric"
               pattern="\d*"
-              aria-label="Set zoom"
-              className="h-6 w-8 min-w-0 shrink border-0 bg-transparent p-0 text-right text-sm outline-none focus:outline-none"
+              aria-label={t('commands.zoom.level')}
+              className="h-6 w-8 min-w-0 shrink border-0 bg-transparent p-0 text-end text-sm outline-none focus:outline-none"
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value.replace(/[^0-9]/g, ''))}
               onBlur={() => {
@@ -163,7 +171,8 @@ function ZoomControls() {
               type="button"
               aria-haspopup="menu"
               aria-expanded={zoomOpen}
-              title="Zoom options"
+              title={zoomMenu.label}
+              part={buttonPart(false)}
               className={buttonClass(false)}
               onClick={() => shell?.toggleMenu('zoom')}
             >
@@ -173,7 +182,8 @@ function ZoomControls() {
           <span {...ARROW_STOP}>
             <button
               type="button"
-              title="Zoom out"
+              title={zoomOut.label}
+              part={buttonPart(false)}
               className={buttonClass(false)}
               onClick={() => commands.execute('zoom:out')}
             >
@@ -183,7 +193,8 @@ function ZoomControls() {
           <span {...ARROW_STOP}>
             <button
               type="button"
-              title="Zoom in"
+              title={zoomIn.label}
+              part={buttonPart(false)}
               className={buttonClass(false)}
               onClick={() => commands.execute('zoom:in')}
             >
@@ -199,14 +210,16 @@ function ZoomControls() {
 /** The 'button' variant of the zoom slot — a single icon that opens the menu. */
 function ZoomButton() {
   const shell = useOptionalCapability(ShellToken);
+  const zoomMenu = useCommand('menu:zoom');
   return (
     <MenuAnchor menuId="zoom">
       {(zoomOpen) => (
         <button
           type="button"
-          title="Zoom"
+          title={zoomMenu.label}
           aria-haspopup="menu"
           aria-expanded={zoomOpen}
+          part={buttonPart(zoomOpen)}
           className={buttonClass(zoomOpen)}
           onClick={() => shell?.toggleMenu('zoom')}
         >
@@ -229,6 +242,8 @@ function GroupTrigger({ view }: { view: GroupDisclosureView }) {
         onClick={() => setOpen((previous) => !previous)}
         aria-haspopup="menu"
         aria-expanded={open}
+        // The chevron the trailing mode tabs fold behind is a tab too; another group's is a button.
+        part={view.id === 'modes' ? modeTabPart(activeHidden) : buttonPart(open)}
         className={tabClass(activeHidden)}
       >
         <Icon name="chevronDown" size={18} />
@@ -251,10 +266,11 @@ function CollapsedModes({ view }: { view: CollapsedGroupView }) {
         onClick={() => setOpen((previous) => !previous)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="bg-surface hover:bg-hover flex w-full cursor-pointer appearance-none items-center rounded-md py-1.5 pl-3 pr-2 text-[13px] transition-colors"
+        part={buttonPart(open)}
+        className="bg-surface hover:bg-hover flex w-full cursor-pointer appearance-none items-center rounded-md py-1.5 pe-2 ps-3 text-[13px] transition-colors"
       >
         <span
-          className={`min-w-0 flex-1 truncate text-left ${isActive ? 'text-accent' : 'text-fg'}`}
+          className={`min-w-0 flex-1 truncate text-start ${isActive ? 'text-accent' : 'text-fg'}`}
         >
           {active?.label}
         </span>
@@ -285,6 +301,7 @@ function CollapsedMenu({ view }: { view: CollapsedGroupView }) {
         aria-expanded={open}
         aria-label={label}
         title={label}
+        part={buttonPart(open)}
         className={buttonClass(open)}
       >
         {shown?.icon ? (
@@ -314,6 +331,7 @@ function OverflowTrigger({ isOpen, toggle }: { isOpen: boolean; toggle: () => vo
       aria-haspopup="menu"
       aria-expanded={isOpen}
       title={t('demo.more')}
+      part={buttonPart(isOpen)}
       className={buttonClass(isOpen)}
     >
       <Icon name="dots" size={20} />

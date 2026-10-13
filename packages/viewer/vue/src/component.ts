@@ -73,7 +73,7 @@ import { ViewerKey } from './composables';
 type CallbackKey = 'onReady' | 'onDocumentChange' | 'onPanelResize';
 
 /** A door's config as props: every key but the callbacks, which are events. */
-export type PDFViewerPropsOf<Config extends ElementConfig> = Omit<Config, CallbackKey>;
+export type PDFViewerPropsOf<Config extends object> = Omit<Config, CallbackKey>;
 
 /** The props of the shared setup: the kernel's config, the widest. */
 export type PDFViewerImplProps = PDFViewerPropsOf<ElementConfig>;
@@ -141,8 +141,6 @@ const CONFIG_PROPS = {
   identity: null,
   notAllowed: null,
   layout: null,
-  stamps: null,
-  signatures: null,
   plugins: null,
   theme: null,
 } satisfies Record<keyof PDFViewerImplProps, unknown>;

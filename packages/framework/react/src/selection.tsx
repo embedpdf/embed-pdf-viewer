@@ -19,7 +19,7 @@ export * from '@embedpdf/plugin-selection';
 // re-exported here so app code has one import for the whole feature.
 export { copySelection } from '@embedpdf/web';
 import * as React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import {
   HANDLE_BAR,
@@ -361,7 +361,14 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   );
 }
 
-export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'>;
+export interface SelectionClipboardProps
+  extends Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'> {
+  /**
+   * Copy only while focus is inside this element, for a page with more than one viewer.
+   * Default: anywhere on the page.
+   */
+  target?: RefObject<HTMLElement | null>;
+}
 
 /**
  * Mount once per viewer to wire clipboard copy: prefetches the selected text
@@ -372,17 +379,20 @@ export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'
  * is ready. For a toolbar Copy button, call `copySelection(useSelection())`
  * from its click handler instead.
  */
-export function SelectionClipboard({ prefetch, onRefused }: SelectionClipboardProps = {}) {
+export function SelectionClipboard({ prefetch, onRefused, target }: SelectionClipboardProps = {}) {
   const selection = useOptionalCapability(SelectionToken);
   // The latest callback, so a new function each render doesn't wire the clipboard again.
   const refused = useRef(onRefused);
   refused.current = onRefused;
   useEffect(() => {
-    if (!selection) return;
+    // The element mounts before this effect runs, so its ref is set by now.
+    const element = target ? target.current : undefined;
+    if (!selection || element === null) return;
     return wireSelectionClipboard(selection, {
       ...(prefetch === undefined ? {} : { prefetch }),
+      ...(element ? { target: element } : {}),
       onRefused: () => refused.current?.(),
     });
-  }, [selection, prefetch]);
+  }, [selection, prefetch, target]);
   return null;
 }

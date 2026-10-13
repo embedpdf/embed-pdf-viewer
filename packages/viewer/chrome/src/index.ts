@@ -7,8 +7,8 @@
  * layout's edits are methods of the layout itself, so going from "pass
  * nothing" to "own the structure" needs no import at all.
  */
-export { FullViewer, themeConfigOf, themeTokenProperty } from './viewer';
-export type { FullViewerProps, ThemeConfig, ThemeTokens, ViewerCustomization } from './viewer';
+export { FullViewer } from './viewer';
+export type { FullViewerProps, ViewerCustomization } from './viewer';
 // Your own components: where a toolbar item sits, and the viewer's own components a delivery
 // places in the page for the viewer to draw.
 export { TOOLBAR_ITEM_CONTEXT_ATTRIBUTES } from './ui/item-context';
@@ -21,13 +21,14 @@ export type {
   PlacedMenu,
   PlacedMenuItem,
 } from './ui/placed-components';
+export type { PanelResizeEvent, ViewerFont } from './config-context';
 export type {
-  PanelResizeEvent,
-  SignaturesCustomization,
-  StampsCustomization,
-  ViewerFont,
-} from './config-context';
-export type { PluginSettings, ViewerPluginsConfig } from './plugin-settings';
+  PluginSettings,
+  SignatureFont,
+  ViewerPluginsConfig,
+  ViewerSignatureSettings,
+  ViewerStampSettings,
+} from './plugin-settings';
 // The prop types a delivery needs to speak FullViewer's contract.
 export type { Engine, EngineFactory, Identity, InitialDocument } from '@embedpdf/react/runtime';
 
@@ -102,8 +103,9 @@ export { ActionsToken } from '@embedpdf/react/actions';
 export { defaultLayout } from './config/chrome';
 export { defaultCommands } from './config/commands';
 export { ICON_PATHS as defaultIcons } from './ui/icons';
-export type { IconDef, PathSpec } from './ui/icons';
-export type { ThemeMode, ThemePreference } from './ui/theme';
+export type { IconDef, IconName, IconPaths, PathSpec } from './ui/icons';
+export { THEME_TOKENS, themeConfigOf, themeTokenCss } from './ui/theme';
+export type { ThemeConfig, ThemeMode, ThemePreference, ThemeToken, ThemeTokens } from './ui/theme';
 
 // ── the layout (core-ui): its data, the layout and its edits, the env ────────
 export { createLayout } from '@embedpdf/core-ui';
@@ -139,4 +141,5 @@ export type {
   Variant,
   ViewerSize,
 } from '@embedpdf/core-ui';
-export type { CommandDef } from '@embedpdf/react/commands';
+// A command as the `commands` config takes it: the headless one, with the viewer's words.
+export type { CommandContext, CommandDef } from './config/viewer-commands';

@@ -124,7 +124,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
           id: 'stamps',
           items: [
             'tool:stamp',
-            // Quick marks (`stamps.toolbar`): thumbnails that arm on click; in
+            // Quick marks (`plugins.stamp.quick`): thumbnails that arm on click; in
             // a menu the stamps panel stands in for them.
             { custom: 'quick-stamps', command: 'tool:stamp', importance: 3 },
             'tool:attachment',
@@ -190,7 +190,18 @@ export const DEFAULT_LAYOUT: LayoutData = {
     // bar serves a single and a multiple selection.
     selection: {
       place: { at: 'selection' },
-      center: [{ id: 'selection', items: ['selection:copy'], importance: 4 }],
+      center: [
+        {
+          id: 'selection',
+          items: [
+            'selection:copy',
+            'selection:highlight',
+            'selection:underline',
+            'selection:strikeout',
+          ],
+          importance: 4,
+        },
+      ],
     },
     annotation: {
       place: { at: 'annotation' },

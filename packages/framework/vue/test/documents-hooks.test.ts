@@ -97,9 +97,11 @@ describe('useMetadataState', () => {
     const { kernel } = await viewerWith(plugins, () => h(Probe), engine);
     expect(latest(states)).toEqual(metadataState.empty);
 
+    // Nothing reads the metadata as the document opens: the composable's reading it loads it.
     await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
-    await kernel.capability(MetadataToken).refresh();
+    await vi.waitFor(() => expect(kernel.capability(MetadataToken).getStatus()).toBe('ready'));
     await settle();
+    expect(states.some((state) => (state as { status: string }).status === 'loading')).toBe(true);
     expect(latest(states)).toEqual({
       metadata: METADATA,
       custom: { contractId: 'C-2026-114' },

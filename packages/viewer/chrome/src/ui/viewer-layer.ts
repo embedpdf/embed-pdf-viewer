@@ -26,6 +26,12 @@ const VIEWER_ROOT_SELECTOR = '[data-embedpdf-root]';
 /** What another surface that holds focus is marked with: a press in it is not a press outside. */
 export const MODAL_SELECTOR = '[aria-modal="true"]';
 
+/**
+ * What the viewer's root is marked with: it takes focus on a press that lands on nothing that
+ * takes focus itself (the pages), so the viewer's keys reach it from there.
+ */
+export const FOCUS_ROOT_ATTRIBUTE = 'data-epdf-focus-root';
+
 /** Place `element` (`position: fixed`) at a box in window px. */
 function placeFixed(
   element: HTMLElement,
@@ -114,7 +120,8 @@ function focusInto(container: HTMLElement): void {
  * Hold the keyboard in `container` until released: focus moves into it (to `initialFocus`, else
  * its first control), Tab and Shift+Tab stay inside it, and Escape calls `onEscape`. With
  * `trap: false` Tab moves on past it, as it does past anything else in the viewer. Releasing
- * gives focus back to what had it before, unless the user has moved it elsewhere.
+ * gives focus back to what had it before, unless the user has moved it elsewhere: a press on
+ * the pages, which puts focus on the viewer's root, doesn't count.
  */
 export function holdFocus(
   container: HTMLElement,
@@ -154,7 +161,9 @@ export function holdFocus(
     release: () => {
       standDown();
       const active = deepActiveElementOf(doc);
-      if (before?.isConnected && (active === null || container.contains(active))) before.focus();
+      const nowhere =
+        active === null || container.contains(active) || active.hasAttribute(FOCUS_ROOT_ATTRIBUTE);
+      if (before?.isConnected && nowhere) before.focus();
     },
   };
 }

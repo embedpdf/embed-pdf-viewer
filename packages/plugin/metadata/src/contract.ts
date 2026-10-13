@@ -49,7 +49,7 @@ export interface CustomMetadataResyncedEvent {
 export interface CustomMetadataCapability {
   /** The current keys, reference-stable until they change; `null` until the first read lands. */
   getSnapshot(): CustomMetadata | null;
-  /** Load state: `idle` → `loading` → `ready`, or `forbidden` / `error`. */
+  /** Load state: `idle` until `ensureLoaded()` asks, then `loading` → `ready`, or `forbidden` / `error`. */
   getStatus(): ResourceStatus;
   /**
    * Set and remove keys: a key left out stays, `null` removes it, a string
@@ -76,8 +76,15 @@ export interface MetadataCapability {
    * the first read lands or while reading is forbidden — see `getStatus()`.
    */
   getSnapshot(): DocumentMetadata | null;
-  /** Load state: `idle` → `loading` → `ready`, or `forbidden` / `error`. */
+  /** Load state: `idle` until `ensureLoaded()` asks, then `loading` → `ready`, or `forbidden` / `error`. */
   getStatus(): ResourceStatus;
+  /**
+   * Read the standard fields and the custom keys from the document, unless they are loaded or
+   * loading: nothing reads them when a document opens. Resolves once both have landed, when
+   * `onResynced` has fired; a later call resolves at once. Rejects with `permission-denied` when
+   * reading is refused, `operation-cancelled` or `instance-closed`; after a failure it reads again.
+   */
+  ensureLoaded(options?: OperationOptions): Promise<void>;
   /**
    * Whether this session may change the Info dict (`doc.metadata.modify`):
    * `update()` and `custom.update()`. The engine enforces the same permission.

@@ -5,9 +5,10 @@
  * (`<AnnotationMenu>`, `<SelectionMenu>`); the which is the commands'
  * `visible`/`enabled` derivations via `useStripView`. This file only draws.
  *
- * The strips sit below what's selected (and above it when there's no room),
- * so a menu from one opens below it, away from the selection (the `selection`
- * edge); it flips when there's no room below.
+ * The strips sit above what's selected, and below it when there's no room, so
+ * a menu from one opens on the strip's side, away from the selection (the
+ * `selection` edge); it flips when there's no room there. Each strip is a
+ * `toolbar` part and its buttons `toolbar-button` parts, like any bar's.
  */
 import type { ResolvedCommand } from '@embedpdf/react/commands';
 import type { useStripView } from '@embedpdf/react/toolbar';
@@ -16,7 +17,7 @@ import { Fragment } from 'react';
 import { BarEdgeProvider } from './bar-edge';
 import { Icon } from './icons';
 import { MenuAnchor } from './menu';
-import { buttonClass } from './toolbar';
+import { buttonClass, buttonPart } from './toolbar';
 
 function StripButton({ cmd, run }: { cmd: ResolvedCommand; run: () => void }) {
   // A menu command is active while its menu is open at this button: it says it's expanded.
@@ -30,6 +31,7 @@ function StripButton({ cmd, run }: { cmd: ResolvedCommand; run: () => void }) {
       aria-expanded={cmd.menu ? active : undefined}
       aria-label={cmd.label}
       title={cmd.label}
+      part={buttonPart(active)}
       className={buttonClass(active, cmd.enabled)}
     >
       {cmd.icon && <Icon name={cmd.icon} size={20} accent={cmd.iconAccent} />}
@@ -51,6 +53,7 @@ export function StripBar({
       <div
         role="toolbar"
         aria-label={label}
+        part="toolbar"
         className="border-border-subtle bg-elevated flex items-center gap-1 rounded-lg border p-1 shadow-xl"
       >
         {view.groups.map((group, i) => (

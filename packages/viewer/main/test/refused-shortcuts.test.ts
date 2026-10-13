@@ -1,6 +1,6 @@
 /**
- * Shortcuts don't fall through: a key whose command is turned off, or not allowed by the
- * scope, never reaches the browser, and the viewer says why in a notice. Ctrl/Cmd+P without
+ * Shortcuts don't fall through: a key pressed in the viewer whose command is turned off, or not
+ * allowed by the scope, never reaches the browser, and the viewer says why in a notice. Ctrl/Cmd+P without
  * printing doesn't print the page, and Ctrl/Cmd+C on text the user may not copy says so.
  *
  * Runs against the built snippet (`pnpm build` first).
@@ -94,6 +94,12 @@ describe('refused shortcuts', () => {
     const tab = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     await tab.goto(`${host.origin}/${name}.html`);
     await waitForDocument(tab);
+    await frames(tab);
+    // The keys reach the viewer while focus is inside it: a press on the pages puts it there.
+    await tab.mouse.click(450, 300);
+    await tab.waitForFunction(
+      () => document.querySelector('embedpdf-viewer')?.shadowRoot?.activeElement != null,
+    );
     await frames(tab);
     // Added after the viewer's own listener, so it sees whether the viewer took the key.
     await tab.evaluate(() => {

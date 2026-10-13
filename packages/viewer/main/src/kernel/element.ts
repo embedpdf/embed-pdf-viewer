@@ -21,11 +21,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import {
   FullViewer,
   defaultIcons,
-  themeConfigOf,
-  themeTokenProperty,
+  themeTokenCss,
   type FullViewerProps,
   type PanelResizeEvent,
-  type ThemeTokens,
   type Viewer,
   type ViewerFont,
 } from '@embedpdf/viewer-chrome';
@@ -35,10 +33,12 @@ import {
   configFromAttributes,
   documentFromSrc,
   idOfSrc,
+  initialDocumentsOf,
   isLiveConfigKey,
+  isOpenInput,
   mergeConfig,
-  type DocumentSrc,
   type ElementConfig,
+  type ElementSrc,
 } from './config';
 import { placedComponentsOf } from './components';
 import { chromeSheet, sheetOf } from './sheets';
@@ -66,8 +66,9 @@ const ROOT = `[${ROOT_ATTRIBUTE}]`;
  * The host is the box the page sizes. The wrapper inside it is the viewer's
  * own root, and nothing on the page reaches past it:
  *   - `all: initial` drops what the page would pass down (the body's font, letter spacing,
- *     alignment, color scheme…), then the viewer states its own text styles, in px. `all`
- *     leaves custom properties alone, so `--epdf-*` set on the page still theme the viewer.
+ *     alignment, color scheme…), then the viewer states its own text styles, in px, in its
+ *     `--epdf-font` and `--epdf-text`. `all` leaves custom properties alone, so `--epdf-*` set
+ *     on the page still theme the viewer.
  *   - Whether it shows or takes presses stays the page's call (`visibility`, `pointer-events`).
  *   - It is the containing block of everything inside, `position: fixed` too, so a dialog
  *     covers the viewer, not the page. Not `contain: paint`: menus may reach past the edge.
@@ -76,9 +77,8 @@ const HOST_CSS =
   ':host{display:block;height:100%}' +
   `${ROOT}{all:initial;visibility:inherit;pointer-events:inherit;` +
   'display:block;position:relative;isolation:isolate;contain:layout;box-sizing:border-box;' +
-  'height:100%;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji",' +
-  '"Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-size:16px;line-height:1.5;' +
-  'color:var(--ep-fg);color-scheme:light;tab-size:4;-webkit-text-size-adjust:100%;' +
+  'height:100%;font-family:var(--epdf-font);font-size:16px;line-height:1.5;' +
+  'color:var(--epdf-text);color-scheme:light;tab-size:4;-webkit-text-size-adjust:100%;' +
   'text-size-adjust:100%;-webkit-tap-highlight-color:transparent}' +
   `${ROOT}.dark{color-scheme:dark}`;
 
@@ -87,49 +87,6 @@ const adoptSheets = (): CSSStyleSheet[] => {
   sheets ??= [sheetOf(HOST_CSS), chromeSheet()];
   return sheets;
 };
-
-/**
- * The theme-token sheet: the overrides from `theme.tokens`/`theme.dark` on the
- * viewer's root, adopted after the chrome sheet so they win over its defaults
- * by order. Base tokens are re-stated for `.dark` (then dark overrides on top),
- * because the chrome's own `.dark` block would otherwise out-cascade a base
- * token. A public `--epdf-*` token is a default only: like the chrome's own, it
- * gives way to the page's value, read on the host as `--ep-host-<name>`.
- */
-function buildTokenSheet(tokens?: ThemeTokens, dark?: ThemeTokens): CSSStyleSheet | null {
-  const valid = (map: ThemeTokens): Array<[string, string]> =>
-    Object.entries(map).filter(([name, value]) => {
-      const ok = /^[a-z][a-z0-9-]*$/.test(name) && !/[{};]/.test(value);
-      if (!ok) console.warn(`[embedpdf] theme: ignoring invalid token "${name}"`);
-      return ok;
-    });
-  const publicNames = new Set<string>();
-  const decl = (entries: Array<[string, string]>): string =>
-    entries
-      .map(([name, value]) => {
-        const property = themeTokenProperty(name);
-        if (!property.startsWith('--epdf-')) return `${property}:${value};`;
-        publicNames.add(name);
-        return `${property}:var(--ep-host-${name},${value});`;
-      })
-      .join('');
-
-  const base = tokens ? valid(tokens) : [];
-  const darkOnly = dark ? valid(dark) : [];
-  const baseDecl = decl(base);
-  const darkDecl = decl([...base, ...darkOnly]);
-  const captures = [...publicNames]
-    .map((name) => `--ep-host-${name}:var(--epdf-${name});`)
-    .join('');
-  const css =
-    (captures ? `:host{${captures}}` : '') +
-    (baseDecl ? `${ROOT}{${baseDecl}}` : '') +
-    (darkDecl ? `${ROOT}.dark{${darkDecl}}` : '');
-  if (!css) return null;
-  const sheet = new CSSStyleSheet();
-  sheet.replaceSync(css);
-  return sheet;
-}
 
 /**
  * Resolve the config's `engine` field into what FullViewer takes.
@@ -208,10 +165,15 @@ const PROPERTIES = ['config', 'src', 'theme', 'locale', 'disable', 'readOnly'] a
  */
 const WRAPPED_ATTRIBUTE = 'data-epdf-wrapped';
 
-/** The document a `src` opened: the id its tab was reserved under, and the id it asked for. */
+/**
+ * The document a `src` opened: the id its tab was reserved under, and the id it asked for, which
+ * becomes the engine's own once it opens (an open input names no id of its own). `opened` settles
+ * with that id, or null when it didn't open.
+ */
 interface SrcDocument {
   readonly reserved: string;
-  readonly id: string;
+  id: string;
+  readonly opened: Promise<string | null>;
 }
 
 export class EmbedPdfViewerElement extends ElementBase {
@@ -249,13 +211,13 @@ export class EmbedPdfViewerElement extends ElementBase {
   }
 
   /**
-   * The document: a URL, a `File`, or bytes. Another one opens in its place, `null` closes it,
-   * and `undefined` goes back to the `src` attribute.
+   * The document: a URL, a `File`, or bytes (or what the door's engine opens). Another one opens
+   * in its place, `null` closes it, and `undefined` goes back to the `src` attribute.
    */
-  set src(src: DocumentSrc | null | undefined) {
+  set src(src: ElementSrc | null | undefined) {
     this.#change({ src });
   }
-  get src(): DocumentSrc | null {
+  get src(): ElementSrc | null {
     return this.config.src ?? null;
   }
 
@@ -402,26 +364,52 @@ export class EmbedPdfViewerElement extends ElementBase {
     // A tab's id changes once its source has said which document it is.
     const previousId = previous && documents.has(previous.id) ? previous.id : previous?.reserved;
     const position = previousId ? documents.getOrder().indexOf(previousId) : -1;
-    if (config.src != null) {
-      const id = this.#freeIdFor(config.src);
-      const [reserved] = documents.openAll([documentFromSrc(config.src, id)]);
-      if (reserved) {
-        this.#srcDocument = { reserved, id };
-        if (position >= 0) documents.move(reserved, position);
-      }
-    }
+    // The new document opens before the old one closes, so the active one never switches to a
+    // neighbour in between; an open input waits for the close (see documentFromSrc).
+    let previousClosed: () => void = () => {};
+    const closed = new Promise<void>((resolve) => (previousClosed = resolve));
+    if (config.src != null) this.#openSrc(config.src, position, previous ? closed : undefined);
     if (previous) {
-      this.#closing.add(previous.id);
-      const release = () => this.#closing.delete(previous.id);
-      Promise.all([documents.close(previous.reserved), documents.close(previous.id)]).then(
-        release,
-        release,
-      );
+      const closingId = previous.id;
+      this.#closing.add(closingId);
+      const tried = new Set([previous.reserved, closingId]);
+      const release = () => {
+        this.#closing.delete(closingId);
+        previousClosed();
+      };
+      Promise.all([...tried].map((id) => documents.close(id)))
+        // One still opening is closed by its reserved id; one the engine renamed meanwhile, by
+        // the id it opened under.
+        .then(() => previous.opened)
+        .then((id) => (id !== null && !tried.has(id) ? documents.close(id) : undefined))
+        .then(release, release);
     }
   }
 
+  /** Open `src` as the `src` document, at `position` in the tabs, once `after` settles. */
+  #openSrc(src: ElementSrc, position: number, after?: Promise<void>): void {
+    const { documents } = this.#viewer!;
+    const id = this.#freeIdFor(src);
+    const { source, name } = documentFromSrc(src, id, after);
+    const before = new Set(documents.getOrder());
+    // Its tab exists at once: the one id the order didn't have.
+    const opening = documents.open(source, name !== undefined ? { name } : {});
+    const reserved = documents.getOrder().find((tab) => !before.has(tab));
+    const opened = opening.then(
+      ({ document }) => document.id,
+      () => null,
+    );
+    if (!reserved) return;
+    const shown: SrcDocument = { reserved, id: isOpenInput(src) ? reserved : id, opened };
+    this.#srcDocument = shown;
+    void opened.then((openedId) => {
+      if (openedId !== null) shown.id = openedId;
+    });
+    if (position >= 0) documents.move(reserved, position);
+  }
+
   /** The id `src` asks for, or with a number after it while a document still has it. */
-  #freeIdFor(src: DocumentSrc): string {
+  #freeIdFor(src: ElementSrc): string {
     const wanted = idOfSrc(src);
     const taken = (id: string) => this.#closing.has(id) || Boolean(this.#viewer?.documents.has(id));
     let id = wanted;
@@ -429,11 +417,10 @@ export class EmbedPdfViewerElement extends ElementBase {
     return id;
   }
 
-  /** The chrome's sheets, and the theme's tokens after them. */
+  /** The chrome's sheets, and the theme's tokens after them, so they win over its defaults. */
   #adoptSheets(theme: ElementConfig['theme']): void {
-    const { tokens, dark } = themeConfigOf(theme);
-    const tokenSheet = buildTokenSheet(tokens, dark);
-    this.shadowRoot!.adoptedStyleSheets = [...adoptSheets(), ...(tokenSheet ? [tokenSheet] : [])];
+    const tokens = themeTokenCss(theme, ROOT);
+    this.shadowRoot!.adoptedStyleSheets = [...adoptSheets(), ...(tokens ? [sheetOf(tokens)] : [])];
   }
 
   #mount(): void {
@@ -454,7 +441,7 @@ export class EmbedPdfViewerElement extends ElementBase {
     this.#props = {
       engine,
       fonts,
-      initialDocuments: documents,
+      initialDocuments: documents && initialDocumentsOf(documents),
       theme,
       themeTarget: this.#wrapper,
       // The viewer's own components among the children (`<epdf-button>`, `<epdf-menu>`).

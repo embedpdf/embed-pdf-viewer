@@ -11,21 +11,25 @@
   import { SelectionToken } from '@embedpdf/plugin-selection';
   import { wireSelectionClipboard } from '@embedpdf/web';
   import { useOptionalCapability } from '../runtime/readers.svelte';
+  import { valueOf } from '../runtime/values.svelte';
   import type { SelectionClipboardProps } from './props';
 
-  let { prefetch, onRefused }: SelectionClipboardProps = $props();
+  let { prefetch, onRefused, target }: SelectionClipboardProps = $props();
 
   // The capability itself, not a handle: the clipboard wiring keeps it and subscribes to it.
   const selection = useOptionalCapability(SelectionToken);
 
   $effect(() => {
     const current = selection.current;
+    const element = valueOf(target);
     // Read at the moment of the refusal, so a new callback needs no new wiring.
     const options = {
       ...(prefetch === undefined ? {} : { prefetch }),
+      ...(element ? { target: element } : {}),
       onRefused: () => untrack(() => onRefused)?.(),
     };
-    if (!current) return;
+    // A target that hasn't mounted yet wires nothing; this runs again once it has.
+    if (!current || (target !== undefined && !element)) return;
     return untrack(() => wireSelectionClipboard(current, options));
   });
 </script>

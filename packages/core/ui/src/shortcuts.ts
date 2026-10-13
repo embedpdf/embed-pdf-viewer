@@ -94,6 +94,24 @@ export function matchShortcut(
 }
 
 /**
+ * Whether two shortcuts are pressed with the same keys on this platform: `'Mod+S'` and
+ * `'Ctrl+s'` are where `Mod` is Ctrl, and not on a Mac.
+ */
+export function sameShortcut(left: string, right: string, options: { isMac: boolean }): boolean {
+  const keysOf = (shortcut: string) => {
+    const parsed = parseShortcut(shortcut);
+    return [
+      parsed.key,
+      parsed.ctrl || (parsed.mod && !options.isMac),
+      parsed.meta || (parsed.mod && options.isMac),
+      parsed.alt,
+      parsed.shift,
+    ].join(' ');
+  };
+  return keysOf(left) === keysOf(right);
+}
+
+/**
  * How a key shows, by its lowercase name, where that isn't the name itself:
  * on a Mac, then elsewhere. Matches what each platform's own menus show.
  */

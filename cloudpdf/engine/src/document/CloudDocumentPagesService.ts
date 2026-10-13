@@ -19,6 +19,7 @@ import {
   type PageRotateResult,
   type PdfRotation,
   pageRefsEqual,
+  type SessionEventPublisher,
   type WriteOptions,
   type FlattenWriteOptions,
   type PageInsertBlankOptions,
@@ -33,7 +34,6 @@ import {
   PageRotateResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';

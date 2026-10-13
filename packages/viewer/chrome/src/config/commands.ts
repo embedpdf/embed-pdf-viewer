@@ -5,8 +5,9 @@
  * `commandContext.tryGet(Token)`, never by string id and cast.
  *
  * Each command names its most specific feature in `categories` (the tree in
- * `../features.ts`), so `disable` and `readOnly` turn it off, and what the
- * scope must allow in `requires`, so a user without it doesn't see it.
+ * `../features.ts`), so `disable` and `readOnly` turn it off, and whether the
+ * session may run it in `allowed`, from the owning plugin's `can*` check
+ * (docs/conventions/permissions.md), so a user who may not doesn't see it.
  * `enabled` is only for what can't run right now.
  *
  * Wiring:
@@ -21,7 +22,9 @@
  *   history undo/redo                      → real History
  */
 import { panelCommandOf } from '@embedpdf/core-ui';
+import type { AnnotationToolInput } from '@embedpdf/react/annotation';
 import { CommandsToken, type CommandDef, type IconAccent } from '@embedpdf/react/commands';
+import { FormToken } from '@embedpdf/react/form';
 import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
 import { StageToken, ZoomMode } from '@embedpdf/react/stage';
@@ -33,6 +36,7 @@ import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/s
 import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
 import { MeasurementToken } from '@embedpdf/react/measurement';
+import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
 import { SignatureToken } from '@embedpdf/react/signature';
 import { I18nToken } from '@embedpdf/react/i18n';
@@ -43,14 +47,13 @@ import { openFileCommand } from './open-files';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
-type Requirements = NonNullable<CommandDef['requires']>;
 
-// What the scope must allow, named as the engine names it: the same
-// permissions the owning plugins' twins ask (docs/conventions/permissions.md).
-/** Drawing an annotation of any kind: what `annotation.canCreate()` asks. */
-const CREATES_ANNOTATIONS: Requirements = ['annotations:create'];
-/** Placing and changing form fields: what `form.canDesign()` asks. */
-const DESIGNS_FORMS: Requirements = ['doc.forms.modify'];
+/** The dialog the Go to Page command opens without a page to go to (ui/go-to-page.tsx). */
+export const GO_TO_PAGE_DIALOG = 'go-to-page';
+/** The keyboard shortcuts sheet, which `?` opens (ui/shortcuts-sheet.tsx). */
+export const SHORTCUTS_DIALOG = 'shortcuts';
+/** The confirmation before marked areas are removed for good (ui/redact-confirm.tsx). */
+export const REDACT_CONFIRM_DIALOG = 'redact-confirm';
 
 /** Where selection-made stamps go: the user's own library, persisted. */
 const CUSTOM_LIBRARY_ID = 'embedpdf-custom';
@@ -59,6 +62,30 @@ const stage = (commandContext: Ctx) => commandContext.tryGet(StageToken);
 const interaction = (commandContext: Ctx) => commandContext.tryGet(InteractionToken);
 const anno = (commandContext: Ctx) => commandContext.tryGet(AnnotationToken);
 const textSelection = (commandContext: Ctx) => commandContext.tryGet(SelectionToken);
+
+/**
+ * Whether the session may run a command, as the plugin that owns its verb says, and the
+ * sentence for when it may not (docs/conventions/permissions.md). Without the plugin there is
+ * nothing to ask, and the command's own `enabled` or `visible` says it can't run.
+ */
+type Check = Pick<CommandDef, 'allowed' | 'notAllowedKey'>;
+
+/** Drawing an annotation of any kind: `annotation.canCreate()`. */
+const CREATES_ANNOTATIONS: Check = {
+  allowed: (commandContext) => anno(commandContext)?.canCreate() ?? true,
+  notAllowedKey: 'commands.notAllowed.annotations-create',
+};
+/** Placing and changing form fields: `form.canDesign()`. */
+const DESIGNS_FORMS: Check = {
+  allowed: (commandContext) => commandContext.tryGet(FormToken)?.canDesign() ?? true,
+  notAllowedKey: 'commands.notAllowed.doc-forms-modify',
+};
+/** Placing a stamp or a signature mark: `stamp.canPlace()`. */
+const PLACES_STAMPS: Check = {
+  allowed: (commandContext) =>
+    commandContext.tryGet(StampToken)?.canPlace(commandContext.documentId ?? undefined) ?? true,
+  notAllowedKey: 'commands.notAllowed.annotations-create',
+};
 const sameTextRange = (left: TextRange | null, right: TextRange | null): boolean =>
   left === right ||
   (!!left &&
@@ -158,40 +185,77 @@ const toolAccent = (
   };
 };
 
+/** toolId → the feature its command belongs to, for the tools of yours that extend it. */
+const TOOL_FEATURES: Record<string, Feature> = {};
+
 /** What a tool command belongs to and needs, and how its icon previews the tool. */
 interface ToolOptions {
   /** Its feature, so `disable` and `readOnly` turn it off. */
   readonly feature: Feature;
   /**
-   * What the scope must allow: an authoring tool is gone without it, so a
+   * Whether the session may use it: an authoring tool is gone without it, so a
    * button never offers a paint the owning plugin's gesture gate refuses.
    */
-  readonly requires?: Requirements;
+  readonly check?: Check;
   readonly accent?: ToolAccentDefinition;
 }
 
-/** A tool command: activates a real interaction tool; active = it's the tool.
+/** A tool command without its label: activates a real interaction tool; active = it's the tool.
  *  The icon previews the tool's current defaults — keyed by the same toolId
  *  as run/active, so the accent can't drift to another tool's colors. */
-const tool = (
+const toolCommand = (
   id: string,
   toolId: string,
-  labelKey: string,
-  icon: string,
-  { feature, requires, accent }: ToolOptions,
-): CommandDef => {
-  TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
+  icon: string | undefined,
+  { feature, check, accent }: ToolOptions,
+): Omit<CommandDef, 'labelKey'> => {
+  if (icon) TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
+  TOOL_FEATURES[toolId] = feature;
   return {
     id,
-    labelKey,
-    icon,
+    ...(icon ? { icon } : {}),
     categories: [feature],
-    ...(requires ? { requires } : {}),
+    ...check,
     run: (commandContext) => interaction(commandContext)?.activateTool(toolId),
     active: (commandContext) => interaction(commandContext)?.getActiveToolId() === toolId,
     enabled: (commandContext) => interaction(commandContext) != null,
     iconAccent: (commandContext) => toolAccent(commandContext, toolId, accent),
   };
+};
+
+const tool = (
+  id: string,
+  toolId: string,
+  labelKey: string,
+  icon: string,
+  options: ToolOptions,
+): CommandDef => ({ ...toolCommand(id, toolId, icon, options), labelKey });
+
+/**
+ * Selected text made into a highlight, an underline or a strikeout, with the colors of the
+ * tool that makes the same: shown only while there's a selection.
+ */
+const markupSelection = (
+  id: string,
+  toolId: string,
+  labelKey: string,
+  icon: string,
+  feature: Feature,
+): CommandDef => ({
+  id,
+  labelKey,
+  icon,
+  categories: [feature],
+  ...CREATES_ANNOTATIONS,
+  visible: (commandContext) => textSelection(commandContext)?.hasSelection() ?? false,
+  run: (commandContext) => anno(commandContext)?.createFromSelection(toolId),
+  iconAccent: (commandContext) => toolAccent(commandContext, toolId, { primary: 'color' }),
+});
+
+/** The page number `page:go-to` was given (`args: { page }`, counted from 1), or `null`. */
+const pageArgOf = (args: unknown): number | null => {
+  const page = (args as { page?: unknown } | undefined)?.page;
+  return typeof page === 'number' && Number.isFinite(page) ? Math.round(page) : null;
 };
 
 /** A fixed zoom level (fraction), e.g. 1 = 100%. */
@@ -266,6 +330,55 @@ export const defaultCommands: CommandDef[] = [
     menu: 'zoom',
   },
 
+  // ── pages ──────────────────────────────────────────────────────────────
+  {
+    id: 'page:next',
+    labelKey: 'commands.page.next',
+    icon: 'chevronRight',
+    shortcut: 'ArrowRight',
+    run: (commandContext) => stage(commandContext)?.nextPage(),
+    enabled: (commandContext) => stage(commandContext)?.canGoNext() ?? false,
+  },
+  {
+    id: 'page:previous',
+    labelKey: 'commands.page.previous',
+    icon: 'chevronLeft',
+    shortcut: 'ArrowLeft',
+    run: (commandContext) => stage(commandContext)?.previousPage(),
+    enabled: (commandContext) => stage(commandContext)?.canGoPrevious() ?? false,
+  },
+  {
+    id: 'page:first',
+    labelKey: 'commands.page.first',
+    shortcut: 'Home',
+    run: (commandContext) => stage(commandContext)?.goToFirstPage(),
+    enabled: (commandContext) => stage(commandContext)?.canGoPrevious() ?? false,
+  },
+  {
+    id: 'page:last',
+    labelKey: 'commands.page.last',
+    shortcut: 'End',
+    run: (commandContext) => stage(commandContext)?.goToLastPage(),
+    enabled: (commandContext) => stage(commandContext)?.canGoNext() ?? false,
+  },
+  {
+    // `execute('page:go-to', { args: { page: 3 } })` goes to page 3 (people count from 1; past
+    // either end is that end); without a page it asks for one in a dialog.
+    id: 'page:go-to',
+    labelKey: 'commands.page.goTo',
+    run: (commandContext) => {
+      const view = stage(commandContext);
+      if (!view) return;
+      const page = pageArgOf(commandContext.args);
+      if (page === null) {
+        commandContext.tryGet(ShellToken)?.open(GO_TO_PAGE_DIALOG, { exclusive: 'modal' });
+        return;
+      }
+      view.goToPage(Math.min(Math.max(page, 1), view.getPageCount()) - 1);
+    },
+    enabled: (commandContext) => (stage(commandContext)?.getPageCount() ?? 0) > 0,
+  },
+
   // ── tools ──────────────────────────────────────────────────────────────
   {
     id: 'tool:pan',
@@ -306,8 +419,10 @@ export const defaultCommands: CommandDef[] = [
     id: 'document:download',
     labelKey: 'commands.download',
     icon: 'download',
+    shortcut: 'Mod+S',
     categories: ['documents.download'],
-    requires: ['doc.download'],
+    allowed: (commandContext) => commandContext.tryGet(DocumentsToken)?.canDownload() ?? true,
+    notAllowedKey: 'commands.notAllowed.doc-download',
     run: (commandContext) => {
       const id = commandContext.documentId ?? undefined;
       const documents = commandContext.tryGet(DocumentsToken);
@@ -333,9 +448,10 @@ export const defaultCommands: CommandDef[] = [
     id: 'document:print',
     labelKey: 'commands.print',
     icon: 'print',
-    shortcut: 'Mod+p',
+    shortcut: 'Mod+P',
     categories: ['documents.print'],
-    requires: ['doc.print'],
+    allowed: (commandContext) => commandContext.tryGet(DocumentsToken)?.canPrint() ?? true,
+    notAllowedKey: 'commands.notAllowed.doc-print',
     // WP → window.print() → DP through the one serialized verb op (the
     // latch suppresses any nested script print); documentless chrome (or
     // no actions plugin) keeps today's direct dialog.
@@ -427,99 +543,99 @@ export const defaultCommands: CommandDef[] = [
   // ── annotate tools (real interaction tools) ─────────────────────────────
   tool('tool:highlight', 'highlight', 'commands.annotate.highlight', 'highlight', {
     feature: 'annotations.highlight',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:strikeout', 'strikeout', 'commands.annotate.strikeout', 'strikethrough', {
     feature: 'annotations.markup',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:underline', 'underline', 'commands.annotate.underline', 'underline', {
     feature: 'annotations.markup',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:squiggly', 'squiggly', 'commands.annotate.squiggly', 'squiggly', {
     feature: 'annotations.markup',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:ink', 'ink', 'commands.annotate.ink', 'pencilMarker', {
     feature: 'annotations.drawing',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:ink-highlight', 'ink-highlight', 'commands.annotate.inkHighlight', 'inkHighlighter', {
     feature: 'annotations.drawing',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:free-text', 'free-text', 'commands.annotate.text', 'freeText', {
     feature: 'annotations.text',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'fontColor' },
   }),
   tool('tool:insert-text', 'insert-text', 'commands.annotate.insertText', 'insertText', {
     feature: 'annotations.text',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:replace-text', 'replace-text', 'commands.annotate.replaceText', 'replaceText', {
     feature: 'annotations.text',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:callout', 'free-text-callout', 'commands.annotate.callout', 'callout', {
     feature: 'annotations.text',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color', secondary: 'interiorColor' },
   }),
   // Sticky note ("comment") — click-to-place; the icon renders from the
   // engine-baked /AP in the tool's current color.
   tool('tool:note', 'note', 'commands.annotate.note', 'message', {
     feature: 'annotations.notes',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
   }),
   // Link — drag an invisible hit rectangle, then set the target in the style
   // panel's Link control (create-then-edit). While active, existing links
   // become editable rects instead of navigating.
   tool('tool:link', 'link', 'commands.annotate.link', 'link', {
     feature: 'annotations.links',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
   }),
 
   // ── shape tools (real interaction tools) ────────────────────────────────
   tool('tool:square', 'square', 'commands.shapes.rectangle', 'square', {
     feature: 'shapes',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color', secondary: 'interiorColor' },
   }),
   tool('tool:circle', 'circle', 'commands.shapes.circle', 'circle', {
     feature: 'shapes',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color', secondary: 'interiorColor' },
   }),
   tool('tool:line', 'line', 'commands.shapes.line', 'line', {
     feature: 'shapes',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   // The arrow tool is a `line` preset (a line with an arrowhead) — registered by
   // the annotationPlugin `tools` config in viewer.tsx, activated like any other tool.
   tool('tool:arrow', 'arrow', 'commands.shapes.arrow', 'lineArrow', {
     feature: 'shapes',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
   tool('tool:polygon', 'polygon', 'commands.shapes.polygon', 'polygon', {
     feature: 'shapes',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color', secondary: 'interiorColor' },
   }),
   tool('tool:polyline', 'polyline', 'commands.shapes.polyline', 'zigzag', {
     feature: 'shapes',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
     accent: { primary: 'color' },
   }),
 
@@ -535,14 +651,14 @@ export const defaultCommands: CommandDef[] = [
     icon: 'rubberStamp',
     categories: ['stamps'],
     // Nothing the picker could place without it, as for every insert tool.
-    requires: CREATES_ANNOTATIONS,
+    ...PLACES_STAMPS,
     // No stamp plugin → no library to show.
     ...togglesPanel('stamps', (commandContext) => commandContext.tryGet(StampToken) != null),
   },
   // File attachment — click the spot, pick the file (the attachment provider).
   tool('tool:attachment', 'attachment', 'commands.insert.attachment', 'paperclip', {
     feature: 'attachments.adding',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
   }),
   // Signatures open the people panel (libraries of kind 'signatures'): pick a
   // mark → with a target field it signs (or fills) it, else it arms — a click
@@ -552,7 +668,8 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.insert.signature',
     icon: 'signature',
     categories: ['signatures.signing'],
-    requires: CREATES_ANNOTATIONS,
+    // A mark off a field is a stamp; one on a field is the field's value.
+    ...PLACES_STAMPS,
     ...togglesPanel(
       'signatures',
       (commandContext) =>
@@ -564,52 +681,68 @@ export const defaultCommands: CommandDef[] = [
   // tool itself is a `stamp` preset registered in viewer.tsx.
   tool('tool:image', 'image', 'commands.insert.image', 'photo', {
     feature: 'stamps',
-    requires: CREATES_ANNOTATIONS,
+    check: CREATES_ANNOTATIONS,
   }),
 
   // ── form tools (the form plugin's draw-to-place palette) ────────────────
   tool('tool:text-field', 'form-text', 'commands.form.textfield', 'formTextfield', {
     feature: 'forms.building',
-    requires: DESIGNS_FORMS,
+    check: DESIGNS_FORMS,
   }),
   tool('tool:checkbox', 'form-checkbox', 'commands.form.checkbox', 'formCheckbox', {
     feature: 'forms.building',
-    requires: DESIGNS_FORMS,
+    check: DESIGNS_FORMS,
   }),
   tool('tool:radio', 'form-radio', 'commands.form.radio', 'formRadio', {
     feature: 'forms.building',
-    requires: DESIGNS_FORMS,
+    check: DESIGNS_FORMS,
   }),
   tool('tool:combo-box', 'form-combobox', 'commands.form.select', 'formSelect', {
     feature: 'forms.building',
-    requires: DESIGNS_FORMS,
+    check: DESIGNS_FORMS,
   }),
   tool('tool:list-box', 'form-listbox', 'commands.form.listbox', 'formListbox', {
     feature: 'forms.building',
-    requires: DESIGNS_FORMS,
+    check: DESIGNS_FORMS,
   }),
   tool('tool:button', 'form-button', 'commands.form.button', 'formButton', {
     feature: 'forms.building',
-    requires: DESIGNS_FORMS,
+    check: DESIGNS_FORMS,
   }),
   tool('tool:signature-field', 'form-signature', 'commands.form.signature', 'signature', {
     feature: 'forms.building',
-    requires: DESIGNS_FORMS,
+    check: DESIGNS_FORMS,
   }),
 
   // ── redaction (the toolbar arms the tool; the panel owns the destructive
   // verbs — Apply All / Clear live in the redaction sidebar) ─────────────────
-  // Marks are annotations: marking asks what `redaction.canMark()` asks.
+  // Marks are annotations, so marking is `redaction.canMark()`.
   tool('tool:redact', 'redact', 'commands.redact.mark', 'redactArea', {
     feature: 'redaction',
-    requires: CREATES_ANNOTATIONS,
+    check: {
+      allowed: (commandContext) => commandContext.tryGet(RedactionToken)?.canMark() ?? true,
+      notAllowedKey: 'commands.notAllowed.annotations-create',
+    },
   }),
+  {
+    id: 'redaction:apply',
+    labelKey: 'commands.redact.applyAll',
+    icon: 'redact',
+    categories: ['redaction'],
+    allowed: (commandContext) => commandContext.tryGet(RedactionToken)?.canApply() ?? true,
+    // It can't be undone, so it asks first: the confirmation applies.
+    modal: REDACT_CONFIRM_DIALOG,
+    enabled: (commandContext) => {
+      const redaction = commandContext.tryGet(RedactionToken);
+      return !!redaction && redaction.getPendingCount() > 0 && !redaction.isApplying();
+    },
+  },
 
   // ── measurement: the tools need a calibrated page right now (`canMeasure`) ──
   {
     ...tool('tool:distance', 'distance', 'measurement.distance', 'distance', {
       feature: 'measurement',
-      requires: CREATES_ANNOTATIONS,
+      check: CREATES_ANNOTATIONS,
       accent: { primary: 'color' },
     }),
     enabled: canMeasureNow,
@@ -617,7 +750,7 @@ export const defaultCommands: CommandDef[] = [
   {
     ...tool('tool:perimeter', 'perimeter', 'measurement.perimeter', 'perimeter', {
       feature: 'measurement',
-      requires: CREATES_ANNOTATIONS,
+      check: CREATES_ANNOTATIONS,
       accent: { primary: 'color' },
     }),
     enabled: canMeasureNow,
@@ -625,7 +758,7 @@ export const defaultCommands: CommandDef[] = [
   {
     ...tool('tool:area', 'area', 'measurement.area', 'area', {
       feature: 'measurement',
-      requires: CREATES_ANNOTATIONS,
+      check: CREATES_ANNOTATIONS,
       accent: { primary: 'color' },
     }),
     enabled: canMeasureNow,
@@ -635,8 +768,9 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'measurement.calibrate',
     icon: 'calibrate',
     categories: ['measurement'],
-    // What `measurement.canCalibrate()` asks: setting a page's scale changes the document.
-    requires: ['doc.annotate.modify'],
+    // Setting a page's scale changes the document.
+    allowed: (commandContext) => commandContext.tryGet(MeasurementToken)?.canCalibrate() ?? true,
+    notAllowedKey: 'commands.notAllowed.doc-annotate-modify',
     enabled: (commandContext) => commandContext.tryGet(MeasurementToken) != null,
     active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'calibrate',
     run: (commandContext) => commandContext.tryGet(MeasurementToken)?.startCalibration(),
@@ -656,6 +790,8 @@ export const defaultCommands: CommandDef[] = [
     id: 'annotation:delete',
     labelKey: 'commands.annotate.delete',
     icon: 'trash',
+    // Backspace is the Delete key of a Mac keyboard.
+    shortcut: ['Delete', 'Backspace'],
     categories: ['annotations'],
     // One change for the whole selection: a form widget lent to the annotation
     // plugin is deleted as the form says (its field, when every widget of it goes).
@@ -708,7 +844,11 @@ export const defaultCommands: CommandDef[] = [
     icon: 'rubberStampPlus',
     categories: ['stamps'],
     // The stamp carries the annotations' appearances out of the document.
-    requires: ['doc.download'],
+    allowed: (commandContext) =>
+      commandContext
+        .tryGet(StampToken)
+        ?.canCreateFromAnnotations(commandContext.documentId ?? undefined) ?? true,
+    notAllowedKey: 'commands.notAllowed.doc-download',
     run: (commandContext) => {
       const annotation = anno(commandContext);
       const stamp = commandContext.tryGet(StampToken);
@@ -792,7 +932,8 @@ export const defaultCommands: CommandDef[] = [
     // A deployment denying doc.text.copy shows no Copy at all — and with zero
     // visible commands the strip renders nothing, so there is never an empty
     // bubble. Ctrl/Cmd+C is the clipboard wiring's, which says it isn't allowed.
-    requires: ['doc.text.copy'],
+    allowed: (commandContext) => textSelection(commandContext)?.canCopy() ?? true,
+    notAllowedKey: 'commands.notAllowed.doc-text-copy',
     visible: (commandContext) => textSelection(commandContext)?.hasSelection() ?? false,
     // Async Clipboard write inside the click's activation window; instant
     // when <SelectionClipboard>'s commit prefetch already fetched the text.
@@ -811,6 +952,28 @@ export const defaultCommands: CommandDef[] = [
       );
     },
   },
+
+  markupSelection(
+    'selection:highlight',
+    'highlight',
+    'commands.annotate.highlight',
+    'highlight',
+    'annotations.highlight',
+  ),
+  markupSelection(
+    'selection:underline',
+    'underline',
+    'commands.annotate.underline',
+    'underline',
+    'annotations.markup',
+  ),
+  markupSelection(
+    'selection:strikeout',
+    'strikeout',
+    'commands.annotate.strikeout',
+    'strikethrough',
+    'annotations.markup',
+  ),
 
   // ── link strip items: Link / Go to link / Remove link ────────────────────
   {
@@ -845,6 +1008,16 @@ export const defaultCommands: CommandDef[] = [
     categories: ['annotations.links'],
     run: (commandContext) => anno(commandContext)?.selection.updateLink(null),
     visible: (commandContext) => selectionLink(commandContext) != null,
+  },
+
+  // ── the keyboard ────────────────────────────────────────────────────────
+  {
+    // No feature: it only says which keys do what.
+    id: 'help:shortcuts',
+    labelKey: 'commands.shortcuts',
+    shortcut: '?',
+    modal: SHORTCUTS_DIALOG,
+    enabled: (commandContext) => commandContext.tryGet(ShellToken) != null,
   },
 
   // ── history ──────────────────────────────────────────────────────────────
@@ -900,4 +1073,30 @@ function modeCommand(
     },
     active: (commandContext) => commandContext.tryGet(ShellToken)?.isOpen(id) ?? false,
   };
+}
+
+// ── your own tools ───────────────────────────────────────────────────────────
+
+/**
+ * A `tool:<id>` command for each tool of yours (`plugins.annotation.tools`) that no command has
+ * (`isTaken` says which ids do): labelled by its `meta.label`, else its id; drawn with its
+ * `meta.icon`, else the icon of the tool it extends; in that tool's feature, else `annotations`.
+ */
+export function toolCommandsFor(
+  tools: readonly AnnotationToolInput[],
+  isTaken: (id: string) => boolean,
+): CommandDef[] {
+  return tools.flatMap((input): CommandDef[] => {
+    const id = `tool:${input.id}`;
+    if (isTaken(id)) return [];
+    const base = input.extends;
+    const meta = input.meta ?? {};
+    const icon = typeof meta.icon === 'string' ? meta.icon : base && TOOL_ICONS[base]?.icon;
+    const command = toolCommand(id, input.id, icon || undefined, {
+      feature: (base && TOOL_FEATURES[base]) || 'annotations',
+      check: CREATES_ANNOTATIONS,
+      ...(base && TOOL_ICONS[base]?.accent ? { accent: TOOL_ICONS[base].accent } : {}),
+    });
+    return [{ ...command, label: typeof meta.label === 'string' ? meta.label : input.id }];
+  });
 }

@@ -1,8 +1,9 @@
 import type { Locale } from '@embedpdf/react/i18n';
 
-/** Spanish pack — loaded lazily (see the i18n `loaders` config in App). The
- *  longer Spanish labels are exactly what makes the measured toolbar re-solve
- *  on locale switch, with zero configuration. */
+/**
+ * Spanish pack, in the words Adobe Acrobat's Spanish edition uses (redaction is "Censurar").
+ * Its longer labels make the measured toolbar move more buttons into "More" on a switch.
+ */
 export const es: Locale = {
   code: 'es',
   name: 'Español',
@@ -65,7 +66,11 @@ export const es: Locale = {
         odd: 'Dos páginas',
         even: 'Portada',
       },
-      scroll: { group: 'Desplazamiento', vertical: 'Vertical', horizontal: 'Horizontal' },
+      scroll: {
+        group: 'Desplazamiento',
+        vertical: 'Vertical',
+        horizontal: 'Horizontal',
+      },
       rotate: {
         group: 'Girar',
         clockwise: 'Girar a la derecha',
@@ -79,7 +84,7 @@ export const es: Locale = {
         shapes: 'Formas',
         insert: 'Insertar',
         form: 'Formulario',
-        redact: 'Redactar',
+        redact: 'Censurar',
       },
       annotate: {
         cancelCreation: 'Cancelar dibujo',
@@ -116,8 +121,8 @@ export const es: Locale = {
         polyline: 'Polilínea',
       },
       insert: {
-        attachment: 'Adjuntar archivo',
         stamp: 'Sello',
+        attachment: 'Adjuntar archivo',
         signature: 'Firma',
         image: 'Imagen',
       },
@@ -131,12 +136,20 @@ export const es: Locale = {
         signature: 'Campo de firma',
       },
       redact: {
-        mark: 'Marcar para redacción',
-        applyAll: 'Aplicar redacciones',
+        mark: 'Marcar para censurar',
+        applyAll: 'Aplicar censuras',
         clearAll: 'Borrar marcas',
       },
       undo: 'Deshacer',
       redo: 'Rehacer',
+      page: {
+        next: 'Página siguiente',
+        previous: 'Página anterior',
+        first: 'Primera página',
+        last: 'Última página',
+        goTo: 'Ir a la página',
+      },
+      shortcuts: 'Atajos de teclado',
       notAllowed: {
         default: '{label} no está permitido',
         'annotations-create': 'No está permitido añadir anotaciones',
@@ -161,12 +174,29 @@ export const es: Locale = {
       open: 'Abrir',
       opening: 'Abriendo…',
     },
-    // The drop target over the pages while a PDF is dragged over them.
-    dropToOpen: { label: 'Suelta un PDF para abrirlo' },
+    dropToOpen: {
+      label: 'Suelta un PDF para abrirlo',
+    },
     documentError: {
       title: 'No se pudo abrir el documento',
       unknown: 'El documento no se pudo abrir.',
+      notFound: 'No se encontró el archivo.',
+      notAllowed: 'No tienes acceso a este documento.',
+      damaged: 'Este archivo no es un PDF o está dañado.',
+      unsupported: 'Este visor no puede abrir este tipo de documento.',
+      retry: 'Reintentar',
       close: 'Cerrar documento',
+    },
+    tabs: {
+      close: 'Cerrar {name}',
+      loading: 'Cargando',
+      untitled: 'Documento {id}',
+    },
+    closeUnsaved: {
+      title: '¿Cerrar sin guardar?',
+      body: '«{name}» tiene cambios que no se han descargado. Se perderán.',
+      cancel: 'Cancelar',
+      close: 'Cerrar sin guardar',
     },
     viewOnly: {
       label: 'Solo lectura',
@@ -180,6 +210,15 @@ export const es: Locale = {
     menu: {
       back: 'Atrás',
     },
+    shortcuts: {
+      document: 'Documento',
+      viewing: 'Visualización',
+      editing: 'Edición',
+      other: 'Otros',
+    },
+    goToPage: {
+      go: 'Ir',
+    },
     panels: {
       thumbnails: 'Miniaturas',
       outline: 'Esquema',
@@ -189,7 +228,7 @@ export const es: Locale = {
       style: 'Estilo',
       stamps: 'Sellos',
       signatures: 'Firmas',
-      redaction: 'Redacciones',
+      redaction: 'Censuras',
       measurement: 'Mediciones',
       switch: 'Cambiar de panel',
     },
@@ -208,7 +247,7 @@ export const es: Locale = {
       freeText: 'Texto',
       stamp: 'Sello',
       caret: 'Intercalación',
-      redact: 'Redacción',
+      redact: 'Censura',
       fileAttachment: 'Adjunto',
     },
     demo: {
@@ -222,6 +261,8 @@ export const es: Locale = {
       searchSearching: 'Buscando…',
       searchResults: '{count} resultados encontrados',
       searchNoResults: 'Sin resultados',
+      searchPrevious: 'Resultado anterior',
+      searchNext: 'Resultado siguiente',
       searchPage: 'Página {page}',
       commentsForbidden: 'No tienes acceso a los comentarios de este documento.',
       commentsLoading: 'Cargando comentarios…',
@@ -251,13 +292,13 @@ export const es: Locale = {
       cancel: 'Cancelar',
       pageBadge: 'pág. {page}',
       redactionEmpty:
-        'No hay redacciones pendientes. Usa la herramienta Redactar para marcar texto o áreas.',
+        'No hay censuras pendientes. Usa la herramienta Censurar para marcar texto o áreas.',
       redactionArea: 'Marca de área',
       redactionText: 'Marca de texto',
       redactionRemove: 'Quitar marca',
-      redactConfirmTitle: '¿Aplicar redacciones?',
+      redactConfirmTitle: '¿Aplicar censuras?',
       redactConfirmBody:
-        'Eliminar permanentemente el contenido bajo {count} marcas de redacción. No se puede deshacer.',
+        'Eliminar permanentemente el contenido bajo {count} marcas de censura. No se puede deshacer.',
       redactConfirmCollateral: 'También se eliminarán {count} otras anotaciones.',
       redactApply: 'Aplicar',
       redactApplying: 'Aplicando…',
@@ -268,8 +309,8 @@ export const es: Locale = {
       fieldOptionAdd: 'Añadir opción',
       fieldOptionRemove: 'Quitar opción',
       fieldNone: 'Ninguno',
-      redactLabelTitle: 'Etiqueta de redacción',
-      redactLabelPlaceholder: 'p. ej. REDACTADO',
+      redactLabelTitle: 'Etiqueta de censura',
+      redactLabelPlaceholder: 'p. ej. CENSURADO',
       redactLabelRepeat: 'Repetir etiqueta en toda la región',
       stampsAll: 'Todos los sellos',
       stampsLoading: 'Cargando sellos…',

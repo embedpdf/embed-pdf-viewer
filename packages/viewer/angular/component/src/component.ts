@@ -93,6 +93,9 @@ export function definedOf<Keys extends object>(keys: Keys): Partial<Keys> {
  */
 type ConfigInput<Key extends keyof ElementConfig> = InputSignal<ElementConfig[Key] | undefined>;
 
+/** The keys each door types its own way, as inputs of its own: the engine, the documents, the user. */
+type DoorKey = 'engine' | 'src' | 'documents' | 'scope' | 'identity';
+
 /** A viewer that is ready, and the injector your templates in it get. */
 export interface ViewerInside {
   readonly viewer: Viewer;
@@ -152,15 +155,11 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
   readonly disable: ConfigInput<'disable'> = input<ElementConfig['disable']>();
   /** Every feature that changes the document off, or all but `except`. Follows its input. */
   readonly readOnly: ConfigInput<'readOnly'> = input<ElementConfig['readOnly']>();
-  /** Several documents, with their names and passwords; with these, `src` is ignored. */
-  readonly documents: ConfigInput<'documents'> = input<ElementConfig['documents']>();
   readonly layout: ConfigInput<'layout'> = input<ElementConfig['layout']>();
   readonly commands: ConfigInput<'commands'> = input<ElementConfig['commands']>();
   readonly icons: ConfigInput<'icons'> = input<ElementConfig['icons']>();
   readonly strings: ConfigInput<'strings'> = input<ElementConfig['strings']>();
   readonly notAllowed: ConfigInput<'notAllowed'> = input<ElementConfig['notAllowed']>();
-  readonly stamps: ConfigInput<'stamps'> = input<ElementConfig['stamps']>();
-  readonly signatures: ConfigInput<'signatures'> = input<ElementConfig['signatures']>();
   readonly plugins: ConfigInput<'plugins'> = input<ElementConfig['plugins']>();
 
   // ── what the viewer tells ──────────────────────────────────────────────────
@@ -201,20 +200,17 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
   protected abstract readonly elementConfig: Signal<ElementConfig>;
 
   /** The inputs every door has, without the ones left out. */
-  protected readonly sharedConfig: Signal<Partial<ElementConfig>> = computed(() =>
+  protected readonly sharedConfig: Signal<Partial<Omit<ElementConfig, DoorKey>>> = computed(() =>
     definedOf({
       theme: this.theme(),
       locale: this.locale(),
       disable: this.disable(),
       readOnly: this.readOnly(),
-      documents: this.documents(),
       layout: this.layout(),
       commands: this.commands(),
       icons: this.icons(),
       strings: this.strings(),
       notAllowed: this.notAllowed(),
-      stamps: this.stamps(),
-      signatures: this.signatures(),
       plugins: this.plugins(),
     }),
   );

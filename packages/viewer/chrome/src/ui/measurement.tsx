@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useCapability, useSelector } from '@embedpdf/react/runtime';
 import { AnnotationToken, useAnnotationState } from '@embedpdf/react/annotation';
 import { StageToken } from '@embedpdf/react/stage';
-import { useSurface } from '@embedpdf/react/shell';
 import {
   MeasurementToken,
   useMeasurement,
@@ -24,30 +23,6 @@ const button =
 
 /** The current page's address, or null with no page (empty document). */
 const useCurrentPage = () => useSelector(StageToken, (stage) => stage.getCurrentPage());
-
-export function MeasurementScaleButton() {
-  const t = useT();
-
-  const page = useCurrentPage();
-  const scale = usePageScale(page);
-
-  const surface = useSurface('measurement');
-  return (
-    <button
-      className={`${button} inline-flex items-center gap-1.5 whitespace-nowrap`}
-      onClick={() => surface.open()}
-      title={t('measurement.title')}
-    >
-      <Icon name="updateScale" size={20} className="shrink-0" />
-      <span>
-        {t('measurement.scale')}:{' '}
-        {scale?.measure?.subtype === 'rectilinear'
-          ? (scale.measure.ratio ?? t('measurement.custom'))
-          : t('measurement.unavailable')}
-      </span>
-    </button>
-  );
-}
 
 export function MeasurementSection() {
   const t = useT();

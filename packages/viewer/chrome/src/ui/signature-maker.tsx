@@ -8,7 +8,7 @@
  * unless it's saving.
  */
 import { useEffect, useId, useRef, useState } from 'react';
-import { isLocalEngine, useKernel } from '@embedpdf/react/runtime';
+import { useKernel } from '@embedpdf/react/runtime';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { useStamp, type MarkSource } from '@embedpdf/react/stamp';
@@ -17,18 +17,15 @@ import {
   SIGNATURE_MARK_NAME,
   SIGNATURES_LIBRARY_KIND,
 } from '@embedpdf/react/signature';
-import { useSignaturesConfig } from '../config-context';
+import { useSignatureSettings } from '../config-context';
 import { Dialog } from './dialog';
 import { Icon } from './icons';
+import { markFontsOf, registerMarkFont, type MarkFont } from './signature-fonts';
 
 type Tab = 'draw' | 'type' | 'upload';
 type Stroke = Array<{ x: number; y: number }>;
 
 const PAD = { width: 360, height: 120 };
-const BUILTIN_FONTS: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'helvetica-oblique', label: 'Helvetica' },
-  { key: 'times-italic', label: 'Times' },
-];
 
 /** One pad: draw / type / upload, producing a `MarkSource` or null. */
 function MarkPad({
@@ -39,14 +36,14 @@ function MarkPad({
 }: {
   value: MarkSource | null;
   onChange: (mark: MarkSource | null) => void;
-  fonts: ReadonlyArray<{ key: string; label: string }>;
+  fonts: readonly MarkFont[];
   registerFont: (key: string) => Promise<void>;
 }) {
   const t = useT();
   const [tab, setTab] = useState<Tab>('draw');
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [text, setText] = useState('');
-  const [font, setFont] = useState(fonts[0]?.key ?? 'helvetica-oblique');
+  const [font, setFont] = useState(fonts[0]?.key ?? '');
   const [fileName, setFileName] = useState<string | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<Stroke | null>(null);
@@ -113,9 +110,21 @@ function MarkPad({
         <button type="button" className={tabClass('draw')} onClick={() => setTab('draw')}>
           {t('demo.makerDraw')}
         </button>
-        <button type="button" className={tabClass('type')} onClick={() => setTab('type')}>
-          {t('demo.makerType')}
-        </button>
+        {fonts.length > 0 ? (
+          <button
+            type="button"
+            className={tabClass('type')}
+            onClick={() => {
+              setTab('type');
+              // The font is read while the name is typed, so the mark is ready when it is.
+              registerFont(font).catch((error: unknown) =>
+                console.error('[embedpdf] loading the signature font failed:', error),
+              );
+            }}
+          >
+            {t('demo.makerType')}
+          </button>
+        ) : null}
         <button type="button" className={tabClass('upload')} onClick={() => setTab('upload')}>
           {t('demo.makerUpload')}
         </button>
@@ -208,7 +217,7 @@ export function SignatureMakerModal() {
   const surface = useSurface('signature-maker');
   const stamp = useStamp();
   const kernel = useKernel();
-  const config = useSignaturesConfig();
+  const config = useSignatureSettings();
   const [name, setName] = useState('');
   const [signatureMark, setSignatureMark] = useState<MarkSource | null>(null);
   const [initialsMark, setInitialsMark] = useState<MarkSource | null>(null);
@@ -219,21 +228,12 @@ export function SignatureMakerModal() {
   const existingId = surface.props?.libraryId as string | undefined;
   const existing = existingId ? stamp.getLibrary(existingId) : null;
   const wantsInitials = (config.kinds ?? ['signature', 'initials']).includes('initials');
-  const fonts = [
-    ...(config.fonts ?? []).map((font) => ({ key: font.key, label: font.label })),
-    ...BUILTIN_FONTS,
-  ];
-  const registered = useRef(new Set<string>());
-  // A configured script face is registered on the engine the stamp plugin
-  // authors with (the viewer's own) the first time a typed mark uses it.
+  const [fonts] = useState(() => markFontsOf(config.fonts));
+  // A font is registered on the engine the stamp plugin authors with (the viewer's own) the
+  // first time the Type tab opens on it, or a typed mark uses it.
   const registerFont = async (key: string) => {
-    const spec = config.fonts?.find((font) => font.key === key);
-    const engine = kernel.engine;
-    if (!spec || registered.current.has(key) || !isLocalEngine(engine)) return;
-    const response = await fetch(spec.url);
-    if (!response.ok) throw new Error(`${spec.url}: HTTP ${response.status}`);
-    await engine.fonts.register({ key, data: new Uint8Array(await response.arrayBuffer()) });
-    registered.current.add(key);
+    const font = fonts.find((each) => each.key === key);
+    if (font) await registerMarkFont(kernel.engine, font);
   };
 
   if (!surface.isOpen) return null;
@@ -332,7 +332,7 @@ export function SignatureMakerModal() {
           <p className="text-fg mb-1 text-xs font-semibold uppercase tracking-wide">
             {t('demo.initialsLabel')}
             {existing ? null : (
-              <span className="text-fg-muted ml-1 font-normal normal-case tracking-normal">
+              <span className="text-fg-muted ms-1 font-normal normal-case tracking-normal">
                 {t('demo.makerOptional')}
               </span>
             )}

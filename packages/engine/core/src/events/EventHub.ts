@@ -1,11 +1,10 @@
-import { subscribeToType } from '@embedpdf/engine-core/runtime';
 import type {
   DocumentEvent,
   DocumentEventInit,
   DocumentEventOf,
-  DocumentEventStream,
   DocumentEventType,
-} from '@embedpdf/engine-core/runtime';
+} from './DocumentEvent';
+import { subscribeToType, type DocumentEventStream } from './DocumentEventStream';
 
 /**
  * The in-process implementation of `DocumentEventStream`, shared by both

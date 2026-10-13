@@ -31,9 +31,9 @@ import {
   type AnnotationUpdateResult,
   type LocalPageAnnotationsService as LocalPageAnnotationsServiceContract,
   type PageRef,
+  type SessionEventPublisher,
   type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import {
   renderAppearanceImages,

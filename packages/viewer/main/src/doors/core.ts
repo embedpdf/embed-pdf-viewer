@@ -20,6 +20,7 @@ import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 
 import {
   initViewer,
+  type ElementSrc,
   type EmbedPdfViewerElement,
   type MountTarget,
   type ViewerConfigBase,
@@ -30,9 +31,11 @@ export * from '../kernel';
 /**
  * The engine-agnostic contract. Same public name as the local door's config —
  * one name per door, so sample code and docs never pick a door-specific type
- * name; the door you imported decides what it means.
+ * name; the door you imported decides what it means. A document is what the
+ * engine you give opens: a URL, a file or bytes, or its own open input
+ * (`{ kind: 'token', token }` for the cloud engine).
  */
-export interface ViewerConfig extends ViewerConfigBase {
+export interface ViewerConfig extends ViewerConfigBase<ElementSrc> {
   engine: Engine | EngineFactory;
 }
 

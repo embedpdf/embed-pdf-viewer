@@ -24,43 +24,8 @@ import {
 import type { BarGroup, BarSchema } from '@embedpdf/react/toolbar';
 import { DEFAULT_LAYOUT } from './config/chrome';
 import type { IconDef } from './ui/icons';
-import type { SignatureMode, SignerPort, TrustPort } from '@embedpdf/react/signature';
-import type { StampAssetEngine } from '@embedpdf/react/stamp';
-
-export interface StampsCustomization {
-  /** `false`: no built-in library. A string: URL template with `{locale}`. */
-  readonly defaultLibrary?: false | string;
-  /** Library kinds the stamps sidebar lists. Default `['stamps']`. */
-  readonly sidebar?: ReadonlyArray<string>;
-  /** Quick marks in the Insert toolbar: asset ids (`library:name`) from any
-   *  library, or one library's whole set. Default none. */
-  readonly toolbar?: ReadonlyArray<string> | { readonly library: string };
-  /** The local engine stamp libraries and signature marks open in, or a
-   *  function that makes one on first use. Default: the viewer's own engine,
-   *  which is right when it is local. A cloud viewer needs one of its own. */
-  readonly assetEngine?: StampAssetEngine;
-}
-
-export interface SignaturesCustomization {
-  /** Which marks a person keeps. Default both. */
-  readonly kinds?: ReadonlyArray<'signature' | 'initials'>;
-  /** `'one'`: a single person per browser (no "new signature" once one exists). Default `'many'`. */
-  readonly libraries?: 'one' | 'many';
-  /** What placing a mark on a field does; default `sign` with a key, else `visual`. */
-  readonly mode?: SignatureMode;
-  /** The key — `webCryptoSigner`, `remoteSigner`, `personalSigner`, or a thunk resolving one per signing. */
-  readonly key?: SignerPort | (() => Promise<SignerPort>);
-  /** Trust anchors for validation; none → verdicts top out at "valid, signer unknown". */
-  readonly trust?: TrustPort;
-  /** Offer a certification (first signature, DocMDP) in the sign dialog. Default false. */
-  readonly allowCertify?: boolean;
-  /** Script faces for typed marks: registered on the viewer's engine on first use. */
-  readonly fonts?: ReadonlyArray<{
-    readonly key: string;
-    readonly url: string;
-    readonly label: string;
-  }>;
-}
+import { NO_VIEWER_COMMANDS, type ViewerCommands } from './config/viewer-commands';
+import type { ViewerSignatureSettings, ViewerStampSettings } from './plugin-settings';
 
 /**
  * A font beyond the standard 14, for the engine: what `engine.fonts` lists. The style panel
@@ -92,8 +57,12 @@ export interface ResolvedViewerConfig {
   readonly layout?: LayoutOption;
   /** User-registered icons — additive over the built-in set. */
   readonly icons: Readonly<Record<string, IconDef>>;
-  readonly stamps: StampsCustomization;
-  readonly signatures: SignaturesCustomization;
+  /** Your commands over the built-in ones, for the commands the layout brings too. */
+  readonly viewerCommands: ViewerCommands;
+  /** What the viewer adds to `plugins.stamp`: the standard stamps, the quick stamps. */
+  readonly stamp: ViewerStampSettings;
+  /** What the viewer adds to `plugins.signature`: which marks people keep, their fonts. */
+  readonly signature: ViewerSignatureSettings;
   /** The engine's fonts the style panel offers (see {@link ViewerFont}). */
   readonly fonts: readonly ViewerFont[];
   /** Hears each width the user gives a panel, by dragging its edge or with its keys. */
@@ -102,8 +71,9 @@ export interface ResolvedViewerConfig {
 
 const DEFAULT_CONFIG: ResolvedViewerConfig = {
   icons: {},
-  stamps: {},
-  signatures: {},
+  viewerCommands: NO_VIEWER_COMMANDS,
+  stamp: {},
+  signature: {},
   fonts: [],
 };
 
@@ -205,16 +175,21 @@ export function useStripSchema(target: SelectionTarget): BarSchema | undefined {
   return useContext(ResolvedLayoutContext).strip(target) ?? undefined;
 }
 
+/** Your commands over the built-in ones: what the layout's panel and mode commands merge under. */
+export function useViewerCommands(): ViewerCommands {
+  return useContext(ViewerConfigContext).viewerCommands;
+}
+
 export function useCustomIcons(): Readonly<Record<string, IconDef>> {
   return useContext(ViewerConfigContext).icons;
 }
 
-export function useStampsConfig(): StampsCustomization {
-  return useContext(ViewerConfigContext).stamps;
+export function useStampSettings(): ViewerStampSettings {
+  return useContext(ViewerConfigContext).stamp;
 }
 
-export function useSignaturesConfig(): SignaturesCustomization {
-  return useContext(ViewerConfigContext).signatures;
+export function useSignatureSettings(): ViewerSignatureSettings {
+  return useContext(ViewerConfigContext).signature;
 }
 
 export function useConfiguredFonts(): readonly ViewerFont[] {

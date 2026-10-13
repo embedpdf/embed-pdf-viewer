@@ -80,6 +80,19 @@ export interface CommandDef {
    * `notAllowed: 'disable'` setting. With no document open there is nothing to check.
    */
   readonly requires?: readonly Permission[];
+  /**
+   * Whether the session may run it, from the plugins' `can*` checks
+   * (`documents.canPrint()`), for a command whose permission is a plugin's to know. When it
+   * says no, the command isn't allowed, as with `requires`. Asked only while a document is
+   * open; one that throws allows it.
+   */
+  readonly allowed?: (context: CommandContext) => boolean;
+  /**
+   * The translation key of the sentence that says why `allowed` refused it, with `{label}` for
+   * its label: `'commands.notAllowed.doc-print'`. Without it, or a string for it,
+   * `commands.notAllowed.default`.
+   */
+  readonly notAllowedKey?: string;
 
   // ── what the command opens ───────────────────────────────────────────────
   // A command that opens a panel, menu or dialog says so instead of opening
@@ -326,6 +339,11 @@ export interface CommandsCapability extends SettingsApi<CommandsSettings> {
   execute(id: CommandId, options?: ExecuteOptions): Promise<ExecuteResult>;
   /** Whether a command can run now: it exists, and is enabled and visible. */
   canExecute(id: CommandId, documentId?: string): boolean;
+  /**
+   * Why a command won't run whatever the moment: it's turned off, or not allowed for its
+   * document. `null` when it may run (or only can't right now), and for an unknown id.
+   */
+  getRefusal(id: CommandId, documentId?: string): CommandRefusal | null;
 
   // ── turning commands off ──
   /** The categories turned off. */

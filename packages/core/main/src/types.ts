@@ -673,7 +673,8 @@ export interface DocumentsCapability {
    */
   canOpenFiles(): boolean;
   /**
-   * Open a failed document (`status: 'error'`) again, with the same source and options.
+   * Open a failed document (`status: 'error'`) again, with the same source and options, in its
+   * own tab: it keeps its id and its place, and the active document stays the active one.
    * Resolves like `open()`. Rejects `invalid-input` for a document that didn't fail.
    */
   retry(id: string, options?: OperationOptions): Promise<OpenDocumentResult>;

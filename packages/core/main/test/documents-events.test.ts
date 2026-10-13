@@ -74,6 +74,42 @@ describe('documents · lifecycle events', () => {
     await kernel.destroy();
   });
 
+  it('retry() opens a failed document in its own tab: its place, and the active one stays', async () => {
+    let attempts = 0;
+    const engine = {
+      open: (input: { id?: string }) =>
+        input.id === 'b' && ++attempts === 1
+          ? Promise.reject(new Error('network down'))
+          : Promise.resolve(makeHandle(input.id ?? 'x')),
+      destroy: () => Promise.resolve(),
+    } as unknown as Engine;
+    const kernel = createKernel({ engine, plugins: [] });
+    await kernel.start();
+    const { documents } = kernel;
+    documents.openAll([
+      { source: bytesInput('a') },
+      { source: bytesInput('b') },
+      { source: bytesInput('c') },
+    ]);
+    await vi.waitFor(() => expect(documents.get('c')?.status).toBe('ready'));
+    expect(documents.get('b')?.status).toBe('error');
+    documents.setActive('c');
+    const log: string[] = [];
+    documents.onActiveChanged((event) => log.push(`active:${event.documentId}`));
+    documents.onClosed((event) => log.push(`closed:${event.documentId}`));
+
+    const retried = documents.retry('b');
+    await Promise.resolve();
+    expect(documents.getOrder()).toEqual(['a', 'b', 'c']);
+    expect(documents.get('b')?.status).toBe('loading');
+    await expect(retried).resolves.toMatchObject({ document: { id: 'b', status: 'ready' } });
+    expect(documents.getOrder()).toEqual(['a', 'b', 'c']);
+    expect(documents.getActiveId()).toBe('c');
+    // The tab never closed, and nothing switched.
+    expect(log).toEqual([]);
+    await kernel.destroy();
+  });
+
   it('rename, setOrder, getOrder, getCount and a reference-stable list', async () => {
     const kernel = createKernel({ engine: immediateEngine(), plugins: [] });
     await kernel.start();

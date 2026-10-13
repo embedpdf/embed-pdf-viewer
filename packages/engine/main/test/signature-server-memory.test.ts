@@ -11,7 +11,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { createPdfRuntime, type PdfRuntimeModule } from '@embedpdf/engine-runtime';
-import { InlineTransport, LazyTransport, LocalEngine } from '../src/index';
+import { LazyTransport, LocalEngine } from '../src/index';
+import { InlineTransport } from '../src/transport/InlineTransport';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PAYLOAD = 16 * 1024 * 1024;

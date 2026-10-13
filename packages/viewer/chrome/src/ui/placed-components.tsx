@@ -20,7 +20,7 @@ import { BarEdgeProvider } from './bar-edge';
 import { Icon } from './icons';
 import { MenuItem, MenuPopover } from './menu';
 import { useSlottedEdges } from './slotted-edges';
-import { CommandButton, buttonClass } from './toolbar';
+import { CommandButton, buttonClass, buttonPart } from './toolbar';
 
 // ── the list ─────────────────────────────────────────────────────────────────
 
@@ -222,7 +222,7 @@ function MenuView({ menu }: { menu: PlacedMenu }) {
         aria-expanded={open}
         aria-label={menu.label ?? undefined}
         title={menu.label ?? undefined}
-        part="toolbar-button"
+        part={buttonPart(open)}
         className={buttonClass(open)}
         onClick={() => setOpen((previous) => !previous)}
       >

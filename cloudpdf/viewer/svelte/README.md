@@ -17,12 +17,14 @@ npm install @cloudpdf/viewer-svelte
   let { token }: { token: string } = $props();
 </script>
 
-<CloudPDFViewer baseUrl="https://api.cloudpdf.com" docToken={token} style="height: 100vh" />
+<CloudPDFViewer baseUrl="https://api.cloudpdf.com" src={{ token }} style="height: 100vh" />
 ```
 
-`docToken` is a doc-scoped JWT minted by your backend; `docId` opens a document
-by id when the engine-level `token` already authorizes it. For several documents
-at once, pass `documents` exactly as the open-source viewer takes it.
+`src` is the document: `{ token }` with a document token your backend creates
+for the user (a string, or a function that gives a fresh one), `{ id }` when the
+engine-level `token` already allows it, or `{ shareToken }` with a share link
+from the dashboard. Another `src` opens in its place. For several documents at
+once, pass `documents`: entries of `{ src, name, password, active }`.
 
 ## It is the open viewer, with one thing swapped
 

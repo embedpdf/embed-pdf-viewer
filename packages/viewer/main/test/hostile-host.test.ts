@@ -5,7 +5,7 @@
  * header above everything, its own `@font-face` named like the viewer's
  * annotation font. The viewer must look exactly as it does on a plain page,
  * keep its overlays inside its own box, and still take the page's
- * `--epdf-*` variables.
+ * `--epdf-*` variables and `::part()` rules.
  *
  * Runs against the built snippet (`pnpm build` first), like
  * snippet-cross-origin.test.ts, with the same Chromium fallback.
@@ -239,12 +239,58 @@ describe('the viewer on a hostile page', () => {
           .querySelector('embedpdf-viewer')!
           .shadowRoot!.querySelector('[data-embedpdf-root]')!,
       )
-        .getPropertyValue('--ep-accent')
+        .getPropertyValue('--epdf-accent')
         .trim(),
     );
     expect(accent).toBe('#e91e63');
     await page.waitForTimeout(300);
     const recolored = await page.locator('embedpdf-viewer').screenshot();
     expect(await difference(browser, shot, recolored)).toBeGreaterThan(0);
+  });
+
+  it("takes the page's tokens and ::part() rules", async () => {
+    const { page } = hostile;
+    await page.bringToFront();
+    await page.addStyleTag({
+      content: `
+        embedpdf-viewer {
+          --epdf-surface: rgb(240, 250, 230);
+          --epdf-text: rgb(60, 20, 20);
+          --epdf-border: rgb(20, 20, 160);
+          --epdf-font: serif;
+          --epdf-radius: 0px;
+        }
+        embedpdf-viewer::part(toolbar-button) { border-radius: 999px; }
+        embedpdf-viewer::part(mode-tab-active) { font-weight: 600; }`,
+    });
+    await page.waitForTimeout(300);
+    const look = await page.evaluate(() => {
+      const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+      const bar = getComputedStyle(root.querySelector('[data-bar="main"]')!);
+      const button = getComputedStyle(
+        root.querySelector('[data-bar="main"] [part="toolbar-button"]')!,
+      );
+      const tab = getComputedStyle(root.querySelector('[part~="mode-tab-active"]')!);
+      // The zoom field's box has the small corners, which follow the radius.
+      const field = root.querySelector('input[name="zoom"]')!.closest('form')!.parentElement!;
+      return {
+        surface: bar.backgroundColor,
+        text: bar.color,
+        border: bar.borderBottomColor,
+        font: button.fontFamily,
+        button: button.borderTopLeftRadius,
+        field: getComputedStyle(field).borderTopLeftRadius,
+        tab: tab.fontWeight,
+      };
+    });
+    expect(look).toEqual({
+      surface: 'rgb(240, 250, 230)',
+      text: 'rgb(60, 20, 20)',
+      border: 'rgb(20, 20, 160)',
+      font: 'serif',
+      button: '999px',
+      field: '0px',
+      tab: '600',
+    });
   });
 });

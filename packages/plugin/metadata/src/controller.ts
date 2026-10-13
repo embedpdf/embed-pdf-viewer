@@ -24,6 +24,8 @@ const METADATA_MODIFY: DocCapability = 'doc.metadata.modify';
  * changes only when a load lands or its confirmed document event arrives
  * (`metadata.updated`, `metadata.customUpdated`), whoever caused the edit,
  * and that is also the one place its `onUpdated` and `onResynced` fire.
+ * Nothing needs them when a document opens, so they load on demand: the
+ * first `ensureLoaded()` (what `metadataState` asks for) reads them.
  */
 export function createMetadataController(ctx: PluginContext<void>) {
   const updated = ctx.events.source<MetadataUpdatedEvent>();
@@ -33,6 +35,7 @@ export function createMetadataController(ctx: PluginContext<void>) {
 
   const metadata = ctx.mirror<DocumentMetadata | null>({
     name: 'metadata',
+    onDemand: true,
     initial: () => null,
     load: async (doc) => ({ value: await doc.metadata.get() }),
     fold: (value, event) => (event.type === 'metadata.updated' ? event.metadata : value),
@@ -53,6 +56,7 @@ export function createMetadataController(ctx: PluginContext<void>) {
 
   const custom = ctx.mirror<CustomMetadata | null>({
     name: 'customMetadata',
+    onDemand: true,
     initial: () => null,
     load: async (doc) => ({ value: await doc.metadata.custom.get() }),
     fold: (value, event) => (event.type === 'metadata.customUpdated' ? event.custom : value),
@@ -100,6 +104,11 @@ export function createMetadataController(ctx: PluginContext<void>) {
   const api: MetadataCapability = {
     getSnapshot: metadata.get,
     getStatus: metadata.getStatus,
+    ensureLoaded: (options) =>
+      ctx.cancellable(
+        options?.signal,
+        Promise.all([metadata.ensureLoaded(), custom.ensureLoaded()]).then(() => undefined),
+      ),
     canUpdate,
     update: async (patch, options) => {
       refuseWrite('metadata.update', options);

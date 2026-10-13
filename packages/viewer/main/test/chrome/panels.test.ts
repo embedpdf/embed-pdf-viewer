@@ -75,9 +75,11 @@ describe('panelCommandsFor', () => {
     expect(categoriesOf('panel:comments')).toEqual(['comments']);
     expect(categoriesOf('panel:style')).toEqual(['annotations']);
     expect(categoriesOf('panel:signatures')).toEqual(['signatures']);
-    expect(commands.find((command) => command.id === 'panel:search')?.requires).toEqual([
-      'doc.text.search',
-    ]);
+    // Whether the session may search is the search plugin's to say, and Ctrl/Cmd+F opens it.
+    const search = commands.find((command) => command.id === 'panel:search');
+    expect(search?.requires).toBeUndefined();
+    expect(search?.notAllowedKey).toBe('commands.notAllowed.doc-text-search');
+    expect(search?.shortcut).toBe('Mod+F');
   });
 
   it("follows a panel's own title over the built-in one", () => {

@@ -24,16 +24,29 @@ import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { panelsOnSide } from '../config/panels';
 import { ThumbsStageToken } from '../config/stage';
 import { useResolvedLayout } from '../config-context';
-import { AnnotationStylePanel } from './annotation-style';
-import { CommentsPanel } from './comments-panel';
-import { MeasurementSection } from './measurement';
+import { lazyComponent } from './lazy';
 import { PanelFrame, useCloseOnPick } from './panel-frame';
 import type { PanelSide } from './panel-layout';
 import { PanelSwitcher } from './panel-switcher';
-import { RedactionPanel } from './redaction-panel';
-import { SearchPanel } from './search-panel';
-import { SignaturesPanel } from './signatures-panel';
-import { StampsPanel } from './stamps-panel';
+
+// Each feature's panel loads the first time it opens.
+const SearchPanel = lazyComponent(() => import('./search-panel').then((ui) => ui.SearchPanel));
+const CommentsPanel = lazyComponent(() =>
+  import('./comments-panel').then((ui) => ui.CommentsPanel),
+);
+const MeasurementSection = lazyComponent(() =>
+  import('./measurement').then((ui) => ui.MeasurementSection),
+);
+const AnnotationStylePanel = lazyComponent(() =>
+  import('./annotation-style').then((ui) => ui.AnnotationStylePanel),
+);
+const StampsPanel = lazyComponent(() => import('./stamps-panel').then((ui) => ui.StampsPanel));
+const SignaturesPanel = lazyComponent(() =>
+  import('./signatures-panel').then((ui) => ui.SignaturesPanel),
+);
+const RedactionPanel = lazyComponent(() =>
+  import('./redaction-panel').then((ui) => ui.RedactionPanel),
+);
 
 /** What a built-in panel draws in its slot. */
 interface BuiltInContent {
@@ -178,21 +191,18 @@ function ThumbnailList() {
               closeOnPick();
             }}
             title={`Page ${page.pageIndex + 1}`}
+            // The current page in the accent with a tint around it, the others in a light line.
+            className={`box-border cursor-pointer rounded ${
+              page.pageIndex === currentPage
+                ? 'border-accent ring-accent-light border-2 ring-2'
+                : 'border-border-subtle border'
+            }`}
             style={{
               position: 'absolute',
               top: page.frame.top,
               left: page.frame.left,
               right: page.frame.right,
               bottom: page.frame.bottom,
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-              borderRadius: 4,
-              border:
-                page.pageIndex === currentPage
-                  ? '2px solid var(--epdf-accent)'
-                  : '1px solid var(--ep-border-subtle)',
-              boxShadow:
-                page.pageIndex === currentPage ? '0 0 0 2px var(--ep-accent-light)' : 'none',
             }}
           />
           <div
@@ -206,7 +216,7 @@ function ThumbnailList() {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 11,
-              color: 'var(--ep-fg-muted)',
+              color: 'var(--epdf-text-muted)',
               pointerEvents: 'none',
             }}
           >

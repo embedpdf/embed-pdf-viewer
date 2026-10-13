@@ -20,20 +20,21 @@ const signer = personalSigner({
 const element = EmbedPDF.init({
   target: '#viewer',
   src: '/ebook.pdf',
-  signatures: {
-    key: () => signer,
-    trust: { anchors: async () => [(await signer).certificate] },
-    allowCertify: true,
-  },
   // The engine-fonts rung: fonts beyond the standard 14, fetched from this
   // harness, registered on the engine, mounted for the live editor, and
   // offered in the style panel.
   engine: {
     fonts: [{ key: 'roboto', url: '/fonts/Roboto-Regular.ttf', familyName: 'Roboto' }],
   },
-  // The plugins rung: a plugin's settings by its name, over the viewer's own.
+  // The plugins rung: a plugin's settings by its name, over the viewer's own, and the
+  // signatures rung under the signature plugin's.
   plugins: {
     search: { highlight: { color: '#a7f3d0' } },
+    signature: {
+      key: () => signer,
+      trust: { anchors: async () => [(await signer).certificate] },
+      allowCertify: true,
+    },
   },
 });
 

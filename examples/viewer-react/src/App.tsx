@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import { PDFViewer, Region, ToolbarItem, usePDFViewer } from '@embedpdf/viewer-react';
-import type { DocumentInfo, InitialDocument, LayoutFunction } from '@embedpdf/viewer-react';
+import type { DocumentInfo, LayoutFunction } from '@embedpdf/viewer-react';
 
 const STATUS = {
   draft: { label: 'Draft', color: '#f59e0b' },
@@ -71,22 +71,16 @@ function AcmeTabBar() {
   );
 }
 
-const fromPublic = (id: string, name: string): InitialDocument => ({
-  name,
-  source: async () => ({
-    kind: 'bytes',
-    id,
-    bytes: new Uint8Array(await (await fetch('/testlab.pdf')).arrayBuffer()),
-  }),
-});
-
 const layout: LayoutFunction = (base) =>
   base.add({ custom: 'status' }, { to: 'main', section: 'end' });
 
 export function App() {
   return (
     <PDFViewer
-      documents={[fromPublic('proposal', 'Proposal'), fromPublic('contract', 'Contract')]}
+      documents={[
+        { src: '/testlab.pdf', name: 'Proposal' },
+        { src: '/testlab.pdf', name: 'Contract' },
+      ]}
       layout={layout}
       style={{ height: '100vh', display: 'block' }}
     >

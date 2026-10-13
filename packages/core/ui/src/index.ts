@@ -119,5 +119,5 @@ export type {
   ToolbarPart,
 } from './toolbar-layout';
 
-export { formatShortcut, matchShortcut, parseShortcut } from './shortcuts';
+export { formatShortcut, matchShortcut, parseShortcut, sameShortcut } from './shortcuts';
 export type { KeyStroke, ParsedShortcut } from './shortcuts';

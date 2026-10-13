@@ -12,8 +12,8 @@ import {
   type AnnotationList,
   type AnnotationListOptions,
   type DocumentAnnotationsService,
+  type SessionEventPublisher,
 } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { ownedResources, transferableResources } from './bundleResources';
 import type { ScopeGuard } from '../scope';

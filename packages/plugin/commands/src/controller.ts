@@ -2,8 +2,9 @@
  * The commands controller: the commands (from the settings, added while the
  * app runs, and from families), resolution for a document (derivations over
  * live state, safe to throw), the one way to run a command, turning commands
- * off (by category and one by one), the scope's say (`requires`), and the
- * host-only keystroke matcher.
+ * off (by category and one by one), what the session may run (the scope's
+ * `requires`, the plugins' checks in `allowed`), and the host-only keystroke
+ * matcher.
  *
  * Definitions hold functions, so the commands added while the app runs are a
  * map outside state; every change to it calls `ctx.notify()` so readers read
@@ -209,17 +210,17 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     }
   };
 
-  const { isTurnedOff, missingPermissionOf, refusalOf } = createAvailability(ctx, settings);
+  const { isTurnedOff, notAllowedKeyOf, refusalOf } = createAvailability(ctx, settings);
 
   const derivationsOf = (entry: RegisteredCommand, documentId?: string): Derivations => {
     const { definition } = entry;
     const context = commandContext(documentId);
     const label = labelOf(definition, context);
-    // Turned off hides it; a missing permission hides it, or disables it with the reason.
+    // Turned off hides it; not allowed hides it, or disables it with the reason.
     const turnedOff = isTurnedOff(definition);
-    const missing = turnedOff ? null : missingPermissionOf(definition, context);
+    const notAllowed = turnedOff ? null : notAllowedKeyOf(definition, context);
     const shownWhenNotAllowed = settings.get().notAllowed === 'disable';
-    const ruledOut = turnedOff || missing !== null;
+    const ruledOut = turnedOff || notAllowed !== null;
     // A command that opens something is active while it's open, unless it says otherwise.
     let active: boolean;
     if (definition.active) {
@@ -246,10 +247,10 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       !ruledOut && derive(definition.enabled, context, true),
       active,
       !turnedOff &&
-        (missing === null || shownWhenNotAllowed) &&
+        (notAllowed === null || shownWhenNotAllowed) &&
         derive(definition.visible, context, true),
-      missing !== null && shownWhenNotAllowed
-        ? notAllowedMessage(missing, label, context)
+      notAllowed !== null && shownWhenNotAllowed
+        ? notAllowedMessage(notAllowed, label, context)
         : undefined,
     ];
   };
@@ -431,6 +432,10 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       const resolved = resolveCommand(id, documentId);
       return !!resolved && resolved.enabled && resolved.visible;
     },
+    getRefusal: (id, documentId) => {
+      const entry = entryOf(id);
+      return entry ? refusalOf(entry.definition, commandContext(documentId)) : null;
+    },
     ...turningOff,
     onExecuted: executed.on,
     onExecutionFailed: executionFailed.on,
@@ -439,8 +444,12 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       let refused: ShortcutMatch | null = null;
       for (const entry of definedCommands()) {
         if (!entry.parsed.some((shortcut) => matchShortcut(shortcut, stroke, options))) continue;
-        const refusal = refusalOf(entry.definition, commandContext());
+        const context = commandContext();
+        const refusal = refusalOf(entry.definition, context);
         if (!refusal) return { commandId: entry.definition.id, refusal: null };
+        // A refused command takes its keys only where it would show: Delete with nothing
+        // selected stays the page's, even where deleting is turned off.
+        if (!derive(entry.definition.visible, context, true)) continue;
         refused ??= { commandId: entry.definition.id, refusal };
       }
       return refused;
