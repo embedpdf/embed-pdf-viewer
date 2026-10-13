@@ -166,8 +166,12 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))("a feature's code", () =
       }, open);
     }
     await tab.evaluate(() => new Promise((done) => setTimeout(done, 500)));
-    // The stamps panel brings in the standard stamps, a PDF (base64 `%PDF`): data, not code.
-    const code = scripts.slice(before).filter(({ text }) => !text.includes('"JVBERi0'));
+    // Data, not code: the stamps panel brings in the standard stamps, a PDF (base64 `%PDF`), and
+    // the document's form fields bring in the standard faces they're drawn in, OpenType fonts
+    // (base64 `OTTO`), each the first time a widget that needs it paints.
+    const code = scripts
+      .slice(before)
+      .filter(({ text }) => !text.includes('"JVBERi0') && !text.includes('"T1RUTw'));
     expect(code.map(({ path }) => path)).toEqual([]);
   });
 });

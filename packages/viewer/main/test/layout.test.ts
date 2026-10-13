@@ -22,12 +22,15 @@ import {
   type ViewerHost,
 } from './helpers/viewer-host';
 
-/** A page whose viewer gets `config`, a script expression with `layout` written as a function. */
+/**
+ * A page whose viewer gets `config`, a script expression with `layout` written as a function. The
+ * viewer is wide enough for every mode tab, the page's own ones too, in any platform's system font.
+ */
 const page = (config: string) => `<!doctype html><html><head><meta charset="utf-8">
 <title>layout</title>
 <style>
   body { margin: 0; }
-  #viewer { position: absolute; left: 0; top: 0; width: 1100px; height: 700px; display: block; }
+  #viewer { position: absolute; left: 0; top: 0; width: 1400px; height: 700px; display: block; }
 </style></head>
 <body>
 <div id="viewer"></div>
@@ -110,7 +113,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the layout config', () 
     await host?.close();
   });
 
-  const open = async (path: string, width = 1280): Promise<Page> => {
+  const open = async (path: string, width = 1440): Promise<Page> => {
     const tab = await browser.newPage({ viewport: { width, height: 800 } });
     await tab.goto(`${host.origin}${path}`);
     await waitForDocument(tab);
@@ -251,7 +254,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the layout config', () 
           ?.getBoundingClientRect().top ?? 0) > 400,
     );
     await tab.evaluate(() => {
-      document.getElementById('viewer')!.style.width = '1100px';
+      document.getElementById('viewer')!.style.width = '1400px';
     });
     await tab.waitForFunction(
       () =>
