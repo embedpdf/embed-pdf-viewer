@@ -2,7 +2,7 @@
  * Copying the selected text counts for the viewer that has focus only: with two viewers on a
  * page, each with text selected, Ctrl/Cmd+C copies from the one focus is inside, and so does a
  * copy the browser sends to the body (Edit → Copy); with focus elsewhere, the page copies its
- * own selected text without a viewer taking part.
+ * own selected text, or a field of the page its own, without a viewer taking part.
  *
  * What gets copied is recorded in the page, so the system clipboard is never touched: the
  * Clipboard API's `writeText` is a stand-in, and a listener of the page's own, after the
@@ -22,11 +22,13 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>copy</titl
 <style>
   body { margin: 0; }
   #page-text { position: absolute; left: 8px; top: 0; margin: 8px 0; }
+  #page-field { position: absolute; left: 640px; top: 8px; width: 300px; }
   #a { position: absolute; left: 0; top: 60px; width: 620px; height: 700px; display: block; }
   #b { position: absolute; left: 640px; top: 60px; width: 620px; height: 700px; display: block; }
 </style></head>
 <body>
 <p id="page-text">Text of the page around the viewers.</p>
+<input id="page-field" value="Text in a field of the page" />
 <embedpdf-viewer id="a" src="/sample.pdf" theme="light" locale="en"></embedpdf-viewer>
 <embedpdf-viewer id="b" src="/sample.pdf" theme="light" locale="en"></embedpdf-viewer>
 <script type="module">
@@ -213,6 +215,24 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('copying', () => {
     await expect
       .poll(() => copyAtBody(tab), { timeout: 5_000 })
       .toEqual({ prevented: true, text: texts.a });
+  });
+
+  it('leaves a copy in a field of the page to the field while focus is in it', async () => {
+    await selectInBoth(tab);
+    await tab.focus('#page-field');
+    await tab.evaluate(() => (document.getElementById('page-field') as HTMLInputElement).select());
+    expect(await hasFocus(tab, 'a')).toBe(false);
+    expect(await hasFocus(tab, 'b')).toBe(false);
+    await forgetRecorded(tab);
+    await tab.keyboard.press('ControlOrMeta+c');
+    await expect.poll(async () => (await recordedOf(tab)).copies.length).toBeGreaterThan(0);
+    await writesSettled(tab);
+    // The field's own copy: no viewer prevented it, put its text in it, or wrote anything.
+    expect(await recordedOf(tab)).toEqual({
+      written: [],
+      copies: [{ prevented: false, text: '' }],
+      keys: [false],
+    });
   });
 
   it("leaves the page's own selected text to the page while focus is outside the viewers", async () => {
