@@ -79,7 +79,7 @@
       "dependsOn": ["^build", "build"]
     },
     "@embedpdf/engine#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/packages/core/annotation/src/**",
