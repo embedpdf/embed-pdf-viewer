@@ -34,7 +34,7 @@ describe('page layers', () => {
     expect(layers.painted()).toBe(during);
     release();
     expect(layers.painted()).toBe(during);
-    // A layer that leaves and comes back gives the same answer as before.
+    // A layer that leaves and comes back gives the same answer again.
     const again = layers.paint('formFields');
     const both = layers.painted();
     again();

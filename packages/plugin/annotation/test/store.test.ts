@@ -451,7 +451,7 @@ describe('store.apply', () => {
     ]);
     const [id] = applied.ids;
     const { change } = harness.applied[0]!;
-    const [op] = ('ops' in change ? change.ops : []) as { objectNumber: number }[];
+    const [op] = ('ops' in change ? change.ops : []) as readonly { objectNumber: number }[];
     expect(id).toBe(annotationKey(refOf(op!.objectNumber)));
     expect(harness.model().byId[id!]).toMatchObject({
       unconfirmed: true,

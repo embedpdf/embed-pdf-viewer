@@ -102,13 +102,13 @@ function squareDTO(
   return {
     ref,
     page: toPageRef(1),
-    index: 0,
     hasAppearance: true,
     appearanceState: null,
     nm: null,
     ...NO_FLAGS,
     rect: { left: 100, bottom: 100, right: 200, top: 200 },
     contents: null,
+    subject: null,
     author: null,
     createdAt: null,
     modifiedAt: null,
@@ -130,6 +130,7 @@ function squareDTO(
     strokeWidth: 2,
     opacity: 1,
     borderStyle: 'solid',
+    dashArray: null,
   } as Annotation<PdfCoordinates>;
 }
 
@@ -167,7 +168,6 @@ describe('record — Ink Highlight intent and blend', () => {
   const dto = (): Annotation<PdfCoordinates> => ({
     ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 20 },
     page: toPageRef(1),
-    index: 0,
     hasAppearance: true,
     appearanceState: null,
     nm: null,
@@ -233,7 +233,6 @@ function calloutDTO(objectNumber = 20): Annotation<PdfCoordinates> {
   return {
     ref,
     page: toPageRef(1),
-    index: 0,
     hasAppearance: true,
     appearanceState: null,
     nm: null,
@@ -321,13 +320,13 @@ function rotatedPolylineDTO(rotation: number, objectNumber = 31): Annotation<Pdf
   return {
     ref,
     page: toPageRef(1),
-    index: 0,
     hasAppearance: true,
     appearanceState: null,
     nm: null,
     ...NO_FLAGS,
     rect: { left: 100, bottom: 100, right: 300, top: 300 },
     contents: null,
+    subject: null,
     author: null,
     createdAt: null,
     modifiedAt: null,
@@ -346,6 +345,11 @@ function rotatedPolylineDTO(rotation: number, objectNumber = 31): Annotation<Pdf
     strokeWidth: 2,
     opacity: 1,
     borderStyle: 'solid',
+    dashArray: null,
+    intent: null,
+    measure: null,
+    captionEnabled: null,
+    captionCenter: null,
     vertices: [
       { x: 120, y: 120 },
       { x: 200, y: 260 },
@@ -505,13 +509,13 @@ function polygonDTO(
   return {
     ref,
     page: toPageRef(1),
-    index: 0,
     hasAppearance: true,
     appearanceState: null,
     nm: null,
     ...NO_FLAGS,
     rect: { left: 100, bottom: 100, right: 300, top: 300 },
     contents: null,
+    subject: null,
     author: null,
     createdAt: null,
     modifiedAt: null,
@@ -530,6 +534,11 @@ function polygonDTO(
     strokeWidth: 2,
     opacity: 1,
     borderStyle: 'solid',
+    dashArray: null,
+    intent: null,
+    measure: null,
+    captionEnabled: null,
+    captionCenter: null,
     vertices: [
       { x: 120, y: 120 },
       { x: 200, y: 260 },
@@ -663,7 +672,6 @@ describe('record — line endings leave /Rect to the engine', () => {
     ({
       ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 77 },
       page: toPageRef(1),
-      index: 0,
       hasAppearance: true,
       appearanceState: null,
       nm: null,

@@ -5,7 +5,7 @@
  * `baseIndex`), and the layer saves and reopens to the same page.
  */
 import { describe, expect, test } from 'vitest';
-import type { DocumentHandle, Engine, PageRef } from '@embedpdf/engine-core/runtime';
+import type { Engine, LocalDocumentHandle, PageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 /**
@@ -58,7 +58,7 @@ describe.each(['wasm', 'native'] as const)(
     async function reopened(
       engine: Engine,
       baseBytes: Uint8Array,
-      doc: DocumentHandle,
+      doc: LocalDocumentHandle,
       page: PageRef,
     ) {
       const bytes = await doc.downloadLayer();

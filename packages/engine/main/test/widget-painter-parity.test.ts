@@ -461,8 +461,12 @@ describe('the widget painter draws what the engine writes', () => {
       const created = await doc.forms.create(testCase.draft(page));
       if (testCase.value) await doc.forms.setValue(created.field.ref, testCase.value);
       const form = await doc.forms.list();
+      const createdRef = created.field.ref;
       const field = form.fields.find(
-        (each) => each.ref.objectNumber === created.field.ref.objectNumber,
+        (each) =>
+          each.ref.kind === 'objectNumber' &&
+          createdRef.kind === 'objectNumber' &&
+          each.ref.objectNumber === createdRef.objectNumber,
       )!;
       const ref = field.widgets[0]!.ref!;
       const row = form.widgets.find(

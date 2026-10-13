@@ -55,7 +55,7 @@ export interface PageResidencyPolicy {
 
 /**
  * 384 MB: what a server thread of the hosted plan can spare, and well inside
- * the heap a phone browser allows a tab (see the page-residency plan, D1).
+ * the heap a phone browser allows a tab.
  */
 export const DEFAULT_PAGE_RESIDENCY_POLICY: PageResidencyPolicy = {
   budgetBytes: 384 * 1024 * 1024,

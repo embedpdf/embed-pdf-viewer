@@ -157,7 +157,7 @@ export function applyReorder(
   plan: PlannedReorder,
 ): void {
   const { fn, mem } = runtime;
-  // Promotion keeps every position, so the plan's still hold.
+  // Promotion keeps every position, so `plan`'s indices still hold.
   promoteInlineAnnotations(runtime, session, plan.stack.page.objectNumber);
   const moved = withScratch(mem, 4 * plan.from.length, (arrPtr) => {
     plan.from.forEach((index, i) => mem.poke(arrPtr, 'i32', index, 4 * i));

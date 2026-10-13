@@ -53,16 +53,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Adversarial licensing tests
-        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
-
       - name: Build published server artifact
         # Build the server's production workspace dependencies in topological
         # order. --filter-prod excludes core-signature's test-only dependency
         # on the local engine, whose browser worker needs a staged WASM payload.
         # Build tools remain available from the full dependency install above.
         # The server's runtime wrapper build needs no native or WASM payloads.
+        # Before the tests: buildApp reaches the engine, which imports the
+        # runtime wrapper from its dist.
         run: pnpm --filter-prod "@cloudpdf/server..." build
+
+      - name: Adversarial licensing tests
+        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
 
       - name: Verify published license API boundary
         run: >-

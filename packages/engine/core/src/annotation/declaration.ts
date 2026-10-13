@@ -448,7 +448,15 @@ function shapesOf(
     if (owner === 'data') {
       const write = writeNullable ? schemas.write.nullable() : schemas.write;
       create[name] = required ? write : write.optional();
-      update[name] = (readBack ? z.union([write, read[name]!]) : write).optional();
+      // A field read and written as one schema takes that schema back,
+      // nullable when either side is: a union of the two would name it twice.
+      const sameSchema = schemas.read === schemas.write;
+      const readBackUpdate = sameSchema
+        ? readNullable || writeNullable
+          ? schemas.write.nullable()
+          : schemas.write
+        : z.union([write, read[name]!]);
+      update[name] = (readBack ? readBackUpdate : write).optional();
       if (readBack) readBackWrites[name] = write;
     } else {
       // Accepted so a read DTO can be sent back; the engine decides what happens to it.
