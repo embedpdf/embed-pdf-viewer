@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
-import { EpdfPdfViewer } from '@embedpdf/viewer-angular';
+import { EpdfPdfViewer } from '@cloudpdf/viewer-angular';
 
 @Component({
   selector: 'app-report',
   imports: [EpdfPdfViewer],
   template: `
     @defer (on viewport) {
-      <epdf-pdf-viewer src="/report.pdf" style="height: 100vh" />
+      <epdf-pdf-viewer [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 100vh" />
     } @placeholder {
       <div style="height: 100vh"></div>
     }

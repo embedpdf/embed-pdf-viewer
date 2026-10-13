@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PDFViewer, Region } from '@embedpdf/viewer-svelte';
+  import { PDFViewer, Region } from '@cloudpdf/viewer-svelte';
   import AppHeader from './AppHeader.svelte'; // your app
   import RecentFiles from './RecentFiles.svelte';
 </script>

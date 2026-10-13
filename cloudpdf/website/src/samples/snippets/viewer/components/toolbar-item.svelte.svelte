@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-svelte';
+  import { PDFViewer, ToolbarItem, type Layout } from '@cloudpdf/viewer-svelte';
   import { versions } from './versions.svelte'; // your app
 
   const layout = (layout: Layout) =>

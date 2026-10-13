@@ -92,11 +92,11 @@ describe('pdf.permissions expansion — bit-derived', () => {
     expect(checkCapability('doc.content.copy', ['pdf.permissions'], bits)).toBe(true);
   });
 
-  it('bit 5 absent denies all text capabilities', () => {
-    expect(checkCapability('doc.text.select', ['pdf.permissions'], NO_BITS)).toBe(false);
+  it('bit 5 absent denies taking the text out, not finding or selecting it (as Acrobat)', () => {
     expect(checkCapability('doc.text.copy', ['pdf.permissions'], NO_BITS)).toBe(false);
-    expect(checkCapability('doc.text.search', ['pdf.permissions'], NO_BITS)).toBe(false);
     expect(checkCapability('doc.content.copy', ['pdf.permissions'], NO_BITS)).toBe(false);
+    expect(checkCapability('doc.text.select', ['pdf.permissions'], NO_BITS)).toBe(true);
+    expect(checkCapability('doc.text.search', ['pdf.permissions'], NO_BITS)).toBe(true);
   });
 
   it('bit 3 grants doc.print', () => {

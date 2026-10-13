@@ -1,0 +1,31 @@
+<!-- 2.x:
+
+<div id="pdf-viewer" style="height: 100vh"></div>
+
+<script type="module">
+  import CloudPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
+
+  const container = CloudPDF.init({
+    type: 'container',
+    target: document.getElementById('pdf-viewer'),
+    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    theme: { preference: 'dark' },
+    disabledCategories: ['redaction', 'document-print'],
+  });
+  container.registry.then((registry) => console.log('ready', registry));
+</script>
+-->
+
+<div id="viewer" style="height: 100vh"></div>
+
+<script type="module">
+  import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  CloudPDF.init({
+    target: '#viewer',
+    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    theme: 'dark',
+    disable: ['redaction', 'documents.print'],
+    onReady: (viewer) => console.log('ready', viewer),
+  });
+</script>

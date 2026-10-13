@@ -41,7 +41,7 @@ export function createViewportSync(
 
   const viewports = ctx.pageMirror<readonly PageMeasurementViewport[]>({
     name: 'viewports',
-    load: async (doc, page) => {
+    load: async (doc, page, signal) => {
       ctx.assertPageRef(page);
       const service = doc.page(page).measure;
       // Without a page measure service, scales live for the session only.
@@ -49,7 +49,10 @@ export function createViewportSync(
       try {
         return (await service.listViewports()).viewports;
       } catch (error) {
-        ctx.state.update(recordLoadError, page.objectNumber, serializeError(error));
+        // A read the closing document cut short is no page's error, and there's no state left.
+        if (!signal.aborted) {
+          ctx.state.update(recordLoadError, page.objectNumber, serializeError(error));
+        }
         throw error;
       }
     },

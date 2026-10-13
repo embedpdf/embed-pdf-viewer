@@ -14,6 +14,15 @@ export const ENGINES = {
     // Stamp libraries are PDFs opened in the browser (`// [!asset-engine]`
     // block): on the local flavor the ONE engine does both jobs.
     assetEngine: { importLine: null, factoryCall: 'engine' },
+    // The ready-made viewer: its packages (`@embedpdf/viewer`, and `-react`,
+    // `-vue`, `-svelte`, `-angular` after it), the CDN script a plain HTML
+    // page loads, and the name that script's default export goes by. The
+    // component names are the same in both flavors.
+    viewer: {
+      package: '@embedpdf/viewer',
+      cdnScript: 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js',
+      defaultImport: 'EmbedPDF',
+    },
   },
   cloud: {
     package: '@cloudpdf/engine',
@@ -26,6 +35,12 @@ export const ENGINES = {
     assetEngine: {
       importLine: "import { localEngine } from '@embedpdf/engine';",
       factoryCall: 'localEngine()',
+    },
+    // The same viewer with the cloud engine as its default (one viewer, two doors).
+    viewer: {
+      package: '@cloudpdf/viewer',
+      cdnScript: 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js',
+      defaultImport: 'CloudPDF',
     },
   },
 };

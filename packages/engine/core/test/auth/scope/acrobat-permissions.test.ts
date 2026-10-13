@@ -52,3 +52,23 @@ describe('pdf.permissions grants what Acrobat allows', () => {
     });
   });
 });
+
+/**
+ * Bit 5 ("Content Copying") clear, checked in Acrobat on the USCIS Form I-140 as published
+ * (`engine/main/test/fixtures/uscis-i-140-protected.pdf`, P = -1052) on Oct 14 2026: Find and
+ * text selection work, Copy doesn't. A search still runs; its snippets, which reproduce the
+ * text, don't.
+ */
+describe('a file that forbids copying text', () => {
+  const granted = expandRawScope(['pdf.permissions'], decodePdfBits(-1052 >>> 0));
+
+  it('finds and selects text, as Acrobat does', () => {
+    expect(granted.has('doc.text.search')).toBe(true);
+    expect(granted.has('doc.text.select')).toBe(true);
+  });
+
+  it("doesn't let the text out: no copy, so no snippets", () => {
+    expect(granted.has('doc.text.copy')).toBe(false);
+    expect(granted.has('doc.content.copy')).toBe(false);
+  });
+});

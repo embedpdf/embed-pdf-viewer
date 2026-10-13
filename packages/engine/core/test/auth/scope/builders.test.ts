@@ -163,16 +163,21 @@ describe('materializePdfPermissions', () => {
   it('null bits yields ONLY the always-on capabilities', () => {
     const list = materializePdfPermissions(decodePdfBits(null));
     expect(list).toEqual(
-      expect.arrayContaining(['doc.open', 'doc.render', 'doc.annotate.read', 'doc.forms.read']),
+      expect.arrayContaining([
+        'doc.open',
+        'doc.render',
+        'doc.annotate.read',
+        'doc.forms.read',
+        'doc.text.search',
+        'doc.text.select',
+      ]),
     );
-    expect(list).toHaveLength(4);
+    expect(list).toHaveLength(6);
   });
 
-  it('bit 5 adds text.{select,copy,search} + content.copy', () => {
+  it('bit 5 adds text.copy + content.copy: taking the text out, as Acrobat reads it', () => {
     const set = new Set(materializePdfPermissions(decodePdfBits(PDF_BITS.COPY)));
-    expect(set.has('doc.text.select')).toBe(true);
     expect(set.has('doc.text.copy')).toBe(true);
-    expect(set.has('doc.text.search')).toBe(true);
     expect(set.has('doc.content.copy')).toBe(true);
   });
 

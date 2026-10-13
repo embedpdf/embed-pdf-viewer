@@ -1,1 +1,1 @@
-npm install @embedpdf/viewer-svelte
+npm install @cloudpdf/viewer-svelte

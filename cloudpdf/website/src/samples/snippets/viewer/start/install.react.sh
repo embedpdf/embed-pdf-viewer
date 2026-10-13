@@ -1,1 +1,1 @@
-npm install @embedpdf/viewer-react
+npm install @cloudpdf/viewer-react

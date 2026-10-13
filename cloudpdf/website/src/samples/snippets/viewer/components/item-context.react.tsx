@@ -1,4 +1,4 @@
-import { useToolbarItem } from '@embedpdf/viewer-react';
+import { useToolbarItem } from '@cloudpdf/viewer-react';
 
 export function Reviewers({ people }: { people: { id: string; name: string; avatar: string }[] }) {
   const { orientation } = useToolbarItem(); // 'horizontal' or 'vertical'

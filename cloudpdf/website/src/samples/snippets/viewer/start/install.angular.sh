@@ -1,1 +1,1 @@
-npm install @embedpdf/viewer-angular
+npm install @cloudpdf/viewer-angular

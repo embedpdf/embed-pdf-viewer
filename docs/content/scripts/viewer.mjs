@@ -2,9 +2,11 @@
  * The checks only the viewer's docs need, next to the snippet check (`snippets.mjs`):
  *
  * - a plain-HTML snippet (`.vanilla.html`): its module scripts, taken out of the page and checked
- *   as JavaScript against `@embedpdf/viewer`; every `<embedpdf-viewer>` and `<epdf-*>` element
- *   the viewer's types declare; every `<embedpdf-viewer>` attribute a config key; every `slot`
- *   one the viewer has, on a child of the viewer; every `<script src>` the CDN script or a path;
+ *   as JavaScript against the site's viewer (`@embedpdf/viewer`, or `@cloudpdf/viewer` for
+ *   cloudpdf.com's copy); every `<embedpdf-viewer>` and `<epdf-*>` element the viewer's types
+ *   declare; every `<embedpdf-viewer>` attribute a config key (and on cloudpdf.com no `src`: a
+ *   cloud document isn't a string); every `slot` one the viewer has, on a child of the viewer;
+ *   every `<script src>` the site's CDN script or a path;
  * - the code a viewer page shows itself (`js` and `ts` blocks: the config, the layout, the
  *   viewer in code), checked the same way, for every framework, as the config is the same in each;
  * - an install command (`.sh`) names packages this repository publishes.
@@ -16,24 +18,27 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { ENGINES } from '../engines.mjs';
 import {
   contentRoot,
   FRAMEWORK_LABELS,
   repoRoot,
   siteRequire,
   toPosix,
-  VIEWER_CDN_URL,
+  VIEWER_CDN_URLS,
 } from './compile.mjs';
 
 // ── the names a page's code uses ────────────────────────────────────────────
 
 /**
  * `_viewer.ts` in the run: the names a viewer page's code uses without importing them, from the
- * one type the pages name, `ViewerConfig`. A name the config doesn't have is
+ * one type the pages name, the site's `ViewerConfig`. A name the config doesn't have is
  * `NotInViewerConfig<'key'>`, so an error says which key is missing.
  */
-const VIEWER_NAMES = `// The names a viewer page's code uses without importing them (scripts/viewer.mjs).
-import type { ViewerConfig } from '@embedpdf/viewer';
+const viewerNames = (
+  engine,
+) => `// The names a viewer page's code uses without importing them (scripts/viewer.mjs).
+import type { ViewerConfig } from '${ENGINES[engine].viewer.package}';
 
 export interface NotInViewerConfig<Key extends string> {
   readonly notInViewerConfig: Key;
@@ -254,11 +259,12 @@ function domModule(elements) {
 }
 
 /**
- * Stage one plain-HTML snippet in `directory`: each module script as its own file, the elements
- * and attributes as a file of type checks on their own lines, and the errors that need no
- * compiler. Returns the staged files with their `locate`, and those errors.
+ * Stage one plain-HTML snippet in `directory`, as `engine`'s site shows it: each module script as
+ * its own file, the elements and attributes as a file of type checks on their own lines, and the
+ * errors that need no compiler. Returns the staged files with their `locate`, and those errors.
  */
-function stageHtml(snippet, source, directory, viewerNames) {
+function stageHtml(snippet, source, directory, viewerNames, engine) {
+  const cdnScript = VIEWER_CDN_URLS[engine];
   const { elements, lines } = readHtml(source);
   const base = path.join(directory, path.basename(snippet.name));
   const config = `import(${JSON.stringify(specifier(directory, viewerNames))}).Config`;
@@ -276,7 +282,13 @@ function stageHtml(snippet, source, directory, viewerNames) {
       });
     }
     for (const attribute of element.attributes) {
-      if (element.tag === 'embedpdf-viewer' && !isGlobalAttribute(attribute.name)) {
+      if (element.tag === 'embedpdf-viewer' && attribute.name === 'src' && engine !== 'local') {
+        error(
+          attribute,
+          `<embedpdf-viewer src>: on this site a document is { token }, { id } or { shareToken }, ` +
+            'which no attribute holds: give it from script (`element.src = …`)',
+        );
+      } else if (element.tag === 'embedpdf-viewer' && !isGlobalAttribute(attribute.name)) {
         checks.push({
           ...attribute,
           text: `/** @type {${config}[${JSON.stringify(camel(attribute.name))}]} */ (undefined); `,
@@ -295,12 +307,12 @@ function stageHtml(snippet, source, directory, viewerNames) {
     }
     const src = element.tag === 'script' && element.attributes.find((a) => a.name === 'src');
     if (src) {
-      if (src.value === VIEWER_CDN_URL) {
-        checks.push({ ...src, text: `import ${JSON.stringify(VIEWER_CDN_URL)}; ` });
+      if (src.value === cdnScript) {
+        checks.push({ ...src, text: `import ${JSON.stringify(cdnScript)}; ` });
       } else if (!/^(\.{0,2}\/)(?!\/)/.test(src.value)) {
         error(
           src,
-          `<script src="${src.value}">: load the viewer from ${VIEWER_CDN_URL} or a path on your own site`,
+          `<script src="${src.value}">: load the viewer from ${cdnScript} or a path on your own site`,
         );
       }
     }
@@ -413,17 +425,17 @@ function isModule(ts, file) {
 }
 
 /**
- * Stage the code blocks a page shows on embedpdf.com, each as a file of its own at the page's
+ * Stage the code blocks a page shows on `engine`'s site, each as a file of its own at the page's
  * line numbers. A `js` block gets the names it uses without importing them (`viewer`, `layout`)
  * on its fence line; a config object (or a command, or a layout item) is checked as one with
  * `@satisfies`, and so is a module's `export const config`. A `ts` block is a module as written.
  */
-function stagePageCode(ts, page, directory, viewerNames) {
+function stagePageCode(ts, page, directory, viewerNames, engine) {
   const files = [];
   const names = specifier(directory, viewerNames);
   for (const block of page.code) {
     const language = CODE_LANGUAGES[block.lang];
-    if (!language || !block.local) continue;
+    if (!language || !block.engines.includes(engine)) continue;
     const code = block.lines.join('\n');
     const lines = [...Array(block.line - 1).fill(''), ...block.lines];
     const insertions = [];
@@ -494,21 +506,35 @@ const READERS_NAMES = new Set([
 ]);
 
 /**
+ * Whether files under `directory` are cloudpdf.com's copy (`cloudpdf/website/src/samples`), which
+ * a check of a site's synced copy (`samples.mjs --root`) reads.
+ */
+const isCloudCopy = (directory) =>
+  !path.relative(path.join(repoRoot, 'cloudpdf'), path.resolve(directory)).startsWith('..');
+
+/**
  * Stage the viewer's plain-HTML snippets (files under `snippetsRoot`) and the code its pages show
- * in `root`: the files to compile, where each came from (a snippet's file, or a page's
- * `viewer/….mdx`), how its lines map back, which diagnostics the check drops, and the `markup`
- * errors no compiler reports. The caller writes the helpers and the tsconfig.
+ * in `root`, as `engine`'s site shows them: the files to compile, where each came from (a
+ * snippet's file, or a page's `viewer/….mdx`), how its lines map back, which diagnostics the
+ * check drops, and the `markup` errors no compiler reports. The caller writes the helpers and the
+ * tsconfig. `read(file)` gives a snippet's text (by default, the file under `snippetsRoot`); the
+ * engine is cloudpdf.com's for files under `cloudpdf/`, a site's synced copy, and embedpdf.com's
+ * otherwise.
  */
 export function stageVanilla(
   snippets,
   pages,
   root,
   snippetsRoot = path.join(contentRoot, 'snippets'),
+  {
+    engine = isCloudCopy(snippetsRoot) ? 'cloud' : 'local',
+    read = (file) => fs.readFileSync(path.join(snippetsRoot, file), 'utf8'),
+  } = {},
 ) {
   const ts = siteRequire('typescript');
-  const viewerNames = path.join(root, '_viewer');
+  const viewerNamesFile = path.join(root, '_viewer');
   fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(`${viewerNames}.ts`, VIEWER_NAMES);
+  fs.writeFileSync(`${viewerNamesFile}.ts`, viewerNames(engine));
 
   const origins = new Map();
   const locate = new Map();
@@ -522,16 +548,18 @@ export function stageVanilla(
 
   for (const snippet of snippets.filter((s) => s.framework === 'vanilla')) {
     if (!snippet.file.endsWith('.html')) continue;
-    const source = fs.readFileSync(path.join(snippetsRoot, snippet.file), 'utf8');
+    const source = read(snippet.file);
     const directory = path.join(root, path.dirname(snippet.name));
     fs.mkdirSync(directory, { recursive: true });
-    const { files, errors } = stageHtml(snippet, source, directory, viewerNames);
+    const { files, errors } = stageHtml(snippet, source, directory, viewerNamesFile, engine);
     for (const file of files) write(snippet.file, file);
     if (errors.length) markup.set(snippet.file, errors);
   }
   for (const page of pages.values()) {
     const directory = path.join(root, '_pages', path.dirname(page.source));
-    for (const file of stagePageCode(ts, page, directory, viewerNames)) write(page.source, file);
+    for (const file of stagePageCode(ts, page, directory, viewerNamesFile, engine)) {
+      write(page.source, file);
+    }
   }
 
   const ignores = (origin, { code }) => origin.endsWith('.mdx') && READERS_NAMES.has(code);
@@ -585,16 +613,21 @@ function workspacePackages() {
 
 /**
  * Each install command's errors, added to its framework's result: an `@embedpdf/` or
- * `@cloudpdf/` package it names that this repository doesn't publish.
+ * `@cloudpdf/` package it names that this repository doesn't publish. `read(file)` gives a
+ * command as the site shows it (by default, as written).
  */
-export function addInstallErrors(snippets, results) {
+export function addInstallErrors(
+  snippets,
+  results,
+  read = (file) => fs.readFileSync(path.join(contentRoot, 'snippets', file), 'utf8'),
+) {
   const installs = snippets.filter((s) => s.file.endsWith('.sh'));
   if (installs.length === 0) return;
   const packages = workspacePackages();
   for (const snippet of installs) {
     const result = results[snippet.framework];
     if (!result?.tool) continue;
-    const source = fs.readFileSync(path.join(contentRoot, 'snippets', snippet.file), 'utf8');
+    const source = read(snippet.file);
     const errors = installedPackages(source)
       .filter((name) => /^@(embedpdf|cloudpdf)\//.test(name) && !packages.get(name)?.published)
       .map((name) => ({
@@ -615,31 +648,39 @@ export function addInstallErrors(snippets, results) {
 
 // ── a page's status ─────────────────────────────────────────────────────────
 
-/** Whether `samples/` has a version of an example for a framework (`<name>.<framework>.*`). */
-function hasExample(name, framework) {
+/**
+ * Whether `samples/` has a version of an example for a framework on `engine`'s site: shared
+ * (`<name>.<framework>.*`), or that site's own (`<name>.<engine>.<framework>.*`).
+ */
+function hasExample(name, framework, engine) {
   const directory = path.join(contentRoot, 'samples', path.dirname(name));
-  const prefix = `${path.basename(name)}.${framework}`;
   if (!fs.existsSync(directory)) return false;
+  const prefixes = [framework, `${engine}.${framework}`].map(
+    (rest) => `${path.basename(name)}.${rest}`,
+  );
   return fs
     .readdirSync(directory)
-    .some((entry) => entry === prefix || entry.startsWith(`${prefix}.`));
+    .some((entry) => prefixes.some((prefix) => entry === prefix || entry.startsWith(`${prefix}.`)));
 }
 
-/** The examples a page shows for a framework that `samples/` has no version of. */
-export function exampleErrors(names, framework) {
+/** The examples a page shows for a framework that `samples/` has no version of on `engine`'s site. */
+export function exampleErrors(names, framework, engine = 'local') {
   return [...names]
     .sort()
-    .filter((name) => !hasExample(name, framework))
+    .filter((name) => !hasExample(name, framework, engine))
     .map((name) => ({ example: name, message: `no ${FRAMEWORK_LABELS[framework]} example` }));
 }
 
 /**
- * The errors of the code a page shows, for one framework: those in its blocks for that framework,
- * or why the code isn't checked.
+ * The errors of the code a page shows on `engine`'s site, for one framework: those in its blocks
+ * for that framework, or why the code isn't checked.
  */
-export function pageCodeErrors(page, framework, result) {
+export function pageCodeErrors(page, framework, result, engine = 'local') {
   const blocks = page.code.filter(
-    (block) => CODE_LANGUAGES[block.lang] && block.local && block.integrations.includes(framework),
+    (block) =>
+      CODE_LANGUAGES[block.lang] &&
+      block.engines.includes(engine) &&
+      block.integrations.includes(framework),
   );
   if (blocks.length === 0) return [];
   if (!result.tool)

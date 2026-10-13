@@ -1,4 +1,4 @@
-import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-react';
+import { PDFViewer, ToolbarItem, type Layout } from '@cloudpdf/viewer-react';
 import { useVersions, type Version } from './versions'; // your app
 
 const layout = (layout: Layout) =>

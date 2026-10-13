@@ -1,7 +1,8 @@
 /**
  * The viewer docs' own checks (`viewer.mjs`), on small pages of our own: a plain-HTML snippet's
- * scripts and elements, and the code a viewer page shows, each compiled against
- * `@embedpdf/viewer` at its source and reported at the page's own lines.
+ * scripts and elements, and the code a viewer page shows, each compiled against the site's viewer
+ * at its source (`@embedpdf/viewer`, and `@cloudpdf/viewer` for cloudpdf.com's copy) and reported
+ * at the page's own lines.
  *
  *   node --test docs/content/scripts/*.test.mjs
  *
@@ -60,6 +61,14 @@ const MDX = `# A page
 
 </Engine>
 
+<Engine local>
+
+\`\`\`js
+{ scope: ['doc.open'] }
+\`\`\`
+
+</Engine>
+
 <Fw only="vanilla">
 
 \`\`\`ts
@@ -71,9 +80,28 @@ export const config = { notAKeyEither: 1 } satisfies ViewerConfig;
 </Fw>
 `;
 
+/** cloudpdf.com's copy of a plain-HTML page: the cloud door's script, and a cloud document. */
+const CLOUD_PAGE = `<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 100vh"></embedpdf-viewer>
+
+<script type="module">
+  import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  document.getElementById('viewer').src = { shareToken: 'shr_example' };
+  CloudPDF.init({ target: '#other', src: { token: () => 'a token' }, scope: ['doc.open'] });
+</script>
+`;
+
 let run;
 let errors;
+let cloudErrors;
 let page;
+
+const snippet = {
+  file: 'viewer/test/page.vanilla.html',
+  name: 'viewer/test/page',
+  framework: 'vanilla',
+  shownAs: 'viewer/test/page.html',
+};
 
 before(async () => {
   run = runDirectory('embedpdf-viewer-test');
@@ -82,25 +110,29 @@ before(async () => {
   fs.writeFileSync(path.join(snippets, 'viewer/test/page.vanilla.html'), PAGE);
   page = readPage(MDX, VIEWER_INTEGRATIONS, 'viewer/test.mdx');
   const result = await checkVanilla(
-    [
-      {
-        file: 'viewer/test/page.vanilla.html',
-        name: 'viewer/test/page',
-        framework: 'vanilla',
-        shownAs: 'viewer/test/page.html',
-      },
-    ],
+    [snippet],
     new Map([['viewer/test', page]]),
     path.join(run, 'vanilla'),
     snippets,
   );
   assert.ok(result.tool, result.reason);
   errors = result.bySnippet;
+
+  const cloud = await checkVanilla(
+    [snippet],
+    new Map([['viewer/test', readPage(MDX, VIEWER_INTEGRATIONS, 'viewer/test.mdx', 'cloud')]]),
+    path.join(run, 'cloud'),
+    snippets,
+    { engine: 'cloud', read: () => CLOUD_PAGE },
+  );
+  assert.ok(cloud.tool, cloud.reason);
+  cloudErrors = cloud.bySnippet;
 });
 
 after(() => removeRunDirectory(run));
 
-const on = (file, line) => (errors.get(file) ?? []).filter((error) => error.line === line);
+const on = (file, line, from = errors) =>
+  (from.get(file) ?? []).filter((error) => error.line === line);
 
 describe('a plain-HTML snippet', () => {
   const file = 'viewer/test/page.vanilla.html';
@@ -147,12 +179,42 @@ describe('the code a viewer page shows', () => {
 
   it('skips the cloudpdf.com site’s code, and checks a TypeScript module as written', () => {
     assert.deepEqual(on(file, 22), []);
-    assert.match(on(file, 32)[0]?.message ?? '', /notAKeyEither/);
+    assert.match(on(file, 40)[0]?.message ?? '', /notAKeyEither/);
   });
 
-  it('knows which frameworks each block is for', () => {
+  it('knows which frameworks and which sites each block is for', () => {
     const typescript = page.code.find((block) => block.lang === 'ts');
     assert.deepEqual(typescript.integrations, ['vanilla']);
-    assert.equal(page.code.find((block) => block.line === 22)?.local, false);
+    assert.deepEqual(page.code.find((block) => block.line === 22)?.engines, ['cloud']);
+    assert.deepEqual(page.code.find((block) => block.line === 30)?.engines, ['local']);
+    assert.deepEqual(typescript.engines, ['local', 'cloud']);
+  });
+});
+
+describe('cloudpdf.com’s copy', () => {
+  const file = 'viewer/test.mdx';
+  const html = 'viewer/test/page.vanilla.html';
+
+  it('checks the cloud site’s code against the cloud config, and skips embedpdf.com’s', () => {
+    assert.deepEqual(on(file, 22, cloudErrors), []);
+    assert.deepEqual(on(file, 30, cloudErrors), []);
+    // A URL isn't a cloud document.
+    assert.match(
+      on(file, 4, cloudErrors)[0]?.message ?? '',
+      /'string' is not assignable to type 'DocumentSrc'/,
+    );
+  });
+
+  it('wants a cloud document from script, and knows the cloud door', () => {
+    assert.match(on(html, 1, cloudErrors)[0]?.message ?? '', /give it from script/);
+    assert.deepEqual(on(html, 6, cloudErrors), []);
+    assert.match(on(html, 7, cloudErrors)[0]?.message ?? '', /scope/);
+  });
+
+  it('reports nothing else', () => {
+    assert.deepEqual(
+      (cloudErrors.get(html) ?? []).map((error) => error.line).sort((a, b) => a - b),
+      [1, 7],
+    );
   });
 });

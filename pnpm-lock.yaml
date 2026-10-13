@@ -457,6 +457,21 @@ importers:
       '@cloudpdf/engine':
         specifier: workspace:*
         version: link:../engine
+      '@cloudpdf/viewer':
+        specifier: workspace:*
+        version: link:../viewer/main
+      '@cloudpdf/viewer-angular':
+        specifier: workspace:*
+        version: link:../viewer/angular
+      '@cloudpdf/viewer-react':
+        specifier: workspace:*
+        version: link:../viewer/react
+      '@cloudpdf/viewer-svelte':
+        specifier: workspace:*
+        version: link:../viewer/svelte
+      '@cloudpdf/viewer-vue':
+        specifier: workspace:*
+        version: link:../viewer/vue
       '@embedpdf/default-stamps':
         specifier: workspace:*
         version: link:../../packages/default-stamps
@@ -2910,6 +2925,9 @@ importers:
       '@embedpdf/react':
         specifier: workspace:*
         version: link:../packages/framework/react
+      '@embedpdf/viewer':
+        specifier: workspace:*
+        version: link:../packages/viewer/main
       '@embedpdf/viewer-angular':
         specifier: workspace:*
         version: link:../packages/viewer/angular

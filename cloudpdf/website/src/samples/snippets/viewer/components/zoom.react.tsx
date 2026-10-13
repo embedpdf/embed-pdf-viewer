@@ -1,4 +1,4 @@
-import { Button, useCommand } from '@embedpdf/viewer-react';
+import { Button, useCommand } from '@cloudpdf/viewer-react';
 import { useStageState } from '@embedpdf/react/stage';
 
 export function ZoomPill() {

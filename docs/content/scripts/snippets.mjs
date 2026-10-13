@@ -14,6 +14,13 @@
  * viewer's, for the same four and `vanilla`, a plain HTML page (`viewer.mjs` checks those, and the
  * code a viewer page shows itself).
  *
+ * Each site gets a status of its own, for the pages it has (`sitePages` in `sync.mjs`: a
+ * `page.cloud.mdx` is cloudpdf.com's `page`, a page with `engines: [local]` isn't there) and what
+ * they show there: a `<Snippet>` in `<Engine cloud>` counts for cloudpdf.com only. The headless
+ * snippets compile once, as written. The viewer's compile once per site, as that site's copy
+ * shows them (`siteFiles`, `transformViewerFile`): embedpdf.com's against `@embedpdf/viewer*`,
+ * cloudpdf.com's against `@cloudpdf/viewer*`, whose errors are at the lines of that copy.
+ *
  * The snippets compile in a run directory that resolves every framework the embedpdf.com site has
  * (`compile.mjs`), each under the name its page shows (`search/search-box.tsx`) so they import
  * each other as written. Workspace packages resolve to their source. A helper a snippet
@@ -22,7 +29,7 @@
  * are about our API.
  *
  * A page's snippets are its `<Snippet name>` tags, for the frameworks its `<Fw only>` blocks
- * allow, on either site: `<Engine>` versions differ only in the engine they create.
+ * allow and the site its `<Engine>` blocks allow.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +49,8 @@ import {
   writeJson,
   writeTsconfig,
 } from './compile.mjs';
+import { ENGINES } from '../engines.mjs';
+import { siteFiles, sitePages, transformViewerFile } from './sync.mjs';
 import {
   addInstallErrors,
   addMarkupErrors,
@@ -51,6 +60,9 @@ import {
 } from './viewer.mjs';
 
 const snippetsRoot = path.join(contentRoot, 'snippets');
+/** The sites, by the engine each one's docs are for: `local` is embedpdf.com, `cloud` cloudpdf.com. */
+const SITES = Object.keys(ENGINES);
+const SITE_LABELS = { local: 'embedpdf.com', cloud: 'cloudpdf.com' };
 const stubsRoot = path.join(contentRoot, 'scripts/snippet-stubs');
 const statusFile = path.join(contentRoot, 'generated/snippet-status.json');
 
@@ -82,16 +94,34 @@ const DOCS = {
  * Every snippet file: its framework, the name pages include it by, and the path the page shows.
  * A snippet is one file (`search/search-box.react.tsx`) or a directory of files, entry first
  * (`start/highlighter.vue/App.vue`). A viewer snippet can also be a plain HTML page
- * (`viewer/start/first.vanilla.html`), and an install command a shell file (`.react.sh`).
+ * (`viewer/start/first.vanilla.html`), and an install command a shell file (`.react.sh`). A
+ * per-site file (`viewer/start/first.cloud.vanilla.html`) is that site's version of its snippet
+ * (`flavor`); {@link forSite} picks a site's.
  */
 function readSnippets() {
   return walk(snippetsRoot).flatMap((absolute) => {
     const file = toPosix(path.relative(snippetsRoot, absolute));
-    const match = file.match(/^(.*)\.(react|vue|svelte|angular|vanilla)(\.[a-z]+$|\/)/);
+    const match = file.match(
+      new RegExp(
+        `^(.*?)(?:\\.(${SITES.join('|')}))?\\.(react|vue|svelte|angular|vanilla)(\\.[a-z]+$|\\/)`,
+      ),
+    );
     if (!match)
       throw new Error(`snippets/${file}: no framework in its name (<name>.<framework>.<ext>)`);
-    const [, name, framework] = match;
-    return [{ file, name, framework, shownAs: file.replace(`.${framework}`, '') }];
+    const [, name, flavor = null, framework] = match;
+    return [{ file, name, framework, flavor, shownAs: file.replace(`.${framework}`, '') }];
+  });
+}
+
+/**
+ * The snippets a site shows: its own version of a snippet where it has one, under the snippet's
+ * plain name, and every shared one otherwise. `emitAs` is the file in the site's copy.
+ */
+function forSite(snippets, engine) {
+  const byFile = new Map(snippets.map((snippet) => [snippet.file, snippet]));
+  return siteFiles([...byFile.keys()], engine).map(({ source, emitAs }) => {
+    const snippet = byFile.get(source);
+    return { ...snippet, emitAs, shownAs: emitAs.replace(`.${snippet.framework}`, '') };
   });
 }
 
@@ -107,13 +137,18 @@ function frameworksIn(attributes, integrations) {
 const TAGS = /<(\/?)(Fw|Snippet|Example|Engine)\b([^>]*)>/g;
 const FENCE = /^ {0,3}(`{3,}|~{3,})\s*([\w-]*)/;
 
+/** `<Engine local>`, `<Engine cloud>`, `<Engine only="cloud">` → the sites it names. */
+const enginesIn = (attributes) =>
+  SITES.filter((engine) => new RegExp(`\\b${engine}\\b`).test(attributes));
+
 /**
- * What one page shows, per framework: its `<Snippet>` and `<Example>` names, and its code blocks
- * with where each starts (`line`, the first line of code). A tag inside `<Fw only>` shows only
- * for the frameworks every enclosing block names; a code block in `<Engine>` without `local` is
- * the cloudpdf.com site's only (`local: false`). Tags inside a code block are code.
+ * What one page shows on `engine`'s site, per framework: its `<Snippet>` and `<Example>` names,
+ * and its code blocks with where each starts (`line`, the first line of code) and the sites it's
+ * on (`engines`). A tag inside `<Fw only>` shows only for the frameworks every enclosing block
+ * names, and one inside `<Engine>` only on the sites every enclosing block names; without an
+ * `engine`, a tag counts for either site. Tags inside a code block are code.
  */
-export function readPage(mdx, integrations, where) {
+export function readPage(mdx, integrations, where, engine) {
   const shows = new Map(integrations.map((integration) => [integration, new Set()]));
   const examples = new Map(integrations.map((integration) => [integration, new Set()]));
   const code = [];
@@ -122,6 +157,11 @@ export function readPage(mdx, integrations, where) {
     open.reduce(
       (list, scope) => (scope.only ? list.filter((fw) => scope.only.includes(fw)) : list),
       integrations,
+    );
+  const sites = () =>
+    open.reduce(
+      (list, scope) => (scope.engines ? list.filter((site) => scope.engines.includes(site)) : list),
+      SITES,
     );
 
   let prose = [];
@@ -133,13 +173,14 @@ export function readPage(mdx, integrations, where) {
           open.push(
             element === 'Fw'
               ? { only: frameworksIn(attributes, integrations) }
-              : { local: /\blocal\b/.test(attributes) },
+              : { engines: enginesIn(attributes) },
           );
         }
         continue;
       }
       const name = attributes.match(/name="([^"]+)"/)?.[1];
       if (!name) throw new Error(`${where}: ${tag} has no name`);
+      if (engine && !sites().includes(engine)) continue;
       for (const framework of allowed())
         (element === 'Snippet' ? shows : examples).get(framework).add(name);
     }
@@ -163,7 +204,7 @@ export function readPage(mdx, integrations, where) {
       line: index + 2,
       lines: body,
       integrations: allowed(),
-      local: open.every((scope) => scope.local !== false),
+      engines: sites(),
     });
     index = end;
   }
@@ -171,16 +212,15 @@ export function readPage(mdx, integrations, where) {
   return { shows, examples, code, source: where };
 }
 
-/** Every page of a set, by the name the status gives it (`text/search`, `viewer/setup`). */
-function readPages({ root, integrations, prefix }) {
-  const pagesRoot = path.join(contentRoot, root);
+/**
+ * Every page of a set that `engine`'s site has, by the name the status gives it (`text/search`,
+ * `viewer/setup`), as that site shows it (`sitePages`). Its `source` is the file it comes from
+ * (`viewer/setup.cloud.mdx`).
+ */
+function readPages({ root, integrations, prefix }, engine) {
   const pages = new Map();
-  for (const absolute of walk(pagesRoot)
-    .filter((file) => file.endsWith('.mdx'))
-    .sort()) {
-    const page = toPosix(path.relative(pagesRoot, absolute)).replace(/\.mdx$/, '');
-    const where = `${root}/${page}.mdx`;
-    pages.set(`${prefix}${page}`, readPage(fs.readFileSync(absolute, 'utf8'), integrations, where));
+  for (const { name, source, mdx } of sitePages(root, engine)) {
+    pages.set(`${prefix}${name}`, readPage(mdx, integrations, source, engine));
   }
   return pages;
 }
@@ -399,18 +439,26 @@ const INCLUDE = {
  */
 const OVERRIDES = { vue: { vueCompilerOptions: { checkUnknownComponents: false } } };
 
+/** A snippet's text as written. */
+const readSnippet = (file) => fs.readFileSync(path.join(snippetsRoot, file), 'utf8');
+
 /**
  * Copy one framework's snippets to `root` (in a run directory) under the names the pages show,
  * write a stub or a stand-in for every helper they import but don't show, and a tsconfig (which,
- * with `viewer`, reads `@embedpdf/viewer` at its source). Returns where each staged snippet came
- * from.
+ * with `viewer`, reads the viewer at its source). `read(snippet)` gives a snippet's text: as
+ * written, or as a site shows it. Returns where each staged snippet came from.
  */
-function stage(framework, snippets, root, { viewer = false } = {}) {
+function stage(
+  framework,
+  snippets,
+  root,
+  { viewer = false, read = (s) => readSnippet(s.file) } = {},
+) {
   const origins = new Map();
   for (const snippet of snippets.filter((s) => s.framework === framework)) {
     const staged = path.join(root, snippet.shownAs);
     fs.mkdirSync(path.dirname(staged), { recursive: true });
-    fs.copyFileSync(path.join(snippetsRoot, snippet.file), staged);
+    fs.writeFileSync(staged, read(snippet));
     origins.set(staged, snippet.file);
   }
   writeHelpers(framework, root, [...origins.keys()]);
@@ -506,7 +554,7 @@ const statusOf = (errors) =>
     : { compiles: true };
 
 /** Per headless page and framework: whether every snippet the page shows compiles. */
-function pageStatus(pages, snippets, results) {
+function headlessPageStatus(pages, snippets, results) {
   const status = {};
   for (const [page, { shows }] of pages) {
     status[page] = {};
@@ -519,7 +567,7 @@ function pageStatus(pages, snippets, results) {
   return status;
 }
 
-function printSummary(title, status, results, snippets, pages, integrations) {
+function printSummary(title, status, results, snippets, integrations) {
   const pageCount = Object.keys(status).length;
   console.log(`${title} (${snippets.length} files, ${pageCount} pages):`);
   for (const framework of integrations) {
@@ -532,11 +580,20 @@ function printSummary(title, status, results, snippets, pages, integrations) {
       `  ${FRAMEWORK_LABELS[framework].padEnd(10)} ${String(compiling).padStart(2)} of ${pageCount} pages compile (${how})`,
     );
   }
+}
+
+/** The snippets of a set that no page shows, on either site. */
+function printUnused(title, snippets, sitesPages) {
   const shown = new Set(
-    [...pages.values()].flatMap(({ shows }) => [...shows.values()].flatMap((names) => [...names])),
+    sitesPages.flatMap((pages) =>
+      [...pages.values()].flatMap(({ shows }) =>
+        [...shows.values()].flatMap((names) => [...names]),
+      ),
+    ),
   );
   const unused = [...new Set(snippets.map((s) => s.name))].filter((name) => !shown.has(name));
-  if (unused.length) console.log(`  ${unused.length} snippets no page shows: ${unused.join(', ')}`);
+  if (unused.length)
+    console.log(`${title}: ${unused.length} snippets no page shows: ${unused.join(', ')}`);
 }
 
 /** The compilers' verdicts, as the status file records them. */
@@ -548,8 +605,11 @@ const verdicts = (results, integrations) =>
     }),
   );
 
-/** Compile the headless snippets, one framework at a time. */
-async function checkHeadless(runRoot, snippets, pages) {
+/**
+ * Compile the headless snippets, one framework at a time, as written: a per-site version under
+ * its own name beside the shared one (`x.cloud.tsx`).
+ */
+async function checkHeadless(runRoot, snippets) {
   const results = {};
   for (const framework of FRAMEWORKS) {
     results[framework] = await compileStaged(
@@ -557,33 +617,47 @@ async function checkHeadless(runRoot, snippets, pages) {
       stage(framework, snippets, path.join(runRoot, framework)),
     );
   }
-  return { results, status: pageStatus(pages, snippets, results) };
+  return results;
 }
 
 /**
- * Compile the viewer's snippets: the frameworks' against `@embedpdf/viewer` at its source, and
- * the plain HTML pages, with the code the pages show themselves (`viewer.mjs`).
+ * Compile the viewer's snippets as `engine`'s site shows them (`siteSnippets`, from `forSite`):
+ * the frameworks' against that site's viewer at its source, and the plain HTML pages, with the
+ * code the pages show themselves (`viewer.mjs`).
  */
-async function checkViewer(runRoot, snippets, pages) {
+async function checkViewer(runRoot, siteSnippets, pages, engine) {
+  const read = (snippet) =>
+    engine === 'local'
+      ? readSnippet(snippet.file) // as written, so an error's line is the file's
+      : transformViewerFile(readSnippet(snippet.file), engine, snippet.emitAs);
   const results = {};
   for (const framework of FRAMEWORKS) {
-    const root = path.join(runRoot, `viewer-${framework}`);
+    const root = path.join(runRoot, `viewer-${engine}-${framework}`);
     results[framework] = await compileStaged(
       framework,
-      stage(framework, snippets, root, { viewer: true }),
+      stage(framework, siteSnippets, root, { viewer: true, read }),
     );
   }
-  results.vanilla = await checkVanilla(snippets, pages, path.join(runRoot, 'viewer-vanilla'));
-  addInstallErrors(snippets, results);
-  return { results, status: viewerPageStatus(pages, snippets, results) };
+  const byFile = new Map(siteSnippets.map((snippet) => [snippet.file, snippet]));
+  const readFile = (file) => read(byFile.get(file));
+  results.vanilla = await checkVanilla(
+    siteSnippets,
+    pages,
+    path.join(runRoot, `viewer-${engine}-vanilla`),
+    snippetsRoot,
+    { engine, read: readFile },
+  );
+  addInstallErrors(siteSnippets, results, readFile);
+  return { results, status: viewerPageStatus(pages, siteSnippets, results, engine) };
 }
 
 /**
  * Compile the viewer's plain-HTML snippets and the code its pages show (`viewer.mjs`) in `root`,
- * the snippets read from `snippetsRoot`.
+ * the snippets read from `snippetsRoot`, as the site of `options.engine` shows them (embedpdf.com
+ * by default; `options.read(file)` gives that site's text).
  */
-export async function checkVanilla(snippets, pages, root, snippetsRoot) {
-  const vanilla = stageVanilla(snippets, pages, root, snippetsRoot);
+export async function checkVanilla(snippets, pages, root, snippetsRoot, options = {}) {
+  const vanilla = stageVanilla(snippets, pages, root, snippetsRoot, options);
   writeHelpers('vanilla', vanilla.root, [...vanilla.origins.keys()]);
   writeTsconfig('vanilla', vanilla.root, INCLUDE.vanilla, {}, { viewer: true });
   const result = await compileStaged('vanilla', vanilla);
@@ -592,19 +666,19 @@ export async function checkVanilla(snippets, pages, root, snippetsRoot) {
 }
 
 /**
- * Per viewer page and framework: whether every snippet and example the page shows is there and
- * compiles, and whether the code the page shows itself compiles (for every framework: the config
- * is the same in each).
+ * Per viewer page and framework on `engine`'s site: whether every snippet and example the page
+ * shows is there and compiles, and whether the code the page shows itself compiles (for every
+ * framework: the config is the same in each).
  */
-function viewerPageStatus(pages, snippets, results) {
+function viewerPageStatus(pages, snippets, results, engine) {
   const status = {};
   for (const [page, shown] of pages) {
     status[page] = {};
     for (const framework of VIEWER_INTEGRATIONS) {
       status[page][framework] = statusOf([
         ...snippetErrors(shown.shows.get(framework), framework, snippets, results[framework]),
-        ...exampleErrors(shown.examples.get(framework), framework),
-        ...pageCodeErrors(shown, framework, results.vanilla),
+        ...exampleErrors(shown.examples.get(framework), framework, engine),
+        ...pageCodeErrors(shown, framework, results.vanilla, engine),
       ]);
     }
   }
@@ -613,56 +687,65 @@ function viewerPageStatus(pages, snippets, results) {
 
 /**
  * Compile every framework's snippets, write `generated/snippet-status.json` and print a summary.
- * Returns the status: `frameworks` and `pages` for the headless docs, and `viewer` with the same
- * two for the viewer's (its pages named `viewer/setup`). Snippets that don't compile never fail
- * it; a compiler that crashes leaves its framework "not compiling", with why.
+ * Returns the status per site (`sites.local` is embedpdf.com, `sites.cloud` cloudpdf.com): for
+ * each, `headless` and `viewer`, each with `frameworks` (the compilers' verdicts) and `pages`
+ * (the viewer's named `viewer/setup`). Snippets that don't compile never fail it; a compiler that
+ * crashes leaves its framework "not compiling", with why.
  */
 export async function checkSnippets() {
   const started = performance.now();
   const snippets = readSnippets();
   const headlessSnippets = snippets.filter((s) => DOCS.headless.owns(s.file));
   const viewerSnippets = snippets.filter((s) => DOCS.viewer.owns(s.file));
-  const headlessPages = readPages(DOCS.headless);
-  const viewerPages = readPages(DOCS.viewer);
 
   // One directory per run, so both sites' builds can check at the same time.
   const runRoot = runDirectory('embedpdf-snippets');
-  let headless;
-  let viewer;
+  const sites = {};
+  const summaries = [];
+  const shownOn = { headless: [], viewer: [] };
   try {
-    headless = await checkHeadless(runRoot, headlessSnippets, headlessPages);
-    viewer = await checkViewer(runRoot, viewerSnippets, viewerPages);
+    const headless = await checkHeadless(runRoot, headlessSnippets);
+    for (const engine of SITES) {
+      const headlessPages = readPages(DOCS.headless, engine);
+      const viewerPages = readPages(DOCS.viewer, engine);
+      const siteHeadless = forSite(headlessSnippets, engine);
+      const siteViewer = forSite(viewerSnippets, engine);
+      const viewer = await checkViewer(runRoot, siteViewer, viewerPages, engine);
+      shownOn.headless.push(headlessPages);
+      shownOn.viewer.push(viewerPages);
+      sites[engine] = {
+        headless: {
+          frameworks: verdicts(headless, FRAMEWORKS),
+          pages: headlessPageStatus(headlessPages, siteHeadless, headless),
+        },
+        viewer: {
+          frameworks: verdicts(viewer.results, VIEWER_INTEGRATIONS),
+          pages: viewer.status,
+        },
+      };
+      const label = SITE_LABELS[engine];
+      summaries.push(
+        [`Headless on ${label}`, sites[engine].headless.pages, headless, siteHeadless, FRAMEWORKS],
+        [
+          `Viewer on ${label}`,
+          sites[engine].viewer.pages,
+          viewer.results,
+          siteViewer,
+          VIEWER_INTEGRATIONS,
+        ],
+      );
+    }
   } finally {
     removeRunDirectory(runRoot);
   }
 
-  const status = {
-    frameworks: verdicts(headless.results, FRAMEWORKS),
-    pages: headless.status,
-    viewer: {
-      frameworks: verdicts(viewer.results, VIEWER_INTEGRATIONS),
-      pages: viewer.status,
-    },
-  };
+  const status = { sites };
   writeJson(statusFile, status);
   const seconds = (performance.now() - started) / 1000;
   console.log(`Snippets, ${seconds.toFixed(1)}s:`);
-  printSummary(
-    'Headless',
-    status.pages,
-    headless.results,
-    headlessSnippets,
-    headlessPages,
-    FRAMEWORKS,
-  );
-  printSummary(
-    'Viewer',
-    status.viewer.pages,
-    viewer.results,
-    viewerSnippets,
-    viewerPages,
-    VIEWER_INTEGRATIONS,
-  );
+  for (const summary of summaries) printSummary(...summary);
+  printUnused('Headless', headlessSnippets, shownOn.headless);
+  printUnused('Viewer', viewerSnippets, shownOn.viewer);
   console.log(`Wrote ${path.relative(process.cwd(), statusFile) || statusFile}.`);
   return status;
 }

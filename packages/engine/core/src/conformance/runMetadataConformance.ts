@@ -3,6 +3,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { AbortError } from '../promise/AbortError';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 export interface ConformanceTestRunner {
   describe(name: string, fn: () => void): void;
@@ -242,7 +243,7 @@ export function runMetadataConformance(
 async function openFixture(engine: Engine, opts: ConformanceOptions) {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Menu, MenuItem } from '@embedpdf/viewer-svelte';
+  import { Menu, MenuItem } from '@cloudpdf/viewer-svelte';
   import { copyLink, emailLink } from './share'; // your app
 </script>
 

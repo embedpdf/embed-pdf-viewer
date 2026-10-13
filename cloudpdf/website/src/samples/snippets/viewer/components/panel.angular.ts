@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
-import { EpdfPanel, EpdfPdfViewer, type Layout } from '@embedpdf/viewer-angular';
+import { EpdfPanel, EpdfPdfViewer, type Layout } from '@cloudpdf/viewer-angular';
 import { Notes } from './notes'; // your app
 
 @Component({
   selector: 'app-review',
   imports: [EpdfPdfViewer, EpdfPanel, Notes],
   template: `
-    <epdf-pdf-viewer src="/report.pdf" [layout]="layout" style="height: 100vh">
+    <epdf-pdf-viewer [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" [layout]="layout" style="height: 100vh">
       <ng-template epdfPanel="notes">
         <app-notes />
       </ng-template>

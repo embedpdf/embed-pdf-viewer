@@ -5,6 +5,7 @@ import type { Engine } from '../engine/Engine';
 import { isLocalDocument, type LocalDocumentHandle } from '../engine/LocalDocumentHandle';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 export interface SignatureConformanceFixtures {
   /** A form with no signature fields at all. */
@@ -858,7 +859,7 @@ async function reopen(
   if (opts.openKind === 'layerBytes') {
     return engine.open({ kind: 'layerBytes', id, baseBytes: bytes });
   }
-  return engine.open({ kind: 'bytes', id, bytes });
+  return engine.open({ kind: 'bytes', id, bytes }, EVERY_PERMISSION);
 }
 
 /** A document the signing tests open: they run on the local engine, which has `version()` and layers. */
@@ -878,7 +879,10 @@ async function open(
   fixture: ConformanceFixture,
 ): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
-    return engine.open({ kind: 'bytes', id: fixture.id, bytes: await fixture.bytes() });
+    return engine.open(
+      { kind: 'bytes', id: fixture.id, bytes: await fixture.bytes() },
+      EVERY_PERMISSION,
+    );
   }
   if (opts.openKind === 'layerBytes') {
     return engine.open({

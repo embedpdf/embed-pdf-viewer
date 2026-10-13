@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { EpdfPdfViewer, EpdfToolbarItem, type Layout } from '@embedpdf/viewer-angular';
+import { EpdfPdfViewer, EpdfToolbarItem, type Layout } from '@cloudpdf/viewer-angular';
 import { Versions } from './versions'; // your app
 
 @Component({

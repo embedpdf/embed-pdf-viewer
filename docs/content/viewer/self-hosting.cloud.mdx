@@ -1,0 +1,50 @@
+---
+title: Self-hosting
+description: The one server the CloudPDF viewer talks to, your own CloudPDF in its place, and the files that run in the browser.
+---
+
+# Self-hosting
+
+The viewer talks to one server: CloudPDF SaaS (`https://engine.cloudpdf.com`), which renders the
+pages, finds the text and stores every change. To run your own CloudPDF instead, deploy the
+[CloudPDF server](/docs/server/getting-started) and say where it is:
+
+```js
+{ engine: { baseUrl: 'https://pdf.example.com' } }
+```
+
+Every request then goes to your server, and nothing else changes. Add its origin to `connect-src`
+in place of CloudPDF SaaS's: see [Security & CSP](concepts/security).
+
+## What runs in the browser
+
+Reading a document is requests to your CloudPDF and nothing more: no WebAssembly, no Web Worker.
+Stamps and Signatures are the exception. A stamp library is a PDF the browser cuts into stamps, so
+the first time someone opens one of them, the viewer loads the PDF engine (`embedpdf.wasm` and its
+worker) and opens the library in it.
+
+| What | Where it comes from by default | Setting |
+| :-- | :-- | :-- |
+| Your documents | Your CloudPDF | `engine.baseUrl` |
+| The engine for stamps (`embedpdf.wasm`, its worker) | Files of your build, emitted by your bundler; for a plain HTML page, the CDN script's folder | `plugins.stamp.assetEngine` |
+| The standard stamps | A lazy JavaScript chunk of your build (`@embedpdf/default-stamps`) | `plugins.stamp.standard` |
+
+`plugins.stamp.assetEngine` gives the viewer an engine of your own for stamps, such as one whose
+files you serve from another directory:
+
+```js
+import { localEngine } from '@embedpdf/engine';
+
+const config = {
+  plugins: {
+    stamp: { assetEngine: () => localEngine({ assetsUrl: '/vendor/embedpdf/' }) },
+  },
+};
+```
+
+## The CDN snippet
+
+The snippet, `dist/cloudpdf.js`, carries the engine for stamps in its folder: `embedpdf.wasm` next to
+its chunks. Every sibling is referenced by a path relative to the folder, so serving it from
+jsDelivr, from your own CDN or from an intranet server is the same: copy the folder, never the file
+alone.

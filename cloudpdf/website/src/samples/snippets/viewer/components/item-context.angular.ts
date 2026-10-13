@@ -1,5 +1,5 @@
 import { Component, inject, input } from '@angular/core';
-import { EpdfToolbarItemContext } from '@embedpdf/viewer-angular';
+import { EpdfToolbarItemContext } from '@cloudpdf/viewer-angular';
 
 @Component({
   selector: 'app-reviewers',

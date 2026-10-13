@@ -1,1 +1,1 @@
-npm install @embedpdf/viewer-vue
+npm install @cloudpdf/viewer-vue

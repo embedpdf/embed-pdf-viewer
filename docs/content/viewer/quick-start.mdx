@@ -14,14 +14,34 @@ its own, so stop whenever it's enough.
 
 <Snippet name="viewer/start/install" />
 
+<Engine local>
+
 The package brings everything: the toolbar and panels, the PDF engine, and its WebAssembly, which
 your build serves from your own site.
+
+</Engine>
+
+<Engine cloud>
+
+The package brings everything: the toolbar and panels, and the engine that opens your documents on
+CloudPDF, which renders the pages. Only Stamps and Signatures load WebAssembly, the first time
+someone opens them.
+
+</Engine>
 
 ## 2. Show a PDF
 
 Give the viewer a document and a height:
 
 <Snippet name="viewer/start/first" />
+
+<Engine cloud>
+
+`shareToken` is a share link from the CloudPDF dashboard, which needs no backend; this one opens our
+demo document. In your app, open each document with a token your backend creates for the user: see
+[Documents](documents).
+
+</Engine>
 
 The viewer fills the box you give it, so it needs a height: a fixed one, `100vh`, or the rest of a
 flex layout. People can now scroll, zoom, search, select text, annotate, fill in forms, sign and
@@ -54,6 +74,8 @@ export const config = {
 Then give it to the viewer:
 
 <Snippet name="viewer/start/customized" />
+
+<Example name="viewer/quick-start/customized" />
 
 The new button behaves like the built-in ones: it has a tooltip, it moves into the "More" menu when
 the toolbar runs out of room, and it's reachable with the keyboard. The icon is 24 × 24 SVG path

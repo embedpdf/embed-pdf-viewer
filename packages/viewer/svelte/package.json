@@ -73,6 +73,11 @@
         "svelte": "./dist/core.js",
         "default": "./dist/core.js"
       },
+      "./component": {
+        "types": "./dist/parts.d.ts",
+        "svelte": "./dist/parts.js",
+        "default": "./dist/parts.js"
+      },
       "./package.json": "./package.json"
     }
   },

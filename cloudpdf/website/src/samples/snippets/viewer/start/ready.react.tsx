@@ -1,9 +1,9 @@
-import { PDFViewer, type Viewer } from '@embedpdf/viewer-react';
+import { PDFViewer, type Viewer } from '@cloudpdf/viewer-react';
 
 function onReady(viewer: Viewer) {
   viewer.documents.onOpened(() => viewer.get('search').search({ text: 'total' }));
 }
 
 export function App() {
-  return <PDFViewer src="/report.pdf" onReady={onReady} style={{ height: '100vh' }} />;
+  return <PDFViewer src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }} onReady={onReady} style={{ height: '100vh' }} />;
 }

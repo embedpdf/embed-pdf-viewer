@@ -19,11 +19,25 @@ The Redact and Measure tabs are gone, with their tools, panels, menu rows and sh
 
 Three questions, three tools. Each one only takes away:
 
+<Engine local>
+
 | You want to say | Use | Reach |
 | :-- | :-- | :-- |
 | Where something goes | [`layout`](../customize/layout) | One place: a bar or a menu. It can still be elsewhere, and its shortcut still works. |
 | Whether this viewer has it | `disable`, or `readOnly` | Everywhere at once: every button, menu row, tab, panel and shortcut |
 | What this user may do | `scope` | Everything, your code included: the engine refuses it |
+
+</Engine>
+
+<Engine cloud>
+
+| You want to say | Use | Reach |
+| :-- | :-- | :-- |
+| Where something goes | [`layout`](../customize/layout) | One place: a bar or a menu. It can still be elsewhere, and its shortcut still works. |
+| Whether this viewer has it | `disable`, or `readOnly` | Everywhere at once: every button, menu row, tab, panel and shortcut |
+| What this user may do | The scope in the user's [token](#what-a-user-may-do) | Everything, your code included: the server refuses it |
+
+</Engine>
 
 A button shows when it's in the layout, isn't disabled, is allowed by the scope, and makes sense
 right now (Copy needs a selection).
@@ -115,8 +129,9 @@ your code.
 }
 ```
 
-Without a `scope`, the user may do everything, and the console reminds you once. The scope and every
-permission in it are the [headless ones](/docs/headless/concepts/permissions).
+Without a `scope`, the user may do what the file allows: everything, unless the PDF restricts
+itself, such as no printing, as in Acrobat. `scope: ['*']` ignores the file's permission flags.
+The scope and every permission in it are the [headless ones](/docs/headless/concepts/permissions).
 
 </Engine>
 
@@ -141,9 +156,19 @@ A PDF can carry restrictions of its own, set by its author with an owner passwor
 printing or no copying. They count when the scope includes `'pdf.permissions'`, which grants what the
 file allows:
 
+<Engine local>
+
 ```js
 { scope: ['pdf.permissions'] }
 ```
+
+</Engine>
+
+<Engine cloud>
+
+Put `pdf.permissions` in the token's scope, next to the other permissions.
+
+</Engine>
 
 Permissions add up: a scope that lists `'doc.print'` next to `'pdf.permissions'` allows printing even
 when the file says no. To let the file decide, list `'pdf.permissions'` and leave its permissions out.

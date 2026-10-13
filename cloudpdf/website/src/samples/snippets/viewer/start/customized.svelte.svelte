@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { PDFViewer } from '@embedpdf/viewer-svelte';
+  import { PDFViewer } from '@cloudpdf/viewer-svelte';
   import { config } from './viewer-config';
 </script>
 
-<PDFViewer src="/report.pdf" {...config} style="height: 100vh" />
+<PDFViewer src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }} {...config} style="height: 100vh" />

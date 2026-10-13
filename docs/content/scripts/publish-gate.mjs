@@ -16,7 +16,10 @@
  * and the code it shows compile for it, and `../viewer-pending.mjs` lists nothing that holds it
  * back: a page whose prose promises what the viewer doesn't do yet stays coming everywhere.
  *
- * The sites read `generated/live-pages.json` through `@embedpdf/docs-kit/publish`.
+ * Each site has its own status (`sites.local` for embedpdf.com, `sites.cloud` for cloudpdf.com),
+ * for the pages it has and the code it shows (`snippets.mjs`): a cloud snippet that doesn't
+ * compile holds back cloudpdf.com's page only. The sites read `generated/live-pages.json` through
+ * `@embedpdf/docs-kit/publish`, each its own part.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -98,7 +101,8 @@ function pendingByPage() {
 
 /**
  * Per viewer page (`viewer/setup`, as the snippet status names it), what `../viewer-pending.mjs`
- * says holds it back. Throws on a page the status doesn't have, or an entry without a reason.
+ * says holds it back. Throws on a page the status doesn't have (on either site: give it every
+ * site's pages), or an entry without a reason.
  */
 export function viewerPendingByPage(pages, pending = VIEWER_PENDING) {
   const byPage = new Map();
@@ -133,6 +137,8 @@ function liveIn(snippetPages, pending = new Map()) {
   return pages;
 }
 
+const SITE_LABELS = { local: 'embedpdf.com', cloud: 'cloudpdf.com' };
+
 function printLive(title, pages, frameworks) {
   const all = Object.values(pages);
   const waiting = all.filter((page) => page.pending.length > 0).length;
@@ -146,52 +152,77 @@ function printLive(title, pages, frameworks) {
 }
 
 /**
- * Check the snippets, then write which page is live for which framework: the headless pages and
- * the viewer's, in one `pages`. Returns them, and the snippet status they come from.
+ * Check the snippets, then write which page is live for which framework on each site: its
+ * headless pages and its viewer pages, in one `pages` per site. Returns them per site, and the
+ * snippet status they come from.
  */
 export async function writePublishStatus() {
   const snippets = await checkSnippets();
-  const headless = liveIn(snippets.pages, pendingByPage());
-  const viewer = liveIn(snippets.viewer.pages, viewerPendingByPage(snippets.viewer.pages));
-  writeJson(livePagesFile, { pages: { ...headless, ...viewer } });
+  const viewerPages = Object.assign(
+    {},
+    ...Object.values(snippets.sites).map((site) => site.viewer.pages),
+  );
+  const viewerPending = viewerPendingByPage(viewerPages);
+  const headlessPending = pendingByPage();
+  const sites = {};
+  for (const [engine, site] of Object.entries(snippets.sites)) {
+    sites[engine] = {
+      headless: liveIn(site.headless.pages, headlessPending),
+      viewer: liveIn(site.viewer.pages, viewerPending),
+    };
+  }
+  writeJson(livePagesFile, {
+    sites: Object.fromEntries(
+      Object.entries(sites).map(([engine, { headless, viewer }]) => [
+        engine,
+        { pages: { ...headless, ...viewer } },
+      ]),
+    ),
+  });
 
-  printLive('Live headless pages', headless, FRAMEWORKS);
-  printLive('Live viewer pages', viewer, VIEWER_INTEGRATIONS);
+  for (const [engine, { headless, viewer }] of Object.entries(sites)) {
+    printLive(`Live headless pages on ${SITE_LABELS[engine]}`, headless, FRAMEWORKS);
+    printLive(`Live viewer pages on ${SITE_LABELS[engine]}`, viewer, VIEWER_INTEGRATIONS);
+  }
   console.log(`Wrote ${path.relative(process.cwd(), livePagesFile) || livePagesFile}.`);
-  return { headless, viewer, snippets };
+  return { sites, snippets };
 }
 
 /**
  * What fails the gate in CI: a compiler that isn't checking (then no page it compiles can be
- * vouched for), and a headless page whose snippets don't compile for a framework. A headless page
- * written ahead of the code names it `pending` in `../reference.mjs` instead. A viewer page that
- * doesn't compile yet is held back and fails nothing: the viewer's pages describe the API it's
- * moving to.
+ * vouched for), and a headless page whose snippets don't compile for a framework, on either site.
+ * A headless page written ahead of the code names it `pending` in `../reference.mjs` instead. A
+ * viewer page that doesn't compile yet is held back on its site and fails nothing: the viewer's
+ * pages describe the API it's moving to. Each problem is said once, however many sites have it.
  */
 export function strictProblems(snippets) {
-  const problems = [];
-  const checks = [
-    ['headless', snippets.frameworks],
-    ['viewer', snippets.viewer.frameworks],
-  ];
-  for (const [docs, frameworks] of checks) {
-    for (const [framework, { tool, reason }] of Object.entries(frameworks)) {
-      if (!tool)
-        problems.push(`the ${docs} ${FRAMEWORK_LABELS[framework]} check isn't checking: ${reason}`);
+  const problems = new Set();
+  for (const [engine, site] of Object.entries(snippets.sites)) {
+    const checks = [
+      ['headless', site.headless.frameworks],
+      [`${SITE_LABELS[engine] ?? engine} viewer`, site.viewer.frameworks],
+    ];
+    for (const [docs, frameworks] of checks) {
+      for (const [framework, { tool, reason }] of Object.entries(frameworks)) {
+        if (!tool)
+          problems.add(
+            `the ${docs} ${FRAMEWORK_LABELS[framework]} check isn't checking: ${reason}`,
+          );
+      }
+    }
+    for (const [page, frameworks] of Object.entries(site.headless.pages)) {
+      for (const [framework, status] of Object.entries(frameworks)) {
+        if (status.compiles || !site.headless.frameworks[framework]?.tool) continue;
+        const [first] = status.errors;
+        const where = first.file ? `${first.file}:${first.line}` : first.snippet;
+        problems.add(
+          `headless/${page}.mdx doesn't compile for ${FRAMEWORK_LABELS[framework]} ` +
+            `(${status.errorCount} errors; ${where}: ${first.message})`,
+        );
+      }
     }
   }
-  for (const [page, frameworks] of Object.entries(snippets.pages)) {
-    for (const [framework, status] of Object.entries(frameworks)) {
-      if (status.compiles || !snippets.frameworks[framework]?.tool) continue;
-      const [first] = status.errors;
-      const where = first.file ? `${first.file}:${first.line}` : first.snippet;
-      problems.push(
-        `headless/${page}.mdx doesn't compile for ${FRAMEWORK_LABELS[framework]} ` +
-          `(${status.errorCount} errors; ${where}: ${first.message})`,
-      );
-    }
-  }
-  return problems;
+  return [...problems];
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

@@ -1,9 +1,15 @@
-<embedpdf-viewer src="/report.pdf" style="height: 100vh">
+<embedpdf-viewer id="viewer" style="height: 100vh">
   <div slot="item:reviewers" class="reviewers">
     <img src="/avatars/ada.png" alt="Ada" title="Ada" />
     <img src="/avatars/grace.png" alt="Grace" title="Grace" />
   </div>
 </embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  document.getElementById('viewer').src = { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+</script>
 
 <style>
   /* The viewer sets data-orientation and data-edge on your element. */

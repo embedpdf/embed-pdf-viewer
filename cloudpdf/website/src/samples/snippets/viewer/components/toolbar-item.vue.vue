@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-vue';
+import { PDFViewer, ToolbarItem, type Layout } from '@cloudpdf/viewer-vue';
 import { useVersions } from './versions'; // your app
 
 const { versions, current, currentUrl, select } = useVersions();

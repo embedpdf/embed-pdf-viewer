@@ -23,6 +23,7 @@
     "@embedpdf/docs-kit": "workspace:*",
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/react": "workspace:*",
+    "@embedpdf/viewer": "workspace:*",
     "@embedpdf/viewer-angular": "workspace:*",
     "@embedpdf/viewer-react": "workspace:*",
     "@embedpdf/viewer-svelte": "workspace:*",

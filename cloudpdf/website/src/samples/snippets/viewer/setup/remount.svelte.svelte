@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PDFViewer, type Layout } from '@embedpdf/viewer-svelte';
+  import { PDFViewer, type Layout } from '@cloudpdf/viewer-svelte';
 
   let { toolbarBelow }: { toolbarBelow: boolean } = $props();
 
@@ -9,7 +9,7 @@
 <!-- A new key mounts a new viewer with the new config. -->
 {#key toolbarBelow}
   <PDFViewer
-    src="/report.pdf"
+    src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }}
     layout={toolbarBelow ? toolbarAtBottom : undefined}
     style="height: 100vh"
   />

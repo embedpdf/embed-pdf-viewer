@@ -9,14 +9,37 @@ import { Callout } from '@/components/docs/callout';
 
 # Setup
 
+<Engine local>
+
 One package gives you the whole viewer: the toolbar and panels, the PDF engine, and everything the
 engine needs, served from your own site.
 
+</Engine>
+
+<Engine cloud>
+
+One package gives you the whole viewer: the toolbar and panels, and the engine that opens your
+documents on CloudPDF.
+
+</Engine>
+
 <Snippet name="viewer/start/install" />
+
+<Engine local>
 
 On a plain HTML page, load the script from jsDelivr as above. In an app with a bundler, install
 `@embedpdf/viewer` and `import '@embedpdf/viewer'` once, which defines the `<embedpdf-viewer>`
 element.
+
+</Engine>
+
+<Engine cloud>
+
+On a plain HTML page, load the script from jsDelivr as above. In an app with a bundler, install
+`@cloudpdf/viewer` and `import '@cloudpdf/viewer'` once, which defines the `<embedpdf-viewer>`
+element.
+
+</Engine>
 
 ## Give it a size
 
@@ -30,6 +53,8 @@ window: see [Small screens](customize/small-screens).
 Everything the viewer can do is one config object. In a framework, every key is a prop:
 
 <Snippet name="viewer/setup/config" />
+
+<Engine local>
 
 | Key | What it is | Page |
 | :-- | :-- | :-- |
@@ -51,6 +76,34 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `onReady` | Called with the `viewer` once it's live | [The viewer in code](code/viewer) |
 | `onDocumentChange` | Called with the document that's showing: the first one, each one the user switches to, and `null` after the last one closes | [Documents](documents#several-documents) |
 | `onPanelResize` | Called with a panel's id and width when the user resizes it | [Panels](customize/panels#keep-the-width-people-chose) |
+
+</Engine>
+
+<Engine cloud>
+
+| Key | What it is | Page |
+| :-- | :-- | :-- |
+| `src` | One document: `{ token }`, `{ id }` or `{ shareToken }` | [Documents](documents) |
+| `documents` | Several documents, shown as tabs | [Documents](documents#several-documents) |
+| `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
+| `commands` | Your own actions | [Buttons & commands](customize/commands) |
+| `icons` | Your own icons | [Buttons & commands](customize/commands#icons) |
+| `theme` | `'light'`, `'dark'`, `'system'`, or your colors | [Theming](customize/theming) |
+| `locale` | `'auto'` or a language code | [Translations](customize/translations) |
+| `strings` | Your own words, and other languages | [Translations](customize/translations) |
+| `disable` | Features, or single buttons, to leave out | [Turn features off](features/turning-off) |
+| `readOnly` | Every feature that changes the document off | [Turn features off](features/turning-off#read-only) |
+| `notAllowed` | `'hide'` (default) or `'disable'` what the user's token doesn't allow | [Turn features off](features/turning-off#what-a-user-may-do) |
+| `plugins` | The settings of each feature's plugin | [Plugins](code/plugins#settings) |
+| `engine` | Your own CloudPDF server (`baseUrl`), the engine's own `token`, or another engine | [Self-hosting](self-hosting) |
+| `onReady` | Called with the `viewer` once it's live | [The viewer in code](code/viewer) |
+| `onDocumentChange` | Called with the document that's showing: the first one, each one the user switches to, and `null` after the last one closes | [Documents](documents#several-documents) |
+| `onPanelResize` | Called with a panel's id and width when the user resizes it | [Panels](customize/panels#keep-the-width-people-chose) |
+
+Who the user is and what they may do come from the document's token, so there's no `scope` or
+`identity`.
+
+</Engine>
 
 The config is plain data and a few functions, the same in every framework. Keep it in a file of its
 own when it grows, and spread it into the viewer, as in the [Quick start](quick-start#3-make-it-yours).
@@ -124,8 +177,20 @@ viewer that has focus, so two viewers never both zoom on one key press.
 ### What it needs from the browser
 
 Chrome and Edge 114, Firefox 125 and Safari 17 (iOS 17), or newer: the first versions with the
-popover API, which the viewer's menus and dialogs open in. The engine runs in a Web Worker, as
-WebAssembly.
+popover API, which the viewer's menus and dialogs open in.
+
+<Engine local>
+
+The engine runs in a Web Worker, as WebAssembly.
+
+</Engine>
+
+<Engine cloud>
+
+The pages render on CloudPDF. Stamps and Signatures open their libraries in the browser, in a Web
+Worker, as WebAssembly.
+
+</Engine>
 
 ### A strict Content Security Policy
 
@@ -134,8 +199,19 @@ has the policy to copy.
 
 ### Air-gapped and self-hosted
 
+<Engine local>
+
 Nothing is fetched from a third party at runtime unless you point the viewer there. See
 [Self-hosting](self-hosting) for every file and the setting that controls it.
+
+</Engine>
+
+<Engine cloud>
+
+The viewer talks to one server: CloudPDF SaaS, or your own CloudPDF when `engine: { baseUrl }`
+names it. See [Self-hosting](self-hosting) for running your own and the files the browser loads.
+
+</Engine>
 
 <Callout type="info">
   The viewer is built on the same packages as [headless](/docs/headless). Everything you set up here

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Menu, MenuItem } from '@embedpdf/viewer-vue';
+import { Menu, MenuItem } from '@cloudpdf/viewer-vue';
 import { copyLink, emailLink } from './share'; // your app
 </script>
 

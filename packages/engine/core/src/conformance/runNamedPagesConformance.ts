@@ -6,6 +6,7 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageListSnapshotSchema, PageNameResultSchema } from '../wire/schemas';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Named-pages conformance: the catalog's `/Names /Pages` registry as layout
@@ -237,7 +238,7 @@ function find(
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

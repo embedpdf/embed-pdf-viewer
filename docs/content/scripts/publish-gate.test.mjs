@@ -15,11 +15,20 @@ const fails = (snippet) => ({
   errors: [{ snippet, file: `${snippet}.react.tsx`, line: 3, message: 'Cannot find name' }],
 });
 
-const status = ({ headless = {}, viewer = {}, tools = {} } = {}) => ({
-  frameworks: { react: { tool: 'tsc' }, vue: { tool: 'vue-tsc' }, ...tools },
-  pages: headless,
-  viewer: { frameworks: { vanilla: { tool: 'tsc' }, react: { tool: 'tsc' } }, pages: viewer },
-});
+/** Both sites' status, each with the same headless pages; `cloud` changes cloudpdf.com's viewer. */
+const status = ({ headless = {}, viewer = {}, tools = {}, cloud = {} } = {}) => {
+  const site = (viewerTools = {}) => ({
+    headless: {
+      frameworks: { react: { tool: 'tsc' }, vue: { tool: 'vue-tsc' }, ...tools },
+      pages: headless,
+    },
+    viewer: {
+      frameworks: { vanilla: { tool: 'tsc' }, react: { tool: 'tsc' }, ...viewerTools },
+      pages: viewer,
+    },
+  });
+  return { sites: { local: site(), cloud: site(cloud) } };
+};
 
 describe('the docs gate in CI', () => {
   it('passes while every headless page compiles, whatever the viewer pages do', () => {
@@ -47,6 +56,13 @@ describe('the docs gate in CI', () => {
     const tools = { vue: { tool: null, reason: 'vue-tsc missed the canary' } };
     assert.deepEqual(strictProblems(status({ headless, tools })), [
       "the headless Vue check isn't checking: vue-tsc missed the canary",
+    ]);
+  });
+
+  it('says which site’s viewer check isn’t checking', () => {
+    const cloud = { react: { tool: null, reason: "the check's own files don't compile" } };
+    assert.deepEqual(strictProblems(status({ cloud })), [
+      "the cloudpdf.com viewer React check isn't checking: the check's own files don't compile",
     ]);
   });
 });

@@ -1,11 +1,13 @@
 ---
 title: Documents
-description: Open a PDF from a URL, a file or bytes, open several as tabs, handle passwords, and download, print or save to your server.
+description: Open a PDF, or several as tabs, handle passwords, and download, print or save to your server.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
 # Documents
+
+<Engine local>
 
 Give the viewer a document with `src`: a URL, a `File`, or bytes.
 
@@ -17,6 +19,31 @@ A relative URL is relative to your page. A URL on another site needs CORS header
 yours, like any `fetch`.
 
 ## Open the file someone picks
+
+</Engine>
+
+<Engine cloud>
+
+Give the viewer a document with `src`. Every document lives on CloudPDF, and `src` says which one
+and who opens it:
+
+| `src` | What it is |
+| :-- | :-- |
+| `{ token }` | A token your backend creates for the user and one document. It says who they are and what they may do. |
+| `{ id }` | A document by its id, when the engine's own token allows it (`engine: { token }`) |
+| `{ shareToken }` | A share link from the CloudPDF dashboard (`shr_…`), which needs no backend |
+
+```js
+{ src: { token: () => fetchDocumentToken('contract-42') } }
+```
+
+A token is a string, or a function that gives a fresh one when the old one runs out. The pages come
+from CloudPDF, so there's no file to serve and no CORS to set up; a share link opens only on the
+websites it allows. [Authentication](/docs/engine/authentication) has what a token carries.
+
+## Open the document someone picks
+
+</Engine>
 
 `src` follows its prop: give it another document, and the viewer opens that one in its place.
 
@@ -40,6 +67,8 @@ dropped files.
 
 Give `documents` instead of `src` to open several at once. Each one gets a tab:
 
+<Engine local>
+
 ```js
 {
   documents: [
@@ -57,6 +86,29 @@ Give `documents` instead of `src` to open several at once. Each one gets a tab:
 | `password` | Its password, if it has one | none |
 | `active` | Show this one first | the first document |
 
+</Engine>
+
+<Engine cloud>
+
+```js
+{
+  documents: [
+    { src: { token: contractToken }, name: 'Contract' },
+    { src: { token: appendixToken }, name: 'Appendix A' },
+    { src: { token: scanToken }, name: 'Signed scan', active: true },
+  ],
+}
+```
+
+| Field | What it is | Default |
+| :-- | :-- | :-- |
+| `src` | `{ token }`, `{ id }` or `{ shareToken }` | none |
+| `name` | What its tab shows | `Document` and the start of its id |
+| `password` | The PDF's password, if it has one | none |
+| `active` | Show this one first | the first document |
+
+</Engine>
+
 The tabs show while more than one document is open. To show them always or never, set
 `layout.tabs('always')` or `layout.tabs('never')` in your [layout](customize/layout).
 `onDocumentChange` tells you which document is showing each time that changes, and `null` once none is.
@@ -66,9 +118,24 @@ The tabs show while more than one document is open. To show them always or never
 A document with a password opens locked, and the viewer asks for it. When you know it, pass it
 along and nobody is asked:
 
+<Engine local>
+
 ```js
 { documents: [{ src: '/payroll.pdf', password: secret }] }
 ```
+
+</Engine>
+
+<Engine cloud>
+
+```js
+{ documents: [{ src: { token: payrollToken }, password: secret }] }
+```
+
+That's the PDF's own password. A share link's passphrase is another one: it goes with the link,
+`src: { shareToken, sharePassword }`.
+
+</Engine>
 
 A wrong password asks again. A document that can't be opened at all shows why in its tab, with a
 **Try again** button.
@@ -77,6 +144,8 @@ A wrong password asks again. A document that can't be opened at all shows why in
 
 `viewer.documents` opens, closes and switches documents. It's the documents plugin, the same as
 [in headless](/docs/headless/documents/opening):
+
+<Engine local>
 
 ```js
 const { document } = await viewer.documents.open(
@@ -87,6 +156,25 @@ const { document } = await viewer.documents.open(
 viewer.documents.setActive(document.id);
 viewer.documents.close(document.id);
 ```
+
+</Engine>
+
+<Engine cloud>
+
+```js
+const { document } = await viewer.documents.open(
+  { kind: 'token', token: () => fetchDocumentToken('invoice-1042') },
+  { name: 'Invoice 1042' },
+);
+
+viewer.documents.setActive(document.id);
+viewer.documents.close(document.id);
+```
+
+`open()` takes a document as the engine names it: `{ kind: 'token' }`, `{ kind: 'id' }` or
+`{ kind: 'share' }`, as in [Authentication](/docs/engine/authentication).
+
+</Engine>
 
 `open()` resolves once the document is ready, and makes it the active one.
 
@@ -162,13 +250,36 @@ viewer.documents.onUnsavedChangesChanged(({ documentId, hasUnsavedChanges }) => 
 
 ### Big files
 
+<Engine local>
+
 The local engine needs the whole file before the first page shows, so a large scan takes as long
 as its download. The toolbar is there at once; only the pages wait.
 
+</Engine>
+
+<Engine cloud>
+
+CloudPDF renders each page on the server and sends it as an image, so the first page shows at
+once, without the browser downloading the whole PDF.
+
+</Engine>
+
 ### Where the bytes go
+
+<Engine local>
 
 With the local engine, a document never leaves the browser: no upload, no server. Each document
 runs in the engine's worker, so a heavy page doesn't freeze your app.
+
+</Engine>
+
+<Engine cloud>
+
+The file stays on CloudPDF. The browser gets the pages as images, and only what the token allows:
+a user who may not download never receives the file, and one who may not copy never receives the
+text.
+
+</Engine>
 
 ### Every documents method
 

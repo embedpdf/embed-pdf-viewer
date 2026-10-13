@@ -16,6 +16,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { ENGINES } from '../engines.mjs';
+
 export const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const repoRoot = path.resolve(contentRoot, '../..');
 export const siteRoot = path.join(repoRoot, 'website');
@@ -32,8 +34,14 @@ export const FRAMEWORK_LABELS = {
   angular: 'Angular',
 };
 
-/** The viewer's CDN script, as the docs show it: the only URL a plain-HTML page loads it from. */
-export const VIEWER_CDN_URL = 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+/**
+ * The viewer's CDN script, as each site's docs show it (`engines.mjs`): the only URL a plain-HTML
+ * page loads it from. embedpdf.com's is {@link VIEWER_CDN_URL}.
+ */
+export const VIEWER_CDN_URLS = Object.fromEntries(
+  Object.entries(ENGINES).map(([engine, { viewer }]) => [engine, viewer.cdnScript]),
+);
+export const VIEWER_CDN_URL = VIEWER_CDN_URLS.local;
 
 export const toPosix = (file) => file.split(path.sep).join('/');
 
@@ -120,25 +128,37 @@ export function resolvePaths() {
 }
 
 /**
- * `@embedpdf/viewer` at its source, under each name the docs import it by: its entries, and the
- * CDN script. Its package names only its build, which the docs check never needs.
+ * Both doors of the viewer at their source, under each name the docs import them by: `@embedpdf/viewer`'s
+ * entries and CDN script, and cloudpdf.com's, `@cloudpdf/viewer`, its CDN script and its framework
+ * packages, which the embedpdf.com site the checks resolve from doesn't install. `@embedpdf/viewer`
+ * names only its build, which the docs check never needs.
  */
 function viewerPaths() {
   const doors = path.join(repoRoot, 'packages/viewer/main/src/doors');
+  const cloud = path.join(repoRoot, 'cloudpdf/viewer');
   return {
     '@embedpdf/viewer': [path.join(doors, 'local.ts')],
     '@embedpdf/viewer/portable': [path.join(doors, 'portable.ts')],
     '@embedpdf/viewer/core': [path.join(doors, 'core.ts')],
     '@embedpdf/viewer/snippet': [path.join(doors, 'snippet.ts')],
-    [VIEWER_CDN_URL]: [path.join(doors, 'snippet.ts')],
+    [VIEWER_CDN_URLS.local]: [path.join(doors, 'snippet.ts')],
+    '@cloudpdf/viewer': [path.join(cloud, 'main/src/index.ts')],
+    '@cloudpdf/viewer/snippet': [path.join(cloud, 'main/src/index.ts')],
+    [VIEWER_CDN_URLS.cloud]: [path.join(cloud, 'main/src/index.ts')],
+    ...Object.fromEntries(
+      FRAMEWORKS.map((framework) => [
+        `@cloudpdf/viewer-${framework}`,
+        [path.join(cloud, framework, 'src/index.ts')],
+      ]),
+    ),
   };
 }
 
 /**
  * Write the tsconfig one framework's files compile with: `include` names them, and `overrides`
  * changes one of the framework's option groups (`{ vueCompilerOptions: {…} }`). With `viewer`,
- * the files read `@embedpdf/viewer` at its source ({@link viewerPaths}), which is `.tsx`: JSX
- * is on, or a program leaves those files out.
+ * the files read the viewer at its source, either door ({@link viewerPaths}), which is `.tsx`:
+ * JSX is on, or a program leaves those files out.
  */
 export function writeTsconfig(framework, root, include, overrides = {}, { viewer = false } = {}) {
   const groups = { ...FRAMEWORK_OPTIONS[framework] };

@@ -5,6 +5,7 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { PageFlattenResultSchema } from '../wire/schemas';
 import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataConformance';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /** Transport-neutral coverage for the content + annotation flatten rail. */
 export function runPageFlattenConformance(
@@ -71,7 +72,10 @@ export function runPageFlattenConformance(
 
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() });
+    return engine.open(
+      { kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() },
+      EVERY_PERMISSION,
+    );
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

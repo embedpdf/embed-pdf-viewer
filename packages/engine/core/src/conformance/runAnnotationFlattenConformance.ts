@@ -8,6 +8,7 @@ import type { DocumentEvent } from '../events/DocumentEvent';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef } from '../identity/PageRef';
 import { AnnotationFlattenResultSchema } from '../wire/schemas';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 const square = (x: number, y: number): SquareDraft => ({
   subtype: 'square',
@@ -144,7 +145,10 @@ function sameRef(left: AnnotationRef, right: AnnotationRef): boolean {
 
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() });
+    return engine.open(
+      { kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() },
+      EVERY_PERMISSION,
+    );
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

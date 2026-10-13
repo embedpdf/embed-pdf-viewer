@@ -3,6 +3,7 @@
 ---
 
 Form actions and push buttons can be written:
+
 - **Action creators:** `EPDFAction_CreateJavaScript`, `EPDFAction_CreateHide`, `EPDFAction_CreateResetForm` and `EPDFAction_CreateSubmitForm` make indirect action dictionaries, naming fields by name or object number (`EPDF_ACTION_TARGET`). `EPDFAction_SetNext` chains actions.
 - **Event setters:** `EPDFAnnot_SetEventAction` sets a widget's `/A` or `/AA` event; `EPDFForm_SetFieldEventAction` sets a field's keystroke, format, validate or calculate action. On a field merged with its widget each touches only its own plane's keys. A field's events inherited from a parent are copied in before its first own entry, so they keep applying.
 - **Calculation order:** `EPDFForm_SetCalculationOrder` writes `/AcroForm /CO`.

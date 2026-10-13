@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, useCommand } from '@embedpdf/viewer-vue';
+import { Button, useCommand } from '@cloudpdf/viewer-vue';
 import { useStageState } from '@embedpdf/vue/stage';
 
 const { zoomLevel } = useStageState();

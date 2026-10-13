@@ -77,7 +77,10 @@ export function runFormScriptConformance(
     };
 
     /** The script an event runs, or null. */
-    const scriptOf = (field: FormFieldDTO, event: 'keystroke' | 'format' | 'validate' | 'calculate') => {
+    const scriptOf = (
+      field: FormFieldDTO,
+      event: 'keystroke' | 'format' | 'validate' | 'calculate',
+    ) => {
       const root = field.actions?.[event]?.root;
       return root?.type === 'javascript' ? root.script : null;
     };
@@ -108,7 +111,10 @@ export function runFormScriptConformance(
           readOnly: true,
           actions: {
             calculate: CALCULATE,
-            format: { ...script('AFNumber_Format(2, 0, 0, 0, "", true);'), next: [script('x = 1;')] },
+            format: {
+              ...script('AFNumber_Format(2, 0, 0, 0, "", true);'),
+              next: [script('x = 1;')],
+            },
           },
         });
         expect(scriptOf(created.field, 'calculate')).toBe('event.value = 1;');
@@ -125,7 +131,9 @@ export function runFormScriptConformance(
     test('update sets, replaces and removes scripts; an event left out keeps its own', async () => {
       await withDoc(async (doc) => {
         await doc.forms.update(NAME, { actions: { format: script('a();') } });
-        await doc.forms.update(NAME, { actions: { format: script('b();'), validate: script('c();') } });
+        await doc.forms.update(NAME, {
+          actions: { format: script('b();'), validate: script('c();') },
+        });
         let name = await fieldOf(doc, 'name');
         expect([scriptOf(name, 'format'), scriptOf(name, 'validate')]).toEqual(['b();', 'c();']);
 
@@ -213,7 +221,10 @@ export function runFormScriptConformance(
 
     test('a field event takes JavaScript only', async () => {
       await withDoc(async (doc) => {
-        const notAScript = { type: 'uri', uri: 'https://example.com' } as unknown as FieldScriptWrite;
+        const notAScript = {
+          type: 'uri',
+          uri: 'https://example.com',
+        } as unknown as FieldScriptWrite;
         expect(await outcome(doc.forms.update(NAME, { actions: { format: notAScript } }))).toBe(
           EngineErrorCode.InvalidArg,
         );
@@ -378,7 +389,13 @@ export function runFormScriptConformance(
           ),
           await outcome(
             doc.apply({
-              ops: [{ type: 'forms.update', field: NAME, patch: { actions: { validate: script('v();') } } }],
+              ops: [
+                {
+                  type: 'forms.update',
+                  field: NAME,
+                  patch: { actions: { validate: script('v();') } },
+                },
+              ],
             }),
           ),
         ];

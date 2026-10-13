@@ -2,7 +2,7 @@ import { PercentPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { EpdfCommand } from '@embedpdf/angular/commands';
 import { EpdfStageRef } from '@embedpdf/angular/stage';
-import { EpdfButton } from '@embedpdf/viewer-angular';
+import { EpdfButton } from '@cloudpdf/viewer-angular';
 
 @Component({
   selector: 'app-zoom-pill',

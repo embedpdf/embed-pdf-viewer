@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PDFViewer, type Viewer } from '@embedpdf/viewer-vue';
+import { PDFViewer, type Viewer } from '@cloudpdf/viewer-vue';
 
 const disable = ['forms'];
 const onReady = (viewer: Viewer) => console.log('ready', viewer);
@@ -7,7 +7,7 @@ const onReady = (viewer: Viewer) => console.log('ready', viewer);
 
 <template>
   <PDFViewer
-    src="/report.pdf"
+    :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }"
     theme="system"
     :disable="disable"
     style="height: 100vh"

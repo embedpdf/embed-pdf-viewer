@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PDFViewer, ToolbarItem, usePDFViewer, type Viewer } from '@embedpdf/viewer-react';
+import { PDFViewer, ToolbarItem, usePDFViewer, type Viewer } from '@cloudpdf/viewer-react';
 
 // Inside the viewer: any component you give it.
 function FirstPage() {
@@ -15,7 +15,7 @@ export function Review() {
       <button disabled={!viewer} onClick={() => viewer?.commands.execute('document:print')}>
         Print
       </button>
-      <PDFViewer src="/report.pdf" onReady={setViewer} style={{ height: '80vh' }}>
+      <PDFViewer src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }} onReady={setViewer} style={{ height: '80vh' }}>
         <ToolbarItem id="first-page">
           <FirstPage />
         </ToolbarItem>

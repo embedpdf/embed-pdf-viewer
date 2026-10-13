@@ -1,4 +1,4 @@
-<embedpdf-viewer src="/report.pdf" style="height: 100vh">
+<embedpdf-viewer id="viewer" style="height: 100vh">
   <epdf-menu slot="item:share" icon="link" label="Share">
     <epdf-menu-item icon="copy" id="copy-link">Copy link</epdf-menu-item>
     <epdf-menu-item icon="message" id="email-link">Email a link</epdf-menu-item>
@@ -6,9 +6,10 @@
 </embedpdf-viewer>
 
 <script type="module">
-  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
   import { copyLink, emailLink } from './share.js'; // your app
 
+  document.getElementById('viewer').src = { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
   document.getElementById('copy-link').addEventListener('select', copyLink);
   document.getElementById('email-link').addEventListener('select', emailLink);
 </script>

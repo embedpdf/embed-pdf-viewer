@@ -46,16 +46,20 @@ user may do.
 
 ## Who the user is
 
+<Engine local>
+
 The user's name becomes the author of the annotations and comments they make:
 
 ```js
 { identity: { displayName: 'Ada Lovelace' } }
 ```
 
+</Engine>
+
 <Engine cloud>
 
-On CloudPDF, who the user is and what they may do come from the document's token, so your server
-decides, and `identity` isn't needed.
+The user's name becomes the author of the annotations and comments they make. On CloudPDF, who the
+user is and what they may do come from the document's token, so your server decides.
 
 </Engine>
 

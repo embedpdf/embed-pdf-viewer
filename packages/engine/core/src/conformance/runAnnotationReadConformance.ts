@@ -13,6 +13,7 @@ import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { AnnotationListSchema } from '../wire/schemas';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Expected per-fixture annotation knowledge. The harness asserts against
@@ -329,7 +330,7 @@ export function runAnnotationReadConformance(
 async function openFixture(engine: Engine, opts: AnnotationConformanceOptions) {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

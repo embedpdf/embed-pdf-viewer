@@ -73,7 +73,9 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
   InvalidArg: 'invalid-input',
   MalformedPdf: 'invalid-input',
   PayloadTooLarge: 'invalid-input',
-  WireFormat: 'invalid-input',
+  // An answer of a shape the engine doesn't know, from its worker or its server (a version
+  // apart): the engine failed, not the input, so a document's tab doesn't call the file damaged.
+  WireFormat: 'operation-failed',
   DocNotOpen: 'not-ready',
   DocPasswordRequired: 'permission-denied',
   DocPasswordIncorrect: 'permission-denied',

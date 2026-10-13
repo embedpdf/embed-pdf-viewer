@@ -4,6 +4,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
 
@@ -60,7 +61,10 @@ export function runAnnotationAppearanceExportConformance(
         expect(after.annotations).toEqual(before.annotations);
 
         if (opts.openKind !== 'bytes') return;
-        exported = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-appearance`, bytes });
+        exported = await engine.open(
+          { kind: 'bytes', id: `${opts.fixture.id}-appearance`, bytes },
+          EVERY_PERMISSION,
+        );
         const layout = await exported.pages.list();
         expect(layout.pageCount).toBe(1);
         // Union of [20..60]×[20..60] and [100..130]×[60..90] → 110 × 70.
@@ -99,7 +103,10 @@ export function runAnnotationAppearanceExportConformance(
 
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() });
+    return engine.open(
+      { kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() },
+      EVERY_PERMISSION,
+    );
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

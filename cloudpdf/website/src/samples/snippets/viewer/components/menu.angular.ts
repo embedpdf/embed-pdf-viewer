@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { EpdfMenu, EpdfMenuItem } from '@embedpdf/viewer-angular';
+import { EpdfMenu, EpdfMenuItem } from '@cloudpdf/viewer-angular';
 import { copyLink, emailLink } from './share'; // your app
 
 @Component({

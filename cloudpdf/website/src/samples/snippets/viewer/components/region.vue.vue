@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PDFViewer, Region } from '@embedpdf/viewer-vue';
+import { PDFViewer, Region } from '@cloudpdf/viewer-vue';
 import AppHeader from './AppHeader.vue'; // your app
 import RecentFiles from './RecentFiles.vue';
 </script>

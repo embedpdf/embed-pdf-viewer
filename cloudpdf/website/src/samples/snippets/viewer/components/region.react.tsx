@@ -1,4 +1,4 @@
-import { PDFViewer, Region } from '@embedpdf/viewer-react';
+import { PDFViewer, Region } from '@cloudpdf/viewer-react';
 import { AppHeader, RecentFiles } from './app'; // your app
 
 export function Workspace() {

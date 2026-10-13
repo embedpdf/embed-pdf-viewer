@@ -5,7 +5,7 @@ import {
   type CodePanelProps,
 } from '@embedpdf/docs-kit/mdx/code-panels';
 
-import { Example } from './example';
+import { Example, type ExampleSize } from './example';
 
 /** The props a compiled page gives `<Example>` and `<Snippet>`. */
 export type CompiledExampleProps = CodePanelProps & {
@@ -13,6 +13,8 @@ export type CompiledExampleProps = CodePanelProps & {
   kind?: 'example' | 'snippet';
   /** The sample's name, as written in the page (the key already carries it). */
   name?: string;
+  /** A bigger preview than the example's own: `tall`, or `wide` (see `Example`). */
+  size?: ExampleSize;
 };
 
 /**
@@ -32,6 +34,8 @@ export function RouteExample({
   framework,
   mode,
   kind,
+  name,
+  size,
 }: CompiledExampleProps & {
   /** The route's framework or integration; null on a page that isn't fanned out. */
   framework: string | null;
@@ -47,6 +51,8 @@ export function RouteExample({
     <Example
       mode={mode}
       kind={kind}
+      name={name}
+      size={size}
       filesByFramework={JSON.stringify(shown.filesByFramework)}
       demosByFramework={JSON.stringify(shown.demosByFramework)}
       available={shown.available}

@@ -9,4 +9,5 @@ export default {
   code: 'From code',
   concepts: 'Good to know',
   'self-hosting': 'Self-hosting',
+  migrate: 'Moving from 2.x',
 };

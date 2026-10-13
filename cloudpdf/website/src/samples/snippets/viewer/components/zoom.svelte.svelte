@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, useCommand } from '@embedpdf/viewer-svelte';
+  import { Button, useCommand } from '@cloudpdf/viewer-svelte';
   import { useStageState } from '@embedpdf/svelte/stage';
 
   const stage = useStageState();

@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { EpdfPdfViewer, EpdfRegion } from '@embedpdf/viewer-angular';
+import { EpdfPdfViewer, EpdfRegion } from '@cloudpdf/viewer-angular';
 import { Header, RecentFiles } from './app'; // your app
 
 @Component({

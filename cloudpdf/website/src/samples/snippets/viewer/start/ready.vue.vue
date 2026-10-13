@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PDFViewer, type Viewer } from '@embedpdf/viewer-vue';
+import { PDFViewer, type Viewer } from '@cloudpdf/viewer-vue';
 
 function onReady(viewer: Viewer) {
   viewer.documents.onOpened(() => viewer.get('search').search({ text: 'total' }));
@@ -7,5 +7,5 @@ function onReady(viewer: Viewer) {
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" style="height: 100vh" @ready="onReady" />
+  <PDFViewer :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 100vh" @ready="onReady" />
 </template>

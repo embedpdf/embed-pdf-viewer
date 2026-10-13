@@ -9,6 +9,7 @@ import { defineConfig, type Plugin } from 'vite';
 
 import { discoverSampleVariants, sampleScopeClass } from './src/lib/sample-discovery';
 import { sampleStylesheetsPlugin } from './src/lib/sample-stylesheets';
+import { vanillaDemoId, vanillaSamplesPlugin } from './src/lib/vanilla-demo-samples';
 
 /**
  * The live-demo half of the samples pipeline (DOCS-ARCHITECTURE.md pillar 3).
@@ -20,9 +21,20 @@ import { sampleStylesheetsPlugin } from './src/lib/sample-stylesheets';
  * surgery), and emitted self-contained into `public/demos/` — the docs load
  * them with a NATIVE dynamic import at runtime. The engine and its wasm ride
  * along as ordinary Vite assets, exactly like the example apps.
+ *
+ * The ready-made viewer's examples build the same way, with one more
+ * integration: plain HTML (`<base>.vanilla.html`), whose page loads the
+ * viewer's CDN script, here the local build of `@embedpdf/viewer/snippet`
+ * (src/lib/vanilla-demo-samples.ts).
  */
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLES = path.join(ROOT, 'src', 'samples');
+
+/** The viewer's CDN script, as a plain-HTML example loads it, and this site's build of it. */
+const VIEWER_SCRIPT = {
+  url: 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js',
+  module: '@embedpdf/viewer/snippet',
+};
 
 /** Mounts the app into `el` and returns its unmount; `el` carries the example's style scope meanwhile. */
 const MOUNTABLE: Record<string, (abs: string, scope: string) => string> = {
@@ -62,9 +74,11 @@ const MOUNTABLE: Record<string, (abs: string, scope: string) => string> = {
         el.classList.remove(${JSON.stringify(scope)});
       };
     }`,
+  // The page's own module (vanilla-demo-samples.ts) mounts it, its style scope included.
+  vanilla: (abs) => `export { mount } from ${JSON.stringify(vanillaDemoId(abs))};`,
 };
 
-const demos = discoverSampleVariants(SAMPLES, ['react', 'vue', 'svelte']);
+const demos = discoverSampleVariants(SAMPLES, ['react', 'vue', 'svelte', 'vanilla']);
 const VIRTUAL_PREFIX = 'virtual:demo/';
 
 /** The framework-neutral `topic/base` of a demo (`topic/base.react`). */
@@ -106,6 +120,8 @@ function demoEntriesPlugin(): Plugin {
 export default defineConfig({
   plugins: [
     demoEntriesPlugin(),
+    // A plain-HTML example as a module, its CDN script this site's viewer build.
+    vanillaSamplesPlugin({ samplesRoot: SAMPLES, viewerScript: VIEWER_SCRIPT }),
     // `import './basic.css'`, scoped to its example (src/lib/sample-stylesheets.ts).
     sampleStylesheetsPlugin({
       samplesRoot: SAMPLES,

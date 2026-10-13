@@ -7,6 +7,8 @@ import {
   type DocsRelease,
 } from '@embedpdf/docs-kit/publish';
 
+import { DOCS_SITE } from '../docs-site';
+
 import { docsIntegrationHref } from './docs-integrations';
 
 export type { DocsRelease };
@@ -24,6 +26,7 @@ export function docsRelease(contentPath: string[], integration?: string): DocsRe
     framework: integration,
     preview: isDocsPreview(),
     livePages: () => loadLivePages(LIVE_PAGES),
+    engine: DOCS_SITE.engine,
   });
 }
 

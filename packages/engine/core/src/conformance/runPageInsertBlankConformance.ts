@@ -5,6 +5,7 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /** An on-purpose non-default size so the assertions can't pass by accident. */
 const SIZE = { width: 396, height: 612 };
@@ -107,11 +108,14 @@ export function runPageInsertBlankConformance(
         await doc.pages.insertBlank({ size: SIZE });
         const bytes = await doc.download();
 
-        reopened = await engine.open({
-          kind: 'bytes',
-          id: `${opts.fixture.id}-insert-blank-reopen`,
-          bytes,
-        });
+        reopened = await engine.open(
+          {
+            kind: 'bytes',
+            id: `${opts.fixture.id}-insert-blank-reopen`,
+            bytes,
+          },
+          EVERY_PERMISSION,
+        );
         const after = await reopened.pages.list();
         expect(after.pageCount).toBe(before.pageCount + 1);
         const tail = after.pages[after.pageCount - 1];
@@ -166,7 +170,7 @@ export function runPageInsertBlankConformance(
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

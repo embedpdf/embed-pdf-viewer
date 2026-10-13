@@ -1,5 +1,5 @@
 import { Component, input } from '@angular/core';
-import { EpdfPdfViewer, type Layout } from '@embedpdf/viewer-angular';
+import { EpdfPdfViewer, type Layout } from '@cloudpdf/viewer-angular';
 
 @Component({
   selector: 'app-report',
@@ -7,9 +7,9 @@ import { EpdfPdfViewer, type Layout } from '@embedpdf/viewer-angular';
   template: `
     <!-- Each branch mounts its own viewer with its own config. -->
     @if (toolbarBelow()) {
-      <epdf-pdf-viewer src="/report.pdf" [layout]="toolbarAtBottom" style="height: 100vh" />
+      <epdf-pdf-viewer [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" [layout]="toolbarAtBottom" style="height: 100vh" />
     } @else {
-      <epdf-pdf-viewer src="/report.pdf" style="height: 100vh" />
+      <epdf-pdf-viewer [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 100vh" />
     }
   `,
 })

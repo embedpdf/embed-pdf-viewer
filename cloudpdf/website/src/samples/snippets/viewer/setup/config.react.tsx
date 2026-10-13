@@ -1,9 +1,9 @@
-import { PDFViewer } from '@embedpdf/viewer-react';
+import { PDFViewer } from '@cloudpdf/viewer-react';
 
 export function Report() {
   return (
     <PDFViewer
-      src="/report.pdf"
+      src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }}
       theme="system"
       disable={['forms']}
       onReady={(viewer) => console.log('ready', viewer)}

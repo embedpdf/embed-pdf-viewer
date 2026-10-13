@@ -5,6 +5,7 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /** `%PDF` — every extracted document must lead with the PDF header. */
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46];
@@ -75,7 +76,10 @@ export function runPageExtractConformance(
         const p1 = list.pages[1];
         const bytes = await doc.pages.extract([p1.ref, p0.ref]);
 
-        extracted = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-extracted`, bytes });
+        extracted = await engine.open(
+          { kind: 'bytes', id: `${opts.fixture.id}-extracted`, bytes },
+          EVERY_PERMISSION,
+        );
         const out = await extracted.pages.list();
         expect(out.pageCount).toBe(2);
         expect(out.pages[0].size).toEqual(p1.size);
@@ -158,7 +162,7 @@ export function runPageExtractConformance(
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

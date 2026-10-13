@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
-import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
+import { EpdfPdfViewer, type Viewer } from '@cloudpdf/viewer-angular';
 
 @Component({
   selector: 'app-report',
   imports: [EpdfPdfViewer],
   template: `
     <epdf-pdf-viewer
-      src="/report.pdf"
+      [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }"
       theme="system"
       [disable]="['forms']"
       style="height: 100vh"

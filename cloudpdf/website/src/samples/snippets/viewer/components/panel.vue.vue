@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PDFViewer, Panel, type Layout } from '@embedpdf/viewer-vue';
+import { PDFViewer, Panel, type Layout } from '@cloudpdf/viewer-vue';
 import Notes from './Notes.vue'; // your app
 
 const layout = (layout: Layout) =>
@@ -9,7 +9,7 @@ const layout = (layout: Layout) =>
 </script>
 
 <template>
-  <PDFViewer src="/report.pdf" :layout="layout" style="height: 100vh">
+  <PDFViewer :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" :layout="layout" style="height: 100vh">
     <Panel id="notes">
       <Notes />
     </Panel>

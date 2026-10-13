@@ -21,6 +21,7 @@ import {
   FormWidgetsReorderResultSchema,
 } from '../wire/schemas';
 import { FormSnapshotSchema } from '../forms/schema';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * The three fixtures the forms suite needs. Shapes (names, object numbers,
@@ -80,7 +81,7 @@ export function runFormConformance(
     async function open(fixture: ConformanceFixture, idSuffix = ''): Promise<DocumentHandle> {
       if (opts.openKind === 'bytes') {
         const bytes = await fixture.bytes();
-        return engine.open({ kind: 'bytes', id: fixture.id + idSuffix, bytes });
+        return engine.open({ kind: 'bytes', id: fixture.id + idSuffix, bytes }, EVERY_PERMISSION);
       }
       return engine.open({ kind: 'id', id: fixture.cloudId ?? fixture.id });
     }

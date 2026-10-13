@@ -1,4 +1,4 @@
-import { PDFViewer, type Layout } from '@embedpdf/viewer-react';
+import { PDFViewer, type Layout } from '@cloudpdf/viewer-react';
 
 const toolbarAtBottom = (layout: Layout) => layout.place('main', 'bottom');
 
@@ -7,7 +7,7 @@ export function Report({ toolbarBelow }: { toolbarBelow: boolean }) {
   return (
     <PDFViewer
       key={toolbarBelow ? 'below' : 'above'}
-      src="/report.pdf"
+      src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }}
       layout={toolbarBelow ? toolbarAtBottom : undefined}
       style={{ height: '100vh' }}
     />

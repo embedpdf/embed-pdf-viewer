@@ -1,4 +1,4 @@
-import { Menu, MenuItem } from '@embedpdf/viewer-react';
+import { Menu, MenuItem } from '@cloudpdf/viewer-react';
 import { copyLink, emailLink } from './share'; // your app
 
 export function ShareMenu() {

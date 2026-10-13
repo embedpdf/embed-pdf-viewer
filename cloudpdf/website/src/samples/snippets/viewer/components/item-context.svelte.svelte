@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useToolbarItem } from '@embedpdf/viewer-svelte';
+  import { useToolbarItem } from '@cloudpdf/viewer-svelte';
 
   let { people }: { people: { id: string; name: string; avatar: string }[] } = $props();
   const item = useToolbarItem(); // item.orientation is 'horizontal' or 'vertical'

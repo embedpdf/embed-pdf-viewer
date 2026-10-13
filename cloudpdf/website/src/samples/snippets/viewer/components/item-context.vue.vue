@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useToolbarItem } from '@embedpdf/viewer-vue';
+import { useToolbarItem } from '@cloudpdf/viewer-vue';
 
 defineProps<{ people: { id: string; name: string; avatar: string }[] }>();
 const item = useToolbarItem(); // item.orientation is 'horizontal' or 'vertical'
