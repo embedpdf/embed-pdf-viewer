@@ -143,6 +143,10 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         expect(drawnPointsOf(rotated)![0]![0]!.x).toBeCloseTo(rotatedStart.x, 3);
       });
 
+      // The name the engine gave it on the confirmed create: the record taken
+      // right after drawing has none yet.
+      const savedName = annotation.get(created.ref)!.nm;
+      expect(savedName).not.toBeNull();
       const saved = await doc.download();
       if (process.env.EMBEDPDF_MEASUREMENT_OUTPUT) {
         await writeFile(`${process.env.EMBEDPDF_MEASUREMENT_OUTPUT}/${prefer}.pdf`, saved);
@@ -161,7 +165,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         const layeredAnnotations = (
           await layered.page(toPageRef(pageObjectNumber)).annotations.list()
         ).annotations;
-        expect(layeredAnnotations.find((a) => a.nm === created.nm)).toMatchObject({
+        expect(layeredAnnotations.find((a) => a.nm === savedName)).toMatchObject({
           contents: '16.00 ft',
           leader: { length: 36 },
           captionOffset: { along: 15, perpendicular: 25 },
@@ -181,7 +185,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       try {
         const reopenedPageObjectNumber = (await reopened.pages.list()).pages[0].ref.objectNumber;
         const list = await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list();
-        const restored = list.annotations.find((a) => a.nm === created.nm)!;
+        const restored = list.annotations.find((a) => a.nm === savedName)!;
         expect(restored).toMatchObject({
           intent: 'line-dimension',
           contents: '16.00 ft',

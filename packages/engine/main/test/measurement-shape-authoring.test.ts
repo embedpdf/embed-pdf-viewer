@@ -146,6 +146,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expect(current().rect.height).toBeLessThan(displacedRect.height);
         expectVector();
         const final = current();
+        // The name the engine gave it on the confirmed create: the record taken
+        // right after drawing has none yet.
+        expect(final.nm).not.toBeNull();
         const saved = await doc.download();
         if (process.env.EMBEDPDF_MEASUREMENT_OUTPUT) {
           await writeFile(
@@ -170,7 +173,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
             const list = (
               await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list()
             ).annotations;
-            const restored = list.find((dto) => dto.nm === created.nm)!;
+            const restored = list.find((dto) => dto.nm === final.nm)!;
             expect(restored).toMatchObject({
               subtype: final.subtype,
               intent: final.intent,
