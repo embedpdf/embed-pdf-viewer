@@ -99,7 +99,7 @@ export default function App() {
               Your look
             </button>
             <button type="button" aria-pressed={!mine} onClick={() => setMine(false)}>
-              The PDF's look
+              The PDF’s look
             </button>
           </div>
           <TurnButton />

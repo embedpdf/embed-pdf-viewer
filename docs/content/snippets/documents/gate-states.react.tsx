@@ -9,7 +9,7 @@ export function DocumentView() {
     <DocumentGate
       fallback={<Spinner />}
       locked={(document) => <PasswordForm document={document} />}
-      error={(document) => <p>Couldn't open {document.name}: {document.error.message}</p>}
+      error={(document) => <p>Couldn’t open {document.name}: {document.error.message}</p>}
     >
       <Stage>{() => <RenderLayer />}</Stage>
     </DocumentGate>
