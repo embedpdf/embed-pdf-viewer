@@ -43,20 +43,25 @@ export function resolveDocsPath(mdxPath: string[]): ResolvedDocsPath | null {
   return { contentPath: mdxPath };
 }
 
-/** Fans variant-neutral content entries out into concrete public routes. */
+/**
+ * Fans variant-neutral content entries out into concrete public routes. A
+ * product's own index fans out too (`/docs/headless/react`): middleware
+ * redirects the bare `/docs/headless` there, and its content may differ per
+ * framework.
+ */
 export function expandDocsStaticParams(entries: StaticParam[]) {
   return entries.flatMap((entry) => {
     const value = entry.mdxPath;
     if (!value) return [];
     const mdxPath = Array.isArray(value) ? value : [value];
 
-    if (mdxPath[0] === 'docs' && mdxPath[1] === 'headless' && mdxPath.length > 2) {
+    if (mdxPath[0] === 'docs' && mdxPath[1] === 'headless' && mdxPath.length >= 2) {
       return HEADLESS_INTEGRATIONS.map((integration) => ({
         mdxPath: [mdxPath[0], mdxPath[1], integration, ...mdxPath.slice(2)],
       }));
     }
 
-    if (mdxPath[0] === 'docs' && mdxPath[1] === 'viewer' && mdxPath.length > 2) {
+    if (mdxPath[0] === 'docs' && mdxPath[1] === 'viewer' && mdxPath.length >= 2) {
       return DOCS_INTEGRATIONS.map((integration) => ({
         mdxPath: [mdxPath[0], mdxPath[1], integration, ...mdxPath.slice(2)],
       }));
