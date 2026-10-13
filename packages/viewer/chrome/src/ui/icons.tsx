@@ -203,6 +203,15 @@ export const ICON_PATHS = {
     'M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14',
     'M9 12l2 2l4 -4',
   ],
+  // The form designer: a form's list of fields.
+  formDesign: [
+    'M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2',
+    'M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2',
+    'M9 12l.01 0',
+    'M13 12l2 0',
+    'M9 16l.01 0',
+    'M13 16l2 0',
+  ],
   formListbox: [
     'M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14',
     'M11 8h6',

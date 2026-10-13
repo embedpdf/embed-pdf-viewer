@@ -47,6 +47,9 @@ const SignaturesPanel = lazyComponent(() =>
 const RedactionPanel = lazyComponent(() =>
   import('./redaction-panel').then((ui) => ui.RedactionPanel),
 );
+const FormDesignPanel = lazyComponent(() =>
+  import('./form-design-panel').then((ui) => ui.FormDesignPanel),
+);
 
 /** What a built-in panel draws in its slot. */
 interface BuiltInContent {
@@ -65,6 +68,8 @@ const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, Bu
   ['stamps', { draw: () => <StampsPanel /> }],
   ['signatures', { draw: () => <SignaturesPanel /> }],
   ['redaction', { draw: () => <RedactionPanel /> }],
+  // The form's fields and their settings: each document's own.
+  ['form-design', { draw: (documentId) => <FormDesignPanel key={documentId ?? 'none'} /> }],
 ]);
 
 const NONE: readonly string[] = [];

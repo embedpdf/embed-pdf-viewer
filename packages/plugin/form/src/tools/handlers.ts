@@ -120,7 +120,9 @@ export function createPlaceHandler(
       (candidate) => candidate.page?.objectNumber === page.objectNumber,
     );
     if (policy.select && widget?.ref) annotation.selection.set([widget.ref]);
-    if (policy.tool === 'default') interaction.activateDefaultTool();
+    // Back to design's resting tool, not the default pointer: that one fills, which would end
+    // design and drop the new field's selection.
+    if (policy.tool === 'default') interaction.activateTool('form-edit');
     await created;
   };
 

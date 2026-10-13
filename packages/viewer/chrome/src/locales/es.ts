@@ -134,6 +134,8 @@ export const es: Locale = {
         listbox: 'Lista',
         button: 'Botón',
         signature: 'Campo de firma',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Diseño de formulario',
       },
       redact: {
         mark: 'Marcar para censurar',
@@ -231,6 +233,7 @@ export const es: Locale = {
       signatures: 'Firmas',
       redaction: 'Censuras',
       measurement: 'Mediciones',
+      formDesign: 'Diseño de formulario',
       switch: 'Cambiar de panel',
     },
     annotation: {
@@ -381,6 +384,17 @@ export const es: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Página {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'Aún no hay campos. Elige una herramienta de campo para añadir uno.',
+      page: 'Página {page}',
+      allFields: 'Todos los campos',
+      buttons: 'Botones',
+      boxes: 'Casillas',
+      box: 'Casilla {number}',
+      addButton: 'Añadir botón',
+      addBox: 'Añadir casilla',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(mixto)',

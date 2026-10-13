@@ -1,10 +1,15 @@
 /**
- * The style panel's Field section: the settings of the one field whose widget
- * is selected in design mode, as the form plugin describes them
- * (`getFieldSettings`), written with `form.update()`. Nothing here knows a
- * field family: the description says what to draw.
+ * A field's settings, as the form plugin describes them (`getFieldSettings`),
+ * written with `form.update()`: the form designer's sidebar shows them for the
+ * selected field. Nothing here knows a field family: the description says what
+ * to draw.
  */
-import { FormToken, type FormFieldPatch, type FormFieldSetting } from '@embedpdf/react/form';
+import {
+  FormToken,
+  type FormFieldDTO,
+  type FormFieldPatch,
+  type FormFieldSetting,
+} from '@embedpdf/react/form';
 import { useT } from '@embedpdf/react/i18n';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { useEffect, useState } from 'react';
@@ -19,24 +24,20 @@ interface Option {
   readonly value: string;
 }
 
-export function FieldSettingsSection() {
-  const t = useT();
+/** The field's settings, each with the control its description names. */
+export function FieldSettings({ field }: { field: FormFieldDTO }) {
   const form = useOptionalCapability(FormToken);
-  const field = useOptionalSelector(FormToken, (capability) => capability.getSelectedField(), null);
   const settings = useOptionalSelector(
     FormToken,
-    (capability) => (field ? capability.getFieldSettings(field.ref) : null),
+    (capability) => capability.getFieldSettings(field.ref),
     null,
   );
-  if (!form || !field || !settings || !form.canDesign()) return null;
+  if (!form || !settings || !form.canDesign()) return null;
   const write = (patch: Record<string, unknown>) =>
     void form.update(field.ref, patch as FormFieldPatch).catch(() => undefined);
 
   return (
-    <div className="border-border-subtle mt-4 border-t pt-4">
-      <p className="text-fg-muted mb-3 text-[11px] font-semibold uppercase tracking-wide">
-        {t('demo.fieldSettingsTitle')}
-      </p>
+    <div>
       {settings.properties.map((spec) => (
         <SettingControl
           key={`${spec.key}:${spec.control}`}

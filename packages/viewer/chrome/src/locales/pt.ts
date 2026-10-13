@@ -134,6 +134,8 @@ export const pt: Locale = {
         listbox: 'Caixa de listagem',
         button: 'Botão',
         signature: 'Campo de assinatura',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Design de formulário',
       },
       redact: {
         mark: 'Marcar para tarjar',
@@ -231,6 +233,7 @@ export const pt: Locale = {
       signatures: 'Assinaturas',
       redaction: 'Tarjas',
       measurement: 'Medições',
+      formDesign: 'Design de formulário',
       switch: 'Trocar painel',
     },
     annotation: {
@@ -381,6 +384,17 @@ export const pt: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Página {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'Nenhum campo ainda. Escolha uma ferramenta de campo para adicionar um.',
+      page: 'Página {page}',
+      allFields: 'Todos os campos',
+      buttons: 'Botões',
+      boxes: 'Caixas',
+      box: 'Caixa {number}',
+      addButton: 'Adicionar um botão',
+      addBox: 'Adicionar uma caixa',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(misto)',

@@ -142,10 +142,13 @@ export const DEFAULT_LAYOUT: LayoutData = {
       mode: 'form',
       titleKey: 'commands.mode.form',
       center: [
+        // The design switch first: what a field is, in its sidebar; how it looks is Style's.
+        { id: 'design', items: ['form:design'], importance: 5 },
         { id: 'fields', items: ['tool:text-field', 'tool:checkbox', 'tool:radio'], importance: 4 },
         { id: 'choices', items: ['tool:combo-box', 'tool:list-box'], importance: 2 },
         { id: 'buttons', items: ['tool:button'], importance: 2 },
         { id: 'signatures', items: ['tool:signature-field'], importance: 2 },
+        style,
         history,
       ],
     },
@@ -266,6 +269,8 @@ export const DEFAULT_LAYOUT: LayoutData = {
     signatures: { side: 'end', titleKey: 'panels.signatures', icon: 'signature' },
     redaction: { side: 'end', titleKey: 'panels.redaction', icon: 'redactionSidebar' },
     measurement: { side: 'end', titleKey: 'panels.measurement', icon: 'updateScale' },
+    // The form designer's sidebar: the document's fields, and what the selected one is.
+    'form-design': { side: 'end', titleKey: 'panels.formDesign', icon: 'formDesign' },
   },
 };
 

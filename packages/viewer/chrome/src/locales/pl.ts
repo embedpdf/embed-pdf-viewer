@@ -134,6 +134,8 @@ export const pl: Locale = {
         listbox: 'Pole listy',
         button: 'Przycisk',
         signature: 'Pole podpisu',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Projektowanie formularza',
       },
       redact: {
         mark: 'Oznacz do zaczernienia',
@@ -231,6 +233,7 @@ export const pl: Locale = {
       signatures: 'Podpisy',
       redaction: 'Zaczernienia',
       measurement: 'Pomiary',
+      formDesign: 'Projektowanie formularza',
       switch: 'Przełącz panel',
     },
     annotation: {
@@ -381,6 +384,17 @@ export const pl: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Strona {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'Brak pól. Wybierz narzędzie pola, aby dodać pole.',
+      page: 'Strona {page}',
+      allFields: 'Wszystkie pola',
+      buttons: 'Przyciski',
+      boxes: 'Pola wyboru',
+      box: 'Pole wyboru {number}',
+      addButton: 'Dodaj przycisk',
+      addBox: 'Dodaj pole wyboru',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(różne)',

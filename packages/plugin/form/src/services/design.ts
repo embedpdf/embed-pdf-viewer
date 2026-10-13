@@ -17,7 +17,7 @@ export function createDesign(ctx: FormContext, siblings: FormSiblings): FormDesi
   const interaction = ctx.tryGet(InteractionToken);
   return {
     lending: () =>
-      siblings.annotation !== null &&
+      siblings.annotation() !== null &&
       interaction !== null &&
       ctx.allows('doc.forms.modify') &&
       !(interaction.getActiveTool()?.enables.has('form-fill') ?? false),

@@ -197,7 +197,7 @@ export function createFieldReads(
   // The selection belongs to the annotation plugin: a widget is selected in
   // design mode, where widgets are boxes like any annotation.
   const getSelectedField = memo(
-    () => [fields.view(), siblings.annotation?.selection.list() ?? NOTHING_SELECTED],
+    () => [fields.view(), siblings.annotation()?.selection.list() ?? NOTHING_SELECTED],
     (index, selected): FormFieldDTO | null => {
       const [annotation] = selected;
       if (selected.length !== 1 || !annotation?.subtype.startsWith('widget')) return null;

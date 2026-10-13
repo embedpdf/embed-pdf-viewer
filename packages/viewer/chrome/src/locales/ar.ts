@@ -135,6 +135,8 @@ export const ar: Locale = {
         listbox: 'مربع قائمة',
         button: 'زر',
         signature: 'حقل توقيع',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'تصميم النموذج',
       },
       redact: {
         mark: 'تحديد للتنقيح',
@@ -232,6 +234,7 @@ export const ar: Locale = {
       signatures: 'التوقيعات',
       redaction: 'التنقيحات',
       measurement: 'القياسات',
+      formDesign: 'تصميم النموذج',
       switch: 'تبديل اللوحة',
     },
     annotation: {
@@ -382,6 +385,17 @@ export const ar: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'الصفحة {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'لا توجد حقول بعد. اختر أداة حقل لإضافة حقل.',
+      page: 'الصفحة {page}',
+      allFields: 'كل الحقول',
+      buttons: 'الأزرار',
+      boxes: 'الخانات',
+      box: 'الخانة {number}',
+      addButton: 'إضافة زر',
+      addBox: 'إضافة خانة',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(مختلط)',

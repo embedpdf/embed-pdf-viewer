@@ -127,6 +127,8 @@ export const en: Locale = {
         listbox: 'List Box',
         button: 'Button',
         signature: 'Signature Field',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Form design',
       },
       redact: {
         mark: 'Mark for Redaction',
@@ -230,6 +232,7 @@ export const en: Locale = {
       signatures: 'Signatures',
       redaction: 'Redactions',
       measurement: 'Measurements',
+      formDesign: 'Form design',
       // The tooltip of a panel's title, which opens the other panels on its side.
       switch: 'Switch panel',
     },
@@ -383,6 +386,17 @@ export const en: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Page {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'No fields yet. Pick a field tool to add one.',
+      page: 'Page {page}',
+      allFields: 'All fields',
+      buttons: 'Buttons',
+      boxes: 'Boxes',
+      box: 'Box {number}',
+      addButton: 'Add a button',
+      addBox: 'Add a box',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(mixed)',

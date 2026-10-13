@@ -12,6 +12,7 @@
 import { panelCommandOf, type LayoutData, type LayoutPanel } from '@embedpdf/core-ui';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import type { CommandDef } from '@embedpdf/react/commands';
+import { FormToken } from '@embedpdf/react/form';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken } from '@embedpdf/react/shell';
@@ -122,6 +123,16 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
     },
   ],
   ['measurement', { categories: ['measurement'] }],
+  // The form designer's sidebar: for a session that may design forms, and in Form mode only,
+  // so it closes as Form mode does (`form:design` is its switch).
+  [
+    'form-design',
+    {
+      categories: ['forms.building'],
+      allowed: (commandContext) => commandContext.tryGet(FormToken)?.canDesign() ?? true,
+      visible: (commandContext) => commandContext.tryGet(ShellToken)?.isOpen('mode:form') ?? false,
+    },
+  ],
 ]);
 
 /**

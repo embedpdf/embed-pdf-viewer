@@ -268,9 +268,9 @@ interface DocumentSession extends SessionRef {
   cancel: AbortController;
   capabilities: Map<AnyPlugin, unknown>;
   /**
-   * The plugins whose `create()` is running. A read that reaches one of them meanwhile (a
-   * store notification its `create` caused, read by a listener) finds no capability yet,
-   * instead of building it a second time.
+   * The plugins whose `create()` is running. A read that reaches one of them meanwhile finds
+   * no capability yet, instead of building it a second time. (Listeners can't cause one: the
+   * store holds its notifications while a document's plugins are built.)
    */
   building: Set<AnyPlugin>;
   /** Workspace capabilities as seen from this document's scope (`PluginDef.inScope`), by token. */
@@ -934,10 +934,19 @@ export function createKernel(config: {
     }
     // Construction and connection are part of the transaction (either can
     // throw); the callbacks they register fire post-commit and are isolated
-    // by the store instead. Eager, in dependency order.
-    for (const plugin of documentScopedPlugins) {
-      buildDocumentCapability(plugin, session);
-      session.connectors.get(plugin)?.();
+    // by the store instead. Eager, in dependency order, with the store's change
+    // stream held: a `create()` writes state, and a listener told of it at once
+    // could read a plugin that isn't built yet and build it out of order,
+    // before the plugins it finds while it's created. Listeners hear of the
+    // whole bring-up in one pass, once every plugin is there.
+    const release = store.hold();
+    try {
+      for (const plugin of documentScopedPlugins) {
+        buildDocumentCapability(plugin, session);
+        session.connectors.get(plugin)?.();
+      }
+    } finally {
+      release();
     }
     session.scope.defer(session.handle!.events.subscribe((event) => bursts.last(event)));
     checkpoint(session);

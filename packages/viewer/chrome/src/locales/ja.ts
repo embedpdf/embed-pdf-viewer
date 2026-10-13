@@ -134,6 +134,8 @@ export const ja: Locale = {
         listbox: 'リストボックス',
         button: 'ボタン',
         signature: '署名フィールド',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'フォームデザイン',
       },
       redact: {
         mark: '墨消し用にマーク',
@@ -231,6 +233,7 @@ export const ja: Locale = {
       signatures: '署名',
       redaction: '墨消し',
       measurement: '測定',
+      formDesign: 'フォームデザイン',
       switch: 'パネルを切り替え',
     },
     annotation: {
@@ -381,6 +384,17 @@ export const ja: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: '{page} ページ' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'フィールドはまだありません。フィールドツールを選んで追加してください。',
+      page: '{page} ページ',
+      allFields: 'すべてのフィールド',
+      buttons: 'ボタン',
+      boxes: 'ボックス',
+      box: 'ボックス {number}',
+      addButton: 'ボタンを追加',
+      addBox: 'ボックスを追加',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '（混在）',

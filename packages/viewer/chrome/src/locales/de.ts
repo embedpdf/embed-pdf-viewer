@@ -134,6 +134,8 @@ export const de: Locale = {
         listbox: 'Listenfeld',
         button: 'Schaltfläche',
         signature: 'Unterschriftsfeld',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Formularentwurf',
       },
       redact: {
         mark: 'Zum Schwärzen markieren',
@@ -232,6 +234,7 @@ export const de: Locale = {
       signatures: 'Unterschriften',
       redaction: 'Schwärzungen',
       measurement: 'Messungen',
+      formDesign: 'Formularentwurf',
       switch: 'Bereich wechseln',
     },
     annotation: {
@@ -382,6 +385,17 @@ export const de: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Seite {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'Noch keine Felder. Wählen Sie ein Feldwerkzeug, um eines hinzuzufügen.',
+      page: 'Seite {page}',
+      allFields: 'Alle Felder',
+      buttons: 'Optionsfelder',
+      boxes: 'Kästchen',
+      box: 'Kästchen {number}',
+      addButton: 'Optionsfeld hinzufügen',
+      addBox: 'Kästchen hinzufügen',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(gemischt)',

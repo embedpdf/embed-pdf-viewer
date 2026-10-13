@@ -9,8 +9,7 @@ export function createInterchange(
   ctx: FormContext,
   services: Pick<FormServices, 'siblings' | 'enqueue'>,
 ) {
-  const { enqueue } = services;
-  const annotationHost = services.siblings.annotation;
+  const { enqueue, siblings } = services;
 
   const exportBundle: FormCapability['export'] = async (selection = {}, options) => {
     ctx.assertAllowed('doc.forms.read', 'form.export');
@@ -39,6 +38,7 @@ export function createInterchange(
     return enqueue(async () => {
       const result = await ctx.cancellable(signal, ctx.doc.forms.import(bundle, importOptions));
       // Wait for the annotation plugin to read the new widgets, as `create()` does.
+      const annotationHost = siblings.annotation();
       if (annotationHost) await annotationHost.whenSynced();
       return { fields: result.fields, refMap: result.refMap, dropped: result.dropped };
     }, options);

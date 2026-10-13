@@ -134,6 +134,8 @@ export const nl: Locale = {
         listbox: 'Keuzelijst',
         button: 'Knop',
         signature: 'Handtekeningveld',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Formulierontwerp',
       },
       redact: {
         mark: 'Markeren voor redactie',
@@ -232,6 +234,7 @@ export const nl: Locale = {
       signatures: 'Handtekeningen',
       redaction: 'Redacties',
       measurement: 'Metingen',
+      formDesign: 'Formulierontwerp',
       switch: 'Ander deelvenster',
     },
     annotation: {
@@ -382,6 +385,17 @@ export const nl: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Pagina {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'Nog geen velden. Kies een veldgereedschap om er een toe te voegen.',
+      page: 'Pagina {page}',
+      allFields: 'Alle velden',
+      buttons: 'Knoppen',
+      boxes: 'Vakjes',
+      box: 'Vakje {number}',
+      addButton: 'Knop toevoegen',
+      addBox: 'Vakje toevoegen',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(gemengd)',

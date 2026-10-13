@@ -134,6 +134,8 @@ export const it: Locale = {
         listbox: 'Casella di riepilogo',
         button: 'Pulsante',
         signature: 'Campo firma',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Progettazione modulo',
       },
       redact: {
         mark: 'Contrassegna per oscuramento',
@@ -231,6 +233,7 @@ export const it: Locale = {
       signatures: 'Firme',
       redaction: 'Oscuramenti',
       measurement: 'Misurazioni',
+      formDesign: 'Progettazione modulo',
       switch: 'Cambia pannello',
     },
     annotation: {
@@ -381,6 +384,17 @@ export const it: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Pagina {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'Ancora nessun campo. Scegli uno strumento di campo per aggiungerne uno.',
+      page: 'Pagina {page}',
+      allFields: 'Tutti i campi',
+      buttons: 'Pulsanti',
+      boxes: 'Caselle',
+      box: 'Casella {number}',
+      addButton: 'Aggiungi pulsante',
+      addBox: 'Aggiungi casella',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(misto)',

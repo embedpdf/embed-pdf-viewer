@@ -18,6 +18,7 @@ export const FormToken = createCapabilityToken<FormCapability>('form', {
     import: true,
     refresh: true,
     create: true,
+    addWidget: true,
     update: true,
     delete: true,
     removeWidget: true,

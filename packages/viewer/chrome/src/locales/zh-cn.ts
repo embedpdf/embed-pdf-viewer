@@ -134,6 +134,8 @@ export const zhCN: Locale = {
         listbox: '列表框',
         button: '按钮',
         signature: '签名字段',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: '表单设计',
       },
       redact: {
         mark: '标记涂黑',
@@ -231,6 +233,7 @@ export const zhCN: Locale = {
       signatures: '签名',
       redaction: '涂黑',
       measurement: '测量',
+      formDesign: '表单设计',
       switch: '切换面板',
     },
     annotation: {
@@ -381,6 +384,17 @@ export const zhCN: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: '第 {page} 页' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: '尚无字段。选择一个字段工具以添加字段。',
+      page: '第 {page} 页',
+      allFields: '所有字段',
+      buttons: '按钮',
+      boxes: '复选框',
+      box: '复选框 {number}',
+      addButton: '添加按钮',
+      addBox: '添加复选框',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '（混合）',

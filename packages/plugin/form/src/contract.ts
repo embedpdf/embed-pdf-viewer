@@ -34,6 +34,7 @@ import type {
   PageRef,
   WidgetAnnotation,
   WidgetPatch,
+  WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions/contract';
 
@@ -248,6 +249,12 @@ export interface FormFieldSettings {
 /** What `create()`, `update()` and `removeWidget()` resolve: the field as it is now. */
 export interface FormFieldResult {
   readonly field: FormFieldDTO;
+}
+
+/** What `addWidget()` resolves: the field as it is now, and its new widget. */
+export interface FormWidgetAddResult {
+  readonly field: FormFieldDTO;
+  readonly widget: WidgetAnnotation;
 }
 
 /** Which fields `export()` takes, each whole. Without either, every field. */
@@ -477,6 +484,22 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    * taken, a radio button without its export value).
    */
   create(draft: FormFieldDraft, options?: OperationOptions): Promise<FormFieldResult>;
+  /**
+   * Show a field in one more place: a new widget, placed and styled as `create()`'s
+   * `widgets` take them, every part optional. It looks like the field's last widget unless
+   * you say otherwise. A radio group's new button gets the next free `Choice<n>` as its
+   * value, and a checkbox's new box the field's own, so the boxes check together. Without a
+   * `rect` it goes next in line after the field's widgets on the page (`page`, else the last
+   * widget's): below them while they stand in a column, beside them while they stand in a
+   * row, the same size and the same step; where that leaves the page, a new column (or row)
+   * beside them. Fires `onFieldUpdated`. Rejects `permission-denied` without
+   * `doc.forms.modify`, `not-found` for a field the form doesn't have.
+   */
+  addWidget(
+    ref: FormFieldRef,
+    placement?: Partial<WidgetPlacement>,
+    options?: OperationOptions,
+  ): Promise<FormWidgetAddResult>;
   /** Change a field's settings: pass only what changes. Fires `onFieldUpdated`. Rejects like `create()`. */
   update(
     ref: FormFieldRef,

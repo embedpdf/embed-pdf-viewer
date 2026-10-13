@@ -135,6 +135,8 @@ export const he: Locale = {
         listbox: 'תיבת רשימה',
         button: 'לחצן',
         signature: 'שדה חתימה',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'עיצוב טופס',
       },
       redact: {
         mark: 'סמן להשחרה',
@@ -232,6 +234,7 @@ export const he: Locale = {
       signatures: 'חתימות',
       redaction: 'השחרות',
       measurement: 'מדידות',
+      formDesign: 'עיצוב טופס',
       switch: 'החלף חלונית',
     },
     annotation: {
@@ -382,6 +385,17 @@ export const he: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'עמוד {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'אין שדות עדיין. בחר כלי שדה כדי להוסיף שדה.',
+      page: 'עמוד {page}',
+      allFields: 'כל השדות',
+      buttons: 'לחצנים',
+      boxes: 'תיבות',
+      box: 'תיבה {number}',
+      addButton: 'הוסף לחצן',
+      addBox: 'הוסף תיבה',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(מעורב)',

@@ -78,6 +78,7 @@ const NOT_THE_VIEWERS = (tab: Page): Promise<string[]> =>
       name: string;
       alternateName?: string | null;
       options?: readonly { label: string; value: string }[];
+      widgets: readonly { exportValue?: string }[];
     }
     const fields: readonly Field[] = viewer.get('form').list();
     return [
@@ -88,6 +89,8 @@ const NOT_THE_VIEWERS = (tab: Page): Promise<string[]> =>
         field.name.slice(field.name.lastIndexOf('.') + 1),
         field.alternateName ?? '',
         ...(field.options ?? []).flatMap((option) => [option.label, option.value]),
+        // A radio button's or a checkbox's value, which the form designer lists.
+        ...field.widgets.map((widget) => widget.exportValue ?? ''),
       ]),
       // The default handwriting fonts, by their names (`@embedpdf/default-signature-fonts`).
       'Allura',
@@ -266,6 +269,50 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the words the viewer sh
       tab.evaluate(() => window.element.viewer.get('selection').selectPage(0)),
     );
     await tab.evaluate(() => window.element.viewer.get('selection').clear?.());
+    expect(found).toEqual({});
+  });
+
+  it('wraps every word of the form designer', async () => {
+    await run(tab, 'mode:form');
+    await visit('the form designer', () => run(tab, 'form:design'), 'Form design');
+    // A field selected: its settings.
+    await visit(
+      "a field's settings",
+      () =>
+        tab.evaluate(() =>
+          window.element
+            .shadowRoot!.querySelector<HTMLButtonElement>(
+              '[data-epdf-panel="form-design"] li button',
+            )!
+            .click(),
+        ),
+      'All fields',
+    );
+    // A radio group selected: its buttons, and the button that adds one.
+    await visit(
+      "a radio group's buttons",
+      () =>
+        tab.evaluate(async () => {
+          const { viewer } = window.element;
+          const page = viewer.documents.getPage(0);
+          const { field } = await viewer.get('form').create({
+            family: 'radio',
+            name: 'guard-group',
+            widgets: [
+              {
+                page: page.ref,
+                rect: { x: 72, y: 40, width: 16, height: 16 },
+                exportValue: 'Choice1',
+              },
+            ],
+          });
+          viewer.get('annotation').selection.set([field.widgets[0].ref]);
+        }),
+      'Add a button',
+    );
+    await tab.evaluate(() => window.element.viewer.get('annotation').selection.set([]));
+    await run(tab, 'form:design');
+    await run(tab, 'mode:view');
     expect(found).toEqual({});
   });
 

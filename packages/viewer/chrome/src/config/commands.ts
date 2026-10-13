@@ -54,6 +54,31 @@ export const GO_TO_PAGE_DIALOG = 'go-to-page';
 export const SHORTCUTS_DIALOG = 'shortcuts';
 /** The confirmation before marked areas are removed for good (ui/redact-confirm.tsx). */
 export const REDACT_CONFIRM_DIALOG = 'redact-confirm';
+/** The form designer's sidebar (ui/form-design-panel.tsx), which `form:design` opens. */
+export const FORM_DESIGN_PANEL = 'form-design';
+/** Form design's resting tool, the form plugin's: widgets select, move and resize there. */
+export const FORM_DESIGN_TOOL = 'form-edit';
+/** The form plugin's field tools, each placing a field (the Form bar's `tool:*` buttons). */
+const FORM_FIELD_TOOLS: readonly string[] = [
+  'form-text',
+  'form-checkbox',
+  'form-radio',
+  'form-combobox',
+  'form-listbox',
+  'form-button',
+  'form-signature',
+];
+
+/**
+ * Whether a tool designs a form: design's resting tool, or a field tool. Neither fills, so the
+ * form lends its widgets to be selected, moved and resized.
+ */
+export const isFormDesignTool = (tool: string | null | undefined): boolean =>
+  tool === FORM_DESIGN_TOOL || (tool != null && FORM_FIELD_TOOLS.includes(tool));
+
+/** Whether a form is being designed: the active tool designs it. */
+export const isDesigningForm = (commandContext: Pick<Ctx, 'tryGet'>): boolean =>
+  isFormDesignTool(commandContext.tryGet(InteractionToken)?.getActiveToolId());
 
 /** Where selection-made stamps go: the user's own library, persisted. */
 const CUSTOM_LIBRARY_ID = 'embedpdf-custom';
@@ -533,10 +558,8 @@ export const defaultCommands: CommandDef[] = [
   modeCommand('mode:shapes', 'commands.mode.shapes', { feature: 'shapes' }),
   // Stamps, images, attachments and signatures: no one feature holds them all.
   modeCommand('mode:insert', 'commands.mode.insert'),
-  modeCommand('mode:form', 'commands.mode.form', {
-    feature: 'forms.building',
-    toolId: 'form-edit',
-  }),
+  // Form mode opens for filling and looking; `form:design` switches design on.
+  modeCommand('mode:form', 'commands.mode.form', { feature: 'forms.building' }),
   modeCommand('mode:redact', 'commands.mode.redact', { feature: 'redaction' }),
   modeCommand('mode:measure', 'commands.mode.measure', { feature: 'measurement' }),
 
@@ -683,6 +706,33 @@ export const defaultCommands: CommandDef[] = [
     feature: 'stamps',
     check: CREATES_ANNOTATIONS,
   }),
+
+  // ── form design ─────────────────────────────────────────────────────────
+  // The switch: on, the design tool and the design sidebar (fields select, move and resize);
+  // off, the pointer, where they fill again. A field tool turns design on by itself, and
+  // leaving Form mode ends it (its sidebar shows only in Form mode).
+  {
+    id: 'form:design',
+    labelKey: 'commands.form.design',
+    icon: 'formDesign',
+    categories: ['forms.building'],
+    ...DESIGNS_FORMS,
+    run: (commandContext) => {
+      const tools = interaction(commandContext);
+      const shell = commandContext.tryGet(ShellToken);
+      if (!tools) return;
+      if (isDesigningForm(commandContext)) {
+        tools.activateTool('pointer');
+        shell?.close(FORM_DESIGN_PANEL);
+        return;
+      }
+      if (shell && !shell.isOpen('mode:form')) shell.open('mode:form', { exclusive: 'mode' });
+      tools.activateTool(FORM_DESIGN_TOOL);
+      shell?.open(FORM_DESIGN_PANEL);
+    },
+    active: isDesigningForm,
+    enabled: (commandContext) => interaction(commandContext) != null,
+  },
 
   // ── form tools (the form plugin's draw-to-place palette) ────────────────
   tool('tool:text-field', 'form-text', 'commands.form.textfield', 'formTextfield', {
@@ -1055,21 +1105,20 @@ export const MODE_SURFACES = [
 function modeCommand(
   id: (typeof MODE_SURFACES)[number],
   labelKey: string,
-  { feature, toolId = 'pointer' }: { feature?: Feature; toolId?: string } = {},
+  { feature }: { feature?: Feature } = {},
 ): CommandDef {
   return {
     id,
     labelKey,
     // The tab goes with its feature; a tab of several features stays.
     ...(feature ? { categories: [feature] } : {}),
-    // A mode tab is a shell surface and a tool policy: the Form tab flips the
-    // pointer into form design ('form-edit' — widgets select/move/resize like
-    // annotations); every other tab (and closing one) drops back to the
-    // default pointer, where widgets are fill controls again.
+    // A mode tab is a shell surface and a tool policy: every tab (and closing
+    // one) drops back to the default pointer, where widgets are fill controls;
+    // form design is `form:design`'s switch inside the Form tab.
     run: (commandContext) => {
       const shell = commandContext.tryGet(ShellToken);
       shell?.toggle(id, { exclusive: 'mode' });
-      interaction(commandContext)?.activateTool(shell?.isOpen(id) ? toolId : 'pointer');
+      interaction(commandContext)?.activateTool('pointer');
     },
     active: (commandContext) => commandContext.tryGet(ShellToken)?.isOpen(id) ?? false,
   };

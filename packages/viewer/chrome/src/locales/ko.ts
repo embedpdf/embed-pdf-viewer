@@ -134,6 +134,8 @@ export const ko: Locale = {
         listbox: '목록 상자',
         button: '단추',
         signature: '서명 필드',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: '양식 디자인',
       },
       redact: {
         mark: '교정 표시',
@@ -231,6 +233,7 @@ export const ko: Locale = {
       signatures: '서명',
       redaction: '교정',
       measurement: '측정',
+      formDesign: '양식 디자인',
       switch: '패널 전환',
     },
     annotation: {
@@ -381,6 +384,17 @@ export const ko: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: '{page}페이지' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: '아직 필드가 없습니다. 필드 도구를 골라 필드를 추가하십시오.',
+      page: '{page}페이지',
+      allFields: '모든 필드',
+      buttons: '단추',
+      boxes: '확인란',
+      box: '확인란 {number}',
+      addButton: '단추 추가',
+      addBox: '확인란 추가',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(혼합)',

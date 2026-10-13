@@ -135,6 +135,8 @@ export const fr: Locale = {
         listbox: 'Zone de liste',
         button: 'Bouton',
         signature: 'Champ de signature',
+        // The Form mode's design switch, which opens the form designer's sidebar.
+        design: 'Conception de formulaire',
       },
       redact: {
         mark: 'Marquer pour biffage',
@@ -233,6 +235,7 @@ export const fr: Locale = {
       signatures: 'Signatures',
       redaction: 'Biffages',
       measurement: 'Mesures',
+      formDesign: 'Conception de formulaire',
       switch: 'Changer de panneau',
     },
     annotation: {
@@ -383,6 +386,17 @@ export const fr: Locale = {
     },
     // A thumbnail's tooltip.
     thumbnails: { page: 'Page {page}' },
+    // The form designer's sidebar: the fields by page, and the selected one's buttons.
+    formDesign: {
+      empty: 'Aucun champ pour l’instant. Choisissez un outil de champ pour en ajouter un.',
+      page: 'Page {page}',
+      allFields: 'Tous les champs',
+      buttons: 'Boutons',
+      boxes: 'Cases',
+      box: 'Case {number}',
+      addButton: 'Ajouter un bouton',
+      addBox: 'Ajouter une case',
+    },
     // The style panel's own words around the properties.
     stylePanel: {
       mixed: '(mixte)',

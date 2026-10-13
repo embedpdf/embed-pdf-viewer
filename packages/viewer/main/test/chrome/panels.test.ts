@@ -23,6 +23,7 @@ const BUILT_IN = [
   'signatures',
   'redaction',
   'measurement',
+  'form-design',
 ];
 
 const lookUp = (translations: object, key: string): unknown =>
@@ -132,6 +133,7 @@ describe('panelsOnSide', () => {
       'signatures',
       'redaction',
       'measurement',
+      'form-design',
       'notes',
     ]);
   });
