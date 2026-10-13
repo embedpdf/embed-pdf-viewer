@@ -54,6 +54,9 @@
     "@embedpdf/default-stamps#build": {
       "outputs": ["locales/**"]
     },
+    "@embedpdf/default-signature-fonts#build": {
+      "outputs": ["modules/**"]
+    },
     "@embedpdf/viewer#test": {
       "dependsOn": ["build"]
     },

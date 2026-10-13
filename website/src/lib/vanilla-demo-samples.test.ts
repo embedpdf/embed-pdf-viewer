@@ -131,6 +131,21 @@ describe('a plain-HTML example in the demo build', () => {
     );
   });
 
+  it('reads the page as a browser does: comments, attribute values and end tags', () => {
+    const code = moduleOf(
+      [
+        '<div title="<script>stays();</script>"></div>',
+        '<!-- <script type="module">commentedOut();</script> -->',
+        '<script type="module">runs();</script\t\n foo>',
+      ].join('\n'),
+    );
+
+    expect(code).toContain('const markup = "<div title=\\"<script>stays();</script>\\"></div>";');
+    expect(code).toContain('async function script1(document) {runs();}');
+    expect(code).not.toContain('commentedOut');
+    expect(code).not.toContain('script2');
+  });
+
   it('keeps a script that never runs, such as JSON, in the markup', () => {
     const code = moduleOf('<script type="application/json">{"a":1}</script>');
 

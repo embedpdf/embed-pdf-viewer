@@ -563,6 +563,9 @@ importers:
       eslint-config-next:
         specifier: 15.5.12
         version: 15.5.12(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
+      parse5:
+        specifier: ^8.0.1
+        version: 8.0.1
       postcss:
         specifier: ^8.4.32
         version: 8.5.20
@@ -3052,6 +3055,9 @@ importers:
       '@vitejs/plugin-vue':
         specifier: ^6.0.3
         version: 6.0.8(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.9.0))(vue@3.5.40(typescript@5.8.3))
+      parse5:
+        specifier: ^8.0.1
+        version: 8.0.1
       postcss:
         specifier: ^8.5.6
         version: 8.5.6

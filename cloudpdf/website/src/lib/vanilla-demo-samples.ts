@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { parseFragment, type DefaultTreeAdapterTypes } from 'parse5';
 import { parseAst, type Plugin } from 'vite';
 
 import { sampleScopeClass } from './sample-discovery';
@@ -45,12 +46,16 @@ function exampleKey(samplesRoot: string, file: string): string {
     .replace(/\.vanilla\.html$/, '');
 }
 
-function attribute(attributes: string, name: string): string | null {
-  const match = attributes.match(
-    new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i'),
-  );
-  return match ? (match[1] ?? match[2] ?? match[3] ?? '') : null;
+type Element = DefaultTreeAdapterTypes.Element;
+
+/** An element's attribute as the browser reads it, or null when it has none. */
+function attribute(element: Element, name: string): string | null {
+  return element.attrs.find((attr) => attr.name === name)?.value ?? null;
 }
+
+/** The text a script or style element holds. */
+const textOf = (element: Element): string =>
+  element.childNodes.map((child) => ('value' in child ? child.value : '')).join('');
 
 /** A script the browser runs: no `type`, a JavaScript one, or a module. */
 const RUNS = new Set(['', 'module', 'text/javascript', 'application/javascript']);
@@ -92,39 +97,58 @@ export function vanillaDemoModule(
     }
   };
 
-  const markup = source
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(
-      /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi,
-      (whole, attributes: string, body: string) => {
-        if (!RUNS.has((attribute(attributes, 'type') ?? '').trim().toLowerCase())) return whole;
-        const src = attribute(attributes, 'src');
+  // The page as a browser parses it, so a comment, a script's text or an attribute's value is never
+  // taken for a tag. Each edit replaces one node's source; the rest of the page stays as written.
+  const edits: { start: number; end: number; text: string }[] = [];
+  const stylesheets: string[] = [];
+  const visit = (parent: DefaultTreeAdapterTypes.ParentNode): void => {
+    for (const node of parent.childNodes) {
+      if (node.nodeName === '#comment') {
+        const at = node.sourceCodeLocation;
+        if (at) edits.push({ start: at.startOffset, end: at.endOffset, text: '' });
+        continue;
+      }
+      if (!('tagName' in node)) continue;
+      const at = node.sourceCodeLocation;
+      if (node.tagName === 'script') {
+        if (!RUNS.has((attribute(node, 'type') ?? '').trim().toLowerCase())) continue;
+        const src = attribute(node, 'src');
         if (src !== null) {
           checkUrl(src);
           imports.push(`import ${JSON.stringify(src)};`);
-        } else if (body.trim()) {
-          scripts.push(body);
+        } else if (textOf(node).trim()) {
+          scripts.push(textOf(node));
         }
-        return '';
-      },
-    )
-    .replace(/<link\b([^>]*?)\/?>/gi, (whole, attributes: string) => {
-      const href = attribute(attributes, 'href');
-      if ((attribute(attributes, 'rel') ?? '').toLowerCase() !== 'stylesheet' || href === null) {
-        return whole;
+        if (at) edits.push({ start: at.startOffset, end: at.endOffset, text: '' });
+      } else if (node.tagName === 'link') {
+        const href = attribute(node, 'href');
+        if ((attribute(node, 'rel') ?? '').toLowerCase() !== 'stylesheet' || href === null) {
+          continue;
+        }
+        if (!/^\.{1,2}\//.test(href)) {
+          fail(`<link href="${href}">: link the example's own stylesheet, ./<name>.css`);
+        }
+        stylesheets.push(`import ${JSON.stringify(href)};`);
+        if (at) edits.push({ start: at.startOffset, end: at.endOffset, text: '' });
+      } else if (node.tagName === 'style') {
+        if (at?.startTag && at.endTag) {
+          const css = scopeStylesheet(textOf(node), scope);
+          edits.push({ start: at.startTag.endOffset, end: at.endTag.startOffset, text: css });
+        }
+      } else if (node.tagName !== 'template') {
+        // A template's content never runs as the page loads, so its scripts stay in the markup.
+        visit(node);
       }
-      if (!/^\.{1,2}\//.test(href)) {
-        fail(`<link href="${href}">: link the example's own stylesheet, ./<name>.css`);
-      }
-      imports.push(`import ${JSON.stringify(href)};`);
-      return '';
-    })
-    .replace(
-      /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi,
-      (_, attributes: string, css: string) =>
-        `<style${attributes}>${scopeStylesheet(css, scope)}</style>`,
-    )
-    .trim();
+    }
+  };
+  visit(parseFragment(source, { sourceCodeLocationInfo: true }));
+  let markup = source;
+  for (const { start, end, text } of edits.sort((a, b) => b.start - a.start)) {
+    markup = markup.slice(0, start) + text + markup.slice(end);
+  }
+  markup = markup.trim();
+  // The script tags' imports come first, then the stylesheets'.
+  imports.push(...stylesheets);
 
   // Each script's imports, as written, go to the module's top; the rest runs on every mount.
   const runs = scripts.map((body, index) => {
