@@ -3,7 +3,7 @@ import { mountWebFont } from '@embedpdf/angular/runtime';
 
 /** `provideEmbedPdf({ engine }, …)`: runs in the browser, before the first document opens. */
 export const engine = async () => {
-  const pdfEngine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const pdfEngine = cloudEngine();
   const data = await fetch('/fonts/brand-sans.ttf').then((response) => response.arrayBuffer());
 
   await pdfEngine.fonts.register({ key: 'brand-sans', data });

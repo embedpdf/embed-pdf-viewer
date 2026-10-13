@@ -26,6 +26,7 @@ import {
   type PanelResizeEvent,
   type Viewer,
   type ViewerFont,
+  type ViewerPluginsConfig,
 } from '@embedpdf/viewer-chrome';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 import {
@@ -37,8 +38,10 @@ import {
   isLiveConfigKey,
   isOpenInput,
   mergeConfig,
+  pluginsOf,
   type ElementConfig,
   type ElementSrc,
+  type SourceOf,
 } from './config';
 import { placedComponentsOf } from './components';
 import { chromeSheet, sheetOf } from './sheets';
@@ -48,6 +51,15 @@ export interface DoorEngine {
   readonly engine: Engine | EngineFactory;
   /** The fonts the field names, which the viewer registers on the engine and offers. */
   readonly fonts?: readonly ViewerFont[];
+  /**
+   * What a `src` in the words of this engine opens as, for an engine whose documents aren't a
+   * URL, a file or bytes: the cloud's `{ token }` is the engine's `{ kind: 'token' }`. The
+   * element applies it to `src`, `documents` and `.src`.
+   */
+  readonly sourceOf?: SourceOf;
+  /** Plugin settings this engine needs, under the config's own, per plugin: a door whose stamp
+   *  libraries open in another engine names that engine here. */
+  readonly plugins?: ViewerPluginsConfig;
 }
 
 /**
@@ -193,6 +205,8 @@ export class EmbedPdfViewerElement extends ElementBase {
   /** The config the running viewer shows, and the props it renders with. */
   #shown: ElementConfig | null = null;
   #props: FullViewerProps | null = null;
+  /** What the running viewer's door makes of a `src` (`DoorEngine.sourceOf`). */
+  #sourceOf: SourceOf = (src) => src;
   #viewer: Viewer | null = null;
   #srcDocument: SrcDocument | null = null;
   /** The ids of `src` documents still closing, which a new one must not take. */
@@ -387,8 +401,9 @@ export class EmbedPdfViewerElement extends ElementBase {
   }
 
   /** Open `src` as the `src` document, at `position` in the tabs, once `after` settles. */
-  #openSrc(src: ElementSrc, position: number, after?: Promise<void>): void {
+  #openSrc(given: ElementSrc, position: number, after?: Promise<void>): void {
     const { documents } = this.#viewer!;
+    const src = this.#sourceOf(given);
     const id = this.#freeIdFor(src);
     const { source, name } = documentFromSrc(src, id, after);
     const before = new Set(documents.getOrder());
@@ -437,16 +452,18 @@ export class EmbedPdfViewerElement extends ElementBase {
     const { src: _src, documents, engine: _engine, theme, ...customization } = config;
     this.#adoptSheets(theme);
     this.#shown = config;
-    const { engine, fonts } = engineOf(config);
+    const { engine, fonts, sourceOf = (src) => src, plugins } = engineOf(config);
+    this.#sourceOf = sourceOf;
     this.#props = {
       engine,
       fonts,
-      initialDocuments: documents && initialDocumentsOf(documents),
+      initialDocuments: documents && initialDocumentsOf(documents, sourceOf),
       theme,
       themeTarget: this.#wrapper,
       // The viewer's own components among the children (`<epdf-button>`, `<epdf-menu>`).
       components: placedComponentsOf(this),
       ...customization,
+      plugins: pluginsOf(plugins, customization.plugins),
       // The element's own, which call the config's after its events.
       onReady: this.#onReady,
       onDocumentChange: this.#onDocumentChange,

@@ -42,7 +42,7 @@ type Role = keyof typeof roles;
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         identity: dana,
         scope: roles.reader,
         initialDocuments: [{ source: ebook, name: 'ebook.pdf' }],

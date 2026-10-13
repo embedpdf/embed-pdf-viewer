@@ -15,7 +15,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './label.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // What applying paints over every mark: a dark blue area, its label in white.
 const plugins = [
   stagePlugin(),

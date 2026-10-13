@@ -12,7 +12,7 @@ import Readouts from './Readouts.vue';
 
 import '../readout.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),

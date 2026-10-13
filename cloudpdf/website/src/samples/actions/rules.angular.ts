@@ -140,7 +140,7 @@ export class WebsiteRules {
   providers: [
     RunLog,
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       // Websites open only on a click, as the page's example registers it.
       withActions({
         policy: { uri: { user: 'adapter', hover: 'block', lifecycle: 'block' } },

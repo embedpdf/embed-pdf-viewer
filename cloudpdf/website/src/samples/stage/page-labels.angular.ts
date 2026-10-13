@@ -12,7 +12,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfPageChrome, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       // Reserve a 26px band below every page: the label lives there, so it never
       // covers the page and keeps its size when you zoom.
       withStage({ pageFrame: { bottom: 26 } }),

@@ -11,7 +11,7 @@ import OrderControls from './OrderControls.vue';
 
 import '../order.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };

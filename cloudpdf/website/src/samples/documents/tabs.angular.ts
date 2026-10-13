@@ -100,7 +100,7 @@ export class TabTools {
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         initialDocuments: [
           { source: ebook, name: 'Contract' },
           { source: ebook, name: 'Report' },

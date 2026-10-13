@@ -22,24 +22,11 @@ import '@embedpdf/viewer';
 import type { ViewerConfig } from '@embedpdf/viewer';
 import type { Component } from 'svelte';
 
-import PDFViewerImpl from './component.svelte';
-import type { PDFViewerPropsOf } from './props';
+import { PDFViewer as PDFViewerImpl, type PDFViewerPropsOf } from './parts';
 
-// The whole customization vocabulary (and the local engine's config types) rides along, so apps
-// import one package.
 export * from '@embedpdf/viewer';
-export type { PDFViewerExtras, PDFViewerPropsOf } from './props';
-export { useCommand, usePDFViewer } from './hooks';
-export { Panel, Region, ToolbarItem, useToolbarItem } from './slots';
-export type { PanelProps, RegionName, RegionProps, ToolbarItemProps } from './slots';
-export { Button, Menu, MenuItem } from './viewer-components';
-export type { ButtonProps, MenuItemProps, MenuProps } from './viewer-components';
+export * from './parts';
 
-/**
- * Props on this door: `engine` is optional. Leave it out for the built-in local engine (your
- * bundler ships `embedpdf.wasm` inside your own build, with a pinned-CDN fallback when that fetch
- * fails), or pass its options (`{ wasmUrl }`, `{ assetsUrl }`, worker URLs for a strict CSP).
- */
 export type PDFViewerProps = PDFViewerPropsOf<ViewerConfig>;
 
 /** The shared component, narrowed to this door's config: the wider props type assigns to it. */

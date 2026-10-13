@@ -1,0 +1,21 @@
+# @embedpdf/viewer-svelte — ./component
+
+Button [SvelteComponent] (from packages/viewer/svelte/src/viewer-components/Button.svelte): props ButtonProps
+ButtonProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface ButtonProps{ command?: string; icon?: string; label?: string; onclick?: (event: MouseEvent) => void; class?: string; style?: string; }
+Menu [SvelteComponent] (from packages/viewer/svelte/src/viewer-components/Menu.svelte): props MenuProps
+MenuItem [SvelteComponent] (from packages/viewer/svelte/src/viewer-components/MenuItem.svelte): props MenuItemProps
+MenuItemProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface MenuItemProps{ command?: string; icon?: string; onselect?: () => void; children?: Snippet; }
+MenuProps [InterfaceDeclaration] (from packages/viewer/svelte/src/viewer-components/props.ts): export interface MenuProps{ icon?: string; label: string; children?: Snippet; }
+PDFViewer [SvelteComponent] (from packages/viewer/svelte/src/component.svelte): props PDFViewerImplProps; defaults { element: null}; bindable element
+PDFViewerExtras [InterfaceDeclaration] (from packages/viewer/svelte/src/props.ts): export interface PDFViewerExtras{ class?: string; style?: string; children?: Snippet; element?: EmbedPdfViewerElement | null; onready?: (viewer: Viewer) => void; ondocumentchange?: (documentId: string | null) => void; onpanelresize?: (event: PanelResizeEvent) => void; }
+PDFViewerPropsOf [TypeAliasDeclaration] (from packages/viewer/svelte/src/props.ts): export type PDFViewerPropsOf<Config extends object> = Omit<Config, ConfigCallback> & PDFViewerExtras;
+Panel [SvelteComponent] (from packages/viewer/svelte/src/slots/Panel.svelte): props PanelProps
+PanelProps [InterfaceDeclaration] (from packages/viewer/svelte/src/slots/props.ts): export interface PanelProps{ id: string; children?: Snippet; }
+Region [SvelteComponent] (from packages/viewer/svelte/src/slots/Region.svelte): props RegionProps
+RegionName [TypeAliasDeclaration] (from packages/viewer/svelte/src/slots/props.ts): export type RegionName = 'header' | 'footer' | 'tabs' | 'empty';
+RegionProps [InterfaceDeclaration] (from packages/viewer/svelte/src/slots/props.ts): export interface RegionProps{ name: RegionName; children?: Snippet; }
+ToolbarItem [SvelteComponent] (from packages/viewer/svelte/src/slots/ToolbarItem.svelte): props ToolbarItemProps
+ToolbarItemProps [InterfaceDeclaration] (from packages/viewer/svelte/src/slots/props.ts): export interface ToolbarItemProps{ id: string; children?: Snippet; }
+useCommand [FunctionDeclaration] (from packages/framework/svelte/src/commands/readers.svelte.ts): export function useCommand(id: MaybeGetter<string>): CurrentValue<BoundCommand>{ const commands = useCapability(CommandsToken); const documentId = useDocumentId(); const resolved = useKernelValue( () => commands.resolveCommand(valueOf(id), documentId.current ?? undefined), resolvedCommandsEqual, ); return currentOf( derivedValue(() =>{ const command = resolved.current; const requested = valueOf(id); if (command === null){ devWarn( `useCommand:${ requested} `, `useCommand(): ${ unknownCommandWarning(requested, commands.listCommandIds())} `, ); } const scope = documentId.current ?? undefined; return boundCommandOf( command ?? unregisteredCommand(requested), (commandId) => commands.execute(commandId, { documentId: scope} ), { isMac: isMacPlatform()} , ); } ), ); }
+usePDFViewer [FunctionDeclaration] (from packages/viewer/svelte/src/hooks.ts): export function usePDFViewer(): Viewer{ const viewer = hasContext(VIEWER) ? untrack(getContext<() => Viewer | null>(VIEWER)) : null; if (!viewer){ throw new Error( '[embedpdf] usePDFViewer() works in a component inside <PDFViewer>. Outside the viewer, ' + 'keep the viewer its onready gives you.', ); } return viewer; }
+useToolbarItem [FunctionDeclaration] (from packages/viewer/svelte/src/slots/item-context.svelte.ts): export function useToolbarItem(): ToolbarItemContext{ if (!hasContext(TOOLBAR_ITEM)){ throw new Error( '[embedpdf] useToolbarItem() works inside a <ToolbarItem>: it says where that item sits.', ); } return getContext<ToolbarItemPlace>(TOOLBAR_ITEM); }

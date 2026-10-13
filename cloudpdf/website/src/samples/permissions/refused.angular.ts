@@ -71,7 +71,7 @@ export class DownloadAnyway {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, DownloadAnyway],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), scope, initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), scope, initialDocuments: [{ source: ebook }] },
       withStage(),
       withRender(),
     ),

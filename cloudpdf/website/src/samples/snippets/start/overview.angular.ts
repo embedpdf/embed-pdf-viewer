@@ -10,7 +10,7 @@ import { cloudEngine } from '@cloudpdf/engine';
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         initialDocuments: [{ source: { kind: 'url', url: '/contract.pdf' } }],
       },
       withStage(),

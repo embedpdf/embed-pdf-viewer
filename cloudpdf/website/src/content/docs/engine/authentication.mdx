@@ -40,10 +40,7 @@ When your app already has a token for your whole account (an admin tool, a backe
 of its documents by id:
 
 ```ts
-const engine = cloudEngine({
-  baseUrl: 'https://pdf.example.com',
-  token: () => fetchAccountToken(),
-});
+const engine = cloudEngine({ token: () => fetchAccountToken() });
 
 const doc = await engine.open({ kind: 'id', id: 'doc_proposal_2026' });
 ```

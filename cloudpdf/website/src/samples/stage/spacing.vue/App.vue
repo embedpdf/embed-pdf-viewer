@@ -8,7 +8,7 @@ import SpacingControls from './SpacingControls.vue';
 
 import '../spacing.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // No responsive rules, so the padding you set applies at every width.
 const plugins = [stagePlugin({ padding: 32, gap: { px: 12 }, responsive: [] }), renderPlugin()];
 

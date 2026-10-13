@@ -4,4 +4,4 @@
   import { plugins } from './pdf';
 </script>
 
-<Viewer engine={() => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' })} {plugins} />
+<Viewer engine={() => cloudEngine()} {plugins} />

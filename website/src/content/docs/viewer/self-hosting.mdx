@@ -34,8 +34,8 @@ settings are `localEngine()` options.
 <Engine cloud>
 
 With the cloud engine the document lives on your CloudPDF deployment or on
-CloudPDF SaaS, so `baseUrl` is the one network destination the engine itself
-has — and rendering, text, and search happen there, not in the browser. The
+CloudPDF SaaS, so where it runs (`engine: { baseUrl }`, CloudPDF SaaS when
+left out) is the one network destination the engine itself has — and rendering, text, and search happen there, not in the browser. The
 rows above still apply to the parts that run locally: the built-in stamp
 library opens in the browser, so the first time someone opens Stamps or
 Signatures the viewer loads `embedpdf.wasm` and the engine worker. The CDN

@@ -246,8 +246,8 @@ module.exports = [
               regex: '^@embedpdf/viewer(-[a-z]+)?$',
               message:
                 'the cloud tree must not bundle the local PDFium engine: import the ' +
-                'engine-agnostic door instead (`@embedpdf/viewer/core`, ' +
-                '`@embedpdf/viewer-react/core`, …) and inject cloudEngine().',
+                'engine-agnostic door (`@embedpdf/viewer/core`) and the wrappers\' door-blind ' +
+                'parts (`@embedpdf/viewer-react/component`, …), and register the cloud engine.',
             },
           ],
         },

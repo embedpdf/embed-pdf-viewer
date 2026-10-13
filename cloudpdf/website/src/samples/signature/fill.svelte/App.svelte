@@ -12,7 +12,7 @@ import { localEngine } from '@embedpdf/engine';
 
   import '../fill.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   const assetEngine = localEngine();
   // No key: a mark is only drawn in, nothing is sealed.
   const plugins = [

@@ -14,7 +14,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './programmatic.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 // On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.

@@ -14,7 +14,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './draw.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // The selection plugin lets the highlight tool mark the text you select.
 const plugins = [
   stagePlugin(),

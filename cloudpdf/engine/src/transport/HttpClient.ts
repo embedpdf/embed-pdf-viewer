@@ -13,8 +13,13 @@ import {
   type CdnAccessInfoForApply,
 } from '@embedpdf/engine-core/wire';
 
+/** CloudPDF SaaS: where an engine connects when it names no server of its own. */
+export const CLOUDPDF_SAAS_URL = 'https://engine.cloudpdf.com';
+
 export interface HttpClientOptions {
-  baseUrl: string;
+  /** Where your CloudPDF runs: your own `@cloudpdf/server`, or CloudPDF SaaS
+   *  ({@link CLOUDPDF_SAAS_URL}) when left out. */
+  baseUrl?: string;
   /**
    * Optional bearer token. Either a string or a function that
    * returns a fresh token on every call (so callers can rotate
@@ -126,7 +131,7 @@ export class HttpClient {
   private cdnBinding: CdnBinding | null = null;
 
   constructor(private readonly options: HttpClientOptions) {
-    this.base = options.baseUrl.replace(/\/$/, '');
+    this.base = (options.baseUrl ?? CLOUDPDF_SAAS_URL).replace(/\/$/, '');
     const token = options.token;
     this.tokenFn = token === undefined ? null : typeof token === 'function' ? token : () => token;
     this.sessionId = options.sessionId ?? null;

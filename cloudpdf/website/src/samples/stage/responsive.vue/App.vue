@@ -9,7 +9,7 @@ import Toolbar from './Toolbar.vue';
 
 import '../responsive.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 // Facing pages with a roomy margin, and one rule for a narrow Stage: a thin
 // margin and one page at a time. The rule has a name, so the UI can read it too.

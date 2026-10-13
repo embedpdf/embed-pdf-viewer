@@ -10,7 +10,11 @@
  */
 import { PluginError } from '@embedpdf/core';
 import type { OpenInput } from '@embedpdf/engine-core/runtime';
-import type { InitialDocument, ViewerCustomization } from '@embedpdf/viewer-chrome';
+import type {
+  InitialDocument,
+  ViewerCustomization,
+  ViewerPluginsConfig,
+} from '@embedpdf/viewer-chrome';
 
 /** One document for `src`: a URL, a `File` (or any `Blob`), or the PDF's bytes. */
 export type DocumentSrc = string | Blob | ArrayBuffer | Uint8Array;
@@ -40,10 +44,12 @@ export interface ViewerConfigBase<Src = DocumentSrc> extends ViewerCustomization
 }
 
 /**
- * What the element opens: a URL, a file or bytes, or an engine's open input as it is (a
- * `{ kind: 'token' }` a cloud door made of its own `src`, or what an engine of your own takes).
+ * What the element opens: a URL, a file or bytes, an engine's open input as it is (what an engine
+ * of your own takes), or a document in the words of the door's engine, such as the cloud's
+ * `{ token }`, which the door turns into its engine's open input (`DoorEngine.sourceOf`). The
+ * element serves every door, so it reads only the first three; the rest is the door's.
  */
-export type ElementSrc = DocumentSrc | OpenInput;
+export type ElementSrc = DocumentSrc | OpenInput | object;
 
 /**
  * The config as the element sees it — a courier's view.
@@ -109,6 +115,23 @@ export function changedConfigKeys(previous: ElementConfig, next: ElementConfig):
   return [...keys].filter((key) => !sameConfigValue(before[key], after[key]));
 }
 
+/** The door's plugin settings under the config's own, plugin by plugin: a key the config sets wins. */
+export function pluginsOf(
+  door: ViewerPluginsConfig | undefined,
+  own: ViewerPluginsConfig | undefined,
+): ViewerPluginsConfig | undefined {
+  if (!door) return own;
+  const merged: { [name: string]: object | undefined } = { ...door };
+  for (const [name, settings] of Object.entries(own ?? {})) {
+    const under = door[name];
+    merged[name] =
+      under && settings && Object.getPrototypeOf(settings) === Object.prototype
+        ? { ...under, ...settings }
+        : settings;
+  }
+  return merged;
+}
+
 /**
  * Download a URL `src`. Its tab says why when the server says no: the file isn't there
  * (`not-found`), or the download failed.
@@ -141,6 +164,13 @@ function isPdf(bytes: Uint8Array): boolean {
 export const isOpenInput = (src: ElementSrc): src is OpenInput =>
   typeof src === 'object' && 'kind' in src;
 
+/** Whether the element reads a `src` itself: a URL, a file or bytes. */
+const isReadable = (src: ElementSrc): src is DocumentSrc =>
+  typeof src === 'string' ||
+  src instanceof ArrayBuffer ||
+  src instanceof Uint8Array ||
+  (typeof Blob !== 'undefined' && src instanceof Blob);
+
 /** What a `src` document's tab shows: the file's name without `.pdf`. */
 function nameOfSrc(src: DocumentSrc): string {
   const name =
@@ -167,6 +197,9 @@ export const idOfSrc = (src: ElementSrc): string =>
         ? src.name
         : 'document';
 
+/** What a door's `sourceOf` makes of a `src`: what the element opens. */
+export type SourceOf = (src: ElementSrc) => ElementSrc;
+
 /**
  * A `src` as a document to open, under the id given: its tab appears at once, named after the
  * file, and the bytes are read (a URL fetched) under the loading tab, which stops the fetch when
@@ -184,6 +217,14 @@ export function documentFromSrc(
       source: async () => {
         await after;
         return src;
+      },
+    };
+  }
+  if (!isReadable(src)) {
+    // A document in an engine's own words whose door didn't say how it opens.
+    return {
+      source: async () => {
+        throw new PluginError('invalid-input', 'documents', "this viewer can't open that document");
       },
     };
   }
@@ -209,10 +250,12 @@ export function documentFromSrc(
 /**
  * The `documents` entries as the documents to open, in order: each under an id of its own (the
  * second of one URL gets `#2` after it), named as given or after its file, with its password,
- * and the first one marked `active` showing first. An open input opens as it is.
+ * and the first one marked `active` showing first. Each `src` is first what the door makes of it
+ * (`sourceOf`), and an open input opens as it is.
  */
 export function initialDocumentsOf(
   entries: readonly DocumentEntry<ElementSrc>[],
+  sourceOf: SourceOf = (src) => src,
 ): InitialDocument[] {
   const taken = new Set<string>();
   const freeId = (wanted: string): string => {
@@ -221,12 +264,15 @@ export function initialDocumentsOf(
     taken.add(id);
     return id;
   };
-  return entries.map(({ src, name, password, active }) => ({
-    ...(isOpenInput(src) ? { source: src } : documentFromSrc(src, freeId(idOfSrc(src)))),
-    ...(name !== undefined ? { name } : {}),
-    ...(password !== undefined ? { password } : {}),
-    ...(active ? { active } : {}),
-  }));
+  return entries.map(({ src: given, name, password, active }) => {
+    const src = sourceOf(given);
+    return {
+      ...(isOpenInput(src) ? { source: src } : documentFromSrc(src, freeId(idOfSrc(src)))),
+      ...(name !== undefined ? { name } : {}),
+      ...(password !== undefined ? { password } : {}),
+      ...(active ? { active } : {}),
+    };
+  });
 }
 
 /**

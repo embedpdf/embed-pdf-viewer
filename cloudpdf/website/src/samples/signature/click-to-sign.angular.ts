@@ -20,7 +20,7 @@ import { createTestSigner, EpdfSignature, withSignature } from '@embedpdf/angula
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const assetEngine = localEngine();
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 

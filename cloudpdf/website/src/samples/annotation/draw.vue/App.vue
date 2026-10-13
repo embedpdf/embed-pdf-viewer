@@ -11,7 +11,7 @@ import Toolbar from './Toolbar.vue';
 
 import '../draw.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // The selection plugin lets the highlight tool mark the text you select.
 const plugins = [
   stagePlugin(),

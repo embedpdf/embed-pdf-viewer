@@ -4,7 +4,7 @@ import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 </script>
 

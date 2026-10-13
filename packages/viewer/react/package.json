@@ -13,6 +13,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./component": {
+      "development": "./src/parts.ts",
+      "import": "./dist/component.js",
+      "require": "./dist/component.cjs"
+    },
     "./core": {
       "development": "./src/core.ts",
       "import": "./dist/core.js",
@@ -66,6 +71,10 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./component": {
+        "import": "./dist/component.js",
+        "require": "./dist/component.cjs"
       },
       "./core": {
         "import": "./dist/core.js",

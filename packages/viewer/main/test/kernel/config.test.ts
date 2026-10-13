@@ -1,6 +1,7 @@
 /**
  * The element's config: which changes a running viewer follows in place, how attributes and
- * `.config` combine, and what a `src` opens.
+ * `.config` combine, what a `src` opens, and what a door adds: how its documents open and the
+ * plugin settings its engine needs.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +12,7 @@ import {
   initialDocumentsOf,
   isLiveConfigKey,
   mergeConfig,
+  pluginsOf,
   sameConfigValue,
 } from '../../src/kernel/config';
 
@@ -217,5 +219,51 @@ describe('documents entries', () => {
       ),
     );
     expect(ids).toEqual(['/a.pdf', '/a.pdf#2', '/a.pdf#3']);
+  });
+});
+
+describe("a door's documents and plugin settings", () => {
+  /** The cloud door's words for a document, as a door of its own would have them. */
+  const sourceOf = (src: unknown) =>
+    typeof src === 'object' && src !== null && 'shareToken' in src
+      ? { kind: 'share' as const, shareToken: String(src.shareToken) }
+      : (src as string);
+
+  it('open in the words of the door, which turns them into what its engine opens', () => {
+    const documents = initialDocumentsOf(
+      [{ src: { shareToken: 'shr_1' }, name: 'Shared' }, { src: '/report.pdf' }],
+      sourceOf,
+    );
+    expect(documents[0]).toEqual({
+      source: { kind: 'share', shareToken: 'shr_1' },
+      name: 'Shared',
+    });
+    expect(documents[1]!.name).toBe('report');
+  });
+
+  it("fail as invalid-input when no door said how they open, and aren't a URL, a file or bytes", async () => {
+    const { source } = documentFromSrc({ shareToken: 'shr_1' }, 'document');
+    if (typeof source !== 'function') throw new Error('expected a lazy source');
+    await expect(source(new AbortController().signal)).rejects.toMatchObject({
+      code: 'invalid-input',
+    });
+  });
+
+  it("put the door's plugin settings under the config's own, plugin by plugin", () => {
+    const assetEngine = () => ({}) as never;
+    expect(pluginsOf(undefined, { stage: { spread: 'odd' } })).toEqual({
+      stage: { spread: 'odd' },
+    });
+    expect(
+      pluginsOf(
+        { stamp: { assetEngine } },
+        { stamp: { standard: false }, stage: { spread: 'odd' } },
+      ),
+    ).toEqual({ stamp: { assetEngine, standard: false }, stage: { spread: 'odd' } });
+    // A setting the config gives wins.
+    const own = () => ({}) as never;
+    expect(pluginsOf({ stamp: { assetEngine } }, { stamp: { assetEngine: own } })).toEqual({
+      stamp: { assetEngine: own },
+    });
   });
 });

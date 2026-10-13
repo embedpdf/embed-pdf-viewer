@@ -124,7 +124,7 @@ export class Controls {
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         scope: roles.reviewer,
         initialDocuments: [{ source: ebook, name: 'ebook.pdf' }],
       },

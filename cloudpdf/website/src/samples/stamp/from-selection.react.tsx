@@ -23,7 +23,7 @@ import { localEngine } from '@embedpdf/engine';
 
 import './from-selection.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const assetEngine = localEngine();
 const plugins = [
   stagePlugin(),

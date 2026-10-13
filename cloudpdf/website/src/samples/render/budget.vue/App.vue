@@ -8,7 +8,7 @@ import BudgetControls from './BudgetControls.vue';
 
 import '../budget.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // Zoomed in, where the budget and the tiles show.
 const plugins = [stagePlugin({ zoom: { level: 2 } }), renderPlugin()];
 

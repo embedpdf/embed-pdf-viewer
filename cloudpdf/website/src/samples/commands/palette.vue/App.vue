@@ -10,7 +10,7 @@ import CommandPalette from './CommandPalette.vue';
 
 import '../palette.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [
   stagePlugin(),
   renderPlugin(),

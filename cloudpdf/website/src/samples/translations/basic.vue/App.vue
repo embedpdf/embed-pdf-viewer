@@ -13,7 +13,7 @@ import PageCount from './PageCount.vue';
 
 import '../basic.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 // Your strings. The buttons' labels are the standard commands', which come translated.
 const en: Locale = {

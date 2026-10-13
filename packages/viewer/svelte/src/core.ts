@@ -26,16 +26,10 @@ import '@embedpdf/viewer/core';
 import type { ViewerConfig } from '@embedpdf/viewer/core';
 import type { Component } from 'svelte';
 
-import PDFViewerImpl from './component.svelte';
-import type { PDFViewerPropsOf } from './props';
+import { PDFViewer as PDFViewerImpl, type PDFViewerPropsOf } from './parts';
 
 export * from '@embedpdf/viewer/core';
-export type { PDFViewerExtras, PDFViewerPropsOf } from './props';
-export { useCommand, usePDFViewer } from './hooks';
-export { Panel, Region, ToolbarItem, useToolbarItem } from './slots';
-export type { PanelProps, RegionName, RegionProps, ToolbarItemProps } from './slots';
-export { Button, Menu, MenuItem } from './viewer-components';
-export type { ButtonProps, MenuItemProps, MenuProps } from './viewer-components';
+export * from './parts';
 
 /** Props on this door: `engine` is required, and only a real engine satisfies it. */
 export type PDFViewerProps = PDFViewerPropsOf<ViewerConfig>;

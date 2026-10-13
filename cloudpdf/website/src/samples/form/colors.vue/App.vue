@@ -10,7 +10,7 @@ import ColorToolbar from './ColorToolbar.vue';
 
 import '../colors.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // The colors the viewer draws around fields; `null` follows the viewer's accent.
 const plugins = [
   stagePlugin(),

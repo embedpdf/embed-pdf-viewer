@@ -10,7 +10,7 @@
 
   import '../cursor.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   // A standard cursor for the rectangle tool: any CSS cursor name.
   const plugins = [
     stagePlugin(),

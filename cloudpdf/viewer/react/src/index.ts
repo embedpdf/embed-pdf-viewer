@@ -1,60 +1,31 @@
 'use client';
 /**
- * @cloudpdf/viewer-react — the full viewer as a React component, wired to
+ * @cloudpdf/viewer-react — the full viewer as a React component, with the CloudPDF engine as the
+ * default: the same `<PDFViewer>` as `@embedpdf/viewer-react`, whose documents live on your
  * CloudPDF.
  *
  * ```tsx
- * import { CloudPDFViewer } from '@cloudpdf/viewer-react';
+ * import { PDFViewer } from '@cloudpdf/viewer-react';
  *
- * <CloudPDFViewer
- *   baseUrl="https://api.cloudpdf.com"
- *   src={{ token }}
- *   style={{ height: '100vh' }}
- * />
+ * <PDFViewer src={{ token }} style={{ height: '100vh' }} />
  * ```
  *
- * A cloud door, and nothing more. It renders the open-source `<PDFViewer>` from
- * `@embedpdf/viewer-react/core` — the engine-agnostic door, where `engine` is
- * required — and supplies that engine from the cloud vocabulary via
- * `resolveCloudConfig`. Because the core door registers no default engine, the
- * local PDFium engine (6 MB of wasm, the worker source, the main-thread recipe)
- * is not part of startup. The only import of it is the lazy one the stamp
- * libraries make the first time someone opens Stamps or Signatures.
- *
- * Everything the open viewer accepts — `layout`, `commands`, `icons`,
- * `strings`, `theme`, `plugins`, children-as-slots, `onReady`,
- * `usePDFViewer()` — works here unchanged (see `@embedpdf/viewer-react`).
- * This file adds the CloudPDF connection and names the documents in the cloud's
- * words, and subtracts only `scope` and `identity`, which the document's token
- * carries.
+ * A door like the open viewer's two (docs/conventions/viewer-doors.md): it imports the cloud
+ * door, which registers the cloud engine on `<embedpdf-viewer>`, re-exports the wrapper's parts,
+ * and narrows `<PDFViewer>` to the cloud's `ViewerConfig`. `engine` takes the cloud engine's
+ * settings (`baseUrl`, CloudPDF SaaS when left out), `src` a document token, an id or a share link.
  */
-import { resolveCloudConfig, type ViewerConfig } from '@cloudpdf/viewer/config';
-import { PDFViewer, type PDFViewerExtras } from '@embedpdf/viewer-react/core';
-import { createElement, useState } from 'react';
+import '@cloudpdf/viewer';
 
-// The open viewer's whole vocabulary rides along, so a cloud app imports one
-// package — same ladder as the cloud snippet.
-export * from '@embedpdf/viewer-react/core';
-export { resolveCloudConfig } from '@cloudpdf/viewer/config';
-// The cloud's `ViewerConfig`, in place of the one `export *` brings: one name per door.
-export type {
-  CloudSource,
-  DocumentEntry,
-  DocumentSrc,
-  ViewerConfig,
-} from '@cloudpdf/viewer/config';
+import type { ViewerConfig } from '@cloudpdf/viewer';
+import {
+  PDFViewer as PDFViewerImpl,
+  type PDFViewerExtras,
+} from '@embedpdf/viewer-react/component';
 
-/**
- * The cloud connection and its documents (`src` as `{ token }`, `{ id }` or
- * `{ shareToken }`), plus every viewer option except `engine` (this door
- * supplies it) and `scope`/`identity` (the token carries them).
- */
-export type CloudPDFViewerProps = ViewerConfig & PDFViewerExtras;
+export * from '@cloudpdf/viewer';
+export * from '@embedpdf/viewer-react/component';
 
-export function CloudPDFViewer(props: CloudPDFViewerProps) {
-  // The engine, documents and plugins are made from the cloud options once, when the viewer
-  // starts, like every prop that isn't live; the live ones pass through on every render.
-  const [started] = useState(() => resolveCloudConfig(props));
-  const { engine, documents, plugins } = started;
-  return createElement(PDFViewer, { ...resolveCloudConfig(props), engine, documents, plugins });
-}
+export type PDFViewerProps = ViewerConfig & PDFViewerExtras;
+
+export const PDFViewer: (props: PDFViewerProps) => ReturnType<typeof PDFViewerImpl> = PDFViewerImpl;

@@ -10,7 +10,8 @@ import { renderPlugin } from '@embedpdf/react/render';
 import EmbedPDF from '@embedpdf/viewer';
 import { PDFViewer } from '@embedpdf/viewer-react';
 import CloudPDF from '@cloudpdf/viewer';
-import { CloudPDFViewer } from '@cloudpdf/viewer-react';
+// The same component, from the cloud door: its own name only so both build in one file.
+import { PDFViewer as CloudPDFViewer } from '@cloudpdf/viewer-react';
 
 async function createEngine(): Promise<Engine> {
   const { createLocalEngineWithWorker } = await import('@embedpdf/engine');

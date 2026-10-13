@@ -7,7 +7,7 @@ import PageCard from './PageCard.vue';
 
 import '../basic.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // No Stage: a page on its own needs only the render plugin.
 const plugins = [renderPlugin()];
 

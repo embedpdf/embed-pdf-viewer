@@ -94,7 +94,7 @@ export class LayerBar implements OnInit {
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         initialDocuments: [{ source: () => withLayer(), name: 'ebook.pdf' }],
       },
       withStage(),

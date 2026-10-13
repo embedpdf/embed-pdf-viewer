@@ -31,10 +31,14 @@ const root = path.resolve(new URL('../../..', import.meta.url).pathname);
 const check = process.argv.includes('--check');
 const outRoot = path.join(root, 'api');
 
+/** Where the snapshotted packages live: `packages/`, and the CloudPDF viewer's doors (the rest of
+ *  `cloudpdf/` is the server and the generated SDK, with their own checks). */
+const SNAPSHOT_ROOTS = [path.join(root, 'packages'), path.join(root, 'cloudpdf', 'viewer')];
+
 function workspacePackages() {
   const json = execFileSync('pnpm', ['ls', '-r', '--depth', '-1', '--json'], { cwd: root, encoding: 'utf8' });
   return JSON.parse(json)
-    .filter((p) => p.path.startsWith(path.join(root, 'packages') + path.sep))
+    .filter((p) => SNAPSHOT_ROOTS.some((dir) => p.path.startsWith(dir + path.sep)))
     .map((p) => ({ name: p.name, dir: p.path, manifest: JSON.parse(fs.readFileSync(path.join(p.path, 'package.json'), 'utf8')) }))
     .filter((p) => p.manifest.private !== true && p.manifest.exports);
 }

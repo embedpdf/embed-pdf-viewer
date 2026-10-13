@@ -27,7 +27,7 @@ const HINTS: Record<string, string> = {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfSelectionLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       withStage(),
       withRender(),
       // The document opens with the hand tool.

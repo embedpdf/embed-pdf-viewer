@@ -1,30 +1,34 @@
 /**
- * @cloudpdf/viewer-svelte — the full viewer as a Svelte component, wired to CloudPDF.
+ * @cloudpdf/viewer-svelte — the full viewer as a Svelte component, with the CloudPDF engine as
+ * the default: the same `<PDFViewer>` as `@embedpdf/viewer-svelte`, whose documents live on your
+ * CloudPDF.
  *
  * ```svelte
  * <script lang="ts">
- *   import { CloudPDFViewer } from '@cloudpdf/viewer-svelte';
+ *   import { PDFViewer } from '@cloudpdf/viewer-svelte';
  * </script>
  *
- * <CloudPDFViewer baseUrl="https://api.cloudpdf.com" src={{ token }} style="height: 100vh" />
+ * <PDFViewer src={{ token }} style="height: 100vh" />
  * ```
  *
- * A cloud door over `@embedpdf/viewer-svelte/core`: everything the open viewer takes (`layout`,
- * `commands`, `icons`, `strings`, `theme`, `plugins`, your components as children, `onready`,
- * `usePDFViewer()`) works here unchanged. This package adds the CloudPDF connection and names the
- * documents in the cloud's words (`src` as `{ token }`, `{ id }` or `{ shareToken }`), and leaves
- * out `scope` and `identity`, which the document's token carries.
+ * A door like the open viewer's two (docs/conventions/viewer-doors.md): it imports the cloud
+ * door, which registers the cloud engine on `<embedpdf-viewer>`, re-exports the wrapper's parts,
+ * and narrows `<PDFViewer>` to the cloud's `ViewerConfig`. `engine` takes the cloud engine's
+ * settings (`baseUrl`, CloudPDF SaaS when left out), `src` a document token, an id or a share link.
  */
-// The open viewer's whole vocabulary rides along, so a cloud app imports one package.
-export * from '@embedpdf/viewer-svelte/core';
-export { resolveCloudConfig } from '@cloudpdf/viewer/config';
-// The cloud's `ViewerConfig`, in place of the one `export *` brings: one name per door.
-export type {
-  CloudSource,
-  DocumentEntry,
-  DocumentSrc,
-  ViewerConfig,
-} from '@cloudpdf/viewer/config';
+import '@cloudpdf/viewer';
 
-export { default as CloudPDFViewer } from './CloudPDFViewer.svelte';
-export type { CloudPDFViewerProps } from './props';
+import type { ViewerConfig } from '@cloudpdf/viewer';
+import {
+  PDFViewer as PDFViewerImpl,
+  type PDFViewerPropsOf,
+} from '@embedpdf/viewer-svelte/component';
+import type { Component } from 'svelte';
+
+export * from '@cloudpdf/viewer';
+export * from '@embedpdf/viewer-svelte/component';
+
+export type PDFViewerProps = PDFViewerPropsOf<ViewerConfig>;
+
+/** The shared component, narrowed to the cloud's config: the wider props type assigns to it. */
+export const PDFViewer: Component<PDFViewerProps, {}, 'element'> = PDFViewerImpl;

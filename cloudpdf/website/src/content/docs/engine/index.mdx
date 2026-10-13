@@ -52,7 +52,7 @@ const image = await doc.page(pages[0].ref).render.image();
 ```ts
 import { cloudEngine } from '@cloudpdf/engine';
 
-const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+const engine = cloudEngine();
 const doc = await engine.open({ kind: 'token', token: () => fetchDocumentToken(documentId) });
 
 const { pages } = await doc.pages.list();

@@ -90,7 +90,7 @@ export class Toolbar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, Toolbar],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       withStage(),
       withRender(),
       withCommands({ commands: [...standardCommands, twoPages] }),

@@ -9,7 +9,7 @@ import { ThumbsToken } from './thumbs-token';
 
 import '../thumbnail-strip.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 const plugins = [
   stagePlugin(), // the main view

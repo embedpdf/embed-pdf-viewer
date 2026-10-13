@@ -109,7 +109,7 @@ export class ScriptConsole {
   providers: [
     ScriptOutput,
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
       // JavaScript on, and two fields scripts often ask for about the user.
       withActions({
         javascript: { enabled: true, identity: { name: 'Dana Smith', corporation: 'Acme' } },

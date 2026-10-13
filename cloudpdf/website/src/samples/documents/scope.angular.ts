@@ -59,7 +59,7 @@ export class Header {
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         initialDocuments: [
           { source: ebook, name: 'Original' },
           { source: ebook, name: 'Revised' },

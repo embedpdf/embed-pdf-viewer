@@ -1,123 +1,49 @@
 /**
- * @cloudpdf/viewer-vue: the full viewer as a Vue component, wired to CloudPDF.
+ * @cloudpdf/viewer-vue — the full viewer as a Vue component, with the CloudPDF engine as the
+ * default: the same `<PDFViewer>` as `@embedpdf/viewer-vue`, whose documents live on your
+ * CloudPDF.
  *
  * ```vue
  * <script setup lang="ts">
- * import { CloudPDFViewer } from '@cloudpdf/viewer-vue';
+ * import { PDFViewer } from '@cloudpdf/viewer-vue';
  *
  * defineProps<{ token: string }>();
  * </script>
  *
  * <template>
- *   <CloudPDFViewer base-url="https://api.cloudpdf.com" :src="{ token }" style="height: 100vh" />
+ *   <PDFViewer :src="{ token }" style="height: 100vh" />
  * </template>
  * ```
  *
- * A cloud door, and nothing more. It renders the open-source <PDFViewer> from
- * `@embedpdf/viewer-vue/core`, the engine-agnostic door, where `engine` is
- * required, and supplies that engine from the cloud options through
- * `resolveCloudConfig`. Because the core door registers no default engine, the
- * local PDFium engine (the wasm, the worker source, the main-thread recipe) is
- * not part of startup. The only import of it is the lazy one the stamp
- * libraries make the first time someone opens Stamps or Signatures.
- *
- * Everything the open viewer takes (`layout`, `commands`, `icons`, `strings`,
- * `theme`, `plugins`, `<ToolbarItem>`, `<Panel>` and `<Region>` in its slot,
- * `@ready`, `usePDFViewer()`) works here unchanged (see `@embedpdf/viewer-vue`).
- * This file adds the CloudPDF connection and names the documents in the cloud's
- * words (`src` as `{ token }`, `{ id }` or `{ shareToken }`), and leaves out
- * `scope` and `identity`: the document's token carries who the user is and what
- * they may do.
+ * A door like the open viewer's two (docs/conventions/viewer-doors.md): it imports the cloud
+ * door, which registers the cloud engine on `<embedpdf-viewer>`, re-exports the wrapper's parts,
+ * and defines `<PDFViewer>` with the cloud's `ViewerConfig` as its props. `engine` takes the
+ * cloud engine's settings (`baseUrl`, CloudPDF SaaS when left out), `src` a document token, an id
+ * or a share link.
  */
-import { resolveCloudConfig, type ViewerConfig } from '@cloudpdf/viewer/config';
+import '@cloudpdf/viewer';
+
+import type { ViewerConfig } from '@cloudpdf/viewer';
 import {
-  PDFViewer,
+  PDF_VIEWER_OPTIONS,
+  setupPDFViewer,
   type PDFViewerComponent,
   type PDFViewerEmits,
   type PDFViewerPropsOf,
   type PDFViewerSlots,
-  type PanelResizeEvent,
-  type Viewer,
-} from '@embedpdf/viewer-vue/core';
-import { computed, defineComponent, h, shallowRef, toRaw } from 'vue';
+} from '@embedpdf/viewer-vue/component';
+import { defineComponent } from 'vue';
 
-// The open viewer's whole vocabulary rides along, so a cloud app imports one package.
-export * from '@embedpdf/viewer-vue/core';
-export { resolveCloudConfig } from '@cloudpdf/viewer/config';
-// The cloud's `ViewerConfig`, in place of the one `export *` brings: one name per door.
-export type {
-  CloudSource,
-  DocumentEntry,
-  DocumentSrc,
-  ViewerConfig,
-} from '@cloudpdf/viewer/config';
+export * from '@cloudpdf/viewer';
+export * from '@embedpdf/viewer-vue/component';
+
+export type PDFViewerProps = PDFViewerPropsOf<ViewerConfig>;
 
 /**
- * The cloud connection and its documents, plus every viewer option except `engine` (this door
- * supplies it) and `scope`/`identity` (the token carries them). The callbacks are events, as on
- * <PDFViewer>.
+ * The full viewer. The shared setup takes the widest config, so it serves this door's narrower
+ * props as they are; the type adds what a template ref reads (`elementRef`).
  */
-export type CloudPDFViewerProps = PDFViewerPropsOf<ViewerConfig>;
-
-/**
- * Every key of the cloud config, as a prop (TypeScript keeps the list complete). `readOnly`
- * written without a value is `true`, as on <PDFViewer>.
- */
-const CLOUD_PROPS = {
-  baseUrl: null,
-  token: null,
-  fetch: null,
-  src: null,
-  docAffinityHeader: null,
-  onRetry: null,
-  documents: null,
-  commands: null,
-  icons: null,
-  strings: null,
-  locale: null,
-  disable: null,
-  readOnly: { type: [Boolean, Object], default: undefined },
-  notAllowed: null,
-  layout: null,
-  plugins: null,
-  theme: null,
-} satisfies Record<keyof CloudPDFViewerProps, unknown>;
-
-/**
- * The full viewer on CloudPDF. Its type adds what a template ref reads (`elementRef`), as
- * <PDFViewer>'s does.
- */
-export const CloudPDFViewer = defineComponent<
-  CloudPDFViewerProps,
-  PDFViewerEmits,
-  string,
-  PDFViewerSlots
->(
-  (props, { emit, slots, expose }) => {
-    // The engine, documents and plugins are made from the cloud options once, when the viewer
-    // starts, like every prop that isn't live; the live ones pass through on every render.
-    const { engine, documents, plugins } = resolveCloudConfig({ ...toRaw(props) });
-    const viewer = shallowRef<InstanceType<typeof PDFViewer> | null>(null);
-    expose({ elementRef: computed(() => viewer.value?.elementRef ?? null) });
-    return () =>
-      h(
-        PDFViewer,
-        {
-          ...resolveCloudConfig(props),
-          engine,
-          documents,
-          plugins,
-          ref: viewer,
-          onReady: (ready: Viewer) => emit('ready', ready),
-          onDocumentChange: (documentId: string | null) => emit('document-change', documentId),
-          onPanelResize: (event: PanelResizeEvent) => emit('panel-resize', event),
-        },
-        slots,
-      );
-  },
-  {
-    name: 'CloudPDFViewer',
-    props: CLOUD_PROPS,
-    emits: ['ready', 'document-change', 'panel-resize'],
-  },
-) as PDFViewerComponent<CloudPDFViewerProps>;
+export const PDFViewer = defineComponent<PDFViewerProps, PDFViewerEmits, string, PDFViewerSlots>(
+  setupPDFViewer,
+  PDF_VIEWER_OPTIONS,
+) as PDFViewerComponent<PDFViewerProps>;

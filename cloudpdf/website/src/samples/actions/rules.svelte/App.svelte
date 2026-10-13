@@ -6,7 +6,7 @@
 
   import '../rules.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   // Websites open only on a click, as the page's example registers it.
   const plugins = [
     actionsPlugin({

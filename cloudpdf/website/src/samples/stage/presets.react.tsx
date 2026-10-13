@@ -7,7 +7,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './presets.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // Zoomed in, so a page is wider than the view and you can see where it lands.
 const plugins = [stagePlugin({ zoom: { level: 1.6 } }), renderPlugin()];
 

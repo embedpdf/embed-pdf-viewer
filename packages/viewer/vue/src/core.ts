@@ -38,21 +38,10 @@ import {
   type PDFViewerEmits,
   type PDFViewerPropsOf,
   type PDFViewerSlots,
-} from './component';
+} from './parts';
 
 export * from '@embedpdf/viewer/core';
-export type {
-  PDFViewerComponent,
-  PDFViewerEmits,
-  PDFViewerExposed,
-  PDFViewerPropsOf,
-  PDFViewerSlots,
-} from './component';
-export { useCommand, usePDFViewer } from './composables';
-export { Panel, Region, ToolbarItem, useToolbarItem } from './slots';
-export type { PanelProps, RegionName, RegionProps, ToolbarItemProps } from './slots';
-export { Button, Menu, MenuItem } from './viewer-components';
-export type { ButtonProps, MenuItemProps, MenuProps } from './viewer-components';
+export * from './parts';
 
 /** Props on this door: `engine` is required, and only a real engine satisfies it. */
 export type PDFViewerProps = PDFViewerPropsOf<ViewerConfig>;

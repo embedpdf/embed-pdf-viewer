@@ -25,19 +25,11 @@ import '@embedpdf/viewer/core';
 
 import type { ViewerConfig } from '@embedpdf/viewer/core';
 
-import { PDFViewer as PDFViewerImpl, type PDFViewerExtras } from './component';
+import { PDFViewer as PDFViewerImpl, type PDFViewerExtras } from './parts';
 
 export * from '@embedpdf/viewer/core';
-export type { PDFViewerExtras } from './component';
-export { useCommand, usePDFViewer } from './hooks';
-export { Panel, Region, ToolbarItem, useToolbarItem } from './slots';
-export type { PanelProps, RegionName, RegionProps, ToolbarItemProps } from './slots';
-export { Button, Menu, MenuItem } from './viewer-components';
-export type { ButtonProps, MenuItemProps, MenuProps } from './viewer-components';
+export * from './parts';
 
-/** Props on this door: `engine` is required, and only a real engine satisfies it. */
 export type PDFViewerProps = ViewerConfig & PDFViewerExtras;
 
-/** The shared component, narrowed to this door's contract (no cast needed: the
- *  implementation is typed with the wider config — see ./component). */
 export const PDFViewer: (props: PDFViewerProps) => ReturnType<typeof PDFViewerImpl> = PDFViewerImpl;

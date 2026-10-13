@@ -16,6 +16,11 @@
       "svelte": "./src/core.ts",
       "default": "./src/core.ts"
     },
+    "./component": {
+      "types": "./src/parts.ts",
+      "svelte": "./src/parts.ts",
+      "default": "./src/parts.ts"
+    },
     "./package.json": "./package.json"
   },
   "files": [

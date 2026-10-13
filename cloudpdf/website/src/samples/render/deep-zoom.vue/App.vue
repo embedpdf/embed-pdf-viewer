@@ -8,7 +8,7 @@ import ZoomBar from './ZoomBar.vue';
 
 import '../deep-zoom.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // Open at 250%: past what a whole-page picture shows sharply, so tiles carry it.
 const plugins = [stagePlugin({ zoom: { level: 2.5 } }), renderPlugin()];
 

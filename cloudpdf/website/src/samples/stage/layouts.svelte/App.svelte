@@ -7,7 +7,7 @@
 
   import '../layouts.css';
 
-  const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+  const engine = cloudEngine();
   // Facing pages from the start, like a book.
   const plugins = [stagePlugin({ spread: 'odd' }), renderPlugin()];
 

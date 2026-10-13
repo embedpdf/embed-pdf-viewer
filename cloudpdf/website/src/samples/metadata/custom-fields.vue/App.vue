@@ -7,7 +7,7 @@ import CustomFields from './CustomFields.vue';
 
 import '../custom-fields.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 const plugins = [metadataPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };

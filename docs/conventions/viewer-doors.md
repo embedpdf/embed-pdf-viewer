@@ -7,7 +7,9 @@ engine, CloudPDF with a remote one, a CDN snippet, and one wrapper per
 framework — without forking the viewer once.
 
 A **door** is an entry point that decides one thing: which engine is in the
-bundle. Everything else is shared.
+bundle. Everything else is shared, names included: the CloudPDF viewer is the
+same `<embedpdf-viewer>`, `init()`, `<PDFViewer>` and `<epdf-pdf-viewer>` with
+the cloud engine as the default, as `@embedpdf/viewer` is with the built-in one.
 
 Unqualified `kernel/`, `local/`, and `doors/` paths below are relative to
 `packages/viewer/main/src/`.
@@ -55,8 +57,16 @@ Unqualified `kernel/`, `local/`, and `doors/` paths below are relative to
 `.config` must carry a value only the sending door understands. It opens the
 envelope far enough to recognise an `Engine` or a factory, and otherwise hands
 it to the provider its door registered (`EmbedPdfViewerElement.defaultEngineProvider`,
-set by `registerLocalEngine()`; the `/core` door sets none, which is exactly
-what makes its `engine` required).
+set by `registerLocalEngine()` or `@cloudpdf/viewer`'s `registerCloudEngine()`;
+the `/core` door sets none, which is exactly what makes its `engine` required).
+
+What the provider returns (`DoorEngine`) is the engine, and what the element
+can't know about it: the fonts its settings name, how a `src` in that engine's
+words opens (`sourceOf`: the cloud's `{ token }` is the engine's
+`{ kind: 'token' }`; the element reads only URLs, files, bytes and open inputs
+itself), and plugin settings the engine needs under the config's own
+(`plugins`: the cloud's stamp libraries open in a local engine). The element
+has one default engine, so an app imports one door.
 
 Typing that seam narrower would either forbid a legal door vocabulary or
 advertise one a different door cannot honour. So the imperative `el.config =`
@@ -72,15 +82,28 @@ packages/viewer/main/src/
   doors/      entries only — local.ts, portable.ts, core.ts, snippet.ts
 ```
 
-Every framework wrapper is the same three files, in this order:
+Every framework wrapper is the same four files, in this order:
 
 ```
 src/component.ts   the wrapper, engine-blind, `import type` only
-src/index.ts       the local door:  import '@embedpdf/viewer';       + narrowed props
-src/core.ts        the core  door:  import '@embedpdf/viewer/core';  + narrowed props
+src/parts.ts       `./component`: the component at the widest config, and the
+                   components and hooks every door shares
+src/index.ts       the local door:  import '@embedpdf/viewer';       + parts + narrowed props
+src/core.ts        the core  door:  import '@embedpdf/viewer/core';  + parts + narrowed props
 ```
 
+(Angular's are entry folders: `component/`, `core/`, and `src/` for the local door.)
 Read one wrapper and you have read them all.
+
+## Doors in another package
+
+`@cloudpdf/viewer` and its wrappers are doors too, the same shape across a
+package line: `@cloudpdf/viewer` registers the cloud engine and is otherwise
+`@embedpdf/viewer/core`'s surface with the cloud's `ViewerConfig`; each
+`@cloudpdf/viewer-<framework>` imports it, re-exports
+`@embedpdf/viewer-<framework>/component`, and narrows the component to the
+cloud's config. Its npm build leaves every `@embedpdf/*` package to the app's
+bundler, so the app has one element class, the one the engine is registered on.
 
 ## Checklist: adding a framework wrapper
 
@@ -90,8 +113,10 @@ Read one wrapper and you have read them all.
    `ElementConfig & <Framework>Extras`. Set `.config` before the element's
    deferred mount, so the viewer boots exactly once — make that an acceptance
    test.
-3. `index.*` / `core.*`: one side-effect import each, then re-export the
-   component narrowed to that door's `ViewerConfig`.
+3. `parts.*` (`./component`): the component and every framework part, for
+   doors in this package and others. `index.*` / `core.*`: one side-effect
+   import each, re-export the parts, then the component narrowed to that
+   door's `ViewerConfig`.
 4. `package.json`: add `"./core": "./src/core.*"` to `exports` (the build
    derives entries from it — see `tooling/build/README.md`) and list both door
    entries in `sideEffects`. A pure re-export barrel with `sideEffects: false`

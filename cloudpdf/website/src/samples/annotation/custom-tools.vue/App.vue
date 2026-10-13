@@ -10,7 +10,7 @@ import Toolbar from './Toolbar.vue';
 
 import '../custom-tools.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 // A blue pen, an arrow, and three tools of your own. `meta` is yours: the toolbar reads its label.
 const plugins = [
   stagePlugin(),

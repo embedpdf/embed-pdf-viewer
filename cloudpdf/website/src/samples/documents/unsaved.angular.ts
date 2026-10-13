@@ -99,7 +99,7 @@ export class ChangeLog {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, TitleBar, ChangeLog],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }), initialDocuments: [{ source: ebook, name: 'report.pdf' }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook, name: 'report.pdf' }] },
       withStage(),
       withRender(),
       withMetadata(),

@@ -15,7 +15,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import './custom.css';
 
-const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const engine = cloudEngine();
 
 // A command of your own: pressed while the pages show two at a time.
 const twoPages: CommandDef = {

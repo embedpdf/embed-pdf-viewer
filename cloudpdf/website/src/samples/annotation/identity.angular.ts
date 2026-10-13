@@ -120,7 +120,7 @@ export class Authors {
   providers: [
     provideEmbedPdf(
       {
-        engine: () => cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }),
+        engine: () => cloudEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
         initialDocuments: [{ source: ebook }],
       },
