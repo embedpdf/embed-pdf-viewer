@@ -63,6 +63,16 @@ jobs:
         # runtime wrapper from its dist.
         run: pnpm --filter-prod "@cloudpdf/server..." build
 
+      # The runtime wrapper imports the wasm32 payload package, which Vite
+      # resolves when it loads the engine for the tests; hydrate it, and the
+      # host's native addon, from the content-addressed shelf as the package
+      # tests do. A PR that changes runtime sources races its own Build PDF
+      # Runtime workflow, hence the wait.
+      - name: Fetch engine runtime payloads
+        run: pnpm --filter @embedpdf/engine-runtime fetch:payload wasm32 linux-x64
+        env:
+          EPDF_PAYLOAD_WAIT_MINUTES: '30'
+
       - name: Adversarial licensing tests
         run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
 
