@@ -96,7 +96,8 @@ export function symbolsFromCode(code: string): string[] {
       names.split(',').map((name) =>
         name
           .trim()
-          .split(/\s+as\s+/)[0]
+          // One whitespace each side, then trim: `\s+as\s+` backtracks on long runs of spaces.
+          .split(/\sas\s/)[0]
           .trim(),
       ),
     ),

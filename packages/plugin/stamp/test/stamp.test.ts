@@ -20,6 +20,7 @@ import type {
 import { DocumentsToken, type CapabilityToken } from '@embedpdf/core';
 import { createTestContext, type TestPage } from '@embedpdf/core/testing';
 import { createLocalEngine } from '@embedpdf/engine';
+import { DEFAULT_SCRIPT_BUDGET } from '@embedpdf/core-acrojs';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import type { ScriptRealmTarget } from '@embedpdf/plugin-actions/contract/host';
 import { AnnotationToken, type StampInput } from '@embedpdf/plugin-annotation/contract';
@@ -923,6 +924,10 @@ describe('stamp plugin: placement', () => {
         now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
         utcOffsetMinutes: () => 180,
         randomSeed: () => 7,
+        // Production limits, but a generous wall-clock deadline: the default
+        // 50ms contains hostile scripts, and a shared CI runner running other
+        // packages' wasm suites starves a legitimate stamp script past it.
+        budget: { ...DEFAULT_SCRIPT_BUDGET, maxExecutionMs: 5_000 },
       },
       () => undefined,
       target,

@@ -353,7 +353,8 @@ function localTypes(scripts) {
 function scriptBlocks(file) {
   const text = fs.readFileSync(file, 'utf8');
   const blocks = [];
-  const tags = /<!--[\s\S]*?-->|<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script>/g;
+  // Tag names ignore case, as HTML's do.
+  const tags = /<!--[\s\S]*?-->|<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script>/gi;
   for (const [match, attributes, content] of text.matchAll(tags)) {
     if (match.startsWith('<!--')) continue;
     blocks.push({

@@ -17,8 +17,8 @@ export function walk(directory) {
   });
 }
 
-/** A Svelte component's script blocks: the only place its imports are. */
-const SCRIPT_BLOCK = /(<script\b[^>]*>)([\s\S]*?)<\/script>/g;
+/** A Svelte component's script blocks: the only place its imports are. Tag names ignore case. */
+const SCRIPT_BLOCK = /(<script\b[^>]*>)([\s\S]*?)<\/script>/gi;
 
 /**
  * The imports in `code` (static, dynamic, `require`, and `import("…")` types), each with where its
