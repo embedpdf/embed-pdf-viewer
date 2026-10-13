@@ -3,15 +3,15 @@
   "pages": 6,
   "marks": 20,
   "budgets": {
-    "bw-ccitt/page": { "maxOutputRatio": 3.1, "maxPeakMiB": 200 },
-    "gray-jpeg/page": { "maxOutputRatio": 6.3, "maxPeakMiB": 370 },
-    "color-jpeg/page": { "maxOutputRatio": 6.2, "maxPeakMiB": 365 },
-    "gray-jpx/page": { "maxOutputRatio": 14.1, "maxPeakMiB": 350 },
-    "color-jpx/page": { "maxOutputRatio": 5.3, "maxPeakMiB": 330 },
-    "bw-ccitt/each": { "maxOutputRatio": 3.1, "maxPeakMiB": 620 },
-    "gray-jpeg/each": { "maxOutputRatio": 6.3, "maxPeakMiB": 695 },
-    "color-jpeg/each": { "maxOutputRatio": 6.2, "maxPeakMiB": 710 },
-    "gray-jpx/each": { "maxOutputRatio": 14.1, "maxPeakMiB": 800 },
-    "color-jpx/each": { "maxOutputRatio": 5.3, "maxPeakMiB": 810 }
+    "bw-ccitt/page": { "maxOutputRatio": 1.6, "maxPeakMiB": 24 },
+    "gray-jpeg/page": { "maxOutputRatio": 1.05, "maxPeakMiB": 60 },
+    "color-jpeg/page": { "maxOutputRatio": 1.05, "maxPeakMiB": 60 },
+    "gray-jpx/page": { "maxOutputRatio": 3.7, "maxPeakMiB": 100 },
+    "color-jpx/page": { "maxOutputRatio": 1.1, "maxPeakMiB": 250 },
+    "bw-ccitt/each": { "maxOutputRatio": 1.6, "maxPeakMiB": 40 },
+    "gray-jpeg/each": { "maxOutputRatio": 1.05, "maxPeakMiB": 70 },
+    "color-jpeg/each": { "maxOutputRatio": 1.05, "maxPeakMiB": 85 },
+    "gray-jpx/each": { "maxOutputRatio": 3.7, "maxPeakMiB": 120 },
+    "color-jpx/each": { "maxOutputRatio": 1.1, "maxPeakMiB": 250 }
   }
 }

@@ -5,9 +5,10 @@
 // redaction-perf.test.mjs (the CI budgets).
 //
 // Two ways to apply, as the product does:
-//   page  "Apply all": EPDFPage_ApplyRedactions once per page
-//   each  one apply per mark: EPDFAnnot_ApplyRedaction, then the page's
-//         content written again, as when a user applies marks one by one
+//   page  "Apply all": EPDFPage_ApplyRedactions once per page, every mark
+//   each  one apply per mark: EPDFPage_ApplyRedactions with that mark, then
+//         the page's content written again, as when a user applies marks one
+//         by one
 
 import { readFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
@@ -61,19 +62,21 @@ export async function measureRedaction({ runtime: runtimeKind, kind, mode, pages
   const openMiB = memoryMiB();
 
   const count = mem.alloc(8);
+  const markTable = mem.alloc(8);
   let applyMs = 0;
   let generateMs = 0;
   for (let index = 0; index < pages; index++) {
     const page = fn.FPDF_LoadPage(doc, index);
     if (!page) throw new Error(`${kind}: page ${index} does not load`);
     if (mode === 'page') {
-      const [ms, ok] = timed(() => fn.EPDFPage_ApplyRedactions(page, count));
+      const [ms, ok] = timed(() => fn.EPDFPage_ApplyRedactions(page, 0n, 0, count));
       if (!ok) throw new Error(`${kind}: apply failed on page ${index}`);
       applyMs += ms;
       generateMs += timed(() => fn.FPDFPage_GenerateContent(page))[0];
     } else {
       for (let mark = firstMark(fn, page); mark; mark = firstMark(fn, page)) {
-        const [ms, ok] = timed(() => fn.EPDFAnnot_ApplyRedaction(page, mark, count));
+        pokePointer(runtime, markTable, mark);
+        const [ms, ok] = timed(() => fn.EPDFPage_ApplyRedactions(page, markTable, 1, count));
         fn.FPDFPage_CloseAnnot(mark);
         if (!ok) throw new Error(`${kind}: apply failed on page ${index}`);
         applyMs += ms;
@@ -93,6 +96,7 @@ export async function measureRedaction({ runtime: runtimeKind, kind, mode, pages
   const peakMiB = memoryMiB();
 
   fn.EPDF_FreeBuffer(output);
+  mem.free(markTable);
   mem.free(count);
   fn.FPDF_CloseDocument(doc);
   mem.free(inputPtr);
@@ -178,6 +182,12 @@ function addMarks({ fn, mem }, doc, lines, pages, marks) {
     mem.free(rect);
   }
   return placed;
+}
+
+// Writes `pointer` at `at` in the runtime's pointer width.
+function pokePointer(runtime, at, pointer) {
+  if (runtime.kind === 'wasm') runtime.mem.poke(at, 'i32', Number(pointer));
+  else runtime.mem.poke(at, 'i64', BigInt(pointer));
 }
 
 function firstMark(fn, page) {
