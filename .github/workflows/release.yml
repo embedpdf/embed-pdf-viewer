@@ -146,9 +146,6 @@ jobs:
       - name: Verify engine-runtime packages
         run: pnpm run verify:engine-runtime-packages
 
-      - name: Verify license security
-        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
-
       # The version PR regenerates openapi.json through `pnpm ci:version`.
       # Keep a release-time guard as well so a stale committed contract can
       # never reach npm, the server image, or downstream SDK repositories.
@@ -157,6 +154,11 @@ jobs:
 
       - name: Build packages
         run: pnpm run build:release
+
+      # After the build: buildApp reaches the engine, whose runtime package
+      # loads from its dist, as the license-security workflow builds first.
+      - name: Verify license security
+        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
 
       # The consume gate: packs every publishable into real tarballs and runs
       # them through the consumer fixtures (node-esm, node-cjs, vite-app,
