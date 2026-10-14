@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/default-signature-fonts",
-  "version": "1.0.0-next.0",
+  "version": "1.0.0-next.1",
   "private": false,
   "description": "Three handwriting fonts for typed signatures and initials, Allura, Great Vibes and Caveat (SIL Open Font License), as TrueType files and as lazy modules any bundler code-splits, for @embedpdf/plugin-signature to draw a typed mark with.",
   "type": "module",

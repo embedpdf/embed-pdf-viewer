@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/viewer-vue",
-  "version": "3.0.0-next.14",
+  "version": "3.0.0-next.15",
   "private": false,
   "description": "The full viewer as a Vue component with the CloudPDF engine as its default: the same <PDFViewer> as @embedpdf/viewer-vue, rendering on CloudPDF SaaS or your own @cloudpdf/server over HTTPS, the local engine loaded only when stamps need it.",
   "type": "module",

@@ -1,5 +1,89 @@
 # @cloudpdf/server
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The appearance endpoint returns every mode and state an annotation stores, each manifest entry labelled with its `state`, and accepts `modes` as a filter. Annotated page renders draw form fields unless the token says `formFields=false`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `/v1/access` advertises the bundle limits as `bundleLimits`, and the app option is `bundleLimits`. The multipart reader for bundle imports serves any bundle family; annotation imports are unchanged.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Stops work for clients that went away: a request whose client disconnects before its reply is sent now aborts its engine job, where before no disconnect was ever detected. A render shared by several requests stops only once all of them have left.
+
+  Serve the revised document, page, annotation, form, and rendering contracts, including object-number page references, page-space geometry, annotation transfer, custom metadata, and signature-aware mutation checks.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Every layer write sends its worker job an `opId`: the request's `Idempotency-Key`, or one minted for the write. Results' `meta` carry `opId` and `undoable`; page-structure, metadata, attachment and signing results take them from the write.
+
+  Add `POST /v1/docs/{docId}/layers/{layerName}/changes`: user actions, each a change whose ops apply in order in one layer transaction, all or none, or `{ opId, undoOf }`, the undo of an earlier change. One request runs as one worker job and one commit: each change stands on its own (a refused one rolls back alone), and the 200 answers every change in order, applied with its result or refused with its error. Bytes travel as multipart `resource:<key>` parts the JSON names by key. At most 64 changes per request and 512 ops per change.
+
+  Each answered change keeps its answer under its `opId` in the new `change_outcomes` table (migration 033), refusals included, so a retry gets the same answer and a different change under an answered `opId` is refused (`IdempotencyKeyReused`). An applied change keeps what undoes it: a record beside its answer and its captures as one object-store blob. Only the user who made a change may undo it; a redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (`layers.undo_horizon`, `UndoUnavailable`). Answers are kept 30 days (`CLOUDPDF_CHANGE_RETENTION_DAYS`); the sweeper deletes expired answers with their captures, and the records and captures of changes no undo can reach.
+
+  Every change that wrote gets one audit row (kind `change`, its `opId` as idempotency key, `undo_of` naming what an undo undid). The single-op annotation, form and metadata routes now run as one-change requests: their audit rows keep their kinds and payloads, and their `Idempotency-Key` names the change, so `{ undoOf }` undoes them.
+
+  The event stream's rows carry `undoOf`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Form writes stamp field attribution from the token's identity: creating a field, filling one in, and the values a script run writes.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Field groups on the server:
+  - **Fill and sign routes** (a value, a reset, a signature look, a values import, signing) accept a token that may fill in or sign some field: `doc.forms.fill` / `doc.sign`, or a `fields:` scope. The write checks each field against the token's grants.
+  - **Design routes** send the grants too, for the group checks.
+  - **Identity:** the verified identity claim drops `groups`, and `/v1/access` no longer echoes it.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `POST …/form/calculations/reorder` (`doc.forms.reorderCalculations`, audit kind `form.reorderCalculations`). Creating or updating a field with scripts takes `doc.forms.script` too.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Form bundle routes replace `form/data`: `GET …/form/export@:token` (doc and layer, cacheable at the form and layout pins), `POST …/form/export` for a selection a URL can't carry, and multipart `POST …/form/import` and `POST …/form/import-values`, each one change under its `Idempotency-Key`, audited as `form.import` and `form.importValues`. The FDF/XFDF content-type parsers are gone.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The form is its own read family:
+  - **New routes:** `form@{formsVersion}` and `form/pages/{p}/appearances@{widgetVersion}`, each with its layer twin (and an unversioned layer appearance route), needing `doc.forms.read`; `PATCH …/form/widgets/{pageKey}/{annotKey}` (`doc.forms.updateWidget`).
+  - **Pins:** migration 034 adds `layers.forms_version`, `base_versions.forms_version` and `widget_version` on page rows. Form writes move the form's pins, never the annotation pins; annotation writes the reverse. Page insert/delete, flatten and redaction move both. Plane scopes compare the document pins too, and gain `forms`.
+  - Annotation reads and appearance batches hold no widgets.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `DELETE /v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey` deletes a widget (`doc.forms.modify`), audited as `form.deleteWidget`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - `POST /v1/docs/:docId/layers/:layerName/form/effects` is removed: a script run's effects are one change, `POST …/changes`.
+  - A reset of fields already at their defaults, or a display that changes no widget, writes nothing: it can't be undone.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - Pages report their tab order and list boxes their top row.
+  - A widget update that changes only its colour or size keeps its font; a free text's border colour change keeps its font.
+  - A value write that changes nothing records no undo step.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – An annotation import is a change: kept in the change outcomes under its `Idempotency-Key` with the record that undoes it, so `POST …/changes` with `{ undoOf }` undoes and redoes it, and a retry is answered from the outcome. Still audited as `annot.import`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Every multipart request and answer has one shape: a JSON `body` part, and each file as a part `resource:<key>` that the body names by role, `resources: { <role>: <key> }`. Annotation create and update, page insert, attachments, a signature's drawn appearance, signature prepare and change ops name their files this way; bundle imports and exports and appearance batches call their JSON part `body`, and an appearance batch's images are `resource:<key>` parts. A named key with no part, and a part nothing names, are refused.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Serve the four page picture families at both tiers: `render/pages`, `render/annotations`, `render/fields` and `render/all` (renamed from `render/annotated`, which now draws form fields too). Each takes `doc.render` plus the read of what it draws, pins the page counters of the planes it draws, and is stored under its own family.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Serve page routes under `:pageKey` (`obj:N`; malformed keys answer 400), accept `pages`/`page` refs in page mutation, extraction, redaction and weak-session bodies, and emit `PageRef` page identity in every response and event while keeping storage keyed by page object number.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `POST …/pages/reorder`, `POST …/annotations/pages/{pageKey}/items/reorder` and `POST …/form/widgets/{pageKey}/reorder` replace the move routes; page inserts take a `position`. Audit kinds `annot.reorder`, `pages.reorder` and `form.reorderWidgets`. A reorder bumps only its family's pins: annotation reorders the annotation pins, widget reorders the form's.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Widget placements and widget updates take `actions`. Creating a field, adding a widget or updating one with a script, submit or URI action takes `doc.forms.script` too.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Check the caller's authority over an annotation inside the engine's write for updates and deletes, instead of reading the page first: the check and the write see the same document, and each request makes one engine call. The engine checks an update's patch against its annotation's kind.
+
+  Page flatten and redaction apply fail as a whole when a page fails, leaving the document unchanged; their responses no longer list `'failed'` or `'skipped'` pages.
+
+  Address annotations as `:annotKey` = `obj:N` or `base:N` on every annotation route; remove the weak annotation session routes, the `index` update and delete route, page revision tokens and the weak annotation columns (migration `031`). Manifest pages are `{ page, cache }`, and annotation reads and write results carry `PageRef`s.
+
+  `ObjectNumberUnavailable` and `LayerFull` answer HTTP 409.
+
+  Hand object numbers to editing sessions (migration `032`). An editing session is the client's `X-Engine-Session-Id` together with the token's subject, and lives 15 minutes past its last sign of life. `/access` opens one for a caller that may create and hands it numbers (the body's `objectNumbers`, the response's `edit`); a write tops it up when asked with `EmbedPDF-Reserve-Object-Numbers` and answers `EmbedPDF-Object-Numbers`; `POST /v1/docs/:docId/layers/:layerName/object-numbers` reserves up to 1,000 at once; the event stream sends a `session` event and keeps the session alive. Creates name their numbers in the query string (`objectNumber`, `objectNumbers`, `widgetObjectNumbers`, `splitObjectNumber`), and a number the session doesn't hold is refused `not-held`. What a write makes for itself is numbered past every number handed out, and a publish drops the numbers handed out on its layer.
+
+  Every layer write route takes `Idempotency-Key`: a retry gets what the first request committed, and no numbers.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Annotation records are typed `Annotation` (was `AnnotationDTO`).
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The widget attach and detach routes accept the widget's `AnnotationRef` as `body.widget`; widget records on the wire carry `ref`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Security fixes:
+  - **Pictures with annotations need `doc.annotate.read`,** at the origin and in CDN grants. They draw no form fields.
+  - **The event stream sends each connection only what its token may read.** Annotations need `doc.annotate.read`; widgets and form fields need `doc.forms.read`. A row with nothing left goes out marked `withheld`, with only its pins.
+  - **Moving annotations checks each one inside the write,** so moving a widget takes `doc.forms.modify`.
+
 ## 3.0.0-next.14
 
 ### Minor Changes

@@ -1,5 +1,52 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A form field carries `createdBy`, `createdAt`, `filledBy`, `filledByName`, `filledAt` and `importedBy`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Form fields carry `groupId`, and a field's create and update take it. A token's `identity` no longer takes `groups`: a `group=` scope names its group.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `client.doc.forms.reorderCalculations()`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Removed `doc.forms.exportData` and `doc.forms.importData`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `client.doc.forms.updateWidget()` (`PATCH …/form/widgets/{pageKey}/{annotKey}`). The form read returns every widget's row beside the fields, and form results carry the rows of the widgets they changed (`WidgetAnnotation`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Regenerated: `doc.forms.deleteWidget`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - Widgets: `borderStyle` can be `underline`; `dashArray` and `checkStyle`.
+  - A form write's `meta.redrawnWidgets`: the widgets whose pictures it changed.
+  - A `forms.setDisplay` op takes no `expect`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - Pages: `tabOrder`. List boxes: `topIndex`.
+  - A widget's `fontFamily` is any font name, as a free text's is.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The `forms.setSignatureAppearance` change op names its PDF as `resources: { appearance }`.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Regenerated for the `pageKey` path parameter and the `page`/`pages` record fields of the page-identity contract.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Regenerate the TypeScript client for the updated CloudPDF API. Requests and
+  responses now expose object-number page references, revised annotation and
+  form shapes, and custom metadata endpoints.
+
+  A popup update's `parent` is typed `AnnotationRef | null`; the `AnnotationPatchPopup.Parent` alias, which named `AnnotationRef` twice, is gone.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Push-button field drafts and patches; `caption` on widgets.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Regenerated: `doc.pages.reorder`, `doc.annotations.reorder` and `doc.forms.reorderWidgets` with `PagePosition` and `AnnotationPosition`; `doc.pages.move` is gone.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Widget placements and widget patches take `actions` (`WidgetActionsPatch`, `PdfActionWrite`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Widget placements take `rotation`, and `box` beside `rect`; a box kind's create may give `rect` instead of `box`.
+
+### Patch Changes
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Regenerated: widget records carry `ref`, the widget's annotation address.
+
 ## 3.0.0-next.14
 
 ### Minor Changes

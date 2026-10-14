@@ -1,5 +1,12 @@
 # @embedpdf/core-stage
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Move stage geometry and navigation to the page-space coordinate model, with
+  durable page references for layout and reveal operations.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/svelte",
-  "version": "3.0.0-next.14",
+  "version": "3.0.0-next.15",
   "private": false,
   "description": "Svelte 5 adapter for EmbedPDF v3: rune-based functions, components with bind: and snippets, headless layers. The whole framework surface, one entry point per feature.",
   "type": "module",
