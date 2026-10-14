@@ -1,8 +1,7 @@
 /** A one-page blank PDF: the appearance that clears a visual fill. */
-// A content stream that draws NOTHING but is not empty (`q Q`): the engine
-// turns the page into a form XObject, and a page with no content at all has
-// nothing to turn — it refuses; a saved/restored state passes and paints
-// nothing.
+// A content stream that draws nothing but is not empty (`q Q`): the engine
+// turns the page into a form XObject, and refuses a page with no content at
+// all; a saved and restored state passes and paints nothing.
 const CONTENT = 'q Q';
 const OBJECTS = [
   '<< /Type /Catalog /Pages 2 0 R >>',

@@ -11,19 +11,17 @@ import type { FallbackFontDescriptor } from './WorkerThreadPool';
  * mismatched host (stale dist beside a newer parent) is a deploy bug and
  * is refused, never negotiated.
  *
- * Correlation model: the CLIENT allocates `callId`s; `payload.jobId` is
+ * Correlation model: the client allocates `callId`s; `payload.jobId` is
  * only a correlation hint across the boundary — the pool inside the host
- * allocates its own jobIds (`dispatchToSlot`), so the host REWRITES the
+ * allocates its own jobIds (`dispatchToSlot`), so the host rewrites the
  * payload's jobId before dispatch. Forwarding the client's id verbatim
  * would silently orphan every response.
  */
-// v2: the engine wire surface served by the host added the
-// `*.renderEncoded` kinds. The version covers the END-TO-END contract a
-// child must speak — envelope AND the engine ops riding inside it — so a
-// custom `engineHostEntry` pointing at an older dist fails the handshake
-// loudly instead of rejecting every encoded render as an unknown kind.
-// v3: the host emits the `memory` heartbeat consumed by the recycle
-// policy and memory gauges.
+// The version covers the end-to-end contract a child must speak — the
+// envelope, the engine ops riding inside it (such as the
+// `*.renderEncoded` kinds) and the `memory` heartbeat — so bump it on any
+// change there. A custom `engineHostEntry` pointing at an older dist then
+// fails the handshake loudly instead of rejecting new kinds one call at a time.
 export const HOST_PROTOCOL_VERSION = 3;
 
 /** Parent → host. */
@@ -58,12 +56,12 @@ export type HostMessage =
   | { t: 'memory'; rssBytes: number; heapUsedBytes: number };
 
 /**
- * Host boot configuration, passed as ONE env var (JSON) — no argv
+ * Host boot configuration, passed as one env var (JSON) — no argv
  * escaping games, and the whitelist (`hostEnvWhitelist`) stays the only
  * thing that decides what the child may see.
  */
 export interface HostBootConfig {
-  /** Worker-thread entry (file URL string or path) — the SAME worker-entry the inline pool uses. */
+  /** Worker-thread entry (file URL string or path) — the same worker-entry the inline pool uses. */
   workerEntry: string;
   poolSize?: number;
   maxDocsPerSlot?: number;
@@ -77,7 +75,7 @@ export interface HostBootConfig {
 export const HOST_CONFIG_ENV = 'CLOUDPDF_ENGINE_HOST_CONFIG';
 
 /**
- * The child is a LOWER trust domain — that is the entire point of host
+ * The child is a lower trust domain — that is the entire point of host
  * mode. It must never see database credentials, the JWT secret, the
  * license key, or object-store credentials. Whitelist, never spread:
  * only process/runtime basics plus fontconfig cache locations cross.

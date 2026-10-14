@@ -1,4 +1,6 @@
 {
   "toolchain": "Rspack 1",
+  "workerSrc": "'self'",
+  "trustedTypes": ["rspack"],
   "dist": "dist"
 }

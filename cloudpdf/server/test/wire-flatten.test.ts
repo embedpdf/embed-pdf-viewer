@@ -20,14 +20,14 @@ describe('flatten / unflatten', () => {
   test('two-level nesting produces dotted-dotted keys', () => {
     expect(
       flatten({
-        target: { kind: 'rect', rect: { left: 10, bottom: 20, right: 40, top: 60 } },
+        target: { kind: 'rect', rect: { x: 10, y: 20, width: 30, height: 40 } },
       }),
     ).toEqual({
       'target.kind': 'rect',
-      'target.rect.left': 10,
-      'target.rect.bottom': 20,
-      'target.rect.right': 40,
-      'target.rect.top': 60,
+      'target.rect.x': 10,
+      'target.rect.y': 20,
+      'target.rect.width': 30,
+      'target.rect.height': 40,
     });
   });
 
@@ -61,7 +61,7 @@ describe('flatten / unflatten', () => {
   test('unflatten reverses flatten', () => {
     const original = {
       viewport: { kind: 'width', width: 720 },
-      target: { kind: 'rect', rect: { left: 10, bottom: 20, right: 40, top: 60 } },
+      target: { kind: 'rect', rect: { x: 10, y: 20, width: 30, height: 40 } },
       background: 'white',
       rotation: 90,
       includeAnnotations: true,

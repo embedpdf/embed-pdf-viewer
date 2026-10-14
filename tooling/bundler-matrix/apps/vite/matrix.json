@@ -1,4 +1,5 @@
 {
   "toolchain": "Vite 6",
+  "workerSrc": "'self'",
   "dist": "dist"
 }

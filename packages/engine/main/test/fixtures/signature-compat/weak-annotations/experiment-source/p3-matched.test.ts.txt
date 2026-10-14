@@ -1,0 +1,44 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { beforeAll, afterAll, describe, test, expect } from '/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/core/signature/node_modules/vitest/dist/index.js';
+import { createLocalEngine } from '/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/dist/index.js';
+import { validateSignatures } from '/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/core/signature/src/index.ts';
+const directory = '/tmp/epdf-weak-nm-probes/p3-matched';
+const manifest = JSON.parse(await readFile(`${directory}/manifest.json`, 'utf8'));
+const certificate = new Uint8Array(await readFile(manifest.certificate));
+const reports: any[] = [];
+afterAll(async () => { await writeFile(`${directory}/engine-report.json`, JSON.stringify(reports, null, 2)); });
+for (const runtime of ['wasm', 'native'] as const) {
+ describe(runtime, () => {
+  let engine: ReturnType<typeof createLocalEngine>;
+  beforeAll(() => { engine = createLocalEngine({ runtime: { prefer: runtime } }); });
+  afterAll(async () => { await engine.destroy(); });
+  test.each(manifest.cases)('$id preserves certification integrity and reports the expected identities', async (fixture: any) => {
+    const path = `${directory}/${fixture.file}`;
+    const bytes = new Uint8Array(await readFile(path));
+    const doc = await engine.open(runtime === 'native' ? { kind: 'layerFile', id: fixture.id, basePath: path } : {kind:'bytes', id:fixture.id, bytes}, {scope:['*']});
+    try {
+      const results = await validateSignatures(doc, {trust: {anchors: async () => [certificate]}});
+      const analysis = await doc.signatures!.analyze({since: {signatureIndex: 0}});
+      const page = (await doc.pages.list()).pages[0].ref;
+      const annotations = (await doc.page(page).annotations.list()).annotations;
+      const squares = annotations.filter(a => a.subtype === 'square');
+      const weakCount = squares.filter(a => a.ref.kind === 'index').length;
+      const names = fixture.action.includes('names');
+      const deleted = fixture.action.startsWith('delete');
+      const expected = ['control','rewrite'].includes(fixture.action) ? 'unchanged' : 'permitted';
+      reports.push({runtime,id:fixture.id,action:fixture.action,layout:fixture.layout,docMdp:results[0].signature.docMdp,catalogCertification:results[0].signature.catalogCertification,allowsAnnotationModification:doc.security.allows('doc.annotate.modify'),summary:results[0].summary,integrity:results[0].integrity,cryptography:results[0].cryptography,trust:results[0].trust,modifications:results[0].modifications,weakCount,annotationRefs:squares.map(a=>({contents:a.contents,ref:a.ref})),findings:analysis.steps.flatMap(step=>step.findings)});
+      expect(results).toHaveLength(1);
+      expect(results[0].signature.docMdp).toBe(3);
+      expect(results[0].signature.catalogCertification).toBe(true);
+      expect(results[0].integrity).toBe('valid');
+      expect(results[0].cryptography).toBe('valid');
+      expect(results[0].trust).toBe('trusted');
+      expect(doc.security.allows('doc.annotate.modify')).toBe(true);
+      expect(squares).toHaveLength(deleted ? 3 : 4);
+      expect(weakCount).toBe(fixture.layout==='direct' && !names ? squares.length : 0);
+      expect(squares.map(a=>a.contents)).toEqual(deleted ? ['weak-0','weak-2','weak-3'] : ['weak-0','weak-1','weak-2','weak-3']);
+      expect(results[0].modifications.verdict).toBe(expected);
+    } finally { await doc.close(); }
+  });
+ });
+}

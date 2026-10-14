@@ -82,6 +82,34 @@ spacing), a mixed-case `I n v o i c e`, a plain `Invoice 42`, the glued
 `totalamount` next to the spaced `total amount`, `in` / `voice` split across
 a line break, and `the invoices` as the whole-word trap.
 
+## Stamp opacity fixtures
+
+`stamp-opacity-acrobat.pdf` was saved by Acrobat 26.2: a built-in "Not
+Approved" stamp and a custom image stamp, each set to about 30% opacity. Each
+appearance is Acrobat's opacity layer, `/R0 gs /MWFOForm Do`, where `/R0`
+repeats the stamp's `/CA`; under the image stamp's layer, a plain form draws a
+transparency group.
+
+`stamp-rewrapped-acrobat.pdf` is generated, deterministic and byte-stable:
+
+```bash
+node packages/engine/main/test/fixtures/generate-stamp-rewrapped-fixture.mjs
+```
+
+It holds two stamps as EmbedPDF writes them, after Acrobat edited them, in the
+structure Acrobat's saves show: Acrobat keeps our wrapper as its artwork and
+puts its own forms around it. `rewrapped-a` is turned 30 degrees and set to
+60%, under Acrobat's layer and four forms that only draw our wrapper;
+`rewrapped-b` is set to 100%, under one such form; `rewrapped-c` is our 35%
+layer with `/CA` dropped, as a tool that keeps the appearance would leave it.
+
+`stamp-roundtrip-acrobat-60.pdf` and `stamp-roundtrip-acrobat-100.pdf` are
+the real round trip: an "Approved" stamp placed in the viewer, turned and set
+to 40%, then set to 60% and to 100% in Acrobat 26.2. Acrobat replaced our
+opacity layer with its own and kept our wrapper, under a form that moves it
+by 0.0008 pt (its own arithmetic puts the turned box a fraction off the
+origin).
+
 ## Signed fixtures
 
 `signature_chain.pdf` is vendored from the runtime fork
@@ -109,3 +137,14 @@ signature conformance suite; both are a few hundred bytes of plain PDF.
 `two_page_sigfield.pdf` is `unsigned_sigfield.pdf` with one blank second page
 (pikepdf `add_blank_page`): a page that carries no `/Annots` in the base, for
 the "annotation added on a persisted layer, removed after a reopen" case.
+
+`jpx_resolution_levels.pdf` is synthetic: one 300 × 300 pt page drawing a
+1600 × 1600 JPEG 2000 image with six resolution levels, and two square
+annotations whose appearances draw the same image. PDFium decodes such an
+image at a resolution that depends on the size of the render, and caches the
+decode on the page, so it shows whether a page reused across renders still
+renders exactly as a freshly loaded one. Generated with Pillow (OpenJPEG) and
+pikepdf: a smooth three-channel sine pattern, `irreversible=True`,
+`num_resolutions=6`, `quality_layers=[60]`, the page content
+`q 300 0 0 300 0 0 cm /Im0 Do Q`, and annotations at `[20 20 140 140]` and
+`[160 160 280 280]` with 120 × 120 appearance forms.

@@ -16,16 +16,17 @@ import {
 } from './annotationReadPrimitives';
 
 /**
- * Default `/C` colour when an annotation has none. Matches the v2 engine
- * (circle/square/polygon/polyline/line/ink all default red).
+ * Default `/C` colour when an annotation has none: circle, square,
+ * polygon, polyline, line and ink all default to red.
  */
-const DEFAULT_COLOR: Color = { r: 255, g: 0, b: 0 };
+const DEFAULT_COLOR: Color = '#ff0000';
 
 /** Effective `/BS` or legacy `/Border` fields shared by bordered kinds. */
 export interface BorderFields {
   strokeWidth: number;
   borderStyle: AnnotationBorderStyle;
-  dashArray?: number[];
+  /** `null` for a solid border. */
+  dashArray: number[] | null;
 }
 
 /**
@@ -44,7 +45,7 @@ export function readBorderFields(
   return {
     strokeWidth: width,
     borderStyle: borderStyleFromCode(styleCode),
-    ...(dashArray.length > 0 ? { dashArray } : {}),
+    dashArray: dashArray.length > 0 ? dashArray : null,
   };
 }
 
@@ -59,9 +60,7 @@ export function readGeometryStyleExtras(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
 ): GeometryStyleFields {
-  const color = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? {
-    ...DEFAULT_COLOR,
-  };
+  const color = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? DEFAULT_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
 

@@ -209,7 +209,7 @@ const abiSlot = (meta) =>
 
 writeFileSync(
   tsOut,
-  `/* AUTO-GENERATED - DO NOT EDIT BY HAND. */\n` +
+  `/* Auto-generated - do not edit by hand. */\n` +
     `import type { Ptr } from './pdf-runtime-module';\n\n` +
     `export interface PdfFunctions {\n${functions
       .map((fn) => `  ${fn.name}: (${tsParams(fn)}) => ${tsReturn(fn)};`)

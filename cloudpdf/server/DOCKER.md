@@ -65,7 +65,7 @@ docker build -f cloudpdf/server/Dockerfile \
 
 > The pinned libembedpdf **must** be the thread-local-globals build so the
 > multi-worker pool (`CLOUDPDF_WORKER_POOL_SIZE`) is safe. See
-> [runtime-confinement.md](../../.agents/skills/embedpdf-conventions/references/runtime-confinement.md).
+> [runtime-confinement.md](../../docs/conventions/runtime-confinement.md).
 
 ## Run
 

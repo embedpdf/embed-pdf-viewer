@@ -1,0 +1,128 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The menu button, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 14px;
+}
+
+.menubar {
+  position: relative;
+  z-index: 1;
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 14px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.button:hover,
+.button[aria-expanded='true'] {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.readout {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* A menu below its button, and a submenu beside its item */
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(7 32 76 / 0.18);
+}
+
+.submenu {
+  top: 0;
+  left: calc(100% + 4px);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.menu-item:hover,
+.menu-item[aria-expanded='true'] {
+  background: var(--tint);
+}
+
+.menu-item[aria-checked='true'] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.menu-item[aria-checked='true']::after {
+  content: '✓';
+}
+
+.button:focus-visible,
+.menu-item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

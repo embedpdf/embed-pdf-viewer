@@ -58,6 +58,14 @@ import down029 from './029_layer_annotations_version.down.sql';
 import sql029 from './029_layer_annotations_version.sql';
 import down030 from './030_signatures.down.sql';
 import sql030 from './030_signatures.sql';
+import down031 from './031_drop_weak_annotation_state.down.sql';
+import sql031 from './031_drop_weak_annotation_state.sql';
+import down032 from './032_object_numbers.down.sql';
+import sql032 from './032_object_numbers.sql';
+import down033 from './033_change_outcomes.down.sql';
+import sql033 from './033_change_outcomes.sql';
+import down034 from './034_forms_version.down.sql';
+import sql034 from './034_forms_version.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -102,4 +110,28 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
   { version: '028', name: '028_engine_crash_journal.sql', sql: sql028, down: down028 },
   { version: '029', name: '029_layer_annotations_version.sql', sql: sql029, down: down029 },
   { version: '030', name: '030_signatures.sql', sql: sql030, down: down030 },
+  {
+    version: '031',
+    name: '031_drop_weak_annotation_state.sql',
+    sql: sql031,
+    down: down031,
+  },
+  {
+    version: '032',
+    name: '032_object_numbers.sql',
+    sql: sql032,
+    down: down032,
+  },
+  {
+    version: '033',
+    name: '033_change_outcomes.sql',
+    sql: sql033,
+    down: down033,
+  },
+  {
+    version: '034',
+    name: '034_forms_version.sql',
+    sql: sql034,
+    down: down034,
+  },
 ];

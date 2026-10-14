@@ -1,10 +1,11 @@
 /**
- * Zod schemas for engine PDF-document geometry. Exported from `wire.ts` ONLY
+ * Zod schemas for engine PDF-document geometry. Exported from `wire.ts` only
  * (never from `shared.ts`/`runtime`) so the zod-free runtime stays zod-free.
  */
 
 import { z } from 'zod';
 
+import type { PageBox, PagePoint, PageQuad } from './pageSpace';
 import type {
   CalloutLine,
   InkList,
@@ -35,11 +36,12 @@ export const CalloutLineSchema: z.ZodType<CalloutLine> = z.union([
 /** `/InkList` — an array of strokes, each an array of points. */
 export const InkListSchema: z.ZodType<InkList> = z.array(z.array(PdfPointSchema));
 
+/** A rect's edges are finite, as `isFinitePdfRect` checks them on the page. */
 export const PdfRectSchema: z.ZodType<PdfRect> = z.object({
-  left: z.number(),
-  bottom: z.number(),
-  right: z.number(),
-  top: z.number(),
+  left: z.number().finite(),
+  bottom: z.number().finite(),
+  right: z.number().finite(),
+  top: z.number().finite(),
 });
 
 export const PdfSizeSchema: z.ZodType<PdfSize> = z.object({
@@ -48,10 +50,10 @@ export const PdfSizeSchema: z.ZodType<PdfSize> = z.object({
 });
 
 export const PdfQuadSchema: z.ZodType<PdfQuad> = z.object({
-  p1: PdfPointSchema,
-  p2: PdfPointSchema,
-  p3: PdfPointSchema,
-  p4: PdfPointSchema,
+  upperLeft: PdfPointSchema,
+  upperRight: PdfPointSchema,
+  lowerLeft: PdfPointSchema,
+  lowerRight: PdfPointSchema,
 });
 
 export const PdfRotationSchema: z.ZodType<PdfRotation> = z.union([
@@ -60,3 +62,25 @@ export const PdfRotationSchema: z.ZodType<PdfRotation> = z.union([
   z.literal(180),
   z.literal(270),
 ]);
+
+// ── page space ──
+
+export const PagePointSchema: z.ZodType<PagePoint> = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+/** A box is finite, as a rect is (`PdfRectSchema`). */
+export const PageBoxSchema: z.ZodType<PageBox> = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+  width: z.number().finite().nonnegative(),
+  height: z.number().finite().nonnegative(),
+});
+
+export const PageQuadSchema: z.ZodType<PageQuad> = z.object({
+  upperLeft: PagePointSchema,
+  upperRight: PagePointSchema,
+  lowerLeft: PagePointSchema,
+  lowerRight: PagePointSchema,
+});

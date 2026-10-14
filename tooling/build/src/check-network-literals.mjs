@@ -48,7 +48,8 @@ const URL_IN_TEXT = /https?:\/\/([a-z0-9.-]+)/gi;
 function* sourceFiles(dir) {
   if (!fs.existsSync(dir)) return;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (['node_modules', 'dist', 'out', '.next', 'workers', 'lib', 'locales'].includes(entry.name)) continue;
+    // `scripts/` holds build-time tools (generators, checks), which no package publishes.
+    if (['node_modules', 'dist', 'out', '.next', 'workers', 'lib', 'locales', 'scripts'].includes(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) yield* sourceFiles(full);
     else if (SOURCE.test(entry.name) && !TEST.test(full.split(path.sep).join('/'))) yield full;

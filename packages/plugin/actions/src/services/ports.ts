@@ -1,8 +1,9 @@
 /**
- * The registration slots — every port a sibling or the embedder installs.
- * One owner: the slots live here; areas read them at call time (never
- * captured), and every disposer is identity-safe (it clears a slot only
- * while the registrant is still current). Executors are LAST-WINS.
+ * The registration slots: every port a sibling or the embedder installs. One
+ * owner: the slots live here; areas read them at call time (never captured),
+ * and every disposer is identity-safe (it clears a slot only while the
+ * registrant is still current). Executors are last-wins. No capability read
+ * exposes a slot, so installing one wakes no reader.
  */
 import type { Unsubscribe } from '@embedpdf/core';
 import type { PdfActionType } from '@embedpdf/engine-core/runtime';
@@ -12,6 +13,7 @@ import type {
   ActionsHostCapability,
   AnnotCommitSink,
   FormCommitSink,
+  FormReader,
   SubmitResolver,
 } from '../host-contract';
 import type { ActionsEvents } from './events';
@@ -20,18 +22,21 @@ export interface ActionPorts {
   readonly executors: Map<PdfActionType, ActionExecutor>;
   annotCommitSink: AnnotCommitSink | null;
   formCommitSink: FormCommitSink | null;
+  /** The form plugin's form, as the user sees it. */
+  formReader: FormReader | null;
   uiAdapter: ActionUiAdapter | null;
   /** Sink 1 of the submit chain (consent = installation). */
   submitHandler: ActionSubmitHandler | null;
-  /** The form plugin's dataset resolver (D7's one door). */
+  /** The form plugin's dataset resolver: the one door every submit resolves through. */
   submitResolver: SubmitResolver | null;
 }
 
-export function createPorts({ diagnosticHook }: Pick<ActionsEvents, 'diagnosticHook'>) {
+export function createPorts({ reportDiagnostic }: Pick<ActionsEvents, 'reportDiagnostic'>) {
   const ports: ActionPorts = {
     executors: new Map(),
     annotCommitSink: null,
     formCommitSink: null,
+    formReader: null,
     uiAdapter: null,
     submitHandler: null,
     submitResolver: null,
@@ -39,10 +44,10 @@ export function createPorts({ diagnosticHook }: Pick<ActionsEvents, 'diagnosticH
   const api = {
     registerExecutor: (type, executor): Unsubscribe => {
       if (ports.executors.has(type)) {
-        diagnosticHook.emit({
-          code: 'duplicate-executor',
-          message: `executor for '${type}' replaced (last-wins)`,
-        });
+        reportDiagnostic(
+          { code: 'duplicate-executor', message: `executor for '${type}' replaced (last-wins)` },
+          { action: type },
+        );
       }
       ports.executors.set(type, executor);
       return () => {
@@ -61,10 +66,15 @@ export function createPorts({ diagnosticHook }: Pick<ActionsEvents, 'diagnosticH
         if (ports.formCommitSink === sink) ports.formCommitSink = null;
       };
     },
+    registerFormReader: (reader): Unsubscribe => {
+      ports.formReader = reader;
+      return () => {
+        if (ports.formReader === reader) ports.formReader = null;
+      };
+    },
     setSubmitHandler: (handler): Unsubscribe => {
       ports.submitHandler = handler;
-      // Deliberately NOT an open-latch release — that stays the UI
-      // adapter's role.
+      // Not an open-sequence release: that stays the UI adapter's role.
       return () => {
         if (ports.submitHandler === handler) ports.submitHandler = null;
       };

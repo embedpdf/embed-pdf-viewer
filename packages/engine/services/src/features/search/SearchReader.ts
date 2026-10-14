@@ -1,20 +1,21 @@
 import type {
+  PdfCoordinates,
   SearchMatch,
-  SearchMatchRange,
-  SearchRequest,
+  SearchScanRequest,
   SearchSlice,
+  TextRange,
 } from '@embedpdf/engine-core/runtime';
 import {
   EngineError,
   EngineErrorCode,
   buildSnippet,
   charRangeForTextOffsets,
+  createPdfTextLayout,
   foldOptionsFor,
   foldText,
   matchLiteral,
   matchRegex,
-  buildPageTextLayout,
-  textSegmentsForRange,
+  searchQueryOf,
   validateSearchQuery,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -22,16 +23,18 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
+import { SliceTimer, type Slices } from '../../shared/slices';
 import { PageGeometryReader } from '../geometry/PageGeometryReader';
 import { acquirePageCorpus } from './internal/pageCorpusCache';
 import { decodeSearchCursor, encodeSearchCursor, searchQueryKey } from './internal/searchCursor';
 
 /**
  * Per-slice budget defaults and ceilings. The ceiling is the worker's
- * self-defense: one `query()` call is one synchronous stretch of native
- * work, and no request — whatever budget it asks for — may hold the
- * worker longer than ~a few hundred pages. Callers wanting more issue
- * more slices; the cursor makes that cheap.
+ * self-defense: one `query()` call holds the worker until it answers (it
+ * pauses between pages and inside page loads, so an abort stops it), and no
+ * request — whatever budget it asks for — may hold it for more than ~a few
+ * hundred pages. Callers wanting more issue more slices; the cursor makes
+ * that cheap.
  */
 const DEFAULT_MAX_PAGES = 64;
 const CEILING_MAX_PAGES = 256;
@@ -43,14 +46,14 @@ const CEILING_MAX_MATCHES = 1024;
  * trust boundary (worker locally, server process in the cloud):
  *
  *   extract — page text via the session corpus cache (version-keyed on
- *             `mutationSeq`, so results always reflect the CURRENT layer
+ *             `cacheSeq`, so results always reflect the current layer
  *             view — text a redaction removed is unfindable),
  *   match   — the pure engine-core matcher (identical code on every
  *             engine; parity by construction),
  *   anchor  — geometry read only for pages that actually matched, rects
  *             via the selection line-merge (one rect per visual line).
  *
- * Scope gating (`doc.text.search`, `doc.text.copy` for `'full'`) is the
+ * Scope gating (`doc.text.search`, `doc.text.copy` for snippets) is the
  * caller's job — this reader assumes an authorized request.
  */
 export class SearchReader {
@@ -59,12 +62,16 @@ export class SearchReader {
     private readonly session: DocumentSession,
   ) {}
 
-  query(request: SearchRequest, signal: AbortSignal): SearchSlice {
+  async query(
+    request: SearchScanRequest,
+    signal: AbortSignal,
+    slices: Slices,
+  ): Promise<SearchSlice<PdfCoordinates>> {
     throwIfAborted(signal);
-    const query = request.query;
-    const mode = request.mode ?? 'full';
+    const query = searchQueryOf(request);
+    const snippets = request.snippets ?? false;
 
-    // One validator covers everything: regex dialect AND flag combos
+    // One validator covers everything: regex dialect and flag combos
     // (regex + matchDiacritics / ignoreWhitespace are the rejected ones).
     // Literal queries are always valid.
     const valid = validateSearchQuery(query);
@@ -76,15 +83,15 @@ export class SearchReader {
     }
 
     const records = this.session.allRecords();
-    const totalPages = records.length;
+    const pageCount = records.length;
 
     // Nothing findable — don't burn a scan on an empty needle.
     if (!query.regex && foldText(query.text).folded.trim().length === 0) {
-      return { matches: [], nextCursor: null, scannedPages: 0, totalPages };
+      return { matches: [], nextCursor: null, pagesSearched: 0, pageCount };
     }
 
-    const seq = this.session.mutationSeq();
-    const key = searchQueryKey(query, mode);
+    const seq = this.session.cacheSeq();
+    const key = searchQueryKey(query, snippets);
 
     let start = 0;
     let scanned = 0;
@@ -93,15 +100,15 @@ export class SearchReader {
       start = state.start;
       scanned = state.scanned;
     } else {
-      if (request.startPage !== undefined) {
+      if (request.from !== undefined) {
         // Throws NotFound for an unknown page — same contract as page(pon).
-        start = this.session.resolvePageRef(request.startPage).pageObjectNumber;
+        start = this.session.resolvePageRef(request.from).pageObjectNumber;
       }
       if (request.skip !== undefined) {
         // Trusted-position resume: the caller pins content versions
         // externally (the cloud wire's search token carries the content
         // epoch), so no sequence check applies here. Clamp into range.
-        scanned = Math.min(Math.max(0, Math.floor(request.skip)), totalPages);
+        scanned = Math.min(Math.max(0, Math.floor(request.skip)), pageCount);
       }
     }
 
@@ -112,20 +119,28 @@ export class SearchReader {
       order = records.slice(at).concat(records.slice(0, at));
     }
 
-    const maxPages = clamp(request.budget?.maxPages, DEFAULT_MAX_PAGES, CEILING_MAX_PAGES);
-    const maxMatches = clamp(request.budget?.maxMatches, DEFAULT_MAX_MATCHES, CEILING_MAX_MATCHES);
+    const maxPages = clamp(request.limit?.pages, DEFAULT_MAX_PAGES, CEILING_MAX_PAGES);
+    const maxMatches = clamp(request.limit?.matches, DEFAULT_MAX_MATCHES, CEILING_MAX_MATCHES);
 
-    const matches: SearchMatch[] = [];
+    const matches: SearchMatch<PdfCoordinates>[] = [];
     let pagesThisSlice = 0;
     // Budget checks sit at page granularity: a page's matches are never
     // split across slices, so the cursor only ever points between pages.
+    const timer = new SliceTimer(slices, signal);
     while (scanned < order.length && pagesThisSlice < maxPages && matches.length < maxMatches) {
+      if (timer.due) await timer.pause();
       throwIfAborted(signal);
-      const pon = order[scanned].pageObjectNumber;
-      const corpus = acquirePageCorpus(this.runtime, this.session, pon, signal);
+      const pageObjectNumber = order[scanned].pageObjectNumber;
+      const corpus = await acquirePageCorpus(
+        this.runtime,
+        this.session,
+        pageObjectNumber,
+        signal,
+        slices,
+      );
 
       const text = corpus.snapshot.text;
-      let ranges: SearchMatchRange[];
+      let ranges: TextRange[];
       if (query.regex) {
         ranges = matchRegex(text, query);
       } else if (query.matchCase || query.matchDiacritics || query.ignoreWhitespace) {
@@ -136,26 +151,25 @@ export class SearchReader {
       }
 
       if (ranges.length > 0) {
-        const geometry = new PageGeometryReader(this.runtime, this.session).read(pon, signal);
+        const geometry = await new PageGeometryReader(this.runtime, this.session).read(
+          pageObjectNumber,
+          signal,
+          slices,
+        );
         // One canonical layout per page, shared by every match on it.
-        const layout = buildPageTextLayout(geometry);
+        const layout = createPdfTextLayout(geometry);
         for (const range of ranges) {
-          // Match ranges are TEXT-space (string offsets); the hit DTO and
-          // the geometry layout speak CHARACTER space. Convert exactly once,
-          // here — the biased range helper keeps zero-width characters
-          // adjacent to the match OUTSIDE it on both sides. Snippets stay in
-          // text space (their offsets are internal to the snippet string).
-          const chars = charRangeForTextOffsets(
-            corpus.snapshot,
-            range.start,
-            range.start + range.length,
-          );
+          // Match ranges are text-space (string offsets); the hit and the
+          // layout speak character space. Convert exactly once, here — the
+          // biased range helper keeps zero-width characters adjacent to the
+          // match outside it on both sides. Snippets are built from the text.
+          const chars = charRangeForTextOffsets(corpus.snapshot, range);
           matches.push({
-            page: toPageRef(pon),
-            charStart: chars.start,
-            charCount: chars.end - chars.start,
-            segments: textSegmentsForRange(layout, chars.start, chars.end - chars.start),
-            ...(mode === 'full' ? { snippet: buildSnippet(text, range) } : {}),
+            page: toPageRef(pageObjectNumber),
+            start: chars.start,
+            count: chars.count,
+            segments: layout.segments(chars),
+            ...(snippets ? { snippet: buildSnippet(text, range) } : {}),
           });
         }
       }
@@ -168,8 +182,8 @@ export class SearchReader {
       matches,
       nextCursor:
         scanned < order.length ? encodeSearchCursor({ v: 1, seq, key, start, scanned }) : null,
-      scannedPages: scanned,
-      totalPages,
+      pagesSearched: scanned,
+      pageCount,
     };
   }
 }

@@ -1,6 +1,7 @@
 import {
   EngineError,
   EngineErrorCode,
+  familyKey,
   type FontEmbeddingPermission,
   type FontIdentityInfo,
 } from '@embedpdf/engine-core/runtime';
@@ -19,11 +20,6 @@ function permissionFromCode(code: number): FontEmbeddingPermission {
     default:
       return 'installable';
   }
-}
-
-/** The engine's family comparison: no case, spaces, hyphens, underscores. */
-function familyKey(family: string): string {
-  return family.toLowerCase().replace(/[\s\-_'"]/g, '');
 }
 
 /**

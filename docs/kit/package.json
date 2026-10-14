@@ -3,15 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared docs machinery for embedpdf.com and cloudpdf.com \u2014 components behind the --dk-* token contract. See DOCS-PLATFORM-ARCHITECTURE.md.",
+  "description": "Shared docs machinery for embedpdf.com and cloudpdf.com \u2014 components behind the --dk-* token contract. See docs/conventions/docs-architecture.md.",
   "exports": {
     ".": "./src/index.ts",
     "./mdx": "./mdx/remark-engine-axis.mjs",
     "./styles.css": "./styles.css",
     "./mdx/highlight": "./mdx/highlight-code.mjs",
+    "./mdx/code-panels": "./mdx/code-panels.mjs",
     "./search": "./src/search/index.ts",
     "./mdx/install-channel": "./mdx/install-channel.mjs",
+    "./mdx/frameworks": "./mdx/frameworks.mjs",
     "./llms": "./src/llms.ts",
+    "./publish": "./src/publish.ts",
     "./og": "./src/og/index.ts"
   },
   "peerDependencies": {

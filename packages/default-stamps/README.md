@@ -35,7 +35,7 @@ import { StampToken } from '@embedpdf/plugin-stamp';
 import { loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 
 const stamp = registry.capability(StampToken);
-await stamp.importLibraryPdf(await loadDefaultLibrary('nl')); // title, identifiers, labels come from the file
+await stamp.importLibrary(await loadDefaultLibrary('nl')); // title, identifiers, labels come from the file
 ```
 
 ### As part of your build
@@ -49,7 +49,7 @@ copy, no asset pipeline to configure, no CDN:
 import { LOCALES, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 
 const bytes = await loadDefaultLibrary('nl'); // the PDF; unknown codes fall back to `en`
-await stamp.importLibraryPdf(bytes);
+await stamp.importLibrary(bytes);
 ```
 
 The PDFs themselves stay in the package (`<locale>/stamps.pdf`) for

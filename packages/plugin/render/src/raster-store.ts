@@ -1,26 +1,27 @@
 import type { PageImageHandle } from '@embedpdf/core';
 
 /**
- * Client-side mirror of the server's one-door read-through: per-key
- * SINGLEFLIGHT + cost-budgeted LRU over encoded page images.
+ * The client-side counterpart of the server's read-through cache: per-key
+ * singleflight + cost-budgeted LRU over encoded page images.
  *
- * The key is the raster's canonical identity (conformed viewport +
- * annotations flag + epoch — see `renderSourceKey`), so the render points do
+ * The key is the raster's canonical identity (for page rasters: width,
+ * annotations flag, epoch and format, built by `rasterKey` in the
+ * controller; for tiles: `TileManager`'s tile key), so the render points do
  * the caching work: every ask at one point is the same key, and
  * re-crossings (zoom 1280 → 2560 → back) resolve instantly from the LRU
  * instead of re-rendering. Epoch bumps mint new keys; stale-epoch entries
  * age out through the LRU (they are never re-requested).
  *
- * The budget is COST, approximately bytes: an entry costs its encoded byte
+ * The budget is cost, approximately bytes: an entry costs its encoded byte
  * length when the handle carries bytes (local), its pixel count as a
  * decoded-order estimate otherwise (URL-backed cloud handles), and 1 when
  * neither is known. Entry counts lie — a 512² webp tile and a BMP full page
  * differ by 100× — and long deep-zoom sessions cycle hundreds of tile keys,
  * so the budget is what actually bounds memory.
  *
- * Consumer aborts are REFCOUNTED: a caller abandoning a fetch (camera moved,
+ * Consumer aborts are refcounted: a caller abandoning a fetch (camera moved,
  * layer unmounted) detaches without killing it for other consumers; the
- * underlying engine call aborts only when the LAST in-flight consumer leaves.
+ * underlying engine call aborts only when the last in-flight consumer leaves.
  * Resolved entries are kept (evictable by LRU) — an abort after resolution
  * is a no-op by design.
  */
@@ -57,10 +58,10 @@ export class RasterStore {
         this.evict(); // cost is known only now — budget check at resolution
         return handle;
       },
-      (err) => {
+      (error) => {
         // Failed fetches must not be sticky — drop so the next ask retries.
         this.drop(key, entry);
-        throw err;
+        throw error;
       },
     );
     // Swallow the shared promise's rejection when no consumer is attached
@@ -89,7 +90,7 @@ export class RasterStore {
 
   private attach(key: string, entry: Entry, signal?: AbortSignal): Promise<PageImageHandle> {
     if (signal?.aborted) return Promise.reject(abortReason(signal));
-    // EVERY consumer holds a ref while the fetch is in flight — including
+    // Every consumer holds a ref while the fetch is in flight — including
     // signal-less ones ("I never abandon"), otherwise a signal-bearing
     // sibling's abort could kill a fetch someone else is still awaiting.
     entry.refs += 1;
@@ -106,7 +107,7 @@ export class RasterStore {
         if (settled) return;
         settled = true;
         entry.refs -= 1;
-        // Last live consumer walking away from an UNRESOLVED fetch kills it;
+        // Last live consumer walking away from an unresolved fetch kills it;
         // resolved entries stay for the LRU (that's the cache).
         if (entry.refs <= 0 && entry.handle === undefined) {
           entry.abort.abort(abortReason(signal));
@@ -123,12 +124,12 @@ export class RasterStore {
           signal.removeEventListener('abort', onAbort);
           resolve(handle);
         },
-        (err) => {
+        (error) => {
           if (settled) return;
           settled = true;
           entry.refs -= 1;
           signal.removeEventListener('abort', onAbort);
-          reject(err);
+          reject(error);
         },
       );
     });
@@ -145,8 +146,8 @@ export class RasterStore {
     if (this.total <= this.maxCost) return;
     // Oldest-first over evictable entries: resolved and consumer-free.
     const candidates = [...this.entries.entries()]
-      .filter(([, e]) => e.refs <= 0 && e.handle !== undefined)
-      .sort((a, b) => a[1].used - b[1].used);
+      .filter(([, entry]) => entry.refs <= 0 && entry.handle !== undefined)
+      .sort((left, right) => left[1].used - right[1].used);
     for (const [key, entry] of candidates) {
       if (this.total <= this.maxCost) return;
       this.drop(key, entry);

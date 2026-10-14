@@ -4,28 +4,38 @@ import {
   parseScope,
   validateScopeArray,
   type DocumentProtection,
-  type IdentityClaims,
+  type Identity,
   type SignedDocumentPolicy,
 } from '@embedpdf/engine-core/runtime';
 
 import type { HandleScopeContext } from './HandleScopeContext';
 
 /**
- * Default scope when the caller omits the `scope` option on
- * `LocalEngine.open()`. Wildcard grants every capability and bypasses
- * every collab check — the right default for "I just want to open a
- * PDF and try things out" prototyping, but not what cloud JWTs look
- * like. A one-time console warning fires the first time this default
- * is used per process, pointing developers at the realistic-testing
- * pattern.
+ * The scope of a document opened without one: what the file itself allows, as Acrobat reads its
+ * permission flags (`pdf.permissions`), and what no flag governs: downloading, importing
+ * annotations and form data, running a form's scripts and submitting it, certifying the
+ * document, and putting annotations and fields in any group. An unprotected PDF allows everything; a protected one
+ * keeps its restrictions, as it does in Acrobat. An app that wants more (`'*'`) or less passes
+ * its own scope.
  */
-const DEFAULT_LOCAL_SCOPE: ReadonlyArray<string> = ['*'];
+const DEFAULT_LOCAL_SCOPE: ReadonlyArray<string> = [
+  'pdf.permissions',
+  'doc.download',
+  'doc.download.flattened',
+  'doc.annotate.import',
+  'doc.forms.import',
+  'doc.forms.script',
+  'doc.forms.submit',
+  'doc.sign.certify',
+  'annotations:set-group:all',
+  'fields:set-group:all',
+];
 
 export interface BuildHandleScopeContextInput {
-  /** Raw scope array from `OpenOptions.scope`; defaults to `['*']`. */
+  /** Raw scope array from `OpenOptions.scope`; defaults to what the file allows ({@link DEFAULT_LOCAL_SCOPE}). */
   scope?: ReadonlyArray<string>;
   /** Identity claims from `OpenOptions.identity`; defaults to `{}`. */
-  identity?: IdentityClaims;
+  identity?: Identity;
   /**
    * Raw PDF permission bits from `FPDF_GetDocPermissions` (or `null`
    * for unencrypted documents with no bits set). Decoded into the
@@ -56,7 +66,6 @@ export interface BuildHandleScopeContextInput {
  */
 export function buildHandleScopeContext(input: BuildHandleScopeContextInput): HandleScopeContext {
   const scope = input.scope ?? DEFAULT_LOCAL_SCOPE;
-  if (input.scope === undefined) warnDefaultScopeOnce();
 
   // Strict validation: any unknown string (including removed legacy
   // names like `doc.read`) throws InvalidScope here.
@@ -81,38 +90,17 @@ export function buildHandleScopeContext(input: BuildHandleScopeContextInput): Ha
  * every mutation.
  *
  * Rules:
- *   - `annotations:*:self` needs `identity.user_id`
- *   - `annotations:*:group=X` needs `identity.groups` to include `X`
- *     (matching the resolver's group-membership check)
- *   - `annotations:*:createdBy=Y` is row-scoped, not caller-scoped, so
- *     no identity field is required at open time.
+ *   - `annotations:*:self` needs `identity.userId`
+ *   - every other filter compares a fact on the record with the value the
+ *     scope names (`group=X`, `createdBy=Y`, `all`), so it needs no
+ *     identity field.
  */
-function assertIdentityForCollabScopes(
-  scope: ReadonlyArray<string>,
-  identity: IdentityClaims,
-): void {
+function assertIdentityForCollabScopes(scope: ReadonlyArray<string>, identity: Identity): void {
   for (const s of scope) {
     const parsed = parseScope(s);
     if (parsed.kind !== 'collab') continue;
-    if (parsed.filter.kind === 'self' && !identity.user_id) {
+    if (parsed.filter.kind === 'self' && !identity.userId) {
       throw new MissingIdentity(s);
     }
-    if (parsed.filter.kind === 'group') {
-      if (!identity.groups?.includes(parsed.filter.groupId)) {
-        throw new MissingIdentity(s);
-      }
-    }
   }
-}
-
-let warnedDefaultScope = false;
-
-function warnDefaultScopeOnce(): void {
-  if (warnedDefaultScope) return;
-  warnedDefaultScope = true;
-
-  console.warn(
-    '[engine-local] open() called without `scope`; defaulting to ["*"] (admin). ' +
-      'Set `scope` explicitly to test realistic permissions matching your cloud deployment.',
-  );
 }

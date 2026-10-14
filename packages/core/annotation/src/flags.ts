@@ -1,9 +1,9 @@
 /**
- * Annotation `/F` flags — the ONE interpretation of ISO 32000-2 Table 167.
+ * Annotation `/F` flags — the one interpretation of ISO 32000-2 Table 167.
  *
- * `Annot.flags` carries the named booleans verbatim from the engine DTO; every
+ * A record's annotation carries the named booleans as the engine reads them; every
  * behavioral question (can I see it? click it? move it? edit its text?) is
- * answered HERE and nowhere else, so rendering, hit-testing, chrome, and the
+ * answered here and nowhere else, so rendering, hit-testing, chrome, and the
  * reducer can never disagree about what a flag means.
  *
  * The flag→behavior split, in one line each:
@@ -18,21 +18,25 @@
  *   noZoom/noRotate — screen-anchored body (see anchor.ts)
  *   invisible       — legacy: hide unknown subtypes with no handler
  */
-import { NO_ANNOTATION_FLAGS, type AnnotationFlags } from '@embedpdf/engine-core/runtime';
-import { capsFor } from './kinds';
+import {
+  NO_ANNOTATION_FLAGS,
+  type Annotation,
+  type AnnotationFlags,
+} from '@embedpdf/engine-core/runtime';
+import { kindOf } from './record/identity';
 
 export type { AnnotationFlags };
 export { NO_ANNOTATION_FLAGS };
 
-/** The `/F` every freshly DRAWN annotation starts with: `print` set (Acrobat
+/** The `/F` every freshly drawn annotation starts with: `print` set (Acrobat
  *  parity — without it the annotation silently disappears when printed). */
 export const DRAWN_FLAGS: AnnotationFlags = { ...NO_ANNOTATION_FLAGS, print: true };
 
 /** All ten flags, for iteration/equality — kept in the primitives' order. */
 export const FLAG_KEYS = Object.keys(NO_ANNOTATION_FLAGS) as ReadonlyArray<keyof AnnotationFlags>;
 
-export const flagsEqual = (a: AnnotationFlags, b: AnnotationFlags): boolean =>
-  FLAG_KEYS.every((k) => a[k] === b[k]);
+export const flagsEqual = (left: AnnotationFlags, right: AnnotationFlags): boolean =>
+  FLAG_KEYS.every((flag) => left[flag] === right[flag]);
 
 /** Merge a partial write over the current flags. */
 export const mergeFlags = (
@@ -45,19 +49,20 @@ export const mergeFlags = (
 
 /**
  * On-screen visibility. `hidden` beats everything; `noView` hides unless
- * `toggleNoView` and the annotation is ENGAGED — the spec says hover/selection,
+ * `toggleNoView` and the annotation is engaged — the spec says hover/selection,
  * and v1 uses selection (the model tracks no hover).
  */
-export const viewable = (f: AnnotationFlags, engaged = false): boolean =>
-  !f.hidden && (!f.noView || (f.toggleNoView && engaged));
+export const viewable = (flags: AnnotationFlags, engaged = false): boolean =>
+  !flags.hidden && (!flags.noView || (flags.toggleNoView && engaged));
 
 /** Any pointer interaction (click-to-select, hover). ReadOnly kills it. */
-export const interactive = (f: AnnotationFlags): boolean => !f.hidden && !f.noView && !f.readOnly;
+export const interactive = (flags: AnnotationFlags): boolean =>
+  !flags.hidden && !flags.noView && !flags.readOnly;
 
-/** The subset of an Annot these predicates read — keeps them testable bare. */
+/** The part of a ModelAnnotation these predicates read. */
 export interface FlagBearer {
-  subtype: string;
-  flags: AnnotationFlags;
+  /** The record's annotation: its kind and `/F` flags are read off it. */
+  annotation: Annotation;
   /** Session authority projected at ingest (permissions.md). Absent =
    *  unstamped (drafts, wildcard local engines, tests) = allowed. */
   authority?: { update: boolean; delete: boolean };
@@ -66,23 +71,44 @@ export interface FlagBearer {
 /** Interaction gate for a concrete annotation: widget kinds ignore `readOnly`
  *  (ISO 32000 — a ReadOnly form field must still be movable by a form designer;
  *  the form-filling layer enforces field ReadOnly itself). */
-export const annotInteractive = (a: FlagBearer): boolean =>
-  capsFor(a.subtype).ignoresReadOnly ? !a.flags.hidden && !a.flags.noView : interactive(a.flags);
+export const annotInteractive = (record: FlagBearer): boolean =>
+  kindOf(record.annotation).caps.ignoresReadOnly
+    ? !record.annotation.hidden && !record.annotation.noView
+    : interactive(record.annotation);
 
 /**
- * Geometry/style mutations — `locked` freezes the OBJECT, not its contents
- * (that's `lockedContents`), AND the session must hold update authority over
+ * Geometry/style mutations — `locked` freezes the object, not its contents
+ * (that's `lockedContents`), and the session must hold update authority over
  * the record. One predicate for hit-test, chrome, and props alike, so a
  * record you may not edit renders and behaves exactly like a locked one.
  */
-export const annotTransformable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.locked && (a.authority?.update ?? true);
+export const annotTransformable = (record: FlagBearer): boolean =>
+  annotInteractive(record) && !record.annotation.locked && (record.authority?.update ?? true);
 
 /** Deletion — the delete half of the authority split (a narrowed grant can
  *  allow update but not delete, or vice versa). Flags gate like transforms. */
-export const annotDeletable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.locked && (a.authority?.delete ?? true);
+export const annotDeletable = (record: FlagBearer): boolean =>
+  annotInteractive(record) && !record.annotation.locked && (record.authority?.delete ?? true);
 
 /** `/Contents` text edits — the contents counterpart of `locked`. */
-export const annotContentsEditable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.lockedContents && (a.authority?.update ?? true);
+export const annotContentsEditable = (record: FlagBearer): boolean =>
+  annotInteractive(record) &&
+  !record.annotation.lockedContents &&
+  (record.authority?.update ?? true);
+
+/** An annotation's text: `lockedContents` guards it, not `locked`. */
+const TEXT_FIELDS: ReadonlySet<string> = new Set(['contents', 'richText']);
+
+/**
+ * May this session change the record's engine `field` now? The one table
+ * every write of engine fields asks (`withValues`):
+ *
+ *   a flag              always, given update authority: unlocking a locked
+ *                       annotation, or showing a hidden one, must work
+ *   contents, richText  unless `lockedContents`: its text
+ *   anything else       unless `locked`: the annotation itself
+ */
+export function mayWrite(record: FlagBearer, field: string): boolean {
+  if ((FLAG_KEYS as readonly string[]).includes(field)) return record.authority?.update ?? true;
+  return TEXT_FIELDS.has(field) ? annotContentsEditable(record) : annotTransformable(record);
+}

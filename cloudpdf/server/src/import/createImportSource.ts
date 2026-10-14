@@ -1,16 +1,16 @@
 /**
- * Factory + AUTHORIZATION LAYER for the import-source family.
+ * Factory + authorization layer for the import-source family.
  *
  * The wire descriptor discriminates authorization models, not storage
  * vendors: `url` carries its own authority (the caller minted it);
  * `connection` names operator pre-registered authority. Every gate
- * for connection sources fires HERE, before any provider adapter is
+ * for connection sources fires here, before any provider adapter is
  * constructed and before any network activity:
  *
  *   1. the connection must exist;
  *   2. the caller's credential class must be allowed by it
  *      (default: api-token only);
- *   3. the AUTHENTICATED tenant must be allowed by it;
+ *   3. the authenticated tenant must be allowed by it;
  *   4. the key must fall inside the resolved scope — for
  *      tenant-template scopes, `{tenantId}` is substituted with the
  *      authenticated tenant (validated against the contract's
@@ -43,7 +43,7 @@ import type { ObjectStoreInfo } from '../storage/ObjectStore';
 export interface ImportCallerContext {
   /** Which credential class authenticated the request. */
   via: 'api-token' | 'tenant-jwt';
-  /** The AUTHENTICATED tenant (path tenant, verified by the route). */
+  /** The authenticated tenant (path tenant, verified by the route). */
   tenantId: string;
 }
 
@@ -122,7 +122,7 @@ function resolveConnectionSource(
 }
 
 /**
- * Scope → concrete allowed prefixes for THIS caller. `null` = whole
+ * Scope → concrete allowed prefixes for this caller. `null` = whole
  * bucket (already boot-gated to api-token-only connections).
  */
 export function resolveScopePrefixes(
@@ -179,10 +179,10 @@ function classifyS3Endpoint(endpoint: string | undefined): S3EndpointClass {
  * Canonical backend fingerprint for the self-import refusal, per
  * provider family. Names are only meaningful per backend: AWS bucket
  * names are partition-global (implicit resolution and explicit
- * *.amazonaws.com endpoints are the SAME namespace) while custom S3
+ * *.amazonaws.com endpoints are the same namespace) while custom S3
  * endpoints (R2/MinIO) key identity on (host, bucket); GCS bucket
  * names are globally unique; Azure identity is (account, container);
- * fs identity is path containment IN EITHER DIRECTION. Doubt resolves
+ * fs identity is path containment in either direction. Doubt resolves
  * toward blocking — over-blocking costs a rename, under-blocking is
  * the vulnerability.
  */

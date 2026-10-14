@@ -6,4 +6,13 @@ import type { MetadataCapability } from './contract';
 
 export const MetadataToken = createCapabilityToken<MetadataCapability>('metadata', {
   hint: "add metadataPlugin() from '@embedpdf/plugin-metadata' to your plugins list",
+  // Without a document, an adapter's stand-in rejects these with `not-ready`, as the
+  // capability would; the type asks for every member that returns a promise.
+  promises: {
+    update: true,
+    refresh: true,
+    ensureLoaded: true,
+    'custom.update': true,
+    'custom.refresh': true,
+  },
 });

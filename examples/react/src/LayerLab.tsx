@@ -17,13 +17,13 @@ import {
   Stage,
   DocumentScope,
   RenderLayer,
-  usePageEditor,
+  usePageEdit,
   type PageContextValue,
   stagePlugin,
   renderPlugin,
   pageEditPlugin,
 } from '@embedpdf/react';
-import { useDocuments } from '@embedpdf/react';
+import { useDocuments, useDocumentsState } from '@embedpdf/react';
 import type { Engine, OpenInput, PdfSaveMode } from '@embedpdf/core';
 import { createEngine, engineMode } from './engine';
 
@@ -73,7 +73,8 @@ export function LayerLab() {
 type OpenKind = { name: string; layered: boolean } | null;
 
 function LayerShell() {
-  const { docs, activeId, open, close, setActive, save, saveLayer } = useDocuments();
+  const { open, close, setActive, download, downloadLayer } = useDocuments();
+  const { documents: docs, activeId } = useDocumentsState();
   const [sampleId, setSampleId] = useState(SAMPLES[0].id);
   const [openKind, setOpenKind] = useState<OpenKind>(null);
   const [status, setStatus] = useState('Open a base to begin.');
@@ -83,7 +84,7 @@ function LayerShell() {
   const replace = async (source: OpenInput, name: string, layered: boolean) => {
     try {
       for (const d of docs) await close(d.id);
-      const id = await open(source, { name });
+      const { id } = (await open(source, { name })).document;
       setActive(id);
       setOpenKind({ name, layered });
       setStatus(layered ? `Editing layer over “${name}”.` : `Viewing “${name}” (no layer).`);
@@ -139,7 +140,7 @@ function LayerShell() {
   const saveLayerToDisk = async () => {
     busy('saving layer…');
     try {
-      const bytes = await saveLayer();
+      const bytes = await downloadLayer();
       saveToDisk(bytes, `${sample().id}.layer`);
       setStatus(
         `Saved layer (${bytes.byteLength.toLocaleString()} bytes) — reopen it with “Open + saved layer”.`,
@@ -152,7 +153,7 @@ function LayerShell() {
   const savePdf = async (mode: PdfSaveMode) => {
     busy(`saving ${mode} PDF…`);
     try {
-      const bytes = await save(undefined, { mode });
+      const bytes = await download(undefined, { mode });
       saveToDisk(bytes, `${sample().id}-${mode}.pdf`);
       setStatus(`Saved ${mode} PDF (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {
@@ -250,7 +251,7 @@ function LayerShell() {
 
 /** A real layer edit: rotating a page writes through the engine into the layer. */
 function RotateButton({ page }: { page: PageContextValue }) {
-  const editor = usePageEditor();
+  const editor = usePageEdit();
   if (!editor.canEdit()) return null;
   return (
     <button

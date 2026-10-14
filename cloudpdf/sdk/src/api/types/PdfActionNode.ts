@@ -35,7 +35,7 @@ export namespace PdfActionNode {
         type: "goto";
         subtype: string;
         next: unknown[];
-        destination: CloudPDF.PdfDestination;
+        destination: CloudPDF.PageDestination;
     }
 
     export interface Uri {

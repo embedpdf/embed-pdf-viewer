@@ -17,5 +17,5 @@ import type {
 
 export interface DispatchCore {
   dispatch(trigger: ActionTrigger): Promise<ActionTriggerResult>;
-  runAndEmit(tree: PdfActionTree, ctx: ActionContext): Promise<ActionDispatchResult>;
+  runAndEmit(tree: PdfActionTree, actionContext: ActionContext): Promise<ActionDispatchResult>;
 }

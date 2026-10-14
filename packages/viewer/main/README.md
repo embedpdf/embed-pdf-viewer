@@ -28,20 +28,33 @@ Or declaratively — it's a real custom element:
 ```
 
 `init` accepts the whole customization contract (`commands`, `icons`,
-`strings`, `chrome`, `disabledCategories`, `locale`, `theme`) — see
-`@embedpdf/viewer-chrome`'s README for the ladder. The defaults and schema
-sugar re-export from this module, so "own the toolbar" is one import line:
+`strings`, `layout`, `disable`, `readOnly`, `scope`, `identity`, `notAllowed`,
+`locale`, `theme`) — see
+`@embedpdf/viewer-chrome`'s README for the ladder. `layout` takes a function
+of the default layout and the viewer's env, so changing the toolbar needs no
+import at all:
 
 ```js
-import EmbedPDF, {
-  defaultChrome,
-  defineChrome,
-  group,
-} from 'https://cdn.embedpdf.com/v3/embedpdf.js';
+EmbedPDF.init({
+  target: '#viewer',
+  src: '/report.pdf',
+  layout: (layout, env) =>
+    layout
+      .remove('tool:pan', { from: 'main' })
+      .place('main', env.size === 'compact' ? 'bottom' : 'top'),
+});
 ```
 
-Config is init-only: set `.config` (or the attributes) and the element builds
-the viewer; changing them re-creates it from scratch.
+The default layout (`defaultLayout`) and `createLayout` re-export from this
+module for a layout written from scratch.
+
+Set `.config` (or the attributes) and the element builds the viewer. Five keys
+follow their value while it runs, from `.config`, their own properties
+(`element.src = file`, `.theme`, `.locale`, `.disable`, `.readOnly`) or the
+`src`, `theme` and `locale` attributes: `src` opens the new document (a URL, a
+`File` or bytes) in place of the old one, and the others change the look, the
+language and the tools. Changing any other key re-creates the viewer from
+scratch, documents and all.
 
 ## Build notes
 
@@ -51,9 +64,10 @@ the viewer; changing them re-creates it from scratch.
 - The react→preact aliasing happens HERE and only here (vite.config.ts) —
   aliases point at absolute file paths because the aliased imports live in
   other workspace packages whose node_modules have no preact.
-- `process.env.NODE_ENV` compiles to `'production'`; the element therefore
-  runs config validation UNCONDITIONALLY (element.ts) — a CDN user's typo'd
-  command id warns with the exact id instead of failing silently.
+- `process.env.NODE_ENV` compiles to `'production'`; the viewer therefore
+  checks the layout UNCONDITIONALLY (the chrome's layout root) — a CDN user's
+  typo'd id warns with the exact id and the closest one that exists instead of
+  failing silently.
 - Light-DOM children with a `slot` attribute project into the chrome's
   matching `custom()` sockets (children-as-slots — see the viewer-chrome
   README). They stay in the page's world: page CSS and the host framework's

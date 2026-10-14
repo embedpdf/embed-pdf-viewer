@@ -1,38 +1,35 @@
-import type { EmbeddedFileItem, EmbeddedFileRef } from '../dto/Attachment';
+import type { MutationMeta } from './MutationMeta';
+import type { Attachment, AttachmentRef } from '../dto/Attachment';
 
 /**
- * Cloud manifest coherence pins for an attachment mutation — the
- * `MetadataCache` pattern: the layer doc version advanced, and the
- * `attachmentsVersion` pin re-keys the immutable `/attachments@…` and
- * `/attachment-files/…@…` leaves.
+ * The `meta` of an attachment write: the attachments it created or deleted.
+ * On the cloud, `cacheDelta` advances `docVersion` and `attachmentsVersion`
+ * (which re-keys the `/attachments@…` and `/attachment-files/…@…` leaves)
+ * and no per-page pin.
  */
-export interface AttachmentsCache {
-  previousDocVersion: number;
-  docVersion: number;
-  attachmentsVersion: number;
+export interface AttachmentMutationMeta extends MutationMeta {
+  changed: AttachmentRef[];
 }
 
 /**
- * Result of creating a document-level embedded file. `created` is the
- * fully materialised name-tree entry, read back after the write — its
- * `key` is the durable ref for later download/delete, and its `index`
- * reflects the name-sorted position (creating shifts other indices; keys
- * never move).
+ * Result of creating a document-level embedded file: the new attachment,
+ * read back after the write. Its `index` reflects the name-sorted position
+ * (creating shifts other indices; refs never move).
  */
 export interface AttachmentCreateResult {
-  created: EmbeddedFileItem;
-  /** Cloud-only manifest coherence pins; `null` for local engines. */
-  cache: AttachmentsCache | null;
+  attachment: Attachment;
+  meta: AttachmentMutationMeta;
+}
+
+/** A delete: nothing exists after it, so only `meta`. */
+export interface AttachmentDeleteResult {
+  meta: AttachmentMutationMeta;
 }
 
 /**
- * Result of deleting a document-level embedded file. `deleted` is the
- * durable ref that stopped resolving (the attachment analog of
- * `AnnotationDeleteResult.deleted` — always known here, since attachment
- * refs are never weak).
+ * What a delete removed, as its `attachments.deleted` event names it for
+ * listeners that didn't make the call.
  */
-export interface AttachmentDeleteResult {
-  deleted: EmbeddedFileRef;
-  /** Cloud-only manifest coherence pins; `null` for local engines. */
-  cache: AttachmentsCache | null;
+export function deletedAttachmentOf(result: AttachmentDeleteResult): AttachmentRef | null {
+  return result.meta.changed[0] ?? null;
 }

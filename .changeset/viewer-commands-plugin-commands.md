@@ -1,0 +1,5 @@
+---
+'@embedpdf/plugin-commands': minor
+---
+
+A command says which scope permissions it needs with `requires` (`['doc.print']`), checked against its document: without them it's hidden, or, with the new `notAllowed: 'disable'` setting, shown disabled with a translated `disabledReason` on the resolved command. Turning off a category now turns off every category under it, on whole dotted parts (`annotations` turns off `annotations.highlight`). Single commands turn off next to categories: the `disabledCommands` setting and `disableCommand`, `enableCommand`, `setDisabledCommands`, `getDisabledCommands` and `isCommandDisabled`; a turned-off command is hidden and refused by `execute()`. On the host lens, `matchStroke` returns `{ commandId, refusal }`, where `refusal` (`CommandRefusal`: `'turned-off'` or `'not-allowed'`, with a message) says why a command won't run, and of several commands with the same keys one that may run wins. The standard `document:download` and `document:print` say what they need with `requires`.

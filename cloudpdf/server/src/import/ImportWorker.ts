@@ -1,17 +1,17 @@
 /**
- * In-process async import worker — the phase 3b claim loop. NOT a
+ * In-process async import worker — the import job claim loop. Not a
  * separate deployment unit: it runs inside the server process like
  * the pending-sweeper, and multi-replica deployments are safe because
- * claims are atomic and every transition is FENCED by the claim's
+ * claims are atomic and every transition is fenced by the claim's
  * lease token (a worker whose lease expired cannot overwrite its
  * replacement's work).
  *
- * The six 3b correctness properties, and where they live:
+ * The six correctness properties, and where they live:
  *   1. fenced transitions        — lease_token in every job UPDATE (repo);
  *   2. reconcile-on-claim        — ready→succeed / failed→fail before any
  *                                  transfer, closing the crash window
  *                                  between document commit and job-succeed;
- *   3. exhausted retryables      — the WORKER fails the document and
+ *   3. exhausted retryables      — the worker fails the document and
  *                                  deletes any destination bytes a crashed
  *                                  attempt fully uploaded before commit;
  *   4. atomic doc+job creation   — lifecycle.createQueuedImport (trx);
@@ -117,7 +117,7 @@ export class ImportWorker {
     const { jobs, documents, lifecycle } = this.opts;
     try {
       const doc = await documents.findById(job.docId);
-      // Reconcile BEFORE transferring: a crash between document
+      // Reconcile before transferring: a crash between document
       // commit and job-succeed must complete the bookkeeping, never
       // re-transfer against a ready document.
       if (!doc || doc.tenantId !== job.tenantId) {
@@ -159,14 +159,14 @@ export class ImportWorker {
     const detail = sanitizeImportDetail(err);
     try {
       if (status !== 502) {
-        // Terminal: the transfer path already marked the DOCUMENT
+        // Terminal: the transfer path already marked the document
         // failed for source/content errors; the job records the rest.
         await jobs.failJob(job.id, token, detail);
         return;
       }
       if (job.attempts >= job.maxAttempts) {
         // Exhausted retryables: the transfer path deliberately leaves
-        // the document pending — the WORKER owns this terminal
+        // the document pending — the worker owns this terminal
         // transition, plus cleanup of bytes a crashed attempt may
         // have fully uploaded before commit.
         await documents.markFailed(

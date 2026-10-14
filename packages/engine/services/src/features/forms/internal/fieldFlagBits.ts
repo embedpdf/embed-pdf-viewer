@@ -1,6 +1,6 @@
 /**
  * /Ff bits writable through drafts and patches (1-based spec bit numbers).
- * Family-DEFINING bits (Radio 1<<15, Pushbutton 1<<16, Combo 1<<17) are set
+ * Family-defining bits (Radio 1<<15, Pushbutton 1<<16, Combo 1<<17) are set
  * once by EPDFForm_CreateField and immutable afterwards - the native
  * setter rejects them.
  */

@@ -5,7 +5,7 @@
  * component surface, and this module pulls in Satori and shiki. Sites import
  * it as `@embedpdf/docs-kit/og` from a server route only.
  *
- * See DOCS-PLATFORM-ARCHITECTURE.md — this is the L1 "OG handlers" entry.
+ * See docs/conventions/docs-architecture.md — this is the L1 "OG handlers" entry.
  */
 export {
   BRAND_BOOK_PALETTE,

@@ -1,0 +1,105 @@
+---
+title: Single pages & thumbnails
+description: Show one page on its own, anywhere in your app, and build a thumbnail strip that follows the reader.
+---
+
+# Single pages & thumbnails
+
+`<PageView>` shows one page on its own, without scrolling or zoom: a preview in a card, a page
+picker in a dialog, the page a comment belongs to. Give it a page and a width:
+
+<Snippet name="viewing/page-preview" />
+
+<Example name="page-view/basic" />
+
+Every layer works in `<PageView>` as it does on the Stage: selection, annotations, search
+highlights. So does a menu anchored to the page. The page keeps its rotation and redraws when it
+changes.
+
+## Pick the page
+
+`page` takes a page's `ref` or its index, so `0` is the first page:
+
+<Snippet name="viewing/first-page" />
+
+`usePageList()` gives you every page of the document, in order, to loop over:
+
+<Snippet name="viewing/page-picker" />
+
+<Example name="page-view/picker" />
+
+A page's `label` is the page number the PDF defines, such as `'iv'` or `'A-2'`, when it has one.
+
+## A thumbnail strip
+
+For a strip next to the main view, with many pages that scroll, use a second Stage rather than many
+`<PageView>`s: it mounts only the thumbnails you can see, and it can follow the page the reader is on.
+
+<Snippet name="viewing/thumbnail-strip-token" />
+
+<Snippet name="viewing/thumbnail-strip" />
+
+<Example name="page-view/thumbnail-strip" />
+
+- **Turning off `interaction`** in the strip's settings keeps a drag on it from selecting text in
+  the document.
+- **Turning off `zoomGestures`** keeps the thumbnails their size under a pinch.
+- **`reveal()`** scrolls the strip only as far as needed, so it follows without jumping.
+
+See [Two views of one document](stage#two-views-of-one-document) for everything a second Stage can
+do.
+
+## Props
+
+| Prop         | What it is                                                              | Default          |
+| :----------- | :---------------------------------------------------------------------- | :--------------- |
+| `page`       | The page, as its `ref` or its index                                     | required         |
+| `width`      | The width of the page upright, in pixels: a page turned a quarter is that tall | `240`     |
+| `documentId` | Which document                                                          | the one in scope, else the active one |
+| `fallback`   | What to show until the page is ready                                    | nothing          |
+| `pageFrame`  | Space reserved around the page for your own labels, in pixels per side  | `0`              |
+| `pageChrome` | What to draw in that space                                              | —                |
+
+<Fw only="react">
+
+`fallback` and `pageChrome` take content, and `className` and `style` go on the outer box.
+
+</Fw>
+
+<Fw only="vue">
+
+`fallback` and `page-chrome` are slots, `<template #fallback>` and `<template #page-chrome>`, and
+`class` and `style` go on the outer box.
+
+</Fw>
+
+<Fw only="svelte">
+
+`fallback` and `pageChrome` are snippets, and `class` and `style` go on the outer box.
+
+</Fw>
+
+<Fw only="angular">
+
+`fallback` and `pageChrome` are templates, `<ng-template epdfFallback>` and
+`<ng-template epdfPageChrome>`, and `class` and `style` go on the outer box.
+
+</Fw>
+
+## Good to know
+
+### How pages look
+
+A page here has the same background and shadow as on the Stage: the viewer's `page` settings, or
+`--epdf-page-background` and `--epdf-page-shadow` from CSS (see [Colors & theming](../ui/theming)).
+
+### Menus inside a page view
+
+A menu anchored to the page, such as the selection menu, is placed above everything else on the
+page, so a card or a scrolling list can't cut it off.
+
+### Pointer input
+
+A `<PageView>` takes pointer input for the tools when the interaction plugin is registered, so text
+selection and annotation editing work in it too. On a touch screen, the Stage is the better choice:
+it has the gestures.

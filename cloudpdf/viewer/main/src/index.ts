@@ -1,55 +1,39 @@
 /**
- * @cloudpdf/viewer — the CLOUD snippet, built as `dist/cloudpdf.js`.
+ * @cloudpdf/viewer — the open-source viewer with the cloud engine as its default.
  *
  * ```html
- * <div id="viewer" style="height:100vh"></div>
+ * <embedpdf-viewer id="viewer" style="height: 100vh"></embedpdf-viewer>
  * <script type="module">
- *   import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@VERSION/dist/cloudpdf.js';
- *   CloudPDF.init({
- *     target: '#viewer',
- *     baseUrl: 'https://api.cloudpdf.com',
- *     docToken: '<doc-scoped JWT>',
- *   });
+ *   import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+ *   document.getElementById('viewer').src = { shareToken: 'shr_…' };
  * </script>
  * ```
  *
- * A cloud DOOR over the open-source viewer's ENGINE-AGNOSTIC door
- * (`@embedpdf/viewer/core`): it maps the cloud vocabulary to an injected engine
- * factory (see ./config) and hands everything else straight to `EmbedPDF.init()`.
- * Because the core door registers no default engine, the local PDFium engine —
- * wasm, worker source, main-thread recipe — is structurally absent from this
- * artifact: rendering happens server-side, so the only thing that crosses the
- * network is HTTPS API traffic.
+ * The cloud door, as `@embedpdf/viewer` is the local one: it registers the cloud engine on
+ * `<embedpdf-viewer>` (./register) and is otherwise the engine-agnostic door's surface, so the
+ * element, `init()` and every name are the viewer's. `.` is this for a bundler, sharing
+ * `@embedpdf/viewer/core` with the app; `./snippet`, `dist/cloudpdf.js`, is the same entry built
+ * whole for a script tag, its folder carrying the stamps' WebAssembly.
  */
-import { cloudEngine } from '@cloudpdf/engine';
-import EmbedPDF from '@embedpdf/viewer/core';
-import type { EmbedPdfViewerElement, InitOptions } from '@embedpdf/viewer/core';
+import { initViewer, type EmbedPdfViewerElement } from '@embedpdf/viewer/core';
 
-import { resolveCloudConfig, type CloudSource } from './config';
+import type { InitOptions } from './config';
+import { registerCloudEngine } from './register';
 
-// The whole customization vocabulary rides along, so cloud snippet users
-// import ONE file — same ladder as the open snippet.
+registerCloudEngine();
+
 export * from '@embedpdf/viewer/core';
-export { cloudEngine } from '@cloudpdf/engine';
+export { CLOUDPDF_SAAS_URL, cloudEngine } from '@cloudpdf/engine';
 export type { CloudEngineOptions } from '@cloudpdf/engine';
 // Share-session primitives for custom flows (pre-exchange to inspect a
 // docId, hand-rolled password prompts, bespoke documents arrays).
 export { exchangeShareToken, shareSessionSource, ShareExchangeError } from '@cloudpdf/engine';
 export type { ShareSession, ShareExchangeOptions } from '@cloudpdf/engine';
-export { resolveCloudConfig } from './config';
-export type { CloudSource, CloudShareSource, CloudInitialDocument } from './config';
+// The cloud's `ViewerConfig` and its documents, in place of the engine-agnostic ones `export *`
+// brings: one name per door (docs/conventions/viewer-doors.md).
+export type { DocumentEntry, DocumentSrc, InitOptions, ViewerConfig } from './config';
 
-// `documents` is omitted from the base so CloudSource's list (same
-// InitialDocument type — `{ kind: 'share' }` is a standard OpenInput
-// kind now) governs without a conflicting redeclaration.
-export interface CloudInitOptions
-  extends Omit<InitOptions, 'engine' | 'src' | 'documents'>,
-    CloudSource {}
-
-/** Create an <embedpdf-viewer> backed by the cloud engine and mount it. */
-function init(options: CloudInitOptions): EmbedPdfViewerElement {
-  return EmbedPDF.init(resolveCloudConfig(options));
-}
+const init: (options: InitOptions) => EmbedPdfViewerElement = initViewer;
 
 const CloudPDF = { init };
 export default CloudPDF;

@@ -1,122 +1,60 @@
 /**
- * PDF destination → reveal: the pure translator between the PDF protocol's
- * navigation vocabulary (ISO 32000-1 §12.3.2.2) and the Stage's arrival
- * primitive. Outline clicks, link annotations, and `/OpenAction` all
- * resolve (engine-side) to an explicit `PdfDestination`; this maps it onto
- * ONE `reveal(pageIndex, options)` call — no destination-specific camera
- * code exists anywhere else.
- *
- * The whole protocol collapses onto three knobs:
- *   rect   — what to look at (a point for /XYZ, a rect for /FitR, the
- *            page for /Fit, the content bounding box for /FitB*)
+ * A destination as a reveal. A destination (ISO 32000-1 §12.3.2.2) says
+ * where on a page to look and how close; the stage's reveal takes the same
+ * three knobs:
+ *   rect   — what to look at: a point for `xyz`, a rect for `fitR`, the page
+ *            for `fit` and the `fitB*` kinds
  *   zoom   — 'keep' | {level} | 'fit' | 'fit-width' | 'fit-height'
- *   anchor — where it lands; 'keep' encodes the spec's null-means-retain
+ *   anchor — where it lands; 'keep' is the specification's `null`: keep the
+ *            current value on that axis
  *
- * Coordinates convert PDF user space (y-up, absolute) → content space
- * (y-down, crop-relative) through the SAME `pdfToContent` matrix selection
- * and search use, so a destination and an overlay can never disagree.
+ * Destinations are in page space, the stage's own space, so nothing converts.
+ * The `fitB*` kinds fit the page's content bounding box; the whole page
+ * stands in for it.
  */
-import { applyPoint, pageGeometry } from '@embedpdf/core-geometry';
-import type { Rect } from '@embedpdf/core-geometry';
-import type { PageLayout, PdfDestination } from '@embedpdf/core';
+import type { PageDestination, PdfSize } from '@embedpdf/core';
+
 import type { RevealOptions } from './contract';
 
-export interface DestinationReveal {
-  /** Display index for `reveal()` — from the layout row. */
-  pageIndex: number;
-  options: RevealOptions;
-}
-
-/**
- * Translate one explicit destination against its target page's layout.
- * `bbox` is the page's content BOUNDING box in CONTENT space, for the
- * `/FitB*` kinds — pass it when known; the crop box is the spec-tolerated
- * fallback until the engine exposes it.
- */
-export function destinationToReveal(
-  dest: PdfDestination,
-  layout: PageLayout,
-  bbox?: Rect,
-): DestinationReveal {
-  const geo = pageGeometry(
-    { crop: layout.boxes.crop, rotation: layout.rotation, userUnit: layout.userUnit },
-    1,
-  );
-  const crop = layout.boxes.crop;
-  const toContent = (x: number, y: number) => applyPoint(geo.pdfToContent, { x, y });
-  const page: Rect = { x: 0, y: 0, width: layout.size.width, height: layout.size.height };
-  const box = bbox ?? page;
-
-  const options = ((): RevealOptions => {
-    switch (dest.kind) {
-      case 'xyz': {
-        const hasLeft = dest.left != null;
-        const hasTop = dest.top != null;
-        // Null axes keep the current camera value — the coordinate fed in
-        // for them is inert (the 'keep' anchor never reads it).
-        const p = toContent(dest.left ?? crop.left, dest.top ?? crop.top);
-        return {
-          rect: { x: p.x, y: p.y, width: 0, height: 0 },
-          anchor: { x: hasLeft ? 'start' : 'keep', y: hasTop ? 'start' : 'keep' },
-          // A /XYZ zoom of 0 means null means "retain current".
-          zoom: dest.zoom != null && dest.zoom !== 0 ? { level: dest.zoom } : 'keep',
-        };
-      }
-      case 'fit':
-        return { zoom: 'fit' }; // whole page; slack axis centers
-      case 'fitH': {
-        const hasTop = dest.top != null;
-        const y = hasTop ? toContent(crop.left, dest.top!).y : 0;
-        return {
-          rect: { x: 0, y, width: page.width, height: 0 },
-          zoom: 'fit-width',
-          anchor: { y: hasTop ? 'start' : 'keep' },
-        };
-      }
-      case 'fitV': {
-        const hasLeft = dest.left != null;
-        const x = hasLeft ? toContent(dest.left!, crop.top).x : 0;
-        return {
-          rect: { x, y: 0, width: 0, height: page.height },
-          zoom: 'fit-height',
-          anchor: { x: hasLeft ? 'start' : 'keep' },
-        };
-      }
-      case 'fitR': {
-        const tl = toContent(dest.left, dest.top);
-        const br = toContent(dest.right, dest.bottom);
-        return {
-          rect: {
-            x: Math.min(tl.x, br.x),
-            y: Math.min(tl.y, br.y),
-            width: Math.abs(br.x - tl.x),
-            height: Math.abs(br.y - tl.y),
-          },
-          zoom: 'fit',
-        };
-      }
-      case 'fitB':
-        return { rect: box, zoom: 'fit' };
-      case 'fitBH': {
-        const hasTop = dest.top != null;
-        const y = hasTop ? toContent(crop.left, dest.top!).y : box.y;
-        return {
-          rect: { x: box.x, y, width: box.width, height: 0 },
-          zoom: 'fit-width',
-          anchor: { y: hasTop ? 'start' : 'keep' },
-        };
-      }
-      case 'fitBV': {
-        const hasLeft = dest.left != null;
-        const x = hasLeft ? toContent(dest.left!, crop.top).x : box.x;
-        return {
-          rect: { x, y: box.y, width: 0, height: box.height },
-          zoom: 'fit-height',
-          anchor: { x: hasLeft ? 'start' : 'keep' },
-        };
-      }
+export function revealOfDestination(destination: PageDestination, size: PdfSize): RevealOptions {
+  const { width, height } = size;
+  switch (destination.kind) {
+    case 'xyz': {
+      const { x, y, zoom } = destination;
+      return {
+        // A null axis keeps the current camera value; the number fed in for
+        // it is never read (the 'keep' anchor).
+        rect: { x: x ?? 0, y: y ?? 0, width: 0, height: 0 },
+        anchor: { x: x != null ? 'start' : 'keep', y: y != null ? 'start' : 'keep' },
+        // A zoom of 0 means the same as null: keep the current zoom.
+        zoom: zoom != null && zoom !== 0 ? { level: zoom } : 'keep',
+      };
     }
-  })();
-
-  return { pageIndex: layout.index, options };
+    case 'fit':
+      return { zoom: 'fit' };
+    case 'fitB':
+      return { rect: { x: 0, y: 0, width, height }, zoom: 'fit' };
+    case 'fitH':
+    case 'fitBH': {
+      const { y } = destination;
+      return {
+        rect: { x: 0, y: y ?? 0, width, height: 0 },
+        zoom: 'fit-width',
+        anchor: { y: y != null ? 'start' : 'keep' },
+      };
+    }
+    case 'fitV':
+    case 'fitBV': {
+      const { x } = destination;
+      return {
+        rect: { x: x ?? 0, y: 0, width: 0, height },
+        zoom: 'fit-height',
+        anchor: { x: x != null ? 'start' : 'keep' },
+      };
+    }
+    case 'fitR': {
+      const { x, y, width: rectWidth, height: rectHeight } = destination;
+      return { rect: { x, y, width: rectWidth, height: rectHeight }, zoom: 'fit' };
+    }
+  }
 }

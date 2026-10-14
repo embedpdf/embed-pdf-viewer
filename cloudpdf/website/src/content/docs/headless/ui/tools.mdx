@@ -1,0 +1,193 @@
+---
+title: Tools, cursors & touch
+description: "The active tool decides what the pointer does: select, pan, draw. Switch tools, add your own, and choose cursors, touch behavior and haptics."
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Tools, cursors & touch
+
+At any moment one **tool** is active, and it decides what a click or a drag on the page does: select
+text, scroll, draw a rectangle, place a stamp. The interaction plugin keeps track of it, and every
+feature that uses the pointer works through it. Register `interactionPlugin()`:
+
+<Snippet name="ui/interaction-plugin" />
+
+Then switch tools from your toolbar:
+
+<Snippet name="ui/tool-switch" />
+
+<Example name="tools/switch" />
+
+## The built-in tools
+
+| Tool      | A drag on the page                              | Also                                     |
+| :-------- | :---------------------------------------------- | :--------------------------------------- |
+| `pointer` | Selects text, or selects and moves annotations  | Fills forms, follows links. The default. |
+| `pan`     | Scrolls, like Acrobat's hand tool               | Fills forms, follows links               |
+
+Plugins add their own: the annotation plugin a tool per kind (`square`, `highlight`, `note`…), the form
+plugin a tool per field, redaction `redact`, measurements `distance`. They're all switched the same
+way, with `activateTool(id)`, and `tools` in [State](#state) lists them.
+
+## Hold a tool for a moment
+
+`pushTool()` switches to a tool and remembers the one before; `popTool()` goes back. That's how
+"hold Space to pan" works:
+
+<Snippet name="ui/hold-space" />
+
+<Example name="tools/hold-space" />
+
+`activateDefaultTool()` goes back to the default tool, `pointer` unless you set another.
+
+## Your own tool
+
+A tool of your own gets the pointer on the page, in page coordinates:
+
+```ts
+const remove = interaction.registerTool({
+  id: 'pin',
+  cursor: 'copy',
+  onPointerDown: ({ page, point }) => {
+    addPin(page, point);
+    return true; // this tool handled the click
+  },
+});
+
+interaction.activateTool('pin');
+```
+
+<Example name="tools/pin" />
+
+| Option          | What it is                                                         |
+| :-------------- | :----------------------------------------------------------------- |
+| `id`            | The tool's name, for `activateTool(id)`                            |
+| `cursor`        | The cursor over the page, any CSS cursor                           |
+| `onPointerDown` | A press on a page: `page`, `point`, `modifiers`. Return `true` to take the gesture |
+| `onPointerMove`, `onPointerUp` | The rest of a gesture you took                      |
+| `onHover`       | The pointer moving over a page, with no button pressed             |
+| `touch`         | `'draw'`: one finger drives the tool; `'tap'` (default): a tap is a click, a drag scrolls |
+
+`registerTool()` returns a function that removes the tool again. A tool you drag with takes the press and
+follows the gesture:
+
+<Example name="tools/ruler" />
+
+## Cursors
+
+Each tool has a cursor. Over things the tool can act on, the viewer switches to the right one by itself:
+a move or resize cursor over an annotation, a text cursor over text, a hand over a link. You choose the
+tool's own cursor, in three steps:
+
+- **A CSS cursor**: `cursor: 'crosshair'`.
+- **An image**: `cursor: svgCursor({ svg: penIcon, hotspot: { x: 2, y: 22 } })`. The SVG needs a
+  `width` and a `height`, and `hotspot` is the point that clicks.
+- **An image that changes**, such as a pen in the current color: `useToolCursor()` from a component, which follows the values it reads.
+
+<Snippet name="ui/pen-cursor" />
+
+<Example name="tools/cursor" />
+
+<Fw only="react">
+
+`cursors` replaces the tool's cursors by name, and the tool's own comes back when the component
+unmounts.
+
+</Fw>
+
+<Fw only={['vue', 'svelte']}>
+
+`cursors` replaces the tool's cursors by name. Pass a function, and the cursor follows `color`; the
+tool's own comes back when the component unmounts.
+
+</Fw>
+
+<Fw only="angular">
+
+`overrideCursor()` runs again when `color()` changes, and brings the tool's own cursors back when
+the directive is destroyed.
+
+</Fw>
+
+See [The cursor](../annotations/tools#the-cursor) for annotation tools.
+
+## Touch
+
+On a touch screen, the viewer behaves like a native app:
+
+- **One finger scrolls**, and two fingers pinch-zoom, with `pointer` and `pan`.
+- **Drawing tools take one finger**: it draws, and two fingers still scroll and zoom.
+- **Click tools**, such as placing a note, place with a tap, and a drag still scrolls.
+- **Long-press selects a word**, and handles grow the selection.
+
+A tool of your own chooses with `touch`: `'draw'` for tools you drag with, `'tap'` for tools you
+click with.
+
+## Haptic feedback
+
+Register a feedback provider, and a long-press that lands on a word gives the small tick people know
+from native apps:
+
+<Snippet name="ui/haptics" />
+
+It's safe to leave in: where the browser can't vibrate, iOS Safari included, nothing happens. In a
+native app shell, pass `wkFeedback('yourHandlerName')` to use the app's own haptics.
+
+## Methods
+
+Everything `useInteraction()` gives you.
+
+| Method                             | What it does                                                                                                                                              |
+| :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activateTool(id)`                 | Makes a tool the active one. An id that isn't registered is refused. [The built-in tools](#the-built-in-tools)                                            |
+| `pushTool(id)`, `popTool()`        | Switches to a tool and remembers the one before; goes back to it. [Hold a tool for a moment](#hold-a-tool-for-a-moment)                                  |
+| `activateDefaultTool()`            | Goes back to the default tool                                                                                                                             |
+| `getDefaultToolId()`               | The tool a document opens with, `pointer` unless you set another                                                                                          |
+| `registerTool(tool, { replace? })` | Adds a tool of your own, and returns a function that removes it. An id that's taken is refused unless you pass `replace: true`. [Your own tool](#your-own-tool) |
+| `setToolCursor(id, cursors)`       | Replaces a tool's cursors by name while the app runs; `null` brings its own back. In a component, use `useToolCursor()`, which undoes it when the component goes. [Cursors](#cursors) |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useInteractionSettings()`. [Settings](#settings) |
+
+## State
+
+<StateIntro hook="useInteractionState()" />
+
+| Field          | What it is                                                           | Read once                                                  |
+| :------------- | :------------------------------------------------------------------- | :--------------------------------------------------------- |
+| `activeToolId` | The active tool's id                                                 | `getActiveToolId()`, or `getActiveTool()` for the whole tool |
+| `tools`        | Every tool you can switch to, in the order they were added, the built-in ones first | `listTools()`, or `getTool(id)` and `hasTool(id)` for one |
+
+## Settings
+
+Set them when you register the plugin, and change them while the app runs with
+`interaction.updateSettings({ … })`; `interaction.resetSettings()` goes back to what you registered, and
+`useInteractionSettings()` gives you the current settings.
+
+| Setting       | What it does                                 | Default     |
+| :------------ | :------------------------------------------- | :---------- |
+| `defaultTool` | The tool that's active when a document opens | `'pointer'` |
+| `tools`       | Your own tools, registered from the start    | none        |
+
+## Events
+
+<Snippet name="ui/tool-events" />
+
+| Event                 | Fires when                                   | Carries                           |
+| :-------------------- | :------------------------------------------- | :-------------------------------- |
+| `onToolChanged`       | Another tool became active                   | `toolId`, `previousToolId`        |
+| `onGestureStarted`    | A drag with a tool began                     | `toolId`, `page`, `pointerType`   |
+| `onGestureEnded`      | It ended                                     | `toolId`, `page`, `pointerType`   |
+| `onGestureCancelled`  | It was cancelled, for example by a second finger | `toolId`, `page`, `pointerType` |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+
+## Good to know
+
+### Each document has its own tool
+
+The active tool belongs to the document: switch tabs, and each document is in the tool you left it in.
+
+### Permissions
+
+Tools don't check permissions themselves; the features behind them do. A drawing tool without
+permission to create draws nothing. Hide the buttons with each plugin's checks, such as
+`annotation.canCreate()`.

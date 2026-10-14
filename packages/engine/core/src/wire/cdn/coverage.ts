@@ -16,6 +16,7 @@
 
 import type { PdfBits } from '../../auth/scope';
 import type { LayerScopePlane, LayerScopes } from '../../dto/LayerScopes';
+import { PAGE_RENDER_FAMILIES } from '../renderFamilies';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../resources';
 
 /**
@@ -47,15 +48,14 @@ export interface CdnCoverageEntry {
  * `requirement` at the origin route, but the CDN never gets a
  * credential for them.
  *
- * The URL restructure (paths v2) guarantees each cacheable resource
- * type has a distinct prefix, so prefix-matching adapters get
- * per-resource scope enforcement at the edge — a Bunny token signed
- * at `/v1/docs/{id}/render/pages/` can only authorize render bytes,
- * never text or annotations.
+ * The URL layout gives each cacheable resource type a distinct prefix,
+ * so prefix-matching adapters get per-resource scope enforcement at the
+ * edge — a Bunny token signed at `/v1/docs/{id}/render/pages/` can only
+ * authorize render bytes, never text or annotations.
  */
 /**
- * Plane map: the planes each DOC-LEVEL shared resource depends on. A
- * layer token's edge credential covers a resource's prefix iff EVERY listed
+ * Plane map: the planes each doc-level shared resource depends on. A
+ * layer token's edge credential covers a resource's prefix iff every listed
  * plane is inherited (`'base'`) in the caller's scopes — the same condition
  * the origin guard enforces (origin is the truth; this grant is the
  * TTL-bounded optimization). Resources absent from this map (head, manifest,
@@ -70,14 +70,21 @@ export interface CdnCoverageEntry {
  * as every edge grant.
  */
 const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>> = {
-  'page-render': ['content'],
+  'page-render': PAGE_RENDER_FAMILIES.pages.planes,
+  'page-render-annotations': PAGE_RENDER_FAMILIES.annotations.planes,
+  'page-render-fields': PAGE_RENDER_FAMILIES.fields.planes,
+  'page-render-all': PAGE_RENDER_FAMILIES.all.planes,
   'page-text': ['content'],
   'page-geometry': ['content'],
-  'page-render-annotated': ['content', 'annotations'],
   'page-annotations': ['annotations'],
   'annotations-all': ['annotations'],
+  form: ['forms'],
+  'page-form': ['forms'],
+  // Positions and boxes of the bundle's pages come from the layout.
+  'annotations-export': ['annotations', 'layout'],
   layout: ['layout'],
   metadata: ['metadata'],
+  'metadata-custom': ['metadata'],
   actions: ['actions'],
   attachments: ['attachments'],
   'attachment-files': ['attachments'],

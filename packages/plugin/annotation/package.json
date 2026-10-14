@@ -12,7 +12,6 @@
     "./authoring": "./src/authoring.ts",
     "./contract": "./src/contract.ts",
     "./contract/host": "./src/host-contract.ts",
-    "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -36,10 +35,6 @@
         "import": "./dist/contract/host.js",
         "require": "./dist/contract/host.cjs"
       },
-      "./internal": {
-        "import": "./dist/internal.js",
-        "require": "./dist/internal.cjs"
-      },
       "./package.json": "./package.json"
     }
   },
@@ -49,7 +44,7 @@
   "scripts": {
     "build": "epdf-build",
     "clean": "rimraf dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p test/tools/plain-js/tsconfig.json && tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
@@ -58,6 +53,7 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/plugin-actions": "workspace:*",
     "@embedpdf/core-acrojs": "workspace:*"

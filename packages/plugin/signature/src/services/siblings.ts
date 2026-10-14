@@ -9,7 +9,7 @@ export function resolveSiblings(ctx: SignatureContext) {
   return {
     form: ctx.get(FormToken),
     stamp: () => ctx.tryGet(StampToken),
-    annotation: () => ctx.get(AnnotationToken),
+    annotation: () => ctx.tryGet(AnnotationToken),
   };
 }
 export type SignatureSiblings = ReturnType<typeof resolveSiblings>;

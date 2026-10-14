@@ -1,32 +1,36 @@
 /**
- * The ANNOTATION-selection floating strip:
+ * The annotation-selection floating strip:
  *
- *   config/chrome.ts `strips.annotation`  declares WHAT may appear
- *   each command's visible/enabled        decides WHICH items show
- *   <AnnotationMenu>                      solves WHERE (camera transform,
- *                                         rotate-knob dodging, pointer isolation)
+ *   config/chrome.ts `strips.annotation`  declares what may appear
+ *   each command's visible/enabled        decides which items show
+ *   <AnnotationMenu>                      solves where (camera transform,
+ *                                         rotate-knob dodging, pointer isolation):
+ *                                         above the selection, below it without
+ *                                         room above
  *
  * useStripView is the live intersection: hidden commands drop out, empty
  * groups vanish, null when nothing applies. Mounted in the Stage `overlay`
  * slot. The pixels are the shared <StripBar>.
  */
 import { useEffect } from 'react';
-import { AnnotationMenu } from '@embedpdf/react/annotation-menu';
-import { useAnnotationSelection } from '@embedpdf/react/annotation';
+import { AnnotationMenu, useAnnotationState } from '@embedpdf/react/annotation';
 import { useSurface } from '@embedpdf/react/shell';
 import { useStripView } from '@embedpdf/react/toolbar';
 import { useT } from '@embedpdf/react/i18n';
 import { useStripSchema } from '../config-context';
-import { LinkEditorCard } from './link-editor';
+import { lazyComponent } from './lazy';
 import { StripBar } from './strip-bar';
+
+// The link editor loads the first time someone edits a link.
+const LinkEditorCard = lazyComponent(() => import('./link-editor').then((ui) => ui.LinkEditorCard));
 
 export function AnnotationStrip() {
   const t = useT();
   const view = useStripView(useStripSchema('annotation'));
-  // The link editor popover rides the SAME anchor and REPLACES the strip
-  // while open — one anchored card at a time (v2's popup, on the projector).
+  // The link editor popover rides the same anchor and replaces the strip
+  // while open — one anchored card at a time, on the projector.
   const editor = useSurface('link-editor');
-  const selection = useAnnotationSelection();
+  const selection = useAnnotationState((state) => state.selected);
   // A stale editor never outlives its selection.
   useEffect(() => {
     if (!selection.length && editor.isOpen) editor.close();
@@ -34,7 +38,7 @@ export function AnnotationStrip() {
   }, [selection.length, editor.isOpen]);
   if (!view) return null;
   return (
-    <AnnotationMenu placement="bottom" gap={15}>
+    <AnnotationMenu placement="top" gap={15}>
       {editor.isOpen ? (
         <LinkEditorCard onClose={editor.close} />
       ) : (

@@ -212,6 +212,30 @@ describe('fused search', () => {
     expect(response.hits).toEqual([]);
   });
 
+  it('leaves out a page held back for the reader\'s framework', async () => {
+    const gatedFile = writeIndex(
+      path.join(scratch, 'gated.bin'),
+      [
+        section({
+          id: 'search',
+          anchor: 'search',
+          contentPath: 'docs/headless/text/search',
+          product: 'headless',
+          prose: 'Zoom to a match.',
+          withheldFrom: ['vue', 'svelte', 'angular'],
+        }),
+      ],
+      [],
+    );
+    const index = loadSearchIndex(gatedFile);
+    const find = (integration: string | null) =>
+      searchIndex(index, { query: 'zoom', integration, urlForSection, embedQuery: async () => null });
+
+    expect((await find('vue')).hits).toEqual([]);
+    expect((await find('react')).hits.map((hit) => hit.anchor)).toEqual(['search']);
+    expect((await find(null)).hits.map((hit) => hit.anchor)).toEqual(['search']);
+  });
+
   it('reports a lexical-only artifact as degraded without calling the embedder', async () => {
     const lexFile = writeIndex(
       path.join(scratch, 'lexical-only.bin'),

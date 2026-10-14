@@ -1,0 +1,59 @@
+{
+  "name": "@embedpdf/plugin-history",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Undo and redo per open document, built on the document's change queue: every change the viewer's plugins stage is a step, undone by reference while still pending.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/plugin/history"
+  }
+}

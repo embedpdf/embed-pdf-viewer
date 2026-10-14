@@ -5,7 +5,7 @@
  * Workspace checks (publint, attw, vitest, examples) all run against dev
  * exports. Packing is a transformation — publishConfig swap, `files`
  * allowlist, workspace:* rewriting — and this is the only harness that
- * executes its RESULT: four fixture projects, installed with npm from local
+ * executes its RESULT: fixture projects, installed with npm from local
  * tarballs in a temp dir outside the workspace, one per consumer archetype.
  *
  * Fails loudly before `changeset publish` in the release pipeline.
@@ -83,6 +83,50 @@ interface Fixture {
   check: string;
 }
 
+/** A framework's toolchain, shared by its two viewer apps (one per door). */
+type ViewerApp = Pick<Fixture, 'deps' | 'check'>;
+
+const VUE_APP: ViewerApp = {
+  deps: {
+    vue: '^3.5.13',
+    vite: '^6.3.5',
+    '@vitejs/plugin-vue': '^6.0.3',
+    'vue-tsc': '^3.2.4',
+    typescript: '~5.8.3',
+  },
+  check: 'vite build && vue-tsc -p tsconfig.json',
+};
+
+const SVELTE_APP: ViewerApp = {
+  deps: {
+    svelte: '^5.39.5',
+    vite: '^6.3.5',
+    '@sveltejs/vite-plugin-svelte': '^6.0.0',
+    'svelte-check': '^4.3.0',
+    typescript: '~5.8.3',
+  },
+  check: 'vite build && svelte-check --tsconfig ./tsconfig.json --threshold error',
+};
+
+// Angular 20.2, the floor of the wrappers' peer range and the version they build with.
+const ANGULAR_APP: ViewerApp = {
+  deps: {
+    '@angular/common': '~20.2.0',
+    '@angular/compiler': '~20.2.0',
+    '@angular/core': '~20.2.0',
+    '@angular/forms': '~20.2.0',
+    '@angular/platform-browser': '~20.2.0',
+    rxjs: '^7.8.0',
+    tslib: '^2.6.0',
+    '@angular/build': '~20.2.0',
+    '@angular/cli': '~20.2.0',
+    '@angular/compiler-cli': '~20.2.0',
+    typescript: '~5.8.3',
+  },
+  // Strict templates (tsconfig.json) check the template's inputs against the packed types.
+  check: 'ng build',
+};
+
 const FIXTURES: Fixture[] = [
   {
     name: 'node-esm',
@@ -138,6 +182,16 @@ const FIXTURES: Fixture[] = [
     deps: { react: '^18.3.1', 'react-dom': '^18.3.1', vite: '^6.0.0' },
     check: 'vite build',
   },
+  // The viewer in the other frameworks, one app per door (`<framework>-local` on
+  // @embedpdf, `<framework>-cloud` on @cloudpdf): the door is the app's only packed
+  // dependency, so one it forgets to declare fails the install rather than hiding
+  // behind the other door. Each builds, then type-checks against the packed declarations.
+  { name: 'vue-local', packages: ['@embedpdf/viewer-vue'], ...VUE_APP },
+  { name: 'vue-cloud', packages: ['@cloudpdf/viewer-vue'], ...VUE_APP },
+  { name: 'svelte-local', packages: ['@embedpdf/viewer-svelte'], ...SVELTE_APP },
+  { name: 'svelte-cloud', packages: ['@cloudpdf/viewer-svelte'], ...SVELTE_APP },
+  { name: 'angular-local', packages: ['@embedpdf/viewer-angular'], ...ANGULAR_APP },
+  { name: 'angular-cloud', packages: ['@cloudpdf/viewer-angular'], ...ANGULAR_APP },
   {
     name: 'tsc-nodenext',
     packages: [

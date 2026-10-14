@@ -1,4 +1,6 @@
 {
   "toolchain": "Next 15 (webpack)",
+  "workerSrc": "'self'",
+  "trustedTypes": ["nextjs#bundler"],
   "dist": "out"
 }

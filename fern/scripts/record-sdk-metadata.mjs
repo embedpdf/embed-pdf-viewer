@@ -157,30 +157,29 @@ if (language === 'python') {
 // custom.gemspec.rb hook. Fill that hook deterministically until each SDK has
 // its own repository-owned customization layer.
 if (language === 'ruby') {
-  // fern-ruby-sdk 1.21.1 emits a call to `to_form_data_part` for binary
-  // multipart fields, but neither Ruby's File nor the generated runtime
-  // defines that method. Route the file through the runtime's real add_file
-  // API and make the required parameter visible in its request model. Keep
+  // fern-ruby-sdk 1.28.1 sends a binary multipart field through the runtime's
+  // add_file, but only when it is given and without a content type, and it
+  // leaves the required `file` out of the request model and the examples.
+  // Require the file, send it as a PDF, and make the parameter visible. Keep
   // this strict so a generator upgrade forces us to re-evaluate the patch.
   const uploadClientPath = `${outputDirectory}/lib/CloudPDF/documents/client.rb`;
-  const generatedMultipartLine =
-    'body.add_part(params[:file].to_form_data_part(name: "file")) if params[:file]';
-  const patchedMultipartLine =
-    'body.add_file(name: "file", file: params[:file], content_type: "application/pdf")';
+  const generatedMultipartBlock = `        if params[:file]
+          body.add_file(
+            name: "file",
+            file: params[:file]
+          )
+        end`;
+  const patchedMultipartBlock = `        raise ArgumentError, "file is required" unless params[:file]
+
+        body.add_file(name: "file", file: params[:file], content_type: "application/pdf")`;
   let uploadClient = readFileSync(uploadClientPath, 'utf8');
   if (
-    !uploadClient.includes(generatedMultipartLine) &&
-    !uploadClient.includes(patchedMultipartLine)
+    !uploadClient.includes(generatedMultipartBlock) &&
+    !uploadClient.includes(patchedMultipartBlock)
   ) {
     throw new Error('Ruby upload proxy generator shape changed; revisit the multipart patch');
   }
-  if (uploadClient.includes(generatedMultipartLine)) {
-    uploadClient = uploadClient.replace(
-      generatedMultipartLine,
-      `raise ArgumentError, "file is required" unless params[:file]
-        body.add_file(name: "file", file: params[:file], content_type: "application/pdf")`,
-    );
-  }
+  uploadClient = uploadClient.replace(generatedMultipartBlock, patchedMultipartBlock);
   uploadClient = uploadClient.replace(
     '# @option params [String] :id\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id"\n      #   )',
     '# @option params [String] :id\n      # @option params [#read] :file\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id",\n      #     file: File.open("document.pdf", "rb")\n      #   )',

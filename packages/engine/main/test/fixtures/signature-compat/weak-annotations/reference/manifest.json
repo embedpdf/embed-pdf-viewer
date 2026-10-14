@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "id": "corpus-v3-54",
+      "file": "54-identical-page-widget-control.pdf",
+      "facts": {
+        "sha256": "a5e825d98b7ecd5e03c0a1678a7d91a1974b65dcef6c1c715c4decc51238c753",
+        "byteLength": 20878,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "historicalObservation": "Valid, unchanged in Acrobat on 2026-09-14.",
+      "currentStatus": "observed-valid-unchanged",
+      "currentObservation": "User-provided screenshot on 2026-09-23 confirms VALID and unchanged; see acrobat-observations.json."
+    }
+  ]
+}

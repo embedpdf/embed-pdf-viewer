@@ -1,14 +1,11 @@
 /**
  * Factory for ObjectStore instances. Matches the unified adapter
- * pattern (see ADAPTERS.md) — switch on `config.kind`, accept a
- * SecretResolver via `opts.resolver` for SecretRef-bearing variants
- * (none of today's storage variants need it; the param is reserved
- * for future credential-via-SecretRef configurations).
+ * pattern (see `docs/conventions/server-adapters.md`) — switch on
+ * `config.kind`, accept a SecretResolver via `opts.resolver` for
+ * SecretRef-bearing variants.
  *
- * Returns synchronously today because no current adapter needs
- * async construction. Signature is `async` so future adapters (e.g.,
- * any kind that needs to resolve a SecretRef at construction) fit
- * without a breaking change.
+ * The factory is `async` because a variant may resolve a SecretRef at
+ * construction (the `azure-blob` account key).
  */
 
 import { isSecretRefShape } from '../config/secrets/redact';
@@ -23,7 +20,7 @@ import { AzureBlobObjectStore } from './adapters/AzureBlobObjectStore';
 
 export interface CreateObjectStoreOptions {
   /**
-   * Required when a config carries a `SecretRef` field. Today only the
+   * Required when a config carries a `SecretRef` field. Only the
    * `azure-blob` adapter's optional `accountKey` can be a SecretRef
    * (the keyed-SAS fallback); `fs`/`s3`/`gcs` get credentials from the
    * SDK's own env/role chain and never need the resolver.

@@ -10,15 +10,16 @@
  *   - the CDN signer to determine which path prefixes to cover for a token
  *   - documentation generators
  *
- * NOTE: only READ resources go in this table. Mutation routes
+ * Note: only read resources go in this table. Mutation routes
  * (POST/PATCH/DELETE) use collab scopes with target lookup and don't
- * fit a single capability requirement. /access is also NOT in the
+ * fit a single capability requirement. /access is also not in the
  * table — it's a session-establishment POST that performs its own
  * doc-access check without requiring any capability.
  */
 
 import type { DocCapability, PdfBits } from '../auth/scope';
 import { checkAnyCapability, checkCapability } from '../auth/scope';
+import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
 
 /**
  * Canonical id for every read resource the server exposes.
@@ -33,11 +34,12 @@ export type DocResourceId =
   | 'head'
   | 'manifest'
   | 'page-render'
-  // Plane-prefix rule: annotated renders are their OWN family — they depend
-  // on content+annotations while `/render/pages/` depends on content alone,
-  // and edge grants see only prefixes, so the dependency set must be
-  // visible in the path.
-  | 'page-render-annotated'
+  // The other picture families (`PAGE_RENDER_FAMILIES`): each is its own
+  // path, since each depends on its own planes and needs its own rights,
+  // and edge grants see only prefixes.
+  | 'page-render-annotations'
+  | 'page-render-fields'
+  | 'page-render-all'
   | 'page-text'
   | 'page-geometry'
   // Plane-scope model: doc-level shared variants, one per plane-dependent
@@ -45,29 +47,42 @@ export type DocResourceId =
   // on are inherited — see the RESOURCE_PLANES map in wire/cdn/coverage.ts.
   | 'page-annotations'
   // Whole-document bulk annotation listing, doc-level + layer twin. Its
-  // own family: the path is NOT under the per-page `annotations/pages/`
+  // own family: the path is not under the per-page `annotations/pages/`
   // prefix, so it needs its own catalogue entry for edge grants.
   | 'annotations-all'
+  // Annotation export: data and resource bytes, so it egresses content and
+  // needs `doc.download` beside the annotation read.
+  | 'annotations-export'
+  // The form: fields and widget rows, and each page's widget images. Their
+  // own family with their own prefixes: who may read the form isn't who may
+  // read the annotations, and a cached object is never filtered per row.
+  | 'form'
+  | 'page-form'
+  // Form export: whole fields with their values, so it egresses content and
+  // needs `doc.download` beside the form read.
+  | 'form-export'
   | 'layout'
   | 'metadata'
+  // The Info dict's custom keys: their own path under `/metadata/`, so
+  // their own entry (the `metadata@` prefix doesn't cover `metadata/custom@`).
+  | 'metadata-custom'
   | 'actions'
   | 'attachments'
   | 'attachment-files'
   // Layer-scoped variants of the page resources. Same capability
   // gates as their doc-level cousins (the layer just provides a
-  // possibly-divergent VIEW of the underlying page content — e.g.
-  // server-side redactions in the future). Cataloguing both shapes
-  // means the CDN signer covers the prefixes the SDK actually
-  // requests. See ADR-002 / paths-v2 design for the doc-vs-layer
-  // split rationale.
+  // possibly-divergent view of the underlying page content).
+  // Cataloguing both shapes means the CDN signer covers the prefixes
+  // the SDK actually requests.
   | 'layer-manifest'
   | 'layer-layout'
   | 'layer-metadata'
+  | 'layer-metadata-custom'
   // Digital signatures: the layer's snapshot and analysis (pinned by
   // docVersion, like the manifest), and the version-scoped families —
-  // content-addressed by base sha, each under its OWN prefix (the CDN
+  // content-addressed by base sha, each under its own prefix (the CDN
   // signs literal prefixes, so a grant for signature reads must never
-  // also cover version downloads). The versions LIST is origin-only.
+  // also cover version downloads). The versions list is origin-only.
   | 'layer-signatures'
   | 'layer-signatures-analysis'
   | 'versions'
@@ -77,20 +92,23 @@ export type DocResourceId =
   | 'version-revisions'
   | 'layer-actions'
   | 'layer-page-render'
-  // Layer twin of `page-render-annotated`: annotatedness is path-only at
-  // BOTH tiers (uniform grammar), even though layer grants don't need the
-  // distinction — see the token/path law in wire/paths.ts.
-  | 'layer-page-render-annotated'
+  | 'layer-page-render-annotations'
+  | 'layer-page-render-fields'
+  | 'layer-page-render-all'
   | 'layer-page-text'
   | 'layer-page-geometry'
-  // Search slices, one resource per PERMISSION TIER: rects-only results
+  // Search slices, one resource per permission tier: rects-only results
   // vs snippet-carrying results live under distinct path prefixes, so a
   // CDN credential for one can never authorize (or cache-hit) the other.
   | 'layer-search-rects'
   | 'layer-search-full'
   | 'annotations-read'
   | 'layer-annotations-all'
-  // Attachments, split by permission tier under DISTINCT prefixes (the
+  | 'layer-annotations-export'
+  | 'layer-form'
+  | 'layer-page-form'
+  | 'layer-form-export'
+  // Attachments, split by permission tier under distinct prefixes (the
   // search-rects/search-full rule): the metadata listing rides the base
   // read capability, while decoded file bytes egress content and gate on
   // the download capability — an edge credential for the listing prefix
@@ -116,9 +134,9 @@ export type RouteKind = 'origin' | 'versioned-read';
  *   - `single` — one capability gates the resource
  *   - `any`    — any one of N capabilities gates the resource
  *               (used by /text and /geometry which accept either the
- *                copy/select scope OR the future search scope)
+ *                copy/select scope or the future search scope)
  *   - `all`    — every one of N capabilities is required
- *               (used by /search/full: a snippet IS extracted text, so
+ *               (used by /search/full: a snippet is extracted text, so
  *                the search scope alone is not enough — the copy denial
  *                must hold here too)
  */
@@ -146,7 +164,7 @@ export interface DocResourceDescriptor {
   /**
    * Display prefix with `{docId}` / `{layerName}` placeholders. The
    * literal path-prefix the CDN signs for this resource — by design,
-   * each resource type has its OWN distinct prefix, so a token
+   * each resource type has its own distinct prefix, so a token
    * signed at this prefix authorizes only this resource type at the
    * edge (works on prefix-matching CDNs like Bunny / Cloud CDN /
    * Azure FD with no extra cleverness).
@@ -173,8 +191,46 @@ export interface DocResourceDescriptor {
   cdnCacheable: boolean;
 }
 
+/** A page picture of one family, at the document's shared path. */
+function pageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
+  const { resource, path, needs } = PAGE_RENDER_FAMILIES[family];
+  return {
+    id: resource,
+    pathPattern: `/v1/docs/{docId}/${path}/*/data@*`,
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/${path}/*/data@*`,
+    pathPrefix: `/v1/docs/{docId}/${path}/`,
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/${path}/`,
+    requirement: requirementOf(needs),
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  };
+}
+
+/** A page picture of one family, at a layer's path. */
+function layerPageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
+  const { layerResource, path, needs } = PAGE_RENDER_FAMILIES[family];
+  return {
+    id: layerResource,
+    pathPattern: `/v1/docs/{docId}/layers/{layerName}/${path}/*/data@*`,
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/${path}/*/data@*`,
+    pathPrefix: `/v1/docs/{docId}/layers/{layerName}/${path}/`,
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/${path}/`,
+    requirement: requirementOf(needs),
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  };
+}
+
+function requirementOf(needs: ReadonlyArray<DocCapability>): CapabilityRequirement {
+  return needs.length === 1
+    ? { kind: 'single', capability: needs[0]! }
+    : { kind: 'all', capabilities: needs };
+}
+
 /**
- * URL layout (paths v2): each resource type lives at a distinct path
+ * URL layout: each resource type lives at a distinct path
  * prefix so prefix-matching CDNs (Bunny, Cloud CDN, Azure FD) can
  * enforce per-resource scope at the edge. See wire/paths.ts for the
  * full shape and rationale.
@@ -212,28 +268,10 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'page-render': {
-    id: 'page-render',
-    pathPattern: '/v1/docs/{docId}/render/pages/*/data@*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/render/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/render/pages/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/render/pages/`,
-    requirement: { kind: 'single', capability: 'doc.render' },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
-  'page-render-annotated': {
-    id: 'page-render-annotated',
-    pathPattern: '/v1/docs/{docId}/render/annotated/pages/*/data@*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/render/annotated/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/render/annotated/pages/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/render/annotated/pages/`,
-    // Same capability tier as `page-render` — the split is about PLANE
-    // dependencies (content+annotations vs content), not permissions.
-    requirement: { kind: 'single', capability: 'doc.render' },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
+  'page-render': pageRenderResource('pages'),
+  'page-render-annotations': pageRenderResource('annotations'),
+  'page-render-fields': pageRenderResource('fields'),
+  'page-render-all': pageRenderResource('all'),
   'page-annotations': {
     id: 'page-annotations',
     pathPattern: '/v1/docs/{docId}/annotations/pages/*/items@*',
@@ -257,6 +295,46 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  'annotations-export': {
+    id: 'annotations-export',
+    pathPattern: '/v1/docs/{docId}/annotations/export@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/annotations/export@*`,
+    pathPrefix: '/v1/docs/{docId}/annotations/export@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.annotate.read', 'doc.download'] },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'form-export': {
+    id: 'form-export',
+    pathPattern: '/v1/docs/{docId}/form/export@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/form/export@*`,
+    pathPrefix: '/v1/docs/{docId}/form/export@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/form/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.forms.read', 'doc.download'] },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  form: {
+    id: 'form',
+    pathPattern: '/v1/docs/{docId}/form@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/form@*`,
+    pathPrefix: '/v1/docs/{docId}/form@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/form@`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'page-form': {
+    id: 'page-form',
+    pathPattern: '/v1/docs/{docId}/form/pages/*/appearances@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/form/pages/*/appearances@*`,
+    pathPrefix: '/v1/docs/{docId}/form/pages/',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/form/pages/`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
   layout: {
     id: 'layout',
     pathPattern: '/v1/docs/{docId}/layout@*',
@@ -273,6 +351,16 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     resolvePathPattern: (docId) => `/v1/docs/${docId}/metadata@*`,
     pathPrefix: '/v1/docs/{docId}/metadata@',
     resolvePathPrefix: (docId) => `/v1/docs/${docId}/metadata@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'metadata-custom': {
+    id: 'metadata-custom',
+    pathPattern: '/v1/docs/{docId}/metadata/custom@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/metadata/custom@*`,
+    pathPrefix: '/v1/docs/{docId}/metadata/custom@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/metadata/custom@`,
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
@@ -311,6 +399,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
       `/v1/docs/${docId}/layers/${layerName}/metadata@`,
     // Metadata is the same session-level read as the manifest; gate it
     // behind `doc.open` just like `layer-manifest` / `layer-layout`.
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-metadata-custom': {
+    id: 'layer-metadata-custom',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/metadata/custom@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/metadata/custom@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/metadata/custom@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/metadata/custom@`,
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
@@ -373,30 +473,10 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'layer-page-render': {
-    id: 'layer-page-render',
-    pathPattern: '/v1/docs/{docId}/layers/{layerName}/render/pages/*/data@*',
-    resolvePathPattern: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/render/pages/',
-    resolvePathPrefix: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/pages/`,
-    requirement: { kind: 'single', capability: 'doc.render' },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
-  'layer-page-render-annotated': {
-    id: 'layer-page-render-annotated',
-    pathPattern: '/v1/docs/{docId}/layers/{layerName}/render/annotated/pages/*/data@*',
-    resolvePathPattern: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/annotated/pages/*/data@*`,
-    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/render/annotated/pages/',
-    resolvePathPrefix: (docId, layerName = 'default') =>
-      `/v1/docs/${docId}/layers/${layerName}/render/annotated/pages/`,
-    requirement: { kind: 'single', capability: 'doc.render' },
-    routeKind: 'versioned-read',
-    cdnCacheable: true,
-  },
+  'layer-page-render': layerPageRenderResource('pages'),
+  'layer-page-render-annotations': layerPageRenderResource('annotations'),
+  'layer-page-render-fields': layerPageRenderResource('fields'),
+  'layer-page-render-all': layerPageRenderResource('all'),
   'page-text': {
     id: 'page-text',
     pathPattern: '/v1/docs/{docId}/text/pages/*/data@*',
@@ -404,7 +484,7 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/text/pages/',
     resolvePathPrefix: (docId) => `/v1/docs/${docId}/text/pages/`,
     // Only doc.text.copy gates /text. doc.text.search is reserved for a
-    // future dedicated /search endpoint and intentionally does NOT
+    // future dedicated /search endpoint and intentionally does not
     // grant /text access here.
     requirement: { kind: 'single', capability: 'doc.text.copy' },
     routeKind: 'versioned-read',
@@ -450,7 +530,7 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPattern: '/v1/docs/{docId}/layers/{layerName}/search/rects/data@*',
     resolvePathPattern: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/search/rects/data@*`,
-    // Prefix ends at `data@`: the CDN credential covers ONLY the
+    // Prefix ends at `data@`: the CDN credential covers only the
     // versioned, immutable form — the unversioned `data` URL is
     // origin-routed and never edge-cached.
     pathPrefix: '/v1/docs/{docId}/layers/{layerName}/search/rects/data@',
@@ -484,6 +564,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  'layer-annotations-export': {
+    id: 'layer-annotations-export',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/annotations/export@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/annotations/export@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/annotations/export@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/annotations/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.annotate.read', 'doc.download'] },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
   'layer-annotations-all': {
     id: 'layer-annotations-all',
     pathPattern: '/v1/docs/{docId}/layers/{layerName}/annotations/items@*',
@@ -493,6 +585,44 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/annotations/items@`,
     requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-form-export': {
+    id: 'layer-form-export',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/form/export@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/export@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/form/export@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.forms.read', 'doc.download'] },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-form': {
+    id: 'layer-form',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/form@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form@*`,
+    // `form@`, not `form`: a bare `form` prefix would also cover the write
+    // routes under `form/fields/` and `form/widgets/`.
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/form@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form@`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-page-form': {
+    id: 'layer-page-form',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/form/pages/*/appearances@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/pages/*/appearances@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/form/pages/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/pages/`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },

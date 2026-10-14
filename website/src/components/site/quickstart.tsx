@@ -33,8 +33,6 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['<', 'tag'],
       ['script', 'tag'],
       [' ', 'pun'],
-      ['async', 'attr'],
-      [' ', 'pun'],
       ['type', 'attr'],
       ['=', 'pun'],
       ['"module"', 'str'],
@@ -44,38 +42,41 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       [' EmbedPDF ', 'pun'],
       ['from', 'kw'],
       [' ', 'pun'],
-      ["'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js'", 'str'],
+      ["'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js'", 'str'],
       [';', 'pun'],
       ['\n', ''],
       ['\n', ''],
-      ['  const', 'kw'],
-      [' viewer ', 'pun'],
-      ['= ', 'pun'],
-      ['EmbedPDF', 'fn'],
+      ['  EmbedPDF', 'fn'],
       ['.', 'pun'],
       ['init', 'fn'],
       ['(', 'pun'],
       ['{', 'pun'],
       ['\n', ''],
-      ['    type', 'key'],
-      [': ', 'pun'],
-      ["'container'", 'str'],
-      [',', 'pun'],
-      ['\n', ''],
       ['    target', 'key'],
       [': ', 'pun'],
-      ['document', 'fn'],
-      ['.', 'pun'],
-      ['getElementById', 'fn'],
-      ['(', 'pun'],
-      ['"pdf-viewer"', 'str'],
-      ['),', 'pun'],
+      ["'#pdf-viewer'", 'str'],
+      [',', 'pun'],
       ['\n', ''],
       ['    src', 'key'],
       [': ', 'pun'],
       ["'https://snippet.embedpdf.com/ebook.pdf'", 'str'],
+      [',', 'pun'],
       ['\n', ''],
-      ['  })', 'pun'],
+      ['    onReady', 'key'],
+      [': ', 'pun'],
+      ['(', 'pun'],
+      ['viewer', 'pun'],
+      [') => ', 'pun'],
+      ['console', 'fn'],
+      ['.', 'pun'],
+      ['log', 'fn'],
+      ['(', 'pun'],
+      ["'PDF viewer ready!'", 'str'],
+      [', ', 'pun'],
+      ['viewer', 'pun'],
+      ['),', 'pun'],
+      ['\n', ''],
+      ['  });', 'pun'],
       ['\n', ''],
       ['</', 'tag'],
       ['script', 'tag'],
@@ -93,7 +94,7 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       [' } ', 'pun'],
       ['from', 'kw'],
       [' ', 'pun'],
-      ["'@embedpdf/react-pdf-viewer'", 'str'],
+      ["'@embedpdf/viewer-react'", 'str'],
       [';', 'pun'],
       ['\n', ''],
       ['\n', ''],
@@ -109,13 +110,9 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['    <', 'tag'],
       ['PDFViewer', 'tag'],
       ['\n', ''],
-      ['      config', 'attr'],
+      ['      src', 'attr'],
       ['=', 'pun'],
-      ['{{ ', 'pun'],
-      ['src', 'key'],
-      [': ', 'pun'],
-      ["'https://snippet.embedpdf.com/ebook.pdf'", 'str'],
-      [' }}', 'pun'],
+      ['"https://snippet.embedpdf.com/ebook.pdf"', 'str'],
       ['\n', ''],
       ['      style', 'attr'],
       ['=', 'pun'],
@@ -128,7 +125,7 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['      onReady', 'attr'],
       ['=', 'pun'],
       ['{(', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
       [') => {', 'pun'],
       ['\n', ''],
       ['        console', 'fn'],
@@ -137,7 +134,7 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['(', 'pun'],
       ["'PDF viewer ready!'", 'str'],
       [', ', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
       [');', 'pun'],
       ['\n', ''],
       ['      }}', 'pun'],
@@ -162,17 +159,13 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['  <', 'tag'],
       ['PDFViewer', 'tag'],
       ['\n', ''],
-      ['    :config', 'attr'],
+      ['    src', 'attr'],
       ['=', 'pun'],
-      ['"{ src: ', 'str'],
-      ["'https://snippet.embedpdf.com/ebook.pdf'", 'str'],
-      [' }"', 'str'],
+      ['"https://snippet.embedpdf.com/ebook.pdf"', 'str'],
       ['\n', ''],
-      ['    :style', 'attr'],
+      ['    style', 'attr'],
       ['=', 'pun'],
-      ['"{ height: ', 'str'],
-      ["'500px'", 'str'],
-      [' }"', 'str'],
+      ['"height: 500px"', 'str'],
       ['\n', ''],
       ['    @ready', 'attr'],
       ['=', 'pun'],
@@ -199,17 +192,22 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['import', 'kw'],
       [' { ', 'pun'],
       ['PDFViewer', 'fn'],
+      [', ', 'pun'],
+      ['type ', 'kw'],
+      ['Viewer', 'fn'],
       [' } ', 'pun'],
       ['from', 'kw'],
       [' ', 'pun'],
-      ["'@embedpdf/vue-pdf-viewer'", 'str'],
+      ["'@embedpdf/viewer-vue'", 'str'],
       [';', 'pun'],
       ['\n', ''],
       ['\n', ''],
       ['function ', 'kw'],
       ['onReady', 'fn'],
       ['(', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
+      [': ', 'pun'],
+      ['Viewer', 'fn'],
       [') {', 'pun'],
       ['\n', ''],
       ['  console', 'fn'],
@@ -218,7 +216,7 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['(', 'pun'],
       ["'PDF viewer ready!'", 'str'],
       [', ', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
       [');', 'pun'],
       ['\n', ''],
       ['}', 'pun'],
@@ -244,17 +242,22 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['  import', 'kw'],
       [' { ', 'pun'],
       ['PDFViewer', 'fn'],
+      [', ', 'pun'],
+      ['type ', 'kw'],
+      ['Viewer', 'fn'],
       [' } ', 'pun'],
       ['from', 'kw'],
       [' ', 'pun'],
-      ["'@embedpdf/svelte-pdf-viewer'", 'str'],
+      ["'@embedpdf/viewer-svelte'", 'str'],
       [';', 'pun'],
       ['\n', ''],
       ['\n', ''],
       ['  function ', 'kw'],
       ['onready', 'fn'],
       ['(', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
+      [': ', 'pun'],
+      ['Viewer', 'fn'],
       [') {', 'pun'],
       ['\n', ''],
       ['    console', 'fn'],
@@ -263,7 +266,7 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['(', 'pun'],
       ["'PDF viewer ready!'", 'str'],
       [', ', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
       [');', 'pun'],
       ['\n', ''],
       ['  }', 'pun'],
@@ -276,13 +279,9 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['<', 'tag'],
       ['PDFViewer', 'tag'],
       ['\n', ''],
-      ['  config', 'attr'],
+      ['  src', 'attr'],
       ['=', 'pun'],
-      ['{{ ', 'pun'],
-      ['src', 'key'],
-      [': ', 'pun'],
-      ["'https://snippet.embedpdf.com/ebook.pdf'", 'str'],
-      [' }}', 'pun'],
+      ['"https://snippet.embedpdf.com/ebook.pdf"', 'str'],
       ['\n', ''],
       ['  style', 'attr'],
       ['=', 'pun'],
@@ -312,11 +311,14 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['\n', ''],
       ['import', 'kw'],
       [' { ', 'pun'],
-      ['PDFViewer', 'fn'],
+      ['EpdfPdfViewer', 'fn'],
+      [', ', 'pun'],
+      ['type ', 'kw'],
+      ['Viewer', 'fn'],
       [' } ', 'pun'],
       ['from', 'kw'],
       [' ', 'pun'],
-      ["'@embedpdf/angular-pdf-viewer'", 'str'],
+      ["'@embedpdf/viewer-angular'", 'str'],
       [';', 'pun'],
       ['\n', ''],
       ['\n', ''],
@@ -331,20 +333,18 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['  imports', 'key'],
       [': ', 'pun'],
       ['[', 'pun'],
-      ['PDFViewer', 'fn'],
+      ['EpdfPdfViewer', 'fn'],
       ['],', 'pun'],
       ['\n', ''],
       ['  template', 'key'],
       [': `', 'pun'],
       ['\n', ''],
       ['    <', 'tag'],
-      ['pdf-viewer', 'tag'],
+      ['epdf-pdf-viewer', 'tag'],
       ['\n', ''],
-      ['      [config]', 'attr'],
+      ['      src', 'attr'],
       ['=', 'pun'],
-      ['"{ src: ', 'str'],
-      ["'https://snippet.embedpdf.com/ebook.pdf'", 'str'],
-      [' }"', 'str'],
+      ['"https://snippet.embedpdf.com/ebook.pdf"', 'str'],
       ['\n', ''],
       ['      style', 'attr'],
       ['=', 'pun'],
@@ -364,12 +364,14 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['\n', ''],
       ['export ', 'kw'],
       ['class ', 'kw'],
-      ['AppComponent', 'fn'],
+      ['App', 'fn'],
       [' {', 'pun'],
       ['\n', ''],
       ['  onReady', 'fn'],
       ['(', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
+      [': ', 'pun'],
+      ['Viewer', 'fn'],
       [') {', 'pun'],
       ['\n', ''],
       ['    console', 'fn'],
@@ -378,7 +380,7 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['(', 'pun'],
       ["'PDF viewer ready!'", 'str'],
       [', ', 'pun'],
-      ['registry', 'pun'],
+      ['viewer', 'pun'],
       [');', 'pun'],
       ['\n', ''],
       ['  }', 'pun'],
@@ -388,78 +390,8 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
   },
 ];
 
-const QS_RAW: Record<string, string> = {
-  js: `<div id="pdf-viewer" style="height: 500px"></div>
-<script async type="module">
-  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
-
-  const viewer = EmbedPDF.init({
-    type: 'container',
-    target: document.getElementById("pdf-viewer"),
-    src: 'https://snippet.embedpdf.com/ebook.pdf'
-  })
-</script>`,
-  react: `import { PDFViewer } from '@embedpdf/react-pdf-viewer';
-
-export default function App() {
-  return (
-    <PDFViewer
-      config={{ src: 'https://snippet.embedpdf.com/ebook.pdf' }}
-      style={{ height: '500px' }}
-      onReady={(registry) => {
-        console.log('PDF viewer ready!', registry);
-      }}
-    />
-  );
-}`,
-  vue: `<template>
-  <PDFViewer
-    :config="{ src: 'https://snippet.embedpdf.com/ebook.pdf' }"
-    :style="{ height: '500px' }"
-    @ready="onReady"
-  />
-</template>
-
-<script setup lang="ts">
-import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
-
-function onReady(registry) {
-  console.log('PDF viewer ready!', registry);
-}
-</script>`,
-  svelte: `<script lang="ts">
-  import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
-
-  function onready(registry) {
-    console.log('PDF viewer ready!', registry);
-  }
-</script>
-
-<PDFViewer
-  config={{ src: 'https://snippet.embedpdf.com/ebook.pdf' }}
-  style="height: 500px"
-  {onready}
-/>`,
-  angular: `import { Component } from '@angular/core';
-import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
-
-@Component({
-  selector: 'app-root',
-  imports: [PDFViewer],
-  template: \`
-    <pdf-viewer
-      [config]="{ src: 'https://snippet.embedpdf.com/ebook.pdf' }"
-      style="height: 500px"
-      (ready)="onReady($event)"
-    />
-  \`,
-})
-export class AppComponent {
-  onReady(registry) {
-    console.log('PDF viewer ready!', registry);
-  }
-}`,
-};
+/** The code a snippet's tokens spell: what its line numbers count and the Copy button copies. */
+const codeOf = (lines: Token[]): string => lines.map(([text]) => text).join('');
 
 const PERKS = [
   {
@@ -552,10 +484,11 @@ export function QuickStart() {
   const [active, setActive] = useState('js');
   const [copied, setCopied] = useState(false);
   const current = QS_SNIPPETS.find((s) => s.id === active)!;
-  const lineCount = QS_RAW[active].split('\n').length;
+  const code = codeOf(current.lines);
+  const lineCount = code.split('\n').length;
 
   const onCopy = () => {
-    void navigator.clipboard?.writeText(QS_RAW[active]).then(() => {
+    void navigator.clipboard?.writeText(code).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     });

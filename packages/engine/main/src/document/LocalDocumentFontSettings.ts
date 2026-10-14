@@ -11,7 +11,7 @@ import {
 
 import type { ScopeGuard } from '../scope';
 import type { JobId } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 /**
  * Per-document font and text-layout settings for the local engine: one
@@ -21,7 +21,7 @@ import type { WorkerQueue } from '../worker/WorkerQueue';
 export class LocalDocumentFontSettings implements DocumentFontSettings {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: { isClosed(): boolean },
     private readonly guard: ScopeGuard,
     private readonly layerName?: string,
@@ -36,7 +36,10 @@ export class LocalDocumentFontSettings implements DocumentFontSettings {
   }
 
   private send(
-    settings: Omit<DocumentSetFontSettingsWorkerRequest, 'kind' | 'jobId' | 'docId' | 'layerName'>,
+    settings: Omit<
+      DocumentSetFontSettingsWorkerRequest,
+      'kind' | 'effect' | 'jobId' | 'docId' | 'layerName'
+    >,
   ): AbortablePromise<void> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -52,6 +55,7 @@ export class LocalDocumentFontSettings implements DocumentFontSettings {
       buildPack: (jobId: JobId) =>
         wirePack({
           kind: 'document.setFontSettings',
+          effect: 'session',
           jobId,
           docId: this.docId,
           ...(this.layerName !== undefined ? { layerName: this.layerName } : {}),

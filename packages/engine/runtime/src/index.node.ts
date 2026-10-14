@@ -1,5 +1,5 @@
 /**
- * NODE entry (the exports map's `node` condition). Full auto-detection:
+ * Node entry (the exports map's `node` condition). Full auto-detection:
  * native addon for the resolved target, WASM as the universal fallback.
  */
 export * from './shared';

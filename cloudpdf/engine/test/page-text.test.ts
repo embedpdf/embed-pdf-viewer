@@ -5,7 +5,7 @@ import {
   runPageTextConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -69,7 +69,7 @@ runPageTextConformance(runner, {
   },
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({
+    return cloudEngine({
       baseUrl: fx.baseUrl,
       token: docScopedToken(fx, TENANT_ID, DOC_ID),
     });

@@ -1,48 +1,92 @@
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { createCapabilityToken } from '../src/index';
+import { createCapabilityToken, DocumentsToken } from '../src/index';
 import { createTestContext } from '../src/testing';
 
 /** The testing context behaves like the kernel where a controller can tell. */
 describe('createTestContext', () => {
-  type Action = { type: 'inc' };
   const make = () =>
-    createTestContext<number, Action>({
+    createTestContext<number>({
       id: 'demo',
-      initialState: 0,
-      reduce: (n) => n + 1,
+      state: 0,
       pages: [{ ref: toPageRef(7), crop: { left: 10, bottom: 20, right: 610, top: 820 } }],
     });
+  const increment = (count: number) => count + 1;
 
-  it('dispatches through the reducer and notifies subscribers', () => {
+  it('applies state transitions and notifies subscribers', () => {
     const ctx = make();
     let seen = 0;
-    ctx.subscribe(() => (seen = ctx.getState()));
-    ctx.dispatch({ type: 'inc' });
+    ctx.subscribe(() => (seen = ctx.state.get()));
+    ctx.state.update(increment);
     expect(seen).toBe(1);
   });
 
-  it('answers page geometry from the page list, like the kernel', () => {
+  it('provides a documents registry holding the one document', () => {
     const ctx = make();
-    const space = ctx.geometry.forPage(toPageRef(7));
-    expect(space.pdfToPage({ x: 10, y: 820 })).toEqual({ x: 0, y: 0 });
-    expect(ctx.geometry.tryForPage(toPageRef(8))).toBeNull();
-    expect(() => ctx.geometry.forPage(toPageRef(8))).toThrow(/not in this document/);
+    const documents = ctx.get(DocumentsToken);
+    expect(documents.getActiveId()).toBe('doc');
+    expect(documents.getPage(0)?.ref).toEqual(toPageRef(7));
+    expect(documents.listPages('elsewhere')).toEqual([]);
+  });
+
+  it('answers pages from the page list, like the kernel', () => {
+    const ctx = make();
+    expect(ctx.getPage(toPageRef(7))?.pdfCropBox).toEqual({
+      left: 10,
+      bottom: 20,
+      right: 610,
+      top: 820,
+    });
+    expect(ctx.getPage(toPageRef(8))).toBeNull();
+    expect(() => ctx.assertPageRef(toPageRef(8))).toThrow(/not in this document/);
     expect(ctx.document()?.pages[0]?.size).toEqual({ width: 600, height: 800 });
   });
 
   it('resolves capabilities by token and runs cleanups on dispose', async () => {
     const token = createCapabilityToken<{ ping(): string }>('ping');
     const ctx = createTestContext({
-      initialState: null,
       capabilities: [[token, { ping: () => 'pong' }]],
     });
     expect(ctx.get(token).ping()).toBe('pong');
     expect(ctx.tryGet(createCapabilityToken('other'))).toBeNull();
     let cleaned = false;
-    ctx.cleanup(() => (cleaned = true));
+    ctx.cleanup(() => {
+      cleaned = true;
+    });
     await ctx.dispose();
     expect(cleaned).toBe(true);
+  });
+
+  it('holds the settings a definition declares, and wakes subscribers when they change', () => {
+    const ctx = createTestContext({
+      settings: { defaults: { color: 'yellow', width: 1 }, registered: { width: 2 } },
+    });
+    expect(ctx.settings().get()).toEqual({ color: 'yellow', width: 2 });
+    let woken = 0;
+    ctx.subscribe(() => woken++);
+    ctx.settings().api.updateSettings({ color: 'red' });
+    expect(woken).toBe(1);
+    expect(ctx.settings().get()).toEqual({ color: 'red', width: 2 });
+    // A context without settings has none to read.
+    expect(() => createTestContext().settings()).toThrow('declares no settings');
+  });
+
+  it('reads a download inside what a plugin wrapped around it, until it is disposed', async () => {
+    const ctx = make();
+    const log: string[] = [];
+    ctx.aroundDownload(async (read) => {
+      log.push('before');
+      const bytes = await read();
+      log.push('after');
+      return bytes;
+    });
+    const read = async () => (log.push('read'), new Uint8Array([1]));
+    expect(await ctx.download(read)).toEqual(new Uint8Array([1]));
+    expect(log).toEqual(['before', 'read', 'after']);
+    await ctx.dispose();
+    log.length = 0;
+    await ctx.download(read);
+    expect(log).toEqual(['read']);
   });
 });

@@ -49,7 +49,7 @@ describe('StorageKeys', () => {
     expect(() => StorageKeys.basePdf('t', 'a')).toThrow();
   });
   test('shard is hash-derived: prefixed ids fan out instead of collapsing', () => {
-    // THE bug this grammar fixes: every production id starts with `doc_`,
+    // The bug this grammar fixes: every production id starts with `doc_`,
     // so slice-sharding put the entire fleet in `docs/do/`. Hash sharding
     // must spread same-prefix ids across many buckets.
     const shards = new Set(

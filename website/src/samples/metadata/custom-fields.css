@@ -1,0 +1,141 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --danger: #c62a2a;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The fields, in a card */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+  overflow: hidden;
+}
+
+.fields {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.fields th {
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--muted);
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+}
+
+.fields td {
+  padding: 8px 16px;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.fields td:last-child {
+  width: 1%;
+  text-align: right;
+}
+
+.key {
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+}
+
+/* A new field: name, value and the button, wrapping on a phone */
+.add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.field {
+  appearance: none;
+  flex: 1 1 150px;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 11px;
+}
+
+.field::placeholder {
+  color: var(--muted);
+}
+
+.field:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgb(125 182 255 / 0.35);
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button.quiet {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.error {
+  margin: 0;
+  padding: 0 16px 12px;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

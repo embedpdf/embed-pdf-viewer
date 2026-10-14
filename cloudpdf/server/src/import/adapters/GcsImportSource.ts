@@ -4,14 +4,14 @@
  * read; authority is Application Default Credentials (Workload
  * Identity / key file via the SDK chain), never the request.
  *
- * `revision` maps to the OBJECT GENERATION: a positive decimal
+ * `revision` maps to the object generation: a positive decimal
  * integer ('0' has precondition semantics in GCS and is refused).
  * The read is pinned to the generation observed at stat time even
  * for unpinned requests, so the declared size and the streamed bytes
  * can never belong to different generations; that generation is
  * reported back as `resolvedRevision`.
  *
- * Lazy-load per ADAPTERS.md.
+ * Lazy-load per `docs/conventions/server-adapters.md`.
  */
 import type { Readable } from 'node:stream';
 
@@ -24,7 +24,7 @@ import {
   type ImportSourceOpen,
 } from '../ImportSource';
 
-// Type-only — does NOT trigger the runtime import (see ADAPTERS.md).
+// Type-only — does not trigger the runtime import (see `docs/conventions/server-adapters.md`).
 type StorageModule = typeof import('@google-cloud/storage');
 type Bucket = ReturnType<InstanceType<StorageModule['Storage']>['bucket']>;
 
@@ -118,7 +118,7 @@ export class GcsImportSource implements ImportSource {
         ? String(meta['generation'])
         : undefined;
     // Pin the stream to the stat'ed generation: size and bytes must
-    // come from the SAME object version even if the key is
+    // come from the same object version even if the key is
     // overwritten between stat and read.
     const pinned =
       resolvedRevision !== undefined

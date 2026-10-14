@@ -1,70 +1,41 @@
 import type {
-  FormDataFormat,
   FormFieldDTO,
   FormFieldRef,
   FormSnapshot,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
-import { NULL_PTR, type PdfRuntimeModule } from '@embedpdf/engine-runtime';
+import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
-import { withScratch } from '../../runtime/memory/scratch';
 import { acquireFormModel } from './internal/formModelCache';
-import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
+import { readFieldAt } from './internal/readFormSnapshot';
 import { resolveFieldRef } from './internal/resolveFieldRef';
+import { readForm } from './internal/widgetRows';
+import type { FontRegistrar } from '../fonts/FontRegistrar';
 
 /**
- * Read side of the forms feature. All reads go through the session's
+ * Read side of the forms feature. Field reads go through the session's
  * version-keyed model cache, so repeated reads between mutations reuse
- * one native snapshot build.
+ * one native snapshot build; widget rows are read from the pages.
  */
 export class FormReader {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
+    /** This thread's font registry, for the widget rows. */
+    private readonly fonts?: FontRegistrar,
   ) {}
 
-  snapshot(signal: AbortSignal): FormSnapshot {
+  snapshot(signal: AbortSignal): FormSnapshot<PdfCoordinates> {
     throwIfAborted(signal);
-    const model = acquireFormModel(this.runtime, this.session);
-    return readFormSnapshot(this.runtime, model, this.session.requireDocPtr());
+    return readForm(this.runtime, this.session, signal, this.fonts);
   }
 
-  field(ref: FormFieldRef, signal: AbortSignal): FormFieldDTO {
+  field(ref: FormFieldRef, signal: AbortSignal): FormFieldDTO<PdfCoordinates> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const { fieldIndex } = resolveFieldRef(this.runtime, model, ref);
     return readFieldAt(this.runtime, model, fieldIndex, this.session.requireDocPtr());
-  }
-
-  /**
-   * Serialize form data. Exports read the reconciled view (recovered
-   * fields included; on layers, promoted values win) straight from the
-   * document — the model cache is not involved.
-   */
-  exportData(
-    format: FormDataFormat,
-    signal: AbortSignal,
-  ): { format: FormDataFormat; bytes: ArrayBuffer } {
-    throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
-    const docPtr = this.session.requireDocPtr();
-    const call = format === 'fdf' ? fn.EPDFForm_ExportFDF : fn.EPDFForm_ExportXFDF;
-
-    const length = call(docPtr, NULL_PTR, 0, NULL_PTR, 0);
-    if (length <= 0) {
-      throw new EngineError(EngineErrorCode.Unknown, `form ${format} export failed`);
-    }
-    return withScratch(mem, length, (buf) => {
-      const written = call(docPtr, NULL_PTR, 0, buf, length);
-      if (written !== length) {
-        throw new EngineError(EngineErrorCode.Unknown, `form ${format} export failed`);
-      }
-      const view = mem.readBytes(buf, length);
-      const bytes = new ArrayBuffer(view.byteLength);
-      new Uint8Array(bytes).set(view);
-      return { format, bytes };
-    });
   }
 }

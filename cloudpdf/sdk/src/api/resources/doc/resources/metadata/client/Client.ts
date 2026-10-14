@@ -7,6 +7,7 @@ import * as core from "../../../../../../core/index.js";
 import { handleNonStatusCodeError } from "../../../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../../../errors/index.js";
 import * as CloudPDF from "../../../../../index.js";
+import { CustomClient } from "../resources/custom/client/Client.js";
 
 export declare namespace MetadataClient {
     export type Options = BaseClientOptions;
@@ -16,9 +17,14 @@ export declare namespace MetadataClient {
 
 export class MetadataClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<MetadataClient.Options>;
+    protected _custom: CustomClient | undefined;
 
     constructor(options: MetadataClient.Options) {
         this._options = normalizeClientOptionsWithAuth(options);
+    }
+
+    public get custom(): CustomClient {
+        return (this._custom ??= new CustomClient(this._options));
     }
 
     /**

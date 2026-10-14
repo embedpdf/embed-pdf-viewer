@@ -1,9 +1,7 @@
-import type { RawSigner } from '../cms/build';
-import { ensureEngine } from '../cms/engine';
-import { selfSignedCertificate } from './self-signed';
 import { generateSigningKeyPair, webCryptoSigner } from './webcrypto';
+import type { RawSigner } from '../cms/build';
 
-/** What a personal signer keeps: a NON-extractable private key and its self-signed certificate. */
+/** What a personal signer keeps: a non-extractable private key and its self-signed certificate. */
 export interface PersonalKeyRecord {
   privateKey: CryptoKey;
   certificate: Uint8Array;
@@ -37,10 +35,14 @@ export async function personalSigner(input: {
   algorithm?: 'RSA-PKCS1-v1_5' | 'RSA-PSS' | 'ECDSA';
   hash?: 'sha256' | 'sha384' | 'sha512';
 }): Promise<PersonalSigner> {
+  // The certificate code loads here, not with the module: a viewer that only names this signer
+  // loads it the first time someone signs.
+  const { ensureEngine } = await import('../cms/engine');
   ensureEngine();
   const hash = input.hash ?? 'sha256';
   let record = await input.store.load(input.subject);
   if (!record) {
+    const { selfSignedCertificate } = await import('./self-signed');
     const keys = await generateSigningKeyPair(input.algorithm ?? 'RSA-PKCS1-v1_5', hash, false);
     const certificate = await selfSignedCertificate({
       publicKey: keys.publicKey,
@@ -80,9 +82,9 @@ export function memoryKeyStore(): PersonalKeyStore {
  */
 export function indexedDbKeyStore(
   dbName: string,
-  opts: { storeName?: string } = {},
+  options: { storeName?: string } = {},
 ): PersonalKeyStore {
-  const storeName = opts.storeName ?? 'keys';
+  const storeName = options.storeName ?? 'keys';
   let opening: Promise<IDBDatabase> | null = null;
   const open = (): Promise<IDBDatabase> => {
     opening ??= new Promise((resolve, reject) => {
@@ -111,9 +113,10 @@ export function indexedDbKeyStore(
   };
   return {
     load: async (subject) =>
-      ((await run('readonly', (s) => s.get(subject))) as PersonalKeyRecord | undefined) ?? null,
+      ((await run('readonly', (store) => store.get(subject))) as PersonalKeyRecord | undefined) ??
+      null,
     save: (subject, record) =>
-      run('readwrite', (s) => s.put(record, subject)).then(() => undefined),
-    remove: (subject) => run('readwrite', (s) => s.delete(subject)).then(() => undefined),
+      run('readwrite', (store) => store.put(record, subject)).then(() => undefined),
+    remove: (subject) => run('readwrite', (store) => store.delete(subject)).then(() => undefined),
   };
 }

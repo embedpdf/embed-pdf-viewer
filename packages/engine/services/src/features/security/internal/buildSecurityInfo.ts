@@ -12,7 +12,7 @@ export type OpenedAs = 'none' | 'user' | 'owner';
  * none distinction, the revision-nulling rule, and the
  * `pdfPermissionsAllAllowed` derivation stay defined in exactly one place.
  *
- * The password-blocked / unsupported / unknown shapes are NOT built here:
+ * The password-blocked / unsupported / unknown shapes are not built here:
  * those carry null permission words and only the cold probe can produce
  * them, so they stay local to `SecurityReader.probeFile`.
  */

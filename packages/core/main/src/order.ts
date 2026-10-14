@@ -41,7 +41,7 @@ export function planPlugins(plugins: readonly AnyPlugin[]): PluginPlan {
       );
     }
     byId.set(plugin.id, plugin);
-    if (plugin.token && (plugin.capability || plugin.create)) {
+    if (plugin.token) {
       const other = providerByToken.get(plugin.token);
       if (other) {
         throw new Error(

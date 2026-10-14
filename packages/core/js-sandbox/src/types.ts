@@ -1,7 +1,7 @@
 import type { ScriptSandbox, ScriptSandboxFactory } from '@embedpdf/core-acrojs';
 
 /**
- * The structural sandbox contract is OWNED by `@embedpdf/core-acrojs` (this
+ * The structural sandbox contract is owned by `@embedpdf/core-acrojs` (this
  * package depends on it — the reverse import would be a cycle); re-exported
  * here so implementations and their consumers keep one import site.
  */

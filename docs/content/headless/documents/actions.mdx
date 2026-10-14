@@ -1,0 +1,184 @@
+---
+title: Actions & scripts
+description: "Decide what a PDF may do by itself: links, buttons, form calculations, JavaScript, opening websites and printing."
+---
+
+# Actions & scripts
+
+A PDF can do things by itself: a button that resets a form, a field that adds up others, a link that
+opens a website, a script that runs when the document opens. The actions plugin runs them, with
+rules you choose.<Fw only={['react', 'vue', 'svelte']}> Register it, and install the browser's defaults for opening websites and printing
+once, near the top of your viewer:</Fw><Fw only="angular"> Add `withActions()` to `provideEmbedPdf()`, and `withActionsUi()` for the
+browser's defaults for opening websites and printing:</Fw>
+
+<Snippet name="documents/actions-setup" />
+
+Without it, the plugin still runs what stays inside the viewer, such as going to a page or resetting
+a form, but it won't open a website or a print dialog.
+
+## What runs
+
+| Action                             | By default                                                        |
+| :--------------------------------- | :---------------------------------------------------------------- |
+| Go to a page or a destination      | Runs                                                              |
+| A viewer action, such as next page | Runs                                                              |
+| Show or hide a form field          | Runs                                                              |
+| Reset a form                       | Runs                                                              |
+| Open a website                     | Goes to your UI adapter when the user clicked; reported otherwise |
+| Print                              | Goes to your UI adapter when the user clicked; never on its own   |
+| Submit a form                      | Goes to your submit handler when the user clicked; never on its own |
+| JavaScript                         | Off, until you turn it on                                         |
+
+Actions that start a program, open another file on the user's computer, play media or import data
+never run.
+
+## Turn on JavaScript
+
+Many forms calculate totals, check values and format dates with JavaScript. Turn it on:
+
+```ts
+actionsPlugin({ javascript: { enabled: true } });
+```
+
+Scripts run in a sealed sandbox: they can read and change the document's form fields and move
+between pages, but they can't reach your app, the page's HTML or the network. Each script has a
+time budget, so a script that loops forever is stopped instead of freezing the viewer.
+
+A script can ask who the user is (`identity.name` in Acrobat's JavaScript). It gets the user the
+document was opened for, and you can add the fields scripts often ask for:
+
+```ts
+actionsPlugin({
+  javascript: { enabled: true, identity: { corporation: 'Acme', email: 'dana@acme.com' } },
+});
+```
+
+<Example name="actions/javascript" />
+
+## How websites open, printing and alerts
+
+`useActionsUiAdapter()` installs the browser's defaults: a website opens in a new tab after a safety
+check, printing opens the print dialog, and a script's alert shows the browser's alert. Replace any
+of them with your own UI:
+
+<Snippet name="documents/actions-ui" />
+
+<Example name="actions/website-links" />
+
+| Handler   | Called when                                               |
+| :-------- | :-------------------------------------------------------- |
+| `openUri` | An action opens a website or an email address             |
+| `print`   | An action or a script asks to print                       |
+| `alert`   | A script shows a message                                  |
+| `gotoPage`| A script moves to a page                                  |
+
+## Change the rules
+
+Each kind of action has a rule for each way it can start: a click by the user (`user`), the pointer
+moving over something (`hover`), or the document opening or closing (`lifecycle`):
+
+```ts
+actionsPlugin({
+  policy: {
+    uri: { user: 'adapter', hover: 'block', lifecycle: 'block' }, // websites only on click
+    javascript: { lifecycle: 'block' }, // no scripts when the document opens
+  },
+});
+```
+
+| Rule        | Means                                                    |
+| :---------- | :------------------------------------------------------- |
+| `'allow'`   | Run it                                                   |
+| `'adapter'` | Hand it to your UI adapter (a form submit to your submit handler), which decides |
+| `'report'`  | Don't run it; report it in <Fw only={['react', 'vue', 'svelte']}>`onDiagnosticReported`</Fw><Fw only="angular">`diagnosticReported$`</Fw> |
+| `'block'`   | Don't run it                                             |
+
+The rules can change while the app runs, for example when the user trusts a document:
+
+```ts
+actions.updateSettings({ policy: { javascript: { lifecycle: 'allow' } } });
+```
+
+<Example name="actions/rules" />
+
+## Run an action from code
+
+```ts
+await actions.executeNamed('NextPage');
+```
+
+`executeNamed` runs a viewer action by its name: `'NextPage'`, `'PrevPage'`, `'FirstPage'`,
+`'LastPage'` or `'Print'`. It follows the same rules as a click.
+
+<Example name="actions/run-from-code" />
+
+## Methods
+
+Everything `useActions()` gives you.
+
+| Method                                                       | What it does                                                                                                                                  |
+| :----------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `executeNamed(name, context?)`                               | Runs a viewer action by its name, such as `'NextPage'`, as if the user clicked it. [Run an action from code](#run-an-action-from-code)         |
+| `execute(tree, context)`                                     | Runs actions you already have, such as a tree from `getActionTree()`, under the rules. Resolves `{ status, nodes, diagnostics }`: an action that fails is reported there, not thrown. |
+| `dispatch(trigger)`                                          | Reports that something happened, such as a click on a link or a page opening, and runs the actions behind it. The viewer does this for its own clicks and pages. Never rejects: problems come back in the result. |
+| `getActionTree(source)`                                      | Reads the actions behind a link or button, a form field, a page or the document, without running them. Resolves `null` when there are none.    |
+| `isScriptingEnabled()`                                       | Whether this document's JavaScript runs: it's turned on and the script engine started. [Turn on JavaScript](#turn-on-javascript)               |
+| `setUiAdapter(adapter)`                                      | Installs your handlers for websites, printing and alerts in place of the ones before, and returns a function that removes them. `useActionsUiAdapter()` does this for you. [How websites open, printing and alerts](#how-websites-open-printing-and-alerts) |
+| `setSubmitHandler(handler)`                                  | Sets the function a form's Submit button hands its values to, with the address the PDF names. The viewer never sends them anywhere itself. Returns a function that removes it. |
+| `registerExecutor(type, executor)`                           | Runs one kind of action, such as `'goto'`, with your own code in place of the built-in one. Returns a function that removes it.               |
+| `runDocumentVerb(verb, operation)`                           | Runs your own save (`'save'`) or print (`'print'`) between the document's before and after actions, and resolves with what `operation` returns. `download()` and `print()` do this by themselves. |
+| `prepareClose()`                                             | Runs the document's closing actions. Call it before `documents.close()`, which skips them.                                                    |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Read the settings, change the rules while the app runs, and go back to what you registered. [Settings](#settings)                            |
+| `canExecute(tree, context)`, `canExecuteNamed(name)`         | Whether the rules would run these actions, or this viewer action. [Change the rules](#change-the-rules)                                        |
+| `canDispatch(trigger)`                                       | Whether that kind of trigger is turned on in the `triggers` setting. [Settings](#settings)                                                    |
+
+`context` is `{ origin, source, event }`: why the actions run (`'user'`, `'hover'` or `'lifecycle'`, as
+in [Change the rules](#change-the-rules)), what started them, and which event it was. `executeNamed()`
+fills it in as a click from your code. Every method that returns a promise also takes a `signal` in
+its options, to cancel it.
+
+## Settings
+
+Set them when you register the plugin, and change them while the app runs with
+`actions.updateSettings({ … })`; `actions.resetSettings()` goes back to what you registered, and
+`useActionsSettings()` gives you the current settings.
+
+| Setting               | What it does                                                   | Default           |
+| :-------------------- | :------------------------------------------------------------- | :---------------- |
+| `javascript.enabled`  | Run the document's JavaScript. A change applies to documents opened after it, since a document's script engine starts when it opens | `false` |
+| `javascript.identity` | Who scripts think the user is, on top of the document's user   | the document's user |
+| `policy`              | The rules above, per kind of action and per origin             | as in the table   |
+| `triggers`            | Run actions of the `document`, its `page`s, or `annotation`s   | all `true`        |
+| `openSequence`        | When the document's opening actions run: `'auto'`, `'headless'` (as the document opens, for an app without a Stage), `'off'`. A change applies to documents whose opening actions haven't run yet | `'auto'` |
+
+## Events
+
+<Snippet name="documents/action-diagnostics" />
+
+| Event                        | Fires when                                                                 | Carries                     |
+| :--------------------------- | :------------------------------------------------------------------------- | :-------------------------- |
+| `onExecuted`                 | Actions ran, whatever started them                                         | `tree`, `result`, `source`  |
+| `onDiagnosticReported`       | An action was blocked, reported or couldn't run                            | `code`, `action`, `source`  |
+| `onScriptFailed`             | A script threw an error                                                    | `error`, `source`           |
+| `onScriptDiagnosticReported` | A script was stopped from doing something, such as reaching the network, or used something the viewer doesn't support | `code`, `message` |
+| `onOpenSequenceCompleted`    | The document's opening actions ran                                         | `result`                    |
+| `onSettingsChanged`          | A setting changed                                                          | `settings`, `changed`       |
+
+## Permissions
+
+Actions don't need a permission of their own, but some things they do do: printing needs
+`doc.print`, and changing a form field needs `doc.forms.fill`. An action the user may not perform
+is reported, never run.
+
+## Good to know
+
+### When opening actions run
+
+With `openSequence: 'auto'`, the actions a document runs when it opens wait for the first sign of a
+person: the UI adapter being installed, or a first click. So a document that plays a script on open
+doesn't do it in a background tab nobody has looked at.
+
+### Scripts and forms
+
+Form calculations, validation and formatting are scripts too: with JavaScript on, the
+[form plugin](../forms) runs them as people type. See [Filling forms](../forms).

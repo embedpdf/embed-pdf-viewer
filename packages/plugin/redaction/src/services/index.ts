@@ -1,4 +1,4 @@
-/** Plugin-private services every area is built on (NOT the kernel). */
+/** The plugin-private services every area is built on, created once per instance. */
 import type { RedactionContext } from './context';
 import { createEvents, type RedactionEvents } from './events';
 import { resolveSiblings, type RedactionSiblings } from './siblings';

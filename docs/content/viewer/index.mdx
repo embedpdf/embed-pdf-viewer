@@ -1,0 +1,106 @@
+---
+title: Viewer
+description: A complete PDF viewer you add with one tag, then make your own with a few lines of config, in plain HTML, React, Vue, Svelte or Angular.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+{/* Served at `…/viewer/<framework>` with NO trailing slash: a relative href
+    resolves against `…/viewer/`, so pages are `quick-start`,
+    `customize/layout`, `concepts/how-it-works`. */}
+
+# A complete PDF viewer, ready to embed
+
+The viewer is everything people expect from a PDF app, in one tag: a toolbar, thumbnails, search,
+annotations, comments, forms, signatures and stamps. It fits a phone and a wide screen, speaks the
+user's language, and works with a keyboard and a screen reader.
+
+<Snippet name="viewer/start/first" />
+
+That's the whole integration. The rest of these docs are about making it yours.
+
+## Make it yours
+
+Everything you change is a few lines of config, the same in every framework. Start at the top and
+stop when it's enough:
+
+| You want to | Change | Page |
+| :-- | :-- | :-- |
+| Match your brand | Your accent color, fonts, light or dark | [Theming](customize/theming) |
+| Leave features out, or make it read-only | `disable: ['forms', 'redaction']`, `readOnly: true` | [Turn features off](features/turning-off) |
+| Move or remove buttons | One line per change | [Layout](customize/layout) |
+| Put a toolbar at the bottom, on the side, or several | Where each bar goes | [Layout](customize/layout) |
+| Add your own button | A command: a label, an icon, what it does | [Buttons & commands](customize/commands) |
+| Add your own menu or panel | A list of items, or your component | [Menus](customize/menus), [Panels](customize/panels) |
+| Put your own component in the toolbar | Your React, Vue, Svelte or Angular component | [Your own components](customize/components) |
+| Control the viewer from your app | The `viewer` object | [The viewer in code](code/viewer) |
+
+You never write layout code for phones, menus that open the right way, or keyboard focus. You say
+what goes where, and the viewer takes care of how it behaves. A menu in a bottom toolbar opens
+upward; the thumbnails slide up from the bottom on a phone; a button that doesn't fit moves into
+the "More" menu.
+
+## The viewer or headless?
+
+EmbedPDF comes in two forms, built on the same engine and the same plugins:
+
+- **The viewer** is finished. You configure it, theme it, and add your own buttons, menus, panels
+  and components.
+- **[Headless](/docs/headless)** is the parts. You build the whole interface yourself, and
+  nothing appears on screen unless you put it there.
+
+Start with the viewer. Every feature is a [headless plugin](code/plugins) with the same settings,
+and inside the viewer your own components can use the headless hooks. If you outgrow the viewer,
+what you learned still applies.
+
+<Engine local>
+
+## Local or cloud
+
+The viewer runs on the local engine by default: the PDF opens in the browser, with no server and no
+upload, and it works offline.
+
+<CloudPdfCallout
+  title="Open a 500-page PDF at once"
+  href="https://www.cloudpdf.com/docs/viewer"
+  cta="Use the viewer with CloudPDF"
+>
+
+With CloudPDF, the file stays on your server and pages arrive as images, so the first page shows
+at once, without downloading the whole PDF or the engine. Every action is checked on the server,
+and annotations and comments are shared live between everyone who has the document open. The
+viewer and your config stay the same.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+## The CloudPDF viewer
+
+The file stays on your server. Pages arrive as images, so the first page shows at once; every
+action is checked against the user's token; and annotations, comments and form values are stored
+as people make them, with everyone who has the document open seeing each other's changes.
+
+</Engine>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Quick start"
+    description="Install, show a PDF, add your color and your own button."
+    href="quick-start"
+  />
+  <Card
+    title="Layout"
+    description="Toolbars at any edge, several of them, and every button where you want it."
+    href="customize/layout"
+  />
+  <Card
+    title="Your own components"
+    description="Your React, Vue, Svelte or Angular components inside the viewer."
+    href="customize/components"
+  />
+</Cards>

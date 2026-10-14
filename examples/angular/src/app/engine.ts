@@ -1,9 +1,7 @@
 /**
- * The ONE place an engine is chosen — everything above speaks the engine-core
- * `Engine` contract only. `createLocalEngineWithWorker` constructs
- * synchronously and boots lazily (the host's `warmup()` kicks it off in the
- * background), so the shell renders at t≈0 and only `documents.open()` awaits
- * the engine.
+ * The one place an engine is chosen: everything else speaks the `Engine` contract only.
+ * `createLocalEngineWithWorker` constructs synchronously and boots lazily (the viewer warms it
+ * up when it starts), so the page renders at once and only opening a document waits for it.
  */
 import type { Engine, OpenInput } from '@embedpdf/angular/runtime';
 import { createLocalEngineWithWorker } from '@embedpdf/engine';

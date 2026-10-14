@@ -1,0 +1,104 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --focus: #7db6ff;
+  --unsaved: #b54708;
+  --unsaved-tint: #fffaeb;
+  --saved: #067647;
+  --saved-tint: #ecfdf3;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The title you change, whether it's downloaded, and the download */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.field {
+  appearance: none;
+  flex: 1 1 180px;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+
+.badge {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--saved);
+  background: var(--saved-tint);
+}
+
+.badge[data-unsaved='true'] {
+  color: var(--unsaved);
+  background: var(--unsaved-tint);
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.field:focus-visible,
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* What `onUnsavedChangesChanged` said, newest first */
+.log {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* The pages */
+.stage {
+  height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

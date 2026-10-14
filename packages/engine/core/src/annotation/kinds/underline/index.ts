@@ -1,18 +1,31 @@
-import type { UnderlineDraft } from './draft';
-import type { UnderlineAnnotationDTO } from './dto';
-import type { UnderlinePatch } from './patch';
-import { UnderlineDTOSchema, UnderlineDraftSchema, UnderlinePatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { UnderlineDeclaration } from './declaration';
 
-export type { UnderlineAnnotationDTO } from './dto';
-export type { UnderlineDraft } from './draft';
-export type { UnderlinePatch } from './patch';
-export { UnderlineDTOSchema, UnderlineDraftSchema, UnderlinePatchSchema } from './schema';
+export { UnderlineDeclaration } from './declaration';
+
+export type UnderlineAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof UnderlineDeclaration,
+  C
+>;
+export type UnderlineDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof UnderlineDeclaration,
+  C
+>;
+export type UnderlinePatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof UnderlineDeclaration,
+  C
+>;
+
+export const UnderlineDTOSchema = UnderlineDeclaration.readSchema;
+export const UnderlineDraftSchema = UnderlineDeclaration.createSchema;
+export const UnderlinePatchSchema = UnderlineDeclaration.updateSchema;
 
 export const UnderlineKind: AnnotationKindModule<
   'underline',
-  UnderlineAnnotationDTO,
+  UnderlineAnnotation,
   UnderlineDraft,
   UnderlinePatch
 > = {
@@ -21,4 +34,5 @@ export const UnderlineKind: AnnotationKindModule<
   dtoSchema: UnderlineDTOSchema,
   draftSchema: UnderlineDraftSchema,
   patchSchema: UnderlinePatchSchema,
+  readBackWrites: UnderlineDeclaration.readBackWrites,
 };

@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-23",
+  "kind": "archive-verification",
+  "pdfFileHashesVerified": 88,
+  "observationPdfAndScreenshotPairsVerified": 12,
+  "checklistRowsVerified": 88,
+  "originalSourceHashesVerified": 19,
+  "openSslCmsSignaturesVerified": 88,
+  "certificateTrustEvaluatedByOpenSsl": false,
+  "portableDiagnostics": {
+    "total": 178,
+    "passed": 138,
+    "failed": 40,
+    "exitCode": 1,
+    "failureScope": "Existing indirect-Annots-array policy assertions in the original matrix; five other probe files passed.",
+    "runtimes": ["wasm", "native"]
+  },
+  "note": "Archiving and rerunning did not change input bytes, Acrobat observations, historical reports or promoted policy expectations."
+}

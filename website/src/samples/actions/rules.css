@@ -1,0 +1,146 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #0876fd;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The example, in a card */
+.panel {
+  box-sizing: border-box;
+  padding: 16px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* One row per way to start: its rule and a button, wrapping on a phone */
+.starts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.start:first-child {
+  padding-top: 0;
+}
+
+.start-label {
+  flex: 1 1 180px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.start-label code {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 10px;
+}
+
+.field:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgb(125 182 255 / 0.35);
+}
+
+/* What happened, newest first */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.log {
+  flex: 1 1 240px;
+  min-height: 64px;
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.log li {
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.log li + li {
+  color: var(--muted);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

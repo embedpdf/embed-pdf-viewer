@@ -1,0 +1,19 @@
+ WARN  Issue while reading "/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/.npmrc". Failed to replace env in config: ${NPM_TOKEN}
+ WARN  Issue while reading "/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/.npmrc". Failed to replace env in config: ${NPM_TOKEN}
+packages/engine/runtime/npm/darwin-x64   |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["darwin"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/linux-arm64  |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["glibc"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/linux-x64    |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["glibc"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+.../engine/runtime/npm/linuxmusl-arm64   |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["musl"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+.../engine/runtime/npm/linuxmusl-x64     |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["musl"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/win32-arm64  |  WARN  Unsupported platform: wanted: {"cpu":["arm64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+packages/engine/runtime/npm/win32-x64    |  WARN  Unsupported platform: wanted: {"cpu":["x64"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+
+ RUN  v2.1.9 /tmp/epdf-weak-nm-probes
+
+ ✓ rewrite-reference-writer.test.ts (2 tests) 155ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  15:47:03
+   Duration  1.50s (transform 861ms, setup 0ms, collect 1.15s, tests 155ms, environment 0ms, prepare 40ms)
+

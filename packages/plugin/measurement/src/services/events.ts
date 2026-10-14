@@ -1,6 +1,4 @@
-/** The four change hooks; disposed with the plugin. */
-import { createEventHook } from '@embedpdf/core';
-
+/** The capability's four event sources, disposed with the instance. */
 import type {
   CalibrationCompletedEvent,
   CalibrationDismissedEvent,
@@ -10,21 +8,11 @@ import type {
 import type { MeasurementContext } from './context';
 
 export function createEvents(ctx: MeasurementContext) {
-  const report = (error: unknown) =>
-    globalThis.console?.error('[measurement] listener failed:', error);
-  const scaleChanged = createEventHook<MeasurementScaleChangedEvent>(report);
-  const calibrationRequested = createEventHook<CalibrationRequestedEvent>(report);
-  const calibrationCompleted = createEventHook<CalibrationCompletedEvent>(report);
-  const calibrationDismissed = createEventHook<CalibrationDismissedEvent>(report);
-  ctx.cleanup(() => {
-    for (const hook of [
-      scaleChanged,
-      calibrationRequested,
-      calibrationCompleted,
-      calibrationDismissed,
-    ])
-      hook.dispose();
-  });
-  return { scaleChanged, calibrationRequested, calibrationCompleted, calibrationDismissed };
+  return {
+    scaleChanged: ctx.events.source<MeasurementScaleChangedEvent>(),
+    calibrationRequested: ctx.events.source<CalibrationRequestedEvent>(),
+    calibrationCompleted: ctx.events.source<CalibrationCompletedEvent>(),
+    calibrationDismissed: ctx.events.source<CalibrationDismissedEvent>(),
+  };
 }
 export type MeasurementEvents = ReturnType<typeof createEvents>;

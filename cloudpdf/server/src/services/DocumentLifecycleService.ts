@@ -88,8 +88,8 @@ export interface InitInput {
   /**
    * Customer-supplied SHA-256 of the bytes they intend to upload.
    * Required so we can do a pre-flight dedup check (reuse-existing)
-   * and pin the verify-on-commit target. Phase 1 still verifies
-   * server-side at commit time, so a lying customer never wins.
+   * and pin the verify-on-commit target. The server still hashes the
+   * bytes at commit time, so a lying customer never wins.
    */
   contentSha256: string;
   metadata?: Record<string, unknown> | null;
@@ -157,7 +157,7 @@ export interface DocumentLifecycleOptions {
   /**
    * Base-file cache shared with the security probe and render plane.
    * When present, commit verifies the uploaded bytes by materialising
-   * them into this cache — ONE object-store read serves both the
+   * them into this cache — one object-store read serves both the
    * sha verification and the probe that follows. Absent (admin-only
    * deploys), commit falls back to a streaming remote hash.
    */
@@ -418,10 +418,10 @@ export class DocumentLifecycleService {
    *
    * Failure model:
    *   - policy/content failures (bad source, size/sha mismatch, too
-   *     large, 404/denied at the source) are TERMINAL: the row is
+   *     large, 404/denied at the source) are terminal: the row is
    *     marked failed with a sanitized reason and the call maps to 400;
    *   - transport failures (network, source 5xx, timeout, truncated
-   *     stream) are RETRYABLE: the row stays pending and the call maps
+   *     stream) are retryable: the row stays pending and the call maps
    *     to 502 — retrying with the same idempotencyKey resumes the
    *     same document. Abandoned pendings fall to the sweeper.
    */
@@ -527,10 +527,10 @@ export class DocumentLifecycleService {
   }
 
   /**
-   * Async eligibility, validated at REQUEST time so callers get their
+   * Async eligibility, validated at request time so callers get their
    * 400 immediately: connection sources only (a presigned URL is a
    * perishable secret — it cannot sit in a durable job row), the full
-   * authorization/fingerprint gate must pass NOW, and unpinnable
+   * authorization/fingerprint gate must pass now, and unpinnable
    * providers need a declared sha to fence retries to one content
    * identity.
    */
@@ -630,7 +630,7 @@ export class DocumentLifecycleService {
 
   /**
    * Worker entry: run one queued job's transfer. The job row is the
-   * provenance AND the fence — the worker owns every job transition,
+   * provenance and the fence — the worker owns every job transition,
    * so the transfer runs with provenance writes disabled and reports
    * its outcome back for a fenced succeed/fail. Retries are pinned to
    * one content identity: the requested revision, else the revision
@@ -690,7 +690,7 @@ export class DocumentLifecycleService {
       if (!marked) throw conflict(`document ${doc.id} state changed while starting import`);
       // Provenance from the wire descriptor — recorded even when
       // source construction/authorization fails a moment later. Async
-      // transfers skip this: the CLAIM already owns the job row.
+      // transfers skip this: the claim already owns the job row.
       if (provenance) {
         await this.documentImports?.recordAttemptStart({
           docId: doc.id,
@@ -783,7 +783,7 @@ export class DocumentLifecycleService {
           `sha_mismatch: expected.sha256 declared ${pins.expectedSha} but the source bytes hash to ${observedSha}`,
         );
       }
-      // From here the EXISTING commit path owns verification, the
+      // From here the existing commit path owns verification, the
       // security probe, metering, and thumbnail warming — the import
       // pathway adds no verification machinery of its own.
       let committed: CommitResult;
@@ -855,7 +855,7 @@ export class DocumentLifecycleService {
   }
 
   /**
-   * Import-flavoured intent check. Unlike init (which REQUIRES the
+   * Import-flavoured intent check. Unlike init (which requires the
    * sha upfront), imports may omit pins — so mismatches are enforced
    * only when both sides declare a value.
    */
@@ -918,7 +918,7 @@ export class DocumentLifecycleService {
       throw badRequest('sha_mismatch: declared sha256 must be 64 lowercase hex chars');
     }
 
-    // Verify the uploaded bytes with a SINGLE object-store read.
+    // Verify the uploaded bytes with a single object-store read.
     // `fileCache.acquire` materialises the object into the base-file
     // cache and hashes it on the way down (ShaMismatchError when the
     // bytes don't hash to `declaredSha`); the security probe below then
@@ -941,9 +941,9 @@ export class DocumentLifecycleService {
         }
       }
       if (!baseHandle || baseHandle.sourceKey !== key) {
-        // No cache wired, OR the content-addressed cache already held
-        // these bytes materialised from a DIFFERENT object's key — a
-        // hit proves nothing about what is stored at OUR key, so hash
+        // No cache wired, or the content-addressed cache already held
+        // these bytes materialised from a different object's key — a
+        // hit proves nothing about what is stored at our key, so hash
         // the remote object directly (streaming, constant memory).
         const observedSha = await this.storage.getSha256(key);
         if (!observedSha) {
@@ -992,9 +992,9 @@ export class DocumentLifecycleService {
       const recorded = await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
       if (recorded?.counted) await this.tenantUsage?.recordUpload(updated.tenantId);
 
-      // Thumbnail lifecycle: user-password documents get NO
+      // Thumbnail lifecycle: user-password documents get no
       // derived artifact — a thumbnail is content disclosure, and the lock
-      // tile IS the correct render. Everything else warms fire-and-forget:
+      // tile is the correct render. Everything else warms fire-and-forget:
       // the read-through path is the correctness path, warming is latency.
       if (probe.security.encryptionRequiresPassword === true) {
         await this.documents.setThumbnail(doc.id, doc.tenantId, 'locked');
@@ -1075,7 +1075,7 @@ export class DocumentLifecycleService {
     const prefix = StorageKeys.docRoot(tenantId, docId);
     await this.storage.deletePrefix(prefix);
     // Grants die with the document — explicitly, not via FK cascade,
-    // because SQLite deployments may run without foreign_keys ON and a
+    // because SQLite deployments may run without foreign_keys on and a
     // dangling grant would be a stored 404, not a security hole (the
     // exchange re-checks the document), but still a wart in listings.
     await this.shareGrants?.deleteByDoc(docId, tenantId);
@@ -1093,7 +1093,7 @@ export class DocumentLifecycleService {
     const stale = await this.documents.listStalePending(opts.olderThanMs);
     let swept = 0;
     for (const doc of stale) {
-      // A queued/running async job OWNS its pending document — the
+      // A queued/running async job owns its pending document — the
       // lease/backoff machinery retires it, never the sweeper.
       const job = await this.documentImports?.findByDoc(doc.id, doc.tenantId);
       if (job && (job.state === 'queued' || job.state === 'running')) continue;
@@ -1129,7 +1129,7 @@ function forbiddenError(message: string): Error {
 }
 
 /**
- * Provenance fields derivable from the WIRE descriptor alone —
+ * Provenance fields derivable from the wire descriptor alone —
  * available even when source construction fails. Success enriches
  * kind/location with the resolved adapter identity.
  */

@@ -18,10 +18,20 @@
       "import": "./dist/conformance.js",
       "require": "./dist/conformance.cjs"
     },
+    "./public": {
+      "development": "./src/public.ts",
+      "import": "./dist/public.js",
+      "require": "./dist/public.cjs"
+    },
     "./runtime": {
       "development": "./src/runtime.ts",
       "import": "./dist/runtime.js",
       "require": "./dist/runtime.cjs"
+    },
+    "./validation": {
+      "development": "./src/validation.ts",
+      "import": "./dist/validation.js",
+      "require": "./dist/validation.cjs"
     },
     "./wire": {
       "development": "./src/wire.ts",
@@ -33,6 +43,7 @@
   "scripts": {
     "build": "epdf-build",
     "clean": "rimraf dist",
+    "generate": "node --experimental-transform-types --disable-warning=ExperimentalWarning --import ./scripts/register-source.mjs scripts/generate-kind-facts.ts",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
     "test": "vitest run",
@@ -79,9 +90,17 @@
         "import": "./dist/conformance.js",
         "require": "./dist/conformance.cjs"
       },
+      "./public": {
+        "import": "./dist/public.js",
+        "require": "./dist/public.cjs"
+      },
       "./runtime": {
         "import": "./dist/runtime.js",
         "require": "./dist/runtime.cjs"
+      },
+      "./validation": {
+        "import": "./dist/validation.js",
+        "require": "./dist/validation.cjs"
       },
       "./wire": {
         "import": "./dist/wire.js",

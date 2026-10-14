@@ -7,7 +7,7 @@ const measured: Record<string, { ascent: number; descent: number }> = {
   '"Courier New", Courier, monospace': { ascent: 0.833, descent: 0.3 },
   '"roboto", sans-serif': { ascent: 0.927, descent: 0.244 }, // an approximate browser measurement
 };
-const measure = (f: string) => measured[f] ?? null;
+const measure = (family: string) => measured[family] ?? null;
 
 describe('lineModelFor', () => {
   it('uses the engine metrics for the standard families, whatever the browser substitutes', () => {
@@ -59,8 +59,11 @@ describe('webFontMetrics', () => {
     const context = {
       font: '',
       measureText: vi.fn(() => {
-        const m = read(context.font);
-        return { fontBoundingBoxAscent: m.ascent * 100, fontBoundingBoxDescent: m.descent * 100 };
+        const fontMetrics = read(context.font);
+        return {
+          fontBoundingBoxAscent: fontMetrics.ascent * 100,
+          fontBoundingBoxDescent: fontMetrics.descent * 100,
+        };
       }),
     };
     const createElement = vi.fn(() => ({ getContext: () => context }));

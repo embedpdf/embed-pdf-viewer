@@ -1,6 +1,12 @@
-/** A browser image source whose object URL has an explicit lifetime. */
+/**
+ * A browser image source whose object URL has an explicit lifetime: an
+ * engine `PageImageHandle`, whose `objectUrl()` is cancellable and follows an
+ * `AbortSignal` through `abortWith()`.
+ */
 export interface ObjectUrlImageSource {
-  objectUrl(signal?: AbortSignal): Promise<{ url: string; revoke(): void }>;
+  objectUrl(): {
+    abortWith(signal: AbortSignal): PromiseLike<{ url: string; revoke(): void }>;
+  };
 }
 
 export interface PaintedImageCallbacks {
@@ -48,19 +54,22 @@ export function bindPaintedImage(
 
   image.addEventListener('load', onLoad, { once: true });
 
-  void source.objectUrl(controller.signal).then(
-    (objectUrl) => {
-      if (controller.signal.aborted) {
-        objectUrl.revoke();
-        return;
-      }
-      revoke = objectUrl.revoke;
-      image.src = objectUrl.url;
-    },
-    () => {
-      // Aborted or unavailable: remain hidden and retain fallback coverage.
-    },
-  );
+  void source
+    .objectUrl()
+    .abortWith(controller.signal)
+    .then(
+      (objectUrl) => {
+        if (controller.signal.aborted) {
+          objectUrl.revoke();
+          return;
+        }
+        revoke = objectUrl.revoke;
+        image.src = objectUrl.url;
+      },
+      () => {
+        // Aborted or unavailable: remain hidden and retain fallback coverage.
+      },
+    );
 
   return () => {
     controller.abort();

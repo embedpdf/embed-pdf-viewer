@@ -1,5 +1,5 @@
 /**
- * @cloudpdf/server - self-hostable Engine v3 server.
+ * @cloudpdf/server - the self-hostable engine server.
  *
  * Programmatic API used by tests and integrators. The CLI entry point lives
  * at bin/cloudpdf-server.ts.
@@ -10,7 +10,7 @@ export type { BuildAppOptions, AppBundle } from './app/buildApp';
 /**
  * @license FCL-1.0-ALv2
  *
- * WARNING: The exports below provide CloudPDF's required license runtime.
+ * Warning: The exports below provide CloudPDF's required license runtime.
  * Removing or modifying them to disable or circumvent license enforcement,
  * enable protected functionality without a valid license key, or remove
  * protected functionality is a breach of FCL-1.0-ALv2 while this release is
@@ -57,7 +57,7 @@ export type {
 export { loadFallbackFontsFromEnv } from './runtime/loadFallbackFontsFromEnv';
 export * from './security/index';
 
-// Phase 1 cloud platform surfaces.
+// Database drivers, migrations, repositories and object storage.
 export { createSqliteDb } from './db/drivers/sqlite';
 export type { CreateSqliteDbOptions } from './db/drivers/sqlite';
 export { createPostgresDb } from './db/drivers/postgres';
@@ -82,8 +82,6 @@ export type {
   DocumentPagesTable,
   LayersTable,
   LayerPagesTable,
-  WeakAnnotationSessionsTable,
-  WeakAnnotationSessionPagesTable,
   AuditLogTable,
 } from './db/schema';
 export { DocumentsRepo } from './db/repos/documents.repo';
@@ -101,11 +99,6 @@ export type {
   LayerRow,
   CreateLayerInput,
 } from './db/repos/page_state.repo';
-export { WeakAnnotationSessionsRepo } from './db/repos/weak_annotation_sessions.repo';
-export type {
-  WeakAnnotationSessionRow,
-  WeakAnnotationSessionScope,
-} from './db/repos/weak_annotation_sessions.repo';
 export { AuditLogRepo } from './db/repos/audit_log.repo';
 export type {
   AppendAuditLogInput,
@@ -172,7 +165,6 @@ export {
 export { DocumentImportsRepo, type DocumentImportRow } from './db/repos/document_imports.repo';
 
 // CDN adapter family (signers + factory + config + None adapter).
-// HMAC/CloudFront adapters ship in commit G; purge wiring in commit H.
 export type {
   CdnSigner,
   CdnSignerInfo,
@@ -217,7 +209,7 @@ export type {
   UploadProxyPolicy,
 } from './services/DocumentLifecycleService';
 
-// Phase 3 — document open + worker integration.
+// Document open + worker integration.
 export { BaseFileCache, fileSha256 } from './storage/BaseFileCache';
 export type {
   BaseFileCacheOptions,
@@ -233,8 +225,6 @@ export type {
   DocumentManifest,
   OpenContext,
 } from './services/DocumentService';
-export { CloudRevisionBridge } from './services/CloudRevisionBridge';
-export type { AnnotationMutationResult } from './services/CloudRevisionBridge';
 export { EventLogService } from './services/EventLogService';
 export type {
   AuditEvent,
@@ -245,19 +235,13 @@ export type {
   ExportDocDayResult,
 } from './services/EventLogService';
 export { LayerStateService } from './services/LayerStateService';
-export type { LayerStateServiceOptions, MutationImpactKind } from './services/LayerStateService';
+export type { LayerStateServiceOptions } from './services/LayerStateService';
 export { LayerService } from './services/LayerService';
 export type {
   LayerServiceOptions,
   LayerWriteContext,
   MaterializedLayer,
 } from './services/LayerService';
-export { WeakAnnotationSessionService } from './services/WeakAnnotationSessionService';
-export type {
-  WeakAnnotationSessionServiceOptions,
-  WeakAnnotationSessionContext,
-  WeakAnnotationSessionResult,
-} from './services/WeakAnnotationSessionService';
 
 /**
  * Stable URL of the bundled worker_thread entry. Resolves to:

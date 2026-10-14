@@ -1,136 +1,162 @@
 /**
  * The React surface for @embedpdf/plugin-search.
  *
- * <SearchLayer> is a dumb renderer, the SelectionLayer's twin: it reads
- * the page's content-space hit rects from the capability and paints them
- * through PageContext.toPixels. The active hit gets its own colour.
- * No pointer handling, no engine calls — search is driven from app chrome
+ * <SearchLayer> is the SelectionLayer's twin: it reads the page's page-space
+ * hit rects from the capability and paints them through PageContext.toPixels,
+ * in the colors of the plugin's `highlight` setting, which the `--epdf-search-*`
+ * CSS variables override. No engine calls: search is driven from app chrome
  * via useSearch().
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-search';
 import * as React from 'react';
-import { SearchToken } from '@embedpdf/plugin-search';
+import { useState } from 'react';
+import { SearchToken, searchState } from '@embedpdf/plugin-search';
 import type { SearchCapability, SearchHit } from '@embedpdf/plugin-search';
-import type { EventHook } from '@embedpdf/core';
-import { useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
+import type { EventHook, PageRef } from '@embedpdf/core';
+import { createClickDetector, paint, searchHighlightsOf } from '@embedpdf/web';
+import {
+  useCapability,
+  useCapabilityEvent,
+  useDocumentScope,
+  useKernelValue,
+  usePage,
+} from './runtime';
+import { settingsHook, stateHook } from './state';
 
 export interface SearchLayerProps {
-  /** Highlight colour for hits — SOLID (default: highlighter yellow). */
-  color?: string;
-  /** Highlight colour for the ACTIVE hit — SOLID (default: orange). */
-  activeColor?: string;
   /**
-   * How the highlight composites with the page. `'multiply'` (default) is
-   * the real-highlighter look: text stays crisp black through the colour,
-   * only the paper tints. Pass `'normal'` (with translucent colours) for
-   * dark/scanned documents where multiply-on-dark would vanish.
+   * Make matches clickable: called with the match someone clicks, for example
+   * to make it the active one with `search.goToHit(hit)`. The press still
+   * reaches the page, so a drag that starts on a match selects text, and only
+   * a click calls this. Without it, matches are only paint and the pointer
+   * goes straight through.
    */
-  blendMode?: React.CSSProperties['mixBlendMode'];
-  /** Make hits clickable: called with the hit under the pointer (e.g. to activate it). */
   onHitClick?: (hit: SearchHit) => void;
 }
 
-export function SearchLayer({
-  color = '#ffd500',
-  activeColor = '#ff9632',
-  blendMode = 'multiply',
-  onHitClick,
-}: SearchLayerProps) {
+export function SearchLayer({ onHitClick }: SearchLayerProps) {
   const page = usePage();
-  // Per-page hit arrays are reference-stable in the plugin, so plain Object.is works.
-  const hits = useSelector(SearchToken, (c) => c.listHits({ page: page.ref }));
-  const active = useSelector(SearchToken, (c) => c.getActiveHit());
+  // Per-page hit arrays are reference-stable in the plugin, so this re-renders
+  // only when matches land on this page.
+  const hits = useSearchHits(page.ref);
+  const active = useSearchState((state) => state.activeHit);
+  const highlight = useSearchSettings((settings) => settings.highlight);
+  // Tells a click on a match from a drag that starts there (and selects text).
+  const [clicks] = useState(createClickDetector);
 
   if (hits.length === 0) return null;
 
+  // Each color is its CSS variable first, then the setting: CSS wins.
+  const color = paint('search-highlight', highlight.color);
+  const activeColor = paint('search-highlight-active', highlight.activeColor);
+  const blendMode = paint(
+    'search-blend-mode',
+    highlight.blendMode,
+  ) as React.CSSProperties['mixBlendMode'];
+
+  // Only a clickable match takes the pointer; a plain highlight stays inert.
+  // Nothing here stops the press, so it reaches the page as well.
+  const clickable = onHitClick ? { pointerEvents: 'auto' as const, cursor: 'pointer' } : null;
+  const pointerHandlers = (hit: SearchHit) =>
+    onHitClick && {
+      onPointerDown: (event: React.PointerEvent) => clicks.press(event),
+      onClick: (event: React.MouseEvent) => {
+        if (clicks.isClick(event)) onHitClick(hit);
+      },
+    };
+
+  // Upright lines are a rounded box; turned lines draw their true quad.
+  const pieces = searchHighlightsOf(hits, {
+    active,
+    page: page.transform,
+    color,
+    activeColor,
+  });
+
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      {hits.map((hit: SearchHit) =>
-        hit.segments.map(({ quad: q }, i) => {
-          const fill = hit === active ? activeColor : color;
-          // Only a clickable hit takes the pointer; a plain highlight stays inert.
-          const clickable = onHitClick
-            ? { pointerEvents: 'auto' as const, cursor: 'pointer' }
-            : null;
-          const onClick = onHitClick ? () => onHitClick(hit) : undefined;
-          // Upright hits keep the classic rounded div (pixel-identical to the
-          // pre-orientation layer); rotated hits draw their true oriented cell.
-          const upright =
-            q.upperStart.y === q.upperEnd.y &&
-            q.lowerStart.y === q.lowerEnd.y &&
-            q.upperStart.x === q.lowerStart.x;
-          if (upright) {
-            const tl = page.transform.toPixels(q.upperStart);
-            const br = page.transform.toPixels(q.lowerEnd);
-            return (
-              <div
-                key={`${hit.charStart}:${i}`}
-                onClick={onClick}
-                style={{
-                  position: 'absolute',
-                  left: tl.x,
-                  top: tl.y,
-                  width: br.x - tl.x,
-                  height: br.y - tl.y,
-                  background: fill,
-                  mixBlendMode: blendMode,
-                  borderRadius: 2,
-                  ...clickable,
-                }}
-              />
-            );
-          }
-          const ring = [q.upperStart, q.upperEnd, q.lowerEnd, q.lowerStart].map((p) =>
-            page.transform.toPixels(p),
-          );
-          return (
-            <svg
-              key={`${hit.charStart}:${i}`}
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                overflow: 'visible',
-                mixBlendMode: blendMode,
-              }}
-            >
-              <polygon
-                points={ring.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill={fill}
-                onClick={onClick}
-                style={clickable ?? undefined}
-              />
-            </svg>
-          );
-        }),
+      {pieces.map((piece) =>
+        piece.box ? (
+          <div
+            key={piece.key}
+            {...pointerHandlers(piece.hit)}
+            style={{
+              position: 'absolute',
+              left: piece.box.left,
+              top: piece.box.top,
+              width: piece.box.width,
+              height: piece.box.height,
+              backgroundColor: piece.fill,
+              mixBlendMode: blendMode,
+              borderRadius: 2,
+              ...clickable,
+            }}
+          />
+        ) : (
+          <svg
+            key={piece.key}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              overflow: 'visible',
+              mixBlendMode: blendMode,
+            }}
+          >
+            {/* The fill goes in `style`: an SVG attribute doesn't read var(). */}
+            <polygon
+              points={piece.points ?? undefined}
+              {...pointerHandlers(piece.hit)}
+              style={{ fill: piece.fill, ...clickable }}
+            />
+          </svg>
+        ),
       )}
     </div>
   );
 }
 
 /** The search capability (search / clear / nextHit / previousHit / …) for app chrome. */
-export function useSearch() {
+export function useSearch(): SearchCapability {
   return useCapability(SearchToken);
 }
 
-/** Subscribe to one search event for the mounted lifetime: `useSearchEvent((c) => c.onCompleted, handler)`. */
+/** Subscribe to one search event for the mounted lifetime: `useSearchEvent((search) => search.onCompleted, handler)`. */
 export function useSearchEvent<T>(
-  select: (cap: SearchCapability) => EventHook<T>,
+  select: (search: SearchCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(SearchToken, select, handler);
 }
 
-/** Reactive search read-model for chrome: the query, status, counts, progress. */
-export function useSearchState() {
-  const query = useSelector(SearchToken, (c) => c.getQuery());
-  const status = useSelector(SearchToken, (c) => c.getStatus());
-  const hitCount = useSelector(SearchToken, (c) => c.getHitCount());
-  const activeIndex = useSelector(SearchToken, (c) => c.getActiveHitIndex());
-  const progress = useSelector(SearchToken, (c) => c.getProgress());
-  const error = useSelector(SearchToken, (c) => c.getError());
-  return { query, status, hitCount, activeIndex, progress, error };
+/**
+ * The search's state: the query, status, count, active match, progress and
+ * error (the page's State table, declared once in `searchState`). Takes a
+ * selector, and re-renders only when what it returns changes.
+ */
+export const useSearchState = stateHook(searchState);
+
+/** The search settings (`reveal`, `highlight`), with or without a document. Takes a selector. */
+export const useSearchSettings = settingsHook(SearchToken);
+
+const NO_HITS: readonly SearchHit[] = Object.freeze([]);
+
+/**
+ * Every match found so far, or one page's (its ref or index), for a results
+ * list or a count per thumbnail. The arrays are reference-stable, so a
+ * component re-renders only when matches land on what it shows. Empty without
+ * a document, and for a page that has just left the document.
+ */
+export function useSearchHits(page?: PageRef | number): readonly SearchHit[] {
+  const scoped = useDocumentScope();
+  // Resolved on every read, like the state hook: a document that closes reads as no hits.
+  return useKernelValue(
+    (kernel) =>
+      kernel
+        .tryCapability(SearchToken, scoped ?? undefined)
+        ?.listHits(page === undefined ? undefined : { page }) ?? NO_HITS,
+  );
 }

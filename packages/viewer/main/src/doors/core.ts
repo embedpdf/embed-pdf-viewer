@@ -1,8 +1,8 @@
 /**
- * @embedpdf/viewer/core — the ENGINE-AGNOSTIC door (`dist/core.js`).
+ * @embedpdf/viewer/core — the engine-agnostic door (`dist/core.js`).
  *
  * Everything the local door has — the element, `init()`, the customization
- * vocabulary, the DRIVE tokens — except a default engine: `engine` is REQUIRED
+ * vocabulary, the drive tokens — except a default engine: `engine` is required
  * here, and takes only a real implementation (an `Engine`, or a factory thunk
  * the viewer owns the lifetime of). This is what engine-injecting builds bundle
  * (the cloud snippet wires `cloudEngine`), so the local PDFium engine — wasm,
@@ -10,16 +10,17 @@
  * graph rather than stubbed out.
  *
  * Because that engine is absent, so is its options bag: `engine: { assetsUrl }`
- * configures the BUILT-IN engine, and there is none here to configure. The type
+ * configures the built-in engine, and there is none here to configure. The type
  * says so, instead of accepting it and throwing at mount.
  *
- * This door registers no engine provider — that omission IS the door. App code
+ * This door registers no engine provider — that omission is the door. App code
  * wanting the batteries-included viewer should import `@embedpdf/viewer`.
  */
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 
 import {
   initViewer,
+  type ElementSrc,
   type EmbedPdfViewerElement,
   type MountTarget,
   type ViewerConfigBase,
@@ -28,11 +29,13 @@ import {
 export * from '../kernel';
 
 /**
- * The engine-agnostic contract. Same public NAME as the local door's config —
+ * The engine-agnostic contract. Same public name as the local door's config —
  * one name per door, so sample code and docs never pick a door-specific type
- * name; the door you imported decides what it means.
+ * name; the door you imported decides what it means. A document is what the
+ * engine you give opens: a URL, a file or bytes, or its own open input
+ * (`{ kind: 'token', token }` for the cloud engine).
  */
-export interface ViewerConfig extends ViewerConfigBase {
+export interface ViewerConfig extends ViewerConfigBase<ElementSrc> {
   engine: Engine | EngineFactory;
 }
 

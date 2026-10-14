@@ -1,13 +1,13 @@
 /**
  * The snippet, loaded the way the docs show it: as a native ES module from
- * ANOTHER origin (jsDelivr in production; a local "CDN" here), into a plain
+ * another origin (jsDelivr in production; a local "CDN" here), into a plain
  * page. The regression this guards: every sibling the artifact needs — the
  * worker chunk, `embedpdf.wasm`, lazy chunks — must resolve relative to the
  * artifact's own folder and be fetched from that origin, and nowhere else.
  * A wasm URL computed against the wrong chunk, a CDN literal creeping into
  * the code, a missing CORS-safe sibling: all fail here, before they ship.
  *
- * Runs against the BUILT artifact (`pnpm build` first). Needs a Chromium:
+ * Runs against the built artifact (`pnpm build` first). Needs a Chromium:
  * Playwright's own (`npx playwright-core install chromium`, what CI does)
  * or a local Google Chrome as the fallback.
  */
@@ -74,24 +74,24 @@ function serveDirectory(root: string, cors: boolean, extra: Record<string, strin
   if (existsSync(root)) walk(root, '');
   for (const [pathname, file] of Object.entries(extra)) add(pathname, file);
 
-  return createServer((req, res) => {
+  return createServer((request, result) => {
     let pathname: string;
     try {
-      pathname = decodeURIComponent((req.url ?? '/').split('?')[0]);
+      pathname = decodeURIComponent((request.url ?? '/').split('?')[0]);
     } catch {
-      res.writeHead(400).end();
+      result.writeHead(400).end();
       return;
     }
     const asset = assets.get(pathname);
     if (!asset) {
-      res.writeHead(404).end();
+      result.writeHead(404).end();
       return;
     }
-    res.writeHead(200, {
+    result.writeHead(200, {
       'content-type': asset.contentType,
       ...(cors ? { 'access-control-allow-origin': '*' } : {}),
     });
-    res.end(asset.body);
+    result.end(asset.body);
   });
 }
 
@@ -114,12 +114,12 @@ describe('static fixture server', () => {
   const request = (base: string, path: string) =>
     new Promise<{ status: number | undefined; headers: IncomingHttpHeaders; body: string }>(
       (ok, reject) => {
-        get(base, { path }, (res) => {
+        get(base, { path }, (result) => {
           let body = '';
-          res.setEncoding('utf8');
-          res.on('data', (chunk) => (body += chunk));
-          res.on('end', () => ok({ status: res.statusCode, headers: res.headers, body }));
-          res.on('error', reject);
+          result.setEncoding('utf8');
+          result.on('data', (chunk) => (body += chunk));
+          result.on('end', () => ok({ status: result.statusCode, headers: result.headers, body }));
+          result.on('error', reject);
         }).on('error', reject);
       },
     );
@@ -282,14 +282,14 @@ describe('snippet from a foreign origin', () => {
       );
     }
 
-    const wasm = requests.find((r) => r.url === `${cdnOrigin}/embedpdf.wasm`);
+    const wasm = requests.find((request) => request.url === `${cdnOrigin}/embedpdf.wasm`);
     expect(wasm?.status, 'embedpdf.wasm fetched from the artifact folder').toBe(200);
     const foreign = requests.filter(
-      (r) => !r.url.startsWith(cdnOrigin) && !r.url.startsWith(siteOrigin),
+      (request) => !request.url.startsWith(cdnOrigin) && !request.url.startsWith(siteOrigin),
     );
     expect(foreign, 'no request left the two origins').toEqual([]);
     expect(failures).toEqual([]);
-    expect(errors.filter((e) => !/favicon/i.test(e))).toEqual([]);
+    expect(errors.filter((error) => !/favicon/i.test(error))).toEqual([]);
     await page.close();
   });
 });

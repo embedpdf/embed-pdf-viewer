@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { bindPaintedImage } from '../src/painted-image';
 
+/** An image source like an engine image's: `objectUrl()` follows a signal. */
+function source(url: PromiseLike<{ url: string; revoke(): void }>) {
+  return { objectUrl: () => ({ abortWith: () => url }) };
+}
+
 class FakeImage {
   src = '';
   style = { visibility: '' };
@@ -54,7 +59,7 @@ describe('bindPaintedImage', () => {
 
     const cleanup = bindPaintedImage(
       image as unknown as HTMLImageElement,
-      { objectUrl: async () => ({ url: 'blob:tile', revoke }) },
+      source(Promise.resolve({ url: 'blob:tile', revoke })),
       { onPainted, onUnpainted },
     );
 
@@ -87,7 +92,7 @@ describe('bindPaintedImage', () => {
 
     const cleanup = bindPaintedImage(
       image as unknown as HTMLImageElement,
-      { objectUrl: async () => ({ url: 'blob:tile', revoke }) },
+      source(Promise.resolve({ url: 'blob:tile', revoke })),
       { onPainted, onUnpainted },
     );
 
@@ -113,11 +118,10 @@ describe('bindPaintedImage', () => {
       resolveUrl = resolve;
     });
 
-    const cleanup = bindPaintedImage(
-      image as unknown as HTMLImageElement,
-      { objectUrl: () => objectUrl },
-      { onPainted: vi.fn(), onUnpainted: vi.fn() },
-    );
+    const cleanup = bindPaintedImage(image as unknown as HTMLImageElement, source(objectUrl), {
+      onPainted: vi.fn(),
+      onUnpainted: vi.fn(),
+    });
 
     cleanup();
     resolveUrl({ url: 'blob:late', revoke });

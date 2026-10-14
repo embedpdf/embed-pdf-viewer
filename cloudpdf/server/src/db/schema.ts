@@ -1,14 +1,10 @@
 /**
  * Logical database schema for @cloudpdf/server.
  *
- * Source of truth for both SQLite (Phase 1) and Postgres (Phase 2). The
- * column shapes here are the dialect-agnostic view; per-dialect migration
- * files under `db/migrations/{sqlite,postgres}/` adapt them to actual
- * column types (TEXT/INTEGER for SQLite, equivalents for PG).
- *
- * Phase 1 ships only `tenants`, `documents`, and `schema_migrations`.
- * Later phases add `document_pages`, `layers`, `layer_pages`,
- * `revoked_jtis`, `jwks_cache`, `audit_log`, and weak annotation sessions.
+ * Source of truth for both SQLite and Postgres. The column shapes here
+ * are the dialect-agnostic view; per-dialect migration files under
+ * `db/migrations/{sqlite,postgres}/` adapt them to actual column types
+ * (TEXT/INTEGER for SQLite, equivalents for PG).
  */
 
 import type { Generated } from 'kysely';
@@ -76,7 +72,7 @@ export interface DocumentsTable {
   failure_reason: string | null;
   /**
    * Thumbnail lifecycle for dashboards: `pending` (not warmed yet — the
-   * read-through still works), `ready`, `locked` (user-password doc: NO
+   * read-through still works), `ready`, `locked` (user-password doc: No
    * derived artifact by design), `failed` (warm errored; read-through is
    * the repair path). Defaults `pending` via migration 015.
    */
@@ -92,9 +88,10 @@ export interface DocumentPagesTable {
   doc_id: string;
   page_object_number: number;
   content_version: number;
+  /** The page's annotations except widgets. */
   annotation_version: number;
-  annotation_generation: number;
-  has_weak_annotations: boolean | number;
+  /** The page's widgets (migration 034). */
+  widget_version: number;
   updated_at: number;
 }
 
@@ -132,12 +129,18 @@ export interface LayersTable {
   /**
    * Bulk-annotations pointer epoch for the whole-document
    * `/annotations/items@annotationsVersion` leaf. Bumps only when
-   * annotation list BODIES change (annotation CRUD, page insert/delete,
-   * redaction, flatten, form field/widget structure) — deliberately NOT
-   * on form value writes, metadata, attachments, or page move/rotate.
-   * The `metadata_version` independent-cadence design.
+   * annotation list bodies change (annotation CRUD, stacking order, page
+   * insert/delete, redaction, flatten) — never on form writes (widgets are
+   * the form's), metadata, attachments, or page move/rotate. The
+   * `metadata_version` independent-cadence design.
    */
   annotations_version: number;
+  /**
+   * Form pointer epoch for `/form@formsVersion` (migration 034): bumps on
+   * every form write, a stacking-order move, page insert/delete, redaction
+   * and flatten; never on an annotation write.
+   */
+  forms_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */
@@ -146,6 +149,17 @@ export interface LayersTable {
   current_artifact_key: string | null;
   current_artifact_sha: string | null;
   current_artifact_size: number | null;
+  /**
+   * The layer's object number counter (migration 032): every number below it
+   * was handed out, to an editing session or to a write. NULL until the
+   * layer first needs one.
+   */
+  next_object_number: number | null;
+  /**
+   * The audit id of the layer's last final change (migration 033): no change
+   * before it can be undone. NULL until the first.
+   */
+  undo_horizon: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -154,28 +168,11 @@ export interface LayerPagesTable {
   layer_id: string;
   page_object_number: number;
   content_version: number;
+  /** The page's annotations except widgets. */
   annotation_version: number;
-  annotation_generation: number;
-  has_weak_annotations: boolean | number;
+  /** The page's widgets (migration 034). */
+  widget_version: number;
   updated_at: number;
-}
-
-export interface WeakAnnotationSessionsTable {
-  id: string;
-  tenant_id: string;
-  doc_id: string;
-  layer_name: string;
-  sub: string;
-  created_at: number;
-  updated_at: number;
-  expires_at: number;
-}
-
-export interface WeakAnnotationSessionPagesTable {
-  session_id: string;
-  page_object_number: number;
-  updated_at: number;
-  expires_at: number;
 }
 
 export interface AuditLogTable {
@@ -195,9 +192,11 @@ export interface AuditLogTable {
   artifact_size: number;
   idempotency_key: string | null;
   payload_json: string;
-  /** Engine-instance session id of the mutating client (X-Engine-Session-Id);
+  /** Session id of the mutating open document (X-Engine-Session-Id);
    *  lets SSE subscribers drop their own echoes. NULL when not sent. */
   origin_session_id: string | null;
+  /** An undo's row: the opId of the change it undid (migration 033). */
+  undo_of: string | null;
 }
 
 export type AuditExportStatus = 'running' | 'succeeded' | 'failed';
@@ -282,8 +281,8 @@ export interface SecurityEventsTable {
 
 /**
  * Share grants: standing, revocable authorization decisions for the
- * no-backend embed flow. The row id IS the public share token — a
- * REFERENCE evaluated at exchange time, never a bearer credential,
+ * no-backend embed flow. The row id is the public share token — a
+ * reference evaluated at exchange time, never a bearer credential,
  * which is what makes grants long-lived, editable, and revocable while
  * every credential that reaches a browser stays a short-lived doc JWT.
  */
@@ -313,7 +312,7 @@ export interface ShareGrantsTable {
 }
 
 /**
- * Per-tenant usage FACTS, one row per (tenant, metric, UTC month).
+ * Per-tenant usage facts, one row per (tenant, metric, UTC month).
  * Deliberately separate from `license_usage_counter`: that table
  * answers "is this deployment within its license" and stays
  * deployment-wide; this one answers "what did each tenant consume"
@@ -366,7 +365,7 @@ export interface SchemaMigrationsTable {
 }
 
 /**
- * Phase 2 — per-token denylist consulted on every authenticated
+ * Per-token denylist consulted on every authenticated
  * request. Fronted by `RevokedJtisGuard`'s in-memory LRU so the DB
  * round-trip happens only on cache misses.
  */
@@ -384,7 +383,7 @@ export interface RevokedJtisTable {
 }
 
 /**
- * Phase 2 — persistent JWKS cache keyed by issuer. The actual
+ * Persistent JWKS cache keyed by issuer. The actual
  * verifier uses `jose`'s in-memory cache; this table is the
  * cold-boot warm-up so we don't slam the customer's IdP on every
  * pod restart.
@@ -505,7 +504,60 @@ export interface BaseVersionsTable {
   metadata_version: number;
   attachments_version: number;
   annotations_version: number;
+  forms_version: number;
   created_at: number;
+}
+
+/**
+ * An editing session (migration 032): one open document (its
+ * `X-Engine-Session-Id`) acting for one token subject on one layer. Its
+ * blocks of object numbers stay its own while its expiry keeps moving.
+ */
+export interface EditSessionsTable {
+  layer_id: string;
+  session_id: string;
+  sub: string;
+  expires_at: number;
+  created_at: number;
+}
+
+/**
+ * Up to 32 consecutive object numbers from `first` (migration 032): bit i of
+ * `available` is set while `first + i` is unspent. `session_id` NULL: a
+ * write returned them, for any session.
+ */
+export interface ObjectNumberBlocksTable {
+  layer_id: string;
+  first: number;
+  available: number;
+  session_id: string | null;
+}
+
+/** Whether a change was applied or refused (migration 033). */
+export type ChangeOutcomeStatus = 'applied' | 'refused';
+
+/**
+ * What one change answered, under its opId (migration 033): kept so a retry
+ * gets the same answer, refusals included, and, while it can be undone, the
+ * reverse the engine recorded and the key of its capture blob.
+ */
+export interface ChangeOutcomesTable {
+  layer_id: string;
+  op_id: string;
+  /** The change's fingerprint: a retry under the opId must send the same change. */
+  payload_hash: string;
+  status: ChangeOutcomeStatus;
+  /** The answer as the client got it (JSON): the result, or the error. */
+  response: string;
+  /** The token subject that made it: only they may undo it. */
+  actor: string;
+  /** Its audit row, when applied. */
+  audit_id: number | null;
+  /** The recorded reverse (JSON, captures by offset into the blob), while it can be undone. */
+  reverse: string | null;
+  capture_key: string | null;
+  created_at: number;
+  expires_at: number;
 }
 
 export type DocumentSigningState = 'prepared' | 'completed' | 'aborted' | 'expired';
@@ -559,8 +611,9 @@ export interface Database {
   layer_pages: LayerPagesTable;
   base_versions: BaseVersionsTable;
   document_signings: DocumentSigningsTable;
-  weak_annotation_sessions: WeakAnnotationSessionsTable;
-  weak_annotation_session_pages: WeakAnnotationSessionPagesTable;
+  edit_sessions: EditSessionsTable;
+  object_number_blocks: ObjectNumberBlocksTable;
+  change_outcomes: ChangeOutcomesTable;
   audit_log: AuditLogTable;
   audit_exports: AuditExportsTable;
   pdf_password_verifications: PdfPasswordVerificationsTable;

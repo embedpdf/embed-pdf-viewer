@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { renderDocsMarkdown } from './docs-markdown';
 
-const gettingStarted = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/content/docs/headless/getting-started/index.mdx'),
+const quickStart = fs.readFileSync(
+  path.resolve(process.cwd(), 'src/content/docs/headless/quick-start.mdx'),
   'utf8',
 );
-const viewerGettingStarted = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/content/docs/viewer/getting-started.mdx'),
+const viewerQuickStart = fs.readFileSync(
+  path.resolve(process.cwd(), 'src/content/docs/viewer/quick-start.mdx'),
   'utf8',
 );
 
@@ -20,17 +20,17 @@ describe('renderDocsMarkdown', () => {
   it('exports only the active Headless integration and expands its complete example', () => {
     vi.stubEnv('DOCS_INSTALL_CHANNEL', 'next');
     const markdown = renderDocsMarkdown({
-      sourceCode: gettingStarted,
-      canonicalPath: '/docs/headless/react/getting-started',
+      sourceCode: quickStart,
+      canonicalPath: '/docs/headless/react/quick-start',
       integration: 'react',
       metadata: {
-        title: 'Getting Started',
+        title: 'Quick start',
         description: 'Build your own PDF viewer UI.',
       },
     });
 
-    expect(markdown).toContain('title: "Getting Started — React"');
-    expect(markdown).toContain('\n---\n\n# Getting Started');
+    expect(markdown).toContain('title: "Quick start — React"');
+    expect(markdown).toContain('\n---\n\n# Quick start');
     expect(markdown).toContain('pnpm add @embedpdf/react@next @embedpdf/engine@next');
     expect(markdown).toContain("import { localEngine } from '@embedpdf/engine'");
     expect(markdown).toContain('**`basic.tsx`**');
@@ -54,22 +54,45 @@ describe('renderDocsMarkdown', () => {
 
   it('exports only the selected Viewer integration', () => {
     const markdown = renderDocsMarkdown({
-      sourceCode: viewerGettingStarted,
-      canonicalPath: '/docs/viewer/vue/getting-started',
+      sourceCode: viewerQuickStart,
+      canonicalPath: '/docs/viewer/vue/quick-start',
       integration: 'vue',
       metadata: {
-        title: 'Getting Started',
-        description: 'Drop the EmbedPDF viewer into any page in minutes.',
+        title: 'Quick start',
+        description: 'Install the viewer, show a PDF, and make it yours.',
       },
     });
 
-    expect(markdown).toContain('title: "Getting Started — Vue"');
+    expect(markdown).toContain('title: "Quick start — Vue"');
     expect(markdown).toContain('integration: "Vue"');
-    expect(markdown).toContain('pnpm add @embedpdf/vue-pdf-viewer');
-    expect(markdown).toContain("import { PDFViewer } from '@embedpdf/vue-pdf-viewer'");
-    expect(markdown).not.toContain('@embedpdf/react-pdf-viewer');
-    expect(markdown).not.toContain('@embedpdf/angular-pdf-viewer');
-    expect(markdown).not.toContain('<Example');
+    expect(markdown).toContain('@embedpdf/viewer-vue');
+    expect(markdown).toContain("import { PDFViewer } from '@embedpdf/viewer-vue'");
+    expect(markdown).not.toContain('@embedpdf/viewer-react');
+    expect(markdown).not.toContain('@embedpdf/viewer-angular');
+    expect(markdown).not.toContain('<Snippet');
+  });
+
+  it('shows a viewer page’s <Fw> branch on its own integration, plain HTML included', () => {
+    const sourceCode = [
+      '# Events',
+      '',
+      '<Fw only="vanilla">Listen for `epdf:ready` on the element.</Fw>',
+      '',
+      "<Fw only={['react', 'vue']}>Pass `onReady`.</Fw>",
+    ].join('\n');
+    const exported = (integration: 'vanilla' | 'react' | 'angular') =>
+      renderDocsMarkdown({
+        sourceCode,
+        canonicalPath: `/docs/viewer/${integration}/code/viewer`,
+        integration,
+      });
+
+    expect(exported('vanilla')).toContain('Listen for `epdf:ready` on the element.');
+    expect(exported('vanilla')).not.toContain('Pass `onReady`.');
+    expect(exported('react')).toContain('Pass `onReady`.');
+    expect(exported('react')).not.toContain('epdf:ready');
+    expect(exported('angular')).not.toContain('epdf:ready');
+    expect(exported('angular')).not.toContain('onReady');
   });
 
   it('fails when a custom component has no explicit Markdown projection', () => {

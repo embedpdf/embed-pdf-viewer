@@ -162,6 +162,17 @@
             },
             "default": "./dist/cjs/api/resources/doc/resources/versions/exports.js"
         },
+        "./doc/metadata/custom": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/metadata/resources/custom/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/metadata/resources/custom/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [

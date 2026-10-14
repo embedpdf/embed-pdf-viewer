@@ -24,6 +24,10 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
   // paths. For resolvers that must land on a different build of an entry —
   // e.g. `es2020` (Angular's application builder) → the portable engine.
   const conditions: Record<string, Record<string, string>> = pkg.epdf?.conditions ?? {};
+  // epdf.neverBundle (package.json): specifiers left as they are in dist, for
+  // the consumer's resolver: a `package.json` `imports` entry whose target
+  // depends on where the code runs (the engine's `#inline-transport`).
+  const neverBundle: string[] = pkg.epdf?.neverBundle ?? [];
   const withConditions = (generated: Record<string, unknown>) => {
     const out: Record<string, unknown> = { ...generated };
     for (const [subpath, extra] of Object.entries(conditions)) {
@@ -55,6 +59,7 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
       // the consumer's bundler to compile. Never built, never rewritten.
       customExports: (generated) => withConditions({ ...generated, ...rawEntries }),
     },
+    ...(neverBundle.length > 0 ? { deps: { neverBundle } } : {}),
     publint: true,
     // node16 profile: subpath exports are invisible to legacy node10 module
     // resolution; v3's documented floor is TS >= 4.7 with node16/bundler.
@@ -75,6 +80,7 @@ interface PackageJson {
     rawExports?: string[];
     devExports?: true | string;
     conditions?: Record<string, Record<string, string>>;
+    neverBundle?: string[];
   };
 }
 

@@ -1,20 +1,21 @@
-import { PageEditToken, type PageEditCapability } from '@embedpdf/plugin-page-edit';
-import { useCapability } from './runtime';
-
 /**
- * The page-edit capability, bound to the surrounding `DocumentScope`.
+ * The React surface for @embedpdf/plugin-page-edit. The plugin turns a page
+ * relative to its rotation and resolves placements, so this file is binding
+ * only:
  *
- * Thin idiomatic wrapper over `PageEditToken` — the relative→absolute rotation
- * and page addressing live in the plugin, so this hook (and its Vue/Svelte/
- * Angular siblings) is pure binding sugar with no logic to drift.
- *
- *   const editor = usePageEditor();
- *   editor.rotateBy(page.ref, 90);
- *   if (editor.canEdit()) { … }
+ *   const pageEdit = usePageEdit();
+ *   await pageEdit.rotateBy([page.ref], 90);
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-page-edit';
-export function usePageEditor(): PageEditCapability {
+import { PageEditToken, type PageEditCapability } from '@embedpdf/plugin-page-edit';
+import { useCapability } from './runtime';
+
+/**
+ * The page edits of the surrounding `<DocumentScope>`'s document, else the
+ * active one. Outside a document, every method throws `not-ready`.
+ */
+export function usePageEdit(): PageEditCapability {
   return useCapability(PageEditToken);
 }

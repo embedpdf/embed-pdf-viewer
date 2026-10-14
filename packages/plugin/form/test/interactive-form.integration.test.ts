@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import type { DocumentMeta } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type {
@@ -12,7 +13,7 @@ import type {
   PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -28,16 +29,20 @@ const fixturePath = resolve(
   'interactive_pdf_forms_javascript_demo.pdf',
 );
 
-async function activationFor(doc: DocumentHandle, field: FormFieldDTO): Promise<PdfActionTree> {
+async function activationFor(
+  doc: DocumentHandle,
+  field: FormFieldDTO,
+): Promise<PdfActionTree<unknown>> {
   const widget = field.widgets[0];
-  if (!widget || widget.annotObjectNumber <= 0 || !widget.page) {
+  if (!widget || widget.objectNumber <= 0 || !widget.page) {
     throw new Error(`field '${field.name}' has no addressable widget`);
   }
-  const { annotations } = await doc.page(widget.page).annotations.list();
-  const annotation = annotations.find(
-    ({ ref }) => ref.kind === 'objectNumber' && ref.annotObjectNumber === widget.annotObjectNumber,
+  // A widget's row, with its actions, comes with the form.
+  const { widgets } = await doc.forms.list();
+  const row = widgets.find(
+    ({ ref }) => ref.kind === 'objectNumber' && ref.objectNumber === widget.objectNumber,
   );
-  const action = annotation?.actions?.activate;
+  const action = row?.actions?.activate;
   if (!action) throw new Error(`field '${field.name}' has no activation action`);
   return action;
 }
@@ -85,12 +90,15 @@ describe('interactive form JavaScript acceptance', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
-    const document = () => ({
+    const document = (): DocumentMeta => ({
       id: doc.id,
+      instanceId: doc.id,
       name: 'interactive_pdf_forms_javascript_demo.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
       revision: 0,
+      hasUnsavedChanges: false,
+      renderPolicy: { kind: 'continuous' },
     });
     const realm = standaloneRealm(doc, document, {
       now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
@@ -98,7 +106,7 @@ describe('interactive form JavaScript acceptance', () => {
       randomSeed: () => 7,
       sandboxFactory: createQuickJsSandbox,
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document,
       transaction: realm.transaction,
@@ -133,7 +141,6 @@ describe('interactive form JavaScript acceptance', () => {
 
       expect(printResult).toMatchObject({
         status: 'unchanged',
-        effectsResult: null,
         uiEffects: [{ kind: 'print', phase: 'user' }],
       });
 
@@ -145,14 +152,8 @@ describe('interactive form JavaScript acceptance', () => {
       const premium = packageField.options.find(({ label }) => label === 'Premium - $900');
       if (!premium) throw new Error('Premium package option is missing');
 
-      await controller.commit(packageField.ref, {
-        type: 'choice',
-        values: [premium.value],
-      });
-      await controller.commit(recording.ref, {
-        type: 'toggle',
-        state: recording.exportValue,
-      });
+      await controller.commit(packageField.ref, { value: premium.value });
+      await controller.commit(recording.ref, { checked: true });
 
       const beforeReset = await doc.forms.list();
       const resetButton = beforeReset.fields.find(({ name }) => name === 'btn_reset');
@@ -180,7 +181,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       const confirmation = afterReset.fields.find(({ name }) => name === 'confirmation');
       if (confirmation?.family !== 'text') throw new Error('confirmation field is missing');
-      await controller.commit(confirmation.ref, { type: 'text', value: 'CONFIRM' });
+      await controller.commit(confirmation.ref, { value: 'CONFIRM' });
 
       const beforeConfirm = await doc.forms.list();
       const confirmButton = beforeConfirm.fields.find(({ name }) => name === 'btn_confirm');

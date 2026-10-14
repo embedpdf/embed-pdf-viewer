@@ -1,0 +1,66 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --accent-tint: #e7f0fe;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The active tool, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.badge {
+  min-width: 56px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.badge[data-active='true'] {
+  color: var(--accent);
+  background: var(--accent-tint);
+  border-color: transparent;
+}
+
+.readout {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

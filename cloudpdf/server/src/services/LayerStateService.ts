@@ -1,17 +1,13 @@
 import type {
-  AnnotationMutationKind,
   CacheDelta,
+  CachePins,
   DocumentManifest,
+  DocumentProtection,
   LayerScopes,
   ManifestPage,
-  PageState,
+  PageRef,
 } from '@embedpdf/engine-core/runtime';
-import {
-  changesAnnotationList,
-  invalidatesWeakIndexRefs,
-  knownWeakAnnotationState,
-  toPageRef,
-} from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { Transaction } from 'kysely';
 
 import type { DocumentHead } from './DocumentService';
@@ -49,8 +45,6 @@ export interface BaseVersionFacts extends BasePlanePointers {
   byteLength: number;
 }
 
-export type MutationImpactKind = AnnotationMutationKind;
-
 /**
  * Geometry-pointer epoch for the immutable base view. The base topology is
  * never reordered (structural ops always target a layer), so it stays at 1.
@@ -67,6 +61,7 @@ const BASE_METADATA_VERSION = 1;
 const ALL_BASE_SCOPES: LayerScopes = {
   content: 'base',
   annotations: 'base',
+  forms: 'base',
   layout: 'base',
   attachments: 'base',
   metadata: 'base',
@@ -74,19 +69,19 @@ const ALL_BASE_SCOPES: LayerScopes = {
 };
 
 /**
- * Per-page plane comparison: inherited iff the page SET matches the base
- * exactly AND every page's pin equals its base counterpart's. Set inequality
- * (insert/delete) reads as owned for BOTH per-page planes at the call sites.
+ * Per-page plane comparison: inherited iff the page set matches the base
+ * exactly and every page's pin equals its base counterpart's. Set inequality
+ * (insert/delete) reads as owned for both per-page planes at the call sites.
  */
 function pagePlaneScope(
   layerPages: DurablePageRow[],
   basePages: DurablePageRow[],
-  pin: 'contentVersion' | 'annotationVersion',
+  pin: 'contentVersion' | 'annotationVersion' | 'widgetVersion',
 ): 'base' | 'layer' {
   if (layerPages.length !== basePages.length) return 'layer';
-  const baseByPon = new Map(basePages.map((p) => [p.pageObjectNumber, p[pin]]));
+  const baseByPageObjectNumber = new Map(basePages.map((p) => [p.pageObjectNumber, p[pin]]));
   for (const page of layerPages) {
-    if (baseByPon.get(page.pageObjectNumber) !== page[pin]) return 'layer';
+    if (baseByPageObjectNumber.get(page.pageObjectNumber) !== page[pin]) return 'layer';
   }
   return 'base';
 }
@@ -96,7 +91,7 @@ function pagePlaneScope(
  *
  * Worker sessions are still responsible for PDF parsing/mutation. This
  * service owns the durable DB-backed page state used by manifests and CDN
- * version checks; `CloudRevisionBridge` owns worker/cloud token translation.
+ * version checks.
  */
 export class LayerStateService {
   private readonly documentPages: DocumentPagesRepo;
@@ -133,6 +128,7 @@ export class LayerStateService {
         metadataVersion: row.metadataVersion,
         attachmentsVersion: row.attachmentsVersion,
         annotationsVersion: row.annotationsVersion,
+        formsVersion: row.formsVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -147,7 +143,7 @@ export class LayerStateService {
 
   async ensureBasePages(
     docId: string,
-    loadPages: () => Promise<PageState[]>,
+    loadPages: () => Promise<PageRef[]>,
   ): Promise<DurablePageRow[]> {
     const existing = await this.documentPages.findByDocument(docId);
     if (existing.length > 0) return existing;
@@ -155,10 +151,7 @@ export class LayerStateService {
     const observed = await loadPages();
     await this.documentPages.upsertForDocument(
       docId,
-      observed.map((page) => ({
-        pageObjectNumber: page.page.pageObjectNumber,
-        hasWeakAnnotations: requireKnownWeakAnnotationBoolean(page),
-      })),
+      observed.map((page) => ({ pageObjectNumber: page.objectNumber })),
     );
     return this.documentPages.findByDocument(docId);
   }
@@ -175,46 +168,60 @@ export class LayerStateService {
   }
 
   /**
-   * Plane scopes, the PURE half. A layer is a set of per-plane DELTAS
+   * Plane scopes, the pure half. A layer is a set of per-plane deltas
    * over the immutable base; each plane is `'base'` (inherited — no delta,
-   * the layer's view of that plane IS the base's view) or `'layer'` (owned —
+   * the layer's view of that plane is the base's view) or `'layer'` (owned —
    * the first write to that plane transferred ownership).
    *
-   * Per-page planes (content, annotations) compare against the base
-   * counterpart AND require page-SET equality: insert/delete own both — a
-   * view that removed content must never resolve base artifacts. Structural
-   * ops that PRESERVE the set (move, rotate) own only `layout`:
+   * Per-page planes (content, annotations, forms) compare against the base
+   * counterpart and require page-set equality: insert/delete own them all —
+   * a view that removed content must never resolve base artifacts.
+   * Structural ops that preserve the set (move, rotate) own only `layout`:
    * render/text/geometry artifacts are normalized (rotation is presentation
-   * metadata applied client-side — see `PageRotateResult`), so content and
-   * annotation sharing survive them. Doc-level planes compare their pin
-   * against the base epoch. `actions` is constant `'base'` until action
-   * writing exists (`actionsVersion` is frozen at 1 — no op can change
-   * catalog actions).
+   * metadata applied client-side — see `PageRotateResult`), so content,
+   * annotation and form sharing survive them. `annotations` and `forms` also
+   * compare their document pin (`annotationsVersion`, `formsVersion`): a
+   * write that moved only the document's list owns the plane too, so the
+   * shared list URL is never asked at a pin the base doesn't have. Doc-level
+   * planes compare their pin against the base epoch. `actions` is constant
+   * `'base'` until action writing exists (`actionsVersion` is frozen at 1 —
+   * no op can change catalog actions).
    *
    * Conservative by design: an unmatched page reads as owned.
    */
   computeLayerScopes(
     layer: Pick<
       LayerRow,
-      'layoutVersion' | 'metadataVersion' | 'attachmentsVersion' | 'baseSha'
+      | 'layoutVersion'
+      | 'metadataVersion'
+      | 'attachmentsVersion'
+      | 'annotationsVersion'
+      | 'formsVersion'
+      | 'baseSha'
     > | null,
     layerPages: DurablePageRow[],
     basePages: DurablePageRow[],
     /** The HEAD version's facts; a never-published document is at the initial epochs. */
     head: Pick<
       BaseVersionFacts,
-      'sha256' | 'layoutVersion' | 'metadataVersion' | 'attachmentsVersion'
+      | 'sha256'
+      | 'layoutVersion'
+      | 'metadataVersion'
+      | 'attachmentsVersion'
+      | 'annotationsVersion'
+      | 'formsVersion'
     > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
     // Law 9: a layer whose base is not the head (a sibling published a
-    // version since) is diverged for EVERY plane — the head's layout,
+    // version since) is diverged for every plane — the head's layout,
     // metadata and attachments are another version's. Its reads resolve
     // at layer URLs over its own base until it is rebased.
     if (head && layer.baseSha !== null && layer.baseSha !== head.sha256) {
       return {
         content: 'layer',
         annotations: 'layer',
+        forms: 'layer',
         layout: 'layer',
         attachments: 'layer',
         metadata: 'layer',
@@ -223,12 +230,21 @@ export class LayerStateService {
     }
     const base = head ?? { ...INITIAL_BASE_POINTERS, sha256: layer.baseSha ?? '' };
     // A layer row without page rows means no page-level write ever
-    // committed — content and annotations are trivially inherited.
+    // committed — every per-page plane is trivially inherited.
     const pagesKnown = layerPages.length > 0;
+    const pagePlane = (pin: 'contentVersion' | 'annotationVersion' | 'widgetVersion') =>
+      pagesKnown ? pagePlaneScope(layerPages, basePages, pin) : 'base';
+    const owned = (pages: 'base' | 'layer', pin: number, basePin: number) =>
+      pages === 'base' && pin === basePin ? 'base' : 'layer';
     return {
-      content: pagesKnown ? pagePlaneScope(layerPages, basePages, 'contentVersion') : 'base',
-      annotations: pagesKnown ? pagePlaneScope(layerPages, basePages, 'annotationVersion') : 'base',
-      // Doc-level planes compare against the BASE VERSION's pointers (law
+      content: pagePlane('contentVersion'),
+      annotations: owned(
+        pagePlane('annotationVersion'),
+        layer.annotationsVersion,
+        base.annotationsVersion,
+      ),
+      forms: owned(pagePlane('widgetVersion'), layer.formsVersion, base.formsVersion),
+      // Doc-level planes compare against the base version's pointers (law
       // 9c): a layer seeded over a published version whose metadata sits
       // at epoch 2 is inherited at 2, not owned because 2 ≠ 1.
       layout: layer.layoutVersion === base.layoutVersion ? 'base' : 'layer',
@@ -239,7 +255,7 @@ export class LayerStateService {
   }
 
   /**
-   * Plane scopes, the DURABLE half — the ONE condition behind the
+   * Plane scopes, the durable half — the one condition behind the
    * manifest `scopes` block, the `/v1/access` edge grant, and every origin
    * guard on the doc-level shared routes (the guard is the truth; the grant
    * is the TTL-bounded optimization). A layer with no row has never been
@@ -261,16 +277,19 @@ export class LayerStateService {
     pages: DurablePageRow[],
     /** The head version's facts: its plane pointers are what the base view publishes (law 9). */
     version: BaseVersionFacts,
+    /** What the head version's signatures forbid. */
+    protection: DocumentProtection | null,
   ): DocumentManifest {
     return {
       docVersion: head.docVersion,
-      // The base view's pointers are its VERSION's: the initial epochs for
+      // The base view's pointers are its version's: the initial epochs for
       // an upload, the signing layer's pointers for a published version.
       layoutVersion: version.layoutVersion,
       metadataVersion: version.metadataVersion,
       actionsVersion: 1,
       attachmentsVersion: version.attachmentsVersion,
       annotationsVersion: version.annotationsVersion,
+      formsVersion: version.formsVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -278,14 +297,17 @@ export class LayerStateService {
       layerVersion: 0,
       working: false,
       baseByteLength: version.byteLength,
-      pages: pages.map((page) => this.toManifestPage(`cloud:base:${head.id}`, page)),
+      protection,
+      pages: pages.map((page) => this.toManifestPage(page)),
     };
   }
 
   buildLayerManifest(
     docId: string,
-    /** The LAYER's base version (behind the head after a sibling published). */
+    /** The layer's base version (behind the head after a sibling published). */
     base: Pick<BaseVersionFacts, 'sha256' | 'byteLength'>,
+    /** What the base version's signatures forbid. */
+    protection: DocumentProtection | null,
     layerName: string,
     layer: Pick<
       LayerRow,
@@ -294,6 +316,7 @@ export class LayerStateService {
       | 'metadataVersion'
       | 'attachmentsVersion'
       | 'annotationsVersion'
+      | 'formsVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -313,6 +336,7 @@ export class LayerStateService {
       actionsVersion: 1,
       attachmentsVersion: layer.attachmentsVersion,
       annotationsVersion: layer.annotationsVersion,
+      formsVersion: layer.formsVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
@@ -324,9 +348,8 @@ export class LayerStateService {
       working: layer.currentArtifactKey !== null,
       baseByteLength: base.byteLength,
       scopes,
-      pages: pages.map((page) =>
-        this.toManifestPage(this.layerRevisionScopeId(docId, layerName), page),
-      ),
+      protection,
+      pages: pages.map((page) => this.toManifestPage(page)),
     };
   }
 
@@ -336,13 +359,13 @@ export class LayerStateService {
     previousDocVersion: number;
     docVersion: number;
     /**
-     * The new bulk-annotations pin when this mutation bumped it. Stamped
-     * by the annotation CRUD, flatten, and redaction paths; the form and
-     * page-structure paths bump the COLUMN but omit it here — their
-     * clients recover through the 404-refresh rail, which is correct,
-     * just one round trip slower.
+     * The new document pins when this mutation bumped them: the annotation
+     * list's and the form's. A path that bumps a column but omits it here
+     * leaves its clients to the 404-refresh rail, which is correct, just
+     * one round trip slower.
      */
     annotationsVersion?: number;
+    formsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
@@ -351,6 +374,7 @@ export class LayerStateService {
       ...(input.annotationsVersion !== undefined
         ? { annotationsVersion: input.annotationsVersion }
         : {}),
+      ...(input.formsVersion !== undefined ? { formsVersion: input.formsVersion } : {}),
       // Every ordinary commit writes an artifact: the layer holds edits not
       // yet sealed into a version (a signature's publish clears it again,
       // and refreshes the manifest instead of sending a delta).
@@ -366,7 +390,7 @@ export class LayerStateService {
    * Law 9: a published version contains everything the signing layer's
    * artifact carried — every page it touched, its page order, metadata,
    * attachments, annotations — so the head's catalog becomes the layer's
-   * COMPLETE surviving page set: rows the layer has replace the base's,
+   * complete surviving page set: rows the layer has replace the base's,
    * pages it inserted are added, pages it deleted (seeded on first write,
    * removed by pages.delete) disappear; the signed page gets one more
    * annotation bump for the signature widget. The layer's rows are then
@@ -397,9 +421,8 @@ export class LayerStateService {
       return {
         pageObjectNumber: Number(row.page_object_number),
         contentVersion: Number(row.content_version),
-        annotationVersion: Number(row.annotation_version) + (signed ? 1 : 0),
-        annotationGeneration: Number(row.annotation_generation),
-        hasWeakAnnotations: Boolean(row.has_weak_annotations),
+        annotationVersion: Number(row.annotation_version),
+        widgetVersion: Number(row.widget_version) + (signed ? 1 : 0),
         updatedAt: signed ? input.now : Number(row.updated_at),
       };
     });
@@ -413,8 +436,7 @@ export class LayerStateService {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion,
             annotation_version: page.annotationVersion,
-            annotation_generation: page.annotationGeneration,
-            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+            widget_version: page.widgetVersion,
             updated_at: page.updatedAt,
           })),
         )
@@ -430,67 +452,13 @@ export class LayerStateService {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion,
             annotation_version: page.annotationVersion,
-            annotation_generation: page.annotationGeneration,
-            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+            widget_version: page.widgetVersion,
             updated_at: page.updatedAt,
           })),
         )
         .execute();
     }
     return promoted;
-  }
-
-  decorateBasePageState(docId: string, page: DurablePageRow): PageState {
-    return this.toPageState(`cloud:base:${docId}`, page);
-  }
-
-  decorateLayerPageState(docId: string, layerName: string, page: DurablePageRow): PageState {
-    return this.toPageState(this.layerRevisionScopeId(docId, layerName), page);
-  }
-
-  toLayerManifestPage(docId: string, layerName: string, page: DurablePageRow): ManifestPage {
-    return this.toManifestPage(this.layerRevisionScopeId(docId, layerName), page);
-  }
-
-  layerRevisionScopeId(docId: string, layerName: string): string {
-    return `cloud:layer:${docId}:${layerName}`;
-  }
-
-  /** The BASE view's revision scope — the `docSessionId` every SHARED
-   *  (doc-level) annotation read stamps on its tokens. */
-  baseRevisionScopeId(docId: string): string {
-    return `cloud:base:${docId}`;
-  }
-
-  mutationBumps(
-    kind: MutationImpactKind,
-    pageBefore: Pick<DurablePageRow, 'hasWeakAnnotations'>,
-  ): {
-    bumpLayerDocVersion: boolean;
-    bumpAnnotationVersion: boolean;
-    bumpContentVersion: boolean;
-    bumpAnnotationGeneration: boolean;
-    weakRefsInvalidated: boolean;
-  } {
-    const weakRefsInvalidated = invalidatesWeakIndexRefs(
-      kind,
-      knownWeakAnnotationState(pageBefore.hasWeakAnnotations),
-    );
-    // `annotation_generation` is the durable epoch of the page's /Annots
-    // index space, not a count of currently-weak annotations. Keep bumping
-    // it for every delete/move even when `hasWeakAnnotations` is false:
-    // older CDN-cached snapshots may still contain index refs minted before
-    // an update strengthened those annotations with /NM or object numbers.
-    // `weakRefsInvalidated` is only the client refetch hint for refs known
-    // to be weak in the current page state.
-    const shiftsAnnotationIndexes = kind === 'delete' || kind === 'move';
-    return {
-      bumpLayerDocVersion: true,
-      bumpAnnotationVersion: changesAnnotationList(kind),
-      bumpContentVersion: false,
-      bumpAnnotationGeneration: shiftsAnnotationIndexes,
-      weakRefsInvalidated,
-    };
   }
 
   get repos(): {
@@ -509,41 +477,15 @@ export class LayerStateService {
     };
   }
 
-  private toManifestPage(scopeId: string, page: DurablePageRow): ManifestPage {
-    return {
-      state: this.toPageState(scopeId, page),
-      cache: this.toCachePins(page),
-    };
+  private toManifestPage(page: DurablePageRow): ManifestPage {
+    return { page: toPageRef(page.pageObjectNumber), cache: this.toCachePins(page) };
   }
 
-  private toCachePins(page: DurablePageRow): { contentVersion: number; annotationVersion: number } {
+  private toCachePins(page: DurablePageRow): CachePins {
     return {
       contentVersion: page.contentVersion,
       annotationVersion: page.annotationVersion,
+      widgetVersion: page.widgetVersion,
     };
   }
-
-  private toPageState(scopeId: string, page: DurablePageRow): PageState {
-    return {
-      page: toPageRef(page.pageObjectNumber),
-      revision: {
-        docSessionId: scopeId,
-        page: toPageRef(page.pageObjectNumber),
-        generation: page.annotationGeneration,
-      },
-      weakAnnotationState: {
-        kind: 'known',
-        hasAnyWeakAnnotations: page.hasWeakAnnotations,
-      },
-    };
-  }
-}
-
-function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
-  if (page.weakAnnotationState.kind !== 'known') {
-    throw new Error(
-      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.pageObjectNumber}`,
-    );
-  }
-  return page.weakAnnotationState.hasAnyWeakAnnotations;
 }

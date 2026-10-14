@@ -1,0 +1,97 @@
+{
+  "name": "@embedpdf/viewer-angular",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Angular wrapper for the full viewer: the epdf-pdf-viewer component around the embedpdf-viewer custom element, with template directives for your own components.",
+  "type": "module",
+  "module": "./dist/fesm2022/embedpdf-viewer-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-viewer-angular.mjs"
+    },
+    "./core": {
+      "development": "./core/src/index.ts",
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-viewer-angular-core.mjs"
+    },
+    "./component": {
+      "development": "./component/src/index.ts",
+      "types": "./dist/component/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-viewer-angular-component.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json && node ../../../tooling/build/src/drop-entry-manifests.mjs",
+    "clean": "rimraf dist",
+    "typecheck": "ngc -p tsconfig.json && ngc -p test/pages/tsconfig.json && tsc -p test/tsconfig.json",
+    "test": "vitest run"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/viewer/angular"
+  },
+  "dependencies": {
+    "@embedpdf/angular": "workspace:*",
+    "@embedpdf/viewer": "workspace:*"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=20.2.0 <23.0.0",
+    "@angular/core": ">=20.2.0 <23.0.0",
+    "@angular/forms": ">=20.2.0 <23.0.0"
+  },
+  "devDependencies": {
+    "@angular/build": "~20.2.0",
+    "@angular/common": "~20.2.0",
+    "@angular/compiler": "~20.2.0",
+    "@angular/compiler-cli": "~20.2.0",
+    "@angular/core": "~20.2.0",
+    "@angular/platform-browser": "~20.2.0",
+    "@angular/platform-server": "~20.2.0",
+    "@embedpdf/tooling-build": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ng-packagr": "~20.2.0",
+    "playwright-core": "^1.63.0",
+    "rimraf": "^5.0.0",
+    "rxjs": "^7.8.0",
+    "tslib": "^2.6.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^2.1.9"
+  },
+  "sideEffects": [
+    "./src/index.ts",
+    "./core/src/index.ts",
+    "./dist/fesm2022/embedpdf-viewer-angular.mjs",
+    "./dist/fesm2022/embedpdf-viewer-angular-core.mjs"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/fesm2022/embedpdf-viewer-angular.mjs"
+      },
+      "./core": {
+        "types": "./dist/core/index.d.ts",
+        "default": "./dist/fesm2022/embedpdf-viewer-angular-core.mjs"
+      },
+      "./component": {
+        "types": "./dist/component/index.d.ts",
+        "default": "./dist/fesm2022/embedpdf-viewer-angular-component.mjs"
+      }
+    }
+  },
+  "epdf": {
+    "devExports": "development"
+  }
+}

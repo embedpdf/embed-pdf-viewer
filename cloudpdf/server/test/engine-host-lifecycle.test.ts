@@ -10,11 +10,11 @@ import {
 import { HOST_PROTOCOL_VERSION } from '../src/runtime/host-protocol';
 
 /**
- * The engine-host lifecycle state machine. Test 1 is the review-found
- * bug this design exists to prevent: a dispatch inside the death→respawn
- * gap must reject or complete within its deadline — under the v1 sketch
- * it sailed past a stale resolved `ready`, sent into a dead child whose
- * `exit` had already fired, and hung forever.
+ * The engine-host lifecycle state machine. Test 1 is the failure this
+ * design exists to prevent: a dispatch inside the death→respawn gap must
+ * reject or complete within its deadline — it must not sail past a stale
+ * resolved `ready`, send into a dead child whose `exit` already fired,
+ * and hang forever.
  */
 
 class FakeChild extends EventEmitter implements ChildLike {
@@ -114,7 +114,7 @@ describe('EngineHostClient lifecycle', () => {
 
     children[0]!.exit(139); // host dies
     // Immediately dispatch — the respawn (5ms timer) has not run yet and
-    // the replacement child will NEVER become ready.
+    // the replacement child will never become ready.
     const started = Date.now();
     await expect(client.run('doc-1', build)).rejects.toThrow(/unavailable|respawn/i);
     expect(Date.now() - started).toBeLessThan(1_500); // bounded, not hung
@@ -228,7 +228,7 @@ describe('EngineHostClient lifecycle', () => {
   });
 
   test('memory heartbeats are generation-scoped: cleared AT exit (backoff window), repopulated by the successor', async () => {
-    // Long respawn delay: the assertion below runs INSIDE the
+    // Long respawn delay: the assertion below runs inside the
     // death→respawn gap, where a spawn-time-only reset would still be
     // exporting the corpse's RSS.
     const h = harness({ respawnBaseMs: 300, respawnMaxMs: 300 });
@@ -288,7 +288,7 @@ describe('EngineHostClient lifecycle', () => {
     await recycled;
     // Immediate respawn despite the 5s backoff config = the planned path.
     await until(() => h.children.length === 2, 500);
-    expect(h.crashes).toHaveLength(0); // NO journal strike
+    expect(h.crashes).toHaveLength(0); // no journal strike
     expect(h.restarts).toHaveLength(1); // forget-everything still fired
     await expect(inflight).rejects.toThrow(/recycling/);
     expect(client.recycleStats().manual).toBe(1);
@@ -312,7 +312,7 @@ describe('EngineHostClient lifecycle', () => {
     job.catch(() => undefined);
     await until(() => h.children[0]!.sent.some((m) => m['t'] === 'dispatch'));
     const recycled = client.recycle('soft-rss', { settleWindowMs: 5_000 });
-    // PDFium dies for real mid-drain — BEFORE any shutdown was issued.
+    // PDFium dies for real mid-drain — before any shutdown was issued.
     h.children[0]!.exit(139, null);
     await recycled;
     await until(() => h.children.length === 2);
@@ -349,13 +349,13 @@ describe('EngineHostClient lifecycle', () => {
     await until(() => h.children[0]!.sent.some((m) => m['t'] === 'dispatch'));
     const soft = client.recycle('soft-rss', { settleWindowMs: 10_000 });
     expect(client.health().state).toBe('starting');
-    // Memory crossed the hard watermark mid-settle: escalate NOW.
+    // Memory crossed the hard watermark mid-settle: escalate now.
     expect(await client.recycle('hard-rss', { graceful: false })).toBe(true);
     expect(h.children[0]!.kills).toContain('SIGKILL');
     h.children[0]!.exit(null, 'SIGKILL');
     await soft;
     await until(() => h.children.length === 2);
-    expect(h.crashes).toHaveLength(0); // OUR kill — planned
+    expect(h.crashes).toHaveLength(0); // our kill — planned
     expect(client.recycleStats()['hard-rss']).toBe(1); // counted under the escalated reason
     h.children[1]!.ready();
     await client.destroy();

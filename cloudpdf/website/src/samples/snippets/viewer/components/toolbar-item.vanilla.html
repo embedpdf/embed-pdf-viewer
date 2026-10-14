@@ -1,0 +1,21 @@
+<embedpdf-viewer id="viewer" style="height: 100vh">
+  <select slot="item:versions" class="versions" id="versions">
+    <option value="contract-v3">Version 3</option>
+    <option value="contract-v2">Version 2</option>
+  </select>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+  import { fetchDocumentToken } from './api.js'; // your backend: a token for this user and document
+
+  const viewer = document.getElementById('viewer');
+  const versions = document.getElementById('versions');
+  const show = (id) => (viewer.src = { token: () => fetchDocumentToken(id) });
+  viewer.config = {
+    layout: (layout) =>
+      layout.add({ custom: 'versions', command: 'acme:versions' }, { to: 'main', section: 'start' }),
+  };
+  versions.addEventListener('change', () => show(versions.value));
+  show(versions.value);
+</script>

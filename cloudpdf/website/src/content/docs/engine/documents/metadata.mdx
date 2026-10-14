@@ -1,0 +1,143 @@
+---
+title: Metadata
+description: Read and change a document's title, author, subject, keywords, dates and your own keys.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Metadata
+
+A PDF carries information about itself: a title, an author, when it was made. PDF apps show it in
+their document properties.
+
+```ts
+const metadata = await doc.metadata.get();
+console.log(metadata.title, metadata.author);
+
+await doc.metadata.update({ title: 'Q2 Proposal (final)' });
+```
+
+## Read
+
+`get()` returns every standard field. A field the file doesn't set is `null`:
+
+| Field        | What it is                                                  |
+| :----------- | :---------------------------------------------------------- |
+| `title`      | The document's title.                                       |
+| `author`     | Who wrote it.                                               |
+| `subject`    | What it's about.                                            |
+| `keywords`   | Keywords, as one string (often separated by commas).        |
+| `creator`    | The app the document was made in, such as a word processor. |
+| `producer`   | The app that turned it into a PDF.                          |
+| `createdAt`  | When it was created, as an ISO date.                        |
+| `modifiedAt` | When it was last changed, as an ISO date.                   |
+| `trapped`    | A print-shop setting: `'true'`, `'false'` or `'unknown'`.   |
+
+Keys of your own, and those other apps added, are read separately: see
+[Your own keys](#your-own-keys).
+
+## Change
+
+`update()` changes only the fields you pass. `null` removes a field:
+
+```ts
+const { metadata } = await doc.metadata.update({
+  title: 'Q2 Proposal (final)',
+  author: 'Dana Smith',
+  subject: null, // remove the subject
+});
+```
+
+It returns the metadata as it is after the change, the same shape `get()` returns. What you read
+goes back in as it is, so "change a copy, then save it" works:
+
+```ts
+const current = await doc.metadata.get();
+await doc.metadata.update({ ...current, keywords: `${current.keywords ?? ''}, approved` });
+```
+
+An empty string is a value, not a removal: `title: ''` sets an empty title.
+
+## Dates
+
+Dates are ISO strings, with the time zone offset the PDF gives:
+
+```ts
+metadata.createdAt; // '2017-07-12T21:44:38-07:00'
+```
+
+They're strings, not `Date` objects, so a date survives JSON and goes back into `update()` as it
+is. `new Date(metadata.createdAt)` turns one into a `Date` when you need to compute with it.
+
+When you write a date, pass an ISO string or a `Date`. A string keeps its offset; a `Date` is
+written in UTC:
+
+```ts
+await doc.metadata.update({
+  createdAt: '2026-01-04T09:00:00+01:00',
+  modifiedAt: new Date(),
+});
+```
+
+PDF dates have whole seconds, so milliseconds are dropped. A string that isn't an ISO date and
+time fails with `InvalidArg`.
+
+## Your own keys
+
+Store your own values in the document: a contract number, who reviewed it. Other apps add keys
+like these too, and PDF apps show them as custom properties. They have their own object,
+`doc.metadata.custom`, with the same two calls:
+
+```ts
+const custom = await doc.metadata.custom.get();
+// { reviewedBy: 'dana', draftOwner: 'sam' }, or {} when there are none
+```
+
+`update()` works like it does for the standard fields, with each key as a field: a string sets
+the key, `null` removes it, and keys you leave out stay as they are.
+
+```ts
+const { custom } = await doc.metadata.custom.update({
+  reviewedBy: 'lee',
+  contractId: 'C-2026-114',
+  draftOwner: null, // remove this key
+});
+```
+
+It returns the keys as they are after the change, the same shape `get()` returns.
+
+A key is 1 to 127 printable ASCII characters, doesn't start with `/`, and isn't the name of a
+standard field (`Title`, `Author`, `CreationDate`, …): use `doc.metadata.update()` for those. An
+invalid key fails with `InvalidArg`, which names the key, and nothing is written.
+
+## Permissions
+
+Reading metadata needs `doc.open`. Changing it, your own keys included, needs
+`doc.metadata.modify`; without it, `update()` fails with `Forbidden`.
+
+## Good to know
+
+### The modified date
+
+The engine doesn't change `modifiedAt` for you, neither when you update metadata nor when you
+save. Set it yourself when your app wants it to say when the document last changed:
+
+```ts
+await doc.metadata.update({ modifiedAt: new Date() });
+```
+
+### Where it's stored
+
+The fields are the PDF's document information (the `/Info` dictionary, with keys like `/Title`
+and `/CreationDate`). Your own keys live in the same dictionary under their own names:
+`reviewedBy` is `/reviewedBy`. `trapped` is `'unknown'` both when the file says so and when it
+doesn't say.
+
+### Why your own keys are separate
+
+`update()` keeps what you leave out one level deep: each field you pass replaces that field.
+Your own keys are fields too, so they get an object of their own, where each key is one of those
+fields. Adding a key never touches the others, and a key can't be mistaken for a standard field.
+
+Other code can follow changes with the `metadata.updated` and `metadata.customUpdated` events.
+See [Events](/docs/engine/concepts/events).

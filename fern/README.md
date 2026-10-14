@@ -41,10 +41,11 @@ structurally normalizes generated README titles, descriptions, and visible code
 without rewriting link destinations. It also corrects PHP's non-configurable
 base exception casing, removes Fern's stale PHP formatter caches, and separates
 Ruby's lowercase gem and require identity (`cloudpdf`) from its public module
-(`CloudPDF`). Fern's Ruby generator 1.21.1 currently emits a nonexistent helper
-for binary multipart fields; the same strict post-generation step replaces it
-with the generated runtime's `add_file` API and restores the required `file`
-field and example. Generation fails loudly if that upstream shape changes.
+(`CloudPDF`). Fern's Ruby generator 1.28.1 sends a binary multipart field only
+when it is given, without a content type, and leaves the required `file` out of
+the request model and examples; the same strict post-generation step requires
+it, sends it as `application/pdf`, and restores the field and example.
+Generation fails loudly if that upstream shape changes.
 Generator configuration controls all other public code identifiers.
 
 Validation recursively checks generated text and paths. Every case-insensitive

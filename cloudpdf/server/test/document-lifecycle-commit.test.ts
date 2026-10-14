@@ -1,15 +1,15 @@
 /**
  * Commit-time sha verification. The interesting property under test:
- * commit needs exactly ONE object-store read of the uploaded bytes.
+ * commit needs exactly one object-store read of the uploaded bytes.
  *
  * With a base-file cache wired, `fileCache.acquire` downloads the
  * object into the cache and verifies its hash on the way down; the
  * security probe then reuses that warm entry. The old shape hashed the
- * remote object (buffering it whole in RAM) and THEN materialised it a
+ * remote object (buffering it whole in RAM) and then materialised it a
  * second time for the probe — two full downloads per presigned upload.
  *
  * The cache is content-addressed across documents, so a hit that was
- * materialised from a DIFFERENT object's key proves nothing about OUR
+ * materialised from a different object's key proves nothing about our
  * key — commit must detect that via `handle.sourceKey` and fall back
  * to hashing the remote object directly.
  */

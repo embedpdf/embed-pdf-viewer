@@ -1,13 +1,21 @@
 import type {
+  PdfCoordinates,
   DigestAlgorithm,
   DocumentVersionRef,
-  SignatureAbortResult,
+  SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignaturePrepareInput,
   SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  authorizeFieldWrite,
+  EngineError,
+  EngineErrorCode,
+  toPageRef,
+  type ChangeAuthority,
+  type FieldLockSpec,
+} from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -29,7 +37,9 @@ import {
   type OpenedPdfDocument,
 } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { withScratch } from '../../runtime/memory/scratch';
+import { formatPdfDate } from '../../shared/pdf-date';
 import { generateUuid } from '../../shared/uuid';
+import { groupLockFields, groupOfField } from '../forms/internal/fieldGroups';
 import { disposeFormModel } from '../forms/internal/formModelCache';
 import { withWideStringArray } from '../forms/internal/wideStringArray';
 import { DocumentSaver } from '../save/DocumentSaver';
@@ -106,14 +116,14 @@ const PREPARE_LP64: PrepareLayout = {
 /**
  * The two-phase signing protocol on a session, local and native alike.
  *
- * `prepare` never touches the live document: it builds a CANDIDATE — a
+ * `prepare` never touches the live document: it builds a candidate — a
  * fresh layer over the session's own immutable base (see `openCandidate`)
  * — writes the signature there, saves it through a `CandidateStore`
  * (memory locally, a file beside the base on file-backed sessions), seals
  * it, and parks the saved candidate on the session. `complete` writes the
  * CMS into it, opens it as a new base with a fresh layer, proves the new
  * signature seals a whole revision, and installs it as the session's
- * document. `abort` discards the candidate.
+ * document. `cancel` discards the candidate.
  */
 export class SignatureMutator {
   constructor(
@@ -124,15 +134,31 @@ export class SignatureMutator {
     private readonly candidatePath?: (basePath: string, signingId: string) => string,
   ) {}
 
-  prepare(input: SignaturePrepareInput): SignaturePrepared {
+  /**
+   * Prepare a signing of `input.field`, which `authority` must be allowed to
+   * sign (its group, `fields:sign`). A field in a group, signed without a
+   * `lock`, locks the rest of its group: nobody changes the buyer's fields
+   * once the buyer signed.
+   */
+  prepare(input: SignaturePrepareInput, authority: ChangeAuthority): SignaturePrepared {
     if (this.session.pendingSigning) {
       throw new EngineError(
         EngineErrorCode.SigningPending,
-        `a signing is pending (${this.session.pendingSigning.prepared.signingId}); complete or abort it first`,
+        `a signing is pending (${this.session.pendingSigning.prepared.signingId}); complete or cancel it first`,
       );
     }
     const reader = new SignatureReader(this.runtime, this.session);
     const field = reader.resolveField(input.field);
+    const groupId = groupOfField(this.runtime, this.session, field.fieldObjectNumber);
+    authorizeFieldWrite(authority, groupId, 'sign');
+    const lock: FieldLockSpec | undefined =
+      input.lock ??
+      (groupId !== null
+        ? {
+            action: 'include',
+            fields: groupLockFields(this.runtime, this.session, groupId),
+          }
+        : undefined);
     if (field.signed) {
       throw new EngineError(
         EngineErrorCode.SignatureRefused,
@@ -180,23 +206,20 @@ export class SignatureMutator {
       const candidate = this.openCandidate(signingId, stack);
       stack.push(() => candidate.close());
 
-      // `signer` is the pre-rename wire spelling: older clients still send it.
-      const attribution =
-        input.attribution ??
-        (input as { signer?: SignaturePrepareInput['attribution'] }).signer;
+      const signer = input.signer;
       const valueObjNum = this.callPrepare(candidate.docPtr, field.fieldObjectNumber, {
         subfilter: SUBFILTER_CODE[subFilter],
         digest: DIGEST_CODE[algorithm],
         contentsSize,
-        name: attribution?.name ?? null,
-        reason: attribution?.reason ?? null,
-        location: attribution?.location ?? null,
-        contactInfo: attribution?.contactInfo ?? null,
-        signingTime: input.signingTime ?? null,
+        name: signer?.name ?? null,
+        reason: signer?.reason ?? null,
+        location: signer?.location ?? null,
+        contactInfo: signer?.contactInfo ?? null,
+        signingTime: signer?.signedAt !== undefined ? formatPdfDate(signer.signedAt) : null,
         docmdpPermission: input.certify?.permission ?? 0,
-        fieldmdpAction: input.lock ? FIELD_ACTION_CODE[input.lock.action] : 0,
-        fieldmdpFields: input.lock?.action === 'all' ? [] : (input.lock?.fields ?? []),
-        lockPermission: input.lock?.permission ?? 0,
+        fieldmdpAction: lock ? FIELD_ACTION_CODE[lock.action] : 0,
+        fieldmdpFields: lock?.action === 'all' ? [] : (lock?.fields ?? []),
+        lockPermission: lock?.permission ?? 0,
       });
       if (valueObjNum === 0) {
         throw new EngineError(
@@ -205,12 +228,7 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        bakeWidgetAppearance(this.runtime, 
-          candidate.docPtr,
-          field.widget,
-          input.appearance.pdf,
-          input.appearance.pageIndex ?? 0,
-        );
+        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, input.appearance.pdf);
       }
 
       const store = this.storeFor();
@@ -245,7 +263,17 @@ export class SignatureMutator {
     }
   }
 
-  complete(input: SignatureCompleteInput): SignatureCompleteResult {
+  /**
+   * `opId` names the write. A signing runs outside a layer transaction (it
+   * replaces the document's bytes), so it takes its id here, and it is final:
+   * never undoable.
+   */
+  /** Complete the pending signing; `authority` must still be allowed to sign its field. */
+  complete(
+    input: SignatureCompleteInput,
+    opId: string,
+    authority: ChangeAuthority,
+  ): SignatureCompleteResult {
     const pending = this.session.pendingSigning;
     if (!pending || pending.prepared.signingId !== input.signingId) {
       const last = this.session.lastCompletion;
@@ -260,6 +288,11 @@ export class SignatureMutator {
       }
       throw new EngineError(EngineErrorCode.NotFound, `no pending signing '${input.signingId}'`);
     }
+    authorizeFieldWrite(
+      authority,
+      groupOfField(this.runtime, this.session, pending.fieldObjectNumber),
+      'sign',
+    );
     if (!sameVersion(pending.prepared.expectedVersion, input.expectedVersion)) {
       throw new EngineError(
         EngineErrorCode.SigningVersionMismatch,
@@ -299,8 +332,7 @@ export class SignatureMutator {
     const reader = new SignatureReader(this.runtime, this.session);
     const snapshot = reader.readSnapshot();
     const signature = snapshot.signatures.find(
-      (s) =>
-        s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === pending.fieldObjectNumber,
+      (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === pending.fieldObjectNumber,
     );
     if (!signature) {
       throw new EngineError(
@@ -315,22 +347,22 @@ export class SignatureMutator {
       previous: pending.prepared.expectedVersion,
       protection: snapshot.protection,
       meta: {
-        affectedPages: this.session
-          .allRecords()
-          .map((r) => this.session.pageState(r.pageObjectNumber)),
+        affectedPages: this.session.allRecords().map((r) => toPageRef(r.pageObjectNumber)),
         cacheDelta: null,
+        opId,
+        undoable: false,
       },
     };
     this.session.lastCompletion = { signingId: input.signingId, cms: input.cms.slice(), result };
     return result;
   }
 
-  abort(signingId: string): SignatureAbortResult {
+  cancel(signingId: string): SignatureCancelResult {
     const pending = this.session.pendingSigning;
     if (pending && pending.prepared.signingId === signingId) {
       this.session.pendingSigning = null;
       this.storeFor().discard(pending.saved);
-      return { status: 'aborted' };
+      return { status: 'cancelled' };
     }
     if (this.session.lastCompletion?.signingId === signingId) {
       return { status: 'already-completed' };
@@ -408,7 +440,7 @@ export class SignatureMutator {
   /**
    * File-backed sessions (a file base in the registry: the server) persist
    * the candidate as a file beside the base; everything else keeps it in
-   * memory. The choice follows the SESSION's base, not the candidate's.
+   * memory. The choice follows the session's base, not the candidate's.
    */
   private storeFor(): CandidateStore {
     const base = this.session.source.base;
@@ -456,7 +488,7 @@ export class SignatureMutator {
 
   /**
    * The candidate the signature is authored on. A layer session reopens a
-   * fresh layer over ITS OWN immutable base (a registry retain, no copy of
+   * fresh layer over its own immutable base (a registry retain, no copy of
    * the file), fed the layer it was opened with — or, with unsaved edits,
    * the artifact a save would write, which is cumulative: the edits and
    * the signature then share one revision, as Acrobat saves a
@@ -473,14 +505,15 @@ export class SignatureMutator {
     // layer-sized goes through scratch files beside the base (the signing
     // root the file candidate store owns); the wasm client keeps buffers —
     // its bytes are in memory anyway.
-    const scratch = saver.canWriteScratchFiles() && source.base?.kind === 'file' ? source.base.path : null;
+    const scratch =
+      saver.canWriteScratchFiles() && source.base?.kind === 'file' ? source.base.path : null;
     if (this.session.kind === 'layer' && source.base && !this.loadedDeltaHoldsSignedBytes()) {
       const base = this.baseDocuments.retainByKey(source.base.key);
       if (base) {
         // With unsaved edits, the artifact a save would write — unless the
         // save pass finds nothing reachable changed since load (an
         // annotation added and removed again): then the layer the session
-        // was opened with IS the document, and the candidate seals it.
+        // was opened with is the document, and the candidate seals it.
         let layer: LayerSource = source.layer ?? { kind: 'fresh' };
         if (this.session.hasUnsavedEdits()) {
           if (scratch) {

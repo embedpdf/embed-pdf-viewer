@@ -1,6 +1,6 @@
 /**
  * The SaaS plan catalog, fetched from the control plane. Prices,
- * meters, and trial days are FACTS owned by the platform's catalog —
+ * meters, and trial days are facts owned by the platform's catalog —
  * the page never hardcodes a number, so a catalog migration corrects
  * this site on its next render. Copy (taglines, feature labels)
  * remains the page's judgment.

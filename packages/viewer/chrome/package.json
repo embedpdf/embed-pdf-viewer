@@ -42,6 +42,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@embedpdf/core-ui": "workspace:*",
+    "@embedpdf/default-signature-fonts": "workspace:*",
     "@embedpdf/default-stamps": "workspace:*",
     "@embedpdf/react": "workspace:*",
     "@embedpdf/web": "workspace:*"

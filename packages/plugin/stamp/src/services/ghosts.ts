@@ -7,14 +7,14 @@
 import type { StampPreviewProvider } from '@embedpdf/plugin-annotation/contract';
 
 import type { StampAssetPreview } from '../contract';
-import type { StampAssetEngine } from './asset-engine';
+import type { StampAssetEngineService } from './asset-engine';
 import type { StampBinaries } from './binaries';
 
 export function createGhosts(
   {
     openAssetDocument,
     imageToPreview,
-  }: Pick<StampAssetEngine, 'openAssetDocument' | 'imageToPreview'>,
+  }: Pick<StampAssetEngineService, 'openAssetDocument' | 'imageToPreview'>,
   { ghostRenders }: Pick<StampBinaries, 'ghostRenders'>,
 ) {
   const renderGhost = async (bytes: Uint8Array, devicePixelWidth: number) => {

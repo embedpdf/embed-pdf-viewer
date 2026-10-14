@@ -5,7 +5,7 @@ import type { PageRef } from '../identity/PageRef';
  *
  *   - `page`: a page in the page tree — the normal case; addressable through
  *     `doc.page(ref)` and present in `PageListSnapshot.pages`.
- *   - `template`: a `/Type /Template` dictionary OUTSIDE the page tree
+ *   - `template`: a `/Type /Template` dictionary outside the page tree
  *     (ISO 32000-2 §12.7.7): never listed as a page, never renderable,
  *     `doc.page()` does not accept its object number. Reported so consumers
  *     can diagnose hidden templates instead of silently ignoring them.

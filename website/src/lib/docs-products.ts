@@ -7,11 +7,11 @@ import {
 export const DOCS_PRODUCTS = {
   viewer: {
     label: 'Viewer',
-    href: '/docs/viewer/getting-started',
+    href: '/docs/viewer',
   },
   headless: {
     label: 'Headless',
-    href: '/docs/headless/getting-started',
+    href: '/docs/headless',
   },
   engine: {
     label: 'Engine',

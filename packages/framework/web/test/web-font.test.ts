@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { mountWebFont, observeWebFonts } from '../src/web-font';
+import {
+  createFontMounts,
+  fontKeyOfWebFamily,
+  mountFontProgram,
+  mountWebFont,
+  observeWebFonts,
+  webFontFamily,
+} from '../src/web-font';
 
 /** A `Document` with a font set, and a `FontFace` that loads at once. */
 function fakeDocument() {
@@ -56,13 +63,17 @@ describe('mountWebFont', () => {
     expect(changed).toHaveBeenCalledTimes(4);
     stopOther();
   });
-  it('mounts the bytes as a @font-face named by the key, refcounted per document', async () => {
+  it("mounts the bytes as a @font-face in the viewer's namespace, refcounted per document", async () => {
     vi.stubGlobal('FontFace', FakeFontFace);
     const { doc, faces } = fakeDocument();
     const data = new Uint8Array([1, 2, 3]);
     const first = await mountWebFont('brand-sans', data, { document: doc, weight: 700 });
     const face = [...faces][0] as unknown as FakeFontFace;
-    expect(face.family).toBe('brand-sans');
+    // Namespaced: the page's own `brand-sans` family never stands in for it.
+    expect(face.family).toBe('epdf-brand-sans');
+    expect(webFontFamily('brand-sans')).toBe('epdf-brand-sans');
+    expect(fontKeyOfWebFamily('epdf-brand-sans')).toBe('brand-sans');
+    expect(fontKeyOfWebFamily('Helvetica')).toBe('Helvetica');
     expect(face.descriptors?.weight).toBe('700');
     expect(face.status).toBe('loaded');
     // A second mount of the same key adds nothing and holds its own reference.
@@ -72,6 +83,51 @@ describe('mountWebFont', () => {
     expect(faces.size).toBe(1); // the second holder keeps it
     second();
     expect(faces.size).toBe(0);
+  });
+
+  it('mounts a program under its family, in its own weight and style', async () => {
+    vi.stubGlobal('FontFace', FakeFontFace);
+    const { doc, faces } = fakeDocument();
+    const load = vi.fn(async () => new Uint8Array([4, 5]));
+    const program = {
+      family: 'epdf-0123456789abcdef',
+      weight: 700,
+      style: 'italic' as const,
+      load,
+    };
+    const unmount = await mountFontProgram(program, { document: doc });
+    const face = [...faces][0] as unknown as FakeFontFace;
+    expect([face.family, face.descriptors]).toEqual([
+      'epdf-0123456789abcdef',
+      { weight: '700', style: 'italic' },
+    ]);
+    expect([...new Uint8Array(face.source)]).toEqual([4, 5]);
+    unmount();
+    expect(faces.size).toBe(0);
+  });
+
+  it('mounts each program a layer asks for once, and lets them all go together', async () => {
+    vi.stubGlobal('FontFace', FakeFontFace);
+    const { doc, faces } = fakeDocument();
+    const program = (family: string) => ({
+      family,
+      weight: 400,
+      style: 'normal' as const,
+      load: vi.fn(async () => new Uint8Array([1])),
+    });
+    const sans = program('epdf-aaaaaaaaaaaaaaaa');
+    const serif = program('epdf-bbbbbbbbbbbbbbbb');
+    const mounts = createFontMounts({ document: doc });
+    mounts.mount([sans]);
+    mounts.mount([sans, serif]);
+    await vi.waitFor(() => expect(faces.size).toBe(2));
+    expect(sans.load).toHaveBeenCalledTimes(1);
+    mounts.release();
+    await vi.waitFor(() => expect(faces.size).toBe(0));
+    // A layer that comes back holds again.
+    mounts.mount([sans]);
+    await vi.waitFor(() => expect(faces.size).toBe(1));
+    expect(sans.load).toHaveBeenCalledTimes(2);
   });
 
   it('is a no-op without the FontFace API', async () => {

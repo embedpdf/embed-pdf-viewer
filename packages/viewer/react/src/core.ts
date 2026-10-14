@@ -1,5 +1,6 @@
+'use client';
 /**
- * @embedpdf/viewer-react/core — the ENGINE-AGNOSTIC React door.
+ * @embedpdf/viewer-react/core — the engine-agnostic React door.
  *
  * ```tsx
  * import { PDFViewer } from '@embedpdf/viewer-react/core';
@@ -9,7 +10,7 @@
  * ```
  *
  * The same <PDFViewer> as the main entry — but no default engine, so `engine`
- * is REQUIRED and takes only a real implementation (an `Engine`, or a factory
+ * is required and takes only a real implementation (an `Engine`, or a factory
  * thunk the viewer owns the lifetime of). In exchange the local PDFium engine —
  * wasm, worker source, main-thread recipe — never enters your module graph:
  * nothing is stubbed or aliased away, it is simply not imported. Its options
@@ -24,14 +25,11 @@ import '@embedpdf/viewer/core';
 
 import type { ViewerConfig } from '@embedpdf/viewer/core';
 
-import { PDFViewer as PDFViewerImpl, type PDFViewerExtras } from './component';
+import { PDFViewer as PDFViewerImpl, type PDFViewerExtras } from './parts';
 
 export * from '@embedpdf/viewer/core';
-export type { PDFViewerExtras } from './component';
+export * from './parts';
 
-/** Props on THIS door: `engine` is required, and only a real engine satisfies it. */
 export type PDFViewerProps = ViewerConfig & PDFViewerExtras;
 
-/** The shared component, narrowed to this door's contract (no cast needed: the
- *  implementation is typed with the wider config — see ./component). */
 export const PDFViewer: (props: PDFViewerProps) => ReturnType<typeof PDFViewerImpl> = PDFViewerImpl;

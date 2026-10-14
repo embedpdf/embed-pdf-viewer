@@ -4,20 +4,28 @@ import {
   PAGE_INSERT_BLANK_MAX_COUNT,
   type PageInsertBlankSpec,
   type PageInsertResult,
+  type PagePosition,
   type PageRef,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { pageIndexAt } from './internal/pageIndexAt';
 import { PagesReader } from './PagesReader';
-import type { DocumentSession } from '../../document-session/DocumentSession';
+import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
+import {
+  objectNumberUnavailable,
+  type DocumentSession,
+} from '../../document-session/DocumentSession';
+import { loadFailure } from '../../runtime/loadError';
 import { throwIfAborted } from '../../shared/abort';
 
 /**
  * Insert every page of a standalone PDF into the session document. A
- * structural MUTATION (like move/delete): the source bytes are loaded as a
+ * structural mutation (like move/delete): the source bytes are loaded as a
  * throwaway PDFium document, `FPDF_ImportPagesByIndex` deep-copies its
- * pages in at `destIndex`, and the page registry is rebuilt. Pre-existing
+ * pages in at `position`, and the page registry is rebuilt. Pre-existing
  * pages keep their identity and `RevisionToken`s; the inserted copies get
  * fresh object numbers, resolved from the post-insert registry.
  */
@@ -27,7 +35,11 @@ export class PagesInserter {
     private readonly session: DocumentSession,
   ) {}
 
-  insert(bytes: ArrayBuffer, destIndex: number | undefined, signal: AbortSignal): PageInsertResult {
+  insert(
+    bytes: ArrayBuffer,
+    position: PagePosition,
+    signal: AbortSignal,
+  ): PageInsertResult<PdfCoordinates> {
     throwIfAborted(signal);
     if (bytes.byteLength === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'pages.insert requires non-empty bytes');
@@ -35,21 +47,14 @@ export class PagesInserter {
 
     const { fn, mem } = this.runtime;
     const destPtr = this.session.requireDocPtr();
-    const beforeCount = fn.FPDF_GetPageCount(destPtr);
-    const at = destIndex ?? beforeCount;
-    if (!Number.isInteger(at) || at < 0 || at > beforeCount) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `pages.insert destIndex ${at} out of range [0, ${beforeCount}]`,
-      );
-    }
+    const at = pageIndexAt(this.session, position, fn.FPDF_GetPageCount(destPtr));
 
-    // FPDF_ImportPagesByIndex does NOT fully detach imported objects from
+    // FPDF_ImportPagesByIndex does not fully detach imported objects from
     // their source document (imported streams still read through it), so
     // the source doc and its buffer must outlive every future save of the
     // destination. On failure they are released immediately; on success
-    // they are parked on the session and released at session close.
-    // TODO(fork): a deep-detaching import would let this close eagerly.
+    // they are parked on the session and released at session close; only a
+    // deep-detaching import in the runtime would let them close eagerly.
     const dataPtr = mem.alloc(bytes.byteLength);
     let srcPtr: Ptr | null = null;
     let insertedCount = 0;
@@ -57,9 +62,15 @@ export class PagesInserter {
       mem.writeBytes(dataPtr, new Uint8Array(bytes));
       srcPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
       if (!srcPtr) {
-        throw new EngineError(
-          EngineErrorCode.MalformedPdf,
-          'pages.insert source PDF could not be opened',
+        // A password-protected source is `DocPasswordRequired`, not a
+        // broken file.
+        throw loadFailure(
+          fn,
+          null,
+          new EngineError(
+            EngineErrorCode.MalformedPdf,
+            'pages.insert source PDF could not be opened',
+          ),
         );
       }
       insertedCount = fn.FPDF_GetPageCount(srcPtr);
@@ -84,30 +95,41 @@ export class PagesInserter {
       throw error;
     }
 
-    // Page count and order changed; rebuild the index<->pon map. Existing
-    // pages' revisions and weak-flag bookkeeping stay put (keyed by pon).
+    // Page count and order changed; rebuild the index<->pon map.
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
     const insertedPages: PageRef[] = layout.pages
       .slice(at, at + insertedCount)
       .map((page) => page.ref);
-    return { insertedPages, layout, cache: null };
+    // An inserted page is born in this document, not in its file, so its
+    // inline annotations are born as objects here, named by their numbers.
+    for (const page of insertedPages) {
+      promoteInlineAnnotations(this.runtime, this.session, page.objectNumber);
+    }
+    return {
+      insertedPages,
+      layout,
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() },
+    };
   }
 
   /**
-   * Create `count` blank pages of `size` at `destIndex`. Same mutation
-   * contract as `insert`, but native creation (`FPDFPage_New`) instead of a
-   * deep copy: no source document, so none of the retain-until-close
-   * lifetime hazard above. Each page gets an empty content stream
-   * (`FPDFPage_GenerateContent`) so the saved PDF renders identically in
-   * third-party viewers.
+   * Create `count` blank pages of `size` at `position`. Same mutation
+   * contract as `insert`, but native creation (`EPDFPage_InsertBlankRaw`,
+   * which never loads the page) instead of a deep copy: no source document,
+   * so none of the retain-until-close lifetime hazard above. A blank page has
+   * no `/Contents`, which ISO 32000-2 defines as an empty page.
+   *
+   * `objectNumbers`, one per page, names the pages: numbers the session
+   * holds, each checked before the first page is made.
    */
   insertBlank(
     spec: PageInsertBlankSpec,
-    destIndex: number | undefined,
+    position: PagePosition,
     signal: AbortSignal,
-  ): PageInsertResult {
+    objectNumbers?: readonly number[],
+  ): PageInsertResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { size } = spec;
     const count = spec.count ?? 1;
@@ -131,36 +153,43 @@ export class PagesInserter {
 
     const { fn } = this.runtime;
     const destPtr = this.session.requireDocPtr();
-    const beforeCount = fn.FPDF_GetPageCount(destPtr);
-    const at = destIndex ?? beforeCount;
-    if (!Number.isInteger(at) || at < 0 || at > beforeCount) {
+    const at = pageIndexAt(this.session, position, fn.FPDF_GetPageCount(destPtr));
+
+    if (objectNumbers && objectNumbers.length !== count) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `pages.insertBlank destIndex ${at} out of range [0, ${beforeCount}]`,
+        `pages.insertBlank needs one object number per page: ${objectNumbers.length} for ${count}`,
+        { details: { field: 'objectNumbers' } },
       );
     }
+    for (const objectNumber of objectNumbers ?? []) this.session.useObjectNumber(objectNumber);
 
+    // A failure takes back the pages already made: the job's layer
+    // transaction aborts.
     for (let i = 0; i < count; i++) {
-      // FPDFPage_New would clamp an out-of-range index to "append"; the
-      // guard above keeps that PDFium leniency out of the contract.
-      const pagePtr = fn.FPDFPage_New(destPtr, at + i, size.width, size.height);
-      if (!pagePtr) {
-        // Undo the pages already created so a failure leaves the document
-        // untouched (the registry was never refreshed, so it still agrees).
-        for (let j = 0; j < i; j++) fn.FPDFPage_Delete(destPtr, at);
+      const objectNumber = objectNumbers?.[i];
+      // 0: the next free one.
+      if (
+        !fn.EPDFPage_InsertBlankRaw(destPtr, at + i, size.width, size.height, objectNumber ?? 0)
+      ) {
+        // The index was checked: a numbered page refused is a number another
+        // object has.
+        if (objectNumber !== undefined) throw objectNumberUnavailable(objectNumber, 'taken');
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `FPDFPage_New rejected page ${i + 1}/${count} at index ${at + i}`,
+          `EPDFPage_InsertBlankRaw rejected page ${i + 1}/${count} at index ${at + i}`,
         );
       }
-      fn.FPDFPage_GenerateContent(pagePtr);
-      fn.FPDF_ClosePage(pagePtr);
     }
 
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
     const insertedPages: PageRef[] = layout.pages.slice(at, at + count).map((page) => page.ref);
-    return { insertedPages, layout, cache: null };
+    return {
+      insertedPages,
+      layout,
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() },
+    };
   }
 }

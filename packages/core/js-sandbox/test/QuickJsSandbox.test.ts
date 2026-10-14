@@ -88,7 +88,7 @@ describe('QuickJsSandbox', () => {
       {
         kind: 'setValue',
         ref: ref('dynamic-label'),
-        value: { type: 'text', value: 'initialized' },
+        value: { value: 'initialized' },
       },
     ]);
     expect(vm.run(`stampLabel.call(this);`, input()).event.value).toBe('EmbedPDF');
@@ -102,6 +102,27 @@ describe('QuickJsSandbox', () => {
     );
 
     expect(out.event.value).toBe('undefined/undefined/undefined');
+  });
+
+  it("can't reach the network, open a window or read the page's cookies", async () => {
+    const vm = await sandbox();
+    const out = vm.run(
+      `event.value = [typeof WebSocket, typeof importScripts, typeof window, typeof document,
+         typeof navigator, typeof localStorage, typeof open].join('/');
+       app.launchURL('https://example.test/launch', true);
+       this.getURL('https://example.test/get');
+       this.mailDoc(true, 'someone@example.test');`,
+      input(),
+    );
+
+    expect(out.event.value).toBe(
+      'undefined/undefined/undefined/undefined/undefined/undefined/undefined',
+    );
+    // The three calls that would reach outside are refused and say so; none becomes an effect
+    // (the one form effect is the field showing the value this script set).
+    expect(out.uiEffects).toEqual([]);
+    expect(out.formEffects.map((effect) => effect.kind)).toEqual(['setAppearanceText']);
+    expect(out.diagnostics.filter((each) => each.code === 'blocked-network')).toHaveLength(3);
   });
 
   it('interrupts runaway code and never reuses the faulted runtime', async () => {

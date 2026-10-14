@@ -1,0 +1,92 @@
+{
+  "name": "@embedpdf/viewer-vue",
+  "version": "3.0.0-next.14",
+  "private": false,
+  "description": "Vue wrapper for the full viewer: the PDFViewer component around the embedpdf-viewer custom element, with ToolbarItem, Panel and Region for your own components.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./component": {
+      "development": "./src/parts.ts",
+      "import": "./dist/component.js",
+      "require": "./dist/component.cjs"
+    },
+    "./core": {
+      "development": "./src/core.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "epdf-build && node ../../../tooling/build/src/check-framework-package.mjs",
+    "clean": "rimraf dist",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit && vue-tsc -p test/tsconfig.json",
+    "test": "vitest run"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/viewer/vue"
+  },
+  "dependencies": {
+    "@embedpdf/viewer": "workspace:*",
+    "@embedpdf/vue": "workspace:*"
+  },
+  "peerDependencies": {
+    "vue": ">=3.4"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "playwright-core": "^1.63.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^2.1.9",
+    "vue": "^3.5.13",
+    "vue-tsc": "^3.2.4"
+  },
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/core.ts",
+    "./dist/index.js",
+    "./dist/index.cjs",
+    "./dist/core.js",
+    "./dist/core.cjs"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./component": {
+        "import": "./dist/component.js",
+        "require": "./dist/component.cjs"
+      },
+      "./core": {
+        "import": "./dist/core.js",
+        "require": "./dist/core.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "epdf": {
+    "devExports": "development"
+  }
+}

@@ -3,22 +3,27 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { createLocalEngine } from '@embedpdf/engine';
-import type { DocumentHandle, FormEffect, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import { createLocalEngine, type DocumentHandle } from '@embedpdf/engine';
 import {
   javaScriptProgramFromActionTree,
   scriptFieldsFromSnapshot,
   type ScriptFieldInput,
   type ScriptInput,
+  type ScriptOutput,
 } from '@embedpdf/core-acrojs';
 import { createQuickJsSandbox } from '../src';
+
+// `@embedpdf/engine-core` is not a dependency of this package: name its
+// types through the declared ones.
+type FormEffect = ScriptOutput['formEffects'][number];
+type FormFieldRef = ScriptFieldInput['ref'];
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');
 
 function sameRef(left: FormFieldRef, right: FormFieldRef): boolean {
   return left.kind === 'objectNumber' && right.kind === 'objectNumber'
-    ? left.fieldObjectNumber === right.fieldObjectNumber
+    ? left.objectNumber === right.objectNumber
     : left.kind === 'fqn' && right.kind === 'fqn'
       ? left.name === right.name
       : false;
@@ -37,12 +42,13 @@ function applyOverlay(fields: ScriptFieldInput[], effects: FormEffect[]): void {
     if (!field) continue;
     if (effect.kind === 'setDisplay') field.display = effect.display;
     if (effect.kind === 'setValue') {
+      const value = effect.value;
       field.value =
-        effect.value.type === 'text'
-          ? effect.value.value
-          : effect.value.type === 'toggle'
-            ? effect.value.state
-            : [...effect.value.values];
+        'selectedValues' in value
+          ? [...value.selectedValues]
+          : 'checked' in value
+            ? value.checked
+            : value.value;
     }
   }
 }
@@ -67,7 +73,7 @@ describe('dynamic stamp real-PDF vertical slice', () => {
       );
       const [snapshot, actions] = await Promise.all([
         document.forms.list(),
-        document.actions!.read(),
+        document.actions!.get(),
       ]);
       const fields = scriptFieldsFromSnapshot(snapshot);
       const baseInput: Omit<ScriptInput, 'fields' | 'event'> = {
@@ -118,18 +124,22 @@ describe('dynamic stamp real-PDF vertical slice', () => {
         applyOverlay(fields, output.formEffects);
       }
 
+      // The scripts only set values: each is a `forms.setValue` op of one change.
+      const ops = effects.map((effect) => {
+        if (effect.kind !== 'setValue') throw new Error(`unexpected ${effect.kind} effect`);
+        return { type: 'forms.setValue' as const, field: effect.ref, value: effect.value };
+      });
       const events: string[] = [];
       const unsubscribe = document.events.subscribe((event) => events.push(event.type));
-      const applied = await document.forms.applyEffects!(effects);
+      const applied = await document.apply({ ops });
       unsubscribe();
-      expect(applied.results.map(({ status }) => status)).toEqual([
-        'applied',
-        'applied',
-        'applied',
-        'applied',
+      expect(applied.meta.undoable).toBe(true);
+      expect(events).toEqual([
+        'forms.valueSet',
+        'forms.valueSet',
+        'forms.valueSet',
+        'forms.valueSet',
       ]);
-      expect(applied.meta).not.toBeNull();
-      expect(events).toEqual(['form.effectsApplied']);
 
       const afterApply = await document.forms.list();
       expect(
@@ -155,7 +165,7 @@ describe('dynamic stamp real-PDF vertical slice', () => {
 
       const page = (await reopened.pages.list()).pages[0];
       expect(reopened.pages.flatten).toBeDefined();
-      const flattenedResult = await reopened.pages.flatten!([page.ref], 'display');
+      const flattenedResult = await reopened.pages.flatten!([page.ref], { usage: 'display' });
       expect(flattenedResult.results.map(({ status }) => status)).toEqual(['applied']);
       expect(reopened.pages.extract).toBeDefined();
       const extracted = await reopened.pages.extract!([page.ref]);

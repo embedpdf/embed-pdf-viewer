@@ -3,12 +3,12 @@
  *
  *   - `./worker-entry.ts` — shipped as raw TS source (`@embedpdf/engine/worker-entry`),
  *     compiled by the consumer's bundler (Vite `?worker`, manual `new Worker`).
- *   - `workers/embedpdf-worker.js` — a self-contained BUILT artifact (Emscripten
+ *   - `workers/embedpdf-worker.js` — a self-contained built artifact (Emscripten
  *     glue statically bundled), used two ways: stringified into
  *     `workers/embedpdf-worker.source.js` for the default inline-blob spawn, and
  *     copied verbatim by strict-CSP users as a same-origin static worker.
  *
- * Boot is INIT-DRIVEN: the worker does nothing until the main thread posts
+ * Boot is init-driven: the worker does nothing until the main thread posts
  * `{ kind: 'init', wasmUrl?, wasmBinary? }` (see resolveWasmSource — the main
  * thread decides where the wasm comes from; the worker never guesses). Then it
  * creates the WASM runtime in this thread, wires a {@link WorkerHost} to
