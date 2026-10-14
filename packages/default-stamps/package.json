@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/default-stamps",
-  "version": "1.0.0-next.0",
+  "version": "1.0.0-next.1",
   "private": false,
   "description": "The standard rubber-stamp library as Acrobat-compatible PDFs, one per locale: title, /Names /Pages registry (identifier=label), vector artwork. Import with @embedpdf/plugin-stamp or drop into Acrobat's Stamps folder.",
   "type": "module",

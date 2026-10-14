@@ -1,5 +1,12 @@
 # @embedpdf/core-js-sandbox
 
+## 3.0.0-next.15
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Align the JavaScript sandbox host types with the updated engine document and
+  annotation references used by form scripts and dynamic stamps.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

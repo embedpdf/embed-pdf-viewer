@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/viewer-angular",
-  "version": "3.0.0-next.14",
+  "version": "3.0.0-next.15",
   "private": false,
   "description": "Angular wrapper for the full viewer: the epdf-pdf-viewer component around the embedpdf-viewer custom element, with template directives for your own components.",
   "type": "module",

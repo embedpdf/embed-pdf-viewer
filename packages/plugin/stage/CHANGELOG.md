@@ -1,5 +1,43 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Stage events are derived from state changes in one place, with unchanged payloads. `StageAction` is no longer exported and the state's `vp` field is `viewport`. A controller built directly (`createStageController`) exposes the full `StageHostCapability` type, so optional parameters stay optional.
+
+  Stage layout, reveal, and navigation use durable page references and page-space coordinates, including transforms for pages with nondefault boxes and rotation.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – The stage capability follows the contract dictionary, split into a public contract (`/contract`) and a host lens (`/contract/host`).
+
+  Reads: `getCamera`, `getViewpoint`, `getViewportSize`, `getZoomLevel`, `getZoomMode`, `getViewRotation`, `getSettings` (the one place for `flow`/`layout`/`spread`/`sizing`/`bounded`/`pageFrame`/…), `getViewState`, `getCurrentPage`, `getCurrentPageIndex`, `listCurrentItemPages`, `listVisiblePages`, `isPageVisible`, `getPageFrame`, `getPageAt`, `listActiveRules`, `matchesRule`, `isMoving`, `canGoNext`, `canGoPrevious`. Writes: `zoomIn`/`zoomOut`/`zoomTo`/`zoomBy`, `fitWidth`/`fitPage`/`fitAll`/`fitAutomatic`, `goToPage(ref)`/`goToPageIndex`/`goToFirstPage`/`goToLastPage`/`nextPage`/`previousPage`, `reveal(ref)`/`revealIndex`/`revealRect`, `scrollTo`/`scrollBy`/`panBy`/`setCamera`/`stopMotion`, `setViewRotation`/`rotateViewBy`, `setFlow`/`setLayout`/`setSpread`/`setSizing`/`updateSettings`/`resetSettings`/`resetView`/`applyViewState`, `setResponsiveRules`. Coordinates are page space ⇄ viewport: `pageToViewport`, `viewportToPage`, `pageRectToViewport`. Events: `onPageChanged`, `onZoomChanged`, `onCameraChanged`, `onMotionEnded`, `onSettingsChanged`, `onViewportChanged`.
+
+  Host (`StageHostCapability`, same runtime token): `setViewportSize`, `setDevicePixelRatio`, `beginGesture`/`endGesture`, `fling`, `doubleTapZoom`, `zoomAround`, `getScrollMetrics`, `worldToViewport`/`viewportToWorld`/`pageToWorld`, `provideInitialView`, `placeInitial`, `refit`, `getLensId`.
+
+  Removed: the per-setting getters, `pages()` and `pageCount()` (the page list is document truth: `documents.listPages`), `visiblePages`, `currentPage`, `currentItemPages`, `pageRect`, `pageAt`, `pointOnPage`, `pageRectToScreen`, `toScreen`/`toWorld`, `setViewport`, `cameraInMotion`, `automatic`, `next`/`prev`, index-taking `goToPage`/`reveal`, `lensId`, `update`, `setResponsive`, `matches`, `activeRules`.
+  - Internal layout: `contract` / `host-contract` / `model` / `controller` with `services`, `read`, `camera`, `navigation`, `settings`, `view` and `sync` areas; the plugin is defined on `create()`.
+  - `StageState` / `StageAction` are host-lens types now (`@embedpdf/plugin-stage/contract/host`), no longer exported from `/contract` or the package root.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – `pages()` entries, `visiblePages()` and `pageAt()` results carry `ref: PageRef`; `pageRect`, `pointOnPage`, `pageToWorld` and `pageRectToScreen` take a `PageRef`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The Stage's state is declared once as `stageState` (`zoomLevel`, `zoomMode`, `currentPageIndex`, `currentPage`, `pageCount`, `viewRotation`, `activeRules`), which each framework turns into its state hook. New `getPageCount()`. `getCurrentPage()` and `onPageChanged`'s `page` are the page's `PageRef` (was its `PageInfo`). `isPageVisible`, `getPageFrame`, `viewportToPage`, `pageToViewport` and `pageRectToViewport` take a page's ref or its index, and read a page that isn't in the document as `null`/`false`.
+
+  Settings change only through `updateSettings()`: `setFlow`, `setLayout`, `setSpread` and `setSizing` are gone. How a view takes pointer input is now its own settings, `interaction`, `panFallback` and `zoomGestures` (all `true` by default), so a thumbnail strip registers `stagePlugin({ token, interaction: false, zoomGestures: false })` and can change them while the app runs. A `pageFrame` may name only the sides it reserves (`{ bottom: 20 }`); the others are 0. `getSettings()` returns the same object until a setting changes. GoTo and Named page actions now move the view by its `scrollBehavior` setting instead of always gliding.
+
+### Patch Changes
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – Internal: the controller composes through the kernel's `composeApi`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The plugin's definition takes its types from its token and state instead of type arguments. The Stage keeps its settings per view, outside the definition, so its definition's settings type is `NoSettings`; `getSettings`, `updateSettings` and `resetSettings` work as before.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Navigation called before the stage has a size is no longer lost. `goToPage()`, `goToFirstPage()`, `goToLastPage()`, `nextPage()`, `previousPage()`, `reveal()` and `goToDestination()` called as the document opens wait for the first placement; the last call lands instantly after the initial view (or a restored one), so the first frame already shows it. A PDF's open action to a page now opens there too.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The stage's frame loops (navigation and zoom tweens, the fling, the camera-rest countdown) are owned by its instance: the frames still scheduled when the document closes are cancelled, and none are scheduled after. One of them used to write into the closed instance ("a state update after the instance closed") whenever a page was torn down mid-countdown.
+
+  After placement, a viewport report with no area (a hidden container, or one taken out of the page before its stage is torn down) keeps the last real viewport and the view, instead of fitting to a 0 × 0 box and firing viewport, zoom and camera events. Shown again at its size, the stage carries on where it was.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A viewport report of the size the stage already has is now a no-op. It used to count as a resize: it cancelled a navigation still animating and re-applied the old anchor, so a `reveal()` asked for as the view opened (before the ResizeObserver's first callback repeated the size) kept its zoom but never moved.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13
