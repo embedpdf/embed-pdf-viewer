@@ -369,6 +369,8 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
   it('opens the "More" menu of a phone as a sheet from the bottom, not beside its button', async () => {
     const tab = await open('/phone-bottom.html', 380);
     await click(tab, 'More');
+    // Wait out the slide up from below the viewer.
+    await tab.waitForTimeout(350);
     expect(await menusOf(tab)).toEqual([]);
     const sheet = await tab.evaluate(() => {
       const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;

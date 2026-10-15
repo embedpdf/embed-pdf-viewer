@@ -1,6 +1,7 @@
 /**
  * The viewer on a phone, and with a finger: menus open as sheets from the
- * bottom of the viewer, a submenu slides in over its menu and goes back, a
+ * bottom of the viewer, a submenu slides in over its menu and goes back, the
+ * whole viewer dims behind a sheet, less as its handle drags it down, and a
  * sheet closes on a tap above it, Escape or a drag down its handle; the mode
  * tabs after the first fold behind a chevron; the page
  * number hides while the pages scroll; every button and menu row is 44 px
@@ -303,6 +304,92 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('small screens', () => {
     await tab.mouse.up();
     await frames(tab);
     expect(await sheetsOf(tab)).toEqual([]);
+    await tab.close();
+  });
+
+  it('slides in with its layer still and the whole viewer dimmed behind it', async () => {
+    const tab = await open('/share.html');
+    // Every frame of the slide: how far the sheet's layer is scrolled, and whether the dimming
+    // covers the whole layer.
+    const sliding = tab.evaluate(
+      () =>
+        new Promise<{ scrolled: number; uncovered: number; frames: number }>((resolve) => {
+          const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+          const result = { scrolled: 0, uncovered: 0, frames: 0 };
+          const start = performance.now();
+          const sample = () => {
+            const layer = [...root.querySelectorAll<HTMLElement>('[data-epdf-layer]')].find(
+              (each) => each.matches(':popover-open') && each.querySelector('[data-epdf-sheet]'),
+            );
+            const scrim = layer?.querySelector(':scope > [aria-hidden="true"]');
+            if (layer && scrim) {
+              const outer = layer.getBoundingClientRect();
+              const inner = scrim.getBoundingClientRect();
+              result.frames += 1;
+              result.scrolled = Math.max(result.scrolled, layer.scrollTop);
+              result.uncovered = Math.max(
+                result.uncovered,
+                inner.top - outer.top,
+                outer.bottom - inner.bottom,
+              );
+            }
+            if (performance.now() - start < 600) requestAnimationFrame(sample);
+            else resolve(result);
+          };
+          requestAnimationFrame(sample);
+        }),
+    );
+    await clickBox(tab, await buttonOf(tab, 'Menu'), 'the Menu button');
+    const slide = await sliding;
+    expect(slide.frames).toBeGreaterThan(5);
+    expect(slide.scrolled).toBe(0);
+    expect(slide.uncovered).toBeLessThan(1);
+    await tab.close();
+  });
+
+  it('dims the viewer less the further its handle is dragged down, and fully again at rest', async () => {
+    const tab = await open('/share.html');
+    await clickBox(tab, await buttonOf(tab, 'Menu'), 'the Menu button');
+    await settle(tab);
+    const scrimOf = () =>
+      tab.evaluate(() => {
+        const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+        const layer = [...root.querySelectorAll<HTMLElement>('[data-epdf-layer]')].find((each) =>
+          each.matches(':popover-open'),
+        )!;
+        const scrim = layer.querySelector<HTMLElement>(':scope > [aria-hidden="true"]')!;
+        const handle = root.querySelector('[data-epdf-sheet-handle]')!.getBoundingClientRect();
+        const boxOf = (rect: DOMRect) => ({
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+        });
+        return {
+          layer: boxOf(layer.getBoundingClientRect()),
+          scrim: boxOf(scrim.getBoundingClientRect()),
+          opacity: Number(getComputedStyle(scrim).opacity),
+          handle: { x: (handle.left + handle.right) / 2, y: (handle.top + handle.bottom) / 2 },
+        };
+      });
+    const before = (await sheetsOf(tab))[0]!.sheet;
+    const height = before.bottom - before.top;
+    const { handle } = await scrimOf();
+
+    await tab.mouse.move(handle.x, handle.y);
+    await tab.mouse.down();
+    await tab.mouse.move(handle.x, handle.y + height * 0.4, { steps: 8 });
+    await frames(tab);
+    const dragged = await scrimOf();
+    expect(dragged.scrim).toEqual(dragged.layer);
+    expect(dragged.opacity).toBeCloseTo(0.6, 1);
+
+    await tab.mouse.move(handle.x, handle.y, { steps: 8 });
+    await tab.waitForTimeout(150);
+    await tab.mouse.up();
+    await settle(tab);
+    expect(await sheetsOf(tab)).toHaveLength(1);
+    expect((await scrimOf()).opacity).toBe(1);
     await tab.close();
   });
 

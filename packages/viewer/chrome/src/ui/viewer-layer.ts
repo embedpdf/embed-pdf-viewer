@@ -20,6 +20,13 @@ import { screenEdgesOf, windowSizeOf, type ScreenEdges } from './screen-edges';
 /** The `popover` attribute, which React's types don't list yet. */
 export const POPOVER = { popover: 'manual' } as Record<string, string>;
 
+/**
+ * The classes every layer starts from. It clips what overflows it rather than hiding it: a box
+ * with hidden overflow still scrolls, and Safari scrolls it to show a control that takes focus
+ * while the sheet holding it still slides in from below.
+ */
+export const LAYER_CLASS = 'text-fg m-0 overflow-clip border-0 bg-transparent';
+
 /** The custom element's root: the viewer's box. */
 const VIEWER_ROOT_SELECTOR = '[data-embedpdf-root]';
 
