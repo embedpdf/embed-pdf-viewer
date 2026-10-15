@@ -1,10 +1,11 @@
 /**
  * A sheet: what a panel or a menu is on a phone. It slides up from the bottom
  * of the viewer, over the pages, in a layer over the whole viewer
- * (`viewer-layer.ts`); the viewer above it dims, and a tap there closes it.
- * Its handle drags it taller or shorter, or down to close it, and a flick
- * moves it a whole step (`sheet-rest.ts`). It keeps clear of the home bar and
- * the screen's rounded corners when the viewer reaches the screen's edge.
+ * (`viewer-layer.ts`); the viewer behind it dims, and a tap there closes it.
+ * Its handle drags it taller or shorter, or down to close it, the dimming
+ * fading as it goes, and a flick moves it a whole step (`sheet-rest.ts`).
+ * It keeps clear of the home bar and the screen's rounded corners when the
+ * viewer reaches the screen's edge.
  * A sheet takes focus when it opens, keeps Tab inside it, closes on Escape
  * and gives focus back to the button that opened it; a menu's sheet leaves
  * the keyboard to its menu. A sheet that holds a list closes when one of its
@@ -22,7 +23,7 @@ import {
 
 import { safeAreaPaddingOf } from './screen-edges';
 import { SHEET_TOP_CLEARANCE_PX, panelSheetHeightsOf, sheetRestOf } from './sheet-rest';
-import { MODAL_SELECTOR, POPOVER, attachViewerLayer, holdFocus } from './viewer-layer';
+import { LAYER_CLASS, MODAL_SELECTOR, POPOVER, attachViewerLayer, holdFocus } from './viewer-layer';
 
 /** A press that starts on one of these in the handle's row is the control's, not a drag. */
 const CONTROL_SELECTOR =
@@ -106,6 +107,7 @@ export function Sheet({
   children,
 }: SheetProps) {
   const layer = useRef<HTMLDivElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -119,7 +121,10 @@ export function Sheet({
       ? panelSheetHeightsOf(layer.current?.offsetHeight ?? 0)
       : [sheet.current?.offsetHeight ?? 0];
 
-  /** Show the sheet dragged to `height` (its top that far above the viewer's bottom). */
+  /**
+   * Show the sheet dragged to `height` (its top that far above the viewer's bottom). Below its
+   * lowest rest, the viewer behind it dims less the further down it goes.
+   */
   const show = (height: number, heights: readonly number[]) => {
     const element = sheet.current;
     if (!element || heights.length === 0) return;
@@ -128,6 +133,9 @@ export function Sheet({
     if (size === 'panel') element.style.height = `${Math.min(tallest, Math.max(lowest, height))}px`;
     const below = Math.max(0, lowest - height);
     element.style.translate = below > 0 ? `0 ${below}px` : '';
+    if (scrim.current) {
+      scrim.current.style.opacity = below > 0 ? `${Math.max(0, 1 - below / lowest)}` : '';
+    }
   };
 
   useLayoutEffect(() => {
@@ -173,7 +181,8 @@ export function Sheet({
       samples: [{ t: event.timeStamp, x: event.clientX, y: event.clientY }],
       height: startHeight,
     };
-    element.setAttribute('data-dragging', '');
+    // The sheet and the dimming follow the finger, without easing.
+    layer.current?.setAttribute('data-dragging', '');
   };
 
   const onGripMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -189,7 +198,7 @@ export function Sheet({
     const current = drag.current;
     if (!current || current.pointerId !== event.pointerId) return;
     drag.current = null;
-    sheet.current?.removeAttribute('data-dragging');
+    layer.current?.removeAttribute('data-dragging');
     const cancelled = event.type === 'pointercancel';
     const velocity = cancelled
       ? 0
@@ -210,12 +219,15 @@ export function Sheet({
       ref={layer}
       {...POPOVER}
       data-epdf-layer=""
-      className="text-fg m-0 overflow-hidden border-0 bg-transparent p-0 open:flex open:flex-col"
+      className={`${LAYER_CLASS} p-0 open:flex open:flex-col open:justify-end`}
       style={{ position: 'fixed', inset: 'auto', maxWidth: 'none', maxHeight: 'none' }}
     >
+      {/* Behind the whole viewer, not just above the sheet: the sheet sliding in or dragged down
+          never uncovers it. */}
       <div
+        ref={scrim}
         aria-hidden="true"
-        className={`min-h-0 flex-1 ${SCRIM_CLASS}`}
+        className={`absolute inset-0 ${SCRIM_CLASS} in-data-dragging:transition-none`}
         onClick={() => close.current()}
       />
       <div
@@ -226,7 +238,7 @@ export function Sheet({
         part={part}
         {...dataAttributesOf(data)}
         data-epdf-sheet=""
-        className="border-border-subtle bg-elevated starting:translate-y-full data-dragging:transition-none relative flex w-full shrink-0 flex-col rounded-t-2xl border-t shadow-2xl transition-[translate,height] duration-200 ease-out motion-reduce:transition-none"
+        className="border-border-subtle bg-elevated starting:translate-y-full in-data-dragging:transition-none relative flex w-full shrink-0 flex-col rounded-t-2xl border-t shadow-2xl transition-[translate,height] duration-200 ease-out motion-reduce:transition-none"
       >
         <div
           className="shrink-0 touch-pan-x select-none"

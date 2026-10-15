@@ -8,7 +8,7 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 import { SCRIM_CLASS } from './sheet';
-import { POPOVER, attachViewerLayer, holdFocus } from './viewer-layer';
+import { LAYER_CLASS, POPOVER, attachViewerLayer, holdFocus } from './viewer-layer';
 
 export interface DialogProps {
   /** The id of the dialog's title, which names it for assistive technology. */
@@ -42,7 +42,7 @@ export function Dialog({ labelledBy, onClose, className, children }: DialogProps
       ref={layer}
       {...POPOVER}
       data-epdf-layer=""
-      className="text-fg m-0 place-items-center overflow-hidden border-0 bg-transparent p-4 open:grid"
+      className={`${LAYER_CLASS} place-items-center p-4 open:grid`}
       style={{ position: 'fixed', inset: 'auto', maxWidth: 'none', maxHeight: 'none' }}
     >
       <div aria-hidden="true" className={`absolute inset-0 ${SCRIM_CLASS}`} />
