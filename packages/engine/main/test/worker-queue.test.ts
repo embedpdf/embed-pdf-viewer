@@ -381,6 +381,44 @@ describe('a running read giving way', () => {
     expect(log(sent).filter((name) => name === 'warm-up of 2')).toHaveLength(1);
   });
 
+  test('does not give way to a job that waits with it for a runtime write: both run at its rank, in call order', async () => {
+    const { transport, sent, answer } = fakeTransport();
+    const queue = new WorkerQueue(transport);
+    queue.setWorkingSet('doc', 'stage', [shown(1, 'near', 0), shown(2, 'near', 0)]);
+    const warmUp = queue.enqueue(read('warm-up of 2', 2));
+    const render = queue.enqueue(read('render of 1', 1));
+    // The font waits for the warm-up and the render, and is about no page, so on screen: both
+    // run at its rank once page 1 shows, and neither clearly outranks the other.
+    const font = queue.enqueue(runtimeWrite('font'));
+
+    queue.setWorkingSet('doc', 'stage', [shown(1, 'visible', 1_000_000), shown(2, 'near', 0)]);
+    expect(log(sent)).toEqual(['warm-up of 2']);
+    expect(await drain(sent, answer)).toEqual(['warm-up of 2', 'render of 1', 'font']);
+    await Promise.all([warmUp, render, font]);
+  });
+
+  test('still gives way, with a runtime write in line, to a job that clearly outranks it there', async () => {
+    const { transport, sent, answer, stopped } = fakeTransport();
+    const queue = new WorkerQueue(transport);
+    queue.setWorkingSet('doc', 'stage', [shown(1, 'visible', 1_000_000), shown(2, 'near', 0)]);
+    const warmUp = queue.enqueue(read('warm-up of 2', 2));
+    const warmUpId = sent.at(-1)!.jobId;
+    const picture = queue
+      .withFacts({ priority: 'high', view: 'stage' })
+      .enqueue(read('picture of 1', 1));
+    const font = queue.enqueue(runtimeWrite('font'));
+    expect(log(sent)).toEqual(['warm-up of 2', 'stop warm-up of 2']);
+
+    stopped(warmUpId); // the job it gave way to goes next, not the warm-up again
+    expect(log(sent)).toEqual(['warm-up of 2', 'stop warm-up of 2', 'picture of 1']);
+    expect(await drain(sent, answer, sent.length - 1)).toEqual([
+      'picture of 1',
+      'warm-up of 2',
+      'font',
+    ]);
+    await Promise.all([warmUp, picture, font]);
+  });
+
   test('a working set that moves the running read off screen makes it give way', async () => {
     const { transport, sent, answer, stopped } = fakeTransport();
     const queue = new WorkerQueue(transport);
@@ -427,6 +465,19 @@ function write(name: string) {
         effect: 'write',
         jobId,
         docId: 'doc',
+        name,
+      } as unknown as WorkerJobRequest),
+  };
+}
+
+/** A write to the runtime itself, a font registration: every job keeps its order with it. */
+function runtimeWrite(name: string) {
+  return {
+    buildPack: (jobId: number) =>
+      wirePack({
+        kind: 'fonts.register',
+        effect: 'runtimeWrite',
+        jobId,
         name,
       } as unknown as WorkerJobRequest),
   };

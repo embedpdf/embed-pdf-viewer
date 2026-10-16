@@ -46,8 +46,9 @@ describe('code example pipeline', () => {
       expect(files.length).toBeGreaterThan(0);
       expect(files[0].highlightedCode).toContain('<span');
     }
-    // Highlighting every sample is real work (~4s); the default 5s budget flakes under a loaded matrix.
-  }, 30_000);
+    // Highlighting every framework's sample with a cold highlighter is real work: ~10s alone, past
+    // 50s in CI, where turbo runs every package's tests at once.
+  }, 120_000);
 
   it("keeps the page's bigger preview for the card", async () => {
     const node = {

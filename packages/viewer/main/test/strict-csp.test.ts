@@ -10,8 +10,9 @@
  * needs no `font-src`.
  *
  * Runs against the built artifact (`pnpm build` first). Needs a Chromium:
- * Playwright's own (`npx playwright-core install chromium`, what CI does) or a
- * local Google Chrome as the fallback.
+ * Playwright's own (`npx playwright-core install chromium`, what CI's engine
+ * job installs) or the machine's Google Chrome as the fallback (what CI's
+ * packages job runs).
  */
 import { createServer, type Server } from 'node:http';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -188,7 +189,19 @@ async function typeSignatures(page: Page): Promise<Record<string, boolean>> {
     await dialog.locator('input').first().fill(person);
     await dialog.locator('select').first().selectOption({ label: font.label });
     await dialog.getByPlaceholder('Type your name').first().fill(person);
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    await dialog
+      .getByRole('button', { name: 'Save' })
+      .click({ timeout: 15_000 })
+      .catch(async () => {
+        // Save waits for a name and a mark; say which of them the dialog has.
+        const fields = await dialog.evaluate((element) => ({
+          inputs: [...element.querySelectorAll('input')].map((input) => input.value),
+          selects: [...element.querySelectorAll('select')].map((select) => select.value),
+        }));
+        throw new Error(
+          `Save stayed disabled for ${font.label}, the dialog holding ${JSON.stringify(fields)}`,
+        );
+      });
     const library = await page.waitForFunction(
       (name) =>
         (document.querySelector('embedpdf-viewer') as unknown as { viewer: any }).viewer
@@ -234,6 +247,8 @@ async function openViewer<Acted = undefined>(
   const failures: string[] = [];
   const requests: string[] = [];
   const workers: string[] = [];
+  // Everything the page and its workers log, for the report when something fails.
+  const logs: string[] = [];
   await page.exposeFunction('reportViolation', (violation: string) => violations.push(violation));
   await page.addInitScript(() => {
     document.addEventListener('securitypolicyviolation', (event) => {
@@ -250,13 +265,34 @@ async function openViewer<Acted = undefined>(
     if (/Content Security Policy|Trusted ?Type/i.test(message.text()))
       violations.push(message.text());
     if (message.type() === 'error') errors.push(message.text());
+    logs.push(`[${message.type()}] ${message.text()}`);
   });
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('requestfailed', (request) =>
     failures.push(`${request.url()}: ${request.failure()?.errorText}`),
   );
   page.on('request', (request) => requests.push(request.url()));
-  page.on('worker', (worker) => workers.push(worker.url()));
+  page.on('worker', (worker) => {
+    workers.push(worker.url());
+    worker.on('console', (message) => logs.push(`[worker ${message.type()}] ${message.text()}`));
+  });
+
+  /** What the page showed and said: the end of every failure's message. */
+  const report = async () => {
+    const shadowText = await page.evaluate(
+      () => document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent?.slice(0, 400) ?? '',
+    );
+    return [
+      `browser: ${page.context().browser()?.version()}`,
+      `shadow text: ${shadowText}`,
+      `violations: ${violations.join('\n  ')}`,
+      `errors: ${errors.join('\n  ')}`,
+      `failures: ${failures.join('\n  ')}`,
+      `console: ${logs.join('\n  ')}`,
+    ]
+      .map((line) => `\n ${line}`)
+      .join('');
+  };
 
   await page.goto(url);
   const deadline = Date.now() + 60_000;
@@ -264,18 +300,18 @@ async function openViewer<Acted = undefined>(
     until === 'violation' ? violations.length > 0 : await page.evaluate(pageRendered);
   while (!(await done())) {
     if (Date.now() > deadline) {
-      const shadowText = await page.evaluate(
-        () =>
-          document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent?.slice(0, 400) ?? '',
-      );
       throw new Error(
-        `${until === 'violation' ? 'no violation reported' : 'no page rendered'}.\n shadow text: ${shadowText}\n violations: ${violations.join('\n  ')}\n` +
-          ` errors: ${errors.join('; ')}\n failures: ${failures.join('; ')}`,
+        `${until === 'violation' ? 'no violation reported' : 'no page rendered'}.${await report()}`,
       );
     }
     await page.waitForTimeout(100);
   }
-  const acted = act ? await act(page) : undefined;
+  let acted: Acted | undefined;
+  try {
+    acted = act ? await act(page) : undefined;
+  } catch (error) {
+    throw new Error(`${(error as Error).message}${await report()}`);
+  }
   await page.waitForTimeout(1500);
   await page.close();
   return { violations, errors, failures, requests, workers, acted };

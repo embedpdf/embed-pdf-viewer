@@ -5,27 +5,72 @@ import Link from 'next/link';
 
 import { EpButton } from './button';
 import { Eyebrow } from './eyebrow';
-import { AngularIcon, ArrowRightIcon, JsMark, ReactIcon, SvelteIcon, VueIcon } from './icons';
+import { AngularIcon, ArrowRightIcon, ReactIcon, SvelteIcon, VueIcon } from './icons';
 
+/** `page` is the capability's page in the headless docs, which have one for every framework. */
 const CAPABILITIES = [
   {
     src: '/cap-annotation.svg',
     title: 'Annotations',
     desc: 'Highlight, underline, draw and add notes.',
+    page: 'annotations',
   },
-  { src: '/cap-forms.svg', title: 'Forms', desc: 'Fill and save interactive PDF forms.' },
-  { src: '/cap-signature.svg', title: 'Signatures', desc: 'Add, save and manage e-signatures.' },
-  { src: '/cap-search.svg', title: 'Search', desc: 'Find text across the entire document.' },
-  { src: '/cap-redaction.svg', title: 'Redaction', desc: 'Permanently redact sensitive content.' },
-  { src: '/cap-stamps.svg', title: 'Stamps', desc: 'Add and manage document stamps.' },
+  {
+    src: '/cap-forms.svg',
+    title: 'Forms',
+    desc: 'Fill and save interactive PDF forms.',
+    page: 'forms',
+  },
+  {
+    src: '/cap-signature.svg',
+    title: 'Signatures',
+    desc: 'Add, save and manage e-signatures.',
+    page: 'forms/signatures',
+  },
+  {
+    src: '/cap-search.svg',
+    title: 'Search',
+    desc: 'Find text across the entire document.',
+    page: 'text/search',
+  },
+  {
+    src: '/cap-redaction.svg',
+    title: 'Redaction',
+    desc: 'Permanently redact sensitive content.',
+    page: 'annotations/redaction',
+  },
+  {
+    src: '/cap-stamps.svg',
+    title: 'Stamps',
+    desc: 'Add and manage document stamps.',
+    page: 'annotations/stamps',
+  },
 ];
 
-function FrameworkLink({ title, children }: { title: string; children: React.ReactNode }) {
+/** The headless docs' frameworks, by popularity like the rest of the page. */
+const FRAMEWORKS = [
+  { id: 'react', label: 'React', icon: <ReactIcon size={16} /> },
+  { id: 'angular', label: 'Angular', icon: <AngularIcon size={16} /> },
+  { id: 'vue', label: 'Vue', icon: <VueIcon size={16} /> },
+  { id: 'svelte', label: 'Svelte', icon: <SvelteIcon size={16} /> },
+];
+
+/** Sits above the card's own link, so a click on an icon opens that framework's page. */
+function FrameworkLink({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <Link
-      href="/docs"
-      title={title}
-      className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-[rgba(7,32,76,0.08)] bg-white text-[#99A4BE] transition-all duration-150 hover:-translate-y-px hover:scale-105 hover:border-[rgba(8,118,253,0.35)] hover:shadow-[0_2px_8px_rgba(8,118,253,0.18)] [&:hover_svg]:opacity-100 [&_svg]:opacity-55"
+      href={href}
+      title={label}
+      aria-label={label}
+      className="relative z-[1] inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-[rgba(7,32,76,0.08)] bg-white text-[#99A4BE] transition-all duration-150 hover:-translate-y-px hover:scale-105 hover:border-[rgba(8,118,253,0.35)] hover:shadow-[0_2px_8px_rgba(8,118,253,0.18)] [&:hover_svg]:opacity-100 [&_svg]:opacity-55"
     >
       {children}
     </Link>
@@ -63,10 +108,10 @@ export function Capabilities() {
               Get Started
             </EpButton>
             <Link
-              href="/docs"
+              href="/docs/viewer/features"
               className="font-display text-ep-blue hover:text-ep-blue700 group inline-flex items-center gap-1.5 text-[15px] font-semibold transition-all duration-200 hover:gap-2.5"
             >
-              Read the docs
+              See all features
               <ArrowRightIcon size={14} strokeWidth={2.4} />
             </Link>
           </div>
@@ -76,7 +121,7 @@ export function Capabilities() {
           {CAPABILITIES.map((c) => (
             <article
               key={c.title}
-              className="border-ep-border group relative flex flex-col items-center overflow-hidden rounded-2xl border bg-white px-[18px] pb-[22px] pt-6 text-center transition-all duration-200 hover:-translate-y-[3px] hover:border-[rgba(8,118,253,0.30)] hover:shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(7,32,76,0.06),0_18px_36px_-16px_rgba(8,118,253,0.22)]"
+              className="border-ep-border group relative flex flex-col items-center overflow-hidden rounded-2xl border bg-white px-[18px] pb-[22px] pt-6 text-center transition-all duration-200 hover:-translate-y-[3px] hover:border-[rgba(8,118,253,0.30)] hover:shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(7,32,76,0.06),0_18px_36px_-16px_rgba(8,118,253,0.22)] has-[h3_a:focus-visible]:outline-2 has-[h3_a:focus-visible]:outline-offset-2 has-[h3_a:focus-visible]:outline-[#0876FD]"
             >
               <div className="mb-[18px] flex aspect-square max-h-[150px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#F4F8FF]">
                 <Image
@@ -87,31 +132,33 @@ export function Capabilities() {
                   className="block h-auto w-[78%] rounded-lg"
                 />
               </div>
-              <h3 className="font-display text-ep-navy m-0 mb-2 text-[17px] font-extrabold leading-[1.2] tracking-[-0.01em]">
-                {c.title}
+              <h3 className="font-display text-ep-navy group-hover:text-ep-blue m-0 mb-2 text-[17px] font-extrabold leading-[1.2] tracking-[-0.01em] transition-colors duration-200">
+                {/* The whole card links here: the docs open in the reader's last framework. */}
+                <Link
+                  href={`/docs/headless/${c.page}`}
+                  data-ring="none"
+                  className="outline-none after:absolute after:inset-0"
+                >
+                  {c.title}
+                </Link>
               </h3>
               <p className="text-ep-soft m-0 mb-4 max-w-[22ch] font-sans text-sm leading-[1.5]">
                 {c.desc}
               </p>
               <div
+                role="group"
+                aria-label={`${c.title} by framework`}
                 className="mt-auto flex w-full justify-center gap-2 border-t border-[rgba(7,32,76,0.06)] pt-3.5"
-                aria-label={`${c.title} docs by framework`}
               >
-                <FrameworkLink title="Vanilla JS docs">
-                  <JsMark small />
-                </FrameworkLink>
-                <FrameworkLink title="React docs">
-                  <ReactIcon size={16} />
-                </FrameworkLink>
-                <FrameworkLink title="Vue docs">
-                  <VueIcon size={16} />
-                </FrameworkLink>
-                <FrameworkLink title="Svelte docs">
-                  <SvelteIcon size={16} />
-                </FrameworkLink>
-                <FrameworkLink title="Angular docs">
-                  <AngularIcon size={16} />
-                </FrameworkLink>
+                {FRAMEWORKS.map((fw) => (
+                  <FrameworkLink
+                    key={fw.id}
+                    href={`/docs/headless/${fw.id}/${c.page}`}
+                    label={`${c.title} in ${fw.label}`}
+                  >
+                    {fw.icon}
+                  </FrameworkLink>
+                ))}
               </div>
             </article>
           ))}

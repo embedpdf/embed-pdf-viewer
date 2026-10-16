@@ -63,24 +63,38 @@ const READ_WAITS_FOR: ReadonlySet<RequestEffect> = new Set<RequestEffect>([
  */
 export function nextJob<J extends JobInLine>(jobs: readonly J[]): J | undefined {
   const blockers = blockersOf(jobs);
-
-  // A job that holds others back runs at the highest rank among them. Blockers
-  // are always asked earlier, so one pass from the last job back carries every
-  // rank down its whole chain.
-  const lent = jobs.map((job) => job.rank);
-  for (let index = jobs.length - 1; index >= 0; index--) {
-    for (const blocker of blockers[index]!) {
-      lent[blocker] = Math.max(lent[blocker]!, lent[index]!);
-    }
-  }
+  const ranks = lend(jobs, blockers);
 
   let next = -1;
   for (let index = 0; index < jobs.length; index++) {
     const job = jobs[index]!;
     if (job.sent || !job.built || blockers[index]!.length > 0) continue;
-    if (next < 0 || lent[index]! > lent[next]!) next = index;
+    if (next < 0 || ranks[index]! > ranks[next]!) next = index;
   }
   return next < 0 ? undefined : jobs[next];
+}
+
+/**
+ * Each job's rank in line, sent or not: the rank {@link nextJob} picks by,
+ * its own or the higher one it is lent.
+ */
+export function ranksInLine(jobs: readonly JobInLine[]): number[] {
+  return lend(jobs, blockersOf(jobs));
+}
+
+/**
+ * A job that holds others back runs at the highest rank among them. Blockers
+ * are always asked earlier, so one pass from the last job back carries every
+ * rank down its whole chain.
+ */
+function lend(jobs: readonly JobInLine[], blockers: readonly number[][]): number[] {
+  const ranks = jobs.map((job) => job.rank);
+  for (let index = jobs.length - 1; index >= 0; index--) {
+    for (const blocker of blockers[index]!) {
+      ranks[blocker] = Math.max(ranks[blocker]!, ranks[index]!);
+    }
+  }
+  return ranks;
 }
 
 /** Per job, the jobs asked before it that hold it back directly (see the table). */

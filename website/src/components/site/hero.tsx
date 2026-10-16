@@ -16,9 +16,11 @@ export function Hero() {
           <div className="absolute left-[40%] top-[25%] hidden h-[555px] w-[633px] rounded-full bg-[#F7F9FE] min-[641px]:block" />
           <div className="absolute left-[60%] top-[-10%] hidden h-[555px] w-[633px] rounded-full bg-[#F7F9FE] min-[641px]:block" />
         </div>
+        {/* Beside the headline only where the headline has a column of its own;
+            stacked, the grid moves to the screenshot's corner (below). */}
         <div
           aria-hidden
-          className="absolute right-[90px] top-[-50px] z-0 origin-top-right scale-75"
+          className="absolute right-[90px] top-[-70px] z-0 hidden origin-top-right scale-75 min-[961px]:block"
         >
           <DotGrid />
         </div>
@@ -69,19 +71,25 @@ export function Hero() {
           </div>
 
           {/* RIGHT scene */}
-          <div className="relative flex min-w-0 justify-start max-[960px]:mt-6">
+          <div className="relative flex min-w-0 justify-start max-[960px]:mt-10">
+            <div
+              aria-hidden
+              className="absolute right-0 top-[-42px] origin-top-right scale-75 min-[641px]:top-[-58px] min-[961px]:hidden"
+            >
+              <DotGrid />
+            </div>
             <Image
               src="/PDF-Viewer.svg"
               alt="EmbedPDF viewer"
               width={646}
               height={511}
-              className="border-ep-border block aspect-[646/511] w-full max-w-[590px] rounded-[10px] border bg-white shadow-[0_4px_10px_rgba(163,163,163,0.22)]"
+              className="border-ep-border relative block aspect-[646/511] w-full max-w-[590px] rounded-[10px] border bg-white shadow-[0_4px_10px_rgba(163,163,163,0.22)]"
               priority
             />
-            <div className="absolute right-[clamp(-30px,0vw,30px)] top-[14%] z-[3] w-[clamp(240px,28vw,340px)] rounded-[10px] shadow-[0_8px_24px_rgba(14,26,64,0.18)] max-[960px]:right-0 max-[960px]:top-[-16px] max-[640px]:hidden">
+            <div className="absolute right-[-16px] top-[8%] z-[3] w-[clamp(360px,30vw,430px)] rounded-[10px] shadow-[0_8px_24px_rgba(14,26,64,0.18)] max-[960px]:right-0 max-[960px]:top-[-16px] max-[960px]:w-[360px] max-[640px]:hidden">
               <HeroCode />
             </div>
-            <div className="absolute bottom-[-40px] right-10 z-[3] w-[clamp(200px,20vw,250px)] rounded-xl border border-[#E9EEFF] bg-white p-[18px] shadow-[0_8px_28px_rgba(14,26,64,0.14)] max-[960px]:bottom-[-16px] max-[960px]:right-0 max-[640px]:hidden">
+            <div className="absolute bottom-[-64px] right-10 z-[3] w-[250px] rounded-xl border border-[#E9EEFF] bg-white p-[18px] shadow-[0_8px_28px_rgba(14,26,64,0.14)] max-[960px]:bottom-[-16px] max-[960px]:right-0 max-[640px]:hidden">
               <div className="font-display text-ep-navy mb-3.5 text-sm font-extrabold tracking-[-0.005em]">
                 Start embedding in minutes
               </div>
