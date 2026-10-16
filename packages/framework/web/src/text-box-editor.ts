@@ -10,12 +10,14 @@
  * focus and `contentEditable` follow the plugin's `editing`, never the other
  * way, and a press inside the box stays inside it. A framework binding keeps
  * one {@link createTextBoxEditorFollower} per element and hands it what
- * changed; {@link textBoxEditorScaleOf} is the scale of an editor element a
- * renderer draws itself.
+ * changed. {@link freeTextBoxOf} is the layer's own editor element and
+ * {@link ownTextBoxOf} one a renderer draws itself, both laid out at a legible
+ * size (`legible-text.ts`).
  *
  * The plugin's types are mirrored structurally, so this package stays free of
  * EmbedPDF imports.
  */
+import { legibleScaleOf, legibleShrinkOf } from './legible-text';
 import type { PageToPixels } from './page-pixels';
 import { rectInPixels } from './page-pixels';
 import {
@@ -220,8 +222,12 @@ export interface TextBoxCss {
   padding: number;
 }
 
-/** A text box's body style as CSS: put it on the editor element. */
-export interface TextBoxStyle {
+// The style records below are type aliases, not interfaces: an object type alias fits a
+// framework's style type with an index signature for custom properties (Vue's `CSSProperties`),
+// which an interface never does.
+
+/** A text box's body style as CSS. */
+export type TextBoxStyle = {
   fontFamily: string;
   /** In pixels, with its unit. */
   fontSize: string;
@@ -230,7 +236,7 @@ export interface TextBoxStyle {
   fontStyle: string;
   textDecoration: string;
   textAlign: 'left' | 'center' | 'right';
-}
+};
 
 /**
  * A text box's body style at `scale` pixels per point: font, size, color and
@@ -249,35 +255,137 @@ export function textBoxStyleOf(css: TextBoxCss, scale: number): TextBoxStyle {
   };
 }
 
-/** Where a free text's editor element goes, and the scale it draws at. */
-export interface TextPlatePixels {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  /** Pixels per page point. */
-  scale: number;
+/** The layer's own editor element for a free text box, as CSS. */
+export type FreeTextBoxStyle = TextBoxStyle & {
+  position: 'absolute';
+  left: string;
+  top: string;
+  /** The plate's size times the editor's legible scale, in pixels with their unit. */
+  width: string;
+  height: string;
+  boxSizing: 'border-box';
+  /** The box's fill and border are the vector scene's, under this layer. */
+  background: 'transparent';
+  whiteSpace: 'pre-wrap';
+  overflowWrap: 'break-word';
+  overflowX: 'hidden';
+  /** It scrolls while someone types, and clips otherwise, where the baked appearance clips. */
+  overflowY: 'auto' | 'hidden';
+  outline: string;
+  cursor: 'text' | 'default';
+  /** Draws the editor, laid out at a legible size, at the plate's size, turned like the box. */
+  transform: string;
+  transformOrigin: '0 0';
+  /** Not typing: presses fall through to the shapes (select, move, resize). */
+  pointerEvents: 'auto' | 'none';
+};
+
+/** The layer's own editor element for a free text box, and the scale its text is laid out at. */
+export interface FreeTextBox {
+  readonly style: FreeTextBoxStyle;
+  /** Pixels per page point the editor lays its text out at: what its editor takes. */
+  readonly scale: number;
 }
 
 /**
- * The editor element of a free text box in the page layer's pixels: the
- * engine's text plate (`SetPlateRect` and its `re W n` clip), the box inset
- * by its padding. Place it there with no CSS padding, so its edge is the
- * plate's: CSS padding doesn't clip overflow, and scrolled lines would paint
- * over the border band. The box never grows with its text.
+ * The layer's own editor element for a free text box: the engine's text
+ * plate (`SetPlateRect` and its `re W n` clip), the box inset by its padding,
+ * with no CSS padding, so its edge is the plate's: CSS padding doesn't clip
+ * overflow, and scrolled lines would paint over the border band. The box
+ * never grows with its text. It is laid out at a legible size and drawn back
+ * at the plate's (`legible-text.ts`), and a turned box turns about its
+ * centre, as the baked appearance does. While someone types it takes the
+ * pointer and shows an `outline` of that color.
  */
-export function textPlateInPixels(
-  item: { box: { x: number; y: number; width: number; height: number }; css: { padding: number } },
+export function freeTextBoxOf(
+  item: {
+    box: { x: number; y: number; width: number; height: number };
+    css: TextBoxCss;
+    /** Clockwise, in degrees, about the box's centre. */
+    rot?: number;
+    editing: boolean;
+  },
   page: PageToPixels,
-): TextPlatePixels {
+  outline: string,
+): FreeTextBox {
   const box = rectInPixels(item.box, page);
-  const scale = item.box.width > 0 ? box.width / item.box.width : 1;
-  const inset = item.css.padding * scale;
+  const onPage = item.box.width > 0 ? box.width / item.box.width : 1;
+  const inset = item.css.padding * onPage;
+  const width = Math.max(0, box.width - 2 * inset);
+  const height = Math.max(0, box.height - 2 * inset);
+  const legible = legibleScaleOf(item.css.fontSize * onPage);
+  const scale = onPage * legible;
+  // About the plate's centre, once the editor is drawn back at the plate's size from its corner.
+  const turn = item.rot
+    ? `translate(${width / 2}px, ${height / 2}px) rotate(${item.rot}deg) ` +
+      `translate(${-width / 2}px, ${-height / 2}px)`
+    : null;
   return {
-    left: box.left + inset,
-    top: box.top + inset,
-    width: Math.max(0, box.width - 2 * inset),
-    height: Math.max(0, box.height - 2 * inset),
     scale,
+    style: {
+      position: 'absolute',
+      left: `${box.left + inset}px`,
+      top: `${box.top + inset}px`,
+      width: `${width * legible}px`,
+      height: `${height * legible}px`,
+      ...textBoxStyleOf(item.css, scale),
+      boxSizing: 'border-box',
+      background: 'transparent',
+      whiteSpace: 'pre-wrap',
+      overflowWrap: 'break-word',
+      overflowX: 'hidden',
+      overflowY: item.editing ? 'auto' : 'hidden',
+      outline: item.editing ? `${legible}px solid ${outline}` : 'none',
+      cursor: item.editing ? 'text' : 'default',
+      transform: [turn, legibleShrinkOf(legible)].filter(Boolean).join(' ') || 'none',
+      transformOrigin: '0 0',
+      pointerEvents: item.editing ? 'auto' : 'none',
+    },
+  };
+}
+
+/** Your own element as a text box's editor, as CSS: it fills its parent. */
+export type OwnTextBoxStyle = TextBoxStyle & {
+  /** The parent's size times the editor's legible scale, in percent with its unit. */
+  width: string;
+  height: string;
+  boxSizing: 'border-box';
+  /** Draws the editor, laid out at a legible size, at its parent's size. */
+  transform: string;
+  transformOrigin: '0 0';
+  /** While someone types, it takes the pointer (the caret, a drag over words). */
+  pointerEvents?: 'auto';
+};
+
+/** Your own element as a text box's editor, and the scale its text is laid out at. */
+export interface OwnTextBox {
+  readonly style: OwnTextBoxStyle;
+  /** Pixels per page point the editor lays its text out at: what its editor takes. */
+  readonly scale: number;
+}
+
+/**
+ * Your own element as the editor of a text box you draw yourself, at `scale`
+ * pixels per point where it is ({@link textBoxEditorScaleOf}): the box's body
+ * style, filling the element's parent, laid out at a legible size and drawn
+ * back at the parent's (`legible-text.ts`). Draw the box's frame (its fill,
+ * border and padding) on the parent: what's on the element scales with it.
+ */
+export function ownTextBoxOf(
+  item: { css: TextBoxCss; editing: boolean },
+  scale: number,
+): OwnTextBox {
+  const legible = legibleScaleOf(item.css.fontSize * scale);
+  return {
+    scale: scale * legible,
+    style: {
+      ...textBoxStyleOf(item.css, scale * legible),
+      width: `${100 * legible}%`,
+      height: `${100 * legible}%`,
+      boxSizing: 'border-box',
+      transform: legibleShrinkOf(legible) ?? 'none',
+      transformOrigin: '0 0',
+      ...(item.editing ? { pointerEvents: 'auto' as const } : {}),
+    },
   };
 }

@@ -84,15 +84,13 @@ export class FormatButtons {
         <ng-template epdfPage>
           <epdf-render-layer />
           <epdf-annotation-layer>
-            <!-- Your own text box: the element is the editor, in your app's look. It fills
-                 its frame, which the layer places and turns like the text box. -->
+            <!-- Your own text box, in your app's look: it fills its frame, which the layer
+                 places and turns like the text box. The element inside is the editor and
+                 fills the box, so the box draws the fill, border and padding. -->
             <ng-template [epdfAnnotation]="isTextBox" let-annotation>
-              <div
-                [epdfRichTextEditor]="annotation"
-                #editor="epdfRichTextEditor"
-                class="text-box"
-                [class.editing]="editor.editing()"
-              ></div>
+              <div class="text-box" [class.editing]="editor.editing()">
+                <div [epdfRichTextEditor]="annotation" #editor="epdfRichTextEditor"></div>
+              </div>
             </ng-template>
           </epdf-annotation-layer>
         </ng-template>

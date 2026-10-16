@@ -13,7 +13,7 @@ import { annotationKey } from '@embedpdf/core';
 import type { Annotation, AnnotationRef, TextItem } from '@embedpdf/plugin-annotation';
 // Typing reaches the plugin through its host lens (drafts, the text selection).
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
-import { createTextBoxEditorFollower, textBoxEditorScaleOf, textBoxStyleOf } from '@embedpdf/web';
+import { createTextBoxEditorFollower, ownTextBoxOf, textBoxEditorScaleOf } from '@embedpdf/web';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
 import { usePage } from '../runtime/page';
 import type { RichTextEditor } from './types';
@@ -67,7 +67,8 @@ const NO_STYLE: CSSProperties = Object.freeze({});
  * ```
  *
  * `ref` goes on your element (render nothing inside it: the editor owns what's
- * in it); `style` and `editing` are refs.
+ * in it); `style` and `editing` are refs. `style` fills the element's parent at
+ * a legible size: draw the box's frame on the parent.
  */
 export function useRichTextEditor(annotation: MaybeRefOrGetter<Annotation>): RichTextEditor {
   const page = usePage();
@@ -90,16 +91,9 @@ export function useRichTextEditor(annotation: MaybeRefOrGetter<Annotation>): Ric
   const scale = computed(() =>
     textBoxEditorScaleOf(item.value, page.value.transform, lookScale.value),
   );
-  const element = useTextBoxEditor(item, scale);
-  // While typing, the element takes the pointer (the caret, a drag over words).
-  const style = computed((): CSSProperties => {
-    const text = item.value;
-    if (!text) return NO_STYLE;
-    return {
-      ...textBoxStyleOf(text.css, scale.value),
-      ...(text.editing ? { pointerEvents: 'auto' } : {}),
-    };
-  });
+  const own = computed(() => (item.value ? ownTextBoxOf(item.value, scale.value) : null));
+  const element = useTextBoxEditor(item, () => own.value?.scale ?? scale.value);
+  const style = computed((): CSSProperties => own.value?.style ?? NO_STYLE);
   return {
     ref: (target: Element | ComponentPublicInstance | null) => {
       element.value = target instanceof HTMLElement ? target : null;

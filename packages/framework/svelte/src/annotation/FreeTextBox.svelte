@@ -7,49 +7,45 @@
 -->
 <script lang="ts">
   import type { TextItem } from '@embedpdf/plugin-annotation';
-  import { textBoxStyleOf, textPlateInPixels } from '@embedpdf/web';
+  import { freeTextBoxOf } from '@embedpdf/web';
   import type { PageContextValue } from '../runtime/page';
   import { useChromePaint } from './chrome-paint.svelte';
   import { textBoxEditor } from './text-box.svelte';
 
   let { item, page }: { item: TextItem; page: PageContextValue } = $props();
 
-  const plate = $derived(textPlateInPixels(item, page.transform));
-  const text = $derived(textBoxStyleOf(item.css, plate.scale));
   const paint = useChromePaint();
+  // On the engine's text plate (the box inset by its padding), laid out at a legible size.
+  const box = $derived(freeTextBoxOf(item, page.transform, paint.css.textOutline));
   const editor = textBoxEditor(
     () => item,
-    () => plate.scale,
+    () => box.scale,
   );
 </script>
 
-<!-- Fixed to the plate: the box never grows with its text; it scrolls while typing and clips
-     otherwise, where the baked appearance clips. Its fill and border are the scene's, under this
-     layer. A plain text box turns about its centre, as the baked appearance does. Not typing,
-     presses fall through to the shapes (select, move, resize). -->
 <div
   {@attach editor}
-  style:position="absolute"
-  style:left="{plate.left}px"
-  style:top="{plate.top}px"
-  style:width="{plate.width}px"
-  style:height="{plate.height}px"
-  style:font-family={text.fontFamily}
-  style:font-size={text.fontSize}
-  style:color={text.color}
-  style:font-weight={text.fontWeight}
-  style:font-style={text.fontStyle}
-  style:text-decoration={text.textDecoration}
-  style:text-align={text.textAlign}
-  style:box-sizing="border-box"
-  style:background="transparent"
-  style:white-space="pre-wrap"
-  style:overflow-wrap="break-word"
-  style:overflow-y={item.editing ? 'auto' : 'hidden'}
-  style:overflow-x="hidden"
-  style:outline={item.editing ? `1px solid ${paint.css.textOutline}` : 'none'}
-  style:cursor={item.editing ? 'text' : 'default'}
-  style:transform={item.rot ? `rotate(${item.rot}deg)` : undefined}
-  style:transform-origin={item.rot ? 'center' : undefined}
-  style:pointer-events={item.editing ? 'auto' : 'none'}
+  style:position={box.style.position}
+  style:left={box.style.left}
+  style:top={box.style.top}
+  style:width={box.style.width}
+  style:height={box.style.height}
+  style:font-family={box.style.fontFamily}
+  style:font-size={box.style.fontSize}
+  style:color={box.style.color}
+  style:font-weight={box.style.fontWeight}
+  style:font-style={box.style.fontStyle}
+  style:text-decoration={box.style.textDecoration}
+  style:text-align={box.style.textAlign}
+  style:box-sizing={box.style.boxSizing}
+  style:background={box.style.background}
+  style:white-space={box.style.whiteSpace}
+  style:overflow-wrap={box.style.overflowWrap}
+  style:overflow-x={box.style.overflowX}
+  style:overflow-y={box.style.overflowY}
+  style:outline={box.style.outline}
+  style:cursor={box.style.cursor}
+  style:transform={box.style.transform}
+  style:transform-origin={box.style.transformOrigin}
+  style:pointer-events={box.style.pointerEvents}
 ></div>

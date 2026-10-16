@@ -523,6 +523,97 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('small screens', () => {
     await mouse.close();
   });
 
+  // iOS Safari zooms the page in when a field with text under 16 px takes focus. On a phone the
+  // pages are drawn small, so their fields are laid out at 16 px and drawn back at their size.
+  it('lays the fields on the pages out in 16 px text, drawn at their size on the page', async () => {
+    const tab = await open('/whole.html', 375, { touch: true });
+    // The form layer's text editors, once the layer is there: the only fields the viewer places
+    // with an inline style.
+    await tab.waitForFunction(() =>
+      [
+        ...document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelectorAll<HTMLElement>('input, textarea'),
+      ].some((field) => field.style.position === 'absolute'),
+    );
+    const fields = await tab.evaluate(() =>
+      [
+        ...document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelectorAll<HTMLElement>('input, textarea'),
+      ]
+        .filter((field) => field.style.position === 'absolute')
+        .map((field) => {
+          const shown = field.getBoundingClientRect();
+          const box = field.parentElement!.getBoundingClientRect();
+          return {
+            font: parseFloat(getComputedStyle(field).fontSize),
+            shown: [shown.left, shown.top, shown.width, shown.height],
+            box: [box.left, box.top, box.width, box.height],
+          };
+        }),
+    );
+    expect(fields.length).toBeGreaterThan(0);
+    for (const field of fields) {
+      expect(field.font).toBeGreaterThanOrEqual(15.99);
+      field.shown.forEach((value, i) => expect(value).toBeCloseTo(field.box[i]!, 0));
+    }
+
+    // A free text box in 10 pt text, which is about 5 px on this page.
+    const onScreen = await tab.evaluate(async () => {
+      const { viewer } = window.element;
+      const annotation = viewer.get('annotation');
+      const { annotation: made } = await annotation.create(0, {
+        subtype: 'free-text',
+        box: { x: 100, y: 100, width: 300, height: 60 },
+        contents: 'Small text',
+        fontSize: 10,
+      });
+      annotation.text.begin(made.ref);
+      return viewer.get('stage').pageRectToViewport(0, annotation.get(made.ref).rect);
+    });
+    await tab.waitForFunction(() =>
+      document
+        .querySelector('embedpdf-viewer')!
+        .shadowRoot!.querySelector('[contenteditable="true"]'),
+    );
+    const editor = await tab.evaluate(() => {
+      const box = document
+        .querySelector('embedpdf-viewer')!
+        .shadowRoot!.querySelector<HTMLElement>('[contenteditable="true"]')!;
+      const shown = box.getBoundingClientRect();
+      return { font: parseFloat(getComputedStyle(box).fontSize), width: shown.width };
+    });
+    expect(editor.font).toBeGreaterThanOrEqual(15.99);
+    // Drawn back on the box's plate: as wide as the box, less its padding.
+    expect(editor.width).toBeLessThanOrEqual(onScreen.width);
+    expect(editor.width).toBeGreaterThan(onScreen.width * 0.8);
+    await tab.close();
+  });
+
+  it('writes the chrome’s own fields in 16 px text with a finger, and in its own size otherwise', async () => {
+    const searchFontOf = async (tab: Page) => {
+      await tab.evaluate(() => window.element.viewer.get('shell').open('search'));
+      await tab.waitForFunction(() =>
+        document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelector('input[placeholder="Search document…"]'),
+      );
+      return tab.evaluate(() => {
+        const field = document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelector<HTMLElement>('input[placeholder="Search document…"]')!;
+        return getComputedStyle(field).fontSize;
+      });
+    };
+    const finger = await open('/whole.html', 375, { touch: true });
+    expect(await searchFontOf(finger)).toBe('16px');
+    await finger.close();
+    const mouse = await open('/whole.html', 375);
+    expect(await searchFontOf(mouse)).toBe('14px');
+    await mouse.close();
+  });
+
   it('keeps clear of the notch and home bar on the screen edges it reaches, and only there', async () => {
     const paddingOf = (tab: Page) =>
       tab.evaluate(() => {

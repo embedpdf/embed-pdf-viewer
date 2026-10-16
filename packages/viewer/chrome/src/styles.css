@@ -185,6 +185,14 @@ body {
   min-width: 44px;
 }
 
+/* With a finger as the main way of pointing, the chrome's own fields write in 16 px text: iOS
+   Safari zooms the page in when a field with smaller text takes focus. The fields on the pages
+   (a form field, a text box) size their text inline, which wins over this, and are laid out at a
+   legible size instead (`legible-text.ts` in `@embedpdf/web`). */
+[data-touch] :is(input, textarea, select) {
+  font-size: 16px;
+}
+
 /* On a phone, the floating bar with the page number gets out of the way while the pages scroll
    (places.tsx): it fades out, then takes no presses or focus until it fades back in. */
 [data-scroll-hidden] {

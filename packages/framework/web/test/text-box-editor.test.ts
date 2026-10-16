@@ -3,9 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   attachTextBoxEditor,
   createTextBoxEditorFollower,
+  freeTextBoxOf,
+  ownTextBoxOf,
   textBoxEditorScaleOf,
   textBoxStyleOf,
-  textPlateInPixels,
   type TextBoxEditorAnnotation,
   type TextBoxEditorItem,
 } from '../src/text-box-editor';
@@ -129,16 +130,86 @@ describe('text box geometry and style', () => {
     padding: 2,
   };
 
-  it('insets the plate by the padding, at the page’s scale', () => {
-    const page = {
-      toPixels: (point: { x: number; y: number }) => ({ x: point.x * 2, y: point.y * 2 }),
-    };
-    expect(textPlateInPixels({ box: { x: 10, y: 10, width: 20, height: 5 }, css }, page)).toEqual({
-      left: 24,
-      top: 24,
-      width: 32,
-      height: 2,
+  /** A page drawn `scale` pixels per point. */
+  const pageAt = (scale: number) => ({
+    toPixels: (point: { x: number; y: number }) => ({ x: point.x * scale, y: point.y * scale }),
+  });
+  const box = { x: 10, y: 10, width: 20, height: 5 };
+
+  it('puts the layer’s box on the plate, the box inset by its padding, at the page’s scale', () => {
+    // 10 pt at 2 px per point: 20 px text, legible as it is.
+    const { style, scale } = freeTextBoxOf({ box, css, editing: false }, pageAt(2), 'blue');
+    expect(scale).toBe(2);
+    expect(style).toMatchObject({
+      position: 'absolute',
+      left: '24px',
+      top: '24px',
+      width: '32px',
+      height: '2px',
+      fontSize: '20px',
+      overflowY: 'hidden',
+      outline: 'none',
+      cursor: 'default',
+      transform: 'none',
+      transformOrigin: '0 0',
+      pointerEvents: 'none',
+    });
+  });
+
+  it('lays small text out at 16 px, and draws the box back at the plate’s size', () => {
+    // 10 pt at 0.8 px per point is 8 px on the page: laid out twice as big, drawn at half.
+    const plain = { ...css, padding: 0 };
+    const { style, scale } = freeTextBoxOf({ box, css: plain, editing: true }, pageAt(0.8), 'blue');
+    expect(scale).toBe(1.6);
+    expect(style).toMatchObject({
+      left: '8px',
+      top: '8px',
+      width: '32px',
+      height: '8px',
+      fontSize: '16px',
+      overflowY: 'auto',
+      outline: '2px solid blue',
+      cursor: 'text',
+      transform: 'scale(0.5)',
+      pointerEvents: 'auto',
+    });
+  });
+
+  it('turns a turned box about the plate’s centre, once drawn back at the plate’s size', () => {
+    const plain = { ...css, padding: 0 };
+    const { style } = freeTextBoxOf(
+      { box, css: plain, rot: 90, editing: false },
+      pageAt(0.8),
+      'blue',
+    );
+    expect(style.transform).toBe(
+      'translate(8px, 2px) rotate(90deg) translate(-8px, -2px) scale(0.5)',
+    );
+    expect(
+      freeTextBoxOf({ box, css, rot: 90, editing: false }, pageAt(2), 'blue').style.transform,
+    ).toBe('translate(16px, 1px) rotate(90deg) translate(-16px, -1px)');
+  });
+
+  it('fills your element’s parent, and lays small text out at 16 px drawn back at its size', () => {
+    expect(ownTextBoxOf({ css, editing: false }, 2)).toEqual({
       scale: 2,
+      style: {
+        ...textBoxStyleOf(css, 2),
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box',
+        transform: 'none',
+        transformOrigin: '0 0',
+      },
+    });
+    const small = ownTextBoxOf({ css, editing: true }, 0.8);
+    expect(small.scale).toBe(1.6);
+    expect(small.style).toMatchObject({
+      fontSize: '16px',
+      width: '200%',
+      height: '200%',
+      transform: 'scale(0.5)',
+      pointerEvents: 'auto',
     });
   });
 

@@ -95,5 +95,8 @@ pasting, input methods and the format shortcuts:
 > built-in box.
 
 <Fw only="react">`editor.style` is the box's body style as CSS: font, size, color and alignment.</Fw><Fw only="vue">`style` is the box's body style as CSS: font, size, color and alignment.</Fw><Fw only="svelte">`editor.style` is the box's body style as a CSS string: font, size, color and alignment.</Fw><Fw only="angular">The directive gives your element the box's body style: font, size, color and alignment. Its
-`editing()` is true while someone types in the box.</Fw> The formatting calls above work on your element
-as they do on the built-in one.
+`editing()` is true while someone types in the box.</Fw> It also makes the element fill its parent: the
+text is laid out at 16 px or more and drawn back at the box's size, so iOS doesn't zoom the page in
+when the box takes focus. Draw the box's fill, border and padding on the parent, as above; anything
+on the element itself would scale with the text. The formatting calls above work on your element as
+they do on the built-in one.

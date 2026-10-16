@@ -28,10 +28,10 @@ import type { Annotation, AnnotationRef, TextItem } from '@embedpdf/plugin-annot
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
 import {
   createTextBoxEditorFollower,
+  freeTextBoxOf,
+  ownTextBoxOf,
   textBoxEditorScaleOf,
-  textBoxStyleOf,
-  textPlateInPixels,
-  type TextBoxStyle,
+  type OwnTextBox,
 } from '@embedpdf/web';
 import { annotationHostOf, pagePixelsOf, pageViewOf } from './page-reads';
 
@@ -65,36 +65,14 @@ export function bindTextBoxEditor(
 
 /**
  * The layer's own text box for one free text: the engine's text plate (the box inset by its
- * padding), styled like the box's body, with no padding of its own so its edge is the plate's.
- * The box's fill and border are the vector scene's, under it. It takes the pointer only while
+ * padding), styled like the box's body and laid out at a legible size (`freeTextBoxOf`). The
+ * box's fill and border are the vector scene's, under it. It takes the pointer only while
  * someone types in it; otherwise clicks fall through to the shapes (select, move, resize).
  */
 @Directive({
   selector: '[epdfFreeTextBox]',
-  host: {
-    style:
-      'position: absolute; box-sizing: border-box; background: transparent; ' +
-      'white-space: pre-wrap; overflow-wrap: break-word; overflow-x: hidden; transform-origin: center',
-    '[style.left.px]': 'plate().left',
-    '[style.top.px]': 'plate().top',
-    '[style.width.px]': 'plate().width',
-    // Fixed to the plate: the box never grows with its text; it scrolls while typing and clips
-    // otherwise, where the baked appearance clips.
-    '[style.height.px]': 'plate().height',
-    '[style.font-family]': 'look().fontFamily',
-    '[style.font-size]': 'look().fontSize',
-    '[style.color]': 'look().color',
-    '[style.font-weight]': 'look().fontWeight',
-    '[style.font-style]': 'look().fontStyle',
-    '[style.text-decoration]': 'look().textDecoration',
-    '[style.text-align]': 'look().textAlign',
-    '[style.overflow-y]': "item().editing ? 'auto' : 'hidden'",
-    '[style.outline]': "item().editing ? '1px solid ' + outline() : 'none'",
-    '[style.cursor]': "item().editing ? 'text' : 'default'",
-    // A plain text box turns about its centre, as the baked appearance does.
-    '[style.transform]': "item().rot ? 'rotate(' + item().rot + 'deg)' : null",
-    '[style.pointer-events]': "item().editing ? 'auto' : 'none'",
-  },
+  // Property by property: the editor's own line height on the element stays.
+  host: { '[style]': 'box().style' },
 })
 export class EpdfFreeTextBox {
   /** The text box, as the plugin lists it for the page. */
@@ -104,8 +82,9 @@ export class EpdfFreeTextBox {
 
   private readonly page = injectPage('[epdfFreeTextBox]');
   private readonly pixels = pagePixelsOf(this.page);
-  protected readonly plate = computed(() => textPlateInPixels(this.item(), this.pixels()));
-  protected readonly look = computed(() => textBoxStyleOf(this.item().css, this.plate().scale));
+  protected readonly box = computed(() =>
+    freeTextBoxOf(this.item(), this.pixels(), this.outline()),
+  );
 
   constructor() {
     const annotation = annotationHostOf(this.page, '[epdfFreeTextBox]').capability;
@@ -113,38 +92,32 @@ export class EpdfFreeTextBox {
       inject<ElementRef<HTMLElement>>(ElementRef).nativeElement,
       annotation,
       this.item,
-      computed(() => this.plate().scale),
+      computed(() => this.box().scale),
     );
   }
 }
 
 /**
  * Your own element as the editor of a text box you draw yourself, in a look
- * (`<ng-template [epdfAnnotation]="isTextBox" let-annotation>`):
+ * (`<ng-template [epdfAnnotation]="isTextBox" let-annotation>`), inside the element that draws
+ * the box's frame:
  *
- *   <div [epdfRichTextEditor]="annotation" #editor="epdfRichTextEditor"
- *        class="text-box" [class.editing]="editor.editing()"></div>
+ *   <div class="text-box" [class.editing]="editor.editing()">
+ *     <div [epdfRichTextEditor]="annotation" #editor="epdfRichTextEditor"></div>
+ *   </div>
  *
  * It draws the runs, turns typing back into runs, keeps the caret when the style changes, and
  * handles pasting, input methods and the format shortcuts; `text.toggleFormat()` and
  * `selection.update()` work on it as on the layer's own box. It gives the element the box's
- * body style (font, size, color and alignment), and while someone types it takes the pointer.
- * Leave the element empty: the editor fills it.
+ * body style (font, size, color and alignment), filling its parent at a legible size
+ * (`ownTextBoxOf`), so draw the box's fill, border and padding on the parent; while someone
+ * types it takes the pointer. Leave the element empty: the editor fills it.
  */
 @Directive({
   selector: '[epdfRichTextEditor]',
   exportAs: 'epdfRichTextEditor',
-  host: {
-    '[style.font-family]': 'look()?.fontFamily ?? null',
-    '[style.font-size]': 'look()?.fontSize ?? null',
-    '[style.color]': 'look()?.color ?? null',
-    '[style.font-weight]': 'look()?.fontWeight ?? null',
-    '[style.font-style]': 'look()?.fontStyle ?? null',
-    '[style.text-decoration]': 'look()?.textDecoration ?? null',
-    '[style.text-align]': 'look()?.textAlign ?? null',
-    // While typing, the element takes the pointer (the caret, a drag over words).
-    '[style.pointer-events]': "editing() ? 'auto' : null",
-  },
+  // Property by property: the editor's own line height on the element stays.
+  host: { '[style]': 'own()?.style ?? null' },
 })
 export class EpdfRichTextEditor {
   /** The free text annotation this element edits: the template's `let-annotation`. */
@@ -174,10 +147,10 @@ export class EpdfRichTextEditor {
     textBoxEditorScaleOf(this.item(), this.pixels(), this.lookScale?.() ?? 1),
   );
 
-  /** The box's body style: font, size, color and alignment, or null while there is no box. */
-  protected readonly look: Signal<TextBoxStyle | null> = computed(() => {
+  /** The element's style and the scale its text is laid out at, or null while there is no box. */
+  protected readonly own: Signal<OwnTextBox | null> = computed(() => {
     const item = this.item();
-    return item ? textBoxStyleOf(item.css, this.scale()) : null;
+    return item ? ownTextBoxOf(item, this.scale()) : null;
   });
 
   /** True while someone types in the box. */
@@ -188,7 +161,7 @@ export class EpdfRichTextEditor {
       inject<ElementRef<HTMLElement>>(ElementRef).nativeElement,
       this.host.capability,
       this.item,
-      this.scale,
+      computed(() => this.own()?.scale ?? this.scale()),
     );
   }
 }

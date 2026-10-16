@@ -15,8 +15,8 @@ import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotat
 import {
   createTextBoxEditorFollower,
   cssText,
+  ownTextBoxOf,
   textBoxEditorScaleOf,
-  textBoxStyleOf,
 } from '@embedpdf/web';
 import { usePage } from '../runtime/page';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/readers.svelte';
@@ -72,7 +72,8 @@ function lookScaleOf(): () => number {
  * ```
  *
  * `attach` goes on your element (render nothing inside it: the editor owns what's in it); `style`
- * and `editing` follow the box.
+ * and `editing` follow the box. `style` fills the element's parent at a legible size: draw the
+ * box's frame on the parent.
  */
 export function useRichTextEditor(annotation: MaybeGetter<Annotation>): RichTextEditor {
   const page = usePage();
@@ -93,18 +94,11 @@ export function useRichTextEditor(annotation: MaybeGetter<Annotation>): RichText
   // Pixels per point where the element is: inside a scaled look, at the annotation's 100% size;
   // the look's scale does the rest.
   const scale = $derived(textBoxEditorScaleOf(item.current, page.transform, lookScale()));
-  // While typing, the element takes the pointer (the caret, a drag over words).
-  const style = $derived.by(() => {
-    const text = item.current;
-    if (!text) return '';
-    return cssText({
-      ...textBoxStyleOf(text.css, scale),
-      ...(text.editing ? { pointerEvents: 'auto' } : {}),
-    });
-  });
+  const own = $derived(item.current ? ownTextBoxOf(item.current, scale) : null);
+  const style = $derived(own ? cssText(own.style) : '');
   const attach = textBoxEditor(
     () => item.current,
-    () => scale,
+    () => own?.scale ?? scale,
   );
   return {
     attach,

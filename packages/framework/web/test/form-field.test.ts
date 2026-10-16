@@ -77,6 +77,11 @@ describe('field looks', () => {
     const frame = { left: 0, top: 0, width: 100, height: 20 };
     const comb = { box: { width: 100 }, look, multiline: false, comb: true, maxLength: 5 };
     expect(textFieldStyleOf(comb, frame, colors).letterSpacing).toBe('10px');
+    // Laid out twice as big: the size and the spacing double with it.
+    expect(textFieldStyleOf(comb, frame, colors, 2)).toMatchObject({
+      fontSize: '20px',
+      letterSpacing: '20px',
+    });
   });
 
   it('draws a list box’s border at least a pixel wide, in the field’s own style', () => {
