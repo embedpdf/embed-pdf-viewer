@@ -103,53 +103,57 @@ const NOT_THE_VIEWERS = (tab: Page): Promise<string[]> =>
   });
 
 /** Every unwrapped word showing now, each with where it showed. */
-const unwrapped = async (tab: Page): Promise<string[]> =>
-  tab.evaluate(
-    (allowed) => {
-      const root = window.element.shadowRoot!;
-      const shown = (element: Element | null): boolean =>
-        !!element &&
-        element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
-        // The toolbars' measuring copy, and key caps, which are the keyboard's names.
-        !element.closest('[aria-hidden="true"], kbd');
-      const isWord = (text: string) =>
-        /\p{L}/u.test(text) &&
-        !/[⟦⟧]/.test(text) &&
-        !allowed.includes(text) &&
-        // A colour, a size with its unit, a measuring unit or scale (cm², 1/8 in = 1 ft), a
-        // shortcut's keys (⌘O, Ctrl+O).
-        !/^#[0-9a-f]{3,8}$/i.test(text) &&
-        !/^[\d.,\s]+(px|pt)$/i.test(text) &&
-        !/^(?:[\d\s/.:=,]|mm|cm|km|m|in|ft|yd|mi|pt|ha|acre|²)+$/.test(text) &&
-        !/^(?:[⌘⌥⇧⌃]|(?:Ctrl|Alt|Shift)\+)/.test(text);
-      const where = (element: Element) =>
-        element.closest('[data-epdf-panel]')?.getAttribute('data-epdf-panel') ??
-        element.closest('[role="dialog"], [role="menu"], [role="toolbar"]')?.getAttribute('role') ??
-        element.tagName.toLowerCase();
-      const found = new Set<string>();
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        const parent = node.parentElement;
-        if (!parent || parent.closest('style, script, template')) continue;
-        // The page's drawings: SVG text is a field's painted value or caption, or an annotation's
-        // label or caption, the document's words.
-        if (parent.closest('text')) continue;
-        // An option shows while its select does; the browser draws it.
-        if (!shown(parent.tagName === 'OPTION' ? parent.closest('select') : parent)) continue;
-        const text = (node.textContent ?? '').trim();
-        if (isWord(text)) found.add(`${where(parent)}: "${text}"`);
+async function unwrapped(tab: Page): Promise<string[]> {
+  // Each unwrapped text showing, with where it showed.
+  const showing = await tab.evaluate(() => {
+    const root = window.element.shadowRoot!;
+    const shown = (element: Element | null): boolean =>
+      !!element &&
+      element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
+      // The toolbars' measuring copy, and key caps, which are the keyboard's names.
+      !element.closest('[aria-hidden="true"], kbd');
+    const isWord = (text: string) =>
+      /\p{L}/u.test(text) &&
+      !/[⟦⟧]/.test(text) &&
+      // A colour, a size with its unit, a measuring unit or scale (cm², 1/8 in = 1 ft), a
+      // shortcut's keys (⌘O, Ctrl+O).
+      !/^#[0-9a-f]{3,8}$/i.test(text) &&
+      !/^[\d.,\s]+(px|pt)$/i.test(text) &&
+      !/^(?:[\d\s/.:=,]|mm|cm|km|m|in|ft|yd|mi|pt|ha|acre|²)+$/.test(text) &&
+      !/^(?:[⌘⌥⇧⌃]|(?:Ctrl|Alt|Shift)\+)/.test(text);
+    const where = (element: Element) =>
+      element.closest('[data-epdf-panel]')?.getAttribute('data-epdf-panel') ??
+      element.closest('[role="dialog"], [role="menu"], [role="toolbar"]')?.getAttribute('role') ??
+      element.tagName.toLowerCase();
+    const found: [where: string, text: string][] = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || parent.closest('style, script, template')) continue;
+      // The page's drawings: SVG text is a field's painted value or caption, or an annotation's
+      // label or caption, the document's words.
+      if (parent.closest('text')) continue;
+      // An option shows while its select does; the browser draws it.
+      if (!shown(parent.tagName === 'OPTION' ? parent.closest('select') : parent)) continue;
+      const text = (node.textContent ?? '').trim();
+      if (isWord(text)) found.push([`${where(parent)}: "${text}"`, text]);
+    }
+    for (const element of root.querySelectorAll('[title], [aria-label], [placeholder], [alt]')) {
+      if (!shown(element)) continue;
+      for (const attribute of ['title', 'aria-label', 'placeholder', 'alt']) {
+        const text = element.getAttribute(attribute)?.trim() ?? '';
+        if (isWord(text)) found.push([`${where(element)} [${attribute}]: "${text}"`, text]);
       }
-      for (const element of root.querySelectorAll('[title], [aria-label], [placeholder], [alt]')) {
-        if (!shown(element)) continue;
-        for (const attribute of ['title', 'aria-label', 'placeholder', 'alt']) {
-          const text = element.getAttribute(attribute)?.trim() ?? '';
-          if (isWord(text)) found.add(`${where(element)} [${attribute}]: "${text}"`);
-        }
-      }
-      return [...found];
-    },
-    await NOT_THE_VIEWERS(tab),
-  );
+    }
+    return found;
+  });
+  // Read after what showed: a library that finished loading in between (the standard stamps load
+  // as the stamps panel opens) is in it.
+  const allowed = await NOT_THE_VIEWERS(tab);
+  return [
+    ...new Set(showing.filter(([, text]) => !allowed.includes(text)).map(([where]) => where)),
+  ];
+}
 
 const run = (tab: Page, command: string) =>
   tab.evaluate((id) => window.element.viewer.commands.execute(id), command);

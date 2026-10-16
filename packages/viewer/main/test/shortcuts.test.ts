@@ -214,12 +214,12 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('keyboard shortcuts', ()
       (window as unknown as PageRecord).viewers.a.viewer.commands.execute('panel:search'),
     );
 
+    // Asked for before the click: Playwright takes the browser's file dialogs only once the browser
+    // has its request, and a dialog that opens sooner is the browser's own, closed at once.
+    const chooser = tab.waitForEvent('filechooser', { timeout: 10_000 });
     await clickPages(tab, 'b');
-    const [chooser] = await Promise.all([
-      tab.waitForEvent('filechooser', { timeout: 10_000 }),
-      tab.keyboard.press('ControlOrMeta+o'),
-    ]);
-    expect(await chooser.element().getAttribute('accept')).toBe('.pdf,application/pdf');
+    await tab.keyboard.press('ControlOrMeta+o');
+    expect(await (await chooser).element().getAttribute('accept')).toBe('.pdf,application/pdf');
     expect((await record(tab)).prevented).toBe(true);
   });
 
