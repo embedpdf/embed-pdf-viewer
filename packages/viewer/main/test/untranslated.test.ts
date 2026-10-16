@@ -119,7 +119,9 @@ async function unwrapped(tab: Page): Promise<string[]> {
       // shortcut's keys (⌘O, Ctrl+O).
       !/^#[0-9a-f]{3,8}$/i.test(text) &&
       !/^[\d.,\s]+(px|pt)$/i.test(text) &&
-      !/^(?:[\d\s/.:=,]|mm|cm|km|m|in|ft|yd|mi|pt|ha|acre|²)+$/.test(text) &&
+      // Each unit whole, between digits, spaces or signs: "mm" is never "m" twice, which also
+      // keeps the match linear.
+      !/^[\d\s/.:=,²]*(?:(?:mm|cm|km|m|in|ft|yd|mi|pt|ha|acre)(?:[\d\s/.:=,²]+|$))*$/.test(text) &&
       !/^(?:[⌘⌥⇧⌃]|(?:Ctrl|Alt|Shift)\+)/.test(text);
     const where = (element: Element) =>
       element.closest('[data-epdf-panel]')?.getAttribute('data-epdf-panel') ??
