@@ -21,7 +21,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { nextJobId } from './jobIds';
-import { nextJob } from './jobOrder';
+import { nextJob, ranksInLine } from './jobOrder';
 import type { JobId, WorkerRequest, WorkerResponse, WorkerResultPayload } from './protocol';
 import type { Transport } from '../transport/Transport';
 
@@ -103,10 +103,11 @@ interface Job {
  * - A job's rank is its call's priority, then its place: where its page is in
  *   the views' working sets ({@link setWorkingSet}), worked out again before
  *   every pick, so a job follows the camera with no caller involved.
- * - A running read gives way to a job that clearly outranks it (a higher
- *   priority, or a better place): the queue tells the worker to stop it, and
- *   puts it back in line where it was. Its caller never sees that. The worker
- *   stops a read at its next slice, and keeps the page it half loaded.
+ * - A running read gives way to a job that clearly outranks it in line (a
+ *   higher priority, or a better place; {@link preemptFor}): the queue tells
+ *   the worker to stop it, and puts it back in line where it was. Its caller
+ *   never sees that. The worker stops a read at its next slice, and keeps the
+ *   page it half loaded.
  * - `abort()` before the job is sent removes it: it never reaches the worker.
  *   After, it sends an AbortRequest; the worker rejects when it next checks
  *   its signal, and the caller sees an AbortError either way.
@@ -303,15 +304,24 @@ export class WorkerQueue implements JobQueue {
    * least urgent one if several run. Only reads give way: a read must never
    * see half a write, and saves and opens can't stop part way. A read with
    * buffers to move can't be sent twice, so it runs on.
+   *
+   * `next` and the running reads compare at their ranks in line, the ranks the
+   * pick goes by, so a read gives way only to a job sent before it. A read that
+   * a job behind it waits for runs at that job's rank: stopping it for another
+   * job of that rank would send it first again, to be stopped again, and
+   * nothing would run.
    */
   private preemptFor(next: Job): void {
+    const ranks = ranksInLine(this.jobs);
+    const nextRank = ranks[this.jobs.indexOf(next)]!;
     let victim: Job | undefined;
     let victimRank = 0;
-    for (const running of this.jobs) {
+    for (let index = 0; index < this.jobs.length; index++) {
+      const running = this.jobs[index]!;
       if (!running.sent || running.preempted || running.aborted) continue;
       if (running.effect !== 'read' || running.pack!.transfer.length > 0) continue;
-      const now = this.rankNow(running);
-      if (!clearlyOutranks(next.rank, now)) continue;
+      const now = ranks[index]!;
+      if (!clearlyOutranks(nextRank, now)) continue;
       if (!victim || now < victimRank) {
         victim = running;
         victimRank = now;
@@ -322,11 +332,9 @@ export class WorkerQueue implements JobQueue {
     this.transport.send(wirePack({ kind: 'abort', jobId: victim.jobId }));
   }
 
-  /** The job to send next, every waiting job ranked by where it is now. */
+  /** The job to send next, every job ranked by where it is now, the running ones too. */
   private pick(): Job | undefined {
-    for (const job of this.jobs) {
-      if (!job.sent) job.rank = this.rankNow(job);
-    }
+    for (const job of this.jobs) job.rank = this.rankNow(job);
     return nextJob(this.jobs);
   }
 
