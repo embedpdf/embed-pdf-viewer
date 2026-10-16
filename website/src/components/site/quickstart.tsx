@@ -393,8 +393,8 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
 /** The code a snippet's tokens spell: what its line numbers count and the Copy button copies. */
 const codeOf = (lines: Token[]): string => lines.map(([text]) => text).join('');
 
-/** Every tab gets the longest snippet's height, so the panel never resizes or scrolls up and down. */
-const MOST_LINES = Math.max(...QS_SNIPPETS.map((s) => codeOf(s.lines).split('\n').length));
+/** Lines the code panel shows at once; a longer snippet scrolls inside it. */
+const PANEL_LINES = 15;
 
 const PERKS = [
   {
@@ -594,34 +594,39 @@ export function QuickStart() {
             </button>
           </div>
 
+          {/* One scroll area for the code and its line numbers: the numbers scroll up and
+              down with the code and stay put when it scrolls sideways. A new tab starts at
+              the top. */}
           <div
-            className="flex bg-[#0B1220] font-mono text-[13px] leading-[1.65] max-[720px]:text-xs"
-            style={{ height: `calc(${MOST_LINES} * 1.65em + 3.4em)` }}
+            key={active}
+            className="ep-dark-scroll overflow-auto bg-[#0B1220] font-mono text-[13px] leading-[1.65] max-[720px]:text-xs"
+            style={{ height: `calc(${PANEL_LINES} * 1.65em + 3.4em)` }}
           >
-            <div
-              aria-hidden
-              className="flex-shrink-0 select-none border-r border-[#131C32] bg-[#080E1B] py-[1.7em] pl-[22px] pr-3.5 text-right text-[#3B4768] max-[720px]:pl-3.5 max-[720px]:pr-2.5"
-            >
-              {Array.from({ length: lineCount }).map((_, i) => (
-                <div key={i}>{i + 1}</div>
-              ))}
+            <div className="flex min-h-full w-max min-w-full">
+              <div
+                aria-hidden
+                className="sticky left-0 flex-shrink-0 select-none border-r border-[#131C32] bg-[#080E1B] py-[1.7em] pl-[22px] pr-3.5 text-right text-[#3B4768] max-[720px]:pl-3.5 max-[720px]:pr-2.5"
+              >
+                {Array.from({ length: lineCount }).map((_, i) => (
+                  <div key={i}>{i + 1}</div>
+                ))}
+              </div>
+              <pre className="ep-code m-0 flex-1 whitespace-pre px-6 py-[1.7em] font-mono text-[#C8D3EA] [tab-size:2] max-[720px]:px-3.5">
+                <code>
+                  {current.lines.map(([text, type], i) =>
+                    text === '\n' ? (
+                      <br key={i} />
+                    ) : type ? (
+                      <span key={i} className={`tk-${type}`}>
+                        {text}
+                      </span>
+                    ) : (
+                      <span key={i}>{text}</span>
+                    ),
+                  )}
+                </code>
+              </pre>
             </div>
-            {/* Scrolls sideways only, on narrow screens; the gutter stays put. */}
-            <pre className="ep-code ep-dark-scroll m-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden whitespace-pre px-6 py-[1.7em] font-mono text-[#C8D3EA] [tab-size:2] max-[720px]:px-3.5">
-              <code>
-                {current.lines.map(([text, type], i) =>
-                  text === '\n' ? (
-                    <br key={i} />
-                  ) : type ? (
-                    <span key={i} className={`tk-${type}`}>
-                      {text}
-                    </span>
-                  ) : (
-                    <span key={i}>{text}</span>
-                  ),
-                )}
-              </code>
-            </pre>
           </div>
         </div>
 

@@ -1,13 +1,13 @@
 'use client';
 
+import { SearchDialog } from '@embedpdf/docs-kit';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { EpButton } from './button';
 import { ChevronRightIcon, GitHubIcon, SearchIcon, SparkIcon } from './icons';
-import { PRO_LAUNCHED } from './pro';
-import { SearchDialog } from '@embedpdf/docs-kit';
+import { PRO_LAUNCHED } from './launch';
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: 'Docs', href: '/docs' },

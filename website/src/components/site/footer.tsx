@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { DiscordIcon, GitHubIcon } from './icons';
-import { PRO_LAUNCHED } from './pro';
+import { PRO_LAUNCHED } from './launch';
 
 const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
   {

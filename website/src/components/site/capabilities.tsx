@@ -108,10 +108,10 @@ export function Capabilities() {
               Get Started
             </EpButton>
             <Link
-              href="/docs"
+              href="/docs/viewer/features"
               className="font-display text-ep-blue hover:text-ep-blue700 group inline-flex items-center gap-1.5 text-[15px] font-semibold transition-all duration-200 hover:gap-2.5"
             >
-              Read the docs
+              See all features
               <ArrowRightIcon size={14} strokeWidth={2.4} />
             </Link>
           </div>
