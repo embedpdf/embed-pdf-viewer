@@ -184,15 +184,15 @@ export function TwoWays() {
               <>
                 <StackChip
                   accent="blue"
-                  icon={<JsMark />}
-                  label="Vanilla JS"
-                  href="/docs/viewer/vanilla/quick-start"
-                />
-                <StackChip
-                  accent="blue"
                   icon={<ReactIcon />}
                   label="React"
                   href="/docs/viewer/react/quick-start"
+                />
+                <StackChip
+                  accent="blue"
+                  icon={<AngularIcon />}
+                  label="Angular"
+                  href="/docs/viewer/angular/quick-start"
                 />
                 <StackChip
                   accent="blue"
@@ -208,9 +208,9 @@ export function TwoWays() {
                 />
                 <StackChip
                   accent="blue"
-                  icon={<AngularIcon />}
-                  label="Angular"
-                  href="/docs/viewer/angular/quick-start"
+                  icon={<JsMark />}
+                  label="Vanilla JS"
+                  href="/docs/viewer/vanilla/quick-start"
                 />
               </>
             }
@@ -241,6 +241,12 @@ export function TwoWays() {
                 />
                 <StackChip
                   accent="purple"
+                  icon={<AngularIcon />}
+                  label="Angular"
+                  href="/docs/headless/angular"
+                />
+                <StackChip
+                  accent="purple"
                   icon={<VueIcon />}
                   label="Vue"
                   href="/docs/headless/vue"
@@ -250,12 +256,6 @@ export function TwoWays() {
                   icon={<SvelteIcon />}
                   label="Svelte"
                   href="/docs/headless/svelte"
-                />
-                <StackChip
-                  accent="purple"
-                  icon={<AngularIcon />}
-                  label="Angular"
-                  href="/docs/headless/angular"
                 />
               </>
             }

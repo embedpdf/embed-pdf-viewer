@@ -97,11 +97,11 @@ export function Capabilities() {
                 className="mt-auto flex w-full justify-center gap-2 border-t border-[rgba(7,32,76,0.06)] pt-3.5"
                 aria-label={`${c.title} docs by framework`}
               >
-                <FrameworkLink title="Vanilla JS docs">
-                  <JsMark small />
-                </FrameworkLink>
                 <FrameworkLink title="React docs">
                   <ReactIcon size={16} />
+                </FrameworkLink>
+                <FrameworkLink title="Angular docs">
+                  <AngularIcon size={16} />
                 </FrameworkLink>
                 <FrameworkLink title="Vue docs">
                   <VueIcon size={16} />
@@ -109,8 +109,8 @@ export function Capabilities() {
                 <FrameworkLink title="Svelte docs">
                   <SvelteIcon size={16} />
                 </FrameworkLink>
-                <FrameworkLink title="Angular docs">
-                  <AngularIcon size={16} />
+                <FrameworkLink title="Vanilla JS docs">
+                  <JsMark small />
                 </FrameworkLink>
               </div>
             </article>

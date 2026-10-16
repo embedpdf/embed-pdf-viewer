@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { DiscordIcon, GitHubIcon } from './icons';
+import { PRO_LAUNCHED } from './pro';
 
 const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
   {
@@ -10,7 +11,7 @@ const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
       { label: 'Ready-made Viewer', href: '/docs/viewer' },
       { label: 'Headless Components', href: '/docs/headless' },
       { label: 'Live Demo', href: '/demo' },
-      { label: 'EmbedPDF Pro', href: '/pro' },
+      ...(PRO_LAUNCHED ? [{ label: 'EmbedPDF Pro', href: '/pro' }] : []),
     ],
   },
   {

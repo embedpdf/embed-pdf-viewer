@@ -148,6 +148,99 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
     ],
   },
   {
+    id: 'angular',
+    label: 'Angular',
+    icon: <AngularIcon size={16} />,
+    lines: [
+      ['import', 'kw'],
+      [' { ', 'pun'],
+      ['Component', 'fn'],
+      [' } ', 'pun'],
+      ['from', 'kw'],
+      [' ', 'pun'],
+      ["'@angular/core'", 'str'],
+      [';', 'pun'],
+      ['\n', ''],
+      ['import', 'kw'],
+      [' { ', 'pun'],
+      ['EpdfPdfViewer', 'fn'],
+      [', ', 'pun'],
+      ['type ', 'kw'],
+      ['Viewer', 'fn'],
+      [' } ', 'pun'],
+      ['from', 'kw'],
+      [' ', 'pun'],
+      ["'@embedpdf/viewer-angular'", 'str'],
+      [';', 'pun'],
+      ['\n', ''],
+      ['\n', ''],
+      ['@Component', 'fn'],
+      ['({', 'pun'],
+      ['\n', ''],
+      ['  selector', 'key'],
+      [': ', 'pun'],
+      ["'app-root'", 'str'],
+      [',', 'pun'],
+      ['\n', ''],
+      ['  imports', 'key'],
+      [': ', 'pun'],
+      ['[', 'pun'],
+      ['EpdfPdfViewer', 'fn'],
+      ['],', 'pun'],
+      ['\n', ''],
+      ['  template', 'key'],
+      [': `', 'pun'],
+      ['\n', ''],
+      ['    <', 'tag'],
+      ['epdf-pdf-viewer', 'tag'],
+      ['\n', ''],
+      ['      src', 'attr'],
+      ['=', 'pun'],
+      ['"https://snippet.embedpdf.com/ebook.pdf"', 'str'],
+      ['\n', ''],
+      ['      style', 'attr'],
+      ['=', 'pun'],
+      ['"height: 500px"', 'str'],
+      ['\n', ''],
+      ['      (ready)', 'attr'],
+      ['=', 'pun'],
+      ['"onReady($event)"', 'str'],
+      ['\n', ''],
+      ['    /', 'pun'],
+      ['>', 'tag'],
+      ['\n', ''],
+      ['  `', 'pun'],
+      [',', 'pun'],
+      ['\n', ''],
+      ['})', 'pun'],
+      ['\n', ''],
+      ['export ', 'kw'],
+      ['class ', 'kw'],
+      ['App', 'fn'],
+      [' {', 'pun'],
+      ['\n', ''],
+      ['  onReady', 'fn'],
+      ['(', 'pun'],
+      ['viewer', 'pun'],
+      [': ', 'pun'],
+      ['Viewer', 'fn'],
+      [') {', 'pun'],
+      ['\n', ''],
+      ['    console', 'fn'],
+      ['.', 'pun'],
+      ['log', 'fn'],
+      ['(', 'pun'],
+      ["'PDF viewer ready!'", 'str'],
+      [', ', 'pun'],
+      ['viewer', 'pun'],
+      [');', 'pun'],
+      ['\n', ''],
+      ['  }', 'pun'],
+      ['\n', ''],
+      ['}', 'pun'],
+    ],
+  },
+  {
     id: 'vue',
     label: 'Vue',
     icon: <VueIcon size={16} />,
@@ -295,103 +388,13 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       ['>', 'tag'],
     ],
   },
-  {
-    id: 'angular',
-    label: 'Angular',
-    icon: <AngularIcon size={16} />,
-    lines: [
-      ['import', 'kw'],
-      [' { ', 'pun'],
-      ['Component', 'fn'],
-      [' } ', 'pun'],
-      ['from', 'kw'],
-      [' ', 'pun'],
-      ["'@angular/core'", 'str'],
-      [';', 'pun'],
-      ['\n', ''],
-      ['import', 'kw'],
-      [' { ', 'pun'],
-      ['EpdfPdfViewer', 'fn'],
-      [', ', 'pun'],
-      ['type ', 'kw'],
-      ['Viewer', 'fn'],
-      [' } ', 'pun'],
-      ['from', 'kw'],
-      [' ', 'pun'],
-      ["'@embedpdf/viewer-angular'", 'str'],
-      [';', 'pun'],
-      ['\n', ''],
-      ['\n', ''],
-      ['@Component', 'fn'],
-      ['({', 'pun'],
-      ['\n', ''],
-      ['  selector', 'key'],
-      [': ', 'pun'],
-      ["'app-root'", 'str'],
-      [',', 'pun'],
-      ['\n', ''],
-      ['  imports', 'key'],
-      [': ', 'pun'],
-      ['[', 'pun'],
-      ['EpdfPdfViewer', 'fn'],
-      ['],', 'pun'],
-      ['\n', ''],
-      ['  template', 'key'],
-      [': `', 'pun'],
-      ['\n', ''],
-      ['    <', 'tag'],
-      ['epdf-pdf-viewer', 'tag'],
-      ['\n', ''],
-      ['      src', 'attr'],
-      ['=', 'pun'],
-      ['"https://snippet.embedpdf.com/ebook.pdf"', 'str'],
-      ['\n', ''],
-      ['      style', 'attr'],
-      ['=', 'pun'],
-      ['"height: 500px"', 'str'],
-      ['\n', ''],
-      ['      (ready)', 'attr'],
-      ['=', 'pun'],
-      ['"onReady($event)"', 'str'],
-      ['\n', ''],
-      ['    /', 'pun'],
-      ['>', 'tag'],
-      ['\n', ''],
-      ['  `', 'pun'],
-      [',', 'pun'],
-      ['\n', ''],
-      ['})', 'pun'],
-      ['\n', ''],
-      ['export ', 'kw'],
-      ['class ', 'kw'],
-      ['App', 'fn'],
-      [' {', 'pun'],
-      ['\n', ''],
-      ['  onReady', 'fn'],
-      ['(', 'pun'],
-      ['viewer', 'pun'],
-      [': ', 'pun'],
-      ['Viewer', 'fn'],
-      [') {', 'pun'],
-      ['\n', ''],
-      ['    console', 'fn'],
-      ['.', 'pun'],
-      ['log', 'fn'],
-      ['(', 'pun'],
-      ["'PDF viewer ready!'", 'str'],
-      [', ', 'pun'],
-      ['viewer', 'pun'],
-      [');', 'pun'],
-      ['\n', ''],
-      ['  }', 'pun'],
-      ['\n', ''],
-      ['}', 'pun'],
-    ],
-  },
 ];
 
 /** The code a snippet's tokens spell: what its line numbers count and the Copy button copies. */
 const codeOf = (lines: Token[]): string => lines.map(([text]) => text).join('');
+
+/** Every tab gets the longest snippet's height, so the panel never resizes or scrolls up and down. */
+const MOST_LINES = Math.max(...QS_SNIPPETS.map((s) => codeOf(s.lines).split('\n').length));
 
 const PERKS = [
   {
@@ -538,8 +541,9 @@ export function QuickStart() {
                 key={s.id}
                 role="tab"
                 aria-selected={active === s.id}
+                aria-label={s.label}
                 onClick={() => setActive(s.id)}
-                className={`font-display -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3.5 text-[13.5px] font-semibold transition-all duration-150 max-[720px]:px-3 ${
+                className={`font-display -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3.5 text-[13.5px] font-semibold transition-all duration-150 max-[720px]:px-3 max-[480px]:px-2.5 ${
                   active === s.id
                     ? 'border-ep-blue bg-gradient-to-b from-[rgba(8,118,253,0.06)] to-transparent text-white'
                     : 'border-transparent text-[#6B7A99] hover:text-[#B8C5DD]'
@@ -548,7 +552,10 @@ export function QuickStart() {
                 <span className="inline-flex h-[18px] w-[18px] items-center justify-center">
                   {s.icon}
                 </span>
-                <span className={active === s.id ? '' : 'max-[720px]:hidden'}>{s.label}</span>
+                {/* Narrow screens name only the open tab; the narrowest show icons alone. */}
+                <span className={active === s.id ? 'max-[360px]:hidden' : 'max-[720px]:hidden'}>
+                  {s.label}
+                </span>
               </button>
             ))}
             <span className="flex-1" />
@@ -564,7 +571,7 @@ export function QuickStart() {
               {copied ? (
                 <>
                   <CheckIcon size={14} strokeWidth={2.5} />
-                  Copied
+                  <span className="max-[480px]:hidden">Copied</span>
                 </>
               ) : (
                 <>
@@ -581,22 +588,26 @@ export function QuickStart() {
                     <rect x="9" y="9" width="11" height="11" rx="2" />
                     <path d="M5 15V5a2 2 0 0 1 2-2h10" />
                   </svg>
-                  Copy
+                  <span className="max-[480px]:hidden">Copy</span>
                 </>
               )}
             </button>
           </div>
 
-          <div className="ep-dark-scroll flex max-h-[420px] overflow-auto bg-[#0B1220]">
+          <div
+            className="flex bg-[#0B1220] font-mono text-[13px] leading-[1.65] max-[720px]:text-xs"
+            style={{ height: `calc(${MOST_LINES} * 1.65em + 3.4em)` }}
+          >
             <div
               aria-hidden
-              className="flex-shrink-0 select-none border-r border-[#131C32] bg-[#080E1B] py-[22px] pl-[22px] pr-3.5 text-right font-mono text-[13px] leading-[1.65] text-[#3B4768] max-[720px]:py-[18px] max-[720px]:pl-3.5 max-[720px]:pr-2.5 max-[720px]:text-xs"
+              className="flex-shrink-0 select-none border-r border-[#131C32] bg-[#080E1B] py-[1.7em] pl-[22px] pr-3.5 text-right text-[#3B4768] max-[720px]:pl-3.5 max-[720px]:pr-2.5"
             >
               {Array.from({ length: lineCount }).map((_, i) => (
                 <div key={i}>{i + 1}</div>
               ))}
             </div>
-            <pre className="ep-code ep-dark-scroll m-0 flex-1 overflow-x-auto whitespace-pre px-6 py-[22px] font-mono text-[13px] leading-[1.65] text-[#C8D3EA] [tab-size:2] max-[720px]:px-3.5 max-[720px]:py-[18px] max-[720px]:text-xs">
+            {/* Scrolls sideways only, on narrow screens; the gutter stays put. */}
+            <pre className="ep-code ep-dark-scroll m-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden whitespace-pre px-6 py-[1.7em] font-mono text-[#C8D3EA] [tab-size:2] max-[720px]:px-3.5">
               <code>
                 {current.lines.map(([text, type], i) =>
                   text === '\n' ? (
