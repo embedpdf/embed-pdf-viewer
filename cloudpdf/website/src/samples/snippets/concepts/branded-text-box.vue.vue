@@ -7,6 +7,9 @@ const { ref: editorRef, editing, style } = useRichTextEditor(() => props.annotat
 </script>
 
 <template>
-  <!-- The element fills its frame (`width` and `height` 100% in your CSS). -->
-  <div :ref="editorRef" :class="['text-box', { editing }]" :style="style" />
+  <!-- The box fills its frame (`width` and `height` 100% in your CSS) and draws it; the
+       editor inside fills the box. -->
+  <div :class="['text-box', { editing }]">
+    <div :ref="editorRef" :style="style" />
+  </div>
 </template>

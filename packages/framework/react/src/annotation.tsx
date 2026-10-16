@@ -68,12 +68,14 @@ import {
   editingTextKeyOf,
   enrichCommentThreads,
   frameInPixels,
+  freeTextBoxOf,
   ghostOpacity,
   installFilePickerProvider,
   layerTextBoxesOf,
   loadAppearanceUrls,
   loadObjectUrl,
   lookFrameOf,
+  ownTextBoxOf,
   pickRequestedFile,
   pictureOrPainting,
   rasterInFrame,
@@ -84,8 +86,6 @@ import {
   shownAppearance,
   svgShapesOf,
   textBoxEditorScaleOf,
-  textBoxStyleOf,
-  textPlateInPixels,
   type AnnotationChromePaint,
   type AppearanceUrl,
   type FrameFraction,
@@ -651,46 +651,21 @@ function useTextBoxEditor(
 
 /** A free text annotation: the same styled element for reading and typing. */
 function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
-  // The element is the engine's text plate: the box inset by its padding.
-  const plate = textPlateInPixels(item, page.transform);
-  const ref = useTextBoxEditor(item, plate.scale);
   const { painted } = useChromePaint();
-  return (
-    <div
-      ref={ref}
-      suppressContentEditableWarning
-      style={{
-        position: 'absolute',
-        left: plate.left,
-        top: plate.top,
-        width: plate.width,
-        // Fixed to the plate: the box never grows with its text; it scrolls
-        // while typing and clips otherwise, where the baked /AP clips.
-        height: plate.height,
-        ...textBoxStyleOf(item.css, plate.scale),
-        boxSizing: 'border-box',
-        // The box's fill and border are the vector scene's, under this layer.
-        background: 'transparent',
-        whiteSpace: 'pre-wrap',
-        overflowWrap: 'break-word',
-        overflowY: item.editing ? 'auto' : 'hidden',
-        overflowX: 'hidden',
-        outline: item.editing ? `1px solid ${painted.textOutline}` : 'none',
-        cursor: item.editing ? 'text' : 'default',
-        // A plain text box turns about its centre, as the baked /AP does.
-        ...(item.rot ? { transform: `rotate(${item.rot}deg)`, transformOrigin: 'center' } : {}),
-        // Not typing: clicks fall through to the shapes (select, move, resize).
-        pointerEvents: item.editing ? 'auto' : 'none',
-      }}
-    />
-  );
+  // On the engine's text plate (the box inset by its padding), laid out at a legible size.
+  const box = freeTextBoxOf(item, page.transform, painted.textOutline);
+  const ref = useTextBoxEditor(item, box.scale);
+  return <div ref={ref} suppressContentEditableWarning style={box.style} />;
 }
 
 /** What `useRichTextEditor()` gives the element you draw a text box with. */
 export interface RichTextEditor {
   /** Put it on your element: it becomes the editor. */
   ref: (element: HTMLElement | null) => void;
-  /** The box's body style as CSS: font, size, color and alignment. While typing it takes the pointer too. */
+  /**
+   * The box's body style as CSS (font, size, color and alignment), filling the element's parent
+   * at a legible size: draw the box's frame on the parent. While typing it takes the pointer too.
+   */
   style: React.CSSProperties;
   /** True while someone types in the box. */
   editing: boolean;
@@ -721,16 +696,9 @@ export function useRichTextEditor(annotation: Annotation): RichTextEditor {
   // Pixels per point where the element is: inside a scaled look, at the
   // annotation's 100% size; the look's scale does the rest.
   const scale = textBoxEditorScaleOf(item, page.transform, React.useContext(LookScaleContext));
-  const ref = useTextBoxEditor(item, scale);
-  // While typing, the element takes the pointer (the caret, a drag over words).
-  const style = React.useMemo<React.CSSProperties>(
-    () =>
-      item
-        ? { ...textBoxStyleOf(item.css, scale), ...(item.editing ? { pointerEvents: 'auto' } : {}) }
-        : NO_STYLE,
-    [item, scale],
-  );
-  return { ref, style, editing: item?.editing ?? false };
+  const own = React.useMemo(() => (item ? ownTextBoxOf(item, scale) : null), [item, scale]);
+  const ref = useTextBoxEditor(item, own?.scale ?? scale);
+  return { ref, style: own?.style ?? NO_STYLE, editing: item?.editing ?? false };
 }
 
 // ── renderers that take the pointer ──────────────────────────────────────────

@@ -108,8 +108,24 @@ export type TextFieldStyle = FieldTextStyle & {
 };
 
 /**
- * A text field's editor style. A font size of 0 means "fit the box" in PDF:
- * the box height for one line, Acrobat's 12 pt for several.
+ * The size of a text field's text in pixels at `frame`. A font size of 0 means "fit the box" in
+ * PDF: the box height for one line, Acrobat's 12 pt for several.
+ */
+export function textFieldFontPxOf(
+  field: { box: { width: number }; look: FieldLook; multiline: boolean },
+  frame: PixelRect,
+): number {
+  const scale = scaleOf(field, frame);
+  return field.look.fontSize
+    ? field.look.fontSize * scale
+    : field.multiline
+      ? 12 * scale
+      : Math.max(6, frame.height * 0.72);
+}
+
+/**
+ * A text field's editor style at `frame`, with its lengths `legible` times bigger for an editor
+ * laid out at a legible size (`legible-text.ts`).
  */
 export function textFieldStyleOf(
   field: {
@@ -121,21 +137,16 @@ export function textFieldStyleOf(
   },
   frame: PixelRect,
   colors: FormColors,
+  legible = 1,
 ): TextFieldStyle {
-  const scale = scaleOf(field, frame);
-  const fontSize = field.look.fontSize
-    ? field.look.fontSize * scale
-    : field.multiline
-      ? 12 * scale
-      : Math.max(6, frame.height * 0.72);
   return {
     ...cssFontOf(field.look.fontFamily),
-    fontSize: `${fontSize}px`,
+    fontSize: `${textFieldFontPxOf(field, frame) * legible}px`,
     textAlign: field.look.textAlign,
     color: field.look.color ?? colors.text,
     background: field.look.background ?? colors.background,
     ...(field.comb && field.maxLength
-      ? { letterSpacing: `${frame.width / field.maxLength / 2}px` }
+      ? { letterSpacing: `${(frame.width / field.maxLength / 2) * legible}px` }
       : {}),
   };
 }

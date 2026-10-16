@@ -189,19 +189,23 @@ export type {
 export {
   attachTextBoxEditor,
   createTextBoxEditorFollower,
+  freeTextBoxOf,
+  ownTextBoxOf,
   textBoxEditorScaleOf,
-  textBoxStyleOf,
-  textPlateInPixels,
 } from './text-box-editor';
 export type {
+  FreeTextBox,
+  FreeTextBoxStyle,
+  OwnTextBox,
+  OwnTextBoxStyle,
   TextBoxCss,
   TextBoxEditor,
   TextBoxEditorAnnotation,
   TextBoxEditorFollower,
   TextBoxEditorItem,
   TextBoxStyle,
-  TextPlatePixels,
 } from './text-box-editor';
+export { LEGIBLE_FONT_PX, legibleScaleOf, legibleShrinkOf } from './legible-text';
 export {
   annotationDrawingOf,
   editingTextKeyOf,
@@ -244,6 +248,7 @@ export {
   listBoxStyleOf,
   pressToggle,
   showSelectedOptions,
+  textFieldFontPxOf,
   textFieldStyleOf,
 } from './form-field';
 export type {

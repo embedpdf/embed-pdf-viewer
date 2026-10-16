@@ -6,9 +6,8 @@
   const editor = useRichTextEditor(() => annotation);
 </script>
 
-<!-- The element fills its frame (`width` and `height` 100% in your CSS). -->
-<div
-  {@attach editor.attach}
-  class={['text-box', editor.editing && 'editing']}
-  style={editor.style}
-></div>
+<!-- The box fills its frame (`width` and `height` 100% in your CSS) and draws it; the editor
+     inside fills the box. -->
+<div class={['text-box', editor.editing && 'editing']}>
+  <div {@attach editor.attach} style={editor.style}></div>
+</div>

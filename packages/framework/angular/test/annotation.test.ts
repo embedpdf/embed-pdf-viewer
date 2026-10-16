@@ -526,7 +526,7 @@ async function openEditor() {
     else editor.textContent = text;
     editor.dispatchEvent(new Event('input', { bubbles: true }));
   };
-  return { annotation, ref: freeText.ref, writes, type };
+  return { annotation, ref: freeText.ref, writes, type, editor };
 }
 
 describe('typing in a free text box', () => {
@@ -540,6 +540,21 @@ describe('typing in a free text box', () => {
     await vi.waitFor(() => expect(writes).toHaveLength(1), { timeout: 5_000 });
     expect(annotation.get(ref)!.contents).toContain('Typed text');
     expect(annotation.isPending(ref)).toBe(false);
+  }, 45_000);
+
+  it('lays the box out with the shared style, and leaves the editor’s own styles', async () => {
+    const { annotation, editor } = await openEditor();
+    expect(editor.style.position).toBe('absolute');
+    expect(editor.style.transformOrigin).toBe('0 0');
+    expect(editor.style.pointerEvents).toBe('auto');
+    const lineHeight = editor.style.lineHeight;
+    expect(lineHeight).not.toBe('');
+    editor.style.setProperty('--set-elsewhere', 'kept');
+    // Ending the edit restyles the box: the binding sets its own properties and no others.
+    await annotation.text.end();
+    await vi.waitFor(() => expect(editor.style.pointerEvents).toBe('none'));
+    expect(editor.style.lineHeight).toBe(lineHeight);
+    expect(editor.style.getPropertyValue('--set-elsewhere')).toBe('kept');
   }, 45_000);
 
   it('ending the edit writes what was typed at once', async () => {

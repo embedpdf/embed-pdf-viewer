@@ -54,7 +54,15 @@ describe('textFieldEditorStyleOf', () => {
 
   it('shows the field’s text with a focus ring while focused', () => {
     expect(textFieldEditorStyleOf(field, frame, colors, true)).toEqual({
-      ...FORM_CONTROL_FILL,
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      width: '100%',
+      height: '100%',
+      boxSizing: 'border-box',
+      margin: '0',
+      transform: 'none',
+      transformOrigin: '0 0',
       border: 'none',
       outline: '2px solid F',
       outlineOffset: '-2px',
@@ -105,6 +113,45 @@ describe('textFieldEditorStyleOf', () => {
         comb: true,
       }),
     ).toMatchObject({ letterSpacing: '36px', textAlign: 'left', padding: '2px 4px 2px 16px' });
+  });
+
+  it('lays small text out at 16 px, and draws the editor back at the box’s size', () => {
+    // 4 pt at 2 px per point is 8 px on the page: laid out twice as big, drawn at half.
+    const small = { ...field, look: { ...look, fontSize: 4 } };
+    expect(textFieldEditorStyleOf(small, frame, colors, true)).toMatchObject({
+      width: '200%',
+      height: '200%',
+      transform: 'scale(0.5)',
+      transformOrigin: '0 0',
+      fontSize: '16px',
+      outline: '4px solid F',
+      outlineOffset: '-4px',
+      padding: '0 4px',
+    });
+    const layout = {
+      fontFamily: 'Helvetica',
+      fontWeight: 400,
+      fontStyle: 'normal' as const,
+      fontSize: 4,
+      lineHeight: 5,
+      padding: { top: 1, right: 2, bottom: 1, left: 2 },
+      letterSpacing: 0,
+      comb: false,
+    };
+    expect(textFieldEditorStyleOf(small, frame, colors, true, layout)).toMatchObject({
+      width: '200%',
+      fontSize: '16px',
+      lineHeight: '20px',
+      padding: '4px 8px 4px 8px',
+    });
+  });
+
+  it('reaches 16 px for a fitted field too, whatever its smallest size', () => {
+    // A one-line field fitted to an 8 px tall box writes at the 6 px floor.
+    const fitted = { ...field, look: { ...look, fontSize: 0 } };
+    const style = textFieldEditorStyleOf(fitted, { ...frame, height: 8 }, colors, true);
+    expect(parseFloat(style.fontSize)).toBeCloseTo(16);
+    expect(parseFloat(style.width)).toBeCloseTo((100 * 16) / 6);
   });
 
   it('is see-through at rest, and lets the pointer through when disabled', () => {

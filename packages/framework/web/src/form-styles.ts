@@ -8,8 +8,9 @@
  * `form-field` ({@link textFieldStyleOf}, {@link listBoxStyleOf}); its colors
  * from the form settings ({@link formColorsOf}).
  */
-import { listBoxStyleOf, scaleOf, textFieldStyleOf } from './form-field';
+import { listBoxStyleOf, scaleOf, textFieldFontPxOf, textFieldStyleOf } from './form-field';
 import type { FieldLook, FormColors, ListBoxStyle, TextFieldStyle } from './form-field';
+import { legibleScaleOf, legibleShrinkOf } from './legible-text';
 import type { PixelRect } from './page-pixels';
 
 /** A control that fills the widget's box it sits in: every native control the layer draws. */
@@ -84,21 +85,31 @@ export interface TextEditorLayout {
 }
 
 /** A text field's editor: see-through at rest, the field's own look while focused. */
-export type TextFieldEditorStyle = FormControlFill &
-  TextFieldStyle & {
-    border: 'none';
-    outline: string;
-    outlineOffset: string;
-    padding: string;
-    /** In pixels, with its unit: one line of the engine's layout. */
-    lineHeight?: string;
-    resize: 'none';
-    cursor: 'text';
-    /** 1 while focused, 0 at rest, where the field's picture shows through. */
-    opacity: number;
-    /** `none` for a disabled field: the box below runs the widget's action. */
-    pointerEvents?: 'none';
-  };
+export type TextFieldEditorStyle = TextFieldStyle & {
+  position: 'absolute';
+  left: '0';
+  top: '0';
+  /** The widget's box times the editor's legible scale, in percent with its unit. */
+  width: string;
+  height: string;
+  boxSizing: 'border-box';
+  margin: '0';
+  /** Draws the editor, laid out at a legible size, at the size of the widget's box. */
+  transform: string;
+  transformOrigin: '0 0';
+  border: 'none';
+  outline: string;
+  outlineOffset: string;
+  padding: string;
+  /** In pixels, with its unit: one line of the engine's layout. */
+  lineHeight?: string;
+  resize: 'none';
+  cursor: 'text';
+  /** 1 while focused, 0 at rest, where the field's picture shows through. */
+  opacity: number;
+  /** `none` for a disabled field: the box below runs the widget's action. */
+  pointerEvents?: 'none';
+};
 
 /**
  * The style of a text field's editor, the `<input>` or `<textarea>` that is
@@ -106,6 +117,9 @@ export type TextFieldEditorStyle = FormControlFill &
  * focus ring; at rest it is see-through over the field's picture. A disabled
  * control would swallow clicks, and the box below runs the widget's action
  * (the read-only "button" pattern), so a disabled one lets them through.
+ *
+ * It fills the widget's box, laid out at a legible size and drawn back at the
+ * box's (`legible-text.ts`), so iOS doesn't zoom the page in when it takes focus.
  *
  * With the engine's `layout` of the text being typed, the editor writes it
  * where the engine will draw it: in the engine's face (mounted), at the size
@@ -120,14 +134,26 @@ export function textFieldEditorStyleOf(
   layout: TextEditorLayout | null = null,
 ): TextFieldEditorStyle {
   const scale = scaleOf(field, frame);
-  const pixels = (points: number) => `${points * scale}px`;
+  const legible = legibleScaleOf(
+    layout ? layout.fontSize * scale : textFieldFontPxOf(field, frame),
+  );
+  const px = (pixels: number) => `${pixels * legible}px`;
+  const pixels = (points: number) => px(points * scale);
   return {
-    ...FORM_CONTROL_FILL,
+    position: 'absolute',
+    left: '0',
+    top: '0',
+    width: `${100 * legible}%`,
+    height: `${100 * legible}%`,
+    boxSizing: 'border-box',
+    margin: '0',
+    transform: legibleShrinkOf(legible) ?? 'none',
+    transformOrigin: '0 0',
     border: 'none',
-    outline: focused ? `2px solid ${colors.focus}` : 'none',
-    outlineOffset: '-2px',
-    padding: '0 2px',
-    ...textFieldStyleOf(field, frame, colors),
+    outline: focused ? `${px(2)} solid ${colors.focus}` : 'none',
+    outlineOffset: px(-2),
+    padding: `0 ${px(2)}`,
+    ...textFieldStyleOf(field, frame, colors, legible),
     ...(layout
       ? {
           fontFamily: layout.fontFamily,
