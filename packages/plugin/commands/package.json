@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-commands",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.16",
   "private": false,
   "description": "The commands: one name per action of the viewer, with its label, icon, state and shortcut, which toolbars, menus, a command palette and the keyboard all show and run. A command's state is read from live state, so every reader follows the kernel's one change stream. `/standard` has the commands every viewer has.",
   "type": "module",

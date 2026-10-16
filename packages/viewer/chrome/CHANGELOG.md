@@ -1,5 +1,13 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.16
+
+### Patch Changes
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – With a finger as the main way of pointing, the viewer's own fields (search, the page number, comments, signatures and the rest) write in 16 px text, so iOS Safari doesn't zoom the page in when one takes focus.
+
+- [#872](https://github.com/embedpdf/embed-pdf-viewer/pull/872) by [@bobsingor](https://github.com/bobsingor) – Fix sheets on a phone: a menu or panel sheet slides straight up from the bottom of the viewer instead of landing too high and dropping into place, and the whole viewer stays dimmed behind it while it slides in or is dragged. Dragging a sheet's handle down fades the dimming with it, and the dimming returns when the sheet is let go at rest.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

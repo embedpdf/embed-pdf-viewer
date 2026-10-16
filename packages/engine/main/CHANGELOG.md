@@ -1,5 +1,11 @@
 # @embedpdf/engine
 
+## 3.0.0-next.16
+
+### Patch Changes
+
+- [#878](https://github.com/embedpdf/embed-pdf-viewer/pull/878) by [@bobsingor](https://github.com/bobsingor) – The local engine no longer stalls when a call that every job waits for, such as `engine.fonts.register()`, is queued while a page read runs: a running read now gives way only to work that is more urgent than what waits behind it, so every queued call still gets its answer.
+
 ## 3.0.0-next.15
 
 ### Minor Changes
