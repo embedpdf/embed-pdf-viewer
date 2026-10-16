@@ -16,7 +16,7 @@
 
 import type { PdfBits } from '../../auth/scope';
 import type { LayerScopePlane, LayerScopes } from '../../dto/LayerScopes';
-import { PAGE_RENDER_FAMILIES } from '../renderFamilies';
+import { PAGE_PICTURES } from '../renderFamilies';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../resources';
 
 /**
@@ -70,10 +70,8 @@ export interface CdnCoverageEntry {
  * as every edge grant.
  */
 const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>> = {
-  'page-render': PAGE_RENDER_FAMILIES.pages.planes,
-  'page-render-annotations': PAGE_RENDER_FAMILIES.annotations.planes,
-  'page-render-fields': PAGE_RENDER_FAMILIES.fields.planes,
-  'page-render-all': PAGE_RENDER_FAMILIES.all.planes,
+  // Every page picture, screen and print, from the one table.
+  ...Object.fromEntries(PAGE_PICTURES.map((picture) => [picture.resource, picture.planes])),
   'page-text': ['content'],
   'page-geometry': ['content'],
   'page-annotations': ['annotations'],

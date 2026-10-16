@@ -22,6 +22,7 @@ import {
   fieldRightsOf,
   type Identity,
   type PageLayerRights,
+  type PagePrintRights,
   type PasswordPrompt,
   passwordPromptFromState,
   protectedCapabilities,
@@ -86,6 +87,18 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     return {
       annotations: this.allows('doc.annotate.read'),
       formFields: this.allows('doc.forms.read'),
+    };
+  }
+
+  /**
+   * What the caller may print, when the client can know it (as for
+   * {@link pageLayerRights}). Null leaves it to the server.
+   */
+  pagePrintRights(): PagePrintRights | null {
+    if (!this.access && !this.tokenHasDocScope) return null;
+    return {
+      print: this.allows('doc.print'),
+      printHigh: this.allows('doc.print.high'),
     };
   }
 

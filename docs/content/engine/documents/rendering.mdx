@@ -137,7 +137,7 @@ The page is drawn on white. For a transparent background, pass `background: 'tra
 PNG or WebP.
 
 Annotations are drawn on the page, form fields included, each in the state it shows: the page as
-it is printed. To draw the page without them, when you draw annotations yourself, pass
+it is shown on screen. To draw the page without them, when you draw annotations yourself, pass
 `includeAnnotations: false`:
 
 ```ts
@@ -158,14 +158,60 @@ them:
 await page.render.image({ includeAnnotations: false, includeFormFields: true });
 ```
 
-Hidden form fields are never drawn, and fields marked not to show on screen are drawn only when
-printing.
+Hidden form fields are never drawn, and fields marked not to show on screen are drawn only in a
+[print picture](#print-pictures).
 
 The picture holds only what the user may read. Left out, `includeAnnotations` draws the
 annotations when the user may read them (`doc.annotate.read`), and `includeFormFields` the form
 fields when they may read the form (`doc.forms.read`). So someone who may fill a form but not read
 its comments gets a picture without the comments. Asking for annotations or fields the user may
 not read fails with `Forbidden`, naming the option.
+
+## Print pictures
+
+A picture for paper follows the print rules instead of the screen's. Pass `usage: 'print'`, and
+size it with a `dpi` viewport:
+
+```ts
+const image = await page.render.image({
+  usage: 'print',
+  viewport: { kind: 'dpi', dpi: 300 },
+  format: 'png',
+});
+```
+
+What changes on paper:
+
+- **Layers take their print state.** A watermark set to show only when printing is drawn, and a
+  layer set to show only on screen is not.
+- **Annotations and form fields are drawn by their `print` flag.** One that doesn't print is left
+  out, even when it shows on screen, such as a Print or Submit button marked "visible but doesn't
+  print". One that is hidden on screen but prints (`noView`) is drawn. Hidden ones never are.
+
+`dpi` is `150` or `300`, in dots per inch of the paper the page prints on, A4 or Letter. A page
+that fits on that paper is drawn at its own size at that DPI. A bigger one gets no more pixels than
+it needs shrunk to fit the paper, since the printer would throw the rest away: an A0 drawing at
+300 DPI is 2482 × 3508 pixels, not 9933 × 14043.
+
+A print picture is always the whole page, upright, on white. It takes only a `dpi` viewport, and
+no `target`, `rotation` or `background`; a `dpi` viewport is only for print pictures. Anything else
+fails with `InvalidArg`. `includeAnnotations` and `includeFormFields` work as for any picture.
+
+`pageTransform()` gives a print picture's size and transform without rendering:
+
+```ts
+const { width, height } = pageTransform(pages[0], { viewport: { kind: 'dpi', dpi: 150 } });
+```
+
+Printing needs `doc.print`, and 300 DPI also `doc.print.high`: the PDF's permission to print at
+full quality. Without them the call fails with `Forbidden`.
+
+<Engine cloud>
+
+Each print picture has an address of its own for each DPI, so a CDN only serves the 300 DPI
+pictures to sessions that may print at full quality.
+
+</Engine>
 
 ## Part of a page
 
@@ -300,22 +346,23 @@ milliseconds, so the renders waiting behind it start right away. See
 
 ## Options
 
-| Option               | What it does                                                        | Default                 |
-| :------------------- | :------------------------------------------------------------------ | :---------------------- |
-| `viewport`           | `{ kind: 'width', width }` in pixels, or `{ kind: 'scale', scale }` | scale `1`               |
-| `rotation`           | Turns the image clockwise: `0`, `90`, `180` or `270`                | `0`                     |
-| `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality)) | see above               |
-| `quality`            | WebP quality, from `0` to `1`                                       | encoder default         |
-| `background`         | `'white'` or `'transparent'`                                        | `'white'`               |
-| `includeAnnotations` | Draw the page's annotations                                         | `true` when the user may read them |
-| `includeFormFields`  | Draw the form fields too                                            | `false` without annotations; else `true` when the user may read the form |
-| `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area        | the whole page          |
+| Option               | What it does                                                                                                    | Default                                                                  |
+| :------------------- | :-------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------- |
+| `viewport`           | `{ kind: 'width', width }` in pixels, or `{ kind: 'scale', scale }`; `{ kind: 'dpi', dpi }` for a print picture | scale `1`                                                                |
+| `rotation`           | Turns the image clockwise: `0`, `90`, `180` or `270`                                                            | `0`                                                                      |
+| `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality))                                             | see above                                                                |
+| `quality`            | WebP quality, from `0` to `1`                                                                                   | encoder default                                                          |
+| `background`         | `'white'` or `'transparent'`                                                                                    | `'white'`                                                                |
+| `includeAnnotations` | Draw the page's annotations                                                                                     | `true` when the user may read them                                       |
+| `includeFormFields`  | Draw the form fields too                                                                                        | `false` without annotations; else `true` when the user may read the form |
+| `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area                                                    | the whole page                                                           |
+| `usage`              | `'display'`, or `'print'` for a [print picture](#print-pictures)                                                | `'display'`                                                              |
 
 ## Permissions
 
 Rendering needs the `doc.render` permission. Without it, the call fails with `Forbidden`. A
 picture with annotations also needs `doc.annotate.read`, and one with form fields
-`doc.forms.read`.
+`doc.forms.read`. A print picture also needs `doc.print`, and at 300 DPI `doc.print.high`.
 
 ## Good to know
 

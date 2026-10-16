@@ -3,6 +3,7 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageRenderTransform } from '../geometry/pageTransform';
 import type { PdfRotation } from '../geometry/primitives';
+import type { PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
@@ -55,7 +56,74 @@ export function resolvePageLayers(
   };
 }
 
-export type PageRenderViewport =
+/**
+ * The two print resolutions, one per print right: 150 for `doc.print`, 300
+ * for `doc.print.high` (Acrobat's low and high resolution printing).
+ */
+export type PrintDpi = 150 | 300;
+
+/** What a caller may print, for {@link checkRenderUsage}. */
+export interface PagePrintRights {
+  /** `doc.print`. */
+  readonly print: boolean;
+  /** `doc.print.high`. */
+  readonly printHigh: boolean;
+}
+
+/**
+ * Check what a render is for. A print picture (`usage: 'print'`) takes a
+ * `{ kind: 'dpi', dpi }` viewport with a DPI of 150 or 300, and no `target`,
+ * `rotation` or `background`: it is the whole page, upright, on white. A
+ * `dpi` viewport is for print pictures only. Anything else is `InvalidArg`,
+ * naming the option. With the caller's rights, a print they may not make is
+ * refused (`PermissionDenied`): any print without `doc.print`, 300 DPI
+ * without `doc.print.high`. Without them (a cloud caller whose rights the
+ * client can't know), the server decides.
+ */
+export function checkRenderUsage<C extends Coordinates>(
+  options:
+    | Pick<PageRenderOptions<C>, 'usage' | 'viewport' | 'target' | 'rotation' | 'background'>
+    | undefined,
+  may: PagePrintRights | null,
+): void {
+  const { usage, viewport } = options ?? {};
+  if (usage === undefined || usage === 'display') {
+    if (viewport?.kind === 'dpi') {
+      invalid('viewport', 'a dpi viewport is only for a print picture (usage: "print")');
+    }
+    return;
+  }
+  if (usage !== 'print') invalid('usage', 'usage must be "display" or "print"');
+  if (viewport?.kind !== 'dpi' || (viewport.dpi !== 150 && viewport.dpi !== 300)) {
+    invalid('viewport', "a print picture needs viewport: { kind: 'dpi', dpi: 150 or 300 }");
+  }
+  for (const field of ['target', 'rotation', 'background'] as const) {
+    if (options?.[field] !== undefined) {
+      invalid(field, `a print picture takes no ${field}: it is the whole page, upright, on white`);
+    }
+  }
+  if (may === null) return;
+  if (!may.print) throw new PermissionDenied('doc.print', 'usage');
+  if (viewport.dpi === 300 && !may.printHigh) {
+    throw new PermissionDenied('doc.print.high', 'viewport');
+  }
+}
+
+/** A print picture's DPI: its viewport's, when it is one; otherwise `undefined`. */
+export function printDpiOf(
+  options: Pick<PageRenderOptions, 'usage' | 'viewport'> | undefined,
+): PrintDpi | undefined {
+  return options?.usage === 'print' && options.viewport?.kind === 'dpi'
+    ? options.viewport.dpi
+    : undefined;
+}
+
+function invalid(field: string, message: string): never {
+  throw new EngineError(EngineErrorCode.InvalidArg, message, { details: { field } });
+}
+
+/** A screen picture's size: by its scale, or by its width. */
+export type PageScreenViewport =
   | {
       /**
        * Render one point as `scale` device pixels. Callers
@@ -71,6 +139,23 @@ export type PageRenderViewport =
        */
       kind: 'width';
       width: number;
+    };
+
+/** A picture's size: a screen size, or a print picture's DPI. */
+export type PageRenderViewport =
+  | PageScreenViewport
+  | {
+      /**
+       * A print picture's size (`usage: 'print'` only): `dpi` dots per inch
+       * of the paper the page prints on, A4 or Letter. A page that fits on
+       * that paper is drawn at its own size at this DPI. A bigger one gets
+       * no more pixels than it needs shrunk to fit the paper, since the
+       * printer would throw the rest away: an A0 drawing at 300 DPI is
+       * 2482 × 3508 pixels, not 9933 × 14043. 150 needs `doc.print`, 300
+       * `doc.print.high`.
+       */
+      kind: 'dpi';
+      dpi: PrintDpi;
     };
 
 export type PageRenderTarget<C extends Coordinates = PageCoordinates> =
@@ -104,6 +189,15 @@ export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
    * printing.
    */
   includeFormFields?: boolean;
+  /**
+   * What the picture is for: the screen (`'display'`, the default) or paper
+   * (`'print'`). A print picture follows the print rules: layers in their
+   * print state, and only the annotations and form fields with the `print`
+   * flag (no-view ones included, hidden ones never). It needs `doc.print`
+   * and a `{ kind: 'dpi', dpi }` viewport, and takes no `target`,
+   * `rotation` or `background`.
+   */
+  usage?: PageFlattenUsage;
   /**
    * Output-pixel budget: the renderer rejects (InvalidArg) instead of
    * allocating when `outputWidth × outputHeight` exceeds it. A width

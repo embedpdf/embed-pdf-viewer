@@ -158,6 +158,7 @@ export type {
   SearchSnippet,
   PageRenderOptions,
   PageImageOptions,
+  PrintDpi,
   PageImageHandle,
   ImageSource,
   PageRaster,

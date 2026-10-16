@@ -71,6 +71,12 @@ export {
   type PageRenderConformanceOptions,
 } from './conformance/runPageRenderConformance';
 export {
+  PRINT_RULES_PDF,
+  PRINT_SCOPES,
+  runPrintRenderConformance,
+  type PrintRenderConformanceOptions,
+} from './conformance/runPrintRenderConformance';
+export {
   runPageSpaceConformance,
   type PageSpaceConformanceOptions,
 } from './conformance/runPageSpaceConformance';

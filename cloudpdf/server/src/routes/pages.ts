@@ -32,11 +32,11 @@ import {
   PageNetworkRenderFormatSchema,
   PageRemoveNameInputSchema,
   PageRotateInputSchema,
-  PAGE_RENDER_FAMILIES,
-  PageRenderQuerySchemas,
+  PAGE_PICTURES,
+  pagePictureQuerySchema,
   unflatten,
   type ManifestPage,
-  type PageRenderFamily,
+  type PageRenderFamilySpec,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -151,9 +151,10 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     });
   });
 
-  // The page pictures, one family per path (`PAGE_RENDER_FAMILIES`): each
-  // needs its own rights and depends on its own planes, at both tiers.
-  for (const spec of Object.values(PAGE_RENDER_FAMILIES)) {
+  // The page pictures, one per path (`PAGE_PICTURES`): the four families on
+  // screen and each printed at each print tier. Each needs its own rights
+  // and depends on its own planes, at the document's path and a layer's.
+  for (const spec of PAGE_PICTURES) {
     const route = `/v1/docs/:docId/${spec.path}/:pageKey/data`;
     const render = async (
       req: FastifyRequest,
@@ -176,7 +177,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         reply,
         signal: abortSignalOf(reply),
         scope: { kind: 'base', ctx, docId },
-        family: spec.family,
+        picture: spec,
         pageObjectNumber: resolvePageKeyParam(pageKey),
         ...(token !== undefined
           ? { tokenQuery: parseTokenOrInvalidArg(decodeRenderToken, token, 'render token') }
@@ -272,7 +273,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     });
   });
 
-  for (const spec of Object.values(PAGE_RENDER_FAMILIES)) {
+  for (const spec of PAGE_PICTURES) {
     const route = `/v1/docs/:docId/layers/:layerName/${spec.path}/:pageKey/data`;
     const render = async (
       req: FastifyRequest,
@@ -295,7 +296,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         reply,
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
-        family: spec.family,
+        picture: spec,
         pageObjectNumber: resolvePageKeyParam(pageKey),
         ...(token !== undefined
           ? { tokenQuery: parseTokenOrInvalidArg(decodeRenderToken, token, 'render token') }
@@ -688,12 +689,12 @@ async function renderPageImage(input: {
   signal: AbortSignal;
   scope: ReadScope;
   /**
-   * The picture family this route belongs to (`PAGE_RENDER_FAMILIES`), at
-   * both the doc and layer tiers. The token says nothing of what the picture
-   * draws; the family's query schema takes exactly its own pins, so a
+   * The picture this route serves (`PAGE_PICTURES`), at both the doc and
+   * layer tiers. The token says nothing of what the picture draws or whether
+   * it prints; the picture's query schema takes exactly its own pins, so a
    * contradictory request fails the parse instead of needing a guard.
    */
-  family: PageRenderFamily;
+  picture: PageRenderFamilySpec;
   pageObjectNumber: number;
   tokenQuery?: Record<string, string>;
   query: unknown;
@@ -708,7 +709,7 @@ async function renderPageImage(input: {
   const flatInput = (input.tokenQuery ?? input.query) as Record<string, unknown>;
   const nested = unflatten(flatInput);
   const parsedQuery = parseOrInvalidArg(
-    PageRenderQuerySchemas[input.family],
+    pagePictureQuerySchema(input.picture),
     nested,
     input.tokenQuery === undefined ? 'render query' : 'render token',
   );
@@ -723,7 +724,7 @@ async function renderPageImage(input: {
   );
 
   // A versioned request carries every pin of its family; each must be current.
-  for (const pin of PAGE_RENDER_FAMILIES[input.family].pins) {
+  for (const pin of input.picture.pins) {
     const requested = parsedQuery[pin];
     if (requested === undefined || requested === page.cache[pin]) continue;
     setNoStore(input.reply);
@@ -737,14 +738,19 @@ async function renderPageImage(input: {
   // Lattice renders are durable: URL space == artifact space at canonical
   // points. Off-lattice tokens are rejected when enforcement is on (the
   // storage-DoS guard); until the SDK ships its `snap` helper they fall
-  // through to the legacy compute-only path below.
+  // through to the legacy compute-only path below. A print picture has one
+  // size per page and tier, off the lattice: it is never classified, so
+  // never stored or refused here, and its versioned URL is still cached.
   const derived = input.derivedRenders;
-  const classification = derived?.classify({
-    imageOptions,
-    format,
-    family: input.family,
-    pins: parsedQuery,
-  });
+  const classification =
+    input.picture.print === null
+      ? derived?.classify({
+          imageOptions,
+          format,
+          family: input.picture.family,
+          pins: parsedQuery,
+        })
+      : undefined;
   // Enforcement is scoped to full-page requests: rect targets belong to
   // the tile policy once advertised and stay compute-only until then;
   // otherwise flipping `enforce` would 400 every region render.
@@ -852,7 +858,7 @@ async function renderPageImage(input: {
             baseSha,
             input.pageObjectNumber,
             classification.canonicalToken,
-            input.family,
+            input.picture.family,
           )
         : derived.layerKey(
             input.scope.ctx.tenantId,
@@ -860,7 +866,7 @@ async function renderPageImage(input: {
             input.scope.layerName,
             input.pageObjectNumber,
             classification.canonicalToken,
-            input.family,
+            input.picture.family,
           );
     const artifact = await derived.getOrRender(
       key,

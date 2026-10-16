@@ -29,7 +29,14 @@ import {
   ImageResourceKeysSchema,
   SourceResourceKeysSchema,
 } from './resourceKeys';
-import { PAGE_RENDER_FAMILIES, type PageRenderFamily, type PageRenderPin } from './renderFamilies';
+import {
+  PAGE_PRINT_FAMILIES,
+  PAGE_RENDER_FAMILIES,
+  type PagePrintTier,
+  type PageRenderFamily,
+  type PageRenderFamilySpec,
+  type PageRenderPin,
+} from './renderFamilies';
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
@@ -802,22 +809,33 @@ const AppearanceModesSchema = z.string().transform((value, ctx) => {
  *   - a versioned request (one with `contentVersion`) carries every one of
  *     them, since the picture changes with each.
  *
- * The transform stamps what the family draws onto the parsed options, so
- * the worker options downstream need no family.
+ * A print picture (`PAGE_PRINT_FAMILIES`) takes only its pins and its image
+ * format: its path says what it draws and at which DPI, and its size comes
+ * from that and the paper, so a page has one print picture per family and
+ * tier.
+ *
+ * The transform stamps what the picture draws (and, for a print picture,
+ * `usage` and its `dpi` viewport) onto the parsed options, so the worker
+ * options downstream need no family.
  */
-function buildPageRenderQuerySchema(family: PageRenderFamily): z.ZodType<PageRenderQuery> {
-  const { draws, pins } = PAGE_RENDER_FAMILIES[family];
+function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<PageRenderQuery> {
+  const { family, draws, pins, print } = picture;
   const pinFields: Record<string, z.ZodTypeAny> = {};
   for (const pin of pins) pinFields[pin] = z.coerce.number().int().positive().optional();
+  const screenFields: Record<string, z.ZodTypeAny> = print
+    ? {}
+    : {
+        viewport: RenderViewportSchema.optional(),
+        target: RenderTargetSchema.optional(),
+        rotation: RenderRotationSchema.optional(),
+        background: RenderBackgroundSchema.optional(),
+      };
   return z
     .object({
       ...pinFields,
       format: PageNetworkRenderFormatSchema.optional(),
-      viewport: RenderViewportSchema.optional(),
-      target: RenderTargetSchema.optional(),
-      rotation: RenderRotationSchema.optional(),
-      background: RenderBackgroundSchema.optional(),
       quality: RenderQualitySchema.optional(),
+      ...screenFields,
     })
     .strict()
     .superRefine((v, ctx) => {
@@ -851,14 +869,18 @@ function buildPageRenderQuerySchema(family: PageRenderFamily): z.ZodType<PageRen
     })
     .transform((v) => {
       const pinned = v as Partial<Record<PageRenderPin, number>>;
+      const screen = v as Pick<PageImageOptions, 'target' | 'viewport' | 'rotation' | 'background'>;
       const options: PageImageOptions = {
-        ...(v.target ? { target: v.target } : {}),
-        ...(v.viewport ? { viewport: v.viewport } : {}),
-        ...(v.rotation !== undefined ? { rotation: v.rotation } : {}),
-        ...(v.background !== undefined ? { background: v.background } : {}),
+        ...(screen.target ? { target: screen.target } : {}),
+        ...(screen.viewport ? { viewport: screen.viewport } : {}),
+        ...(screen.rotation !== undefined ? { rotation: screen.rotation } : {}),
+        ...(screen.background !== undefined ? { background: screen.background } : {}),
         ...(v.quality !== undefined ? { quality: v.quality } : {}),
         ...(v.format !== undefined ? { format: v.format } : {}),
         ...draws,
+        ...(print
+          ? { usage: 'print' as const, viewport: { kind: 'dpi' as const, dpi: print.dpi } }
+          : {}),
       };
       const query: PageRenderQuery = { options };
       for (const pin of pins) {
@@ -872,11 +894,36 @@ function buildPageRenderQuerySchema(family: PageRenderFamily): z.ZodType<PageRen
 export const PageRenderQuerySchemas: Readonly<
   Record<PageRenderFamily, z.ZodType<PageRenderQuery>>
 > = {
-  pages: buildPageRenderQuerySchema('pages'),
-  annotations: buildPageRenderQuerySchema('annotations'),
-  fields: buildPageRenderQuerySchema('fields'),
-  all: buildPageRenderQuerySchema('all'),
+  pages: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.pages),
+  annotations: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.annotations),
+  fields: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.fields),
+  all: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.all),
 };
+
+/** Query/token schemas of the print pictures, by tier and family. */
+export const PagePrintQuerySchemas: Readonly<
+  Record<PagePrintTier, Readonly<Record<PageRenderFamily, z.ZodType<PageRenderQuery>>>>
+> = {
+  print: {
+    pages: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES.print.pages),
+    annotations: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES.print.annotations),
+    fields: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES.print.fields),
+    all: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES.print.all),
+  },
+  'print-high': {
+    pages: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES['print-high'].pages),
+    annotations: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES['print-high'].annotations),
+    fields: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES['print-high'].fields),
+    all: buildPageRenderQuerySchema(PAGE_PRINT_FAMILIES['print-high'].all),
+  },
+};
+
+/** The query/token schema of `picture`, screen or print. */
+export function pagePictureQuerySchema(picture: PageRenderFamilySpec): z.ZodType<PageRenderQuery> {
+  return picture.print
+    ? PagePrintQuerySchemas[picture.print.tier][picture.family]
+    : PageRenderQuerySchemas[picture.family];
+}
 
 /**
  * Query/token schema of an appearance batch, keyed by `pin`. Mirrors
