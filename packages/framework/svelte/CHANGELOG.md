@@ -1,5 +1,11 @@
 # @embedpdf/svelte
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – Tapping a form field or editing a free text box on iOS no longer zooms the page in: their editors lay their text out at 16 px or more and draw it back at the page's size. `useRichTextEditor()`'s `style` now also makes your element fill its parent at that legible size, so draw the box's fill, border and padding on the parent: anything on the element itself scales with its text.
+
 ## 3.0.0-next.15
 
 ### Minor Changes
