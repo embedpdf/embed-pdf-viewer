@@ -4,7 +4,7 @@ import type {
   PageImageHandle,
   PageNetworkRenderFormat,
   PageRaster,
-  PageRenderViewport,
+  PageScreenViewport,
 } from './PageRender';
 import type { PdfRotation } from '../geometry/primitives';
 import { annotationKey } from '../identity/annotationKey';
@@ -58,7 +58,7 @@ export interface AnnotationAppearanceRenderOptions {
    * viewport makes them match it. `{ kind: 'width' }` is the width of the
    * whole (turned) page. Default `{ kind: 'scale', scale: 1 }`.
    */
-  viewport?: PageRenderViewport;
+  viewport?: PageScreenViewport;
   /** Page rotation in degrees clockwise. Default `0`. */
   rotation?: PdfRotation;
   /**

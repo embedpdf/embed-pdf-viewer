@@ -431,8 +431,8 @@ typing pauses (a hold), the ink tool waits for the next stroke of a drawing, a
 form field is written on blur. A hold (see [Pending changes](#pending-changes)) is
 how a change waits, and the kernel sends every open hold before a download
 itself. A write queue holds writes that are on their way.
-Before anything reads the whole file (`documents.download()`, `downloadLayer()`), the
-kernel settles the document (`packages/core/main/src/settle.ts`): it runs every
+Before anything reads the whole file (`documents.download()`, `downloadLayer()`), or draws
+its pages to print them (`documents.preparePrint()`, `print()`), the kernel settles the document (`packages/core/main/src/settle.ts`): it runs every
 flush plugins registered with `ctx.onSettle(flush)` and waits for them, so the
 file has everything the user sees.
 
@@ -444,8 +444,9 @@ file has everything the user sees.
 - A plugin whose queue carries document writes registers it:
   `ctx.onSettle(() => queue.idle())`. A queue whose operations read the file
   themselves is never registered: the actions plugin runs every download
-  inside its queue (`ctx.aroundDownload`, for the document's save actions),
-  and waiting for that queue would wait for itself.
+  inside its queue (`ctx.aroundDownload`, for the document's save actions,
+  and `ctx.aroundPrint`, for its print actions), and waiting for that queue
+  would wait for itself.
 - A failed flush is reported and does not stop the read: the file is then what
   the engine has.
 - The caller's `signal`, or the document closing, cancels the wait with

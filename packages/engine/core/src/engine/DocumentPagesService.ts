@@ -1,3 +1,4 @@
+import type { PageExtractOptions } from '../dto/PageExtract';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PdfRotation } from '../geometry/primitives';
 import type { PageRef } from '../identity/PageRef';
@@ -107,10 +108,18 @@ export interface DocumentPagesService {
    * resource. Gated by `doc.download` (it egresses content), not
    * `doc.pages.assemble`.
    *
+   * With `flatten`, the copy is the pages as they draw for its `usage`: the
+   * annotations and form fields painted in, nothing interactive left, layers
+   * in their state for `usage` (`{ usage: 'print' }` is a print copy). It
+   * takes `doc.download` or `doc.download.flattened`, and paints only what
+   * the caller may read; `includeAnnotations` and `includeFormFields` choose
+   * what it paints, and are refused without `flatten`. The copy keeps the
+   * document's title.
+   *
    * Required-parity, delivered: the local engine runs it in the worker,
    * the cloud engine as POST /pages/extract.
    */
-  extract(pages: PageRef[]): AbortablePromise<Uint8Array>;
+  extract(pages: PageRef[], options?: PageExtractOptions): AbortablePromise<Uint8Array>;
 
   /**
    * Insert every page of a standalone PDF (`bytes`) at `position`

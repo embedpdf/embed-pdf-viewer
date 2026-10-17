@@ -61,7 +61,7 @@ import type {
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
 import type { PageTransform } from '@embedpdf/core-geometry';
 import type { PageViewDemand } from '@embedpdf/plugin-render/contract';
-import { browserClock } from '@embedpdf/web';
+import { browserClock, browserPrinter } from '@embedpdf/web';
 import type { PageContext } from '@embedpdf/web';
 
 import { isDev } from './dev';
@@ -520,6 +520,7 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
         plugins: captured.plugins,
         settings: latestSettings.current,
         clock: browserClock(),
+        printer: browserPrinter(),
       });
     } catch (error) {
       setBoot({ phase: 'error', error }); // plan/graph errors surface, not throw mid-render

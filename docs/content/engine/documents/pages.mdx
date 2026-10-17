@@ -189,6 +189,27 @@ const bytes = await source.pages.extract([ref]);
 await target.pages.insert(bytes, 'start');
 ```
 
+### A copy as the pages print
+
+With `flatten`, the copy is the pages as they look: the annotations and form fields painted into
+the pages, and nothing left to click, fill in or edit. It takes the same options as
+[`flatten()`](#flatten-a-pages-annotations), so `{ usage: 'print' }` makes a copy for paper: only
+what prints is on it, and layers are in their print state. The document itself doesn't change.
+
+```ts
+const printable = await doc.pages.extract(refs, { flatten: { usage: 'print' } });
+```
+
+`includeAnnotations` and `includeFormFields` choose what's painted in. Each defaults to what the
+caller may read, as in a [page picture](/docs/engine/documents/rendering), and they only go with
+`flatten`:
+
+```ts
+await doc.pages.extract(refs, { flatten: { usage: 'print' }, includeAnnotations: false });
+```
+
+The copy keeps the document's title, so a print queue or a saved file has a name.
+
 ## Flatten a page's annotations
 
 Flattening draws a page's annotations into the page itself and removes them, so they can't be
@@ -201,12 +222,15 @@ const { results } = await doc.pages.flatten([page.ref]);
 
 Each page's `status` is `'applied'`, or `'unchanged'` when it had nothing to flatten. Flattening is
 all or nothing: when a page fails, or the call is cancelled, no page changes and the call rejects
-with the error. Hidden annotations, popups and annotations without an appearance stay as they are.
+with the error. Flattening paints what the page shows: an annotation without a stored appearance is
+painted as the engine draws it. Hidden annotations and popups stay as they are, and so do the few
+annotations the engine draws only from a stored appearance, such as a stamp without one.
 Flattening can't be undone, and it ends undo for every change made before it; see
 [Changes & undo](/docs/engine/documents/changes#what-cant-be-undone).
 
-By default the page is flattened as it's shown on screen. Pass `{ usage: 'print' }` to flatten it
-as it prints, which leaves out annotations that don't print:
+By default the page is flattened as it's shown on screen, which leaves out annotations shown only
+when printed. Pass `{ usage: 'print' }` to flatten it as it prints, which leaves out annotations that
+don't print:
 
 ```ts
 await doc.pages.flatten([page.ref], { usage: 'print' });
@@ -225,6 +249,7 @@ To flatten only some annotations, see
 | `list()`                                                         | `doc.open`                                   |
 | `rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()` | `doc.pages.assemble`                         |
 | `extract()`                                                      | `doc.download`: the pages leave the document |
+| `extract()` with `flatten`                                       | `doc.download` or `doc.download.flattened`   |
 | `flatten()`                                                      | `doc.pages.modify` and `doc.annotate.modify` |
 
 See [Permissions](/docs/engine/concepts/permissions).

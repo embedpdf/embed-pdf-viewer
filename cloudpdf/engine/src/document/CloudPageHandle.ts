@@ -1,6 +1,7 @@
 import type {
   PageHandle,
   PageLayerRights,
+  PagePrintRights,
   PageLayout,
   PageRef,
   SessionEventPublisher,
@@ -39,6 +40,7 @@ export class CloudPageHandle implements PageHandle {
     writes: CloudWrites,
     layout: (signal: AbortSignal) => Promise<PageLayout>,
     layerRights: () => PageLayerRights | null,
+    printRights: () => PagePrintRights | null,
   ) {
     this.measure = new CloudPageMeasureService(
       http,
@@ -71,6 +73,7 @@ export class CloudPageHandle implements PageHandle {
       manifest,
       layout,
       layerRights,
+      printRights,
     );
   }
 }

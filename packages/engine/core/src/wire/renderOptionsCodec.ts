@@ -27,8 +27,9 @@ export interface RenderVersions {
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * What the picture draws is never in the token: the caller picks the
- * family's path (`PAGE_RENDER_FAMILIES`) and passes that family's pins.
+ * What the picture draws, and whether and at which DPI it prints, is never
+ * in the token: the caller picks the picture's path (`PAGE_RENDER_FAMILIES`,
+ * `PAGE_PRINT_FAMILIES`) and passes that family's pins.
  * Each family's query schema checks its own pins when the URL is decoded
  * server-side. Round-tripping (flatten → encode → decode → unflatten →
  * schema parse) recovers the original SDK options.
@@ -40,9 +41,13 @@ export function renderImageOptionsToWire(
   const {
     includeAnnotations: _inThePath,
     includeFormFields: _alsoInThePath,
+    usage,
+    viewport,
     ...wireOptions
   } = options;
-  return flatten({ ...wireOptions, ...versions });
+  // A print picture's size is its tier, which is its path too.
+  const sized = usage === 'print' || viewport === undefined ? {} : { viewport };
+  return flatten({ ...wireOptions, ...sized, ...versions });
 }
 
 /**
@@ -58,8 +63,9 @@ export function renderImageOptionsToToken(
 
 /**
  * The worker-side `PageRenderOptions` of a parsed picture request: the
- * render options, and what its family draws (stamped by the family's query
- * schema). Pure shape transform; image encoding stays out.
+ * render options, and what its family draws and whether it prints (stamped
+ * by the picture's query schema). Pure shape transform; image encoding stays
+ * out.
  */
 export function pageRenderOptionsFromImageOptions(options: PageImageOptions): PageRenderOptions {
   return {
@@ -69,6 +75,7 @@ export function pageRenderOptionsFromImageOptions(options: PageImageOptions): Pa
     ...(options.background !== undefined ? { background: options.background } : {}),
     includeAnnotations: options.includeAnnotations ?? false,
     includeFormFields: options.includeFormFields ?? false,
+    ...(options.usage !== undefined ? { usage: options.usage } : {}),
   };
 }
 

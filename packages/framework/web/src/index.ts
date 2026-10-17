@@ -20,6 +20,8 @@ export {
 export type { FilePickerPort, PickFileOptions } from './file-picker';
 export { browserClock } from './clock';
 export type { WebClock } from './clock';
+export { browserPrinter } from './printer';
+export type { WebPrinter, WebPrintSheet, WebStagedPrint } from './printer';
 export { cssText } from './css-text';
 export type { StyleRecord } from './css-text';
 export { copySelection, wireSelectionClipboard } from './clipboard';

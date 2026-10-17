@@ -41,9 +41,6 @@ export const REFERENCE = [
       'headless/documents/tabs.mdx',
       'headless/documents/saving.mdx',
     ],
-    pending: {
-      print: 'no print pipeline yet: printing is decided after phase 3 (K9)',
-    },
   },
   {
     capability: 'plugin/view-manager/src/contract.ts#ViewManagerCapability',

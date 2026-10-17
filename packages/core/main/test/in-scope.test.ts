@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createCapabilityToken } from '../src/index';
 import { createKernel } from '../src/kernel';
 import { DocumentsToken, type AnyPlugin, type PluginContext } from '../src/types';
-import { bytesInput, immediateEngine, makeHandle, page } from './helpers';
+import { bytesInput, immediateEngine, makeHandle, page, quietPrinter } from './helpers';
 
 /**
  * Workspace plugins follow the document in scope: resolved for a document, a workspace
@@ -44,7 +44,11 @@ async function twoDocuments(plugins: AnyPlugin[] = [targetPlugin]) {
       download: () => Promise.resolve(new Uint8Array([0xb])),
     } as unknown as DocumentHandle,
   };
-  const kernel = createKernel({ engine: immediateEngine(handles), plugins });
+  const kernel = createKernel({
+    engine: immediateEngine(handles),
+    plugins,
+    printer: quietPrinter(),
+  });
   await kernel.start();
   await kernel.documents.open(bytesInput('a'));
   await kernel.documents.open(bytesInput('b'));

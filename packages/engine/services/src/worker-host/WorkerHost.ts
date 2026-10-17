@@ -1619,7 +1619,11 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const extracted = new PagesExtractor(this.runtime, session).extract(req.pages, signal);
+    const extracted = new PagesExtractor(this.runtime, session).extract(
+      req.pages,
+      req.flatten,
+      signal,
+    );
     // A read: no finishMutation, no layer artifact. Bytes transfer zero-copy.
     return wirePack({ tag: 'pages.extract', bytes: extracted.bytes, size: extracted.size }, [
       extracted.bytes,

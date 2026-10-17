@@ -95,6 +95,8 @@ export {
   pdfTurnOfDrawn,
   pdfTurnOfUpright,
   renderSize,
+  PRINT_PAPER,
+  printScale,
   pageTransform,
   renderAreaTransform,
   renderMatrix,
@@ -125,6 +127,8 @@ export type {
   PageNetworkRenderFormat,
   PageRaster,
   PageLayerRights,
+  PagePrintRights,
+  PrintDpi,
   PageRenderBackground,
   PageRenderEncodedFormat,
   PageRenderFormat,
@@ -135,13 +139,23 @@ export type {
   PageRenderQuery,
   PageRenderTarget,
   PageRenderViewport,
+  PageScreenViewport,
 } from './dto/PageRender';
 export {
   checkImageQuality,
+  checkRenderUsage,
   createPageImageHandle,
+  printDpiOf,
   imageSourceOfBytes,
   resolvePageLayers,
 } from './dto/PageRender';
+export type {
+  PageExtractFlatten,
+  PageExtractInput,
+  PageExtractOptions,
+  PageExtractRights,
+} from './dto/PageExtract';
+export { resolvePageExtract } from './dto/PageExtract';
 export {
   ANNOTATION_APPEARANCE_MODES,
   appearanceModesOf,

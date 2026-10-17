@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { DocumentsToken, type CapabilityToken } from '@embedpdf/core';
+
 import type {
   DocumentActionsSnapshot,
   DocumentHandle,
@@ -85,8 +87,11 @@ function docHarness(options: {
   openAction?: PdfActionTree;
   readFailsFirst?: boolean;
   formsSubmit?: (request: unknown) => Promise<{ submissionId: string; receivedAt: string }>;
+  /** The host gave the kernel a printer: `documents.print()` opens the dialog. */
+  kernelPrints?: boolean;
 }) {
   let readCalls = 0;
+  const log: string[] = [];
   const snapshot: DocumentActionsSnapshot = {
     nameTreeScripts: [],
     openAction: options.openAction ?? null,
@@ -112,11 +117,24 @@ function docHarness(options: {
           ...(options.formsSubmit ? { submit: options.formsSubmit } : {}),
         },
       } as unknown as Partial<DocumentHandle>,
+      ...(options.kernelPrints
+        ? {
+            capabilities: [
+              [
+                DocumentsToken as CapabilityToken<unknown>,
+                {
+                  canPrint: () => true,
+                  // As the kernel does: the dialog inside every `aroundPrint` wrap.
+                  print: () => ctx.print(async () => void log.push('dialog')),
+                },
+              ],
+            ],
+          }
+        : {}),
     },
     config,
   );
   const capability = ctx.connect(createActionsController(ctx, config));
-  const log: string[] = [];
   capability.registerExecutor('javascript', (node) => {
     if (node.type === 'javascript') log.push(node.script);
     return { status: 'executed' };
@@ -229,6 +247,35 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
     capability.setUiAdapter({ openUri: vi.fn(), print: () => log.push('print-2') });
     await capability.execute(tree(named('Print')), USER);
     expect(log).toEqual(['wp', 'wp', 'print-2', 'dp']);
+  });
+
+  it("with the kernel's printer, Named Print prints the document, inside /WP and /DP", async () => {
+    const { capability, log } = docHarness({
+      kernelPrints: true,
+      trees: { willPrint: tree(script('wp')), didPrint: tree(script('dp')) },
+    });
+    const adapterPrint = vi.fn();
+    capability.setUiAdapter({ openUri: vi.fn(), print: adapterPrint });
+    const result = await capability.execute(tree(named('Print')), USER);
+    expect(result.nodes[0]?.status).toBe('executed');
+    // The kernel's print waits for the dispatch to finish, then runs the wrap.
+    await tick();
+    await tick();
+    expect(log).toEqual(['wp', 'dialog', 'dp']);
+    expect(adapterPrint).not.toHaveBeenCalled();
+  });
+
+  it("with the kernel's printer, a print requested by /WP is suppressed", async () => {
+    const { capability, log, diagnostics } = docHarness({
+      kernelPrints: true,
+      config: { policy: { print: { user: 'adapter', hover: 'block', lifecycle: 'adapter' } } },
+      trees: { willPrint: tree(script('wp', [named('Print')])), didPrint: tree(script('dp')) },
+    });
+    await capability.execute(tree(named('Print')), USER);
+    await tick();
+    await tick();
+    expect(log).toEqual(['wp', 'dialog', 'dp']);
+    expect(diagnostics.some((diagnostic) => diagnostic.code === 'reentrant-print')).toBe(true);
   });
 
   it('a before-event failure never cancels the operation', async () => {

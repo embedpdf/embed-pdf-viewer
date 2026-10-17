@@ -348,6 +348,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.writes,
       (signal) => this.pages.pageLayout(ref, signal),
       () => this.cloudSecurity.pageLayerRights(),
+      () => this.cloudSecurity.pagePrintRights(),
     );
   }
 

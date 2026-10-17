@@ -19,7 +19,11 @@
 
 import type { DocCapability, PdfBits } from '../auth/scope';
 import { checkAnyCapability, checkCapability } from '../auth/scope';
-import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
+import {
+  PAGE_PRINT_FAMILIES,
+  PAGE_RENDER_FAMILIES,
+  type PageRenderFamilySpec,
+} from './renderFamilies';
 
 /**
  * Canonical id for every read resource the server exposes.
@@ -40,6 +44,17 @@ export type DocResourceId =
   | 'page-render-annotations'
   | 'page-render-fields'
   | 'page-render-all'
+  // The print pictures (`PAGE_PRINT_FAMILIES`): each family at each print
+  // tier. The tier is a right (`doc.print`, `doc.print.high`), so it is a
+  // path of its own too.
+  | 'page-print'
+  | 'page-print-annotations'
+  | 'page-print-fields'
+  | 'page-print-all'
+  | 'page-print-high'
+  | 'page-print-high-annotations'
+  | 'page-print-high-fields'
+  | 'page-print-high-all'
   | 'page-text'
   | 'page-geometry'
   // Plane-scope model: doc-level shared variants, one per plane-dependent
@@ -95,6 +110,14 @@ export type DocResourceId =
   | 'layer-page-render-annotations'
   | 'layer-page-render-fields'
   | 'layer-page-render-all'
+  | 'layer-page-print'
+  | 'layer-page-print-annotations'
+  | 'layer-page-print-fields'
+  | 'layer-page-print-all'
+  | 'layer-page-print-high'
+  | 'layer-page-print-high-annotations'
+  | 'layer-page-print-high-fields'
+  | 'layer-page-print-high-all'
   | 'layer-page-text'
   | 'layer-page-geometry'
   // Search slices, one resource per permission tier: rects-only results
@@ -192,8 +215,8 @@ export interface DocResourceDescriptor {
 }
 
 /** A page picture of one family, at the document's shared path. */
-function pageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
-  const { resource, path, needs } = PAGE_RENDER_FAMILIES[family];
+function pageRenderResource(picture: PageRenderFamilySpec): DocResourceDescriptor {
+  const { resource, path, needs } = picture;
   return {
     id: resource,
     pathPattern: `/v1/docs/{docId}/${path}/*/data@*`,
@@ -207,8 +230,8 @@ function pageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
 }
 
 /** A page picture of one family, at a layer's path. */
-function layerPageRenderResource(family: PageRenderFamily): DocResourceDescriptor {
-  const { layerResource, path, needs } = PAGE_RENDER_FAMILIES[family];
+function layerPageRenderResource(picture: PageRenderFamilySpec): DocResourceDescriptor {
+  const { layerResource, path, needs } = picture;
   return {
     id: layerResource,
     pathPattern: `/v1/docs/{docId}/layers/{layerName}/${path}/*/data@*`,
@@ -268,10 +291,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'page-render': pageRenderResource('pages'),
-  'page-render-annotations': pageRenderResource('annotations'),
-  'page-render-fields': pageRenderResource('fields'),
-  'page-render-all': pageRenderResource('all'),
+  'page-render': pageRenderResource(PAGE_RENDER_FAMILIES.pages),
+  'page-render-annotations': pageRenderResource(PAGE_RENDER_FAMILIES.annotations),
+  'page-render-fields': pageRenderResource(PAGE_RENDER_FAMILIES.fields),
+  'page-render-all': pageRenderResource(PAGE_RENDER_FAMILIES.all),
+  'page-print': pageRenderResource(PAGE_PRINT_FAMILIES.print.pages),
+  'page-print-annotations': pageRenderResource(PAGE_PRINT_FAMILIES.print.annotations),
+  'page-print-fields': pageRenderResource(PAGE_PRINT_FAMILIES.print.fields),
+  'page-print-all': pageRenderResource(PAGE_PRINT_FAMILIES.print.all),
+  'page-print-high': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].pages),
+  'page-print-high-annotations': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].annotations),
+  'page-print-high-fields': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].fields),
+  'page-print-high-all': pageRenderResource(PAGE_PRINT_FAMILIES['print-high'].all),
   'page-annotations': {
     id: 'page-annotations',
     pathPattern: '/v1/docs/{docId}/annotations/pages/*/items@*',
@@ -473,10 +504,20 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'layer-page-render': layerPageRenderResource('pages'),
-  'layer-page-render-annotations': layerPageRenderResource('annotations'),
-  'layer-page-render-fields': layerPageRenderResource('fields'),
-  'layer-page-render-all': layerPageRenderResource('all'),
+  'layer-page-render': layerPageRenderResource(PAGE_RENDER_FAMILIES.pages),
+  'layer-page-render-annotations': layerPageRenderResource(PAGE_RENDER_FAMILIES.annotations),
+  'layer-page-render-fields': layerPageRenderResource(PAGE_RENDER_FAMILIES.fields),
+  'layer-page-render-all': layerPageRenderResource(PAGE_RENDER_FAMILIES.all),
+  'layer-page-print': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.pages),
+  'layer-page-print-annotations': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.annotations),
+  'layer-page-print-fields': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.fields),
+  'layer-page-print-all': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.all),
+  'layer-page-print-high': layerPageRenderResource(PAGE_PRINT_FAMILIES['print-high'].pages),
+  'layer-page-print-high-annotations': layerPageRenderResource(
+    PAGE_PRINT_FAMILIES['print-high'].annotations,
+  ),
+  'layer-page-print-high-fields': layerPageRenderResource(PAGE_PRINT_FAMILIES['print-high'].fields),
+  'layer-page-print-high-all': layerPageRenderResource(PAGE_PRINT_FAMILIES['print-high'].all),
   'page-text': {
     id: 'page-text',
     pathPattern: '/v1/docs/{docId}/text/pages/*/data@*',

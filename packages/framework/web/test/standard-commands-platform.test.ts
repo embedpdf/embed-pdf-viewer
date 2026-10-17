@@ -6,12 +6,8 @@ import { standardCommandsBrowser } from '../src/standard-commands-platform';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('standardCommandsBrowser', () => {
-  it('copies with the shared clipboard binding and prints with the browser dialog', () => {
+  it('copies with the shared clipboard binding', () => {
     expect(standardCommandsBrowser.copySelection).toBe(copySelection);
-    const print = vi.fn();
-    vi.stubGlobal('window', { print });
-    standardCommandsBrowser.print();
-    expect(print).toHaveBeenCalledTimes(1);
   });
 
   it('hands the document over as a PDF download', () => {

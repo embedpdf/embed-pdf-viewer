@@ -1,7 +1,12 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { ModificationLevel } from '../signature/types';
 import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
-import { PAGE_RENDER_FAMILIES, type PageRenderFamily } from './renderFamilies';
+import {
+  PAGE_PRINT_FAMILIES,
+  PAGE_RENDER_FAMILIES,
+  type PagePrintTier,
+  type PageRenderFamily,
+} from './renderFamilies';
 import type { AnalysisToken, AnnotationsExportToken, FormExportToken } from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
@@ -20,6 +25,7 @@ import type { AnalysisToken, AnnotationsExportToken, FormExportToken } from './t
  *   /v1/docs/{id}/manifest@{ver}                        — doc-level read
  *   /v1/docs/{id}/render/pages/{N}/data@{ver}                — render is its own prefix
  *   /v1/docs/{id}/render/{annotations,fields,all}/pages/{N}/data@{ver} — and each picture family
+ *   /v1/docs/{id}/render/{print,print-high}/…/pages/{N}/data@{ver}  — and each print tier of each
  *   /v1/docs/{id}/text/pages/{N}/data@{ver}                  — text is its own prefix
  *   /v1/docs/{id}/geometry/pages/{N}/data@{ver}              — geometry is its own prefix
  *   /v1/docs/{id}/layers/{L}/manifest@{ver}
@@ -367,6 +373,28 @@ export const wirePaths = {
   docPageRenderCurrent: (docId: string, family: PageRenderFamily, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
+  /**
+   * A print picture (`PAGE_PRINT_FAMILIES`): a family printed at a tier. The
+   * tier is a right, so it is in the path like the family; the token carries
+   * the family's pins and the image format, nothing that sizes the picture.
+   */
+  docPagePrint: (
+    docId: string,
+    tier: PagePrintTier,
+    family: PageRenderFamily,
+    page: PageRef,
+    token: TokenInput,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_PRINT_FAMILIES[tier][family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+
+  docPagePrintCurrent: (
+    docId: string,
+    tier: PagePrintTier,
+    family: PageRenderFamily,
+    page: PageRef,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_PRINT_FAMILIES[tier][family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
+
   layerPageGeometry: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
 
@@ -389,6 +417,26 @@ export const wirePaths = {
     page: PageRef,
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
+
+  /** Layer twin of `docPagePrint`. */
+  layerPagePrint: (
+    docId: string,
+    layerName: string,
+    tier: PagePrintTier,
+    family: PageRenderFamily,
+    page: PageRef,
+    token: TokenInput,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_PRINT_FAMILIES[tier][family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+
+  layerPagePrintCurrent: (
+    docId: string,
+    layerName: string,
+    tier: PagePrintTier,
+    family: PageRenderFamily,
+    page: PageRef,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_PRINT_FAMILIES[tier][family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /**
    * Immutable base annotation list for a single page (plane-scope model):

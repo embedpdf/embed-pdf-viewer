@@ -87,6 +87,8 @@ export function snapFullPageViewport(
   opts?: { pageWidth?: number },
 ): PageRenderViewport {
   if (policy.kind === 'continuous') return viewport;
+  // A print picture has its own size, for its paper, off the lattice.
+  if (viewport.kind === 'dpi') return viewport;
   if (policy.fullPage.widths.length === 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'render policy has an empty width ladder');
   }
