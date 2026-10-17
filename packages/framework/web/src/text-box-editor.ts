@@ -124,12 +124,11 @@ export function attachTextBoxEditor<Ref>(
       if (editing === shownEditing) return;
       shownEditing = editing;
       element.contentEditable = editing ? 'true' : 'false';
-      if (editing) {
-        element.focus();
-        // Enter at the top, where the baked appearance anchors the text, so
-        // baked → edit → baked never jumps.
-        element.scrollTop = 0;
-      }
+      if (editing) element.focus();
+      // At the top on entering and on leaving, where the baked appearance
+      // anchors the text, so baked → edit → baked never jumps: typing scrolls
+      // an overflowing box to the caret, and it must not stay there.
+      element.scrollTop = 0;
     },
     detach() {
       binding?.detach();
