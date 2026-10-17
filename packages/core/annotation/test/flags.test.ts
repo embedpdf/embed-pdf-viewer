@@ -1,8 +1,20 @@
 import { quadFromRect } from '@embedpdf/core-geometry';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  PdfAnnotationSubtypeCode,
+  toPageRef,
+  type Annotation,
+} from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, recordOf, step, type RecordInput, STYLE, restyle } from './support';
+import {
+  modelWith,
+  recordOf,
+  step,
+  type RecordInput,
+  STYLE,
+  restyle,
+  withAnnotation,
+} from './support';
 import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
 import {
   DRAWN_FLAGS,
@@ -55,21 +67,47 @@ const square = (
     ...over,
   });
 
+/** A square's annotation with these flags: what `viewable` reads. */
+const squareWith = (over: Partial<AnnotationFlags> = {}): Annotation =>
+  square('v1', flagsWith(over)).annotation;
+
+/** An annotation of a type the engine doesn't model, with these flags. */
+const unsupported = (
+  rawSubtypeCode: number,
+  rawSubtypeName: string,
+  over: Partial<AnnotationFlags> = {},
+): Annotation =>
+  withAnnotation(square('u1', flagsWith(over)), {
+    subtype: 'unsupported',
+    rawSubtypeCode,
+    rawSubtypeName,
+  }).annotation;
+
 const loaded = (annots: ModelAnnotation[]): Model => modelWith(annots);
 const run = (model: Model, msgs: Message[]): Model =>
   msgs.reduce((acc, message) => step(acc, message)[0], model);
 
 describe('flag predicates (ISO 32000 Table 167)', () => {
   it('hidden beats everything on screen', () => {
-    expect(viewable(flagsWith({ hidden: true }))).toBe(false);
-    expect(viewable(flagsWith({ hidden: true, toggleNoView: true }), true)).toBe(false);
+    expect(viewable(squareWith({ hidden: true }))).toBe(false);
+    expect(viewable(squareWith({ hidden: true, toggleNoView: true }), true)).toBe(false);
     expect(interactive(flagsWith({ hidden: true }))).toBe(false);
   });
 
   it('noView hides unless toggleNoView + engaged', () => {
-    expect(viewable(flagsWith({ noView: true }))).toBe(false);
-    expect(viewable(flagsWith({ noView: true, toggleNoView: true }))).toBe(false);
-    expect(viewable(flagsWith({ noView: true, toggleNoView: true }), true)).toBe(true);
+    expect(viewable(squareWith({ noView: true }))).toBe(false);
+    expect(viewable(squareWith({ noView: true, toggleNoView: true }))).toBe(false);
+    expect(viewable(squareWith({ noView: true, toggleNoView: true }), true)).toBe(true);
+  });
+
+  it('invisible hides only a type that is not standard', () => {
+    const { UNKNOWN, SCREEN } = PdfAnnotationSubtypeCode;
+    expect(viewable(squareWith({ invisible: true }))).toBe(true);
+    expect(viewable(unsupported(UNKNOWN, 'MyCompanyMark', { invisible: true }))).toBe(false);
+    expect(viewable(unsupported(UNKNOWN, 'MyCompanyMark'))).toBe(true);
+    // Standard, though the engine doesn't model it, or PDFium doesn't know it.
+    expect(viewable(unsupported(SCREEN, 'Screen', { invisible: true }))).toBe(true);
+    expect(viewable(unsupported(UNKNOWN, 'Projection', { invisible: true }))).toBe(true);
   });
 
   it('readOnly is visible but inert; locked stays interactive but frozen', () => {
