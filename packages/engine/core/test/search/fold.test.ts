@@ -65,6 +65,55 @@ describe('foldText', () => {
     expect(f.folded).toBe('ab');
   });
 
+  test('strips a line-break hyphen (hyphen immediately followed by whitespace)', () => {
+    // Secondary guard: some producers emit a literal hyphen+newline.
+    const f = foldText('con-\ntainers');
+    expect(f.folded).toBe('containers');
+    // "c" maps to 0, then "on" → 1,2; then "tainers" maps to 5..11.
+    // The '-' (index 3) and '\n' (index 4) are suppressed.
+    expect(Array.from(f.map)).toEqual([0, 1, 2, 5, 6, 7, 8, 9, 10, 11]);
+  });
+
+  test('strips a line-break hyphen followed by multiple whitespace characters', () => {
+    const f = foldText('con-\n   tainers');
+    expect(f.folded).toBe('containers');
+  });
+
+  test('strips U+FFFE (PDFium synthetic line-break hyphen marker)', () => {
+    // PDFium inserts U+FFFE between text runs at a column-break hyphen point.
+    // "con\uFFFEtainers" is what our engine actually extracts from the PDF.
+    const f = foldText('con\uFFFEtainers');
+    expect(f.folded).toBe('containers');
+    // U+FFFE (index 3, one code unit) is dropped; "tainers" maps to 4..10.
+    expect(Array.from(f.map)).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  test('strips U+FFFE within a longer phrase', () => {
+    const f = foldText('locks of the con\uFFFEtainers concerned');
+    expect(f.folded).toBe('locks of the containers concerned');
+  });
+
+  test('preserves a real compound hyphen (not followed by whitespace)', () => {
+    const f = foldText('lock-in');
+    expect(f.folded).toBe('lock-in');
+  });
+
+  test('preserves a trailing hyphen (end of string)', () => {
+    const f = foldText('word-');
+    expect(f.folded).toBe('word-');
+  });
+
+  test('strips line-break hyphen with dropWhitespace too', () => {
+    // With ignoreWhitespace the hyphen must still be stripped and no space emitted.
+    const f = foldText('con-\ntainers', { dropWhitespace: true });
+    expect(f.folded).toBe('containers');
+  });
+
+  test('strips U+FFFE with dropWhitespace too', () => {
+    const f = foldText('con\uFFFEtainers', { dropWhitespace: true });
+    expect(f.folded).toBe('containers');
+  });
+
   test('folds compatibility forms', () => {
     expect(foldText('²').folded).toBe('2'); // superscript two
   });
