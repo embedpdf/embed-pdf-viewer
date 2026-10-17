@@ -1,5 +1,4 @@
 import { DocumentsToken, type CapabilityToken } from '@embedpdf/core';
-import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
@@ -27,7 +26,6 @@ function contextWith(capabilities: Map<CapabilityToken<unknown>, unknown>): Comm
 const platform = () => ({
   copySelection: vi.fn(async () => 'text'),
   saveFile: vi.fn(),
-  print: vi.fn(),
 });
 
 function standard(platformImpl = platform()) {
@@ -163,15 +161,12 @@ describe('standard commands', () => {
     expect(platform.saveFile).toHaveBeenCalledWith(bytes, 'contract.pdf');
   });
 
-  it("prints through the document's print actions when the actions plugin is there", async () => {
-    const { command, platform } = standard();
-    const actions = {
-      runDocumentVerb: vi.fn(async (_verb: string, operation: () => unknown) => operation()),
-    };
-    await command('document:print').run?.(contextWith(new Map([[ActionsToken, actions]])));
-    expect(actions.runDocumentVerb).toHaveBeenCalledWith('print', expect.any(Function));
-    expect(platform.print).toHaveBeenCalledTimes(1);
-    await command('document:print').run?.(contextWith(new Map()));
-    expect(platform.print).toHaveBeenCalledTimes(2);
+  it('prints the document in scope through the kernel', async () => {
+    const { command } = standard();
+    const documents = { print: vi.fn(async () => {}), canPrint: () => true };
+    const context = contextWith(new Map([[DocumentsToken, documents]]));
+    expect(command('document:print').allowed?.(context)).toBe(true);
+    await command('document:print').run?.(context);
+    expect(documents.print).toHaveBeenCalledWith('doc', { signal: undefined });
   });
 });

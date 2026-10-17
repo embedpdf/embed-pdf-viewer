@@ -159,7 +159,8 @@ describe('a command with a built-in id', () => {
     const print = find(commands, 'document:print');
     expect(print.label).toBe('Print it');
     expect(print.labelKey).toBeUndefined();
-    expect(print.run).toBe(builtIn('document:print').run);
+    expect(print.modal).toBe(builtIn('document:print').modal);
+    expect(print.modal).toBeDefined();
     expect(find(commands, 'menu:document').menu).toBeUndefined();
     expect(
       mergeCommand({ id: 'x', panel: 'notes', icon: 'eye' }, { id: 'x', menu: 'more' }),

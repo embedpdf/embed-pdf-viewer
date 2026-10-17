@@ -49,7 +49,7 @@ import { createPageMirror } from './page-mirror';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
 import { findPage, pageOf } from './page-of';
-import { readWrapped, type DownloadWrap } from './context';
+import { runWrapped, type DownloadWrap, type PrintWrap } from './context';
 import { fieldPermissionDenied, permissionDenied, sessionAllows } from './permissions';
 import { createSettingsStore, type NoSettings, type SettingsDeclaration } from './settings';
 import { settle, type SettleFlush } from './settle';
@@ -118,6 +118,11 @@ export interface TestContext<S, T extends object = NoSettings> extends PluginCon
    * `aroundDownload` wrap, the first registered outermost.
    */
   download(read: () => Promise<Uint8Array>): Promise<Uint8Array>;
+  /**
+   * What a print does around the print dialog: `print` inside every `aroundPrint` wrap, the
+   * first registered outermost.
+   */
+  print(print: () => Promise<void>): Promise<void>;
   /** Run the registered cleanups and abort the lifetime (the plugin's unmount). */
   dispose(): Promise<void>;
 }
@@ -178,7 +183,9 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     getPageIndex: (ref, id) => pagesOf(id).findIndex((page) => pageRefsEqual(page.ref, ref)),
     getRevision: (id) => (known(id) ? meta.revision : -1),
     canDownload: () => true,
-    canPrint: () => true,
+    // A test context has no printer.
+    canPrint: () => false,
+    getPrintQuality: () => null,
     // A test context opens nothing.
     canOpenFiles: () => false,
     open: unsupported('open'),
@@ -194,6 +201,8 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     swap: unsupported('swap'),
     download: unsupported('download'),
     downloadLayer: unsupported('downloadLayer'),
+    preparePrint: unsupported('preparePrint'),
+    print: unsupported('print'),
     onOpened: never,
     onOpenFailed: never,
     onLocked: never,
@@ -217,6 +226,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
   const lifetime = new AbortController();
   const settleFlushes = new Set<SettleFlush>();
   const downloadWraps: DownloadWrap[] = [];
+  const printWraps: PrintWrap[] = [];
   const pages = (options.pages ?? []).map(layoutOf);
   const capabilities = new Map<CapabilityToken<unknown>, unknown>(options.capabilities ?? []);
   const documentEvents = createEventHook<DocumentEvent>(report);
@@ -362,6 +372,13 @@ export function createTestContext<S = void, T extends object = NoSettings>(
         if (index >= 0) downloadWraps.splice(index, 1);
       });
     },
+    aroundPrint: (wrap) => {
+      printWraps.push(wrap);
+      cleanups.push(() => {
+        const index = printWraps.indexOf(wrap);
+        if (index >= 0) printWraps.splice(index, 1);
+      });
+    },
     events: {
       source: <T>() => {
         const hook = createEventHook<T>((error) =>
@@ -444,7 +461,8 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       bursts.last(event);
     },
     settle: (signal) => settle(settleFlushes, [signal, lifetime.signal], report),
-    download: (read) => readWrapped(downloadWraps, read),
+    download: (read) => runWrapped(downloadWraps, read),
+    print: (print) => runWrapped(printWraps, print),
     dispose: async () => {
       lifetime.abort();
       for (const fn of cleanups.splice(0).reverse()) await fn();

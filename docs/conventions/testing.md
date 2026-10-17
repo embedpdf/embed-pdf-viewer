@@ -53,6 +53,7 @@ The returned context adds:
 | `capabilities`             | The token map, to add or replace capabilities during a test.                                                       |
 | `settle(signal?)`          | Runs every `ctx.onSettle` flush and waits for them, as `documents.download()` does before it reads the file.       |
 | `download(read)`           | Runs `read` inside every `ctx.aroundDownload` wrap, as `documents.download()` does after settling.                 |
+| `print(print)`             | Runs `print` inside every `ctx.aroundPrint` wrap, as a prepared print does around the print dialog.                |
 | `dispose()`                | Aborts the lifetime and runs every registered cleanup.                                                             |
 
 `manualClock(options?)` from `@embedpdf/core/testing` is time that moves only

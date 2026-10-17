@@ -40,15 +40,54 @@ from an earlier revision. See [Saving](/docs/engine/documents/saving).
 
 ## Print
 
-`print()` prints the document, not your app: its pages, at print quality, through the browser's
-print dialog.
+`print()` prints the document, not your app: its pages, each on a sheet of its own size, through the
+browser's print dialog. Like `download()`, it waits for changes still on their way first.
 
 ```ts
 await documents.print();
+await documents.print(undefined, { pages: [page.ref], includeAnnotations: false });
 ```
 
-When the [actions plugin](actions) is registered, the PDF's own print actions run too, as they would
-in Acrobat.
+`pages` takes page refs and prints them in that order; without it, every page prints. A page prints
+as the PDF says it prints, which isn't always how it looks on screen: an annotation or a form field
+whose print setting is off stays off the paper, and a layer meant for paper only shows up on it.
+`includeAnnotations: false` leaves the annotations out; form fields always print.
+
+When the [actions plugin](actions) is registered, the PDF's own print actions run around the
+browser's dialog, as they would in Acrobat.
+
+### How sharp it prints
+
+The browser prints pictures of the pages. How sharp they are depends on what the document allows:
+
+| Permission       | Pictures                                                           |
+| :--------------- | :----------------------------------------------------------------- |
+| `doc.print.high` | 300 DPI                                                            |
+| `doc.print` only | 150 DPI, as a PDF asks when it allows only low-resolution printing |
+
+`getPrintQuality()` says which, for a note in your dialog: `{ kind: 'images', dpi: 300 }`, or `null`
+when the document can't be printed here.
+
+### Your own print dialog
+
+Drawing the pages takes a moment, and on iOS the browser's dialog opens only straight from a tap.
+So a dialog of your own prepares the printout when it opens, and prints it from its button:
+
+```ts
+const prepared = await documents.preparePrint(undefined, {
+  pages,
+  onProgress: ({ pagesRendered, pageCount }) => setProgress(pagesRendered / pageCount),
+});
+
+printButton.onclick = () => prepared.print();
+// when your dialog closes
+prepared.dispose();
+```
+
+`prepared.print()` prepares again first when the document changed since, and resolves when the
+browser's dialog closes. When a choice in your dialog changes, prepare again: cancel the one on
+its way with its `signal`, or `dispose()` the one that was ready. Closing the document frees a prepared printout. The viewer's Print dialog works
+this way.
 
 <Engine local>
 
@@ -101,12 +140,14 @@ What `useDocuments()` gives you for downloading and printing. Opening and closin
 [Opening documents](opening#methods), tabs and the active document on
 [Several documents](tabs#methods).
 
-| Method                              | What it does                                                                                                                                         |
-| :---------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `download(id?, { mode })`           | The PDF with every change, as bytes. Waits for changes still on their way first. `mode` is `'incremental'` (the default) or `'rewrite'`. [A quick save or a full rewrite](#a-quick-save-or-a-full-rewrite) |
-| `downloadLayer(id?)`                | Only the changes, as a layer you store and open again on top of the original. Local engine only; rejects when the document wasn't opened with a layer. [Keep only the changes](#keep-only-the-changes) |
-| `print(id?)`                        | Prints the document's pages through the browser's print dialog. [Print](#print)                                                                     |
-| `canDownload(id?)`, `canPrint(id?)` | Whether downloading and printing are allowed. [Permissions](#permissions)                                                                            |
+| Method                                                         | What it does                                                                                                                                                                                               |
+| :------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `download(id?, { mode })`                                      | The PDF with every change, as bytes. Waits for changes still on their way first. `mode` is `'incremental'` (the default) or `'rewrite'`. [A quick save or a full rewrite](#a-quick-save-or-a-full-rewrite) |
+| `downloadLayer(id?)`                                           | Only the changes, as a layer you store and open again on top of the original. Local engine only; rejects when the document wasn't opened with a layer. [Keep only the changes](#keep-only-the-changes)     |
+| `print(id?, { pages, includeAnnotations, onProgress })`        | Prints the document's pages through the browser's print dialog. [Print](#print)                                                                                                                            |
+| `preparePrint(id?, { pages, includeAnnotations, onProgress })` | Draws the pages for printing, ready for the browser's dialog; resolves `{ quality, pageCount, print(), dispose() }`. [Your own print dialog](#your-own-print-dialog)                                       |
+| `getPrintQuality(id?)`                                         | How it prints here: `{ kind: 'images', dpi }`, or `null` when it can't. [How sharp it prints](#how-sharp-it-prints)                                                                                        |
+| `canDownload(id?)`, `canPrint(id?)`                            | Whether downloading and printing are allowed. [Permissions](#permissions)                                                                                                                                  |
 
 Without an `id`, each uses the document in scope: the one a
 [`<DocumentScope>`](tabs#talk-to-a-specific-document) around your component names, or else the
@@ -122,10 +163,11 @@ active one. Every method that returns a promise also takes a `signal` in its opt
 
 ## Permissions
 
-| Permission     | What it allows                        | Check                       |
-| :------------- | :------------------------------------ | :-------------------------- |
-| `doc.download` | `download()` and `downloadLayer()`    | `documents.canDownload()`   |
-| `doc.print`    | `print()`                             | `documents.canPrint()`      |
+| Permission       | What it allows                     | Check                         |
+| :--------------- | :--------------------------------- | :---------------------------- |
+| `doc.download`   | `download()` and `downloadLayer()` | `documents.canDownload()`     |
+| `doc.print`      | `print()` and `preparePrint()`     | `documents.canPrint()`        |
+| `doc.print.high` | Printing at 300 DPI instead of 150 | `documents.getPrintQuality()` |
 
 Hide the buttons when the check says no. The engine refuses the call anyway.
 

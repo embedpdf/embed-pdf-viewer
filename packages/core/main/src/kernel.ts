@@ -5,7 +5,7 @@ import { createStore } from './store';
 import {
   createPluginContext,
   markConnected,
-  readWrapped,
+  runWrapped,
   sliceKey,
   type ContextServices,
   type SessionRef,
@@ -48,8 +48,15 @@ import {
   type DocumentActiveChangedEvent,
   type DocumentPagesChangedEvent,
   type DocumentUnsavedChangesChangedEvent,
+  type HostPrinter,
+  type PageInfo,
   type PendingMeta,
   type Permission,
+  type PreparedPrint,
+  type PrintOptions,
+  type PrintQuality,
+  type PrintSheet,
+  type StagedPrint,
   type PluginScope,
   type Unsubscribe,
   type UnlockOptions,
@@ -63,6 +70,7 @@ import {
   type DocumentEvent,
   type EngineRenderPolicy,
   type PageLayout,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 const EMPTY_PAGES: readonly PageLayout[] = Object.freeze([]);
@@ -215,6 +223,10 @@ const isUrlSource = (source: OpenInput | UrlSource): source is UrlSource => sour
 const noLayer = () =>
   new PluginError('unsupported', 'documents', 'only the local engine gives a layer to download');
 
+/** How a print comes out at each tier, one object each, so readers can compare them with `Object.is`. */
+const PRINT_STANDARD: PrintQuality = Object.freeze({ kind: 'images', dpi: 150 });
+const PRINT_HIGH: PrintQuality = Object.freeze({ kind: 'images', dpi: 300 });
+
 /**
  * The documents capability as seen from inside one document's scope: every call whose document
  * is optional uses that document instead of the active one. The rest is the registry itself.
@@ -228,6 +240,9 @@ const documentsInScope = (
   download: (id = documentId, options) => documents.download(id, options),
   downloadLayer: (id = documentId, options) => documents.downloadLayer(id, options),
   canDownload: (id = documentId) => documents.canDownload(id),
+  preparePrint: (id = documentId, options) => documents.preparePrint(id, options),
+  print: (id = documentId, options) => documents.print(id, options),
+  getPrintQuality: (id = documentId) => documents.getPrintQuality(id),
   canPrint: (id = documentId) => documents.canPrint(id),
   listPages: (id = documentId) => documents.listPages(id),
   getPage: (page, id = documentId) => documents.getPage(page, id),
@@ -279,6 +294,11 @@ interface DocumentSession extends SessionRef {
   connectors: Map<AnyPlugin, () => void>;
   /** How many changes the document has had since it opened: a download that read them all clears `hasUnsavedChanges`. */
   changeCount: number;
+  /**
+   * How many changes the document has had since it opened, on any engine and from any session:
+   * a prepared print that saw fewer is prepared again before it prints.
+   */
+  changesSeen: number;
   close(): Promise<void>;
 }
 
@@ -317,6 +337,11 @@ export function createKernel(config: {
    * timers and no frames.
    */
   clock?: HostClock;
+  /**
+   * The host's print dialog: where `documents.print()` sends the pages. A browser passes
+   * `browserPrinter()` from `@embedpdf/web`. Without one, nothing prints (`canPrint()` is false).
+   */
+  printer?: HostPrinter;
 }): Kernel {
   const { engine, plugins } = config;
   const report = config.report ?? ((error: unknown) => console.error('[kernel]', error));
@@ -454,12 +479,14 @@ export function createKernel(config: {
       leases: new Map(),
       settleFlushes: new Set(),
       downloadWraps: [],
+      printWraps: [],
       changes: createDocumentChanges({
         handle: () => session.handle,
         notify: () => store.notify(),
         report,
       }),
       changeCount: 0,
+      changesSeen: 0,
       close: () => closeSession(session),
     };
     // A download waits for every change: open holds are sent, and the answers awaited.
@@ -681,9 +708,159 @@ export function createKernel(config: {
         readAt = session.changeCount;
         return cancellable('documents', signal, read(handle));
       };
-      const bytes = await readWrapped(session.downloadWraps, readFile);
+      const bytes = await runWrapped(session.downloadWraps, readFile);
       if (readAt === session.changeCount) setUnsavedChanges(session, false);
       return bytes;
+    } catch (error) {
+      throw toPluginError('documents', error);
+    }
+  }
+
+  // ── printing ─────────────────────────────────────────────────────────────
+
+  const printer = config.printer ?? null;
+
+  const canPrintOn = (documentId: string | undefined): boolean =>
+    printer !== null && allowsOn(documentId, 'doc.print');
+
+  const printQualityOf = (documentId: string | undefined): PrintQuality | null => {
+    if (!canPrintOn(documentId)) return null;
+    return allowsOn(documentId, 'doc.print.high') ? PRINT_HIGH : PRINT_STANDARD;
+  };
+
+  /** The pages a print asks for, in its order: every page when it names none. */
+  function printPagesOf(
+    session: DocumentSession,
+    pages: readonly PageRef[] | undefined,
+  ): readonly PageInfo[] {
+    const all = metaOf(session.id)?.pages ?? EMPTY_PAGES;
+    if (pages === undefined) return all;
+    if (pages.length === 0) {
+      throw new PluginError('invalid-input', 'documents', 'a print needs at least one page');
+    }
+    return pages.map((ref) => {
+      const page = findPage(all, ref);
+      if (!page) {
+        throw new PluginError(
+          'not-found',
+          'documents',
+          `page ${ref.objectNumber} is not in this document`,
+        );
+      }
+      return page;
+    });
+  }
+
+  /**
+   * Draw the pages by the print rules and hand them to the printer, once the document settled.
+   * The pages are looked up again each time, so one deleted meanwhile refuses `not-found`.
+   * Returns the staged print and the change it saw last, so a print can tell it went stale.
+   */
+  async function stagePrint(
+    session: DocumentSession,
+    activePrinter: HostPrinter,
+    quality: PrintQuality,
+    options: PrintOptions,
+  ): Promise<{ staged: StagedPrint; changesSeen: number }> {
+    const { signal } = options;
+    await settle(session.settleFlushes, [signal, session.signal], report);
+    const handle = documentHandle(session.id);
+    if (!handle) throw new PluginError('not-ready', 'documents', 'no open document to print');
+    const changesSeen = session.changesSeen;
+    const pages = printPagesOf(session, options.pages);
+    const sheets: PrintSheet[] = [];
+    options.onProgress?.({ pagesRendered: 0, pageCount: pages.length });
+    for (const page of pages) {
+      const image = await cancellable(
+        'documents',
+        signal,
+        handle.page(page.ref).render.image({
+          usage: 'print',
+          viewport: { kind: 'dpi', dpi: quality.dpi },
+          format: 'png',
+          ...(options.includeAnnotations !== undefined
+            ? { includeAnnotations: options.includeAnnotations }
+            : {}),
+        }),
+      );
+      const blob = await cancellable('documents', signal, image.blob());
+      sheets.push({ image: blob, widthPt: page.size.width, heightPt: page.size.height });
+      options.onProgress?.({ pagesRendered: sheets.length, pageCount: pages.length });
+    }
+    const staged = await activePrinter.stage(sheets, {
+      name: session.name ?? 'document',
+      ...(signal ? { signal } : {}),
+    });
+    return { staged, changesSeen };
+  }
+
+  /**
+   * Get a print ready. Refused before anything runs without `doc.print` or a printer, or for
+   * pages the document doesn't have. Its `print()` runs inside every `aroundPrint` wrap (the
+   * document's own print actions), and prepares again first when the document changed since:
+   * a will-print action that fills in a date is on the paper.
+   */
+  async function preparePrint(
+    documentId: string | undefined,
+    options: PrintOptions = {},
+  ): Promise<PreparedPrint> {
+    const session = readySession(documentId, 'preparePrint');
+    if (!allowsOn(session.id, 'doc.print')) {
+      throw permissionDenied('documents', 'doc.print', 'documents.preparePrint');
+    }
+    const quality = printQualityOf(session.id);
+    if (!printer || !quality) {
+      throw new PluginError(
+        'unsupported',
+        'documents',
+        'no printer: pass one to createKernel({ printer }), such as browserPrinter() from @embedpdf/web',
+      );
+    }
+    const pageCount = printPagesOf(session, options.pages).length;
+    try {
+      let { staged, changesSeen } = await stagePrint(session, printer, quality, options);
+      let disposed = false;
+      const dispose = () => {
+        if (disposed) return;
+        disposed = true;
+        staged.dispose();
+      };
+      session.scope.defer(dispose);
+      return {
+        quality,
+        pageCount,
+        async print(printOptions) {
+          if (disposed) {
+            throw new PluginError('invalid-input', 'documents', 'this print was disposed');
+          }
+          const signal = printOptions?.signal;
+          const run = async () => {
+            if (session.changesSeen !== changesSeen) {
+              const fresh = await stagePrint(session, printer, quality, {
+                ...(options.pages ? { pages: options.pages } : {}),
+                ...(options.includeAnnotations !== undefined
+                  ? { includeAnnotations: options.includeAnnotations }
+                  : {}),
+                ...(signal ? { signal } : {}),
+              });
+              staged.dispose();
+              ({ staged, changesSeen } = fresh);
+            }
+            if (signal?.aborted) {
+              throw new PluginError('operation-cancelled', 'documents', 'print cancelled', {
+                cause: signal.reason,
+              });
+            }
+            await staged.print();
+          };
+          try {
+            await runWrapped(session.printWraps, run);
+          } catch (error) {
+            throw toPluginError('documents', error);
+          }
+        },
+        dispose,
+      };
     } catch (error) {
       throw toPluginError('documents', error);
     }
@@ -896,9 +1073,12 @@ export function createKernel(config: {
     session.scope.defer(bursts.close);
     const unsubscribeEvents = session.handle!.events.subscribe((event) => {
       bursts.first(event);
-      if (tracksChanges && changesDocument(event)) {
-        session.changeCount += 1;
-        setUnsavedChanges(session, true);
+      if (changesDocument(event)) {
+        session.changesSeen += 1;
+        if (tracksChanges) {
+          session.changeCount += 1;
+          setUnsavedChanges(session, true);
+        }
       }
       const layout = layoutFromEvent(event);
       if (!layout) return;
@@ -1298,9 +1478,20 @@ export function createKernel(config: {
         // Refused before anything runs: the cloud engine keeps layers itself.
         (handle) => (isLocalDocument(handle) ? null : noLayer()),
       ),
+    // Printing it: the pages drawn by the print rules, on the host's printer (preparePrint above).
+    preparePrint: (id, options) => preparePrint(id, options),
+    async print(id, options = {}) {
+      const prepared = await preparePrint(id, options);
+      try {
+        await prepared.print(options.signal ? { signal: options.signal } : undefined);
+      } finally {
+        prepared.dispose();
+      }
+    },
+    getPrintQuality: (id) => printQualityOf(id),
     // The verbs that need them live here, so their checks do too (permissions.md).
     canDownload: (id) => allowsOn(id, 'doc.download'),
-    canPrint: (id) => allowsOn(id, 'doc.print'),
+    canPrint: (id) => canPrintOn(id),
     // The page registry, addressed by PageRef (durable) or display index.
     listPages: (id) => metaOf(id)?.pages ?? EMPTY_PAGES,
     getPage: (page, id) => findPage(metaOf(id)?.pages ?? EMPTY_PAGES, page),

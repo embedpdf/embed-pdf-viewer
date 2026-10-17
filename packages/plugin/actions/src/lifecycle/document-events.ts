@@ -2,8 +2,8 @@
  * The verb-shaped document events (/WC, /WS, /DS, /WP, /DP) and the print
  * door: one catalog lifecycle tree per event, run inside the current queue
  * operation and never throwing (a broken script must not cancel the user's
- * save or print), and the adapter print wrapped /WP → print → /DP under the
- * print latch.
+ * save or print), and a print request sent to the kernel's print, or, without
+ * a printer, to the adapter, wrapped /WP → print → /DP under the print latch.
  */
 import { PluginError, type OperationOptions } from '@embedpdf/core';
 
@@ -25,7 +25,14 @@ import type { ActionsOpenSequence } from './open-sequence';
 export function createDocumentEvents(
   services: Pick<
     ActionsServices,
-    'events' | 'catalog' | 'queue' | 'ports' | 'authority' | 'printLatch' | 'settings'
+    | 'events'
+    | 'catalog'
+    | 'queue'
+    | 'ports'
+    | 'authority'
+    | 'documentPrint'
+    | 'printLatch'
+    | 'settings'
   >,
   {
     ensureOpenSequenceBeforeDocEvent,
@@ -37,6 +44,7 @@ export function createDocumentEvents(
   const { enqueue, budget } = services.queue;
   const ports = services.ports.slots;
   const { allowsPrint } = services.authority;
+  const { documentPrint } = services;
   const printLatch = services.printLatch;
 
   /**
@@ -81,13 +89,21 @@ export function createDocumentEvents(
   };
 
   /**
-   * Both adapter print paths (the Named Print verb, and script `doc.print()`
-   * effects from the actions plane) go through here: /WP →
-   * `ports.uiAdapter.print` exactly once → /DP, with the latch reset in
-   * `finally`. While the latch is held (including `runDocumentVerb('print')`'s
-   * body) a nested request is suppressed with `reentrant-print`. An adapter
-   * throw skips /DP (the latch still resets). /DP fires when the adapter call
-   * returns, since a browser cannot observe dialog completion.
+   * Both print paths (the Named Print verb, and script `doc.print()` effects
+   * from the actions plane) go through here. While the latch is held
+   * (including `runDocumentVerb('print')`'s body) a nested request is
+   * suppressed with `reentrant-print`.
+   *
+   * With the kernel's print, a user's request starts `documents.print()` and
+   * returns: the kernel runs /WP and /DP around the dialog through this
+   * plugin's `aroundPrint` wrap, a `runDocumentVerb('print')` that waits for
+   * the current queue operation, so it is never awaited here. A hover or
+   * lifecycle request never opens the dialog.
+   *
+   * Without a printer: /WP → `ports.uiAdapter.print` exactly once → /DP,
+   * with the latch reset in `finally`. An adapter throw skips /DP (the latch
+   * still resets). /DP fires when the adapter call returns, since a browser
+   * cannot observe dialog completion.
    */
   const firePrintThroughAdapter = async (
     uiContext: { origin: ActionOrigin; phase: 'boot' | 'user' } | undefined,
@@ -104,6 +120,19 @@ export function createDocumentEvents(
     if (!allowsPrint()) {
       diagnose({ code: 'blocked', message: 'print: doc.print is not allowed' });
       return { status: 'blocked', detail: 'doc.print is not allowed' };
+    }
+    if (documentPrint.available()) {
+      if (uiContext && uiContext.origin !== 'user') {
+        diagnose({ code: 'blocked', message: `print: a ${uiContext.origin} request never prints` });
+        return { status: 'blocked', detail: `${uiContext.origin} print request` };
+      }
+      documentPrint.start().catch((error: unknown) =>
+        diagnose({
+          code: 'trigger-failed',
+          message: `print: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+      );
+      return { status: 'executed' };
     }
     if (!ports.uiAdapter) {
       diagnose({ code: 'no-adapter', message: 'print: no UI adapter installed' });

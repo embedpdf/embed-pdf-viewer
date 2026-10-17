@@ -46,6 +46,7 @@ import type {
   PageDestination,
   PdfDestination,
   Identity,
+  PrintDpi,
 } from '@embedpdf/engine-core/runtime';
 
 // re-export the engine contracts so consumers import them from @embedpdf/core
@@ -434,6 +435,14 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * others. Document-scoped plugins only; unregistered when the instance closes.
    */
   aroundDownload(wrap: (read: () => Promise<Uint8Array>) => Promise<Uint8Array>): void;
+  /**
+   * Run something of the document's own around every print of it (`documents.print()`, a
+   * prepared print's `print()`): `wrap` gets the print and resolves when it did, doing what
+   * comes before and after it. The actions plugin runs the document's print actions this way.
+   * The first registered wraps the others. Document-scoped plugins only; unregistered when the
+   * instance closes.
+   */
+  aroundPrint(wrap: (print: () => Promise<void>) => Promise<void>): void;
   /** Acquire a resource whose disposal the instance owns; a late arrival after close is disposed, not returned. */
   acquire<R>(
     get: (lifetime: AbortSignal) => Promise<R>,
@@ -611,6 +620,89 @@ export interface DownloadOptions extends OperationOptions {
 }
 
 /**
+ * How a print comes out: pictures of the pages, drawn by the print rules, at 150 DPI with
+ * `doc.print` or 300 DPI with `doc.print.high` (Acrobat's low and high resolution printing).
+ */
+export interface PrintQuality {
+  readonly kind: 'images';
+  readonly dpi: PrintDpi;
+}
+
+/** How far preparing a print got. */
+export interface PrintProgress {
+  /** Pages whose picture is ready. */
+  readonly pagesRendered: number;
+  /** Pages the print has. */
+  readonly pageCount: number;
+}
+
+export interface PrintOptions extends OperationOptions {
+  /** The pages to print, in this order. Default: every page. */
+  readonly pages?: readonly PageRef[];
+  /**
+   * Print the annotations that print. Default: when the user may read them. Form fields print
+   * when the user may read the form, as in a page picture.
+   */
+  readonly includeAnnotations?: boolean;
+  /** Called each time a page's picture is ready, and once before the first. */
+  readonly onProgress?: (progress: PrintProgress) => void;
+}
+
+/**
+ * A print got ready by `documents.preparePrint()`. Everything slow already happened, so
+ * `print()` opens the print dialog at once: call it from the user's tap, which some browsers
+ * require for a print dialog.
+ */
+export interface PreparedPrint {
+  readonly quality: PrintQuality;
+  /** How many sheets it prints: one per page. */
+  readonly pageCount: number;
+  /**
+   * Open the print dialog. The document's own print actions run around it, when the actions
+   * plugin is installed; when they, or anyone, change the document after it was prepared, it is
+   * prepared again first. Resolves when the printer has the sheets. Rejects `invalid-input` once
+   * disposed, `operation-cancelled` when `signal` fires before the dialog opens.
+   */
+  print(options?: OperationOptions): Promise<void>;
+  /** Free what preparing took. Closing the document does too. */
+  dispose(): void;
+}
+
+/** One printed sheet: a picture of a page, and the page's size on paper. */
+export interface PrintSheet {
+  /** A PNG of the page, drawn by the print rules. */
+  readonly image: Blob;
+  /** The page's width in points (1/72 inch), as it prints. */
+  readonly widthPt: number;
+  /** The page's height in points. */
+  readonly heightPt: number;
+}
+
+/** What a printer got ready: `print()` opens the print dialog with it. */
+export interface StagedPrint {
+  /** Open the print dialog. Resolves once the printer has the sheets. */
+  print(): Promise<void>;
+  /** Free what staging took. */
+  dispose(): void;
+}
+
+/**
+ * Where prints go: the host's print dialog. A browser passes `browserPrinter()` from
+ * `@embedpdf/web`; an app with its own print path (a desktop shell, a native app) passes its
+ * own.
+ */
+export interface HostPrinter {
+  /**
+   * Get the sheets ready to print, so `print()` on what it returns opens the dialog at once.
+   * `name` names the print job. Rejects when `signal` fires.
+   */
+  stage(
+    sheets: readonly PrintSheet[],
+    options: { readonly name: string; readonly signal?: AbortSignal },
+  ): Promise<StagedPrint>;
+}
+
+/**
  * One boot document for `documents.openAll()` — the shared shape every
  * framework adapter's `initialDocuments` input uses (adapters re-export it,
  * never redefine it). `active` picks the selected tab (default: the first);
@@ -736,7 +828,24 @@ export interface DocumentsCapability {
   downloadLayer(id?: string, options?: OperationOptions): Promise<Uint8Array>;
   /** Whether the document (the one in scope without an id) may be downloaded: `doc.download`. */
   canDownload(id?: string): boolean;
-  /** Whether the document (the one in scope without an id) may be printed: `doc.print`. */
+  /**
+   * Get a print of the document ready (the one in scope without an id): wait for changes still
+   * on their way, draw each page by the print rules, and hand the pictures to the host's
+   * printer. `onProgress` follows the pages. Rejects `permission-denied` without `doc.print`,
+   * `unsupported` when the host gave no printer, `not-found` for a page the document doesn't
+   * have, `invalid-input` for an empty `pages`, `not-ready` with no open document,
+   * `operation-cancelled` when `signal` fires.
+   */
+  preparePrint(id?: string, options?: PrintOptions): Promise<PreparedPrint>;
+  /**
+   * Prepare a print and print it: `preparePrint()`, then its `print()`. The document's own
+   * print actions run around the dialog when the actions plugin is installed. Rejects as
+   * `preparePrint()` does.
+   */
+  print(id?: string, options?: PrintOptions): Promise<void>;
+  /** How a print of the document comes out for this user, or null when they can't print it. */
+  getPrintQuality(id?: string): PrintQuality | null;
+  /** Whether the document (the one in scope without an id) may be printed: `doc.print`, and the host gave a printer. */
   canPrint(id?: string): boolean;
   /**
    * The document's pages, in order (the one in scope without an id). The same array until a

@@ -1,0 +1,5 @@
+---
+'@embedpdf/core': minor
+---
+
+The documents capability prints. `print(id?, { pages, includeAnnotations, onProgress })` draws the pages as they print (layers, annotations and form fields by their print settings) and hands them to the browser's print dialog, each page on a sheet of its own size. `preparePrint(id?, options)` does the drawing ahead and resolves `{ quality, pageCount, print(), dispose() }`, so a dialog's Print button opens the browser's dialog straight from the tap; its `print()` prepares again when the document changed since. `getPrintQuality(id?)` says how sharp it prints: `{ kind: 'images', dpi: 300 }` with `doc.print.high`, 150 DPI with `doc.print` only, `null` when it can't. Printing waits for changes still on their way, as a download does. The host hands the kernel its printer, `createKernel({ printer })` (`HostPrinter`), and `canPrint()` is `doc.print` and a printer. A plugin runs the document's own around the print dialog with `ctx.aroundPrint(wrap)`; the test context's `print(run)` runs those wraps.

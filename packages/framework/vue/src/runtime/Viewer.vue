@@ -8,7 +8,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, toRaw, watch } from 'vue';
 import { createKernel, isLocalEngine, viewerSettingsOf } from '@embedpdf/core';
-import { browserClock } from '@embedpdf/web';
+import { browserClock, browserPrinter } from '@embedpdf/web';
 import type {
   AnyPlugin,
   Engine,
@@ -148,6 +148,7 @@ onMounted(() => {
       plugins: initial.plugins,
       settings: settingsOf(),
       clock: browserClock(),
+      printer: browserPrinter(),
     });
   } catch (error) {
     // A plan or dependency error shows in the `error` slot.
