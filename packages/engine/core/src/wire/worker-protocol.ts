@@ -16,6 +16,7 @@ import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { FontIdentityInfo } from '../dto/FontSpec';
 import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
 import type { MetadataPatch } from '../dto/MetadataPatch';
+import type { PageExtractFlatten } from '../dto/PageExtract';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageNetworkRenderFormat, PageRaster, PageRenderOptions } from '../dto/PageRender';
@@ -1180,6 +1181,9 @@ export interface PagesExtractWorkerRequest {
   docId: string;
   layerName?: string;
   pages: PageRef[];
+  /** A flattened copy: what it paints, already checked against the caller's
+   *  rights (`resolvePageExtract`). Absent for a plain copy. */
+  flatten?: PageExtractFlatten;
 }
 
 /** List the document catalog's `/EmbeddedFiles` name tree (a read). */

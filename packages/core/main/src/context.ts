@@ -53,6 +53,8 @@ export interface SessionRef {
   readonly settleFlushes: Set<SettleFlush>;
   /** What runs around each read of the document's file, first registered outermost. */
   readonly downloadWraps: DownloadWrap[];
+  /** What runs around each print of the document, first registered outermost. */
+  readonly printWraps: PrintWrap[];
   /** The document's change queue, shared by its plugins (`ctx.changes`). */
   readonly changes: DocumentChanges;
 }
@@ -60,12 +62,14 @@ export interface SessionRef {
 /** Something of the document's own that runs around a download: it gets the read and returns its bytes. */
 export type DownloadWrap = (read: () => Promise<Uint8Array>) => Promise<Uint8Array>;
 
-/** `read`, inside every wrap: the first registered is the outermost. */
-export const readWrapped = (
-  wraps: readonly DownloadWrap[],
-  read: () => Promise<Uint8Array>,
-): Promise<Uint8Array> =>
-  wraps.reduceRight<() => Promise<Uint8Array>>((inner, wrap) => () => wrap(inner), read)();
+/** Something of the document's own that runs around a print: it gets the print and resolves when it did. */
+export type PrintWrap = (print: () => Promise<void>) => Promise<void>;
+
+/** `run`, inside every wrap: the first registered is the outermost. */
+export const runWrapped = <T>(
+  wraps: readonly ((inner: () => Promise<T>) => Promise<T>)[],
+  run: () => Promise<T>,
+): Promise<T> => wraps.reduceRight<() => Promise<T>>((inner, wrap) => () => wrap(inner), run)();
 
 /**
  * Everything a context needs from the kernel, injected so this module has no cycles
@@ -398,6 +402,18 @@ export function createPluginContext(
       scope.defer(() => {
         const index = session.downloadWraps.indexOf(wrap);
         if (index >= 0) session.downloadWraps.splice(index, 1);
+      });
+    },
+    aroundPrint(wrap) {
+      if (!session) {
+        throw new Error(
+          `[kernel] workspace plugin "${plugin.id}" has no document to print; ctx.aroundPrint() is for document-scoped plugins.`,
+        );
+      }
+      session.printWraps.push(wrap);
+      scope.defer(() => {
+        const index = session.printWraps.indexOf(wrap);
+        if (index >= 0) session.printWraps.splice(index, 1);
       });
     },
     async acquire(get, dispose) {

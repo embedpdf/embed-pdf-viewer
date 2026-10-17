@@ -33,7 +33,6 @@ import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
-import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
 import { MeasurementToken } from '@embedpdf/react/measurement';
 import { RedactionToken } from '@embedpdf/react/redaction';
@@ -54,6 +53,8 @@ export const GO_TO_PAGE_DIALOG = 'go-to-page';
 export const SHORTCUTS_DIALOG = 'shortcuts';
 /** The confirmation before marked areas are removed for good (ui/redact-confirm.tsx). */
 export const REDACT_CONFIRM_DIALOG = 'redact-confirm';
+/** The Print dialog: which pages, and whether annotations print (ui/print-dialog.tsx). */
+export const PRINT_DIALOG = 'print';
 /** The form designer's sidebar (ui/form-design-panel.tsx), which `form:design` opens. */
 export const FORM_DESIGN_PANEL = 'form-design';
 /** Form design's resting tool, the form plugin's: widgets select, move and resize there. */
@@ -477,15 +478,9 @@ export const defaultCommands: CommandDef[] = [
     categories: ['documents.print'],
     allowed: (commandContext) => commandContext.tryGet(DocumentsToken)?.canPrint() ?? true,
     notAllowedKey: 'commands.notAllowed.doc-print',
-    // WP → window.print() → DP through the one serialized verb op (the
-    // latch suppresses any nested script print); documentless chrome (or
-    // no actions plugin) keeps today's direct dialog.
-    run: (commandContext) => {
-      const actions =
-        commandContext.documentId != null ? commandContext.tryGet(ActionsToken) : null;
-      if (actions) void actions.runDocumentVerb('print', () => window.print());
-      else window.print();
-    },
+    // The dialog chooses the pages and prepares them; its Print button opens the browser's.
+    modal: PRINT_DIALOG,
+    enabled: (commandContext) => commandContext.documentId != null,
   },
   {
     id: 'view:fullscreen',

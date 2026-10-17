@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { decodePdfBits, PDF_BITS } from '../../src/auth/scope';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../../src/wire/resources';
 import { cdnCoverageForScope } from '../../src/wire/cdn/coverage';
+import {
+  PAGE_PICTURES,
+  PAGE_PRINT_FAMILIES,
+  PAGE_RENDER_FAMILIES,
+} from '../../src/wire/renderFamilies';
 
 const NO_BITS = decodePdfBits(null);
 const BIT5 = decodePdfBits(PDF_BITS.COPY);
@@ -625,5 +630,82 @@ describe('DOC_RESOURCES — pathPrefix invariants (anti-drift)', () => {
       .map((r) => r.resolvePathPrefix('doc_X', 'myLayer'));
     const unique = new Set(cacheablePrefixes);
     expect(unique.size).toBe(cacheablePrefixes.length);
+  });
+});
+
+describe('print pictures', () => {
+  const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
+  const PRINT_IDS = PAGE_PICTURES.filter((p) => p.print?.tier === 'print').map((p) => p.resource);
+  const HIGH_IDS = PAGE_PICTURES.filter((p) => p.print?.tier === 'print-high').map(
+    (p) => p.resource,
+  );
+  const READS = ['doc.open', 'doc.render', 'doc.annotate.read', 'doc.forms.read'];
+
+  it('every picture, screen or print, has a path prefix no other picture starts with', () => {
+    const prefixes = PAGE_PICTURES.flatMap((p) => [
+      DOC_RESOURCES[p.resource].resolvePathPrefix('doc_1', 'L1'),
+      DOC_RESOURCES[p.layerResource].resolvePathPrefix('doc_1', 'L1'),
+    ]);
+    expect(new Set(prefixes).size).toBe(prefixes.length);
+    for (const a of prefixes) {
+      for (const b of prefixes) {
+        if (a !== b) expect(b.startsWith(a)).toBe(false);
+      }
+    }
+  });
+
+  it("a print picture needs its family's rights plus its tier's, at both tiers", () => {
+    for (const picture of PAGE_PICTURES.filter((p) => p.print !== null)) {
+      const screen = PAGE_RENDER_FAMILIES[picture.family];
+      const tier = [...picture.print!.needs];
+      for (const id of [picture.resource, picture.layerResource]) {
+        expect(checkResourceAccess(id, [...screen.needs, ...tier], NO_BITS)).toBe(true);
+        for (const missing of [...screen.needs, ...tier]) {
+          const short = [...screen.needs, ...tier].filter((s) => s !== missing);
+          expect(checkResourceAccess(id, short, NO_BITS)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('the CDN signs a print tier only for a session with its right', () => {
+    const screen = ids(cdnCoverageForScope(READS, NO_BITS, { docId: 'doc_1', layerName: 'L1' }));
+    const print = ids(
+      cdnCoverageForScope([...READS, 'doc.print'], NO_BITS, { docId: 'doc_1', layerName: 'L1' }),
+    );
+    const high = ids(
+      cdnCoverageForScope([...READS, 'doc.print', 'doc.print.high'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+      }),
+    );
+    for (const id of [...PRINT_IDS, ...HIGH_IDS]) expect(screen.has(id)).toBe(false);
+    for (const id of PRINT_IDS) expect(print.has(id)).toBe(true);
+    for (const id of HIGH_IDS) expect(print.has(id)).toBe(false);
+    for (const id of [...PRINT_IDS, ...HIGH_IDS]) expect(high.has(id)).toBe(true);
+  });
+
+  it('a print picture depends on the planes its family does', () => {
+    const annotationsOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: {
+          content: 'base',
+          annotations: 'layer',
+          forms: 'base',
+          layout: 'base',
+          attachments: 'base',
+          metadata: 'base',
+          actions: 'base',
+        },
+      }),
+    );
+    for (const tier of ['print', 'print-high'] as const) {
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].annotations.resource)).toBe(false);
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].all.resource)).toBe(false);
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].fields.resource)).toBe(true);
+      expect(annotationsOwned.has(PAGE_PRINT_FAMILIES[tier].pages.resource)).toBe(true);
+    }
   });
 });

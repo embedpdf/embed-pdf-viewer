@@ -6,7 +6,7 @@ import { documentState, documentsState } from '../src/documents-state';
 import { isPluginError } from '../src/errors';
 import { createKernel } from '../src/kernel';
 import { DocumentsToken, type AnyPlugin, type PluginContext } from '../src/types';
-import { bytesInput, immediateEngine, makeHandle, settle } from './helpers';
+import { bytesInput, immediateEngine, makeHandle, quietPrinter, settle } from './helpers';
 
 /**
  * The documents capability as the Opening, Several documents and Saving pages describe it: what
@@ -30,7 +30,11 @@ function localHandle(id: string, allows: (permission: string) => boolean = () =>
 const change = { type: 'metadata.updated', origin: { kind: 'local' } };
 
 async function openLocal(handle: ReturnType<typeof localHandle>, plugins: AnyPlugin[] = []) {
-  const kernel = createKernel({ engine: immediateEngine({ [handle.id]: handle }), plugins });
+  const kernel = createKernel({
+    engine: immediateEngine({ [handle.id]: handle }),
+    plugins,
+    printer: quietPrinter(),
+  });
   await kernel.start();
   await kernel.documents.open(bytesInput(handle.id));
   return kernel;

@@ -8,6 +8,7 @@ import {
   type PageImageResult,
   type PageLayerRights,
   type PageLayout,
+  type PagePrintRights,
   type PageNetworkRenderFormat,
   type PageRef,
   type PageRenderImage,
@@ -16,11 +17,12 @@ import {
   renderAreaTransform,
   renderTargetArea,
   checkImageQuality,
+  checkRenderUsage,
+  printDpiOf,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 import {
-  PAGE_RENDER_FAMILIES,
-  pageRenderFamilyOf,
+  pagePictureOf,
   renderImageOptionsToWire,
   wirePaths,
   type RenderVersions,
@@ -41,6 +43,8 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly layout: (signal: AbortSignal) => Promise<PageLayout>,
     /** What the caller may read, when the client can know it; null leaves it to the server. */
     private readonly layerRights: () => PageLayerRights | null,
+    /** What the caller may print, when the client can know it; null leaves it to the server. */
+    private readonly printRights: () => PagePrintRights | null,
   ) {}
 
   image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
@@ -52,14 +56,16 @@ export class CloudPageRenderService implements PageRenderService {
     return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
-      // A picture draws what the caller may read, and the family it draws is
-      // its path. Without the caller's rights (a tenant or API token), it asks
-      // for everything and the server decides.
+      // A picture draws what the caller may read, and a print picture needs
+      // the print right of its DPI. What it draws, and whether and at which
+      // DPI it prints, is its path. Without the caller's rights (a tenant or
+      // API token), it asks for everything and the server decides.
+      checkRenderUsage(options, this.printRights());
       const layers = resolvePageLayers(
         options,
         this.layerRights() ?? { annotations: true, formFields: true },
       );
-      const family = PAGE_RENDER_FAMILIES[pageRenderFamilyOf(layers)];
+      const picture = pagePictureOf(layers, printDpiOf(options));
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         const pageObjectNumber = this.pageRef.objectNumber;
@@ -77,18 +83,37 @@ export class CloudPageRenderService implements PageRenderService {
         // picture draws is its family's path; the token carries the family's
         // pins.
         const pins: RenderVersions = { contentVersion: page.cache.contentVersion };
-        for (const pin of family.pins) pins[pin] = page.cache[pin];
+        for (const pin of picture.pins) pins[pin] = page.cache[pin];
         const wireToken = renderImageOptionsToWire({ ...options, format }, pins);
         // Plane-scope rule: a picture resolves at the doc-level (shared base)
         // path iff every plane its family depends on is inherited, so 1,000
         // inheriting visitors share one URL set, one origin render, and no
         // layer session.
-        return planesInherited(manifest, family.planes)
-          ? wirePaths.docPageRender(this.docId, family.family, this.pageRef, wireToken)
+        const print = picture.print;
+        if (planesInherited(manifest, picture.planes)) {
+          return print
+            ? wirePaths.docPagePrint(
+                this.docId,
+                print.tier,
+                picture.family,
+                this.pageRef,
+                wireToken,
+              )
+            : wirePaths.docPageRender(this.docId, picture.family, this.pageRef, wireToken);
+        }
+        return print
+          ? wirePaths.layerPagePrint(
+              this.docId,
+              this.layerName,
+              print.tier,
+              picture.family,
+              this.pageRef,
+              wireToken,
+            )
           : wirePaths.layerPageRender(
               this.docId,
               this.layerName,
-              family.family,
+              picture.family,
               this.pageRef,
               wireToken,
             );

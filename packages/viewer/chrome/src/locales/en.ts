@@ -220,6 +220,28 @@ export const en: Locale = {
     },
     // The Go to Page dialog's button.
     goToPage: { go: 'Go' },
+    // The Print dialog (`document:print`): which pages, whether annotations print, how far
+    // preparing the printout is, that it waits for the Print button (Safari), and how it prints
+    // on this device.
+    print: {
+      title: 'Print',
+      pages: 'Pages',
+      allPages: 'All pages',
+      currentPage: 'Current page',
+      range: 'Custom',
+      rangeLabel: 'Pages to print',
+      rangePlaceholder: 'e.g. 1-3, 5',
+      rangeInvalid: 'Use page numbers from 1 to {total}, such as 1-3, 5',
+      annotations: 'Print annotations',
+      preparing: 'Preparing…',
+      preparingPage: 'Preparing page {page} of {total}…',
+      ready: 'Ready to print.',
+      images: 'Pages print as images at {dpi} DPI.',
+      lowResolution: 'This document allows only low-resolution printing ({dpi} DPI).',
+      failed: 'The printout couldn’t be prepared.',
+      cancel: 'Cancel',
+      print: 'Print',
+    },
     // The built-in panels' titles, which are their buttons' labels too.
     panels: {
       thumbnails: 'Thumbnails',

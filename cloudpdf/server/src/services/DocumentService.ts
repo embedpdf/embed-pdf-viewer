@@ -1,4 +1,4 @@
-import type { PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
+import type { PageExtractFlatten, PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -1535,6 +1535,7 @@ export class DocumentService {
     docId: string,
     layerName: string,
     pageObjectNumbers: number[],
+    flatten: PageExtractFlatten | null,
     signal?: AbortSignal,
   ): Promise<Uint8Array> {
     await this.ensureLayerOnPool(ctx, docId, layerName);
@@ -1546,6 +1547,7 @@ export class DocumentService {
         docId,
         layerName,
         pages: pageObjectNumbers.map(toPageRef),
+        ...(flatten ? { flatten } : {}),
       });
     const result = await this.pool.run(docId, build, signal);
     if (result.tag !== 'pages.extract') {

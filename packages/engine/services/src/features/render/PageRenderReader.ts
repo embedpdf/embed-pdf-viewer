@@ -9,6 +9,7 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
+  checkRenderUsage,
   normalizePdfRect,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
@@ -23,6 +24,11 @@ import type { Slices } from '../../shared/slices';
 const FPDF_RENDER_ANNOT = 0x01;
 /** `EPDF_RENDER_WIDGETS`: the form fields' widgets. */
 const EPDF_RENDER_WIDGETS = 0x8000;
+/**
+ * `FPDF_PRINTING`: the print rules. Layers take their print state, and
+ * annotations and widgets draw by their `print` flag (no-view ones too).
+ */
+const FPDF_PRINTING = 0x800;
 const FPDF_RENDER_TOBECONTINUED = 1;
 const FPDF_RENDER_DONE = 2;
 
@@ -52,17 +58,22 @@ export class PageRenderReader {
     try {
       throwIfAborted(signal);
 
+      // The worker draws what it's asked: who may see or print what is
+      // checked before a render gets here, so a left-out option draws
+      // everything. A print picture is the whole page, upright, sized for
+      // its paper by its `dpi` viewport.
+      checkRenderUsage(options, null);
+      const print = options.usage === 'print';
       const page = readPageBox(this.runtime, pagePtr);
       const target = resolveTarget(options.target, page);
       const rotation = options.rotation ?? 0;
       const viewport = options.viewport ?? { kind: 'scale', scale: 1 };
 
-      // The worker draws what it's asked: who may see what is checked
-      // before a render gets here, so a left-out option draws everything.
       const layers = resolvePageLayers(options, { annotations: true, formFields: true });
       let flags = FPDF_REVERSE_BYTE_ORDER;
       if (layers.includeAnnotations) flags |= FPDF_RENDER_ANNOT;
       if (layers.includeFormFields) flags |= EPDF_RENDER_WIDGETS;
+      if (print) flags |= FPDF_PRINTING;
 
       const raster = await rasterizeAsync(this.runtime, {
         rect: target,

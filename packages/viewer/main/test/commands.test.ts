@@ -81,7 +81,24 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>commands</
   import EmbedPDF from '/embedpdf.js';
   window.heard = [];
   window.printed = 0;
-  window.print = () => { window.printed += 1; };
+  // No PDF viewer, so the viewer prints pictures from a frame of its own. Where the browser's PDF
+  // viewer shows the copy, the print() the stub below sets when the frame loads isn't always the
+  // one the print reaches.
+  Object.defineProperty(navigator, 'pdfViewerEnabled', { value: false });
+  // What the browser's print dialog would do: each print frame's print() counts, and printing
+  // finishes at once.
+  new MutationObserver((records) => {
+    for (const node of records.flatMap((record) => [...record.addedNodes])) {
+      if (!(node instanceof HTMLIFrameElement)) continue;
+      node.addEventListener('load', () => {
+        const view = node.contentWindow;
+        view.print = () => {
+          window.printed += 1;
+          view.dispatchEvent(new Event('afterprint'));
+        };
+      });
+    }
+  }).observe(document.body, { childList: true });
   window.element = EmbedPDF.init(${CONFIG});
 </script>
 </body></html>`;
@@ -198,8 +215,19 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('buttons and commands', 
       shortcuts: ['Mod+P'],
     });
     expect(await execute(tab, 'document:print')).toEqual({ status: 'executed' });
-    // The document's own print actions run first, then the dialog opens.
+    // It opens the Print dialog, which prepares the pages; its Print button prints them.
+    const PRINT_BUTTON = '[role="dialog"] button[type="submit"]';
+    await tab.waitForFunction(
+      (selector) =>
+        window.element.shadowRoot!.querySelector<HTMLButtonElement>(selector)?.disabled === false,
+      PRINT_BUTTON,
+    );
+    await tab.evaluate(
+      (selector) => window.element.shadowRoot!.querySelector<HTMLButtonElement>(selector)!.click(),
+      PRINT_BUTTON,
+    );
     await tab.waitForFunction(() => (window as unknown as Heard).printed === 1);
+    await tab.waitForFunction(() => !window.element.shadowRoot!.querySelector('[role="dialog"]'));
   });
 
   it('draws { paths, fill } filled, and a built-in icon replaced wherever it shows', async () => {

@@ -4,7 +4,8 @@
  * JavaScript executor extracts them and routes them through
  * `firePrintThroughAdapter` and `performSubmit` after the transaction, since
  * the /WP and /DP wrap and the post-commit dataset must run outside the host
- * transaction). Such effects here come from the form pipeline's K/V/C/F path.
+ * transaction). Such effects here come from the form pipeline's K/V/C/F path;
+ * a print goes to the kernel's print when the host gave a printer.
  */
 import type { ActionOrigin, ActionSource } from '../contract';
 import type {
@@ -18,12 +19,16 @@ import { intentOfSubmitEffect } from '../submit/intent';
 import type { ActionsSubmit } from '../submit/perform';
 
 export function createScriptSurface(
-  services: Pick<ActionsServices, 'events' | 'ports' | 'authority' | 'printLatch'>,
+  services: Pick<
+    ActionsServices,
+    'events' | 'ports' | 'authority' | 'documentPrint' | 'printLatch'
+  >,
   { performSubmit }: ActionsSubmit,
 ) {
   const { reportDiagnostic, scriptDiagnosticReported, scriptFailed } = services.events;
   const ports = services.ports.slots;
   const { allowsPrint } = services.authority;
+  const { documentPrint } = services;
   const printLatch = services.printLatch;
 
   const surfaceScriptResult = (result: ScriptSurfaceResult): void => {
@@ -73,6 +78,27 @@ export function createScriptSurface(
           code: 'ui-effect-suppressed',
           message: 'script print request during a document print event — suppressed (reentrant)',
         });
+        continue;
+      }
+      // With the kernel's print, a user's print request prints the document, and the kernel
+      // runs /WP and /DP around it. A hover or lifecycle request never prints.
+      if (effect.kind === 'print' && documentPrint.available()) {
+        if (result.origin !== 'user') {
+          scriptDiagnosticReported.emit({
+            code: 'ui-effect-suppressed',
+            message: `script print request from a ${result.origin} event suppressed`,
+          });
+          continue;
+        }
+        documentPrint.start().catch((error: unknown) =>
+          reportDiagnostic(
+            {
+              code: 'trigger-failed',
+              message: `print: ${error instanceof Error ? error.message : String(error)}`,
+            },
+            { action: 'javascript', source },
+          ),
+        );
         continue;
       }
       if (!ports.uiAdapter) {

@@ -77,6 +77,7 @@ export type {
   PageRenderOptions,
   PageRenderTarget,
   PageRenderViewport,
+  PrintDpi,
   PageImageHandle,
   PageImageOptions,
   PageImageObjectUrl,

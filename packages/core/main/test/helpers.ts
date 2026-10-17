@@ -1,6 +1,8 @@
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
+import type { HostPrinter } from '../src/types';
+
 /** Shared fakes for kernel tests: an engine that opens immediately. */
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
 export const page = (pageObjectNumber: number, index: number): PageLayout =>
@@ -56,4 +58,9 @@ export function immediateEngine(handles: Record<string, DocumentHandle> = {}): E
 }
 
 export const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: new Uint8Array() });
+
+/** A printer that takes every print and opens no dialog. */
+export const quietPrinter = (): HostPrinter => ({
+  stage: async () => ({ print: async () => {}, dispose: () => {} }),
+});
 export const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
