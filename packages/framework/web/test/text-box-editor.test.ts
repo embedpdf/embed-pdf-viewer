@@ -81,6 +81,16 @@ describe('attachTextBoxEditor', () => {
     expect(element.focus).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the text from the top again once editing ends', () => {
+    const { element, editor } = harness();
+    editor.update(item(true), 1);
+    // Typing past the box scrolls it to the caret.
+    element.scrollTop = 120;
+    editor.update(item(false), 1);
+    expect(element.contentEditable).toBe('false');
+    expect(element.scrollTop).toBe(0);
+  });
+
   it('routes typing to the item’s annotation', () => {
     const { element, annotation, editor } = harness();
     editor.update(item(true), 1);
