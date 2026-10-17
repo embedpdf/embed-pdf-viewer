@@ -767,6 +767,9 @@ export function linearLayout(
     return vertical ? it.y + it.height : it.x + it.width;
   });
   const firstPage = items.map((it) => it.pageIndexes[0]);
+  const itemOf = new Map(
+    items.flatMap((it) => it.pageIndexes.map((pi) => [pi, it.index] as const)),
+  );
 
   return {
     size,
@@ -788,7 +791,7 @@ export function linearLayout(
       return items[posIdx(position)];
     },
     itemOfPage(pi) {
-      return clamp(upperBound(firstPage, pi) - 1, 0, items.length - 1);
+      return itemOf.get(pi) ?? clamp(upperBound(firstPage, pi) - 1, 0, items.length - 1);
     },
   };
 }
@@ -893,6 +896,9 @@ export function gridLayout(
 
   const size: Size = { width: columns * stepX - gap, height: Math.max(1, yCursor - gap) };
   const firstPage = items.map((it) => it.pageIndexes[0]);
+  const itemOf = new Map(
+    items.flatMap((it) => it.pageIndexes.map((pi) => [pi, it.index] as const)),
+  );
 
   return {
     size,
@@ -921,7 +927,7 @@ export function gridLayout(
       return items[clamp(row * columns + colAt(col), 0, itemCount - 1)];
     },
     itemOfPage(pi) {
-      return clamp(upperBound(firstPage, pi) - 1, 0, itemCount - 1);
+      return itemOf.get(pi) ?? clamp(upperBound(firstPage, pi) - 1, 0, itemCount - 1);
     },
   };
 }
