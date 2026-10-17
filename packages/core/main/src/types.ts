@@ -620,17 +620,22 @@ export interface DownloadOptions extends OperationOptions {
 }
 
 /**
- * How a print comes out: pictures of the pages, drawn by the print rules, at 150 DPI with
- * `doc.print` or 300 DPI with `doc.print.high` (Acrobat's low and high resolution printing).
+ * How a print comes out.
+ *
+ * - `'pdf'`: the printer prints a copy of the pages as they print (`pages.extract()` with
+ *   `flatten: { usage: 'print' }`): sharp text and lines. It takes `doc.print.high`, a right to
+ *   keep the copy (`doc.download` or `doc.download.flattened`: every print dialog can save it as
+ *   a file), and a printer that prints a PDF (`HostPrinter.stagePdf`).
+ * - `'images'` otherwise: pictures of the pages, drawn by the print rules, at 150 DPI with
+ *   `doc.print` or 300 DPI with `doc.print.high` (Acrobat's low and high resolution printing).
  */
-export interface PrintQuality {
-  readonly kind: 'images';
-  readonly dpi: PrintDpi;
-}
+export type PrintQuality =
+  | { readonly kind: 'pdf' }
+  | { readonly kind: 'images'; readonly dpi: PrintDpi };
 
 /** How far preparing a print got. */
 export interface PrintProgress {
-  /** Pages whose picture is ready. */
+  /** Pages that are ready: one at a time as pictures, all at once as a PDF. */
   readonly pagesRendered: number;
   /** Pages the print has. */
   readonly pageCount: number;
@@ -641,10 +646,10 @@ export interface PrintOptions extends OperationOptions {
   readonly pages?: readonly PageRef[];
   /**
    * Print the annotations that print. Default: when the user may read them. Form fields print
-   * when the user may read the form, as in a page picture.
+   * when the user may read the form, whatever this says.
    */
   readonly includeAnnotations?: boolean;
-  /** Called each time a page's picture is ready, and once before the first. */
+  /** Called each time pages are ready, and once before the first. */
   readonly onProgress?: (progress: PrintProgress) => void;
 }
 
@@ -655,13 +660,14 @@ export interface PrintOptions extends OperationOptions {
  */
 export interface PreparedPrint {
   readonly quality: PrintQuality;
-  /** How many sheets it prints: one per page. */
+  /** How many pages it prints. */
   readonly pageCount: number;
   /**
    * Open the print dialog. The document's own print actions run around it, when the actions
    * plugin is installed; when they, or anyone, change the document after it was prepared, it is
-   * prepared again first. Resolves when the printer has the sheets. Rejects `invalid-input` once
-   * disposed, `operation-cancelled` when `signal` fires before the dialog opens.
+   * prepared again first. Resolves when the printer has the job. When the printer refuses a
+   * PDF, the same pages print as pictures. Rejects `invalid-input` once disposed,
+   * `operation-cancelled` when `signal` fires before the dialog opens.
    */
   print(options?: OperationOptions): Promise<void>;
   /** Free what preparing took. Closing the document does too. */
@@ -680,7 +686,7 @@ export interface PrintSheet {
 
 /** What a printer got ready: `print()` opens the print dialog with it. */
 export interface StagedPrint {
-  /** Open the print dialog. Resolves once the printer has the sheets. */
+  /** Open the print dialog. Resolves once the printer has the job. */
   print(): Promise<void>;
   /** Free what staging took. */
   dispose(): void;
@@ -698,6 +704,15 @@ export interface HostPrinter {
    */
   stage(
     sheets: readonly PrintSheet[],
+    options: { readonly name: string; readonly signal?: AbortSignal },
+  ): Promise<StagedPrint>;
+  /**
+   * Present when this printer prints a PDF file on this device: a browser whose own PDF viewer
+   * prints it, a desktop shell, a native print API. Gets `pdf`, a copy of the pages as they
+   * print, ready as `stage()` gets sheets ready. A printer without it prints pictures.
+   */
+  stagePdf?(
+    pdf: Uint8Array,
     options: { readonly name: string; readonly signal?: AbortSignal },
   ): Promise<StagedPrint>;
 }
@@ -830,11 +845,12 @@ export interface DocumentsCapability {
   canDownload(id?: string): boolean;
   /**
    * Get a print of the document ready (the one in scope without an id): wait for changes still
-   * on their way, draw each page by the print rules, and hand the pictures to the host's
-   * printer. `onProgress` follows the pages. Rejects `permission-denied` without `doc.print`,
-   * `unsupported` when the host gave no printer, `not-found` for a page the document doesn't
-   * have, `invalid-input` for an empty `pages`, `not-ready` with no open document,
-   * `operation-cancelled` when `signal` fires.
+   * on their way, make the pages as they print (a PDF copy or pictures, as `getPrintQuality()`
+   * says), and hand them to the host's printer. `onProgress` follows the pages. Rejects
+   * `permission-denied` without `doc.print`, `unsupported` when the host gave no printer,
+   * `not-found` for a page the document doesn't have, `invalid-input` for an empty `pages` or a
+   * page named twice, `not-ready` with no open document, `operation-cancelled` when `signal`
+   * fires.
    */
   preparePrint(id?: string, options?: PrintOptions): Promise<PreparedPrint>;
   /**

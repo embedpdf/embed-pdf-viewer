@@ -58,15 +58,21 @@ browser's dialog, as they would in Acrobat.
 
 ### How sharp it prints
 
-The browser prints pictures of the pages. How sharp they are depends on what the document allows:
+On a desktop browser with its own PDF viewer on, a document that allows high-quality printing and
+keeping a copy prints as a PDF: a copy of the pages as they print, which the browser's viewer prints
+with sharp text and lines. Every print dialog can save what it prints as a file, so the copy takes
+a right to keep it. Everywhere else the browser prints pictures of the pages:
 
-| Permission       | Pictures                                                           |
-| :--------------- | :----------------------------------------------------------------- |
-| `doc.print.high` | 300 DPI                                                            |
-| `doc.print` only | 150 DPI, as a PDF asks when it allows only low-resolution printing |
+| Permission                                                      | Prints                                                                               |
+| :-------------------------------------------------------------- | :----------------------------------------------------------------------------------- |
+| `doc.print.high` and `doc.download` or `doc.download.flattened` | The PDF copy; pictures at 300 DPI on phones, tablets and Chrome set to download PDFs |
+| `doc.print.high`                                                | Pictures at 300 DPI                                                                  |
+| `doc.print` only                                                | Pictures at 150 DPI, as a PDF asks when it allows only low-resolution printing       |
 
-`getPrintQuality()` says which, for a note in your dialog: `{ kind: 'images', dpi: 300 }`, or `null`
-when the document can't be printed here.
+`getPrintQuality()` says which, for a note in your dialog: `{ kind: 'pdf' }`,
+`{ kind: 'images', dpi: 300 }`, or `null` when the document can't be printed here. When the
+browser turns the PDF down after all, the same pages print as pictures at 300 DPI, and the
+prepared print's `quality` says so.
 
 ### Your own print dialog
 

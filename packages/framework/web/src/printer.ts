@@ -1,10 +1,15 @@
 /**
  * The browser's print dialog, for the kernel: `createKernel({ printer: browserPrinter() })`.
- * A print is one sheet per page: the page's picture on a sheet of the page's own size
- * (`@page`), shrunk to fit when the browser prints on other paper. A desktop browser prints the
- * sheets from a hidden frame. iOS prints a frame as a picture of the page around it, so there
- * the sheets print from the page itself, hidden on screen. Structurally `HostPrinter` from
- * `@embedpdf/core`, declared here so this package stays dependency-free.
+ *
+ * Where the browser's own PDF viewer prints a PDF file (a desktop browser with it on), the
+ * printer takes the kernel's PDF copy and the viewer prints it from a hidden frame: sharp text
+ * and lines. Everywhere it prints pictures: one sheet per page, the page's picture on a sheet of
+ * the page's own size (`@page`), shrunk to fit when the browser prints on other paper. A desktop
+ * browser prints the sheets from a hidden frame. iOS prints a frame as a picture of the page
+ * around it, so there the sheets print from the page itself, hidden on screen.
+ *
+ * Structurally `HostPrinter` from `@embedpdf/core`, declared here so this package stays
+ * dependency-free.
  */
 
 /** Structural twin of `PrintSheet` (`@embedpdf/core`). */
@@ -26,27 +31,87 @@ export interface WebPrinter {
     sheets: readonly WebPrintSheet[],
     options: { readonly name: string; readonly signal?: AbortSignal },
   ): Promise<WebStagedPrint>;
+  stagePdf?(
+    pdf: Uint8Array,
+    options: { readonly name: string; readonly signal?: AbortSignal },
+  ): Promise<WebStagedPrint>;
 }
 
 /** The attribute that marks the sheets printed from the page itself. */
 const PRINT_ROOT = 'data-epdf-print';
 
-/** The browser's printer. */
+/** The browser's printer: it prints PDFs where the browser's own PDF viewer does. */
 export function browserPrinter(): WebPrinter {
+  const printer: WebPrinter = { stage: stageSheets };
+  if (!printsPdfFiles()) return printer;
+
+  // The viewer prints a PDF after `print()` returned, and removing its frame cancels that: the
+  // frame of a printed PDF stays until the next PDF is staged.
+  let removePrinted: (() => void) | null = null;
   return {
-    async stage(sheets, { name, signal }) {
-      const urls = sheets.map((sheet) => URL.createObjectURL(sheet.image));
-      const revoke = () => urls.forEach((url) => URL.revokeObjectURL(url));
-      try {
-        return printsFramesAsPictures()
-          ? await stageInPage(sheets, urls, name, revoke, signal)
-          : await stageInFrame(sheets, urls, name, revoke, signal);
-      } catch (error) {
-        revoke();
-        throw error;
-      }
+    ...printer,
+    async stagePdf(pdf, { name, signal }) {
+      removePrinted?.();
+      removePrinted = null;
+      const frame = await loadPdfFrame(pdf, name, signal);
+      let printed = false;
+      return {
+        async print() {
+          frame.view.focus();
+          frame.view.print();
+          printed = true;
+        },
+        dispose() {
+          if (printed) removePrinted = frame.remove;
+          else frame.remove();
+        },
+      };
     },
   };
+}
+
+/** The sheets staged where this browser prints them: from the page on iOS, else a frame. */
+async function stageSheets(
+  sheets: readonly WebPrintSheet[],
+  { name, signal }: { readonly name: string; readonly signal?: AbortSignal },
+): Promise<WebStagedPrint> {
+  const urls = sheets.map((sheet) => URL.createObjectURL(sheet.image));
+  const revoke = () => urls.forEach((url) => URL.revokeObjectURL(url));
+  try {
+    return printsFramesAsPictures()
+      ? await stageInPage(sheets, urls, name, revoke, signal)
+      : await stageInFrame(sheets, urls, name, revoke, signal);
+  } catch (error) {
+    revoke();
+    throw error;
+  }
+}
+
+/** `pdf` loaded in a hidden frame of its own, where the browser's PDF viewer shows it. */
+async function loadPdfFrame(
+  pdf: Uint8Array,
+  name: string,
+  signal: AbortSignal | undefined,
+): Promise<{ view: Window; remove(): void }> {
+  const url = URL.createObjectURL(new Blob([pdf as BlobPart], { type: 'application/pdf' }));
+  const frame = hiddenFrame();
+  frame.title = name;
+  frame.src = url;
+  const remove = () => {
+    frame.remove();
+    URL.revokeObjectURL(url);
+  };
+  const loaded = untilEvent(frame, 'load', signal);
+  document.body.appendChild(frame);
+  try {
+    await loaded;
+    const view = frame.contentWindow;
+    if (!view) throw new Error('the print frame did not load');
+    return { view, remove };
+  } catch (error) {
+    remove();
+    throw error;
+  }
 }
 
 /**
@@ -102,19 +167,11 @@ function sheetElements(
 const FRAME_DOCUMENT =
   '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>';
 
-/** The sheets in a hidden frame of their own, so nothing of the host page prints with them. */
-async function stageInFrame(
-  sheets: readonly WebPrintSheet[],
-  urls: readonly string[],
-  name: string,
-  revoke: () => void,
-  signal: AbortSignal | undefined,
-): Promise<WebStagedPrint> {
-  const { css, sizes } = printSheetsStyle(sheets);
+/** A frame laid out but out of sight: a frame that is not laid out may never load. */
+function hiddenFrame(): HTMLIFrameElement {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.tabIndex = -1;
-  // Laid out, but out of sight: a frame that is not laid out may never load.
   Object.assign(frame.style, {
     position: 'fixed',
     right: '0',
@@ -125,6 +182,19 @@ async function stageInFrame(
     opacity: '0',
     pointerEvents: 'none',
   });
+  return frame;
+}
+
+/** The sheets in a hidden frame of their own, so nothing of the host page prints with them. */
+async function stageInFrame(
+  sheets: readonly WebPrintSheet[],
+  urls: readonly string[],
+  name: string,
+  revoke: () => void,
+  signal: AbortSignal | undefined,
+): Promise<WebStagedPrint> {
+  const { css, sizes } = printSheetsStyle(sheets);
+  const frame = hiddenFrame();
   frame.srcdoc = FRAME_DOCUMENT;
   const loaded = untilEvent(frame, 'load', signal);
   document.body.appendChild(frame);
@@ -250,6 +320,16 @@ function untilSettled<T>(work: Promise<T>, signal: AbortSignal | undefined): Pro
       },
     );
   });
+}
+
+/**
+ * Whether this browser prints a PDF file from a frame: its own PDF viewer is on (Chrome set to
+ * download PDFs has none, and would download the copy instead), and it is not iOS, which reports
+ * a viewer but prints a framed PDF as a picture of its first page, or Android.
+ */
+function printsPdfFiles(): boolean {
+  if (typeof navigator === 'undefined' || navigator.pdfViewerEnabled !== true) return false;
+  return !printsFramesAsPictures() && !/Android/i.test(navigator.userAgent);
 }
 
 /**

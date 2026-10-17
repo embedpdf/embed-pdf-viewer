@@ -184,8 +184,10 @@ while the viewer has focus. A download includes every annotation, form value and
 **Print** opens a dialog: every page, the current page or pages such as `1-3, 5`, and whether
 annotations print. It prepares the pages as it opens, so its **Print** button opens the browser's
 print dialog at once. Pages print as the PDF says they print: an annotation or a form field that is
-set not to print stays off the paper. They print as pictures, at 300 DPI, or at 150 DPI when the
-document allows only low-resolution printing; the dialog says which.
+set not to print stays off the paper. On a desktop browser with its own PDF viewer, a document that
+allows high-quality printing and downloading prints as a PDF, with sharp text and lines. Everywhere
+else the pages print as pictures, at 300 DPI, or at 150 DPI when the document allows only
+low-resolution printing; the dialog says which.
 
 When the scope doesn't allow printing, or you [turn it off](features/turning-off), **Print** isn't
 there, and `Ctrl`/`Cmd`+`P` says so instead of printing the web page.

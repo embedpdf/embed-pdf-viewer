@@ -9,12 +9,15 @@ const sheet = (widthPt: number, heightPt: number) => ({
   heightPt,
 });
 
-/** Object URLs the test can count, made and revoked. */
-function objectUrls() {
+/**
+ * Object URLs the test can count, made and revoked. A frame loads its URL, so a PDF's stands in
+ * as a blank page (`about:blank#pdf-0`).
+ */
+function objectUrls(prefix = 'blob:sheet-') {
   const made: string[] = [];
   const revoked: string[] = [];
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => {
-    const url = `blob:sheet-${made.length}`;
+    const url = `${prefix}${made.length}`;
     made.push(url);
     return url;
   });
@@ -145,5 +148,69 @@ describe('browserPrinter on a desktop browser', () => {
     staged.dispose();
     expect(document.body.querySelector('iframe')).toBeNull();
     expect(revoked).toEqual(made);
+  });
+});
+
+describe('browserPrinter and PDFs', () => {
+  const desktop = (pdfViewerEnabled: boolean, userAgent = 'Mozilla/5.0 (Macintosh) Chrome/146') =>
+    vi.stubGlobal('navigator', { userAgent, maxTouchPoints: 0, pdfViewerEnabled });
+
+  it('prints PDFs only where the browser has its own PDF viewer, and not on phones or tablets', () => {
+    desktop(true);
+    expect(browserPrinter().stagePdf).toBeTypeOf('function');
+    // Chrome set to download PDFs has no viewer: it would download the copy instead.
+    desktop(false);
+    expect(browserPrinter().stagePdf).toBeUndefined();
+    // iOS reports a viewer, but prints a framed PDF as a picture of its first page.
+    desktop(true, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15');
+    expect(browserPrinter().stagePdf).toBeUndefined();
+    desktop(true, 'Mozilla/5.0 (Linux; Android 15) Chrome/146 Mobile');
+    expect(browserPrinter().stagePdf).toBeUndefined();
+  });
+
+  /** Stage `pdf`: the frame it loads in, and the staged print once the frame loaded. */
+  async function stagePdf(printer: ReturnType<typeof browserPrinter>, name: string) {
+    const staging = printer.stagePdf!(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { name });
+    const frames = document.body.querySelectorAll('iframe');
+    const frame = frames[frames.length - 1]!;
+    frame.dispatchEvent(new Event('load'));
+    const staged = await staging;
+    const print = vi.fn();
+    Object.assign(frame.contentWindow!, { print, focus: () => {} });
+    return { frame, staged, print };
+  }
+
+  it('prints a PDF from a frame of its own, and keeps the frame until the next PDF', async () => {
+    desktop(true);
+    const { made, revoked } = objectUrls('about:blank#pdf-');
+    const printer = browserPrinter();
+    const first = await stagePdf(printer, 'Contract');
+    expect(first.frame.getAttribute('src')).toBe('about:blank#pdf-0');
+    expect(first.frame.title).toBe('Contract');
+
+    await first.staged.print();
+    expect(first.print).toHaveBeenCalledTimes(1);
+    // The viewer prints after print() returned: the frame stays after the print is disposed.
+    first.staged.dispose();
+    expect(first.frame.isConnected).toBe(true);
+    expect(revoked).toEqual([]);
+
+    const second = await stagePdf(printer, 'Contract');
+    expect(first.frame.isConnected).toBe(false);
+    expect(revoked).toEqual(['about:blank#pdf-0']);
+    // Never printed: gone at once.
+    second.staged.dispose();
+    expect(second.frame.isConnected).toBe(false);
+    expect(revoked).toEqual(made);
+  });
+
+  it('a print the browser refuses rejects, so the kernel can print pictures instead', async () => {
+    desktop(true);
+    objectUrls('about:blank#pdf-');
+    const { staged, print } = await stagePdf(browserPrinter(), 'Contract');
+    print.mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    await expect(staged.print()).rejects.toThrow('blocked');
   });
 });

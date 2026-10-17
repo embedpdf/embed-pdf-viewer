@@ -71,6 +71,7 @@ import {
   type EngineRenderPolicy,
   type PageLayout,
   type PageRef,
+  type PrintDpi,
 } from '@embedpdf/engine-core/runtime';
 
 const EMPTY_PAGES: readonly PageLayout[] = Object.freeze([]);
@@ -225,7 +226,20 @@ const noLayer = () =>
 
 /** How a print comes out at each tier, one object each, so readers can compare them with `Object.is`. */
 const PRINT_STANDARD: PrintQuality = Object.freeze({ kind: 'images', dpi: 150 });
-const PRINT_HIGH: PrintQuality = Object.freeze({ kind: 'images', dpi: 300 });
+const PRINT_HIGH: Extract<PrintQuality, { kind: 'images' }> = Object.freeze({
+  kind: 'images',
+  dpi: 300,
+});
+const PRINT_PDF: PrintQuality = Object.freeze({ kind: 'pdf' });
+
+/** One print being staged: the document, its pages, what prints beside them, the job's name. */
+interface PrintJob {
+  readonly handle: DocumentHandle;
+  readonly pages: readonly PageInfo[];
+  readonly layers: { readonly includeAnnotations: boolean; readonly includeFormFields: boolean };
+  readonly name: string;
+  readonly options: PrintOptions;
+}
 
 /**
  * The documents capability as seen from inside one document's scope: every call whose document
@@ -723,9 +737,17 @@ export function createKernel(config: {
   const canPrintOn = (documentId: string | undefined): boolean =>
     printer !== null && allowsOn(documentId, 'doc.print');
 
+  /**
+   * How a print comes out: the PDF copy with `doc.print.high`, a right to keep the copy (every
+   * print dialog can save it as a file) and a printer that prints a PDF; else pictures, at the
+   * resolution `doc.print.high` or `doc.print` allows.
+   */
   const printQualityOf = (documentId: string | undefined): PrintQuality | null => {
     if (!canPrintOn(documentId)) return null;
-    return allowsOn(documentId, 'doc.print.high') ? PRINT_HIGH : PRINT_STANDARD;
+    if (!allowsOn(documentId, 'doc.print.high')) return PRINT_STANDARD;
+    const mayKeepCopy =
+      allowsOn(documentId, 'doc.download') || allowsOn(documentId, 'doc.download.flattened');
+    return mayKeepCopy && printer?.stagePdf ? PRINT_PDF : PRINT_HIGH;
   };
 
   /** The pages a print asks for, in its order: every page when it names none. */
@@ -738,7 +760,7 @@ export function createKernel(config: {
     if (pages.length === 0) {
       throw new PluginError('invalid-input', 'documents', 'a print needs at least one page');
     }
-    return pages.map((ref) => {
+    const found = pages.map((ref) => {
       const page = findPage(all, ref);
       if (!page) {
         throw new PluginError(
@@ -749,56 +771,113 @@ export function createKernel(config: {
       }
       return page;
     });
+    if (new Set(found).size !== found.length) {
+      throw new PluginError('invalid-input', 'documents', 'a print names a page twice');
+    }
+    return found;
   }
 
   /**
-   * Draw the pages by the print rules and hand them to the printer, once the document settled.
-   * The pages are looked up again each time, so one deleted meanwhile refuses `not-found`.
-   * Returns the staged print and the change it saw last, so a print can tell it went stale.
+   * What prints beside the page content: the annotations as the options ask, by default when
+   * the user may read them; the form fields whenever the user may read the form.
+   */
+  const printLayersOf = (documentId: string, options: PrintOptions) => ({
+    includeAnnotations: options.includeAnnotations ?? allowsOn(documentId, 'doc.annotate.read'),
+    includeFormFields: allowsOn(documentId, 'doc.forms.read'),
+  });
+
+  /**
+   * Make the pages as they print and hand them to the printer, once the document settled: the
+   * PDF copy, or a picture of each page. The pages are looked up again each time, so one deleted
+   * meanwhile refuses `not-found`. Returns the staged print, how it came out, and the change it
+   * saw last, so a print can tell it went stale.
    */
   async function stagePrint(
     session: DocumentSession,
     activePrinter: HostPrinter,
     quality: PrintQuality,
     options: PrintOptions,
-  ): Promise<{ staged: StagedPrint; changesSeen: number }> {
+  ): Promise<{ staged: StagedPrint; quality: PrintQuality; changesSeen: number }> {
     const { signal } = options;
     await settle(session.settleFlushes, [signal, session.signal], report);
     const handle = documentHandle(session.id);
     if (!handle) throw new PluginError('not-ready', 'documents', 'no open document to print');
     const changesSeen = session.changesSeen;
-    const pages = printPagesOf(session, options.pages);
+    const job: PrintJob = {
+      handle,
+      pages: printPagesOf(session, options.pages),
+      layers: printLayersOf(session.id, options),
+      name: session.name ?? 'document',
+      options,
+    };
+    options.onProgress?.({ pagesRendered: 0, pageCount: job.pages.length });
+    if (quality.kind === 'images') {
+      return { staged: await stagePictures(job, activePrinter, quality.dpi), quality, changesSeen };
+    }
+    try {
+      return { staged: await stagePdfCopy(job, activePrinter), quality, changesSeen };
+    } catch (error) {
+      // A printer can turn the PDF copy down (a browser that reports a PDF viewer it doesn't
+      // show): the same pages print as pictures.
+      if (signal?.aborted) throw error;
+      const staged = await stagePictures(job, activePrinter, PRINT_HIGH.dpi);
+      return { staged, quality: PRINT_HIGH, changesSeen };
+    }
+  }
+
+  /** The PDF copy of the pages as they print, staged with the printer. */
+  async function stagePdfCopy(job: PrintJob, activePrinter: HostPrinter): Promise<StagedPrint> {
+    const { handle, pages, layers, name, options } = job;
+    const { signal } = options;
+    if (!activePrinter.stagePdf) {
+      throw new PluginError('unsupported', 'documents', 'this printer prints no PDF');
+    }
+    const pdf = await cancellable(
+      'documents',
+      signal,
+      handle.pages.extract(
+        pages.map((page) => page.ref),
+        { flatten: { usage: 'print' }, ...layers },
+      ),
+    );
+    const staged = await activePrinter.stagePdf(pdf, { name, ...(signal ? { signal } : {}) });
+    options.onProgress?.({ pagesRendered: pages.length, pageCount: pages.length });
+    return staged;
+  }
+
+  /** A picture of each page, drawn by the print rules at `dpi`, staged with the printer. */
+  async function stagePictures(
+    job: PrintJob,
+    activePrinter: HostPrinter,
+    dpi: PrintDpi,
+  ): Promise<StagedPrint> {
+    const { handle, pages, layers, name, options } = job;
+    const { signal } = options;
     const sheets: PrintSheet[] = [];
-    options.onProgress?.({ pagesRendered: 0, pageCount: pages.length });
     for (const page of pages) {
       const image = await cancellable(
         'documents',
         signal,
         handle.page(page.ref).render.image({
           usage: 'print',
-          viewport: { kind: 'dpi', dpi: quality.dpi },
+          viewport: { kind: 'dpi', dpi },
           format: 'png',
-          ...(options.includeAnnotations !== undefined
-            ? { includeAnnotations: options.includeAnnotations }
-            : {}),
+          ...layers,
         }),
       );
       const blob = await cancellable('documents', signal, image.blob());
       sheets.push({ image: blob, widthPt: page.size.width, heightPt: page.size.height });
       options.onProgress?.({ pagesRendered: sheets.length, pageCount: pages.length });
     }
-    const staged = await activePrinter.stage(sheets, {
-      name: session.name ?? 'document',
-      ...(signal ? { signal } : {}),
-    });
-    return { staged, changesSeen };
+    return activePrinter.stage(sheets, { name, ...(signal ? { signal } : {}) });
   }
 
   /**
    * Get a print ready. Refused before anything runs without `doc.print` or a printer, or for
    * pages the document doesn't have. Its `print()` runs inside every `aroundPrint` wrap (the
    * document's own print actions), and prepares again first when the document changed since:
-   * a will-print action that fills in a date is on the paper.
+   * a will-print action that fills in a date is on the paper. When the printer turns the PDF
+   * copy down, preparing or printing, the same pages print as pictures, and `quality` says so.
    */
   async function preparePrint(
     documentId: string | undefined,
@@ -818,7 +897,11 @@ export function createKernel(config: {
     }
     const pageCount = printPagesOf(session, options.pages).length;
     try {
-      let { staged, changesSeen } = await stagePrint(session, printer, quality, options);
+      let {
+        staged,
+        changesSeen,
+        quality: printed,
+      } = await stagePrint(session, printer, quality, options);
       let disposed = false;
       const dispose = () => {
         if (disposed) return;
@@ -826,8 +909,22 @@ export function createKernel(config: {
         staged.dispose();
       };
       session.scope.defer(dispose);
+      /** Stage the print again, as `as`, in place of what was staged. */
+      const restage = async (as: PrintQuality, signal: AbortSignal | undefined) => {
+        const fresh = await stagePrint(session, printer, as, {
+          ...(options.pages ? { pages: options.pages } : {}),
+          ...(options.includeAnnotations !== undefined
+            ? { includeAnnotations: options.includeAnnotations }
+            : {}),
+          ...(signal ? { signal } : {}),
+        });
+        staged.dispose();
+        ({ staged, changesSeen, quality: printed } = fresh);
+      };
       return {
-        quality,
+        get quality() {
+          return printed;
+        },
         pageCount,
         async print(printOptions) {
           if (disposed) {
@@ -835,23 +932,19 @@ export function createKernel(config: {
           }
           const signal = printOptions?.signal;
           const run = async () => {
-            if (session.changesSeen !== changesSeen) {
-              const fresh = await stagePrint(session, printer, quality, {
-                ...(options.pages ? { pages: options.pages } : {}),
-                ...(options.includeAnnotations !== undefined
-                  ? { includeAnnotations: options.includeAnnotations }
-                  : {}),
-                ...(signal ? { signal } : {}),
-              });
-              staged.dispose();
-              ({ staged, changesSeen } = fresh);
-            }
+            if (session.changesSeen !== changesSeen) await restage(quality, signal);
             if (signal?.aborted) {
               throw new PluginError('operation-cancelled', 'documents', 'print cancelled', {
                 cause: signal.reason,
               });
             }
-            await staged.print();
+            try {
+              await staged.print();
+            } catch (error) {
+              if (printed.kind !== 'pdf') throw error;
+              await restage(PRINT_HIGH, signal);
+              await staged.print();
+            }
           };
           try {
             await runWrapped(session.printWraps, run);

@@ -1,4 +1,9 @@
-import type { DocumentHandle, PageImageOptions, PageRef } from '@embedpdf/engine-core/runtime';
+import type {
+  DocumentHandle,
+  PageExtractOptions,
+  PageImageOptions,
+  PageRef,
+} from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createKernel } from '../src/kernel';
@@ -14,9 +19,10 @@ import { bytesInput, immediateEngine, makeHandle, page, settle } from './helpers
 
 /**
  * Printing as the Saving page describes it: `preparePrint()` waits for changes on their way,
- * draws each page by the print rules and stages the pictures with the host's printer; `print()`
- * opens the dialog inside the document's own print actions, and prepares again first when the
- * document changed since.
+ * makes the pages as they print (the PDF copy where the rights and the printer allow it, else a
+ * picture of each page) and stages them with the host's printer; `print()` opens the dialog
+ * inside the document's own print actions, and prepares again first when the document changed
+ * since.
  */
 
 const A: PageRef = { kind: 'objectNumber', objectNumber: 1 };
@@ -35,13 +41,16 @@ function printableHandle(allows: (permission: string) => boolean = () => true) {
         Promise.resolve(new Blob([`page ${ref.kind === 'objectNumber' ? ref.objectNumber : ''}`])),
     });
   });
+  const copy = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+  const extract = vi.fn((_pages: PageRef[], _options: PageExtractOptions) => Promise.resolve(copy));
   Object.assign(handle, {
     security: { allows },
+    pages: { ...handle.pages, extract },
     page: (ref: PageRef) => ({
       render: { image: (options: PageImageOptions) => image(ref, options) },
     }),
   });
-  return { handle, renders, image };
+  return { handle, renders, image, extract, copy };
 }
 
 /** A printer that records what it was given and when its dialog opened. */
@@ -58,6 +67,30 @@ function recordingPrinter(log: string[] = []) {
     },
   };
   return { printer, staged, disposed, log };
+}
+
+/**
+ * A printer that also prints a PDF, and records the copies it was given. `refuse` turns the PDF
+ * down: when it is staged, or when its dialog would open.
+ */
+function pdfPrinter(log: string[] = [], refuse?: 'stage' | 'print') {
+  const pictures = recordingPrinter(log);
+  const pdfs: Array<{ pdf: Uint8Array; name: string }> = [];
+  const printer: HostPrinter = {
+    ...pictures.printer,
+    async stagePdf(pdf, options) {
+      if (refuse === 'stage') throw new Error('this browser shows no PDF in a frame');
+      const index = pdfs.push({ pdf, name: options.name }) - 1;
+      return {
+        print: async () => {
+          if (refuse === 'print') throw new Error('the PDF viewer is off');
+          log.push(`pdf dialog ${index}`);
+        },
+        dispose: () => void log.push(`pdf disposed ${index}`),
+      };
+    },
+  };
+  return { ...pictures, printer, pdfs };
 }
 
 async function open(
@@ -145,6 +178,8 @@ describe('printing', () => {
       usage: 'print',
       viewport: { kind: 'dpi', dpi: 300 },
       format: 'png',
+      includeAnnotations: true,
+      includeFormFields: true,
     });
     expect(progress).toEqual([
       { pagesRendered: 0, pageCount: 2 },
@@ -165,7 +200,11 @@ describe('printing', () => {
     const kernel = await open(handle, { printer: recordingPrinter().printer });
     await kernel.documents.preparePrint(undefined, { pages: [B, A], includeAnnotations: false });
     expect(renders.map((render) => render.page)).toEqual([B, A]);
-    expect(renders[0]!.options.includeAnnotations).toBe(false);
+    // Without the annotations, the form fields still print.
+    expect(renders[0]!.options).toMatchObject({
+      includeAnnotations: false,
+      includeFormFields: true,
+    });
 
     await expect(
       kernel.documents.preparePrint(undefined, {
@@ -175,6 +214,9 @@ describe('printing', () => {
     await expect(kernel.documents.preparePrint(undefined, { pages: [] })).rejects.toMatchObject({
       code: 'invalid-input',
     });
+    await expect(
+      kernel.documents.preparePrint(undefined, { pages: [A, B, A] }),
+    ).rejects.toMatchObject({ code: 'invalid-input' });
   });
 
   it('opens the dialog inside what plugins registered around it, the first registered outermost', async () => {
@@ -251,5 +293,74 @@ describe('printing', () => {
     expect(inA.getPrintQuality()).toEqual({ kind: 'images', dpi: 300 });
     await inA.preparePrint();
     expect(staged[0]!.name).toBe('Contract');
+  });
+
+  it('prints the PDF copy with doc.print.high, a right to keep it, and a printer that prints PDFs', async () => {
+    const { handle, extract, copy, image } = printableHandle();
+    const { printer, pdfs, log } = pdfPrinter();
+    const kernel = await open(handle, { printer });
+    expect(kernel.documents.getPrintQuality()).toEqual({ kind: 'pdf' });
+
+    const progress: PrintProgress[] = [];
+    const prepared = await kernel.documents.preparePrint(undefined, {
+      pages: [B],
+      onProgress: (step) => progress.push(step),
+    });
+    expect(prepared.quality).toEqual({ kind: 'pdf' });
+    expect(extract).toHaveBeenCalledWith([B], {
+      flatten: { usage: 'print' },
+      includeAnnotations: true,
+      includeFormFields: true,
+    });
+    expect(image).not.toHaveBeenCalled();
+    expect(pdfs).toEqual([{ pdf: copy, name: 'Contract' }]);
+    expect(progress).toEqual([
+      { pagesRendered: 0, pageCount: 1 },
+      { pagesRendered: 1, pageCount: 1 },
+    ]);
+    await prepared.print();
+    expect(log).toEqual(['pdf dialog 0']);
+  });
+
+  it('prints pictures without a right to keep the copy, or a printer that prints PDFs', async () => {
+    const noDownload = printableHandle(
+      (permission) => permission !== 'doc.download' && permission !== 'doc.download.flattened',
+    );
+    const kernel = await open(noDownload.handle, { printer: pdfPrinter().printer });
+    expect(kernel.documents.getPrintQuality()).toEqual({ kind: 'images', dpi: 300 });
+
+    const flattenedOnly = printableHandle((permission) => permission !== 'doc.download');
+    const flattenedKernel = await open(flattenedOnly.handle, { printer: pdfPrinter().printer });
+    expect(flattenedKernel.documents.getPrintQuality()).toEqual({ kind: 'pdf' });
+
+    const standard = printableHandle((permission) => permission !== 'doc.print.high');
+    const standardKernel = await open(standard.handle, { printer: pdfPrinter().printer });
+    expect(standardKernel.documents.getPrintQuality()).toEqual({ kind: 'images', dpi: 150 });
+  });
+
+  it('prints pictures when the printer refuses the PDF copy after all', async () => {
+    const { handle, renders } = printableHandle();
+    const { printer, staged, log } = pdfPrinter([], 'print');
+    const kernel = await open(handle, { printer });
+    await kernel.documents.print();
+    expect(renders.map((render) => render.options.viewport)).toEqual([
+      { kind: 'dpi', dpi: 300 },
+      { kind: 'dpi', dpi: 300 },
+    ]);
+    expect(staged).toHaveLength(1);
+    expect(log).toEqual(['pdf disposed 0', 'dialog 0']);
+  });
+
+  it('prints pictures, and says so, when the printer turns the PDF copy down while preparing', async () => {
+    const { handle, renders } = printableHandle();
+    const { printer, staged, log } = pdfPrinter([], 'stage');
+    const kernel = await open(handle, { printer });
+    expect(kernel.documents.getPrintQuality()).toEqual({ kind: 'pdf' });
+    const prepared = await kernel.documents.preparePrint();
+    expect(prepared.quality).toEqual({ kind: 'images', dpi: 300 });
+    expect(renders).toHaveLength(2);
+    expect(staged).toHaveLength(1);
+    await prepared.print();
+    expect(log).toEqual(['dialog 0']);
   });
 });
