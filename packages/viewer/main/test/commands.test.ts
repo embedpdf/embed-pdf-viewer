@@ -81,6 +81,10 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>commands</
   import EmbedPDF from '/embedpdf.js';
   window.heard = [];
   window.printed = 0;
+  // No PDF viewer, so the viewer prints pictures from a frame of its own. Where the browser's PDF
+  // viewer shows the copy, the print() the stub below sets when the frame loads isn't always the
+  // one the print reaches.
+  Object.defineProperty(navigator, 'pdfViewerEnabled', { value: false });
   // What the browser's print dialog would do: each print frame's print() counts, and printing
   // finishes at once.
   new MutationObserver((records) => {
