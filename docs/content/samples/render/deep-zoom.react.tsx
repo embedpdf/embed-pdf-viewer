@@ -1,15 +1,14 @@
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useZoom } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
-import { Button, Demo, Readout, Spacer, StageFrame, Toolbar, stageFill } from '../stage/_shared/chrome';
+import './deep-zoom.css';
 
 const engine = localEngine();
-// Defaults: the base bitmap stops at the 640px budget; tiles carry
-// sharpness beyond it — only for the visible region, at your exact zoom.
-const plugins = [stagePlugin(), renderPlugin()];
+// Open at 250%: past what a whole-page picture shows sharply, so tiles carry it.
+const plugins = [stagePlugin({ zoom: { level: 2.5 } }), renderPlugin()];
 
 // [!doc-source ebook]
 const ebook = async (): Promise<OpenInput> => {
@@ -19,29 +18,37 @@ const ebook = async (): Promise<OpenInput> => {
 // [!/doc-source]
 
 function ZoomBar() {
-  const { zoom, zoomIn, zoomOut, fitWidth } = useZoom();
+  const stage = useStage();
+  const zoomLevel = useStageState((state) => state.zoomLevel);
+
   return (
-    <Toolbar>
-      <Button onClick={() => zoomOut()}>−</Button>
-      <Readout>{Math.round(zoom * 100)}%</Readout>
-      <Button onClick={() => zoomIn()}>+</Button>
-      <Spacer />
-      <Button onClick={() => fitWidth()}>Fit width</Button>
-    </Toolbar>
+    <div className="toolbar">
+      <button
+        type="button"
+        className="button"
+        aria-label="Zoom out"
+        onClick={() => stage.zoomOut()}
+      >
+        −
+      </button>
+      <output className="readout">{Math.round(zoomLevel * 100)}%</output>
+      <button type="button" className="button" aria-label="Zoom in" onClick={() => stage.zoomIn()}>
+        +
+      </button>
+      <button type="button" className="button push" onClick={() => stage.fitWidth()}>
+        Fit width
+      </button>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <ZoomBar />
-          <StageFrame height={460}>
-            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <ZoomBar />
+        <Stage className="stage">{() => <RenderLayer />}</Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

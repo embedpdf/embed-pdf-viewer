@@ -184,33 +184,33 @@ export function TwoWays() {
               <>
                 <StackChip
                   accent="blue"
-                  icon={<JsMark />}
-                  label="Vanilla JS"
-                  href="/docs/viewer/vanilla/getting-started"
-                />
-                <StackChip
-                  accent="blue"
                   icon={<ReactIcon />}
                   label="React"
-                  href="/docs/viewer/react/getting-started"
-                />
-                <StackChip
-                  accent="blue"
-                  icon={<VueIcon />}
-                  label="Vue"
-                  href="/docs/viewer/vue/getting-started"
-                />
-                <StackChip
-                  accent="blue"
-                  icon={<SvelteIcon />}
-                  label="Svelte"
-                  href="/docs/viewer/svelte/getting-started"
+                  href="/docs/viewer/react/quick-start"
                 />
                 <StackChip
                   accent="blue"
                   icon={<AngularIcon />}
                   label="Angular"
-                  href="/docs/viewer/angular/getting-started"
+                  href="/docs/viewer/angular/quick-start"
+                />
+                <StackChip
+                  accent="blue"
+                  icon={<VueIcon />}
+                  label="Vue"
+                  href="/docs/viewer/vue/quick-start"
+                />
+                <StackChip
+                  accent="blue"
+                  icon={<SvelteIcon />}
+                  label="Svelte"
+                  href="/docs/viewer/svelte/quick-start"
+                />
+                <StackChip
+                  accent="blue"
+                  icon={<JsMark />}
+                  label="Vanilla JS"
+                  href="/docs/viewer/vanilla/quick-start"
                 />
               </>
             }
@@ -237,25 +237,25 @@ export function TwoWays() {
                   accent="purple"
                   icon={<ReactIcon />}
                   label="React"
-                  href="/docs/headless/react/getting-started"
-                />
-                <StackChip
-                  accent="purple"
-                  icon={<VueIcon />}
-                  label="Vue"
-                  href="/docs/headless/vue/getting-started"
-                />
-                <StackChip
-                  accent="purple"
-                  icon={<SvelteIcon />}
-                  label="Svelte"
-                  href="/docs/headless/svelte/getting-started"
+                  href="/docs/headless/react"
                 />
                 <StackChip
                   accent="purple"
                   icon={<AngularIcon />}
                   label="Angular"
-                  href="/docs/headless/angular/getting-started"
+                  href="/docs/headless/angular"
+                />
+                <StackChip
+                  accent="purple"
+                  icon={<VueIcon />}
+                  label="Vue"
+                  href="/docs/headless/vue"
+                />
+                <StackChip
+                  accent="purple"
+                  icon={<SvelteIcon />}
+                  label="Svelte"
+                  href="/docs/headless/svelte"
                 />
               </>
             }

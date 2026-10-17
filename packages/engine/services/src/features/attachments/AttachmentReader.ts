@@ -1,11 +1,11 @@
 import type {
   AnnotationRef,
   AttachmentFileWorkerPayload,
-  EmbeddedFileItem,
-  EmbeddedFileRef,
+  Attachment,
+  AttachmentRef,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toAttachmentRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -17,14 +17,15 @@ import {
 } from './internal/attachmentPrimitives';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
+import type { Slices } from '../../shared/slices';
 import { resolveAnnotPtr } from '../annotations/internal/identity/resolveAnnotationPointer';
 
 /**
  * Read-only access to embedded files, at both of their homes: the
  * document catalog's `/EmbeddedFiles` name tree (list / readFile by
  * index) and a FileAttachment annotation's `/FS` (readAnnotationFile by
- * ref). Pure READS over the session — no revision bumps, no layer
- * artifacts (the `PagesExtractor` shape).
+ * ref). Pure reads over the session — no layer artifacts (the
+ * `PagesExtractor` shape).
  *
  * Byte delivery mirrors the request's `path?`: absent → a standalone
  * buffer for the transfer list (browser); present → the decoded file is
@@ -38,24 +39,28 @@ export class AttachmentReader {
   ) {}
 
   /** Snapshot of the `/EmbeddedFiles` name tree, in tree (key-sorted) order. */
-  list(signal: AbortSignal): EmbeddedFileItem[] {
+  list(signal: AbortSignal): Attachment[] {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const count = fn.FPDFDoc_GetAttachmentCount(docPtr);
-    const items: EmbeddedFileItem[] = [];
+    const items: Attachment[] = [];
     for (let index = 0; index < count; index++) {
       const attachmentPtr = fn.FPDFDoc_GetAttachment(docPtr, index);
       if (!attachmentPtr) continue;
       const key = readAttachmentKey(fn, mem, docPtr, index) ?? '';
-      items.push({ ...readAttachmentFileInfo(fn, mem, attachmentPtr), key, index });
+      items.push({
+        ...readAttachmentFileInfo(fn, mem, attachmentPtr),
+        ref: toAttachmentRef(key),
+        index,
+      });
     }
     return items;
   }
 
   /** Decode one document-level embedded file, addressed by key. */
   readFile(
-    ref: EmbeddedFileRef,
+    ref: AttachmentRef,
     path: string | undefined,
     maxDecodedBytes: number | undefined,
     signal: AbortSignal,
@@ -78,21 +83,29 @@ export class AttachmentReader {
       );
     }
     const info = readAttachmentFileInfo(fn, mem, attachmentPtr);
-    return this.extract(attachmentPtr, info.name, info.mimeType, path, maxDecodedBytes);
+    return this.extract(
+      attachmentPtr,
+      info.name,
+      info.mimeType ?? undefined,
+      path,
+      maxDecodedBytes,
+    );
   }
 
   /** Decode the file embedded in a FileAttachment annotation's `/FS`. */
-  readAnnotationFile(
+  /** A file attachment annotation's file; a page not parsed yet loads in slices. */
+  async readAnnotationFile(
     pageObjectNumber: PageObjectNumber,
     ref: AnnotationRef,
     path: string | undefined,
     maxDecodedBytes: number | undefined,
     signal: AbortSignal,
-  ): AttachmentFileWorkerPayload {
+    slices: Slices,
+  ): Promise<AttachmentFileWorkerPayload> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
+    const pagePtr = await pool.acquireInSlices(pageObjectNumber, signal, slices);
     let annotPtr: Ptr | null = null;
     try {
       annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
@@ -104,7 +117,13 @@ export class AttachmentReader {
         );
       }
       const info = readAttachmentFileInfo(fn, mem, attachmentPtr);
-      return this.extract(attachmentPtr, info.name, info.mimeType, path, maxDecodedBytes);
+      return this.extract(
+        attachmentPtr,
+        info.name,
+        info.mimeType ?? undefined,
+        path,
+        maxDecodedBytes,
+      );
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
       pool.release(pageObjectNumber);

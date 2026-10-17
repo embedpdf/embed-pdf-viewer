@@ -5,7 +5,7 @@
  *
  * The fixture `baseCoverage` mirrors a realistic /access response —
  * the caller's scope granted four cacheable resources, and each one
- * lives at its own distinct path prefix (paths v2). The per-prefix
+ * lives at its own distinct path prefix. The per-prefix
  * shape is what every adapter sees, so the tests verify the
  * per-resource scope enforcement contract end-to-end.
  *
@@ -115,7 +115,7 @@ describe('BunnyCdnSigner', () => {
     expect(access.authHeader).toBeNull();
     expect(access.signedPathPolicies).toHaveLength(baseCoverage.length);
     // Each entry's prefix matches the corresponding coverage entry,
-    // and its token is the HMAC over THAT prefix (not a doc-wide one)
+    // and its token is the HMAC over that prefix (not a doc-wide one)
     for (const [i, policy] of (access.signedPathPolicies ?? []).entries()) {
       expect(policy.pathPrefix).toBe(baseCoverage[i]!.pathPrefix);
       const expected = signBunnyToken(
@@ -271,7 +271,7 @@ describe('CloudCdnSigner', () => {
         KeyName: 'my-key',
         Signature: expect.any(String),
       });
-      // URLPrefix decodes to the resource-scoped origin + prefix, NOT
+      // URLPrefix decodes to the resource-scoped origin + prefix, not
       // a doc-wide prefix — so the signature is bound to one resource.
       expect(Buffer.from(policy.queryParams.URLPrefix, 'base64').toString('utf8')).toBe(
         `https://cdn.example.com${baseCoverage[i]!.pathPrefix}`,

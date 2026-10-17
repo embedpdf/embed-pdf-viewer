@@ -1,79 +1,95 @@
-import { pageSpace } from '@embedpdf/core-geometry';
 import {
   creationDraftAnchor,
   type CreationDraftAnchor,
   type Model,
-  type Vec,
 } from '@embedpdf/core-annotation';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
+import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { createdRefOf } from './outcomes';
 
 /**
- * Creation drafts: the live multi-click or buffered-ink draft a gesture
- * builds, its commit and cancel doors, and the captured-draft seam the
- * measurement plugin calibrates from.
+ * Creation drafts: the polygon or polyline a click per point builds (and the
+ * buffered ink strokes), its finish and cancel doors, and the captured-draft
+ * seam the measurement plugin calibrates from.
  */
 export function createDrafts(
-  ctx: Pick<AnnotationContext, 'doc'>,
+  ctx: Pick<AnnotationContext, 'cancellable'>,
   {
     store,
-    geometry,
-    writes,
     events,
-  }: Pick<AnnotationServices, 'store' | 'geometry' | 'writes' | 'events'>,
+    tools,
+    afterCreate,
+  }: Pick<AnnotationServices, 'store' | 'events' | 'tools' | 'afterCreate'>,
+  annotations: Pick<AnnotationReads, 'get'>,
 ) {
   let anchorCache: { model: Model; v: CreationDraftAnchor | null } | null = null;
   const draftAnchorOf = (): CreationDraftAnchor | null => {
-    const m = store.model();
-    if (anchorCache && anchorCache.model === m) return anchorCache.v;
-    const v = creationDraftAnchor(m);
-    anchorCache = { model: m, v };
-    return v;
+    const model = store.model();
+    if (anchorCache && anchorCache.model === model) return anchorCache.v;
+    const anchor = creationDraftAnchor(model);
+    anchorCache = { model: model, v: anchor };
+    return anchor;
   };
 
   // A capture-only tool (the measurement calibration line) reports its draft
-  // in PDF user space instead of creating anything.
-  store.onEffect('captured', (fx) => {
-    if (!ctx.doc) return;
-    const crop = geometry.cropOf(fx.page.pageObjectNumber);
-    if (crop && fx.geom.t === 'line') {
-      const pdf = (p: Vec) => pageSpace(crop).pageToPdf(p);
+  // instead of creating anything.
+  store.onEffect('captured', (effect) => {
+    if (effect.geometry.kind === 'line') {
       events.draftCaptured.emit({
-        tool: fx.tool,
-        page: fx.page,
-        from: pdf(fx.geom.a),
-        to: pdf(fx.geom.b),
+        tool: effect.tool,
+        page: effect.page,
+        from: effect.geometry.linePoints.start,
+        to: effect.geometry.linePoints.end,
       });
     }
   });
 
+  /** End the draft as a double-click does, through the active tool's `afterCreate`. */
+  const finish = async (
+    options: { signal?: AbortSignal } = {},
+  ): Promise<{ annotation: Annotation } | null> => {
+    const draft = store.model().draft;
+    if (!draft || !draft.kind.startsWith('create-')) return null;
+    const toolId = tools.activeTool()?.id;
+    const commit = store.commit(
+      { type: draft.kind === 'create-ink' ? 'finishInkDraft' : 'finishCreationDraft' },
+      { adjust: afterCreate.shape(toolId) },
+    );
+    afterCreate.done(toolId, commit);
+    if (!commit.effects.some((effect) => effect.type === 'create')) return null;
+    const ref = await ctx.cancellable(options.signal, createdRefOf(commit));
+    const annotation = annotations.get(ref);
+    return annotation ? { annotation } : null;
+  };
+
+  /** The `draft` noun. */
+  const draftApi = {
+    get: () => draftAnchorOf(),
+    finish,
+    cancel: () => {
+      store.commit({ type: 'cancel' });
+    },
+  };
+
   const api = {
-    getCreationDraft: () => draftAnchorOf(),
-    hasCreationDraft: () => store.model().draft?.g.startsWith('create-') ?? false,
-    finishCreationDraft: async () => {
-      const draft = store.model().draft;
-      if (!draft || !draft.g.startsWith('create-')) return null;
-      const effects = store.commit({
-        t: draft.g === 'create-ink' ? 'finishInkDraft' : 'finishCreationDraft',
-      });
-      const fx = writes.createEffectsOf(effects)[0];
-      return fx ? writes.awaitCreate(fx.id) : null;
-    },
     finishInkDraft: () => {
-      store.commit({ t: 'finishInkDraft' });
-    },
-    cancelCreationDraft: () => {
-      store.commit({ t: 'cancel' });
+      const toolId = tools.activeTool()?.id;
+      afterCreate.done(
+        toolId,
+        store.commit({ type: 'finishInkDraft' }, { adjust: afterCreate.shape(toolId) }),
+      );
     },
     cancel: () => {
-      store.commit({ t: 'cancel' });
+      store.commit({ type: 'cancel' });
     },
     distanceCreationPage: () => {
       const draft = store.model().draft;
-      return draft?.g === 'create-distance' && draft.step === 'offset' ? draft.page : null;
+      return draft?.kind === 'create-distance' && draft.step === 'offset' ? draft.page : null;
     },
     onDraftCaptured: events.draftCaptured.on,
   };
 
-  return { api };
+  return { draft: draftApi, api };
 }

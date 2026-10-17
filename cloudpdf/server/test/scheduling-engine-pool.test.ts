@@ -205,14 +205,14 @@ describe('overload over HTTP (host fixture, maxInFlight=1)', () => {
     try {
       await seedDocument(fx, 'tenant-s', 'docsched1');
       await seedDocument(fx, 'tenant-s', 'docsched2');
-      // Warm BOTH docs while the slot is free.
+      // Warm both docs while the slot is free.
       expect((await listAnnotations(fx, 'tenant-s', 'docsched1', 'alice')).status).toBe(200);
       expect((await listAnnotations(fx, 'tenant-s', 'docsched2', 'alice')).status).toBe(200);
       // Park a create in the engine (__STALL__ never replies) — it holds
       // the single admission slot.
       const stalled = createAnnotation(fx, 'tenant-s', 'docsched1', 'alice', '__STALL__');
       await until(() => fx.bundle.engineScheduler!.schedulingStats().interactive.inFlight >= 1);
-      // The probe uses a DIFFERENT document: a read of docsched1's own
+      // The probe uses a different document: a read of docsched1's own
       // layer would park on the write-in-flight marker (the dirty window)
       // before ever reaching admission — correct, but not what this test
       // measures. docsched2 goes straight to the scheduler.

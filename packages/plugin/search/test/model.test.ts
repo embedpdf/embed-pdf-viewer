@@ -1,91 +1,107 @@
 import { describe, expect, test } from 'vitest';
 import { toPageRef } from '@embedpdf/core';
 import type { SearchHit } from '../src/contract';
-import { initialSearchState, pagesWithHits, reduceSearch, type SearchState } from '../src/model';
+import {
+  appendHits,
+  cancelSession,
+  clearSession,
+  completeSession,
+  failSession,
+  initialSearchState,
+  pagesWithHits,
+  setActiveHit,
+  startSession,
+  type SearchState,
+} from '../src/model';
 
 const seg = (rect: { x: number; y: number; width: number; height: number }) => ({
   quad: {
-    upperStart: { x: rect.x, y: rect.y },
-    upperEnd: { x: rect.x + rect.width, y: rect.y },
-    lowerStart: { x: rect.x, y: rect.y + rect.height },
-    lowerEnd: { x: rect.x + rect.width, y: rect.y + rect.height },
+    upperLeft: { x: rect.x, y: rect.y },
+    upperRight: { x: rect.x + rect.width, y: rect.y },
+    lowerLeft: { x: rect.x, y: rect.y + rect.height },
+    lowerRight: { x: rect.x + rect.width, y: rect.y + rect.height },
   },
   rect,
   advance: 1 as const,
 });
 
-const hit = (pon: number, charStart: number): SearchHit => ({
-  page: toPageRef(pon),
+const hit = (pageObjectNumber: number, start: number): SearchHit => ({
+  page: toPageRef(pageObjectNumber),
   pageIndex: 0,
-  charStart,
-  charCount: 4,
+  start,
+  count: 4,
   segments: [seg({ x: 0, y: 0, width: 10, height: 10 })],
   bounds: { x: 0, y: 0, width: 10, height: 10 },
 });
 
 const started = (): SearchState =>
-  reduceSearch(initialSearchState(), {
-    type: 'START',
-    query: { text: 'test' },
-    operationId: 'session#1',
-  });
+  startSession(initialSearchState(), { text: 'test' }, 'session#1');
 
-describe('reduceSearch', () => {
-  test('START resets everything and enters searching with the operation id', () => {
+describe('search transitions', () => {
+  test('startSession resets everything and enters searching with the operation id', () => {
     const dirty: SearchState = {
       ...initialSearchState(),
       hits: [hit(5, 0)],
       hitsByPage: { 5: [hit(5, 0)] },
-      activeIndex: 0,
+      activeHitIndex: 0,
       status: 'complete',
     };
-    const s = reduceSearch(dirty, {
-      type: 'START',
-      query: { text: 'x', matchCase: true },
-      operationId: 'session#2',
-    });
-    expect(s.status).toBe('searching');
-    expect(s.hits).toEqual([]);
-    expect(s.hitsByPage).toEqual({});
-    expect(s.activeIndex).toBe(-1);
-    expect(s.operationId).toBe('session#2');
-    expect(s.query).toEqual({ text: 'x', matchCase: true });
+    const state = startSession(dirty, { text: 'x', matchCase: true }, 'session#2');
+    expect(state.status).toBe('searching');
+    expect(state.hits).toEqual([]);
+    expect(state.hitsByPage).toEqual({});
+    expect(state.activeHitIndex).toBe(-1);
+    expect(state.operationId).toBe('session#2');
+    expect(state.query).toEqual({ text: 'x', matchCase: true });
   });
 
-  test('APPEND accumulates, keeps per-page arrays reference-stable, activates the first hit', () => {
-    let s = started();
-    s = reduceSearch(s, { type: 'APPEND', hits: [hit(5, 0), hit(5, 9)], scanned: 1, total: 8 });
-    const page5 = s.hitsByPage[5];
-    s = reduceSearch(s, { type: 'APPEND', hits: [hit(7, 2)], scanned: 3, total: 8 });
-    expect(s.hits.length).toBe(3);
-    expect(s.hitsByPage[5]).toBe(page5); // untouched page keeps its array
-    expect(s.hitsByPage[7].map((h) => h.charStart)).toEqual([2]);
-    expect(s.activeIndex).toBe(0);
-    expect(s.progress).toEqual({ scanned: 3, total: 8 });
-    expect(pagesWithHits(s).map((p) => p.pageObjectNumber)).toEqual([5, 7]);
+  test('appendHits accumulates, keeps per-page arrays reference-stable, activates the first hit', () => {
+    let state = started();
+    state = appendHits(state, [hit(5, 0), hit(5, 9)], { pagesSearched: 1, pageCount: 8 });
+    const page5 = state.hitsByPage[5];
+    state = appendHits(state, [hit(7, 2)], { pagesSearched: 3, pageCount: 8 });
+    expect(state.hits.length).toBe(3);
+    expect(state.hitsByPage[5]).toBe(page5); // an untouched page keeps its array
+    expect(state.hitsByPage[7].map((found) => found.start)).toEqual([2]);
+    expect(state.activeHitIndex).toBe(0);
+    expect(state.progress).toEqual({ pagesSearched: 3, pageCount: 8 });
+    // In document order, which moving a page changes: page 7 is first here.
+    const pages = [{ ref: toPageRef(7) }, { ref: toPageRef(6) }, { ref: toPageRef(5) }];
+    expect(pagesWithHits(state, pages).map((page) => page.objectNumber)).toEqual([7, 5]);
   });
 
-  test('an empty APPEND only advances progress; an explicit active index survives appends', () => {
-    let s = started();
-    s = reduceSearch(s, { type: 'APPEND', hits: [], scanned: 4, total: 8 });
-    expect(s.hits.length).toBe(0);
-    expect(s.activeIndex).toBe(-1);
-    s = reduceSearch(s, { type: 'APPEND', hits: [hit(5, 0), hit(5, 9)], scanned: 5, total: 8 });
-    s = reduceSearch(s, { type: 'SET_ACTIVE', index: 1 });
-    s = reduceSearch(s, { type: 'APPEND', hits: [hit(7, 2)], scanned: 6, total: 8 });
-    expect(s.activeIndex).toBe(1);
+  test('an empty slice only advances progress; an explicit active index survives appends', () => {
+    let state = started();
+    state = appendHits(state, [], { pagesSearched: 4, pageCount: 8 });
+    expect(state.hits.length).toBe(0);
+    expect(state.activeHitIndex).toBe(-1);
+    state = appendHits(state, [hit(5, 0), hit(5, 9)], { pagesSearched: 5, pageCount: 8 });
+    state = setActiveHit(state, 1);
+    state = appendHits(state, [hit(7, 2)], { pagesSearched: 6, pageCount: 8 });
+    expect(state.activeHitIndex).toBe(1);
   });
 
-  test('COMPLETE, CANCELLED and ERROR are terminal; CLEAR returns to idle', () => {
-    const s = started();
-    expect(reduceSearch(s, { type: 'COMPLETE' }).status).toBe('complete');
-    expect(reduceSearch(s, { type: 'CANCELLED' }).status).toBe('cancelled');
-    const failed = reduceSearch(s, {
-      type: 'ERROR',
-      error: { code: 'operation-failed', message: 'boom', capability: 'search' },
+  test('progress with the same counts keeps its object, and an empty slice with it changes nothing', () => {
+    let state = appendHits(started(), [hit(5, 0)], { pagesSearched: 1, pageCount: 8 });
+    const { progress } = state;
+    state = appendHits(state, [hit(5, 9)], { pagesSearched: 1, pageCount: 8 });
+    expect(state.progress).toBe(progress);
+    expect(state.hits.length).toBe(2);
+    expect(appendHits(state, [], { pagesSearched: 1, pageCount: 8 })).toBe(state);
+  });
+
+  test('complete, cancelled and failed are terminal; clearing returns to idle', () => {
+    const state = started();
+    expect(completeSession(state).status).toBe('complete');
+    expect(cancelSession(state).status).toBe('cancelled');
+    const failed = failSession(state, {
+      code: 'operation-failed',
+      message: 'boom',
+      capability: 'search',
+      permission: null,
     });
     expect(failed.status).toBe('error');
     expect(failed.error?.message).toBe('boom');
-    expect(reduceSearch(failed, { type: 'CLEAR' })).toEqual(initialSearchState());
+    expect(clearSession(failed)).toEqual(initialSearchState());
   });
 });

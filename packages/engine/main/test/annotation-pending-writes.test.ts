@@ -1,0 +1,102 @@
+/**
+ * Changes made faster than the engine answers, through the annotation plugin
+ * on the real engine: an edit of a new annotation before its create is
+ * confirmed, and two edits of an inline annotation, which keeps its base
+ * position as its name through both. The engine must end with every change,
+ * and the plugin's records must be the engine's.
+ */
+import { readFile } from 'node:fs/promises';
+import { describe, expect, test } from 'vitest';
+import { annotationKey, type DocumentHandle } from '@embedpdf/engine-core/runtime';
+import { createLocalEngine } from '../src/index';
+import { annotationShell } from './helpers/annotation-shell';
+
+const FIXTURE = new URL(
+  '../../../../examples/engine-runtime-demo/public/annotations.pdf',
+  import.meta.url,
+);
+
+async function openFixture(id: string) {
+  const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+  const bytes = new Uint8Array(await readFile(FIXTURE));
+  const doc = await engine.open(
+    { kind: 'layerBytes', id, baseBytes: bytes, layer: { kind: 'fresh' } },
+    { scope: ['*'] },
+  );
+  const pages = (await doc.pages.list()).pages;
+  return { doc, pages, ...(await annotationShell(doc, pages)) };
+}
+
+async function engineKeys(doc: DocumentHandle): Promise<string[]> {
+  const { annotations } = await doc.annotations.list();
+  return annotations.map((dto) => annotationKey(dto.ref)).sort();
+}
+
+describe('changes faster than the engine answers (local engine)', () => {
+  test('an edit of a new annotation before its create is confirmed is written after it', async () => {
+    const { doc, pages, ctx, annotation } = await openFixture('pending-create-edit');
+    try {
+      const created = annotation.create(
+        pages[0]!.ref,
+        { subtype: 'square', box: { x: 20, y: 20, width: 60, height: 40 } },
+        undefined,
+        { select: true },
+      );
+      // The create is in flight: the new annotation is selected under the name it was created with.
+      expect(annotation.selection.list()).toHaveLength(1);
+      const restyled = annotation.selection.update({ color: '#00ff00' });
+      const { ref } = (await created).annotation;
+      expect((await restyled).failed).toEqual([]);
+      await annotation.whenSynced();
+
+      expect(ref.kind).toBe('objectNumber');
+      expect(annotation.selection.list().map((entry) => entry.ref)).toEqual([ref]);
+      const shown = annotation.get(ref);
+      expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
+      const raw = (await doc.page(ref.page).annotations.list()).annotations.find(
+        (dto) => annotationKey(dto.ref) === annotationKey(ref),
+      );
+      expect(raw && 'color' in raw ? raw.color : null).toEqual('#00ff00');
+      expect(
+        annotation
+          .list()
+          .map((entry) => annotationKey(entry.ref))
+          .sort(),
+      ).toEqual(await engineKeys(doc));
+    } finally {
+      await ctx.dispose();
+    }
+  });
+
+  test('two edits of an inline annotation land on one record, under its birth name', async () => {
+    const { doc, ctx, annotation } = await openFixture('pending-inline-edits');
+    try {
+      const inline = annotation.list().find((entry) => entry.ref.kind === 'baseIndex')!.ref;
+      annotation.selection.set([inline]);
+      const green = annotation.selection.update({ color: '#00ff00' });
+      const faded = annotation.selection.update({ opacity: 0.2 });
+      const results = await Promise.all([green, faded]);
+      expect(results.flatMap((result) => result.failed)).toEqual([]);
+      await annotation.whenSynced();
+
+      const keys = annotation
+        .list()
+        .map((entry) => annotationKey(entry.ref))
+        .sort();
+      expect(keys).toEqual(await engineKeys(doc));
+      const selected = annotation.selection.list().map((entry) => entry.ref);
+      expect(selected).toEqual([inline]);
+      // The engine stores opacity in 1/255 steps.
+      const shown = annotation.get(inline);
+      expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
+      expect(shown && 'opacity' in shown ? shown.opacity : null).toBeCloseTo(0.2, 2);
+      const raw = (await doc.page(inline.page).annotations.list()).annotations.find(
+        (dto) => annotationKey(dto.ref) === annotationKey(inline),
+      );
+      expect(raw && 'color' in raw ? raw.color : null).toBe('#00ff00');
+      expect(raw && 'opacity' in raw ? raw.opacity : null).toBeCloseTo(0.2, 2);
+    } finally {
+      await ctx.dispose();
+    }
+  });
+});

@@ -1,5 +1,5 @@
 /**
- * A STANDALONE realm for direct controller tests — what the actions plugin
+ * A standalone realm for direct controller tests — what the actions plugin
  * mints for a viewer document (or, detached, for a stamp asset). Production
  * code never builds one here: the realm factory lives in `plugin-actions`.
  */
@@ -19,7 +19,7 @@ import type { DocumentMeta } from '@embedpdf/core';
 
 /**
  * The realm's default budget: production limits for memory, stack, effects
- * and output, but a generous WALL-CLOCK deadline. `DEFAULT_SCRIPT_BUDGET`'s
+ * and output, but a generous wall-clock deadline. `DEFAULT_SCRIPT_BUDGET`'s
  * 50ms is a hostile-script containment limit measured on the wall clock and
  * shared by a whole K → F → C chain (`Date.now() + maxExecutionMs` in
  * QuickJsSandbox); a shared CI runner, with turbo running sibling packages'
@@ -80,7 +80,7 @@ export function standaloneRealm(
       };
     },
     bootSources: async () => {
-      const actions = doc.actions ? await doc.actions.read() : null;
+      const actions = doc.actions ? await doc.actions.get() : null;
       return (
         actions?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ?? []
       );

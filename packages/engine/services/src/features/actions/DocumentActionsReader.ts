@@ -1,4 +1,8 @@
-import type { DocumentActionsSnapshot, PdfActionTree } from '@embedpdf/engine-core/runtime';
+import type {
+  DocumentActionsSnapshot,
+  PdfActionTree,
+  PdfDestination,
+} from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -23,7 +27,7 @@ export class DocumentActionsReader {
     private readonly session: DocumentSession,
   ) {}
 
-  read(signal: AbortSignal): DocumentActionsSnapshot {
+  read(signal: AbortSignal): DocumentActionsSnapshot<PdfDestination> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -36,7 +40,7 @@ export class DocumentActionsReader {
       );
     }
 
-    const nameTreeScripts: DocumentActionsSnapshot['nameTreeScripts'] = [];
+    const nameTreeScripts: DocumentActionsSnapshot<PdfDestination>['nameTreeScripts'] = [];
     for (let index = 0; index < count; index++) {
       throwIfAborted(signal);
       const namedPtr = fn.FPDFDoc_GetJavaScriptAction(docPtr, index);
@@ -83,8 +87,9 @@ export class DocumentActionsReader {
     const openDestPtr = openAction ? NULL_PTR : fn.EPDFDoc_GetOpenActionDest(docPtr);
     const openDestination =
       openDestPtr !== NULL_PTR ? readDestination(fn, mem, docPtr, openDestPtr) : null;
-    const additional: Partial<Record<(typeof DOCUMENT_ACTION_EVENTS)[number][0], PdfActionTree>> =
-      {};
+    const additional: Partial<
+      Record<(typeof DOCUMENT_ACTION_EVENTS)[number][0], PdfActionTree<PdfDestination>>
+    > = {};
     for (const [key, event] of DOCUMENT_ACTION_EVENTS) {
       throwIfAborted(signal);
       const action = readActionModel(
@@ -100,7 +105,11 @@ export class DocumentActionsReader {
   }
 }
 
-function requireAction(action: PdfActionTree | null, owner: string, index: number): PdfActionTree {
+function requireAction(
+  action: PdfActionTree<PdfDestination> | null,
+  owner: string,
+  index: number,
+): PdfActionTree<PdfDestination> {
   if (action) return action;
   throw new EngineError(EngineErrorCode.MalformedPdf, `failed to read ${owner}`, {
     details: { index },

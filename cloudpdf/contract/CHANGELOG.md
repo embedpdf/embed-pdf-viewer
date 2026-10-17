@@ -1,5 +1,62 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Document `annotKey` as `obj:N` (an annotation's object number) or `base:N` (an annotation the uploaded file stores inline, by the position it was born at). Annotation reads and write results carry `PageRef`s and `AnnotationRef`s, manifest pages are `{ page, cache }`, and the page revision, weak annotation and `shouldRefetch` fields are gone.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add `doc.changes` (`POST /v1/docs/{docId}/layers/{layerName}/changes`): user actions as changes, each applied all or none, or the undo of an earlier change, answered in order with each change's result or refusal.
+
+  The OpenAPI document names every shared model once and refers to it: page, annotation and field refs, form fields, drafts and patches, a write's meta, the metadata, and each plane's error envelope (every error response is now `EngineErrorPayload` or `AdminErrorPayload`, not a copy per operation and status). Models are no longer inlined per response, so the generated SDKs carry one type per model instead of one per place it appears.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A form field carries `createdBy`, `createdAt`, `filledBy`, `filledByName`, `filledAt` and `importedBy`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Form fields carry `groupId`, and a field's create and update take it. A token's `identity` no longer has `groups`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.reorderCalculations`. Field drafts and patches take `actions` (named components `FieldScriptWrite`, `FieldActionsPatch`, `FieldPosition`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Removed `doc.forms.exportData` and `doc.forms.importData` (FDF/XFDF). Form bundles stay out of the contract for now, as annotation bundles do.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.updateWidget` (`PATCH …/form/widgets/{pageKey}/{annotKey}`). `doc.forms.list` returns every widget's row beside the fields; form results carry the rows of the widgets they changed. Named components `WidgetAnnotation` and `WidgetPatch`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – New operation `doc.forms.deleteWidget`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - Widgets: `borderStyle` can be `underline`; `dashArray` and `checkStyle`.
+  - A form write's `meta.redrawnWidgets`: the widgets whose pictures it changed.
+  - A `forms.setDisplay` op takes no `expect`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - Pages: `tabOrder`, the order a page's annotations take keyboard focus in, or `null`.
+  - List boxes: `topIndex`, the option in the box's top row.
+  - A widget's `fontFamily` is a font name as a free text's is (a standard font, a registered font's key, or a document font's family), not only a standard font.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The `forms.setSignatureAppearance` change op names its PDF as `resources: { appearance }`, and the notes describe the one multipart envelope: a JSON `body` part naming each file by role, and `resource:<key>` file parts.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Page routes take a `pageKey` path parameter (`obj:N`, the page's indirect object number) in place of the numeric `pon`, mirroring `annotKey` and `fieldKey`; page mutation bodies send `pages: PageRef[]`, `pages/names` sends `{ name, page }`, and every page-bearing record in the API uses `page`/`pages`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Update the CloudPDF API contract for the revised engine page, annotation, form,
+  and drawing shapes. Page and annotation references use object numbers, text
+  quadrilaterals name their corners, and form flags use the same flat shape as
+  other flags.
+
+  A popup update's `parent` is one nullable `AnnotationRef`, no longer a union that names it twice; generators that reject duplicate union members (PHP) accept it.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Field drafts and patches take the `pushbutton` family; widget rows, placements and patches have `caption`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `doc.pages.reorder` replaces `doc.pages.move`; new `doc.annotations.reorder` and `doc.forms.reorderWidgets`. Page inserts document a `position` instead of `toIndex`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Widget placements and widget patches take `actions` (named components `PdfActionWrite`, `WidgetActionsPatch`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A box kind's create takes `box` or a `rect` (typed as a box) with a quarter turn; widgets have `box` and `rotation`, and placements take `rotation` and their `rect` or their `box`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Document `Idempotency-Key` on every layer write operation (`idempotencyKeyHeader`): a retry under the same key on the same layer answers with what the first request committed. The error codes include `ObjectNumberUnavailable` and `LayerFull`.
+
+### Patch Changes
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The widget attach and detach routes accept the widget's `AnnotationRef` as `body.widget`; widget records on the wire carry `ref`.
+
 ## 3.0.0-next.14
 
 ### Minor Changes

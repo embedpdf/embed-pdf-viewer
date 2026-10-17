@@ -1,69 +1,47 @@
 /**
- * The React surface for @embedpdf/plugin-i18n — sugar over the generic
- * binding, nothing more. The plugin keeps locale packs in the store, so
- * reactivity is the kernel's one change stream; there are no emitters to
- * subscribe and no per-plugin plumbing.
- *
- * Because the capability is workspace-scoped and engine-free, these hooks
- * work from the FIRST frame — including inside `<Viewer fallback>` — while
- * the engine is still booting.
+ * The React surface for @embedpdf/plugin-i18n. The plugin is workspace-scoped
+ * and needs no engine, so these hooks work from the first frame, before a
+ * document opens: a loading screen and a password prompt translate too.
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-i18n';
-import { useMemo } from 'react';
-import { I18nToken } from '@embedpdf/plugin-i18n';
-import type { I18nCapability, LocaleInfo, TranslateOptions } from '@embedpdf/plugin-i18n';
+import { I18nToken, i18nState } from '@embedpdf/plugin-i18n';
+import type { I18nCapability, TranslateOptions } from '@embedpdf/plugin-i18n';
 import type { EventHook } from '@embedpdf/core';
-import { useCapability, useCapabilityEvent, useKernelValue, useSelector } from './runtime';
+import { useCapability, useCapabilityEvent, useSelector } from './runtime';
+import { settingsHook, stateHook } from './state';
 
-/** The raw i18n capability (t / setLocale / listLocales / getDirection / …). */
-export const useI18n = () => useCapability(I18nToken);
+/** The i18n capability: `t`, `setLocale`, `addTranslations`, `registerLocale`, the settings calls. */
+export function useI18n(): I18nCapability {
+  return useCapability(I18nToken);
+}
 
-/** Subscribe to one i18n event for the mounted lifetime: `useI18nEvent((c) => c.onLocaleChanged, handler)`. */
+/** Subscribe to one i18n event for the mounted lifetime: `useI18nEvent((i18n) => i18n.onLocaleChanged, handler)`. */
 export function useI18nEvent<T>(
-  select: (cap: I18nCapability) => EventHook<T>,
+  select: (i18n: I18nCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(I18nToken, select, handler);
 }
 
 /**
- * A reactive translate function. New identity whenever i18n state changes
- * (locale switch, pack registered), so memoized children re-render too.
- *
- *   const t = useT();
- *   <button title={t('commands.zoom.in')}>+</button>
- *   <span>{t('pages', { params: { count } })}</span>
+ * The current language, how it reads, every language you can switch to, and the one loading (the
+ * translations page's State table, declared once in `i18nState`). Takes a selector, and
+ * re-renders only when what it returns changes.
  */
-export function useT(): (key: string, options?: TranslateOptions) => string {
-  const i18n = useCapability(I18nToken);
-  const slice = useKernelValue((k) => k.getState().plugins['i18n']);
-  return useMemo(() => (key, options) => i18n.t(key, options), [i18n, slice]);
-}
+export const useI18nState = stateHook(i18nState);
 
-const localeListEqual = (a: readonly LocaleInfo[], b: readonly LocaleInfo[]): boolean =>
-  a.length === b.length &&
-  a.every((x, i) => x.code === b[i].code && x.name === b[i].name && x.loaded === b[i].loaded);
+/** The i18n settings (`locale`, `fallbackLocale`, `locales`, `loaders`). Takes a selector. */
+export const useI18nSettings = settingsHook(I18nToken);
 
 /**
- * Everything a locale switcher needs, reactive.
+ * A translate function that re-renders the component when the language or the strings change,
+ * and keeps its identity otherwise, so memoized children holding it re-render too.
  *
- *   const { locale, locales, loading, setLocale } = useLocale();
+ *   const t = useT();
+ *   <span>{t('search.results', { params: { count } })}</span>
  */
-export function useLocale(): {
-  locale: string;
-  dir: 'ltr' | 'rtl';
-  locales: readonly LocaleInfo[];
-  /** Code of a lazy pack being fetched, if any — show a spinner on it. */
-  loading: string | null;
-  /** Resolves once the locale is usable (a lazy pack is fetched first). */
-  setLocale: (code: string) => Promise<void>;
-} {
-  const i18n = useCapability(I18nToken);
-  const locale = useSelector(I18nToken, (c) => c.getLocale());
-  const dir = useSelector(I18nToken, (c) => c.getDirection());
-  const loading = useSelector(I18nToken, (c) => c.getLoadingLocale());
-  const locales = useSelector(I18nToken, (c) => c.listLocales(), localeListEqual);
-  return { locale, dir, locales, loading, setLocale: i18n.setLocale };
+export function useT(): (key: string, options?: TranslateOptions) => string {
+  return useSelector(I18nToken, (i18n) => i18n.getTranslator());
 }

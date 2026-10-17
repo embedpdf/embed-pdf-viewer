@@ -4,7 +4,7 @@
  * No first-party Azure mock library, so we `vi.mock` both
  * `@azure/storage-blob` and `@azure/identity` with a faithful
  * in-memory fake. The fake stores bytes + metadata and records how
- * SAS was signed, so we verify BOTH presigning paths:
+ * SAS was signed, so we verify both presigning paths:
  *   - keyless (no accountKey)  → DefaultAzureCredential + user-delegation SAS
  *   - keyed   (accountKey set) → StorageSharedKeyCredential + account-key SAS
  *

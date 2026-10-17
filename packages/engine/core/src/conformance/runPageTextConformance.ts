@@ -10,6 +10,7 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageTextSnapshotSchema } from '../wire/schemas';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Per-fixture expectations for the text-extraction harness. Concrete
@@ -56,7 +57,7 @@ export function runPageTextConformance(
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
-        const snap = await page.text.read();
+        const snap = await page.text.get();
         expect(PageTextSnapshotSchema.safeParse(snap).success).toBe(true);
         expect(snap.charCount >= opts.fixture.minCharCount).toBe(true);
         expect(snap.text.length > 0).toBe(true);
@@ -69,7 +70,7 @@ export function runPageTextConformance(
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
-        const snap = await page.text.read();
+        const snap = await page.text.get();
         expect(snap.text.includes(opts.fixture.expectedSubstring)).toBe(true);
       } finally {
         await doc.close();
@@ -82,7 +83,7 @@ export function runPageTextConformance(
         let caught: unknown;
         try {
           const ghost = doc.page(toPageRef(999_999_999));
-          await ghost.text.read();
+          await ghost.text.get();
         } catch (err) {
           caught = err;
         }
@@ -97,7 +98,7 @@ export function runPageTextConformance(
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
-        const p = page.text.read();
+        const p = page.text.get();
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {
@@ -111,7 +112,7 @@ export function runPageTextConformance(
       await doc.close();
       let caught: unknown;
       try {
-        await page.text.read();
+        await page.text.get();
       } catch (err) {
         caught = err;
       }
@@ -124,7 +125,7 @@ export function runPageTextConformance(
 async function openFixture(engine: Engine, opts: PageTextConformanceOptions) {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

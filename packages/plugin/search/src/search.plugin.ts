@@ -1,21 +1,23 @@
 import { definePlugin } from '@embedpdf/core';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-import { SearchToken, type SearchCapability, type SearchConfig } from './contract';
+
+import { SEARCH_DEFAULTS, SearchToken, type SearchConfig } from './contract';
 import { createSearchController } from './controller';
-import { initialSearchState, reduceSearch, type SearchAction, type SearchState } from './model';
+import { initialSearchState } from './model';
 
 /**
- * Document text search over the engine's budgeted, cursor-resumable slices.
- * Document-scoped; no pointer handling. The Stage is optional: with one, scans
- * start at the current page (viewport-first) and navigation reveals hits.
+ * Document text search over the engine's budgeted, resumable slices.
+ * Document-scoped; no pointer handling. The stage is optional: with one,
+ * scans start at the current page and navigation reveals hits. `config` is
+ * the settings the app registers, over {@link SEARCH_DEFAULTS}.
  */
 export const searchPlugin = (config?: SearchConfig) =>
-  definePlugin<SearchState, SearchAction, SearchCapability>({
+  definePlugin({
     id: 'search',
     token: SearchToken,
     scope: 'document',
     optional: [StageToken],
-    initialState: initialSearchState,
-    reduce: reduceSearch,
-    create: (ctx) => createSearchController(ctx, config),
+    state: initialSearchState,
+    settings: { defaults: SEARCH_DEFAULTS, registered: config },
+    create: createSearchController,
   });

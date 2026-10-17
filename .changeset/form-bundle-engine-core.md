@@ -1,0 +1,5 @@
+---
+'@embedpdf/engine-core': minor
+---
+
+Form bundles replace FDF/XFDF. `doc.forms.export(selection)` takes whole fields out as a `FormBundle` (each field with its widgets, value, scripts, actions and attribution; a signature and a `noExport` value never travel); `doc.forms.import(bundle, options)` copies the design and `doc.forms.importValues(bundle, options)` fills fields of the same name, each one change you can undo, answered again on a retry. New: `FormBundle`, `FormTransfer` (one JSON file), `FormExportSelection`, `FormImportOptions`, `FormValuesImportOptions`, `FormImportResult`, `FormValuesImportResult`, the drop reasons, the pure planners `planFormImport` and `planFormValuesImport`, `formImportFacts` and `formValuesImportFacts`, `FormImportOp`, the wire schemas, paths, resources (`form-export`, `layer-form-export`) and the export token, and `allowsCapability()`. Removed: `FormDataFormat`, `FormDataExport`, the FDF/XFDF `FormImportResult`, the `forms.imported` event and the `form/data` paths. New conformance suite `runFormTransferConformance`.

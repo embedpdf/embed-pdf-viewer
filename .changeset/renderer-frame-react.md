@@ -1,0 +1,5 @@
+---
+'@embedpdf/react': minor
+---
+
+An annotation renderer draws into a frame: the layer places, sizes and turns it exactly like the annotation's own drawing, also on a turned page and during a drag, a resize or a turn, and the component fills it. The layer's own drawing sits in the same frame, so a custom look and the native one can never disagree, and blending (a highlight's multiply) happens on the frame. A look is drawn at the annotation's 100% size and scaled with the page, text and borders included, as the PDF's own drawing is; `scale: false` on a renderer draws at the size on screen instead. Renderers get `frame` (`width` and `height` at the 100% size, its `rotation` on screen, and its `scale`) and `selected`, and `native` fills the frame; `box` and `page` are gone, and `appearance` is `{ url }`. A note drawn your way now stays upright on a turned page, like its icon. `useRichTextEditor(annotation)` reads the page it's on itself. `BehaviorRendererProps` is its own shape: a behavior renderer places its controls from `item` and `page`.

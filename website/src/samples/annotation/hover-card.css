@@ -1,0 +1,59 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --text: #3b4b7a;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The card next to the annotation under the pointer */
+.card {
+  max-width: 220px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px -10px rgb(7 32 76 / 0.3);
+}
+
+.card strong {
+  color: var(--ink);
+}
+
+.card p {
+  margin: 4px 0 0;
+}
+
+.hint {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

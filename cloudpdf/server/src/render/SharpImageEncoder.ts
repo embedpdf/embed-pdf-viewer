@@ -21,7 +21,9 @@ export class SharpImageEncoder {
 
     if (opts.format === 'webp') {
       return {
-        stream: image.webp(opts.quality === undefined ? {} : { quality: opts.quality }),
+        stream: image.webp(
+          opts.quality === undefined ? {} : { quality: sharpQuality(opts.quality) },
+        ),
         contentType: 'image/webp',
       };
     }
@@ -34,7 +36,7 @@ export class SharpImageEncoder {
 
   /**
    * Encode to a materialized buffer — the derived-artifact store persists
-   * bytes, not streams (the same bytes are sent AND stored).
+   * bytes, not streams (the same bytes are sent and stored).
    */
   async encodeToBuffer(
     raster: PageRaster,
@@ -44,4 +46,9 @@ export class SharpImageEncoder {
     const bytes = new Uint8Array(await encoded.stream.toBuffer());
     return { bytes, contentType: encoded.contentType };
   }
+}
+
+/** Engine quality is 0–1 (the `canvas.toBlob` scale); libvips takes 1–100. */
+function sharpQuality(quality: number): number {
+  return Math.min(100, Math.max(1, Math.round(quality * 100)));
 }

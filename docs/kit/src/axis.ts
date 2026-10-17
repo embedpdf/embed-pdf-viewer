@@ -1,7 +1,7 @@
 import type { FeedbackSite } from './feedback';
 
 /**
- * The two content axes (DOCS-PLATFORM-ARCHITECTURE.md):
+ * The two content axes (docs/conventions/docs-architecture.md):
  *
  * - framework — chosen by the reader, resolved at runtime from the URL
  * - engine    — chosen by the product, resolved at build time per site

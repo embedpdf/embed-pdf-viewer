@@ -1,12 +1,13 @@
 'use client';
 
+import { SearchDialog } from '@embedpdf/docs-kit';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { EpButton } from './button';
 import { ChevronRightIcon, GitHubIcon, SearchIcon, SparkIcon } from './icons';
-import { SearchDialog } from '@embedpdf/docs-kit';
+import { PRO_LAUNCHED } from './launch';
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: 'Docs', href: '/docs' },
@@ -45,20 +46,22 @@ export function Header() {
           />
         </Link>
 
-        <Link
-          href="/pro"
-          aria-label="EmbedPDF Pro"
-          className="hover:bg-ep-mist group hidden h-8 flex-shrink-0 items-center gap-1.5 rounded-full border border-[#E9EEFF] bg-[#F3F7FE] px-3 transition-all duration-150 hover:border-[#C7DEFF] min-[769px]:inline-flex"
-        >
-          <SparkIcon size={13} className="text-ep-blue flex-shrink-0" />
-          <span className="from-ep-navy to-ep-blue hidden bg-gradient-to-r bg-clip-text font-sans text-[13px] font-bold text-transparent min-[1025px]:inline">
-            EmbedPDF Pro
-          </span>
-          <ChevronRightIcon
-            size={11}
-            className="text-ep-subtle group-hover:text-ep-blue transition-all duration-150 group-hover:translate-x-0.5"
-          />
-        </Link>
+        {PRO_LAUNCHED && (
+          <Link
+            href="/pro"
+            aria-label="EmbedPDF Pro"
+            className="hover:bg-ep-mist group hidden h-8 flex-shrink-0 items-center gap-1.5 rounded-full border border-[#E9EEFF] bg-[#F3F7FE] px-3 transition-all duration-150 hover:border-[#C7DEFF] min-[769px]:inline-flex"
+          >
+            <SparkIcon size={13} className="text-ep-blue flex-shrink-0" />
+            <span className="from-ep-navy to-ep-blue hidden bg-gradient-to-r bg-clip-text font-sans text-[13px] font-bold text-transparent min-[1025px]:inline">
+              EmbedPDF Pro
+            </span>
+            <ChevronRightIcon
+              size={11}
+              className="text-ep-subtle group-hover:text-ep-blue transition-all duration-150 group-hover:translate-x-0.5"
+            />
+          </Link>
+        )}
 
         <button
           onClick={() => setSearchOpen(true)}

@@ -1,0 +1,214 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --accent-tint: #e7f0fe;
+  --mark: #ffe36e;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The panel buttons, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 14px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-tint);
+  border-color: var(--line-strong);
+}
+
+.button:focus-visible,
+.close:focus-visible,
+.item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The pages and the open panel: stacked, and side by side where there's room */
+.workspace {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stage,
+.panel {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.stage {
+  height: 340px;
+  background: var(--canvas);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+@container (min-width: 620px) {
+  .stage {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 420px;
+  }
+
+  .panel {
+    flex: 0 0 250px;
+    max-height: 420px;
+  }
+}
+
+/* Inside a panel */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.close {
+  width: 28px;
+  height: 28px;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--ink);
+  background: var(--tint);
+}
+
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+}
+
+.field:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgb(125 182 255 / 0.35);
+}
+
+.notes {
+  flex: 1;
+  min-height: 140px;
+  resize: none;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--tint);
+}
+
+.item-page {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.item-text {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.item-text mark {
+  background: var(--mark);
+  color: inherit;
+  border-radius: 2px;
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

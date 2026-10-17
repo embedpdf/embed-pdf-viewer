@@ -5,14 +5,14 @@
  * A ctrl/cmd wheel event is one of three physically different inputs that
  * happen to share an event type, each with its own unit system:
  *
- *   • trackpad PINCH — browsers (Chrome/Edge/Firefox) synthesize ctrl+wheel
+ *   • trackpad pinch — browsers (Chrome/Edge/Firefox) synthesize ctrl+wheel
  *     px-deltas scaled to the de-facto convention that `exp(-Δ/100)` tracks
  *     the physical finger scale 1:1. Anything weaker feels dead (the content
  *     must track the fingers — the Figma/maps feel).
- *   • mouse NOTCHES — coarse steps: ±100/±120 px in Chrome, lines/pages mode
+ *   • mouse notches — coarse steps: ±100/±120 px in Chrome, lines/pages mode
  *     in Firefox. The pinch mapping would triple per click; a notch instead
  *     steps by 1.2, the same ratio as the zoom buttons.
- *   • cmd + continuous SCROLL — real scroll px, big and streaming (with
+ *   • cmd + continuous scroll — real scroll px, big and streaming (with
  *     momentum): a gentle scrub coefficient. A cmd+mouse notch (±120 px)
  *     lands within 0.3% of the 1.2 button step, so it needs no special case.
  *
@@ -31,15 +31,15 @@ export interface WheelSample {
 const NOTCH = 1.2;
 
 /** Zoom factor for a ctrl/cmd wheel event (the caller decides zoom vs pan). */
-export function wheelZoomFactor(e: WheelSample): number {
+export function wheelZoomFactor(sample: WheelSample): number {
   // Lines/pages mode (Firefox mouse wheels): one button-step per notch.
-  if (e.deltaMode !== 0) return Math.pow(NOTCH, -Math.sign(e.deltaY));
-  if (e.ctrlKey) {
+  if (sample.deltaMode !== 0) return Math.pow(NOTCH, -Math.sign(sample.deltaY));
+  if (sample.ctrlKey) {
     // px deltas with ctrl: a real mouse notch arrives big (±100/±120) and
     // steps like the buttons; anything smaller is a synthesized pinch.
-    if (Math.abs(e.deltaY) >= 100) return Math.pow(NOTCH, -Math.sign(e.deltaY));
-    return Math.exp(-e.deltaY / 100);
+    if (Math.abs(sample.deltaY) >= 100) return Math.pow(NOTCH, -Math.sign(sample.deltaY));
+    return Math.exp(-sample.deltaY / 100);
   }
   // cmd + continuous scroll: the gentle scrub.
-  return Math.exp(-e.deltaY * 0.0015);
+  return Math.exp(-sample.deltaY * 0.0015);
 }

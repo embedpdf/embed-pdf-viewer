@@ -2,14 +2,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { runFormConformance, type ConformanceTestRunner } from '@embedpdf/engine-core/conformance';
-import type { FormEffect, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import { formEffectOps, type FormEffect, type FormFieldRef } from '@embedpdf/engine-core/runtime';
 import {
   javaScriptProgramFromActionTree,
   scriptFieldsFromSnapshot,
   type ScriptInput,
 } from '../../../packages/core/acrojs/src';
 import { createQuickJsSandbox } from '../../../packages/core/js-sandbox/src';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
   seedDocumentFromBytes,
@@ -35,14 +35,15 @@ let fx: DbSeededFixture | undefined;
 const TENANT_ID = 'cloud-forms-conformance-tenant';
 
 // The suite opens several independent documents, so the engine carries a
-// TENANT token (doc-scoped tokens bind to one docId). The import target is
-// a second copy of toggle_fields.pdf — id-opened docs are server state, so
-// the round-trip test can't mint one by re-opening bytes.
+// tenant token (doc-scoped tokens bind to one docId). The import and delete
+// targets are further copies of toggle_fields.pdf — id-opened docs are
+// server state, so those tests can't mint one by re-opening bytes.
 const DOCS = {
   toggleFields: { id: 'toggle-fields-cloud', file: 'toggle_fields.pdf', pages: 1 },
   orphanWidgets: { id: 'orphan-widgets-cloud', file: 'orphan_widgets.pdf', pages: 1 },
   choiceFields: { id: 'listbox-form-cloud', file: 'listbox_form.pdf', pages: 1 },
   importTarget: { id: 'toggle-fields-import-target-cloud', file: 'toggle_fields.pdf', pages: 1 },
+  deleteTarget: { id: 'toggle-fields-delete-target-cloud', file: 'toggle_fields.pdf', pages: 1 },
   dynamicStamp: {
     id: 'dynamic-approval-stamp-cloud',
     file: 'EmbedPDF_Dynamic_Approval_Stamp.pdf',
@@ -90,10 +91,11 @@ runFormConformance(runner, {
     orphanWidgets: fixture(DOCS.orphanWidgets.id),
     choiceFields: fixture(DOCS.choiceFields.id),
     importTarget: fixture(DOCS.importTarget.id),
+    deleteTarget: fixture(DOCS.deleteTarget.id),
   },
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');
-    return createCloudEngine({
+    return cloudEngine({
       baseUrl: fx.baseUrl,
       token: tenantToken(fx, TENANT_ID),
     });
@@ -102,15 +104,15 @@ runFormConformance(runner, {
 
 function sameRef(left: FormFieldRef, right: FormFieldRef): boolean {
   return left.kind === 'objectNumber' && right.kind === 'objectNumber'
-    ? left.fieldObjectNumber === right.fieldObjectNumber
+    ? left.objectNumber === right.objectNumber
     : left.kind === 'fqn' && right.kind === 'fqn'
       ? left.name === right.name
       : false;
 }
 
-test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer', async () => {
+test('dynamic-stamp script effects apply as one change and persist in its layer', async () => {
   if (!fx) throw new Error('fixture not initialised');
-  const engine = createCloudEngine({
+  const engine = cloudEngine({
     baseUrl: fx.baseUrl,
     token: tenantToken(fx, TENANT_ID),
   });
@@ -118,7 +120,7 @@ test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer
   const sandbox = await createQuickJsSandbox();
 
   try {
-    const [snapshot, actions] = await Promise.all([doc.forms.list(), doc.actions!.read()]);
+    const [snapshot, actions] = await Promise.all([doc.forms.list(), doc.actions!.get()]);
     const fields = scriptFieldsFromSnapshot(snapshot);
     const baseInput: Omit<ScriptInput, 'fields' | 'event'> = {
       document: {
@@ -163,16 +165,15 @@ test('dynamic-stamp scripts feed the cloud effects sink and persist in its layer
 
     const eventTypes: string[] = [];
     const unsubscribe = doc.events.subscribe((event) => eventTypes.push(event.type));
-    const applied = await doc.forms.applyEffects!(effects);
+    const applied = await doc.apply({ ops: formEffectOps(effects) });
     unsubscribe();
-    expect(applied.results.map(({ status }) => status)).toEqual([
-      'applied',
-      'applied',
-      'applied',
-      'applied',
+    expect(applied.items.map(({ type }) => type)).toEqual([
+      'forms.setValue',
+      'forms.setValue',
+      'forms.setValue',
+      'forms.setValue',
     ]);
-    expect(applied.meta).not.toBeNull();
-    expect(eventTypes).toContain('form.effectsApplied');
+    expect(eventTypes).toContain('forms.valueSet');
 
     const reread = await doc.forms.list();
     expect(

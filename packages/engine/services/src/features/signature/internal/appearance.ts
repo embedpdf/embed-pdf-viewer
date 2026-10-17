@@ -8,7 +8,7 @@ import { CloseStack } from '../../../document-session/lifecycle/PdfDocumentOpene
 const FIT_CONTAIN = 0;
 
 /**
- * Draw one page of a PDF into a widget annotation's normal appearance —
+ * Draw a one-page PDF into a widget annotation's normal appearance —
  * what a signature's mark is, whether the field is being signed
  * (`SignatureMutator`) or only filled visually (`FormMutator`).
  *
@@ -24,19 +24,18 @@ export function bakeWidgetAppearance(
   docPtr: Ptr,
   widget: FormWidget,
   pdf: Uint8Array,
-  pageIndex: number,
 ): void {
   const { mem, fn } = runtime;
   const stack = new CloseStack();
   try {
     const pagePtr = widget.page
-      ? fn.EPDFDoc_LoadPageByObjectNumber(docPtr, widget.page.pageObjectNumber)
+      ? fn.EPDFDoc_LoadPageByObjectNumber(docPtr, widget.page.objectNumber)
       : NULL_PTR;
     if (!pagePtr) {
       throw new EngineError(EngineErrorCode.NotFound, 'the widget page could not be loaded');
     }
     stack.push(() => fn.FPDF_ClosePage(pagePtr));
-    const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, widget.annotObjectNumber);
+    const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, widget.objectNumber);
     if (!annotPtr) {
       throw new EngineError(EngineErrorCode.NotFound, 'the signature widget could not be loaded');
     }
@@ -49,7 +48,14 @@ export function bakeWidgetAppearance(
       throw new EngineError(EngineErrorCode.MalformedPdf, 'the appearance PDF could not be opened');
     }
     stack.push(() => fn.FPDF_CloseDocument(artworkPtr));
-    if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, artworkPtr, pageIndex)) {
+    const pages = fn.FPDF_GetPageCount(artworkPtr);
+    if (pages !== 1) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `the appearance PDF has ${pages} pages; a signature appearance takes a one-page PDF`,
+      );
+    }
+    if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, artworkPtr, 0)) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         'the appearance page could not be drawn into the widget',

@@ -9,11 +9,11 @@ afterEach(cleanup);
 
 describe('<FormFocusRing>', () => {
   it('renders an inert focus indicator above the widget appearance', () => {
-    const view = render(<FormFocusRing visible={false} />);
+    const view = render(<FormFocusRing visible={false} color="#3858e9" />);
 
     expect(view.container.firstElementChild).toBeNull();
 
-    view.rerender(<FormFocusRing visible />);
+    view.rerender(<FormFocusRing visible color="rgba(66, 133, 244, 0.8)" />);
     const ring = view.container.querySelector('[data-embedpdf-form-focus-ring]');
 
     expect(ring).not.toBeNull();

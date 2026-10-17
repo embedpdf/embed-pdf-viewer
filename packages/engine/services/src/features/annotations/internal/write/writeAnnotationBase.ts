@@ -1,4 +1,11 @@
-import type { AnnotationDraftBase, AnnotationPatchBase } from '@embedpdf/engine-core/runtime';
+import {
+  annotationDefaultsOf,
+  type AnnotationDraftBase,
+  type AnnotationPatchBase,
+  type AnnotationSubtype,
+  type DateInput,
+  type PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -7,25 +14,24 @@ import {
   writeAnnotStringOrClear,
 } from './annotationWritePrimitives';
 import { formatPdfDate } from '../../../../shared/pdf-date';
+import { flagFieldsOf } from '../annotationFlagBits';
 
 /**
  * Write the annotation-wide base fields shared by every Draft
- * (contents/subject/nm). The kind-specific writer calls this BEFORE its
+ * (contents/subject/nm). The kind-specific writer calls this before its
  * own field writes; order doesn't actually matter at the PDF level, but
  * keeping the base first makes the writers symmetric with the readers.
  *
  * `/T` (author display) is stamped by the mutator from
  * `AnnotationActor.displayName` via {@link writeAnnotationAuthor}.
  *
- * `nm` is written verbatim if the caller supplied one. The mutator
- * decides whether to opportunistically stamp a UUID v4 on a weak
- * annotation; the writer does not.
+ * `nm` is written verbatim if the caller supplied one.
  */
 export function applyAnnotationBaseDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: AnnotationDraftBase,
+  draft: AnnotationDraftBase<PdfCoordinates>,
 ): void {
   if (draft.contents !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', draft.contents);
@@ -33,20 +39,20 @@ export function applyAnnotationBaseDraft(
   if (draft.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', draft.subject);
   }
-  if (draft.nm !== undefined && draft.nm.length > 0) {
+  if (draft.nm) {
     writeAnnotString(fn, mem, annotPtr, 'NM', draft.nm);
   }
-  if (draft.flags !== undefined) {
-    setAnnotFlags(fn, annotPtr, draft.flags);
-  }
+  // A flag the draft leaves out is its kind's default: a new annotation
+  // prints, except a popup.
+  const subtype = (draft as { subtype?: AnnotationSubtype }).subtype;
+  const flags = flagFieldsOf({ ...(subtype ? annotationDefaultsOf(subtype) : {}), ...draft });
+  if (flags) setAnnotFlags(fn, annotPtr, flags);
 }
 
 /**
  * Write the annotation-wide base fields shared by every Patch
  * (contents/subject). /T is bound at creation and not patchable — see
- * `AnnotationPatchBase`. /NM is monotonic per annotation; the mutator
- * may stamp /NM opportunistically on a weak annotation via
- * `writeAnnotationNm`.
+ * `AnnotationPatchBase`. /NM is set only at create.
  *
  * Three-state semantics on string|null fields:
  *   undefined -> don't touch the dict
@@ -57,7 +63,7 @@ export function applyAnnotationBasePatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: AnnotationPatchBase,
+  patch: AnnotationPatchBase<PdfCoordinates>,
 ): void {
   if (patch.contents !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', patch.contents);
@@ -65,15 +71,14 @@ export function applyAnnotationBasePatch(
   if (patch.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', patch.subject);
   }
-  if (patch.flags !== undefined) {
-    setAnnotFlags(fn, annotPtr, patch.flags);
-  }
+  const flags = flagFieldsOf(patch);
+  if (flags) setAnnotFlags(fn, annotPtr, flags);
 }
 
 /**
  * Stamp /T (the standard PDF "author" display field) on an annotation.
- * Called by the mutator on CREATE — /T is bound to the caller's
- * `display_name` at creation. No-op when `displayName` is empty so
+ * Called by the mutator on create — /T is bound to the caller's
+ * `displayName` at creation. No-op when `displayName` is empty so
  * callers don't need to gate it.
  */
 export function writeAnnotationAuthor(
@@ -87,18 +92,17 @@ export function writeAnnotationAuthor(
 }
 
 /**
- * Stamp /NM on an annotation that didn't have one. Used by the mutator
- * (not by the writers proper) to upgrade a weak annotation to durable
- * identity during update. Idempotent and silent if the value is empty.
+ * Stamp `/CreationDate` on a new annotation: on create, the same moment it
+ * stamps as `/M`; on a restoring import, the date the annotation had, its
+ * offset kept.
  */
-export function writeAnnotationNm(
+export function writeAnnotationCreated(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  nm: string,
+  now: DateInput = new Date(),
 ): void {
-  if (nm.length === 0) return;
-  writeAnnotString(fn, mem, annotPtr, 'NM', nm);
+  writeAnnotString(fn, mem, annotPtr, 'CreationDate', formatPdfDate(now));
 }
 
 /**
@@ -107,7 +111,7 @@ export function writeAnnotationNm(
  * it lives here alongside /T / /NM / /Contents rather than in any
  * vendor-namespaced extension.
  *
- * Called by the mutator on every annotation create AND every update;
+ * Called by the mutator on every annotation create and every update;
  * the existing base draft/patch writers leave /M alone because the
  * value is derived from the moment of the write, not from the
  * draft/patch payload. The base reader already extracts /M and
@@ -119,7 +123,7 @@ export function writeAnnotationModified(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  now: Date = new Date(),
+  now: DateInput = new Date(),
 ): void {
   writeAnnotString(fn, mem, annotPtr, 'M', formatPdfDate(now));
 }

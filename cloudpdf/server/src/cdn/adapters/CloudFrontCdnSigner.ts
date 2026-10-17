@@ -5,7 +5,7 @@
  *                        policy lists one Resource glob per granted
  *                        cacheable resource — CloudFront enforces the
  *                        union at the edge. A render-only scope's
- *                        policy contains ONLY the render glob, so the
+ *                        policy contains only the render glob, so the
  *                        cookies can't authorize text or annotations.
  *   'urls'             : one per-prefix Policy/Signature/Key-Pair-Id
  *                        triple per granted resource, emitted via
@@ -28,7 +28,7 @@
  *   policyB64 = cloudfront-base64(policy)
  *   sigB64    = cloudfront-base64(sig)
  *
- * **Per-resource scope enforcement at the edge** (paths v2)
+ * **Per-resource scope enforcement at the edge**
  *
  * The policy enumerates only the granted resources' prefixes — never
  * a broad `/v1/docs/<id>/*` glob. Combined with the path-prefix
@@ -45,7 +45,8 @@
  * Config carries `cookieDomain`; if omitted, cookies are scoped to
  * the CDN host exactly (no cross-host coverage).
  *
- * Purge: stub here; real CreateInvalidation lands in commit H.
+ * Purge is not implemented: it returns a `no-op` receipt without calling
+ * `CreateInvalidation`.
  */
 
 import type { CdnAccessInfo } from '@embedpdf/engine-core/runtime';
@@ -95,7 +96,7 @@ export class CloudFrontCdnSigner implements CdnSigner {
     if (this.opts.mode === 'cookies') {
       // Single multi-Resource policy: each granted prefix becomes its
       // own Resource entry, signed once. The edge admits a request
-      // iff its URL matches at least one Resource AND the expiry
+      // iff its URL matches at least one Resource and the expiry
       // hasn't passed.
       const resources = input.coverage.map((entry) => `${this.cdnOrigin}${entry.pathPrefix}*`);
       const { policyB64, signatureB64 } =
@@ -191,7 +192,7 @@ export function signCloudFrontPolicy(
 /**
  * Like {@link signCloudFrontPolicy} but for a multi-Resource policy.
  * Each `resource` becomes its own Statement entry — CloudFront admits
- * a URL iff at least one Statement's Resource matches it (logical OR
+ * a URL iff at least one Statement's Resource matches it (logical or
  * across Statements). Used by cookies mode to pack one Statement per
  * granted cacheable resource into a single signature.
  *

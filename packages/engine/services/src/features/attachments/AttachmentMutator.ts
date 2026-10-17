@@ -1,11 +1,11 @@
 import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
-  EmbeddedFileRef,
+  AttachmentRef,
   WireAttachmentFile,
   WireResourceMap,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toAttachmentRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -22,9 +22,8 @@ import { throwIfAborted } from '../../shared/abort';
  * write path (`writeAttachmentFilePayload`) with the file-attachment
  * annotation writer.
  *
- * Identity is the name-tree KEY (unique by construction), so unlike
- * annotations there is no weak-ref/revision bookkeeping here. Note the
- * tree is key-sorted: both mutations shift OTHER entries' indices; keys
+ * Identity is the name-tree key (unique by construction). Note the
+ * tree is key-sorted: both mutations shift other entries' indices; keys
  * never move. Layer persistence (`finishMutation`) and event publication
  * happen in the callers, exactly like every other mutation family.
  */
@@ -49,11 +48,11 @@ export class AttachmentMutator {
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
-    const resource = resources?.[file.resource];
+    const resource = resources?.[file.resources.file];
     if (!resource) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `attachment file references resource '${file.resource}' but no such binary payload accompanied the mutation`,
+        `attachment file references resource '${file.resources.file}' but no such binary payload accompanied the mutation`,
       );
     }
     if (file.name.length === 0) {
@@ -85,7 +84,8 @@ export class AttachmentMutator {
     writeAttachmentFilePayload(fn, mem, attachmentPtr, docPtr, file, resource);
 
     // Read back the materialised entry at its (name-sorted) position.
-    const index = resolveAttachmentIndex(fn, mem, docPtr, { kind: 'key', key: file.name });
+    const ref = toAttachmentRef(file.name);
+    const index = resolveAttachmentIndex(fn, mem, docPtr, ref);
     if (index < 0) {
       throw new EngineError(
         EngineErrorCode.Unknown,
@@ -93,14 +93,14 @@ export class AttachmentMutator {
       );
     }
     return {
-      created: { ...readAttachmentFileInfo(fn, mem, attachmentPtr), key: file.name, index },
+      attachment: { ...readAttachmentFileInfo(fn, mem, attachmentPtr), ref, index },
       // Cloud coherence pins are a server concern; the worker reports none.
-      cache: null,
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed: [ref] },
     };
   }
 
   /** Delete an embedded file by key. Unlinks the tree entry only. */
-  delete(ref: EmbeddedFileRef, signal: AbortSignal): AttachmentDeleteResult {
+  delete(ref: AttachmentRef, signal: AbortSignal): AttachmentDeleteResult {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -115,6 +115,8 @@ export class AttachmentMutator {
     if (!fn.FPDFDoc_DeleteAttachment(docPtr, index)) {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDFDoc_DeleteAttachment returned false');
     }
-    return { deleted: ref, cache: null };
+    return {
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed: [ref] },
+    };
   }
 }

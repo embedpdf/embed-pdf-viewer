@@ -1,0 +1,110 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The page pictures beside the large one; above it on a narrow screen */
+.images {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.strip {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 10px;
+  padding: 4px;
+  overflow-x: auto;
+}
+
+.thumbnail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 104px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.thumbnail img {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(7 32 76 / 0.12);
+}
+
+.thumbnail[aria-selected='true'] {
+  color: var(--accent);
+}
+
+.thumbnail[aria-selected='true'] img {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.thumbnail:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+/* The large picture: exactly the pixels asked for, shown at the width there is */
+.preview {
+  flex: 1 1 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 300px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+}
+
+.preview img {
+  max-width: 100%;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+}
+
+/* Side by side once there's room: the pictures in a column, after the rules
+   above so they win */
+@container (min-width: 560px) {
+  .strip {
+    flex: 0 0 120px;
+    flex-direction: column;
+    max-height: 460px;
+    overflow: auto;
+  }
+
+  .preview {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

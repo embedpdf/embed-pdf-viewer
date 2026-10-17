@@ -9,7 +9,7 @@ import type { DocsOgBrand } from '@embedpdf/docs-kit/og';
  * both brands are drawn from the same colour system, so nothing but the
  * lockup and the domain differs here.
  *
- * The lockup is inlined as a data URI rather than referenced by path: OG
+ * The lockup is inlined as a data URI rather than referenced by path: Og
  * images are generated statically, with no server to resolve `/…` against.
  * Width is the real 697×107 aspect at the card's 46px cap height, because
  * Satori will not measure an SVG.

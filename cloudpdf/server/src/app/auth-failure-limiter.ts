@@ -1,5 +1,5 @@
 /**
- * Per-client throttle on authentication FAILURES, not requests.
+ * Per-client throttle on authentication failures, not requests.
  *
  * Rationale: legitimate traffic presents valid tokens and is never counted,
  * so the limiter needs no tuning against peak RPS — only sources that keep

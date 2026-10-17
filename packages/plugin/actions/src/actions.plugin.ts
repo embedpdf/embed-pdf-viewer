@@ -1,27 +1,26 @@
 import { definePlugin } from '@embedpdf/core';
 
-import type { ActionsConfig } from './contract';
+import { ACTIONS_DEFAULTS, type ActionsConfig } from './contract';
 import { createActionsController } from './controller';
 import { ActionsToken } from './host-contract';
-import type { ActionsHostCapability } from './host-contract';
-import { actionsReducer, initialActionsState } from './model';
-import type { ActionsAction, ActionsState } from './model';
+import { registeredSettings } from './settings';
 
 /**
- * The action engine: the DEPENDENCY ROOT of the action architecture. It
+ * The action engine, the dependency root of the action architecture. It
  * interprets extracted /A and /AA trees; it never detects triggers and never
- * imports another plugin's token — stage, annotation, link, and form
- * optionally depend on ActionsToken and register their executors and sinks
- * at connect time (the kernel's topological order guarantees this plugin
- * initializes first). JavaScript is one registered interpreter among many:
- * Hide, ResetForm, GoTo, and Named work with scripting off.
+ * imports another plugin's token: the stage, annotation, link and form
+ * plugins optionally depend on it and register their executors and sinks
+ * when they connect (the kernel's dependency order creates this plugin
+ * first). JavaScript is one registered interpreter among many: Hide,
+ * ResetForm, GoTo and Named work with scripting off. Document-scoped and
+ * stateless; its settings are what the app registered over
+ * {@link ACTIONS_DEFAULTS}.
  */
 export const actionsPlugin = (config?: ActionsConfig) =>
-  definePlugin<ActionsState, ActionsAction, ActionsHostCapability>({
+  definePlugin({
     id: 'actions',
     token: ActionsToken,
     scope: 'document',
-    initialState: initialActionsState,
-    reduce: actionsReducer,
-    create: (ctx) => ({ api: createActionsController(ctx, config) }),
+    settings: { defaults: ACTIONS_DEFAULTS, registered: registeredSettings(config) },
+    create: (ctx) => createActionsController(ctx, config),
   });

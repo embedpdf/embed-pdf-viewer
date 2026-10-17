@@ -4,7 +4,7 @@
  * Known values are wire-stable lowercase (the house vocabulary — same
  * rationale as `AnnotationReplyType` / `AnnotationBorderStyle`); the PDF
  * stores the capitalized Table 174 spellings. Unknown values — custom
- * Acrobat state models and their states — pass through VERBATIM in both
+ * Acrobat state models and their states — pass through verbatim in both
  * directions, so foreign review workflows survive a round trip.
  */
 

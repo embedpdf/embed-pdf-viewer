@@ -1,0 +1,94 @@
+/* Colors: the example's own, and EmbedPDF's (--epdf-*) for the dark theme */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The dark theme: no code runs when it switches, the browser repaints */
+.pdf-viewer[data-theme='dark'] {
+  --ink: #e6ecfa;
+  --muted: #93a3c7;
+  --line: #2a3a63;
+  --surface: #131d3b;
+  --tint: #1d2a52;
+  --canvas: #0b1328;
+  --accent: #8ab4ff;
+
+  --epdf-accent: #8ab4ff;
+  --epdf-page-background: #2b2b2b;
+  --epdf-page-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.6);
+  --epdf-search-highlight: #7dd3fc;
+  --epdf-search-highlight-active: #f0abfc;
+}
+
+.pdf-viewer {
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  transition: background-color 0.2s ease;
+}
+
+/* The theme switch, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.segmented button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

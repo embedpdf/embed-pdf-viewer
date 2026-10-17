@@ -1,5 +1,11 @@
 # @embedpdf/default-stamps
 
+## 1.0.0-next.1
+
+### Patch Changes
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The README and the `loadDefaultLibrary` documentation hand the library to `importLibrary` of `@embedpdf/plugin-stamp` (was `importLibraryPdf`).
+
 ## 1.0.0-next.0
 
 ### Major Changes

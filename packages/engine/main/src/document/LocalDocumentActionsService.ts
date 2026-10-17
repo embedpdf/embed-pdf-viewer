@@ -8,9 +8,8 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -19,12 +18,12 @@ interface DocClosedView {
 export class LocalDocumentActionsService implements DocumentActionsService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
   ) {}
 
-  read(): AbortablePromise<DocumentActionsSnapshot> {
+  get(): AbortablePromise<DocumentActionsSnapshot> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -35,12 +34,10 @@ export class LocalDocumentActionsService implements DocumentActionsService {
     } catch (error) {
       return AbortablePromise.rejectReason(error);
     }
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'actions.read', jobId, docId: this.docId }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'actions.read', effect: 'read', jobId, docId: this.docId }),
+    });
     return AbortablePromise.run(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

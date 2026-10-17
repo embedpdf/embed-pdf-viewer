@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     testTimeout: 30_000,
-    // Every suite's beforeAll boots a FULL server fixture (Fastify + a
+    // Every suite's beforeAll boots a full server fixture (Fastify + a
     // native-PDFium worker pool + migrations). With all suites running —
     // the restructure had silently ENOENT-skipped seven of them — parallel
     // cold boots contend on CPU and can legitimately exceed 30s on a busy

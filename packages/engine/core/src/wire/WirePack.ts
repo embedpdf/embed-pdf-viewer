@@ -15,8 +15,8 @@
  *     access) is a semantic decision belonging to the code that
  *     produced the buffer. Inferring it later — by walking the
  *     payload looking for `ArrayBuffer` instances and assuming they
- *     should all be transferred — is the v2 footgun this design
- *     replaces.
+ *     should all be transferred — detaches buffers the producer
+ *     meant to keep.
  *
  *   - **Type-checked at the boundary.** A handler returning
  *     `WirePack<RenderResult>` cannot forget to declare its
@@ -57,10 +57,8 @@ export const EMPTY_TRANSFER: readonly Transferable[] = Object.freeze([]);
  *
  * The `transfer` argument is optional; omitting it (or passing `[]`)
  * is the explicit, type-checked way to say "I declare this message
- * carries no transferables." That's structurally identical to the
- * shape the v2 walker generated for non-binary messages, but here
- * the declaration is at construction time, in the producer's own
- * code, where the knowledge actually lives.
+ * carries no transferables." The declaration is made at construction
+ * time, in the producer's own code, where the knowledge actually lives.
  *
  *   wirePack({ kind: 'metadata.read', jobId, docId })
  *   wirePack({ kind: 'open.fatMem', jobId, docId, bytes }, [bytes])

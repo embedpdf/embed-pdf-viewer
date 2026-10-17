@@ -1,0 +1,11 @@
+<input type="file" accept="application/pdf" id="file" />
+<embedpdf-viewer id="viewer" style="height: 80vh"></embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const viewer = document.getElementById('viewer');
+  document.getElementById('file').addEventListener('change', (event) => {
+    viewer.src = event.target.files[0];
+  });
+</script>

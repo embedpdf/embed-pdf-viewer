@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-signature",
-  "version": "3.0.0-next.14",
+  "version": "3.0.0-next.15",
   "private": false,
   "description": "Document-scoped digital signing: sign a signature field with a mark (a stamp-library asset or bytes you bring) through a signer port, fill it visually without sealing, validate what is signed, and drop an armed mark onto a field. Owns the act, never a mark — marks are the stamp plugin's.",
   "type": "module",
@@ -10,8 +10,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
-    "./contract/host": "./src/host-contract.ts",
-    "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -26,14 +24,6 @@
       "./contract": {
         "import": "./dist/contract.js",
         "require": "./dist/contract.cjs"
-      },
-      "./contract/host": {
-        "import": "./dist/contract/host.js",
-        "require": "./dist/contract/host.cjs"
-      },
-      "./internal": {
-        "import": "./dist/internal.js",
-        "require": "./dist/internal.cjs"
       },
       "./package.json": "./package.json"
     }

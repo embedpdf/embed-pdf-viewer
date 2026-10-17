@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { DocumentScreen } from './screens/document';
 import { LibraryScreen } from './screens/library';
 import { ShareDialog } from './share/ShareDialog';
 import { useRoute } from './state/route';
 import { StoreProvider, useStore } from './state/store';
-import { Badge, Spinner } from './ui/primitives';
+import { Badge, cx, Spinner } from './ui/primitives';
 
 export function App() {
   return (
@@ -94,7 +94,71 @@ function TopBar({ tenantId, onHome }: { tenantId: string; onHome: () => void }) 
       <span className="text-cp-muted hidden text-xs sm:inline">
         Rendering runs on the server — no PDF engine in this bundle.
       </span>
+      <LatencyPicker />
     </header>
+  );
+}
+
+/** Round trips the dev server can add to every `/v1` request. */
+const LATENCY_PRESETS = [
+  { label: 'No added latency', ms: 0, jitter: 0 },
+  { label: '+150 ms', ms: 150, jitter: 0 },
+  { label: '+500 ms', ms: 500, jitter: 0 },
+  { label: '+300–700 ms (out of order)', ms: 300, jitter: 400 },
+  { label: '+1 s', ms: 1000, jitter: 0 },
+  { label: '+2 s', ms: 2000, jitter: 0 },
+];
+
+/**
+ * Slow the network down on purpose, to see what the viewer does at a real
+ * round trip. The delay is held by the Vite dev server (`/__latency`), so the
+ * picker is absent in a production build.
+ */
+function LatencyPicker() {
+  const [current, setCurrent] = useState<{ ms: number; jitter: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/__latency')
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setCurrent)
+      .catch(() => setCurrent(null));
+  }, []);
+
+  if (!current) return null;
+  const selected = LATENCY_PRESETS.findIndex(
+    (p) => p.ms === current.ms && p.jitter === current.jitter,
+  );
+
+  return (
+    <label className="text-cp-muted flex items-center gap-2 text-xs">
+      <span className="hidden md:inline">Network</span>
+      <select
+        value={selected}
+        onChange={async (e) => {
+          const preset = LATENCY_PRESETS[Number(e.target.value)]!;
+          const res = await fetch(`/__latency?ms=${preset.ms}&jitter=${preset.jitter}`);
+          setCurrent(await res.json());
+        }}
+        className={cx(
+          'h-8 rounded-lg border px-2 text-[13px] font-medium',
+          current.ms + current.jitter > 0
+            ? 'border-amber-300 bg-amber-50 text-amber-800'
+            : 'border-cp-border text-cp-navy bg-white',
+        )}
+      >
+        {selected === -1 && (
+          <option value={-1}>
+            +{current.ms}
+            {current.jitter ? `–${current.ms + current.jitter}` : ''} ms
+          </option>
+        )}
+        {LATENCY_PRESETS.map((preset, i) => (
+          <option key={preset.label} value={i}>
+            {preset.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

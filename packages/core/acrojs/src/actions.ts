@@ -2,15 +2,18 @@ import type { PdfActionNode, PdfActionTree } from '@embedpdf/engine-core/runtime
 
 /**
  * Return executable JavaScript in PDF action order (root, then `/Next`
- * depth-first). A poisoned native snapshot is never partially executed.
+ * depth-first). A poisoned native snapshot is never partially executed. Any
+ * kind of destination will do: only the scripts are read.
  */
-export function javaScriptSourcesFromActionTree(tree: PdfActionTree): string[] {
+export function javaScriptSourcesFromActionTree<Destination>(
+  tree: PdfActionTree<Destination>,
+): string[] {
   if (tree.incomplete) {
     throw new Error('Refusing to execute an incomplete PDF action tree');
   }
 
   const sources: string[] = [];
-  const visit = (node: PdfActionNode): void => {
+  const visit = (node: PdfActionNode<Destination>): void => {
     // Only the javascript arm is collected; rendition `/JS` deliberately
     // waits for a rendition interpreter.
     if (node.type === 'javascript') sources.push(node.script);
@@ -21,6 +24,8 @@ export function javaScriptSourcesFromActionTree(tree: PdfActionTree): string[] {
 }
 
 /** One event source that preserves the tree's shared field overlay. */
-export function javaScriptProgramFromActionTree(tree: PdfActionTree): string {
+export function javaScriptProgramFromActionTree<Destination>(
+  tree: PdfActionTree<Destination>,
+): string {
   return javaScriptSourcesFromActionTree(tree).join('\n;\n');
 }

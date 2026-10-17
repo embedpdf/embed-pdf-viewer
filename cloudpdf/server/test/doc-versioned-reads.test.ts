@@ -212,8 +212,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
       },
     );
     expect(res.status).toBe(200);
-    // Content reads carry geometry/text only — no `pageState`. Liveness
-    // (revision/weak state) rides on annotation reads + the manifest.
+    // Content reads carry geometry/text only; the manifest carries the pins.
     const body = (await res.json()) as {
       text: string;
       charCount: number;
@@ -314,6 +313,51 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     expect(res.status).toBe(403);
   });
 
+  test('each picture takes doc.render and the read of what it draws, at both tiers', async () => {
+    const tenantId = 'tenant-annotatedperm';
+    const docId = 'doctxx009';
+    await seedDocument(fx, tenantId, docId);
+    const options = 'background=white,format=webp,viewport.kind=width,viewport.width=320';
+    const fetchAs = (scope: string[], path: string) =>
+      fetch(`${fx.baseUrl}/v1/docs/${docId}${path}`, {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, { scope })}` },
+      });
+    const families = [
+      { path: 'render/pages', pins: 'contentVersion=1', reads: [] },
+      {
+        path: 'render/annotations/pages',
+        pins: 'annotationVersion=1,contentVersion=1',
+        reads: ['doc.annotate.read'],
+      },
+      {
+        path: 'render/fields/pages',
+        pins: 'contentVersion=1,widgetVersion=1',
+        reads: ['doc.forms.read'],
+      },
+      {
+        path: 'render/all/pages',
+        pins: 'annotationVersion=1,contentVersion=1,widgetVersion=1',
+        reads: ['doc.annotate.read', 'doc.forms.read'],
+      },
+    ];
+
+    for (const family of families) {
+      // The token's fields in their canonical (alphabetical) order.
+      const token = [...family.pins.split(','), ...options.split(',')].sort().join(',');
+      for (const path of [
+        `/${family.path}/obj:1/data@${token}`,
+        `/layers/default/${family.path}/obj:1/data@${token}`,
+      ]) {
+        const scope = ['doc.open', 'doc.render', ...family.reads];
+        expect((await fetchAs(scope, path)).status).toBe(200);
+        for (const missing of family.reads) {
+          const short = scope.filter((s) => s !== missing);
+          expect((await fetchAs(short, path)).status).toBe(403);
+        }
+      }
+    }
+  });
+
   test('missing Authorization header returns 401', async () => {
     const tenantId = 'tenant-tunauth';
     const docId = 'doctxx008';
@@ -348,10 +392,10 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/annotations@aN', () =>
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      pageState: { page: { pageObjectNumber: number } };
       annotations: unknown[];
+      pages: Array<{ objectNumber: number }>;
     };
-    expect(body.pageState.page.pageObjectNumber).toBe(1);
+    expect(body.pages).toEqual([toPageRef(1)]);
     expect(Array.isArray(body.annotations)).toBe(true);
   });
 
@@ -394,7 +438,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     await tearDown(fx);
   });
 
-  test('every manifest page reports state and cache pins separately', async () => {
+  test('every manifest page reports its page and cache pins', async () => {
     const tenantId = 'tenant-m-pp';
     const docId = 'docmpp001';
     await seedDocument(fx, tenantId, docId, { pageCount: 5 });
@@ -406,11 +450,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const body = (await res.json()) as {
       docVersion: number;
       pages: Array<{
-        state: {
-          page: { pageObjectNumber: number };
-          revision: { docSessionId: string; generation: number };
-          weakAnnotationState: { kind: string; hasAnyWeakAnnotations: boolean };
-        };
+        page: { kind: string; objectNumber: number };
         cache: {
           contentVersion: number;
           annotationVersion: number;
@@ -421,15 +461,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     expect(body.pages).toHaveLength(5);
     for (let i = 0; i < body.pages.length; i++) {
       const page = body.pages[i]!;
-      expect(page.state.revision).toEqual({
-        docSessionId: `cloud:base:${docId}`,
-        page: page.state.page,
-        generation: 0,
-      });
-      expect(page.state.weakAnnotationState).toEqual({
-        kind: 'known',
-        hasAnyWeakAnnotations: false,
-      });
+      expect(page.page.kind).toBe('objectNumber');
       expect(page.cache.contentVersion).toBe(1);
       expect(page.cache.annotationVersion).toBe(1);
     }
@@ -466,11 +498,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
 
     await fx.db
       .updateTable('document_pages')
-      .set({
-        annotation_version: 7,
-        annotation_generation: 3,
-        has_weak_annotations: 1,
-      })
+      .set({ annotation_version: 7 })
       .where('doc_id', '=', docId)
       .where('page_object_number', '=', 1)
       .execute();
@@ -481,22 +509,12 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     expect(second.status).toBe(200);
     const body = (await second.json()) as {
       pages: Array<{
-        state: {
-          page: { pageObjectNumber: number };
-          revision: { docSessionId: string; generation: number };
-          weakAnnotationState: { kind: string; hasAnyWeakAnnotations: boolean };
-        };
+        page: { objectNumber: number };
         cache: { annotationVersion: number };
       }>;
     };
-    const page = body.pages.find((p) => p.state.page.pageObjectNumber === 1);
-    expect(page).toMatchObject({
-      cache: { annotationVersion: 7 },
-      state: {
-        revision: { docSessionId: `cloud:base:${docId}`, generation: 3 },
-        weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: true },
-      },
-    });
+    const page = body.pages.find((p) => p.page.objectNumber === 1);
+    expect(page).toMatchObject({ cache: { annotationVersion: 7 } });
   });
 
   test('layer manifest is served from durable layer page rows', async () => {
@@ -536,8 +554,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
           page_object_number: 1,
           content_version: 2,
           annotation_version: 5,
-          annotation_generation: 9,
-          has_weak_annotations: 1,
           updated_at: now,
         },
         {
@@ -545,8 +561,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
           page_object_number: 2,
           content_version: 1,
           annotation_version: 1,
-          annotation_generation: 0,
-          has_weak_annotations: 0,
           updated_at: now,
         },
       ])
@@ -563,21 +577,13 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const body = (await res.json()) as {
       docVersion: number;
       pages: Array<{
-        state: {
-          page: { pageObjectNumber: number };
-          revision: { docSessionId: string; generation: number };
-          weakAnnotationState: { kind: string; hasAnyWeakAnnotations: boolean };
-        };
+        page: { objectNumber: number };
         cache: { contentVersion: number; annotationVersion: number };
       }>;
     };
     expect(body.docVersion).toBe(4);
     expect(body.pages[0]).toMatchObject({
-      state: {
-        page: toPageRef(1),
-        revision: { docSessionId: `cloud:layer:${docId}:${layerName}`, generation: 9 },
-        weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: true },
-      },
+      page: toPageRef(1),
       cache: { contentVersion: 2, annotationVersion: 5 },
     });
   });
@@ -592,9 +598,10 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      pages: Array<{ state: { revision: { docSessionId: string } } }>;
+      pages: Array<{ page: { objectNumber: number }; cache: { annotationVersion: number } }>;
     };
-    expect(body.pages[0]?.state.revision.docSessionId).toBe(`cloud:layer:${docId}:bob`);
+    expect(body.pages).toHaveLength(2);
+    expect(body.pages[0]?.cache.annotationVersion).toBe(1);
 
     const layerCount = await fx.db
       .selectFrom('layers')
@@ -642,8 +649,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
           page_object_number: 1,
           content_version: 4,
           annotation_version: 6,
-          annotation_generation: 8,
-          has_weak_annotations: 1,
           updated_at: now,
         },
         {
@@ -651,8 +656,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
           page_object_number: 2,
           content_version: 1,
           annotation_version: 1,
-          annotation_generation: 0,
-          has_weak_annotations: 0,
           updated_at: now,
         },
       ])
@@ -665,8 +668,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       },
     );
     // The text leaf resolves at the durable contentVersion (4) and is
-    // immutably cacheable. It carries no liveness — `pageState` lives on
-    // annotation reads + the manifest, not on content reads.
+    // immutably cacheable.
     expect(text.status).toBe(200);
     expect(text.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
     const textBody = (await text.json()) as { text: string };
@@ -731,8 +733,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
           page_object_number: 1,
           content_version: 3,
           annotation_version: 1,
-          annotation_generation: 0,
-          has_weak_annotations: 0,
           updated_at: now,
         },
         {
@@ -740,8 +740,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
           page_object_number: 2,
           content_version: 1,
           annotation_version: 1,
-          annotation_generation: 0,
-          has_weak_annotations: 0,
           updated_at: now,
         },
       ])
@@ -795,8 +793,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
         page_object_number: 1,
         content_version: 2,
         annotation_version: 1,
-        annotation_generation: 0,
-        has_weak_annotations: 0,
         updated_at: now,
       })
       .execute();
@@ -887,8 +883,6 @@ describe('Phase 4 manifest pages — per-page versions', () => {
         page_object_number: 1,
         content_version: 7,
         annotation_version: 9,
-        annotation_generation: 4,
-        has_weak_annotations: 1,
         updated_at: now,
       })
       .execute();
@@ -901,13 +895,13 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const manifestBody = (await manifest.json()) as {
       docVersion: number;
       pages: Array<{
-        state: { revision: { generation: number } };
+        page: { objectNumber: number };
         cache: { contentVersion: number; annotationVersion: number };
       }>;
     };
     expect(manifestBody.docVersion).toBe(5);
     expect(manifestBody.pages[0]).toMatchObject({
-      state: { revision: { generation: 4 } },
+      page: toPageRef(1),
       cache: { contentVersion: 7, annotationVersion: 9 },
     });
 
@@ -927,12 +921,9 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     expect(annotations.status).toBe(200);
     expect(annotations.headers.get('cache-control')).toBe(NO_STORE);
     const annotationsBody = (await annotations.json()) as {
-      pageState: { revision: { docSessionId: string; generation: number } };
+      pages: Array<{ objectNumber: number }>;
     };
-    expect(annotationsBody.pageState.revision).toMatchObject({
-      docSessionId: `cloud:layer:${docId}:${layerName}`,
-      generation: 4,
-    });
+    expect(annotationsBody.pages).toEqual([toPageRef(1)]);
   });
 
   test('DB-backed cloud mode does not register legacy in-memory mutation routes', async () => {

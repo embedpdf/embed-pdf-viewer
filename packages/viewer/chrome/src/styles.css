@@ -9,82 +9,132 @@
    so the `theme` preference is authoritative over the OS setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Semantic theme tokens — ported 1:1 from the snippet's light/dark themes
-   (viewers/snippet/src/config/theme.ts). Runtime CSS variables so the theme
-   switches with a class; `@theme inline` below turns each into a Tailwind
-   color utility (bg-surface, text-fg-muted, border-subtle, …). */
-/* `:host` alongside `:root`: inside the <embedpdf-viewer> shadow root there is
-   no :root match, so the host carries the base tokens. The dark override stays
-   a plain `.dark` class — the element applies it to its shadow WRAPPER (and
-   apps to <html>), so one selector serves both worlds. */
-:root,
+/* A floating bar's pill (places.tsx): on its toolbar, styles the section that holds the bar's
+   items, the toolbar's child with an item (`data-epdf-toolbar-item`) that draws something. */
+@custom-variant float-pill (& > div:has(> [data-epdf-toolbar-item]:not(:empty)));
+
+/* The viewer's look, as the `--epdf-*` variables the Theming page lists: its accent, the
+   colors of its surfaces, text and lines, the corner radius and the font. Every other color the
+   chrome draws with is mixed from them in `@theme inline` below, so setting one restyles
+   everything made of it. They turn into Tailwind utilities there: `bg-surface`, `text-fg-muted`,
+   `border-border-subtle`, `rounded-md` and the rest. */
+
+/* The page's own value of each public variable this sheet gives a default, read on the host,
+   where the page's CSS arrives (set on the element or inherited from around it). Nothing public
+   is declared on the host: a value there would hide one set around the viewer. */
 :host {
-  --ep-app: #f3f4f6;
-  --ep-surface: #ffffff;
-  --ep-surface-alt: #f1f3f5;
-  --ep-elevated: #ffffff;
-  --ep-fg: #111827;
-  --ep-fg-secondary: #374151;
-  --ep-fg-muted: #6b7280;
-  --ep-fg-disabled: #9ca3af;
-  --ep-on-accent: #ffffff;
-  --ep-border: #d1d5db;
-  --ep-border-subtle: #e5e7eb;
-  --ep-border-strong: #9ca3af;
-  --ep-accent: #3b82f6;
-  --ep-accent-hover: #2563eb;
-  --ep-accent-active: #1d4ed8;
-  --ep-accent-light: #eff6ff;
-  --ep-hover: #f3f4f6;
-  --ep-active: #e5e7eb;
-  --ep-selected: #eff6ff;
-  --ep-canvas: #f3f4f6;
+  --embedpdf-host-accent: var(--epdf-accent);
+  --embedpdf-host-background: var(--epdf-background);
+  --embedpdf-host-surface: var(--epdf-surface);
+  --embedpdf-host-surface-raised: var(--epdf-surface-raised);
+  --embedpdf-host-text: var(--epdf-text);
+  --embedpdf-host-text-muted: var(--epdf-text-muted);
+  --embedpdf-host-border: var(--epdf-border);
+  --embedpdf-host-hover: var(--epdf-hover);
+  --embedpdf-host-canvas: var(--epdf-canvas);
+  --embedpdf-host-radius: var(--epdf-radius);
+  --embedpdf-host-font: var(--epdf-font);
+  --embedpdf-host-scrollbar-thumb: var(--epdf-scrollbar-thumb);
+  --embedpdf-host-toolbar-surface: var(--epdf-toolbar-surface);
+  --embedpdf-host-toolbar-border: var(--epdf-toolbar-border);
+  --embedpdf-host-toolbar-active: var(--epdf-toolbar-active);
+}
+
+/* The variables live on the viewer's root: the element's shadow wrapper (`data-embedpdf-root`),
+   or the document when the chrome is the page. Each is the page's value when it set one, else
+   this mode's default, so the parts drawn on the pages (which read the same variables) and your
+   own components in the viewer always agree with the chrome. The dark defaults are a plain
+   `.dark` class, which the element puts on its wrapper and apps on <html>. */
+:root,
+[data-embedpdf-root] {
+  --epdf-accent: var(--embedpdf-host-accent, #3b82f6);
+  --epdf-background: var(--embedpdf-host-background, #f3f4f6);
+  --epdf-surface: var(--embedpdf-host-surface, #ffffff);
+  --epdf-surface-raised: var(--embedpdf-host-surface-raised, #ffffff);
+  --epdf-text: var(--embedpdf-host-text, #111827);
+  --epdf-text-muted: var(--embedpdf-host-text-muted, #6b7280);
+  --epdf-border: var(--embedpdf-host-border, #d1d5db);
+  --epdf-hover: var(--embedpdf-host-hover, #f3f4f6);
+  --epdf-canvas: var(--embedpdf-host-canvas, #f3f4f6);
+  --epdf-radius: var(--embedpdf-host-radius, 6px);
+  --epdf-font: var(
+    --embedpdf-host-font,
+    ui-sans-serif,
+    system-ui,
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji'
+  );
+
+  /* The headless parts' own variables (the headless docs' "Colors & theming"), defaulting to the
+     viewer's look. */
+  --epdf-scrollbar-thumb: var(
+    --embedpdf-host-scrollbar-thumb,
+    color-mix(in srgb, var(--epdf-text) 35%, transparent)
+  );
+  --epdf-toolbar-surface: var(--embedpdf-host-toolbar-surface, var(--epdf-surface-raised));
+  --epdf-toolbar-border: var(--embedpdf-host-toolbar-border, var(--epdf-border));
+  --epdf-toolbar-active: var(
+    --embedpdf-host-toolbar-active,
+    color-mix(in srgb, var(--epdf-hover) 90%, var(--epdf-text))
+  );
+
+  /* The pressed and chosen look: a tint of the accent on the surface, stronger in dark, where a
+     light tint barely shows. */
+  --embedpdf-accent-tint: color-mix(in srgb, var(--epdf-accent) 8%, var(--epdf-surface));
 }
 
 .dark {
-  --ep-app: #111827;
-  --ep-surface: #1f2937;
-  --ep-surface-alt: #374151;
-  --ep-elevated: #1f2937;
-  --ep-fg: #f9fafb;
-  --ep-fg-secondary: #e5e7eb;
-  --ep-fg-muted: #9ca3af;
-  --ep-fg-disabled: #6b7280;
-  --ep-on-accent: #111827;
-  --ep-border: #4b5563;
-  --ep-border-subtle: #374151;
-  --ep-border-strong: #6b7280;
-  --ep-accent: #60a5fa;
-  --ep-accent-hover: #3b82f6;
-  --ep-accent-active: #2563eb;
-  --ep-accent-light: #1e3a5f;
-  --ep-hover: #374151;
-  --ep-active: #4b5563;
-  --ep-selected: #1e3a5f;
-  --ep-canvas: #0d1117;
+  --epdf-accent: var(--embedpdf-host-accent, #60a5fa);
+  --epdf-background: var(--embedpdf-host-background, #111827);
+  --epdf-surface: var(--embedpdf-host-surface, #1f2937);
+  --epdf-surface-raised: var(--embedpdf-host-surface-raised, #1f2937);
+  --epdf-text: var(--embedpdf-host-text, #f9fafb);
+  --epdf-text-muted: var(--embedpdf-host-text-muted, #9ca3af);
+  --epdf-border: var(--embedpdf-host-border, #4b5563);
+  --epdf-hover: var(--embedpdf-host-hover, #374151);
+  --epdf-canvas: var(--embedpdf-host-canvas, #0d1117);
+  --epdf-scrollbar-thumb: var(
+    --embedpdf-host-scrollbar-thumb,
+    color-mix(in srgb, var(--epdf-text) 28%, transparent)
+  );
+  --embedpdf-accent-tint: color-mix(in srgb, var(--epdf-accent) 25%, var(--epdf-surface));
 }
 
+/* Each utility reads the variables where it's used, so a variable set in a part of the viewer
+   (or for one of your components) restyles that part. The shades between two tokens are mixes,
+   which follow both. Corners scale with `--epdf-radius`: `rounded-md` is the radius itself. */
 @theme inline {
-  --color-app: var(--ep-app);
-  --color-surface: var(--ep-surface);
-  --color-surface-alt: var(--ep-surface-alt);
-  --color-elevated: var(--ep-elevated);
-  --color-fg: var(--ep-fg);
-  --color-fg-secondary: var(--ep-fg-secondary);
-  --color-fg-muted: var(--ep-fg-muted);
-  --color-fg-disabled: var(--ep-fg-disabled);
-  --color-on-accent: var(--ep-on-accent);
-  --color-border: var(--ep-border);
-  --color-border-subtle: var(--ep-border-subtle);
-  --color-border-strong: var(--ep-border-strong);
-  --color-accent: var(--ep-accent);
-  --color-accent-hover: var(--ep-accent-hover);
-  --color-accent-active: var(--ep-accent-active);
-  --color-accent-light: var(--ep-accent-light);
-  --color-hover: var(--ep-hover);
-  --color-active: var(--ep-active);
-  --color-selected: var(--ep-selected);
-  --color-canvas: var(--ep-canvas);
+  --color-app: var(--epdf-background);
+  --color-surface: var(--epdf-surface);
+  --color-surface-alt: color-mix(in srgb, var(--epdf-surface), var(--epdf-text) 6%);
+  --color-elevated: var(--epdf-surface-raised);
+  --color-fg: var(--epdf-text);
+  --color-fg-secondary: color-mix(in srgb, var(--epdf-text) 65%, var(--epdf-text-muted));
+  --color-fg-muted: var(--epdf-text-muted);
+  --color-fg-disabled: color-mix(in srgb, var(--epdf-text-muted) 60%, var(--epdf-surface));
+  --color-on-accent: var(--epdf-surface);
+  --color-border: var(--epdf-border);
+  --color-border-subtle: color-mix(in srgb, var(--epdf-border) 50%, var(--epdf-surface));
+  --color-border-strong: color-mix(in srgb, var(--epdf-border) 75%, var(--epdf-text));
+  --color-accent: var(--epdf-accent);
+  --color-accent-hover: color-mix(in srgb, var(--epdf-accent) 80%, black);
+  --color-accent-active: color-mix(in srgb, var(--epdf-accent) 65%, black);
+  --color-accent-light: var(--embedpdf-accent-tint);
+  --color-hover: var(--epdf-hover);
+  --color-active: color-mix(in srgb, var(--epdf-hover) 90%, var(--epdf-text));
+  --color-selected: var(--embedpdf-accent-tint);
+  --color-canvas: var(--epdf-canvas);
+
+  --radius: calc(var(--epdf-radius) * 2 / 3);
+  --radius-xs: calc(var(--epdf-radius) / 2);
+  --radius-sm: calc(var(--epdf-radius) * 2 / 3);
+  --radius-md: var(--epdf-radius);
+  --radius-lg: calc(var(--epdf-radius) * 4 / 3);
+  --radius-xl: calc(var(--epdf-radius) * 2);
+  --radius-2xl: calc(var(--epdf-radius) * 8 / 3);
 }
 
 html,
@@ -95,17 +145,9 @@ body,
 }
 
 body {
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
-  color: var(--ep-fg);
-  background: var(--ep-app);
+  font-family: var(--epdf-font);
+  color: var(--epdf-text);
+  background: var(--epdf-background);
 }
 
 /* The measurement layer in <Toolbar> is aria-hidden + visibility:hidden; make
@@ -115,18 +157,48 @@ body {
 }
 
 /* Headless scrollbar theming. The component ships geometry + behavior only
-   (thumb drag, track paging, auto-hide → data-state); everything visual is
-   these few rules — restyle or replace them freely. */
-:root {
-  --epdf-scrollbar-thumb: rgba(17, 24, 39, 0.35);
-}
-.dark {
-  --epdf-scrollbar-thumb: rgba(249, 250, 251, 0.28);
-}
+   (thumb drag, track paging, auto-hide → data-state); its color is
+   `--epdf-scrollbar-thumb` above, and everything else is these few rules —
+   restyle or replace them freely. */
 [data-embedpdf-scrollbar-thumb] {
   transition: background 150ms;
 }
 [data-embedpdf-scrollbar-thumb]:hover,
 [data-embedpdf-scrollbar][data-dragging] [data-embedpdf-scrollbar-thumb] {
-  background: var(--ep-fg-muted);
+  background: var(--epdf-text-muted);
+}
+
+/* With a finger as the main way of pointing (`data-touch` on the viewer's root, from its env),
+   every button in a bar, document tab, panel header button and menu row, in a sheet or not, is
+   at least 44 px tall: the size a fingertip hits. It follows the viewer's env, not a media
+   query, like the rest of its layout. */
+[data-touch] [role='toolbar'] button,
+[data-touch] [role='tab'],
+[data-touch] [data-epdf-panel-header] button,
+[data-touch]
+  [role='menu']
+  :is([role='menuitem'], [role='menuitemradio'], [role='menuitemcheckbox']) {
+  min-height: 44px;
+}
+[data-touch] [role='toolbar'] button,
+[data-touch] [data-epdf-panel-header] button {
+  min-width: 44px;
+}
+
+/* With a finger as the main way of pointing, the chrome's own fields write in 16 px text: iOS
+   Safari zooms the page in when a field with smaller text takes focus. The fields on the pages
+   (a form field, a text box) size their text inline, which wins over this, and are laid out at a
+   legible size instead (`legible-text.ts` in `@embedpdf/web`). */
+[data-touch] :is(input, textarea, select) {
+  font-size: 16px;
+}
+
+/* On a phone, the floating bar with the page number gets out of the way while the pages scroll
+   (places.tsx): it fades out, then takes no presses or focus until it fades back in. */
+[data-scroll-hidden] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 200ms,
+    visibility 0s 200ms;
 }

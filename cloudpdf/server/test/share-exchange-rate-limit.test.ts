@@ -13,7 +13,7 @@ import { registerShareSessionRoutes } from '../src/routes/share-sessions';
 /**
  * The share exchange's three limiters, tier by tier: per-IP attempts
  * (volume), per-IP failures (probe lockout), per-token attempts
- * (volume, consumed BEFORE the grant row is read). The route is
+ * (volume, consumed before the grant row is read). The route is
  * registered directly on a bare Fastify instance with tiny injected
  * budgets — the deps expose them as test seams for exactly this.
  */
@@ -169,7 +169,7 @@ describe('share exchange rate limiting', () => {
 
     // First roundtrip (no password) is the normal prompt flow…
     expect((await exchange(fx, { shareToken: share.id })).statusCode).toBe(422);
-    // …and did NOT count as a probe failure (budget is 1, so a counted
+    // …and did not count as a probe failure (budget is 1, so a counted
     // failure would 429 this request), so the retry succeeds…
     expect((await exchange(fx, { shareToken: share.id, password: 's3cret' })).statusCode).toBe(200);
     // …but both roundtrips consumed the token's attempt budget.

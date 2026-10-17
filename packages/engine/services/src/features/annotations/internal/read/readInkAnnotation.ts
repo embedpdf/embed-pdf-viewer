@@ -1,25 +1,27 @@
-import type { AnnotationBase, InkAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { AnnotationBase, InkAnnotation, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readInkList, readIntent } from './annotationReadPrimitives';
+import { readPointsTurn, uprightPoint } from './readPointsTurn';
 import { readGeometryStyleExtras } from './readStyle';
-import { readAnnotationRotation } from './readAnnotationTransformMetadata';
 import { inkIntentFromName } from '../inkIntent';
 
 export function readInk(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): InkAnnotationDTO {
-  const rotation = readAnnotationRotation(fn, mem, annotPtr);
+  base: AnnotationBase<PdfCoordinates>,
+): InkAnnotation<PdfCoordinates> {
+  const drawn = readInkList(fn, mem, annotPtr);
+  // The strokes upright, and the turn that draws them.
+  const turn = readPointsTurn(fn, mem, annotPtr, drawn);
   const intent = inkIntentFromName(readIntent(fn, mem, annotPtr));
   return {
     ...base,
     subtype: 'ink',
     ...readGeometryStyleExtras(fn, mem, annotPtr),
     intent,
-    inkList: readInkList(fn, mem, annotPtr),
-    ...(rotation != null ? { rotation } : {}),
+    inkList: drawn.map((stroke) => stroke.map((point) => uprightPoint(point, turn))),
+    rotation: turn?.degrees ?? null,
   };
 }

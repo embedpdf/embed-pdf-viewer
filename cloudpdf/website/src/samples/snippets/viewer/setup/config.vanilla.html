@@ -1,0 +1,13 @@
+<div id="viewer" style="height: 100vh"></div>
+
+<script type="module">
+  import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  CloudPDF.init({
+    target: '#viewer',
+    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    theme: 'system',
+    disable: ['forms'],
+    onReady: (viewer) => console.log('ready', viewer),
+  });
+</script>

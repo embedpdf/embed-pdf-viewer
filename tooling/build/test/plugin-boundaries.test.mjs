@@ -121,8 +121,8 @@ test('rejects a second capability token declared by a contract entry', (t) => {
 test('rejects implementation modules reachable from a contract entry', (t) => {
   const root = fixture({
     ...pluginFiles('alpha', {
-      'packages/plugin/alpha/src/contract.ts': `export { createAlphaCapability } from './capability';\n`,
-      'packages/plugin/alpha/src/capability.ts': `export const createAlphaCapability = () => {};\n`,
+      'packages/plugin/alpha/src/contract.ts': `export { createAlphaController } from './controller';\n`,
+      'packages/plugin/alpha/src/controller.ts': `export const createAlphaController = () => {};\n`,
     }),
   });
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

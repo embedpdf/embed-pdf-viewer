@@ -15,7 +15,7 @@ import type {
   ScriptSandboxFactory,
 } from './types';
 
-/** The per-run world a CALLER supplies (fields snapshot, prefetched annots
+/** The per-run world a caller supplies (fields snapshot, prefetched annots
  *  plane, the event). Document/identity/environment come from the host. */
 export interface ScriptWorldInput {
   fields: ScriptFieldInput[];
@@ -31,14 +31,14 @@ export interface ScriptWorldInput {
 export interface ScriptTransaction {
   /**
    * Run the name-tree boot if it has not run in this realm yet; returns the
-   * boot output exactly ONCE (its effects belong to the first transaction —
+   * boot output exactly once (its effects belong to the first transaction —
    * commit them, tag their UI effects `phase: 'boot'`), null thereafter.
    */
   boot(world: ScriptWorldInput, budget?: ScriptBudget): Promise<ScriptOutput | null>;
   /** One deterministic run against the shared realm. Auto-boots defensively
    *  (that boot's output is then returned by the next `boot()` call).
    *  `budget` overrides the host default per run — the form pipeline slices
-   *  ONE transaction-wide time budget across its K/V/C/F passes. */
+   *  one transaction-wide time budget across its K/V/C/F passes. */
   run(program: string, world: ScriptWorldInput, budget?: ScriptBudget): Promise<ScriptOutput>;
 }
 
@@ -55,12 +55,12 @@ export interface ScriptHostOptions {
 }
 
 /**
- * The ONE realm per document (umbrella law #5): a name-tree function must be
+ * The one realm per document: a name-tree function must be
  * callable from a page-open script and a field calculate alike.
  *
- * `transaction(body)` is the realm mutex, and the body performs EVERYTHING
+ * `transaction(body)` is the realm mutex, and the body performs everything
  * for one logical script transaction — world prefetch, VM run(s), document
- * commits through the owner sinks, model reconciliation — BEFORE the mutex
+ * commits through the owner sinks, model reconciliation — before the mutex
  * releases, so the next transaction always prefetches post-commit truth
  * (the commit-inside-the-boundary law). Lock hierarchy: caller queues
  * (actions dispatch / form mutation) acquire this queue, never the reverse,
@@ -88,26 +88,26 @@ export function seedFrom(documentId: string, sequence: number): number {
   return hash >>> 0;
 }
 
-/** Engine JWT/session identity composed under embedder overrides — the
- *  standard `ScriptHostOptions.identity` builder. */
+/** The session's identity, as Acrobat JavaScript's `identity` object, under
+ *  embedder overrides — the standard `ScriptHostOptions.identity` builder. */
 export function resolveScriptIdentity(
   doc: DocumentHandle,
   overrides?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>),
 ): ScriptIdentity {
-  const claims = doc.security.identity;
+  const identity = doc.security.identity;
   const supplied = typeof overrides === 'function' ? overrides() : (overrides ?? {});
   return {
-    name: supplied.name ?? claims?.display_name ?? claims?.user_id ?? '',
-    loginName: supplied.loginName ?? claims?.user_id ?? '',
-    corporation: supplied.corporation ?? claims?.group_id ?? '',
-    email: supplied.email ?? '',
+    name: supplied.name ?? identity?.displayName ?? identity?.userId ?? '',
+    loginName: supplied.loginName ?? identity?.userId ?? '',
+    corporation: supplied.corporation ?? identity?.organization ?? '',
+    email: supplied.email ?? identity?.email ?? '',
   };
 }
 
 export function createScriptHost(options: ScriptHostOptions): ScriptHost {
   const budget = options.budget ?? DEFAULT_SCRIPT_BUDGET;
 
-  // Deliberately NOT @embedpdf/core's createSerialQueue: this package is a
+  // Deliberately not @embedpdf/core's createSerialQueue: this package is a
   // dependency-light leaf (engine-core types only) and must not pull the
   // kernel toolkit in. Identical contract, documented twin.
   let tail: Promise<void> = Promise.resolve();
@@ -148,7 +148,7 @@ export function createScriptHost(options: ScriptHostOptions): ScriptHost {
     event: world.event,
   });
 
-  /** A resource fault poisons the realm: rebuild + re-boot lazily NEXT time. */
+  /** A resource fault poisons the realm: rebuild + re-boot lazily next time. */
   const noteFault = (sandbox: ScriptSandbox): void => {
     if (!sandbox.disposed) return;
     sandboxPromise = null;
@@ -161,7 +161,7 @@ export function createScriptHost(options: ScriptHostOptions): ScriptHost {
     runBudget?: ScriptBudget,
   ): Promise<ScriptOutput | null> => {
     if (booted) return null;
-    // Degrade-never-brick: mark booted BEFORE running, exactly the
+    // Degrade-never-brick: mark booted before running, exactly the
     // controller's law — a hostile boot script must not re-run per event.
     booted = true;
     const sandbox = await ensureSandbox();
@@ -171,7 +171,7 @@ export function createScriptHost(options: ScriptHostOptions): ScriptHost {
       sources = await bootSourcesCache;
     } catch (error) {
       bootSourcesCache = null; // transient read failure — retry on rebuild
-      // Degrade OBSERVABLY: a synthetic boot output carries the diagnostic
+      // Degrade observably: a synthetic boot output carries the diagnostic
       // so the caller surfaces "the name tree could not even be read".
       return {
         event: { rc: true, value: null, change: '', selStart: 0, selEnd: 0 },

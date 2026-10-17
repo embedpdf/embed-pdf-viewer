@@ -8,7 +8,7 @@ import type { AnyPlugin } from '../src/types';
 // paste, not an investigation.
 
 const stub = (id: string, overrides: Partial<AnyPlugin> = {}): AnyPlugin =>
-  ({ id, initialState: () => ({}), reduce: (s: unknown) => s, ...overrides }) as AnyPlugin;
+  ({ id, create: () => ({ api: {} }), ...overrides }) as AnyPlugin;
 
 describe('planPlugins missing-dependency errors', () => {
   it('appends the required token’s authored hint', () => {
@@ -30,7 +30,10 @@ describe('planPlugins missing-dependency errors', () => {
 
   it('does not fire when the dependency is present', () => {
     const hub = createCapabilityToken<unknown>('interaction', { hint: 'unused here' });
-    const provider = stub('interaction', { token: hub, capability: () => ({}) } as Partial<AnyPlugin>);
+    const provider = stub('interaction', {
+      token: hub,
+      create: () => ({ api: {} }),
+    } as Partial<AnyPlugin>);
     expect(() => planPlugins([provider, stub('selection', { requires: [hub] })])).not.toThrow();
   });
 });

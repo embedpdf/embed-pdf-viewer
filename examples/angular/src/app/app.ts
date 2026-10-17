@@ -1,29 +1,43 @@
 /**
- * The root: chooses the engine + plugin set and mounts the viewer. Everything
- * that READS the kernel lives in <app-workspace>, INSIDE <epdf-viewer>, where
- * the host is injectable. One import line per feature.
+ * The root: it provides the viewer (the engine, the documents to open, one feature per plugin)
+ * and lays out the workspace. The components in its template share that viewer and inject its
+ * services; this component could inject them too.
  */
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { EpdfViewer } from '@embedpdf/angular/runtime';
-import { stagePlugin } from '@embedpdf/angular/stage';
-import { renderPlugin } from '@embedpdf/angular/render';
-import { createEngine } from './engine';
+import { provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { withRender } from '@embedpdf/angular/render';
+import { withStage } from '@embedpdf/angular/stage';
+import { createEngine, sampleSource } from './engine';
 import { Workspace } from './workspace';
+import { DocTabs } from './doc-tabs';
 
 @Component({
   selector: 'app-root',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EpdfViewer, Workspace],
+  imports: [DocTabs, Workspace],
+  providers: [
+    provideEmbedPdf(
+      {
+        // A function: the viewer makes the engine in the browser, and destroys it with this
+        // component.
+        engine: createEngine,
+        initialDocuments: [{ source: () => sampleSource('ebook', '/ebook.pdf'), name: 'Ebook' }],
+      },
+      withStage(),
+      withRender(),
+    ),
+  ],
+  styles: `
+    :host {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+  `,
   template: `
-    <epdf-viewer [engine]="engine" [plugins]="plugins">
-      <app-workspace />
-    </epdf-viewer>
+    <!-- Workspace UI: outside the document gate, there from the first moment. -->
+    <app-doc-tabs />
+    <app-workspace />
   `,
 })
-export class App {
-  // Thunk form: the host constructs the engine when the kernel materializes
-  // and destroys it on teardown.
-  readonly engine = createEngine;
-  readonly plugins = [stagePlugin(), renderPlugin()];
-}
+export class App {}

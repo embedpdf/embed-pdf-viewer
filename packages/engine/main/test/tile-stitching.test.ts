@@ -1,6 +1,6 @@
 /**
  * Tile stitching ground truth — the engine's rect-target renders must
- * REGISTER: a tile equals the same region of a wider render, adjacent
+ * register: a tile equals the same region of a wider render, adjacent
  * tiles butt seamlessly, and bled (overlapping) tiles agree bit-for-bit in
  * their overlap. This is the contract the render plugin's tile plane
  * composites on; if it drifts, on-screen seams follow. Mock-free: real
@@ -10,7 +10,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle, PageRaster } from '@embedpdf/engine-core/runtime';
+import type { LocalDocumentHandle, PageRaster } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
@@ -28,19 +28,17 @@ const pdfPath = resolve(
 );
 
 let engine: LocalEngine;
-let doc: DocumentHandle;
-let pon: number;
+let doc: LocalDocumentHandle;
+let pageObjectNumber: number;
 let pageW = 0;
-let pageH = 0;
 
 beforeAll(async () => {
   const bytes = new Uint8Array(await readFile(pdfPath));
   engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   doc = await engine.open({ kind: 'bytes', id: 'stitch-doc', bytes });
   const pages = (await doc.pages.list()).pages;
-  pon = pages[0]!.ref.pageObjectNumber;
+  pageObjectNumber = pages[0]!.ref.objectNumber;
   pageW = pages[0]!.size.width;
-  pageH = pages[0]!.size.height;
 }, 60_000);
 
 afterAll(async () => {
@@ -48,17 +46,12 @@ afterAll(async () => {
   await engine?.destroy();
 });
 
-/** y-down page-point rect → y-up engine rect. */
-const eng = (x: number, y: number, w: number, h: number) => ({
-  left: x,
-  right: x + w,
-  top: pageH - y,
-  bottom: pageH - (y + h),
-});
+/** A tile's area: page space, from the page's top-left, y down. */
+const eng = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
 const raw = (rect: ReturnType<typeof eng>, scale: number): Promise<PageRaster> =>
   doc
-    .page(toPageRef(pon))
+    .page(toPageRef(pageObjectNumber))
     .render.raw({ target: { kind: 'rect', rect }, viewport: { kind: 'scale', scale } });
 
 /** Max |RGB diff| over an aligned sub-rectangle of two rasters. */
@@ -119,7 +112,7 @@ describe('tile stitching (wasm engine, real document)', () => {
     expect(unionH.width).toBe(1024);
     expect(bledA.width).toBe(514);
 
-    // A tile IS the same region of a wider render (both axes).
+    // A tile is the same region of a wider render (both axes).
     expect(maxDiff(tileA, 0, 0, unionH, 0, 0, 512, 512)).toBeLessThanOrEqual(1);
     expect(maxDiff(tileB, 0, 0, unionH, 512, 0, 512, 512)).toBeLessThanOrEqual(1);
     expect(maxDiff(tileC, 0, 0, unionV, 0, 512, 512, 512)).toBeLessThanOrEqual(1);

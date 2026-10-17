@@ -7,12 +7,46 @@ const tsParser = require('@typescript-eslint/parser');
 const importPlugin = require('eslint-plugin-import');
 const nextPlugin = require('@next/eslint-plugin-next');
 
+/**
+ * What plugins and the *-core packages may not reach for in the environment.
+ * Time comes from the host, through the context (`ctx.clock`), so the kernel
+ * owns its lifetime and tests can step it; the DOM lives in `@embedpdf/web`.
+ */
+const hostOnlyGlobals = [
+  ...[
+    'setTimeout',
+    'clearTimeout',
+    'setInterval',
+    'clearInterval',
+    'requestAnimationFrame',
+    'cancelAnimationFrame',
+    'requestIdleCallback',
+    'cancelIdleCallback',
+  ].map((name) => ({
+    name,
+    message:
+      'Time comes from the host: use ctx.clock (after, nextFrame) — see docs/conventions/plugins.md.',
+  })),
+  ...['window', 'document', 'navigator'].map((name) => ({
+    name,
+    message: 'Plugins and cores stay DOM-free: browser code lives in @embedpdf/web.',
+  })),
+];
+
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
   {
     // Framework samples are compiled by their dedicated tsconfig files in the
     // website check:samples script, not the root type-aware ESLint project.
-    ignores: ['node_modules', 'dist', 'build', '.turbo', 'website/src/samples/**'],
+    // The standard faces' data is generated (core-fonts' generate script).
+    ignores: [
+      'node_modules',
+      'dist',
+      'build',
+      '.turbo',
+      'website/src/samples/**',
+      'packages/core/fonts/src/standard/**/*.generated.ts',
+    ],
   },
   {
     plugins: {
@@ -72,15 +106,112 @@ module.exports = [
     },
   },
   {
-    // The two-door invariant, enforced (naming.md + packages/viewer/*/src/component.*).
+    // Names say what a value is (docs/conventions/naming.md): no single
+    // letters beyond loop counters, coordinates, ignored parameters and the
+    // translate function, and none of the abbreviations the glossary retires.
+    files: [
+      'packages/{core,plugin,framework,viewer}/*/src/**/*.{ts,tsx}',
+      'packages/framework/angular/*/src/**/*.ts',
+    ],
+    rules: {
+      'id-length': [
+        'error',
+        {
+          min: 2,
+          properties: 'never',
+          exceptions: ['i', 'j', 'x', 'y', '_', 't'],
+          exceptionPatterns: ['^[TKV]$'],
+        },
+      ],
+      'id-denylist': [
+        'error',
+        'pon',
+        'pons',
+        'opts',
+        'cfg',
+        'err',
+        'evt',
+        'ev',
+        'prev',
+        'cur',
+        'idx',
+        'res',
+        'req',
+        'cb',
+        'tmp',
+        'cap',
+        'def',
+        'sel',
+        'ptr',
+        'pts',
+        'bin',
+        'el',
+        'msg',
+        'annot',
+        'geom',
+        'rawCtx',
+      ],
+    },
+  },
+  {
+    // A PDF transform matrix is `[a b c d e f]` in the specification; the
+    // matrix helpers keep those entry names so the math reads like the spec.
+    files: ['packages/core/geometry/src/index.ts'],
+    rules: {
+      'id-length': [
+        'error',
+        {
+          min: 2,
+          properties: 'never',
+          exceptions: ['i', 'j', 'x', 'y', '_', 't', 'a', 'b', 'c', 'd', 'e', 'f'],
+          exceptionPatterns: ['^[TKV]$'],
+        },
+      ],
+    },
+  },
+  {
+    // Plugins, the kernel and the pure cores never touch the environment's
+    // timers or the DOM. `clock.ts` is the kernel's one door to timers.
+    files: ['packages/plugin/*/src/**/*.ts', 'packages/core/*/src/**/*.ts'],
+    ignores: ['packages/core/main/src/clock.ts'],
+    rules: {
+      'no-restricted-globals': ['error', ...hostOnlyGlobals],
+    },
+  },
+  {
+    // Inside a plugin, events and write queues come from the context, so the
+    // kernel owns their lifetime (docs/conventions/plugins.md).
+    files: ['packages/plugin/*/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@embedpdf/core',
+              importNames: ['createEventHook', 'createSerialQueue'],
+              message: 'Use ctx.events.source() / ctx.serialQueue() inside plugins.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The two-door invariant, enforced (docs/conventions/packages.md and
+    // packages/viewer/*/src/component.*).
     //
-    // A framework wrapper's component module must stay ENGINE-BLIND: the local
+    // A framework wrapper's shared modules must stay engine-blind: the local
     // PDFium engine enters a consumer's bundle through a runtime import of the
-    // `.` door, and if that import sits in the shared component then BOTH doors
+    // `.` door, and if that import sits in a module both doors share then both
     // carry it and the cloud build's "no wasm" promise is silently gone. Types
     // are free — they vanish at compile time — so the boundary is exactly
-    // `import type`.
-    files: ['packages/viewer/*/src/component.{ts,tsx}'],
+    // `import type`. Only the door entries import the viewer itself.
+    files: [
+      'packages/viewer/{react,vue,svelte}/src/**/*.{ts,tsx}',
+      'packages/viewer/angular/component/src/**/*.ts',
+    ],
+    ignores: ['packages/viewer/*/src/index.ts', 'packages/viewer/*/src/core.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
@@ -101,10 +232,10 @@ module.exports = [
   },
   {
     // The CloudPDF tree renders server-side by definition — "no wasm in your
-    // bundle" IS the product — so it must never reach for the local-engine
+    // bundle" is the product — so it must never reach for the local-engine
     // door. `@embedpdf/viewer` and `@embedpdf/viewer-<fw>` bundle PDFium;
-    // their `/core` subpaths do not. (A bare `*` glob does not cross `/`, so
-    // the `/core` doors stay allowed.)
+    // their `/core` subpaths do not. A regex names the bare packages only: a
+    // glob pattern also matches every path under a package, `/core` included.
     files: ['cloudpdf/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
@@ -112,11 +243,11 @@ module.exports = [
         {
           patterns: [
             {
-              group: ['@embedpdf/viewer', '@embedpdf/viewer-*'],
+              regex: '^@embedpdf/viewer(-[a-z]+)?$',
               message:
                 'the cloud tree must not bundle the local PDFium engine: import the ' +
-                'engine-agnostic door instead (`@embedpdf/viewer/core`, ' +
-                '`@embedpdf/viewer-react/core`, …) and inject cloudEngine().',
+                'engine-agnostic door (`@embedpdf/viewer/core`) and the wrappers\' door-blind ' +
+                'parts (`@embedpdf/viewer-react/component`, …), and register the cloud engine.',
             },
           ],
         },

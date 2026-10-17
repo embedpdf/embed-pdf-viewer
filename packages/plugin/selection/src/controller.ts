@@ -1,25 +1,21 @@
 import {
   PluginError,
-  isPluginError,
-  type ChangeOrigin,
-  type ControllerContext,
+  memo,
+  memoByKey,
+  type PluginContext,
   type DocCapability,
   type OperationOptions,
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/core';
-import { textQuadBounds, type Point, type Rect } from '@embedpdf/core-geometry';
+import { boundsOfRects, quadBounds, type Point, type Rect } from '@embedpdf/core-geometry';
 import {
-  expandTextRangeToLine,
-  expandTextRangeToWord,
-  sliceTextByChars,
-  textGlyphAt,
-  textGlyphQuad,
-  textSegmentsForRange,
+  sliceText,
   toPageRef,
-  type PageGeometrySnapshot,
   type PageTextSnapshot,
+  type TextLayout,
 } from '@embedpdf/engine-core/runtime';
+import { connectSelection } from './connect';
 import type {
   SelectionAnchor,
   SelectionChangedEvent,
@@ -27,328 +23,275 @@ import type {
   SelectionCommittedEvent,
   SelectionEndpoint,
   SelectionRangeInput,
+  SelectionSettings,
   SelectionSnapshot,
   TextRange,
 } from './contract';
-import {
-  buildSelectionPageGeometry,
-  contentPointToPdf,
-  toContentSegment,
-  toContentTextQuad,
-  type SelectionPageGeometry,
-  type SelectionSegment,
-} from './geometry';
+import type { SelectionSegment } from './geometry';
 import type { SelectionHostCapability } from './host-contract';
-import type { GlyphPointer, SelectionAction, SelectionRange, SelectionState } from './model';
+import {
+  clearSelection,
+  contentChangedPagesOf,
+  setHighlightHidden,
+  setSelecting,
+  setSelection,
+  type GlyphPosition,
+  type SegmentsByPage,
+  type SelectionRange,
+  type SelectionState,
+} from './model';
 
 const SELECT_SCOPE: DocCapability = 'doc.text.select';
 const COPY_SCOPE: DocCapability = 'doc.text.copy';
 const EMPTY_SEGMENTS: readonly SelectionSegment[] = Object.freeze([]);
 const EMPTY_PAGES: readonly PageRef[] = Object.freeze([]);
+const EMPTY_RECTS: readonly Rect[] = Object.freeze([]);
 /** How many page-text reads a `readText` keeps in flight at once. */
 const TEXT_READ_CONCURRENCY = 8;
 /** An open-ended focus: settles to the page's real last character once its geometry loads. */
 const OPEN_END = Number.MAX_SAFE_INTEGER;
 
-const localOrigin = (trigger: ChangeOrigin['trigger']): ChangeOrigin => ({
-  locality: 'local',
-  trigger,
-  sessionId: null,
-  actorId: null,
-});
-
 /** Everything the read model derives from one state object, built once per state. */
 interface ReadModel {
-  state: SelectionState;
-  snapshot: SelectionSnapshot;
-  pages: readonly PageRef[];
-  anchor: SelectionAnchor | null;
-  rects: Map<PageObjectNumber, readonly Rect[]>;
+  readonly snapshot: SelectionSnapshot;
+  readonly pages: readonly PageRef[];
+  readonly anchor: SelectionAnchor | null;
 }
 
 /**
  * The selection controller.
  *
- * The model holds the range and its derived page-space segments; the large,
- * non-serializable per-page caches live here, split by what invalidates them:
+ * State holds the range and its derived page-space segments. Engine data
+ * lives outside state:
  *
- *   - `rawGeometry` — PDF-space geometry snapshots, rotation-independent.
- *     Dropped only when a page leaves the registry or page CONTENT changes
- *     (redaction apply / flatten).
- *   - `derived` — the page-space transform + layout, keyed by the layout
- *     params (crop/rotation/userUnit), so a view-rotate re-derives from the
- *     cached raw snapshot with NO refetch.
- *   - `textSnapshots` — per-page text (for `readText`), same content-only
- *     invalidation as `rawGeometry`.
+ *   - text geometry is a page mirror: PDF-space snapshots loaded on demand,
+ *     re-read when a confirmed event changes a page's content (redaction
+ *     apply, flatten) and dropped when a page is deleted. Page-space
+ *     geometry is derived from a snapshot and the page's current layout, so
+ *     a view rotation re-derives without asking the engine again.
+ *   - `textSnapshots` holds per-page text promises for `readText`, dropped
+ *     on the same content changes and when a page leaves the registry.
  *
- * Two habits keep it readable top to bottom: `publish` is the ONE place the
- * selection changes and `onChanged` / `onCleared` fire; `recompute` rebuilds
- * the segments for every loaded page in the span and warms the rest (they
- * recompute on arrival, with a `system` origin).
+ * `recompute` rebuilds the segments of every loaded page in the span and
+ * warms the rest, which recompute when their geometry arrives. The change
+ * and clear events are derived from state changes in one place.
  *
  * Selection is cross-page: glyphs are ordered globally by (page index,
  * glyph), so a drag from page 2 into page 4 selects the tail of 2, all of 3,
- * and the head of 4. Stored endpoints are CLAMPED once their page's geometry
+ * and the head of 4. Stored endpoints are clamped once their page's geometry
  * is known, which is how `selectAll`'s open end settles.
+ *
+ * The settings belong to the plugin registration; the pointer handler reads
+ * the drag threshold from them, and the framework layers read the colors.
  */
-export function createSelectionController(ctx: ControllerContext<SelectionState, SelectionAction>) {
-  const rawGeometry = new Map<PageObjectNumber, PageGeometrySnapshot>();
-  const derived = new Map<PageObjectNumber, { key: string; geom: SelectionPageGeometry }>();
-  const loads = new Map<PageObjectNumber, Promise<void>>();
-  const textSnapshots = new Map<PageObjectNumber, Promise<PageTextSnapshot>>();
-  /** Bumped on content invalidation; in-flight reads from before are discarded. */
-  let epoch = 0;
-
+export function createSelectionController(ctx: PluginContext<SelectionState, SelectionSettings>) {
+  const settings = ctx.settings();
   const changed = ctx.events.source<SelectionChangedEvent>();
   const committed = ctx.events.source<SelectionCommittedEvent>();
   const cleared = ctx.events.source<SelectionClearedEvent>();
+  const textSnapshots = new Map<PageObjectNumber, Promise<PageTextSnapshot>>();
 
-  const state = () => ctx.getState();
-  const canSelect = (): boolean => ctx.doc.security.allows(SELECT_SCOPE);
-  const canCopy = (): boolean => ctx.doc.security.allows(COPY_SCOPE);
-  const assertScope = (scope: DocCapability, operation: string): void => {
-    if (!ctx.doc.security.allows(scope)) {
-      throw new PluginError('permission-denied', 'selection', `${operation} requires ${scope}`, {
-        details: { required: scope },
-      });
-    }
-  };
+  const state = () => ctx.state.get();
+  const canSelect = (): boolean => ctx.allows(SELECT_SCOPE);
+  const canCopy = (): boolean => ctx.allows(COPY_SCOPE);
 
   // ── page addressing (the registry is the truth for order and layout) ──
-  const layoutOf = (pon: PageObjectNumber) => ctx.getPage(toPageRef(pon));
-  const pageIndexOf = (pon: PageObjectNumber): number => layoutOf(pon)?.index ?? -1;
-  const ponAtIndex = (i: number): PageObjectNumber | undefined =>
-    ctx.document()?.pages[i]?.ref.pageObjectNumber;
+  const pageIndexOf = (page: PageRef): number => ctx.getPage(page)?.index ?? -1;
+  const pageAtIndex = (index: number): PageRef | undefined => ctx.document()?.pages[index]?.ref;
 
-  /** Page-space geometry for a page, derived on demand from the raw snapshot
-   *  + the CURRENT layout params. A view-rotate (or crop change) changes the
-   *  key and re-derives — the engine is never asked again. */
-  function geometryFor(pon: PageObjectNumber): SelectionPageGeometry | null {
-    const raw = rawGeometry.get(pon);
-    const layout = layoutOf(pon);
-    if (!raw || !layout) return null;
-    const crop = layout.boxes.crop;
-    const key = `${layout.rotation}|${layout.userUnit}|${crop.left},${crop.bottom},${crop.right},${crop.top}`;
-    const hit = derived.get(pon);
-    if (hit && hit.key === key) return hit.geom;
-    const geom = buildSelectionPageGeometry(raw, crop, layout.rotation, layout.userUnit);
-    derived.set(pon, { key, geom });
-    return geom;
-  }
+  // ── text geometry ──
+  const geometry = ctx.pageMirror<TextLayout>({
+    name: 'geometry',
+    load: (doc, page) => doc.page(page).text.layout(),
+    affected: contentChangedPagesOf,
+    changed: ({ cause }) => {
+      // A page's geometry arrived: a boundary page's segments can fill in.
+      if (cause !== 'load') return;
+      const current = state().selection;
+      if (current) recompute(current);
+    },
+  });
 
-  const glyphAt = (geom: SelectionPageGeometry, point: Point): number | null =>
-    textGlyphAt(geom.layout, contentPointToPdf(geom, point));
+  /** A page's snapshot while it is loaded and current: a page whose re-read
+   *  failed has no geometry, exactly as {@link SelectionHostCapability.isLoaded} says. */
+  const snapshotOf = (page: PageRef): TextLayout | undefined =>
+    geometry.getStatus(page) === 'ready' ? geometry.get(page) : undefined;
 
-  /** Warm a page's geometry; the settled promise never rejects (see the host contract). */
+  /** A page's text layout while it is loaded and current. */
+  const geometryFor = snapshotOf;
+
+  const glyphAt = (layout: TextLayout, point: Point): number | null => layout.charAt(point);
+
+  /** Warm a page's geometry; the returned promise never rejects (see the host contract). */
   function ensureLoaded(page: PageRef): Promise<void> {
-    const pon = page.pageObjectNumber;
-    if (rawGeometry.has(pon)) return Promise.resolve();
-    const inFlight = loads.get(pon);
-    if (inFlight) return inFlight;
     // Authorized-only warming: without doc.text.select the read is guaranteed
-    // to be refused — don't issue it. The engine stays the security boundary.
-    if (!canSelect() || !layoutOf(pon)) return Promise.resolve();
-    const at = epoch;
-    const load = ctx.doc
-      .page(page)
-      .geometry.read()
-      .then(
-        (snapshot) => {
-          loads.delete(pon);
-          if (at !== epoch) return; // content changed while in flight — stale
-          rawGeometry.set(pon, snapshot);
-          ctx.dispatch({ type: 'pageLoaded', page });
-          const current = state().selection;
-          if (current) recompute(current, 'system'); // a mid-span page arrived → fill its segments
-        },
-        () => {
-          loads.delete(pon); // closed / aborted / refused — nothing to paint, a later call retries
-        },
-      );
-    loads.set(pon, load);
-    return load;
+    // to be refused, so it is not issued. The engine stays the security boundary.
+    if (!canSelect() || !ctx.getPage(page)) return Promise.resolve();
+    return geometry.ensureLoaded(page).catch(() => {
+      /* refused or failed: nothing to paint, and a later call retries */
+    });
   }
 
   // ── the range model ──
-  function orderedEnds(sel: SelectionRange): {
-    start: GlyphPointer;
-    end: GlyphPointer;
+  function orderedEnds(selection: SelectionRange): {
+    start: GlyphPosition;
+    end: GlyphPosition;
     direction: 'forward' | 'backward';
   } {
-    const ai = pageIndexOf(sel.anchor.page.pageObjectNumber);
-    const fi = pageIndexOf(sel.focus.page.pageObjectNumber);
-    const anchorFirst = ai < fi || (ai === fi && sel.anchor.glyph <= sel.focus.glyph);
+    const anchorPageIndex = pageIndexOf(selection.anchor.page);
+    const focusPageIndex = pageIndexOf(selection.focus.page);
+    const anchorFirst =
+      anchorPageIndex < focusPageIndex ||
+      (anchorPageIndex === focusPageIndex && selection.anchor.glyph <= selection.focus.glyph);
     return anchorFirst
-      ? { start: sel.anchor, end: sel.focus, direction: 'forward' }
-      : { start: sel.focus, end: sel.anchor, direction: 'backward' };
+      ? { start: selection.anchor, end: selection.focus, direction: 'forward' }
+      : { start: selection.focus, end: selection.anchor, direction: 'backward' };
   }
 
-  /** Clamp a pointer into its page's real character range once geometry is known. */
-  function clampPointer(ptr: GlyphPointer): GlyphPointer {
-    const geom = geometryFor(ptr.page.pageObjectNumber);
-    if (!geom) return ptr;
-    const max = Math.max(geom.layout.glyphs.length - 1, 0);
-    const glyph = Math.max(0, Math.min(ptr.glyph, max));
-    return glyph === ptr.glyph ? ptr : { page: ptr.page, glyph };
-  }
-
-  /** The one place the selection changes. Commits the model, then tells listeners. */
-  function publish(
-    selection: SelectionRange | null,
-    segments: Record<number, readonly SelectionSegment[]>,
-    trigger: ChangeOrigin['trigger'],
-  ): void {
-    const before = state();
-    if (selection) ctx.dispatch({ type: 'set', selection, segments });
-    else ctx.dispatch({ type: 'clear' });
-    if (state() === before) return; // clearing nothing is not a change
-    const origin = localOrigin(trigger);
-    const model = readModel();
-    changed.emit({ range: model.snapshot.range, pages: model.pages, origin });
-    if (!selection) cleared.emit({ origin });
+  /** Clamp a position into its page's real character range once geometry is known. */
+  function clampPosition(position: GlyphPosition): GlyphPosition {
+    const textLayout = geometryFor(position.page);
+    if (!textLayout) return position;
+    const max = Math.max(textLayout.charCount - 1, 0);
+    const glyph = Math.max(0, Math.min(position.glyph, max));
+    return glyph === position.glyph ? position : { page: position.page, glyph };
   }
 
   /** Rebuild merged line segments for every loaded page in the span; warm the
-   *  rest. Clears when an endpoint's page has left the registry — a range
+   *  rest. Clears when an endpoint's page has left the registry: a range
    *  across a structural edit is meaningless. */
-  function recompute(sel: SelectionRange, trigger: ChangeOrigin['trigger']): void {
+  function recompute(selection: SelectionRange): void {
     const clamped: SelectionRange = {
-      anchor: clampPointer(sel.anchor),
-      focus: clampPointer(sel.focus),
+      anchor: clampPosition(selection.anchor),
+      focus: clampPosition(selection.focus),
     };
     const { start, end } = orderedEnds(clamped);
-    const si = pageIndexOf(start.page.pageObjectNumber);
-    const ei = pageIndexOf(end.page.pageObjectNumber);
-    if (si < 0 || ei < 0) {
-      publish(null, {}, trigger);
+    const startPageIndex = pageIndexOf(start.page);
+    const endPageIndex = pageIndexOf(end.page);
+    if (startPageIndex < 0 || endPageIndex < 0) {
+      ctx.state.update(clearSelection);
       return;
     }
-    const segments: Record<number, readonly SelectionSegment[]> = {};
-    for (let i = si; i <= ei; i++) {
-      const pon = ponAtIndex(i);
-      if (pon == null) continue;
-      const geom = geometryFor(pon);
-      if (!geom) {
-        void ensureLoaded(toPageRef(pon)); // recomputes on arrival
+    const segments: Record<PageObjectNumber, readonly SelectionSegment[]> = {};
+    for (let i = startPageIndex; i <= endPageIndex; i++) {
+      const page = pageAtIndex(i);
+      if (!page) continue;
+      const textLayout = geometryFor(page);
+      if (!textLayout) {
+        void ensureLoaded(page); // recomputes on arrival
         continue;
       }
-      const from = i === si ? start.glyph : 0;
-      const to = i === ei ? end.glyph : geom.layout.glyphs.length - 1;
-      segments[pon] = textSegmentsForRange(geom.layout, from, to - from + 1).map((s) =>
-        toContentSegment(geom, s),
-      );
+      const from = i === startPageIndex ? start.glyph : 0;
+      const to = i === endPageIndex ? end.glyph : textLayout.charCount - 1;
+      segments[page.objectNumber] = textLayout.segments({ start: from, count: to - from + 1 });
     }
-    publish(clamped, segments, trigger);
+    ctx.state.update(setSelection, clamped, segments);
   }
 
-  const setGesture = (active: boolean): void => ctx.dispatch({ type: 'setGestureActive', active });
-  /** Changes made while a gesture drives the selection are the user's; the rest come through the API. */
-  const writeTrigger = (): ChangeOrigin['trigger'] => (state().gestureActive ? 'user' : 'api');
+  // ── the read model, built once per selection and registry revision ──
+  // Only the range and the segments go in, so a change to the gesture fact or
+  // the highlight's visibility keeps every read (the range, the page list) as it was.
+  const readModel = memo(
+    () => [state().selection, state().segments, ctx.document()?.revision ?? 0],
+    (selection, segments): ReadModel => buildReadModel(selection, segments),
+  );
 
-  // ── the read model, built once per state object ──
-  let model: ReadModel | null = null;
-  function readModel(): ReadModel {
-    const s = state();
-    if (model?.state === s) return model;
-    const pagesWithSegments = Object.keys(s.segments)
-      .map(Number)
-      .filter((pon) => (s.segments[pon]?.length ?? 0) > 0)
-      .sort((a, b) => pageIndexOf(a) - pageIndexOf(b));
-    const pages = pagesWithSegments.map((pon) => toPageRef(pon));
-    const snapshotPages = pagesWithSegments.map((pon) => ({
-      page: toPageRef(pon),
-      segments: s.segments[pon],
+  function buildReadModel(selection: SelectionRange | null, segments: SegmentsByPage): ReadModel {
+    const pagesWithSegments = Object.keys(segments)
+      .map((key) => toPageRef(Number(key)))
+      .filter((page) => (segments[page.objectNumber]?.length ?? 0) > 0)
+      .sort((left, right) => pageIndexOf(left) - pageIndexOf(right));
+    const snapshotPages = pagesWithSegments.map((page) => ({
+      page,
+      segments: segments[page.objectNumber],
     }));
-    let snapshot: SelectionSnapshot;
-    let anchor: SelectionAnchor | null = null;
-    if (!s.selection) {
-      snapshot = {
-        pages: snapshotPages,
-        start: null,
-        end: null,
-        direction: 'forward',
-        range: null,
-      };
-    } else {
-      const { start, end, direction } = orderedEnds(s.selection);
-      snapshot = {
-        pages: snapshotPages,
-        start: endpointFor(s, start, 'start'),
-        end: endpointFor(s, end, 'end'),
-        direction,
-        range: {
-          start: { page: start.page, index: start.glyph },
-          end: { page: end.page, index: end.glyph + 1 },
+    const pages = pagesWithSegments.length ? pagesWithSegments : EMPTY_PAGES;
+    if (!selection) {
+      return {
+        snapshot: {
+          pages: snapshotPages,
+          start: null,
+          end: null,
+          direction: 'forward',
+          range: null,
         },
+        pages,
+        anchor: null,
       };
-      // Prefer the gesture's end page; while its geometry is still loading,
-      // fall back to the LAST page (document order) with materialized
-      // segments so the anchor never teleports backwards mid-drag.
-      const endBounds = unionOf(s.segments[end.page.pageObjectNumber]);
-      if (endBounds) anchor = { page: end.page, bounds: endBounds };
-      else {
-        const last = pagesWithSegments[pagesWithSegments.length - 1];
-        if (last != null) anchor = { page: toPageRef(last), bounds: unionOf(s.segments[last])! };
-      }
     }
-    model = {
-      state: s,
-      snapshot,
-      pages: pages.length ? pages : EMPTY_PAGES,
-      anchor,
-      rects: new Map(),
+    const { start, end, direction } = orderedEnds(selection);
+    const snapshot: SelectionSnapshot = {
+      pages: snapshotPages,
+      start: endpointFor(segments, start, 'start'),
+      end: endpointFor(segments, end, 'end'),
+      direction,
+      range: {
+        start: { page: start.page, index: start.glyph },
+        end: { page: end.page, index: end.glyph + 1 },
+      },
     };
-    return model;
+    // Prefer the gesture's end page; while its geometry is still loading,
+    // fall back to the last page (document order) with materialized
+    // segments, so the anchor never jumps backwards mid-drag.
+    const endBounds = unionOf(segments[end.page.objectNumber]);
+    let anchor: SelectionAnchor | null = endBounds ? { page: end.page, bounds: endBounds } : null;
+    const last = pagesWithSegments[pagesWithSegments.length - 1];
+    if (!anchor && last) {
+      anchor = { page: last, bounds: unionOf(segments[last.objectNumber])! };
+    }
+    return { snapshot, pages, anchor };
   }
 
   function endpointFor(
-    s: SelectionState,
-    ptr: GlyphPointer,
+    segmentsByPage: SegmentsByPage,
+    position: GlyphPosition,
     which: 'start' | 'end',
   ): SelectionEndpoint | null {
-    const segments = s.segments[ptr.page.pageObjectNumber] ?? EMPTY_SEGMENTS;
+    const segments = segmentsByPage[position.page.objectNumber] ?? EMPTY_SEGMENTS;
     if (!segments.length) return null;
     const segment = which === 'start' ? segments[0] : segments[segments.length - 1];
-    // Anchor the endpoint to the boundary GLYPH's own oriented cell so caret
+    // Anchor the endpoint to the boundary glyph's own oriented cell so caret
     // placement lands on the exact character edge; fall back to the segment
     // when the glyph is degenerate (e.g. a generated space).
-    const geom = geometryFor(ptr.page.pageObjectNumber);
-    const cell = geom ? textGlyphQuad(geom.layout, ptr.glyph) : null;
-    if (geom && cell) {
-      const glyphQuad = toContentTextQuad(geom, cell);
+    const textLayout = geometryFor(position.page);
+    const cell = textLayout ? textLayout.charQuad(position.glyph) : null;
+    if (textLayout && cell) {
       return {
-        page: ptr.page,
-        glyphQuad,
+        page: position.page,
+        glyphQuad: cell,
         advance: segment.advance,
-        rect: textQuadBounds(glyphQuad),
+        rect: quadBounds(cell),
       };
     }
     return {
-      page: ptr.page,
+      page: position.page,
       glyphQuad: segment.quad,
       advance: segment.advance,
       rect: segment.rect,
     };
   }
 
-  function unionOf(segments: readonly SelectionSegment[] | undefined): Rect | null {
-    if (!segments || segments.length === 0) return null;
-    let x1 = Infinity;
-    let y1 = Infinity;
-    let x2 = -Infinity;
-    let y2 = -Infinity;
-    for (const s of segments) {
-      x1 = Math.min(x1, s.rect.x);
-      y1 = Math.min(y1, s.rect.y);
-      x2 = Math.max(x2, s.rect.x + s.rect.width);
-      y2 = Math.max(y2, s.rect.y + s.rect.height);
-    }
-    return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
-  }
+  const unionOf = (segments: readonly SelectionSegment[] | undefined): Rect | null =>
+    segments ? boundsOfRects(segments.map((segment) => segment.rect)) : null;
+
+  /** A page's segment boxes, the same array until that page's segments change. */
+  const rectsOf = memoByKey(
+    (pageObjectNumber: PageObjectNumber) => [state().segments[pageObjectNumber]],
+    (_pageObjectNumber, segments): readonly Rect[] =>
+      (segments ?? EMPTY_SEGMENTS).map((segment) => segment.rect),
+  );
+
+  // ── events, derived from each state change ──
+  ctx.state.onChange(({ previous, next }) => {
+    if (previous.selection === next.selection && previous.segments === next.segments) return;
+    const model = readModel();
+    changed.emit({ range: model.snapshot.range, pages: model.pages });
+    if (previous.selection !== null && next.selection === null) cleared.emit({});
+  });
 
   // ── writes ──
   function select(input: SelectionRangeInput): void {
-    assertScope(SELECT_SCOPE, 'selection.select');
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.select');
     const range: TextRange =
       'page' in input
         ? {
@@ -358,177 +301,196 @@ export function createSelectionController(ctx: ControllerContext<SelectionState,
         : input;
     ctx.assertPageRef(range.start.page);
     ctx.assertPageRef(range.end.page);
-    const si = pageIndexOf(range.start.page.pageObjectNumber);
-    let ei = pageIndexOf(range.end.page.pageObjectNumber);
-    let endIndex = range.end.index;
-    if (ei < si || (ei === si && endIndex <= range.start.index)) {
-      publish(null, {}, writeTrigger()); // an empty range is no selection
+    const startPageIndex = pageIndexOf(range.start.page);
+    let endPageIndex = pageIndexOf(range.end.page);
+    let endCharIndex = range.end.index;
+    if (
+      endPageIndex < startPageIndex ||
+      (endPageIndex === startPageIndex && endCharIndex <= range.start.index)
+    ) {
+      ctx.state.update(clearSelection); // an empty range is no selection
       return;
     }
-    if (endIndex === 0) {
+    if (endCharIndex === 0) {
       // Half-open end exactly at a page boundary: the last included character
       // is the previous page's last one, which settles by clamping on load.
-      ei -= 1;
-      if (ei < si) {
-        publish(null, {}, writeTrigger());
+      endPageIndex -= 1;
+      if (endPageIndex < startPageIndex) {
+        ctx.state.update(clearSelection);
         return;
       }
-      endIndex = OPEN_END;
+      endCharIndex = OPEN_END;
     }
-    const focusPon = ponAtIndex(ei);
-    if (focusPon == null) return;
-    recompute(
-      {
-        anchor: { page: range.start.page, glyph: Math.max(0, range.start.index) },
-        focus: { page: toPageRef(focusPon), glyph: endIndex - 1 },
-      },
-      writeTrigger(),
-    );
+    const focusPage = pageAtIndex(endPageIndex);
+    if (!focusPage) return;
+    recompute({
+      anchor: { page: range.start.page, glyph: Math.max(0, range.start.index) },
+      focus: { page: focusPage, glyph: endCharIndex - 1 },
+    });
   }
 
   function selectAll(): void {
-    assertScope(SELECT_SCOPE, 'selection.selectAll');
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.selectAll');
     const pages = ctx.document()?.pages ?? [];
     if (pages.length === 0) return;
-    recompute(
-      {
-        anchor: { page: pages[0].ref, glyph: 0 },
-        focus: { page: pages[pages.length - 1].ref, glyph: OPEN_END },
-      },
-      writeTrigger(),
-    );
+    recompute({
+      anchor: { page: pages[0].ref, glyph: 0 },
+      focus: { page: pages[pages.length - 1].ref, glyph: OPEN_END },
+    });
   }
 
-  function selectPage(page: PageRef): void {
-    assertScope(SELECT_SCOPE, 'selection.selectPage');
-    ctx.assertPageRef(page);
-    recompute({ anchor: { page, glyph: 0 }, focus: { page, glyph: OPEN_END } }, writeTrigger());
+  function selectPage(target: PageRef | number): void {
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.selectPage');
+    const page = ctx.pageOf(target).ref;
+    recompute({ anchor: { page, glyph: 0 }, focus: { page, glyph: OPEN_END } });
   }
 
   /** Word / line around a point. Returns whether a span actually engaged
-   *  (geometry present AND a glyph under the point) — the fact haptics and
+   *  (geometry present and a glyph under the point): the fact haptics and
    *  other success-gated feedback key on, so nothing buzzes over blank space. */
-  function selectSpanAt(page: PageRef, point: Point, expand: 'word' | 'line'): boolean {
-    assertScope(SELECT_SCOPE, `selection.select${expand === 'word' ? 'WordAt' : 'LineAt'}`);
-    const geom = geometryFor(page.pageObjectNumber);
-    if (!geom) return false;
-    const i = glyphAt(geom, point);
-    if (i == null) return false;
-    const [from, to] =
-      expand === 'word'
-        ? expandTextRangeToWord(geom.layout, i)
-        : expandTextRangeToLine(geom.layout, i);
-    recompute({ anchor: { page, glyph: from }, focus: { page, glyph: to } }, writeTrigger());
+  function selectSpanAt(target: PageRef | number, point: Point, expand: 'word' | 'line'): boolean {
+    ctx.assertAllowed(SELECT_SCOPE, `selection.select${expand === 'word' ? 'WordAt' : 'LineAt'}`);
+    const page = ctx.pageOf(target).ref;
+    const textLayout = geometryFor(page);
+    if (!textLayout) return false;
+    const glyph = glyphAt(textLayout, point);
+    if (glyph == null) return false;
+    const span = expand === 'word' ? textLayout.wordAt(glyph) : textLayout.lineAt(glyph);
+    if (!span) return false;
+    recompute({
+      anchor: { page, glyph: span.start },
+      focus: { page, glyph: span.start + span.count - 1 },
+    });
     return true;
   }
 
-  function extendTo(page: PageRef, point: Point): void {
-    assertScope(SELECT_SCOPE, 'selection.extendTo');
+  function extendTo(target: PageRef | number, point: Point): void {
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.extendTo');
+    const page = ctx.pageOf(target).ref;
     const current = state().selection;
     if (!current) return;
-    const geom = geometryFor(page.pageObjectNumber);
-    if (!geom) {
-      void ensureLoaded(page); // extended onto a not-yet-loaded page — lands on arrival
+    const textLayout = geometryFor(page);
+    if (!textLayout) {
+      void ensureLoaded(page); // extended onto a page not loaded yet: lands on arrival
       return;
     }
-    const i = glyphAt(geom, point);
-    if (i == null) return; // off-text — keep the last focus
-    recompute({ anchor: current.anchor, focus: { page, glyph: i } }, writeTrigger());
-  }
-
-  function clear(): void {
-    publish(null, {}, writeTrigger());
+    const glyph = glyphAt(textLayout, point);
+    if (glyph == null) return; // off-text: keep the last focus
+    recompute({ anchor: current.anchor, focus: { page, glyph } });
   }
 
   // ── text extraction ──
-  /** Per-page text snapshot, cached as a PROMISE so concurrent readers share
-   *  one fetch. Rejections are evicted (a refused or failed read must not
-   *  poison the cache for a later authorized call). */
-  function pageText(pon: PageObjectNumber): Promise<PageTextSnapshot> {
-    let p = textSnapshots.get(pon);
-    if (!p) {
-      p = Promise.resolve(ctx.doc.page(toPageRef(pon)).text.read());
-      p.catch(() => textSnapshots.delete(pon));
-      textSnapshots.set(pon, p);
-    }
-    return p;
+  /** Per-page text snapshot, cached as a promise so concurrent readers share
+   *  one fetch. Rejections are evicted: a refused or failed read must not
+   *  poison the cache for a later authorized call. */
+  function pageText(page: PageRef): Promise<PageTextSnapshot> {
+    const key = page.objectNumber;
+    const cached = textSnapshots.get(key);
+    if (cached) return cached;
+    const pending = Promise.resolve(ctx.doc.page(page).text.get());
+    textSnapshots.set(key, pending);
+    pending.catch(() => {
+      if (textSnapshots.get(key) === pending) textSnapshots.delete(key);
+    });
+    return pending;
+  }
+
+  async function readText(options?: OperationOptions): Promise<string> {
+    ctx.assertAllowed(COPY_SCOPE, 'selection.readText');
+    const range = readModel().snapshot.range;
+    return range ? readRange(range, options) : '';
   }
 
   async function readTextInRange(range: TextRange, options?: OperationOptions): Promise<string> {
-    assertScope(COPY_SCOPE, 'selection.readText');
+    ctx.assertAllowed(COPY_SCOPE, 'selection.readTextInRange');
+    return readRange(range, options);
+  }
+
+  /** A range's text, read a few pages at a time. Cancelling stops the wait at
+   *  once; the page reads it started finish into the cache, which other
+   *  readers share. */
+  async function readRange(range: TextRange, options?: OperationOptions): Promise<string> {
     ctx.assertPageRef(range.start.page);
     ctx.assertPageRef(range.end.page);
-    const si = pageIndexOf(range.start.page.pageObjectNumber);
-    let ei = pageIndexOf(range.end.page.pageObjectNumber);
-    let endIndex = range.end.index;
-    if (ei < si || (ei === si && endIndex <= range.start.index)) return '';
-    if (endIndex === 0) {
-      ei -= 1; // a range ending at a page boundary includes nothing of that page
-      endIndex = OPEN_END;
+    const startPageIndex = pageIndexOf(range.start.page);
+    let endPageIndex = pageIndexOf(range.end.page);
+    let endCharIndex = range.end.index;
+    if (
+      endPageIndex < startPageIndex ||
+      (endPageIndex === startPageIndex && endCharIndex <= range.start.index)
+    ) {
+      return '';
     }
-    // Per-page half-open character spans. Geometry is NOT needed: boundary
+    if (endCharIndex === 0) {
+      endPageIndex -= 1; // a range ending at a page boundary includes nothing of that page
+      endCharIndex = OPEN_END;
+    }
+    // Per-page half-open character spans. Geometry is not needed: boundary
     // offsets come from the range, interior pages span their whole text
-    // (`sliceTextByChars` clamps to the snapshot's charCount).
-    const spans: Array<{ pon: PageObjectNumber; from: number; to: number }> = [];
-    for (let i = si; i <= ei; i++) {
-      const pon = ponAtIndex(i);
-      if (pon == null) continue;
+    // (`sliceText` clamps to the snapshot's charCount).
+    const spans: Array<{ page: PageRef; from: number; to: number }> = [];
+    for (let i = startPageIndex; i <= endPageIndex; i++) {
+      const page = pageAtIndex(i);
+      if (!page) continue;
       spans.push({
-        pon,
-        from: i === si ? Math.max(0, range.start.index) : 0,
-        to: i === ei ? endIndex : OPEN_END,
+        page,
+        from: i === startPageIndex ? Math.max(0, range.start.index) : 0,
+        to: i === endPageIndex ? endCharIndex : OPEN_END,
       });
     }
+    const signal = options?.signal;
     const parts: string[] = new Array(spans.length);
     for (let base = 0; base < spans.length; base += TEXT_READ_CONCURRENCY) {
-      throwIfAborted(options?.signal);
+      // A signal that has fired starts no more reads.
+      if (signal?.aborted) {
+        throw new PluginError('operation-cancelled', 'selection', 'reading the text was cancelled');
+      }
       const batch = spans.slice(base, base + TEXT_READ_CONCURRENCY);
-      const snapshots = await Promise.all(batch.map((s) => pageText(s.pon)));
-      snapshots.forEach((snap, j) => {
-        parts[base + j] = sliceTextByChars(snap, batch[j].from, batch[j].to);
+      const snapshots = await ctx.cancellable(
+        signal,
+        Promise.all(batch.map((span) => pageText(span.page))),
+      );
+      snapshots.forEach((snapshot, index) => {
+        const { from, to } = batch[index];
+        parts[base + index] = sliceText(snapshot, { start: from, count: to - from });
       });
     }
-    throwIfAborted(options?.signal);
     return parts.join('\n');
   }
 
-  function throwIfAborted(signal: AbortSignal | undefined): void {
-    if (signal?.aborted) {
-      throw new PluginError('operation-cancelled', 'selection', 'selection.readText was cancelled');
-    }
-  }
-
   // ── invalidation ──
-  /** Structural registry change (rotate/move/delete/insert): drop caches for
-   *  pages that left, then recompute. Rotation re-derives transforms via the
-   *  layout key; a deleted endpoint page clears via recompute's registry
-   *  check. Raw snapshots are NEVER refetched here — they are rotation-independent. */
+  /** Structural registry change (rotate/move/delete/insert): drop the text of
+   *  pages that left, then recompute. Rotation re-derives page-space geometry
+   *  through the layout key; a deleted endpoint page clears through
+   *  recompute's registry check. */
   function onPagesUpdated(): void {
-    const alive = new Set((ctx.document()?.pages ?? []).map((p) => p.ref.pageObjectNumber));
-    for (const pon of [...rawGeometry.keys()]) {
-      if (!alive.has(pon)) {
-        rawGeometry.delete(pon);
-        derived.delete(pon);
-        textSnapshots.delete(pon);
-      }
+    const alive = new Set((ctx.document()?.pages ?? []).map((info) => info.ref.objectNumber));
+    for (const pageObjectNumber of [...textSnapshots.keys()]) {
+      if (!alive.has(pageObjectNumber)) textSnapshots.delete(pageObjectNumber);
     }
     const current = state().selection;
-    if (current) recompute(current, 'system');
+    if (current) recompute(current);
   }
 
-  /** Page CONTENT changed (redaction apply / flatten): every cached snapshot
-   *  — geometry AND text — is stale, and any live range points into a
-   *  character space that no longer exists. Drop everything, clear. */
-  function invalidateContent(): void {
-    epoch++;
-    rawGeometry.clear();
-    derived.clear();
-    loads.clear();
-    textSnapshots.clear();
-    publish(null, {}, 'system');
+  /** Page content changed: the pages' text is stale, and a live range points
+   *  into a character space that no longer exists, so it clears. The
+   *  geometry mirror re-reads those pages itself. */
+  function onContentChanged(pages: readonly PageRef[]): void {
+    for (const page of pages) textSnapshots.delete(page.objectNumber);
+    ctx.state.update(clearSelection);
   }
+
+  const setGesture = (active: boolean): void => ctx.state.update(setSelecting, active);
+
+  /** A page's segments, by its ref or its index: a page that isn't in the document has none. */
+  const segmentsOn = (target: PageRef | number): readonly SelectionSegment[] => {
+    const page = ctx.getPage(target);
+    return page ? (state().segments[page.ref.objectNumber] ?? EMPTY_SEGMENTS) : EMPTY_SEGMENTS;
+  };
 
   const api: SelectionHostCapability = {
+    ...settings.api,
+
     // ── public lens ──
     canSelect,
     canCopy,
@@ -538,27 +500,19 @@ export function createSelectionController(ctx: ControllerContext<SelectionState,
     selectWordAt: (page, point) => selectSpanAt(page, point, 'word'),
     selectLineAt: (page, point) => selectSpanAt(page, point, 'line'),
     extendTo,
-    clear,
+    clear: () => ctx.state.update(clearSelection),
     hasSelection: () => state().selection != null,
+    isSelecting: () => state().selecting,
     getSnapshot: () => readModel().snapshot,
     getRange: () => readModel().snapshot.range,
     listSelectedPages: () => readModel().pages,
-    listSegments: (page) => state().segments[page.pageObjectNumber] ?? EMPTY_SEGMENTS,
-    listRects: (page) => {
-      const { rects } = readModel();
-      const pon = page.pageObjectNumber;
-      let hit = rects.get(pon);
-      if (!hit) {
-        hit = (state().segments[pon] ?? EMPTY_SEGMENTS).map((s) => s.rect);
-        rects.set(pon, hit);
-      }
-      return hit;
+    listSegments: segmentsOn,
+    listRects: (target) => {
+      const page = ctx.getPage(target);
+      return page ? rectsOf(page.ref.objectNumber) : EMPTY_RECTS;
     },
     getAnchor: () => readModel().anchor,
-    readText: (options) => {
-      const range = readModel().snapshot.range;
-      return range ? readTextInRange(range, options) : Promise.resolve('');
-    },
+    readText,
     readTextInRange,
     onChanged: changed.on,
     onCommitted: committed.on,
@@ -566,54 +520,45 @@ export function createSelectionController(ctx: ControllerContext<SelectionState,
 
     // ── host lens ──
     ensureLoaded,
-    isLoaded: (page) => !!state().loaded[page.pageObjectNumber],
+    isLoaded: (page) => geometry.getStatus(page) === 'ready',
     isOverText: (page, point) => {
-      const geom = geometryFor(page.pageObjectNumber);
-      return geom ? glyphAt(geom, point) != null : false;
+      const textLayout = geometryFor(page);
+      return textLayout ? glyphAt(textLayout, point) != null : false;
     },
     beginGesture: () => setGesture(true),
     beginGestureAt: (page, point) => {
       if (!canSelect()) return false;
-      const geom = geometryFor(page.pageObjectNumber);
-      if (!geom) return false;
-      const i = glyphAt(geom, point);
-      if (i == null) return false; // not near text — the caller lets the gesture go
-      setGesture(true); // BEFORE the publish, so listeners see a coherent (gesture, segments) pair
-      recompute({ anchor: { page, glyph: i }, focus: { page, glyph: i } }, 'user');
+      const textLayout = geometryFor(page);
+      if (!textLayout) return false;
+      const glyph = glyphAt(textLayout, point);
+      if (glyph == null) return false; // not near text: the caller lets the gesture go
+      // The gesture opens before the selection changes, so listeners see a
+      // coherent (gesture, segments) pair.
+      setGesture(true);
+      recompute({ anchor: { page, glyph }, focus: { page, glyph } });
       return true;
     },
     endGesture: () => {
-      // Settle FIRST, so commit listeners (menus, clipboard prefetch) observe
-      // isGestureActive() === false.
+      // Settle first, so commit listeners (menus, clipboard prefetch) observe
+      // isSelecting() === false.
       setGesture(false);
       const range = readModel().snapshot.range;
       if (range) committed.emit({ range });
     },
-    isGestureActive: () => state().gestureActive,
-    setHighlightVisible: (visible) =>
-      ctx.dispatch({ type: 'setHighlightHidden', hidden: !visible }),
+    setHighlightVisible: (visible) => ctx.state.update(setHighlightHidden, !visible),
     isHighlightVisible: () => !state().highlightHidden,
   };
 
   return {
     api,
     connect() {
-      // Registry changes (rotate/move/delete/insert bump the document revision).
-      let lastRevision = ctx.document()?.revision ?? -1;
-      ctx.cleanup(
-        ctx.subscribe(() => {
-          const revision = ctx.document()?.revision;
-          if (revision === undefined || revision === lastRevision) return;
-          lastRevision = revision;
-          onPagesUpdated();
-        }),
-      );
-      // Content changes: every cached snapshot is stale.
+      // Registry changes (rotate/move/delete/insert) bump the document revision.
+      ctx.watch(() => ctx.document()?.revision ?? 0, onPagesUpdated);
       ctx.listen(ctx.doc.events, (event) => {
-        if (event.type === 'redaction.applied' || event.type === 'pages.flattened') {
-          invalidateContent();
-        }
+        const pages = contentChangedPagesOf(event);
+        if (pages) onContentChanged(pages);
       });
+      connectSelection(ctx, api);
     },
   };
 }

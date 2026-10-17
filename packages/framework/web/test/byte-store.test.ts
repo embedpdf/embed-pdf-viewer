@@ -10,17 +10,17 @@ import { indexedDbByteStore } from '../src/byte-store';
 function installFakeIndexedDb() {
   const databases = new Map<string, Map<string, Map<IDBValidKey, unknown>>>();
   const request = <T>(produce: () => T) => {
-    const req: any = { onsuccess: null, onerror: null, result: undefined, error: null };
+    const request: any = { onsuccess: null, onerror: null, result: undefined, error: null };
     queueMicrotask(() => {
       try {
-        req.result = produce();
-        req.onsuccess?.();
+        request.result = produce();
+        request.onsuccess?.();
       } catch (error) {
-        req.error = error;
-        req.onerror?.();
+        request.error = error;
+        request.onerror?.();
       }
     });
-    return req;
+    return request;
   };
   const objectStore = (rows: Map<IDBValidKey, unknown>) => ({
     put: (value: unknown, key: IDBValidKey) => request(() => (rows.set(key, value), key)),
@@ -30,28 +30,28 @@ function installFakeIndexedDb() {
   });
   (globalThis as any).indexedDB = {
     open(name: string) {
-      const req: any = { onupgradeneeded: null, onsuccess: null, onerror: null };
+      const request: any = { onupgradeneeded: null, onsuccess: null, onerror: null };
       queueMicrotask(() => {
         let stores = databases.get(name);
         const fresh = !stores;
         if (!stores) databases.set(name, (stores = new Map()));
         const db = {
-          objectStoreNames: { contains: (s: string) => stores!.has(s) },
-          createObjectStore: (s: string) => void stores!.set(s, new Map()),
-          transaction: (s: string) => ({
+          objectStoreNames: { contains: (storeName: string) => stores!.has(storeName) },
+          createObjectStore: (storeName: string) => void stores!.set(storeName, new Map()),
+          transaction: (storeName: string) => ({
             objectStore: () => {
-              const rows = stores!.get(s);
-              if (!rows) throw new Error(`NotFoundError: ${s}`);
+              const rows = stores!.get(storeName);
+              if (!rows) throw new Error(`NotFoundError: ${storeName}`);
               return objectStore(rows);
             },
           }),
           close: () => {},
         };
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
+        request.result = db;
+        if (fresh) request.onupgradeneeded?.();
+        request.onsuccess?.();
       });
-      return req;
+      return request;
     },
   };
   return () => {

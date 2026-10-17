@@ -1,0 +1,57 @@
+/* Colors */
+:root {
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --accent-strong: #043f8f;
+  --on-accent: #ffffff;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The button that follows the match */
+.pill {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgb(7 32 76 / 0.25);
+  transition: background-color 0.15s ease;
+}
+
+.pill:hover {
+  background: var(--accent-strong);
+}
+
+.pill:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -15,7 +15,7 @@ const output = (over: Partial<ScriptOutput> = {}): ScriptOutput => ({
 
 const world = (): ScriptWorldInput => ({ fields: [], event: { kind: 'widget-activate' } });
 
-function fakeSandboxFactory(opts?: { dieOnRun?: number }) {
+function fakeSandboxFactory(options?: { dieOnRun?: number }) {
   const calls: string[] = [];
   const inputs: ScriptInput[] = [];
   let built = 0;
@@ -37,7 +37,7 @@ function fakeSandboxFactory(opts?: { dieOnRun?: number }) {
         runs += 1;
         calls.push(`run#${id}:${source}`);
         inputs.push(input);
-        if (opts?.dieOnRun === runs && id === 1) disposed = true; // resource fault
+        if (options?.dieOnRun === runs && id === 1) disposed = true; // resource fault
         return output();
       },
       dispose: () => {

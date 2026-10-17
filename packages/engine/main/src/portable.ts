@@ -1,6 +1,6 @@
 /**
  * `@embedpdf/engine/portable` — the local engine with its wasm delivered
- * through the MODULE GRAPH.
+ * through the module graph.
  *
  * The default entry expects the consumer's bundler to emit `embedpdf.wasm`
  * as an asset (`new URL(..., import.meta.url)`), which webpack, Vite, Rspack,
@@ -13,10 +13,10 @@
  *
  * Costs, compared with the emitted asset: the same bytes over the wire, a
  * short inflate before boot, and no streaming compile. A separate entry, not
- * a runtime fallback, so a build carries ONE copy of the binary — this one or
+ * a runtime fallback, so a build carries one copy of the binary — this one or
  * the asset, never both.
  *
- * Angular gets this entry WITHOUT asking: its application builder resolves
+ * Angular gets this entry without asking: its application builder resolves
  * packages with the `es2020` export condition (the Angular Package Format's
  * own), which no other bundler declares, and `@embedpdf/engine`'s export map
  * routes that condition here. So `import { localEngine } from '@embedpdf/engine'`
@@ -39,9 +39,18 @@ export async function loadInlineWasm(): Promise<ArrayBuffer> {
   return inflate(decodeBase64(packed));
 }
 
-/** `localEngine()` whose default wasm source is {@link loadInlineWasm}. */
+/**
+ * `localEngine()` whose default wasm source is {@link loadInlineWasm}, and
+ * whose workers start from blob: URLs: a toolchain that needs this entry
+ * cannot emit the worker files either.
+ */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
-  return siblingLocalEngine({ wasmLoader: loadInlineWasm, ...options });
+  return siblingLocalEngine({ wasmLoader: loadInlineWasm, ...inlineWorkers(), ...options });
+}
+
+/** Only where there are workers to start: elsewhere the engine and its encoder run in this thread. */
+function inlineWorkers(): Pick<LocalEngineRecipeOptions, 'worker' | 'encoderWorker'> {
+  return typeof Worker === 'undefined' ? {} : { worker: 'inline', encoderWorker: 'inline' };
 }
 
 function decodeBase64(text: string): Uint8Array {

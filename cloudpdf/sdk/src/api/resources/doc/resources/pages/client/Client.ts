@@ -49,12 +49,19 @@ export class PagesClient {
         request: CloudPDF.doc.DocPagesSetScaleRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetScale200Response>> {
-        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, ..._body } = request;
+        const {
+            docId,
+            layerName,
+            pageKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            ..._body
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -208,12 +215,18 @@ export class PagesClient {
         request: CloudPDF.doc.DeletePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesDelete200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -262,7 +275,7 @@ export class PagesClient {
     }
 
     /**
-     * A read, not a mutation: the source document is untouched and no event is published. Body is `{"pageObjectNumbers": number[]}`; the response body is the new PDF.
+     * A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.
      *
      * @throws {@link CloudPDF.BadRequestError}
      * @throws {@link CloudPDF.NotFoundError}
@@ -363,12 +376,18 @@ export class PagesClient {
         request: CloudPDF.doc.FlattenPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesFlatten200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -417,7 +436,7 @@ export class PagesClient {
     }
 
     /**
-     * Multipart mutation envelope: a `body` field holding `{"destIndex"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.
+     * Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.
      *
      * @param {CloudPDF.doc.InsertPagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -455,6 +474,7 @@ export class PagesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": request["X-Document-Password"],
+                "Idempotency-Key": request["Idempotency-Key"],
                 ..._maybeEncodedRequest.headers,
             }),
             requestOptions?.headers,
@@ -505,7 +525,7 @@ export class PagesClient {
     }
 
     /**
-     * Body is `{"size": {"width", "height"}, "count"?, "destIndex"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.
+     * Body is `{"size": {"width", "height"}, "count"?, "position"?}` — size in PDF points, count in [1, 100], `position` a `PagePosition` (omitted → the end).
      *
      * @param {CloudPDF.doc.InsertBlankPagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -535,12 +555,18 @@ export class PagesClient {
         request: CloudPDF.doc.InsertBlankPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesInsertBlank200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -592,88 +618,6 @@ export class PagesClient {
     }
 
     /**
-     * @param {CloudPDF.doc.MovePagesRequest} request
-     * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link CloudPDF.BadRequestError}
-     * @throws {@link CloudPDF.NotFoundError}
-     * @throws {@link errors.CloudPDFError}
-     * @throws {@link errors.CloudPDFTimeoutError}
-     *
-     * @example
-     *     await client.doc.pages.move({
-     *         docId: "docId",
-     *         layerName: "layerName",
-     *         body: {
-     *             "key": "value"
-     *         }
-     *     })
-     */
-    public move(
-        request: CloudPDF.doc.MovePagesRequest,
-        requestOptions?: PagesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocPagesMove200Response> {
-        return core.HttpResponsePromise.fromPromise(this.__move(request, requestOptions));
-    }
-
-    private async __move(
-        request: CloudPDF.doc.MovePagesRequest,
-        requestOptions?: PagesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocPagesMove200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/pages/move`,
-            ),
-            method: "POST",
-            headers: _headers,
-            contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
-            requestType: "json",
-            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocPagesMove200Response, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
-                case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.CloudPDFError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(
-            _response.error,
-            _response.rawResponse,
-            "POST",
-            "/v1/docs/{docId}/layers/{layerName}/pages/move",
-        );
-    }
-
-    /**
      * @param {CloudPDF.doc.SetNamePagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
      *
@@ -702,12 +646,18 @@ export class PagesClient {
         request: CloudPDF.doc.SetNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetName200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -784,12 +734,18 @@ export class PagesClient {
         request: CloudPDF.doc.RemoveNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesRemoveName200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -841,6 +797,96 @@ export class PagesClient {
     }
 
     /**
+     * @param {CloudPDF.doc.DocPagesReorderRequest} request
+     * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.doc.pages.reorder({
+     *         docId: "docId",
+     *         layerName: "layerName",
+     *         pages: [{
+     *                 kind: "objectNumber",
+     *                 objectNumber: 1
+     *             }],
+     *         position: "start"
+     *     })
+     */
+    public reorder(
+        request: CloudPDF.doc.DocPagesReorderRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocPagesReorder200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__reorder(request, requestOptions));
+    }
+
+    private async __reorder(
+        request: CloudPDF.doc.DocPagesReorderRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocPagesReorder200Response>> {
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            ..._body
+        } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/pages/reorder`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as CloudPDF.DocPagesReorder200Response, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/docs/{docId}/layers/{layerName}/pages/reorder",
+        );
+    }
+
+    /**
      * @param {CloudPDF.doc.RotatePagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
      *
@@ -869,12 +915,18 @@ export class PagesClient {
         request: CloudPDF.doc.RotatePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesRotate200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({

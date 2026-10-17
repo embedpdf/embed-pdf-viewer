@@ -32,13 +32,12 @@ const runner: ConformanceTestRunner = {
 runAnnotationMutationConformance(runner, {
   label: 'engine-local (inline transport, wasm runtime)',
   openKind: 'bytes',
-  supportsAppearanceRasters: true,
   fixture: {
     id: 'annotations-pdf-mutations',
     bytes: async () => new Uint8Array(await readFile(fixturePath)),
     expected: { trapped: 'unknown' },
     pageObjectNumber: 3,
-    expectsWeakAnnotation: true,
+    expectsInlineAnnotation: true,
   },
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
 });

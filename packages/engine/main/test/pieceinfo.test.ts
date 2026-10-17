@@ -32,7 +32,6 @@ const runner: ConformanceTestRunner = {
 
 runPieceInfoConformance(runner, {
   label: 'engine-local (inline transport, wasm runtime)',
-  openKind: 'bytes',
   fixture: {
     id: 'sample-pdf-pieceinfo',
     bytes: async () => new Uint8Array(await readFile(fixturePath)),
@@ -48,7 +47,7 @@ describe('pieceInfo update preflight: engine-local', () => {
     const doc = await engine.open({ kind: 'bytes', id: 'pieceinfo-preflight', bytes });
     const application = 'EMBD_PreflightTest';
     try {
-      await doc.pieceInfo!.update(application, { seed: 'before' });
+      await doc.pieceInfo.update(application, { seed: 'before' });
 
       const invalidPatches: PieceInfoPatch[] = [
         { candidate: 'must-not-land', invalid: Number.POSITIVE_INFINITY },
@@ -62,10 +61,10 @@ describe('pieceInfo update preflight: engine-local', () => {
       ];
 
       for (const patch of invalidPatches) {
-        await expect(doc.pieceInfo!.update(application, patch)).rejects.toMatchObject({
+        await expect(doc.pieceInfo.update(application, patch)).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
         });
-        expect((await doc.pieceInfo!.read(application))!.entries).toEqual({
+        expect((await doc.pieceInfo.get(application))!.entries).toEqual({
           seed: { type: 'string', value: 'before' },
         });
       }

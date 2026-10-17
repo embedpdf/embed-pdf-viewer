@@ -1,276 +1,278 @@
 /**
- * The chrome — structure only. No breakpoints, no show/hide lists, no locale
- * overrides, no dividers/spacers, no hand-written overflow menus. What fits is
- * measured and solved at runtime (@embedpdf/core-ui); the overflow menu is
- * derived. Compare to the v2 snippet's 1,950-line ui-schema.ts.
+ * The default layout: every bar, menu and panel the viewer ships, as plain
+ * data. Structure only: no breakpoints, no show/hide lists, no locale
+ * overrides, no dividers or spacers, no hand-written overflow menus. What fits
+ * is measured and solved at runtime (@embedpdf/core-ui); the "More" menu is
+ * derived, and so are the mode tabs (the `modes` group lists one per bar with
+ * a `mode`).
  *
- * `importance` (1 sheds first … 5 pinned) is the only responsive knob.
+ * `importance` (1 makes room first … 5 never leaves the bar) is the only
+ * responsive knob. The bar, group and menu ids are API: they don't change
+ * between minor versions.
  */
-import {
-  defineChrome,
-  group,
-  item,
-  custom,
-  type BarSchema,
-  type ChromeSchema,
-  type MenuSchema,
-} from '@embedpdf/react/toolbar';
+import { createLayout, type LayoutData, type LayoutGroupObject } from '@embedpdf/core-ui';
 
-// Reused across every mode band — plain values, so composition is just a const.
-const style = group('style', { importance: 4 }, [item('panel:annotation-style')]);
-const history = group('history', { importance: 3 }, ['history:undo', 'history:redo']);
-
-// ── main toolbar ─────────────────────────────────────────────────────────────
-const mainBar: BarSchema = {
-  id: 'main',
-  sections: {
-    // v2 layout: everything before the first spacer sits LEFT-aligned —
-    // document menu, workspace, zoom strip, pan/pointer. Only the mode tabs
-    // are truly centered.
-    start: [
-      group('document', { importance: 5 }, [item('document:menu')]),
-      group('workspace', { importance: 4 }, [
-        item('panel:sidebar', { importance: 5 }),
-        item('page:settings'),
-      ]),
-      // The inline zoom strip; when it can't fit it renders its 'button'
-      // variant, and in the overflow menu it projects through zoom:menu.
-      group('zoom', { importance: 4 }, [
-        custom('zoom-controls', { variants: ['inline', 'button'], terminal: 'zoom:menu' }),
-      ]),
-      group('tools', { importance: 2 }, ['pan:toggle', 'pointer:toggle']),
-    ],
-    center: [
-      group('modes', {
-        role: 'tabs',
-        // The group ladder: full strip → trailing tabs shed behind a derived
-        // in-strip chevron (v2's overflow-tabs-button) → select (v2's
-        // mode-select-button) → global overflow. Tab items at importance 1 so
-        // the strip is the FIRST thing to compact; the group at 4 so its
-        // compact forms survive long.
-        shed: true,
-        collapse: 'select',
-        importance: 4,
-        labelKey: 'commands.mode.group',
-        items: [
-          item('mode:view', { variants: ['label'], importance: 1 }),
-          item('mode:annotate', { variants: ['label'], importance: 1 }),
-          item('mode:shapes', { variants: ['label'], importance: 1 }),
-          item('mode:insert', { variants: ['label'], importance: 1 }),
-          item('mode:form', { variants: ['label'], importance: 1 }),
-          item('mode:redact', { variants: ['label'], importance: 1 }),
-          item('mode:measure', { variants: ['label'], importance: 1 }),
-        ],
-      }),
-    ],
-    end: [group('panels', { importance: 5 }, ['panel:search', 'panel:comment'])],
-  },
+// Shared by the mode bars: plain values, so composition is just a const. Both are dependent:
+// they show beside a mode's tools, and a bar left with only them shows nothing, nor its tab.
+const style: LayoutGroupObject = {
+  id: 'style',
+  items: ['panel:style'],
+  importance: 4,
+  dependent: true,
+};
+const history: LayoutGroupObject = {
+  id: 'history',
+  items: ['history:undo', 'history:redo'],
+  importance: 3,
+  dependent: true,
 };
 
-// ── secondary bands (one per mode; which shows is derived from shell) ────────
-const annotateBar: BarSchema = {
-  id: 'annotate',
-  sections: {
-    center: [
-      group('comment', { importance: 4 }, ['annotation:add-note', 'annotation:add-link']),
-      group('markup', { importance: 4 }, [
-        'annotation:add-highlight',
-        'annotation:add-strikeout',
-        'annotation:add-underline',
-        'annotation:add-squiggly',
-      ]),
-      group('draw', { importance: 3 }, ['annotation:add-ink', 'annotation:add-ink-highlight']),
-      group('text', { importance: 2 }, [
-        'annotation:add-text',
-        'annotation:add-insert-text',
-        'annotation:add-replace-text',
-        'annotation:add-callout',
-      ]),
-      style,
-      history,
-    ],
-  },
-};
-
-const shapesBar: BarSchema = {
-  id: 'shapes',
-  sections: {
-    center: [
-      group('shapes', { importance: 4 }, [
-        'annotation:add-rectangle',
-        'annotation:add-circle',
-        'annotation:add-line',
-        'annotation:add-arrow',
-      ]),
-      group('polygons', { importance: 2 }, ['annotation:add-polygon', 'annotation:add-polyline']),
-      style,
-      history,
-    ],
-  },
-};
-
-const insertBar: BarSchema = {
-  id: 'insert',
-  sections: {
-    center: [
-      group('stamps', { importance: 4 }, [
-        'insert:add-stamp',
-        // Quick marks (`stamps.toolbar`): thumbnails that arm on click; in a
-        // menu the stamps panel stands in for them.
-        custom('quick-stamps', { terminal: 'insert:add-stamp', importance: 3 }),
-        'insert:add-attachment',
-        'insert:add-signature',
-        'insert:add-image',
-      ]),
-      style,
-      history,
-    ],
-  },
-};
-
-const formBar: BarSchema = {
-  id: 'form',
-  sections: {
-    center: [
-      group('fields', { importance: 4 }, [
-        'form:add-textfield',
-        'form:add-checkbox',
-        'form:add-radio',
-      ]),
-      group('choice-fields', { importance: 2 }, ['form:add-select', 'form:add-listbox']),
-      group('signature-fields', { importance: 2 }, ['form:add-signature']),
-      history,
-    ],
-  },
-};
-
-const measureBar: BarSchema = {
-  id: 'measure',
-  sections: {
-    center: [
-      group('measure', { importance: 5 }, [
-        'measurement:distance',
-        'measurement:perimeter',
-        'measurement:area',
-        'measurement:calibrate',
-      ]),
-      group('scale', { importance: 4 }, [
-        custom('measurement-scale', { variants: ['inline'], terminal: 'panel:measurement' }),
-      ]),
-      style,
-    ],
-  },
-};
-
-const redactBar: BarSchema = {
-  id: 'redact',
-  sections: {
-    center: [
-      group('redact', { importance: 4 }, ['redaction:redact', 'panel:redaction']),
-      style,
-      history,
-    ],
-  },
-};
-
-// ── menus (command trees; separators derive between sections) ────────────────
-const documentMenu: MenuSchema = {
-  id: 'document',
-  sections: [
-    { items: ['document:download', 'document:print'] },
-    { items: ['document:fullscreen'] },
-  ],
-};
-
-const zoomMenu: MenuSchema = {
-  id: 'zoom',
-  sections: [
-    {
-      labelKey: 'commands.zoom.level',
-      items: ['zoom:50', 'zoom:100', 'zoom:150', 'zoom:200', 'zoom:400'],
+export const DEFAULT_LAYOUT: LayoutData = {
+  bars: {
+    main: {
+      place: 'top',
+      // The start section sits left-aligned: document menu, view, the zoom
+      // field, pan and pointer. Only the mode tabs are truly centered.
+      start: [
+        { id: 'document', items: ['menu:document'], importance: 5 },
+        {
+          id: 'view',
+          items: [{ command: 'panel:thumbnails', importance: 5 }, 'menu:view'],
+          importance: 4,
+        },
+        // The zoom field; when it can't fit it draws its 'button' variant,
+        // and in the "More" menu it stands in as menu:zoom.
+        {
+          id: 'zoom',
+          items: [{ custom: 'zoom', command: 'menu:zoom', variants: ['inline', 'button'] }],
+          importance: 4,
+        },
+        { id: 'tools', items: ['tool:pan', 'tool:pointer'], importance: 2 },
+      ],
+      center: [
+        {
+          // The tabs: View, then one per mode bar. The group ladder: full strip
+          // → trailing tabs shed behind a chevron → select → the "More" menu.
+          // The tabs sit at importance 1 so the strip compacts first; the group
+          // at 4 so its compact forms last.
+          id: 'modes',
+          items: [],
+          shed: true,
+          collapse: 'select',
+          importance: 4,
+          titleKey: 'commands.mode.group',
+        },
+      ],
+      end: [
+        {
+          id: 'panels',
+          items: [
+            // The View only label: it shows only while nothing can change the document, and
+            // draws its icon alone when there's no room.
+            { custom: 'view-only', variants: ['label', 'icon'] },
+            'panel:search',
+            'panel:comments',
+          ],
+          importance: 5,
+        },
+      ],
     },
-    { items: ['zoom:in', 'zoom:out'] },
-    { items: ['zoom:fit-page', 'zoom:fit-width', 'zoom:automatic'] },
-  ],
-};
 
-const pageSettingsMenu: MenuSchema = {
-  id: 'page-settings',
-  sections: [
-    { labelKey: 'commands.spread.group', items: ['spread:none', 'spread:odd', 'spread:even'] },
-    { labelKey: 'commands.scroll.group', items: ['scroll:vertical', 'scroll:horizontal'] },
-    { labelKey: 'commands.rotate.group', items: ['rotate:clockwise', 'rotate:counter-clockwise'] },
-    { items: ['document:fullscreen'] },
-  ],
-};
+    // ── the mode bars: along main, one at a time ──────────────────────────────
+    annotate: {
+      place: { with: 'main' },
+      mode: 'annotate',
+      titleKey: 'commands.mode.annotate',
+      center: [
+        { id: 'comment', items: ['tool:note', 'tool:link'], importance: 4 },
+        {
+          id: 'markup',
+          items: ['tool:highlight', 'tool:strikeout', 'tool:underline', 'tool:squiggly'],
+          importance: 4,
+        },
+        { id: 'draw', items: ['tool:ink', 'tool:ink-highlight'], importance: 3 },
+        {
+          id: 'text',
+          items: ['tool:free-text', 'tool:insert-text', 'tool:replace-text', 'tool:callout'],
+          importance: 2,
+        },
+        style,
+        history,
+      ],
+    },
+    shapes: {
+      place: { with: 'main' },
+      mode: 'shapes',
+      titleKey: 'commands.mode.shapes',
+      center: [
+        {
+          id: 'shapes',
+          items: ['tool:square', 'tool:circle', 'tool:line', 'tool:arrow'],
+          importance: 4,
+        },
+        { id: 'polygons', items: ['tool:polygon', 'tool:polyline'], importance: 2 },
+        style,
+        history,
+      ],
+    },
+    insert: {
+      place: { with: 'main' },
+      mode: 'insert',
+      titleKey: 'commands.mode.insert',
+      center: [
+        {
+          id: 'stamps',
+          items: [
+            'tool:stamp',
+            // Quick marks (`plugins.stamp.quick`): thumbnails that arm on click; in
+            // a menu the stamps panel stands in for them.
+            { custom: 'quick-stamps', command: 'tool:stamp', importance: 3 },
+            'tool:attachment',
+            'tool:signature',
+            'tool:image',
+          ],
+          importance: 4,
+        },
+        style,
+        history,
+      ],
+    },
+    form: {
+      place: { with: 'main' },
+      mode: 'form',
+      titleKey: 'commands.mode.form',
+      center: [
+        // The design switch first: what a field is, in its sidebar; how it looks is Style's.
+        { id: 'design', items: ['form:design'], importance: 5 },
+        { id: 'fields', items: ['tool:text-field', 'tool:checkbox', 'tool:radio'], importance: 4 },
+        { id: 'choices', items: ['tool:combo-box', 'tool:list-box'], importance: 2 },
+        { id: 'buttons', items: ['tool:button'], importance: 2 },
+        { id: 'signatures', items: ['tool:signature-field'], importance: 2 },
+        style,
+        history,
+      ],
+    },
+    redact: {
+      place: { with: 'main' },
+      mode: 'redact',
+      titleKey: 'commands.mode.redact',
+      center: [
+        { id: 'redact', items: ['tool:redact', 'panel:redaction'], importance: 4 },
+        style,
+        history,
+      ],
+    },
+    measure: {
+      place: { with: 'main' },
+      mode: 'measure',
+      titleKey: 'commands.mode.measure',
+      center: [
+        {
+          id: 'measure',
+          items: ['tool:distance', 'tool:perimeter', 'tool:area', 'measurement:calibrate'],
+          importance: 5,
+        },
+        {
+          id: 'scale',
+          items: [
+            { custom: 'measurement-scale', command: 'panel:measurement', variants: ['inline'] },
+          ],
+          importance: 4,
+        },
+        style,
+      ],
+    },
 
-// ── contextual strips (anchored to selections; same BarSchema vocabulary) ────
-// WHICH commands actually show is each command's `visible` derivation (group
-// only when groupable, style only when the kind declares editable props…), so
-// one strip serves single AND multi selection — v2 needed two schemas for that.
-const annotationStrip: BarSchema = {
-  id: 'annotation-strip',
-  sections: {
-    center: [
-      group('annotation-actions', { importance: 4 }, [
-        'annotation:comment',
-        'annotation:style',
-        'annotation:stamp-from-selection',
-        'annotation:link',
-        'annotation:goto-link',
-        'annotation:remove-link',
-        'annotation:group',
-        'annotation:ungroup',
-      ]),
-      // Its own group → a derived separator; delete stands apart.
-      group('annotation-danger', { importance: 5 }, ['annotation:delete']),
+    // ── over the pages ────────────────────────────────────────────────────────
+    pager: {
+      place: { float: 'bottom' },
+      center: [{ id: 'pages', items: [{ custom: 'page-number' }] }],
+    },
+    // Which actions show is each command's `visible` (group only when
+    // groupable, style only when the kind has editable properties…), so one
+    // bar serves a single and a multiple selection.
+    selection: {
+      place: { at: 'selection' },
+      center: [
+        {
+          id: 'selection',
+          items: [
+            'selection:copy',
+            'selection:highlight',
+            'selection:underline',
+            'selection:strikeout',
+          ],
+          importance: 4,
+        },
+      ],
+    },
+    annotation: {
+      place: { at: 'annotation' },
+      center: [
+        {
+          id: 'actions',
+          items: [
+            'annotation:comment',
+            'annotation:style',
+            'annotation:stamp-from-selection',
+            'annotation:link',
+            'annotation:goto-link',
+            'annotation:remove-link',
+            'annotation:group',
+            'annotation:ungroup',
+          ],
+          importance: 4,
+        },
+        // Its own group, so a line sets delete apart.
+        { id: 'danger', items: ['annotation:delete'], importance: 5 },
+      ],
+    },
+  },
+
+  menus: {
+    document: [['document:open', 'document:download', 'document:print'], ['view:fullscreen']],
+    view: [
+      {
+        titleKey: 'commands.spread.group',
+        items: ['view:single-page', 'view:two-pages', 'view:cover-page'],
+      },
+      {
+        titleKey: 'commands.scroll.group',
+        items: ['view:scroll-vertical', 'view:scroll-horizontal'],
+      },
+      {
+        titleKey: 'commands.rotate.group',
+        items: ['view:rotate-clockwise', 'view:rotate-counterclockwise'],
+      },
+      ['view:fullscreen'],
+    ],
+    zoom: [
+      {
+        titleKey: 'commands.zoom.level',
+        items: ['zoom:50', 'zoom:100', 'zoom:150', 'zoom:200', 'zoom:400'],
+      },
+      ['zoom:in', 'zoom:out'],
+      ['zoom:fit-page', 'zoom:fit-width', 'zoom:automatic'],
     ],
   },
-};
 
-// The text-selection strip: appears when a text selection SETTLES (the menu
-// component gates on `isSelecting()`). One command today; "Highlight" et al.
-// are one more id here + one command — no component changes.
-const selectionStrip: BarSchema = {
-  id: 'selection-strip',
-  sections: {
-    center: [group('selection-actions', { importance: 4 }, ['selection:copy'])],
+  // Each panel's button is its `panel:<id>` command, titled and drawn as the panel is
+  // (config/panels.ts); the panels on one side take turns.
+  panels: {
+    thumbnails: { side: 'start', titleKey: 'panels.thumbnails', icon: 'sidebar' },
+    outline: { side: 'start', titleKey: 'panels.outline', icon: 'listTree' },
+    attachments: { side: 'start', titleKey: 'panels.attachments', icon: 'paperclip' },
+    search: { side: 'end', titleKey: 'panels.search', icon: 'search' },
+    comments: { side: 'end', titleKey: 'panels.comments', icon: 'comment' },
+    style: { side: 'end', titleKey: 'panels.style', icon: 'palette' },
+    stamps: { side: 'end', titleKey: 'panels.stamps', icon: 'rubberStamp' },
+    signatures: { side: 'end', titleKey: 'panels.signatures', icon: 'signature' },
+    redaction: { side: 'end', titleKey: 'panels.redaction', icon: 'redactionSidebar' },
+    measurement: { side: 'end', titleKey: 'panels.measurement', icon: 'updateScale' },
+    // The form designer's sidebar: the document's fields, and what the selected one is.
+    'form-design': { side: 'end', titleKey: 'panels.formDesign', icon: 'formDesign' },
   },
 };
 
-/**
- * The DEFAULT chrome — exported as a VALUE, which is the whole customization
- * model: consumers pass nothing and track this, transform it, or write their
- * own. It is never merged with anything.
- */
-export const defaultChrome = defineChrome({
-  bars: { main: mainBar },
-  modeBars: {
-    'mode:annotate': annotateBar,
-    'mode:shapes': shapesBar,
-    'mode:insert': insertBar,
-    'mode:form': formBar,
-    'mode:redact': redactBar,
-    'mode:measure': measureBar,
-  },
-  menus: { document: documentMenu, zoom: zoomMenu, 'page-settings': pageSettingsMenu },
-  strips: { annotation: annotationStrip, selection: selectionStrip },
-});
-
-// Lookups take the RESOLVED schema (the host may have replaced the default) —
-// the typed literal widens to arbitrary string keys here, once.
-
-/** Menu lookup by id (arbitrary string). */
-export function getMenu(schema: ChromeSchema, id: string): MenuSchema | undefined {
-  return (schema.menus as Record<string, MenuSchema> | undefined)?.[id];
-}
-
-/** Secondary band lookup by mode-surface id. */
-export function getModeBar(schema: ChromeSchema, id: string): BarSchema | undefined {
-  return (schema.modeBars as Record<string, BarSchema> | undefined)?.[id];
-}
-
-/** Contextual strip lookup by context id ('annotation', …). */
-export function getStrip(schema: ChromeSchema, id: string): BarSchema | undefined {
-  return (schema.strips as Record<string, BarSchema> | undefined)?.[id];
-}
+/** The default layout, which the `layout` function gets. */
+export const defaultLayout = createLayout(DEFAULT_LAYOUT);

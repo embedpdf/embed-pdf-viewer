@@ -1,5 +1,32 @@
 # @embedpdf/plugin-search
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Search hits carry `page: PageRef`; `hitsForPage(page)` and `startPage` take a `PageRef`.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Rewritten on the kernel's `create()` controller hook with a newest-wins lane for the session. `search()` and `refresh()` (was `rerun`) are awaitable and resolve `{ status, hitCount }`; new `cancel()` keeps the hits found so far. Reads are `getQuery`, `getStatus`, `listHits(filter?)`, `getHitCount`, `listPagesWithHits`, `getActiveHitIndex`, `getActiveHit`, `getProgress`, `getError`; navigation is `nextHit`, `previousHit`, `goToHit`, `revealActiveHit`. Typed events: `onStarted`, `onProgress`, `onCompleted`, `onCancelled`, `onFailed`, `onActiveHitChanged`, `onCleared`. Per-page hit arrays are reference-stable. `SearchPluginConfig` is now `SearchConfig`; `TextSegment` and `SearchMode` are exported.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Expose search hit ranges as `start` and `count`, report progress as
+  `pagesSearched` and `pageCount`, and use `from` to select the starting page.
+  Callers can request snippets with a boolean option, with permission checks
+  that match whether result text will be returned.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Search has live settings: `reveal` (`anchor`, `behavior`) and `highlight` (`color`, `activeColor`, `blendMode`), with `getSettings()`, `updateSettings()`, `resetSettings()` and `onSettingsChanged`. `searchPlugin(config)` registers them over `SEARCH_DEFAULTS` (`SearchConfig` is `DeepPartial<SearchSettings>`), and a change reaches every document at once: `updateSettings({ reveal })` applies to the next `nextHit()`. The settings exist before any document opens.
+
+  `searchState` declares the search's state for every framework: `query`, `status`, `hitCount`, `activeHitIndex` (was `activeIndex`), `activeHit`, `progress` and `error`. `onProgress` is now `onProgressChanged`, carrying `hitCount`, `pagesSearched` and `pageCount` (`SearchProgressChangedEvent`). It fires whenever `getProgress()` changes: once per slice of pages a search gets through, and back to none when a new search starts or `clear()` drops the session. `onStarted`, `onCompleted`, `onCancelled` and `onFailed` no longer carry `operationId`. `search()`, `refresh()` and `findAll()` take `{ signal }`, and cancelling stops the engine's work on the running slice; a newer search still replaces an older one. A page argument (`search(query, { from })`, `listHits({ page })`, `getHitCount(page)`) is a `PageRef` or an index. `search()` rejects `not-found` for a `from` page that isn't in the document, while `listHits({ page })` and `getHitCount(page)` answer `[]` and `0` for it, so a layer reading while its page is deleted still renders. `listPagesWithHits()` lists the pages in document order, which moving a page changes. `search()` and `findAll()` refuse without `doc.text.search` with `permission-denied` before asking the engine, and `canSearch()` reads the same permission. A refusal only rejects: the session stays as it was and no event fires, not even `onFailed`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `goToHit()` takes the hit itself as well as its index, so `<SearchLayer onHitClick={(hit) => search.goToHit(hit)}>` makes a clicked match the active one. A hit kept from before the search ran again is found by the characters it covers; one that isn't among the current hits returns `null` and changes nothing.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The token lists the methods that return a promise, so without a document they reject with `not-ready` in every framework instead of throwing.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – Follows the stage contract (`getCurrentPage`, `reveal(ref)`).
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A search with no `from` starts at the Stage's current page through its `PageRef`.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

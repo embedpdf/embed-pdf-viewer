@@ -1,5 +1,11 @@
+import type { IsoDateTime } from './IsoDateTime';
+
 export type DocumentMetadataTrapped = 'true' | 'false' | 'unknown';
 
+/**
+ * The standard fields of the document's Info dict. The dict's other keys
+ * are {@link CustomMetadata}, read and changed through `doc.metadata.custom`.
+ */
 export interface DocumentMetadata {
   title: string | null;
   author: string | null;
@@ -7,10 +13,9 @@ export interface DocumentMetadata {
   keywords: string | null;
   producer: string | null;
   creator: string | null;
-  /** ISO 8601 string from /CreationDate. Date parsing is the caller's job. */
-  created: string | null;
-  /** ISO 8601 string from /ModDate. Date parsing is the caller's job. */
-  modified: string | null;
+  /** `/CreationDate`. */
+  createdAt: IsoDateTime | null;
+  /** `/ModDate`. */
+  modifiedAt: IsoDateTime | null;
   trapped: DocumentMetadataTrapped;
-  custom: Record<string, string>;
 }

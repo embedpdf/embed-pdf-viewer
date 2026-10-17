@@ -5,7 +5,7 @@ import { contentPathFor, readFrontmatter, walkMdx } from './search/corpus';
 
 /**
  * `llms.txt` — the authored entry map for AI agents
- * (DOCS-PLATFORM-ARCHITECTURE.md; format: llmstxt.org).
+ * (docs/conventions/docs-architecture.md; format: llmstxt.org).
  *
  * The kit enumerates what exists and renders the file; each SITE authors the
  * framing — title, summary, section labels and order — and decides how a

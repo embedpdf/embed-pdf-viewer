@@ -61,7 +61,7 @@ export function createPostgresDb(opts: CreatePostgresDbOptions): Kysely<Schema> 
   // `node-postgres` config properties — pg sends them in the
   // `StartupMessage` so every connection (including reconnects) picks
   // them up atomically. Don't use `pool.on('connect', SET ...)` for
-  // these: the SET is async and races with `pool.destroy()`, which is
+  // these: the set is async and races with `pool.destroy()`, which is
   // exactly the failure path that shows up as PG code 57P01
   // ("terminating connection due to administrator command") in tests.
   const pool = new Pool({

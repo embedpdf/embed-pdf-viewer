@@ -112,6 +112,25 @@ describe('bundler matrix static server', () => {
     });
   }
 
+  it('sends the given headers with every asset, the index fallback included', async (t) => {
+    const policy = "default-src 'self'; worker-src 'self'";
+    const fixture = await serve(join(temporary, 'dist'), {
+      headers: { 'content-security-policy': policy },
+    });
+    t.after(() => new Promise((ok) => fixture.server.close(ok)));
+    for (const [path, accept] of [
+      ['/', 'text/html'],
+      ['/client/route', 'text/html'],
+      ['/chunks/lazy%20module.mjs', '*/*'],
+      ['/embedpdf.wasm', '*/*'],
+    ]) {
+      const response = await request(fixture.origin, path, accept);
+      assert.equal(response.status, 200, path);
+      assert.equal(response.headers['content-security-policy'], policy, path);
+    }
+    assert.equal((await request(origin, '/')).headers['content-security-policy'], undefined);
+  });
+
   it('returns 404 when a navigation has no root index to fall back to', async (t) => {
     const root = join(temporary, 'no-index');
     mkdirSync(root);

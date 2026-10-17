@@ -44,7 +44,7 @@ import type { ObjectStore } from '../storage/ObjectStore';
 /**
  * @license FCL-1.0-ALv2
  *
- * WARNING: The license bootstrap imported below is part of CloudPDF's
+ * Warning: The license bootstrap imported below is part of CloudPDF's
  * license-key functionality. Removing or modifying it to disable or circumvent
  * license enforcement, enable protected functionality without a valid license
  * key, or remove protected functionality is a breach of FCL-1.0-ALv2 while
@@ -68,13 +68,14 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   cloudpdf-server --help
  *
  * Config is read from env (12-factor friendly). `serve` runs the full
- * adapter bootstrap (secrets -> storage -> CDN -> KMS, see ADAPTERS.md)
+ * adapter bootstrap (secrets -> storage -> CDN -> KMS, see
+ * `docs/conventions/server-adapters.md`)
  * so the same binary scales from zero-config SQLite + filesystem to
  * Postgres + S3/GCS/Azure purely by changing env:
  *   CLOUDPDF_DB_DRIVER     sqlite|postgres   (default: sqlite)
  *   CLOUDPDF_DB_SQLITE_PATH                  (default: ./data/cloudpdf.db)
  *   CLOUDPDF_DB_URL         postgres://...    (required for postgres)
- *   CLOUDPDF_REALTIME       in-process        (opt OUT of LISTEN/NOTIFY; postgres
+ *   CLOUDPDF_REALTIME       in-process        (opt out of LISTEN/NOTIFY; postgres
  *                                              defaults to cross-replica delivery)
  *   CLOUDPDF_JWT_SECRET    (default: dev secret — allowed only on development licenses)
  *   CLOUDPDF_API_AUTH_TOKENS  comma-separated static root credentials, valid on
@@ -100,7 +101,7 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   CLOUDPDF_IMPORT_MAX_BYTES / CLOUDPDF_IMPORT_TIMEOUT_MS / CLOUDPDF_IMPORT_MAX_CONCURRENT
  *   CLOUDPDF_IMPORT_ALLOW_HTTP=1 / CLOUDPDF_IMPORT_ALLOW_PRIVATE_NETWORKS=1   (dev / MinIO)
  *   CLOUDPDF_IMPORT_CONNECTIONS=name1,name2   operator-registered pull sources; per name:
- *     CLOUDPDF_IMPORT_CONNECTION_<NAME>_KIND=s3 + _S3_BUCKET/_S3_REGION[/_S3_ENDPOINT],
+ *     CLOUDPDF_IMPORT_CONNECTION_<name>_KIND=s3 + _S3_BUCKET/_S3_REGION[/_S3_ENDPOINT],
  *     _CREDENTIALS=api-token[,tenant-jwt] (default api-token)  _TENANTS=*|csv
  *     _SCOPE=whole-bucket|shared-prefixes|tenant-template (+_SCOPE_PREFIXES/_SCOPE_TEMPLATE)
  *   CLOUDPDF_CDN_KIND       none|bunny|...    (default: none)
@@ -109,8 +110,8 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   CLOUDPDF_AUTO_MIGRATE=0|1    apply migrations on boot (default: on for sqlite)
  *   CLOUDPDF_FAIL_ON_PENDING=1   refuse to start with pending migrations
  *   CLOUDPDF_AUTO_PROVISION_TENANT=1   lazily create tenant rows (dev)
- *   PORT                   (default: 3000)
- *   HOST                   (default: 0.0.0.0)
+ *   port                   (default: 3000)
+ *   host                   (default: 0.0.0.0)
  *   CLOUDPDF_WORKER_POOL_SIZE  int|max  (default: min(2, cpus))
  *   CLOUDPDF_FALLBACK_FONTS  JSON [{key,path,familyName?,...}]  (default: none)
  *   CLOUDPDF_LICENSE_MODE     connected|air-gapped
@@ -846,7 +847,7 @@ async function cmdServe(): Promise<void> {
   const CACHE_MAX_BYTES = process.env['CLOUDPDF_CACHE_MAX_BYTES']
     ? Number(process.env['CLOUDPDF_CACHE_MAX_BYTES'])
     : undefined;
-  // Shutdown posture: keep the app.close() budget BELOW the supervisor's
+  // Shutdown posture: keep the app.close() budget below the supervisor's
   // kill deadline (k8s terminationGracePeriodSeconds, docker stop -t).
   const SHUTDOWN_TIMEOUT_MS = process.env['CLOUDPDF_SHUTDOWN_TIMEOUT_MS']
     ? Number(process.env['CLOUDPDF_SHUTDOWN_TIMEOUT_MS'])
@@ -881,8 +882,8 @@ async function cmdServe(): Promise<void> {
   // boots the full admin + document pipeline with zero external infra.
   const dbCtx = openDb();
 
-  // Auto-migrate defaults ON for SQLite (frictionless local/try-it-out)
-  // and OFF for Postgres (production runs `migrate up` explicitly and
+  // Auto-migrate defaults on for SQLite (frictionless local/try-it-out)
+  // and off for Postgres (production runs `migrate up` explicitly and
   // sets CLOUDPDF_FAIL_ON_PENDING=1). Override with CLOUDPDF_AUTO_MIGRATE.
   const autoMigrateEnv = process.env['CLOUDPDF_AUTO_MIGRATE'];
   const autoMigrate =
@@ -957,15 +958,16 @@ async function cmdServe(): Promise<void> {
     }
   }
 
-  // Adapter bootstrap (see ADAPTERS.md): secrets registry -> resolver,
-  // then storage / CDN / KMS. Storage defaults to filesystem and CDN to
-  // `none`, so this works with no extra env. KMS is opt-in.
+  // Adapter bootstrap (see `docs/conventions/server-adapters.md`):
+  // secrets registry -> resolver, then storage / CDN / KMS. Storage
+  // defaults to filesystem and CDN to `none`, so this works with no
+  // extra env. KMS is opt-in.
   const objectStore = await createObjectStoreOrExit(resolver);
   const cdnSigner = await createCdnSigner(loadCdnConfigFromEnv(process.env), { resolver });
   const kms = await buildKms(resolver);
 
   // Cross-replica realtime doorbell. With Postgres the default is
-  // LISTEN/NOTIFY — REQUIRED for multi-replica deployments (compose
+  // LISTEN/NOTIFY — required for multi-replica deployments (compose
   // --scale / Helm replicas), where in-process delivery would silently
   // hide other replicas' mutations from SSE subscribers. Opt out with
   // CLOUDPDF_REALTIME=in-process (single-replica Postgres only).

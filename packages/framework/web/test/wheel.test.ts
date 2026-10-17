@@ -39,7 +39,7 @@ describe('wheelZoomFactor — one feel per input class', () => {
 
   it('cmd + continuous scroll keeps the gentle scrub (momentum-safe)', () => {
     expect(wheelZoomFactor(px(-40, { meta: true }))).toBeCloseTo(Math.exp(0.06), 6);
-    // a fast momentum event (±150 px) must NOT be misread as a notch
+    // a fast momentum event (±150 px) must not be misread as a notch
     expect(wheelZoomFactor(px(-150, { meta: true }))).toBeCloseTo(Math.exp(0.225), 6);
     // and a cmd+mouse notch lands within 0.3% of the button step anyway
     expect(wheelZoomFactor(px(-120, { meta: true }))).toBeCloseTo(1.2, 2);

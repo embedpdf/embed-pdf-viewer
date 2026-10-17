@@ -1,0 +1,109 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --canvas: #f7f9fc;
+  --ready: #1f8a4c;
+  --ready-tint: #e8f6ee;
+  --waiting: #a86a00;
+  --waiting-tint: #fdf3e1;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The properties, in a card */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+/* The load state: loading, ready, forbidden or error */
+.status {
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 9px;
+  color: var(--waiting);
+  background: var(--waiting-tint);
+}
+
+.status[data-status='ready'] {
+  color: var(--ready);
+  background: var(--ready-tint);
+}
+
+/* One field per row: its name beside its value, stacked on a phone */
+.properties {
+  container-type: inline-size;
+  margin: 0;
+  padding: 4px 16px 10px;
+}
+
+.property {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.property:last-child {
+  border-bottom: 0;
+}
+
+@container (min-width: 460px) {
+  .property {
+    grid-template-columns: 180px 1fr;
+    gap: 16px;
+  }
+}
+
+.property dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.property dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.property dd.unset {
+  font-weight: 400;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

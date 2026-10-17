@@ -1,5 +1,26 @@
 # @cloudpdf/viewer
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The CloudPDF viewer is the open-source viewer with the cloud engine as its default, as `@embedpdf/viewer` is the same viewer with the built-in one. Importing it registers the cloud engine on `<embedpdf-viewer>`, so plain HTML uses the same element (a cloud document is given from script: `viewer.src = { shareToken }`), and `CloudPDF.init()` is the same function as `EmbedPDF.init()`. The engine's settings go under `engine`, `engine: { baseUrl, token, fetch }`, with CloudPDF SaaS when there's no `baseUrl` (they were top-level keys, and `baseUrl` was required). `.` is the door for a bundler, sharing `@embedpdf/viewer/core` with the app; `./snippet` is `dist/cloudpdf.js`. `./config` and `resolveCloudConfig` are gone.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `@cloudpdf/viewer` exports its own `ViewerConfig` type: every key of the viewer's config, with the engine and documents in the cloud's words, and without `scope` and `identity`, which the document's token carries. `CloudInitOptions` is that config plus `target`. The live keys (`theme`, `locale`, `disable`, `readOnly`) work as on `@embedpdf/viewer`.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The document is `src`, in the ways the engine opens one: `{ token }` with a document token from your backend (a string, or a function that gives a fresh one), `{ id }` with the engine's token, or `{ shareToken, sharePassword }` with a share link. `src` follows its prop: another one opens in its place, and `null` closes it. `documents` takes entries of `{ src, name, password, active }` with the same `src`. The `DocumentSrc` and `DocumentEntry` types are exported. The `docToken`, `docId`, `shareToken` and `sharePassword` keys are gone, and so are the `CloudShareSource` and `CloudInitialDocument` types.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The engine stamp libraries open in is `plugins.stamp.assetEngine`, as in the open-source viewer, and still defaults to a local engine loaded on first use; `resolveCloudConfig` returns it in `plugins`. The `stamps` key is gone.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The built-in stamps load in the cloud viewer. The Stamps panel used to show "The built-in stamps could not be loaded." because a stamp library is a PDF that has to be opened in the browser, and the viewer had no local engine for it. `resolveCloudConfig` now gives `stamps.assetEngine` a local engine that is imported the first time someone opens Stamps or Signatures, never at startup. The CDN folder ships `embedpdf.wasm` next to `cloudpdf.js` for it; npm installs leave `@embedpdf/engine` to your bundler. Pass your own `stamps.assetEngine` to replace it.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Adapt the CloudPDF viewer entry point to the revised engine and plugin
+  configuration so cloud-backed viewers use the updated document API.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `resolveCloudConfig` passes `docAffinityHeader` and `onRetry` to the cloud engine. Before, they fell through to the viewer, where nothing read them, so every cloud door (the snippet, `@cloudpdf/viewer-react`) dropped them.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

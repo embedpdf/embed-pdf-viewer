@@ -5,7 +5,7 @@ import type * as CloudPDF from "../index.js";
 export interface DocumentActionsSnapshot {
     nameTreeScripts: DocumentActionsSnapshot.NameTreeScripts.Item[];
     openAction: CloudPDF.PdfActionTree | null;
-    openDestination?: (CloudPDF.PdfDestination | null) | undefined;
+    openDestination?: (CloudPDF.PageDestination | null) | undefined;
     willClose?: CloudPDF.PdfActionTree | undefined;
     willSave?: CloudPDF.PdfActionTree | undefined;
     didSave?: CloudPDF.PdfActionTree | undefined;

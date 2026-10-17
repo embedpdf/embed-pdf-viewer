@@ -231,7 +231,7 @@ export class DocumentSaver {
    * `saveLayerDelta` that says whether anything reachable changed since the
    * layer was opened; empty bytes when nothing did (keep what you have), or
    * when the layer came to equal its base (then `changedSinceLoad` is true
-   * and the document IS the base).
+   * and the document is the base).
    */
   saveLayerDeltaEx(): { bytes: ArrayBuffer; size: number; changedSinceLoad: boolean } {
     return this.saveLayerDeltaImpl(/*reporting=*/ true);

@@ -1,4 +1,4 @@
-/** The sibling planes: the annotation plugin (host lens) and the interaction hub. */
+/** The sibling plugins: annotation (host lens) and the interaction hub. */
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 

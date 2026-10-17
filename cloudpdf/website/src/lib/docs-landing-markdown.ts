@@ -8,7 +8,7 @@ import {
   LANDING_PRODUCT_PATHS,
 } from './docs-landing';
 import {
-  docsGettingStartedHref,
+  docsEntryHref,
   DOCS_INTEGRATION_LABELS,
   PRODUCT_INTEGRATIONS,
 } from './docs-integrations';
@@ -35,7 +35,7 @@ export function projectDocsLanding(absoluteContentUrl: (url: string) => string):
           listItem([
             paragraph([
               link(
-                absoluteContentUrl(docsGettingStartedHref(path.id, integration)),
+                absoluteContentUrl(docsEntryHref(path.id, integration)),
                 DOCS_INTEGRATION_LABELS[integration],
               ),
             ]),

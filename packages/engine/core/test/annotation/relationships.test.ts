@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { NO_ANNOTATION_FLAGS } from '../../src/annotation/primitives';
 import { buildThreads, classifyRelation } from '../../src/annotation/relationships';
-import { annotationKey, refFromStableId } from '../../src/identity/annotationKey';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import { annotationKey } from '../../src/identity/annotationKey';
+import type { Annotation } from '../../src/annotation/kinds';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import type { AnnotationReplyType } from '../../src/annotation/primitives';
 
@@ -12,8 +12,8 @@ const PAGE = 1;
 function objRef(objNum: number): AnnotationRef {
   return {
     kind: 'objectNumber',
-    page: { kind: 'objectNumber', pageObjectNumber: PAGE },
-    annotObjectNumber: objNum,
+    page: { kind: 'objectNumber', objectNumber: PAGE },
+    objectNumber: objNum,
   };
 }
 
@@ -25,30 +25,29 @@ function objRef(objNum: number): AnnotationRef {
 function annot(
   objNum: number,
   rel: {
-    inReplyTo?: AnnotationRef | null;
-    replyType?: AnnotationReplyType | null;
+    reply?: { to: AnnotationRef; type: AnnotationReplyType } | null;
     nm?: string;
   } = {},
-): AnnotationDTO {
+): Annotation {
   return {
     ref: objRef(objNum),
-    page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+    page: { kind: 'objectNumber', objectNumber: PAGE },
     index: 0,
-    identityQuality: 'durable',
+    hasAppearance: true,
+    appearanceState: null,
     nm: rel.nm ?? null,
-    flags: NO_ANNOTATION_FLAGS,
+    ...NO_ANNOTATION_FLAGS,
     rect: { left: 0, top: 10, right: 10, bottom: 0 },
     contents: null,
     author: null,
-    created: null,
-    modified: null,
-    inReplyTo: rel.inReplyTo ?? null,
-    replyType: rel.replyType ?? null,
+    createdAt: null,
+    modifiedAt: null,
+    reply: rel.reply ?? null,
     subtype: 'highlight',
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     opacity: 1,
     quadPoints: [],
-  } as unknown as AnnotationDTO;
+  } as unknown as Annotation;
 }
 
 describe('classifyRelation', () => {
@@ -57,56 +56,38 @@ describe('classifyRelation', () => {
   });
 
   it('returns reply for /IRT with replyType reply', () => {
-    expect(classifyRelation(annot(2, { inReplyTo: objRef(1), replyType: 'reply' }))).toBe('reply');
-  });
-
-  it('returns reply for /IRT with no replyType (ISO default)', () => {
-    expect(classifyRelation(annot(2, { inReplyTo: objRef(1), replyType: null }))).toBe('reply');
+    expect(classifyRelation(annot(2, { reply: { to: objRef(1), type: 'reply' } }))).toBe('reply');
   });
 
   it('returns grouped-subordinate for /IRT with replyType group', () => {
-    expect(classifyRelation(annot(2, { inReplyTo: objRef(1), replyType: 'group' }))).toBe(
+    expect(classifyRelation(annot(2, { reply: { to: objRef(1), type: 'group' } }))).toBe(
       'grouped-subordinate',
     );
   });
 });
 
 describe('annotationKey', () => {
-  it('drops the page for object numbers (document-unique) and keeps it for names and indexes', () => {
+  it('drops the page for object numbers (document-unique) and keeps it for base indexes', () => {
     expect(annotationKey(objRef(7))).toBe('obj:7');
     expect(
       annotationKey({
-        kind: 'nm',
-        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
-        nm: 'abc',
+        kind: 'baseIndex',
+        page: { kind: 'objectNumber', objectNumber: PAGE },
+        baseIndex: 3,
       }),
-    ).toBe('nm:1:abc');
-    expect(
-      annotationKey({
-        kind: 'index',
-        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
-        index: 3,
-        revision: 'r1' as never,
-      }),
-    ).toBe('idx:1:3');
+    ).toBe('base:1:3');
   });
 
-  it('agrees with the wire member key for durable object numbers', () => {
-    // encodeStableIdKey({ kind: 'objectNumber', value: 7 }) === 'obj:7'
+  it('agrees with the wire member key for object numbers', () => {
+    // encodeAnnotKey({ kind: 'objectNumber', objectNumber: 7, page }) === 'obj:7'
     expect(annotationKey(objRef(7))).toBe('obj:7');
-  });
-
-  it('refFromStableId rebuilds the address an event split into page + stable id', () => {
-    const page = { kind: 'objectNumber' as const, pageObjectNumber: PAGE };
-    expect(refFromStableId(page, { kind: 'objectNumber', value: 7 })).toEqual(objRef(7));
-    expect(annotationKey(refFromStableId(page, { kind: 'nm', value: 'abc' }))).toBe('nm:1:abc');
   });
 });
 
 describe('buildThreads', () => {
   it('attaches a reply under its primary', () => {
     const primary = annot(1);
-    const reply = annot(2, { inReplyTo: objRef(1), replyType: 'reply' });
+    const reply = annot(2, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([primary, reply]);
 
     expect(threads).toHaveLength(1);
@@ -117,7 +98,7 @@ describe('buildThreads', () => {
 
   it('treats a missing /RT child as a reply (default)', () => {
     const primary = annot(1);
-    const reply = annot(2, { inReplyTo: objRef(1), replyType: null });
+    const reply = annot(2, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([primary, reply]);
 
     expect(threads[0]!.replies).toEqual([reply]);
@@ -125,7 +106,7 @@ describe('buildThreads', () => {
 
   it('folds a group subordinate into groupedParts, not replies', () => {
     const primary = annot(1);
-    const caret = annot(2, { inReplyTo: objRef(1), replyType: 'group' });
+    const caret = annot(2, { reply: { to: objRef(1), type: 'group' } });
     const threads = buildThreads([primary, caret]);
 
     expect(threads).toHaveLength(1);
@@ -135,8 +116,8 @@ describe('buildThreads', () => {
 
   it('supports a primary with both a group part and a reply', () => {
     const primary = annot(1);
-    const caret = annot(2, { inReplyTo: objRef(1), replyType: 'group' });
-    const reply = annot(3, { inReplyTo: objRef(1), replyType: 'reply' });
+    const caret = annot(2, { reply: { to: objRef(1), type: 'group' } });
+    const reply = annot(3, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([primary, caret, reply]);
 
     expect(threads).toHaveLength(1);
@@ -144,24 +125,8 @@ describe('buildThreads', () => {
     expect(threads[0]!.replies).toEqual([reply]);
   });
 
-  it('matches a child that points at the parent by /NM', () => {
-    const primary = annot(1, { nm: 'parent-nm' });
-    const reply = annot(2, {
-      inReplyTo: {
-        kind: 'nm',
-        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
-        nm: 'parent-nm',
-      },
-      replyType: 'reply',
-    });
-    const threads = buildThreads([primary, reply]);
-
-    expect(threads).toHaveLength(1);
-    expect(threads[0]!.replies).toEqual([reply]);
-  });
-
   it('surfaces an orphan (parent not in the set) as its own primary', () => {
-    const orphan = annot(2, { inReplyTo: objRef(99), replyType: 'reply' });
+    const orphan = annot(2, { reply: { to: objRef(99), type: 'reply' } });
     const threads = buildThreads([orphan]);
 
     expect(threads).toHaveLength(1);
@@ -172,7 +137,7 @@ describe('buildThreads', () => {
   it('preserves primary order from the input', () => {
     const p1 = annot(1);
     const p2 = annot(2);
-    const r1 = annot(3, { inReplyTo: objRef(1), replyType: 'reply' });
+    const r1 = annot(3, { reply: { to: objRef(1), type: 'reply' } });
     const threads = buildThreads([p1, p2, r1]);
 
     expect(threads.map((t) => t.primary)).toEqual([p1, p2]);

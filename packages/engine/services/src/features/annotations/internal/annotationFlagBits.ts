@@ -49,3 +49,15 @@ export function flagsToBits(current: number, partial: Partial<AnnotationFlags>):
   }
   return bits;
 }
+
+/**
+ * The `/F` flags a draft or patch sets, as a partial flag set. Each flag is
+ * its own top-level field, so a write touches only the flags it names.
+ */
+export function flagFieldsOf(fields: Partial<AnnotationFlags>): Partial<AnnotationFlags> | null {
+  const flags: Partial<AnnotationFlags> = {};
+  for (const key of FLAG_KEYS) {
+    if (fields[key] !== undefined) flags[key] = fields[key];
+  }
+  return Object.keys(flags).length > 0 ? flags : null;
+}

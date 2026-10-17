@@ -2,22 +2,22 @@
  * Operator-registered import connections — the `connection` wire kind.
  *
  * A connection is pre-registered authority: which backend, which
- * bucket, WHO may exercise it (credential classes), FOR which tenants,
- * and over WHAT slice (scope). The wire request only ever names
+ * bucket, who may exercise it (credential classes), for which tenants,
+ * and over what slice (scope). The wire request only ever names
  * `{ connectionId, key, revision? }`; everything here is deployment
  * configuration, never wire surface.
  *
  * Scope is a discriminated union so the invalid combinations are
  * unrepresentable rather than refined away:
  *
- *   - `whole-bucket`     the entire bucket. Legal ONLY with the
+ *   - `whole-bucket`     the entire bucket. Legal only with the
  *                        default `api-token` credential class — a
  *                        whole-bucket read is an operator-grade
  *                        capability (boot invariant below).
  *   - `shared-prefixes`  a fixed slice shared by every allowed
  *                        caller (e.g. a common assets folder).
  *   - `tenant-template`  a per-tenant slice: `{tenantId}` is
- *                        substituted with the AUTHENTICATED tenant at
+ *                        substituted with the authenticated tenant at
  *                        resolution time. Scales to any tenant count
  *                        with zero per-tenant configuration.
  *
@@ -84,7 +84,7 @@ const connectionCommon = {
   id: z.string().min(1).max(128),
   /**
    * Which credential classes may exercise this connection.
-   * DEFAULT: operator only — tenant-jwt is an explicit opt-in, and
+   * Default: operator only — tenant-jwt is an explicit opt-in, and
    * even then never for whole-bucket scopes (boot invariant).
    */
   credentials: z
@@ -146,7 +146,7 @@ export const ImportConnectionSchema = z
     }
     // Filesystem roots live on the server host: the blast radius of a
     // containment bug is the disk itself, so fs connections are
-    // STRUCTURALLY operator-only — not a default, an invariant.
+    // structurally operator-only — not a default, an invariant.
     if (conn.kind === 'fs' && conn.credentials.includes('tenant-jwt')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

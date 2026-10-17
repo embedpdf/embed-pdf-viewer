@@ -7,56 +7,87 @@ import react from '@vitejs/plugin-react';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig, type Plugin } from 'vite';
 
-import { discoverSampleVariants } from './src/lib/sample-discovery';
+import { discoverSampleVariants, sampleScopeClass } from './src/lib/sample-discovery';
+import { sampleStylesheetsPlugin } from './src/lib/sample-stylesheets';
+import { vanillaDemoId, vanillaSamplesPlugin } from './src/lib/vanilla-demo-samples';
 
 /**
- * The live-demo half of the samples pipeline (DOCS-PLATFORM-ARCHITECTURE.md).
+ * The live-demo half of the samples pipeline (docs/conventions/docs-architecture.md).
  *
  * Every sample variant (single `<base>.<fw>.<ext>` file or `<base>.<fw>/`
  * directory — see src/lib/sample-discovery.ts) is wrapped in a virtual entry
  * exporting `mount(el) => unmount`, compiled by the framework's own Vite
  * plugin (this is how .vue/.svelte run inside a Next site with zero webpack
  * surgery), and emitted self-contained into `public/demos/` — the docs load
- * them with a NATIVE dynamic import at runtime.
+ * them with a native dynamic import at runtime.
  *
- * On this site the samples are the CLOUD emissions: they provision
+ * On this site the samples are the cloud emissions: they provision
  * `cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' })` and open the
  * shared demo document with its share grant — the demo a visitor watches is
  * the same HTTPS traffic the code panel tells them to write. No wasm rides
  * along; failures surface loudly in the preview (never a local fallback).
+ *
+ * The ready-made viewer's examples build the same way, with one more
+ * integration: plain HTML (`<base>.vanilla.html`), whose page loads the
+ * viewer's CDN script, here the local build of `@cloudpdf/viewer/snippet`
+ * (src/lib/vanilla-demo-samples.ts).
  */
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLES = path.join(ROOT, 'src', 'samples');
 
-const MOUNTABLE: Record<string, (abs: string) => string> = {
-  react: (abs) => `
+/** The viewer's CDN script, as a plain-HTML example loads it, and this site's build of it. */
+const VIEWER_SCRIPT = {
+  url: 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js',
+  module: '@cloudpdf/viewer/snippet',
+};
+
+/** Mounts the app into `el` and returns its unmount; `el` carries the example's style scope meanwhile. */
+const MOUNTABLE: Record<string, (abs: string, scope: string) => string> = {
+  react: (abs, scope) => `
     import { createElement } from 'react';
     import { createRoot } from 'react-dom/client';
     import App from ${JSON.stringify(abs)};
     export function mount(el) {
+      el.classList.add(${JSON.stringify(scope)});
       const root = createRoot(el);
       root.render(createElement(App));
-      return () => root.unmount();
+      return () => {
+        root.unmount();
+        el.classList.remove(${JSON.stringify(scope)});
+      };
     }`,
-  vue: (abs) => `
+  vue: (abs, scope) => `
     import { createApp } from 'vue';
     import App from ${JSON.stringify(abs)};
     export function mount(el) {
+      el.classList.add(${JSON.stringify(scope)});
       const app = createApp(App);
       app.mount(el);
-      return () => app.unmount();
+      return () => {
+        app.unmount();
+        el.classList.remove(${JSON.stringify(scope)});
+      };
     }`,
-  svelte: (abs) => `
+  svelte: (abs, scope) => `
     import { mount as svelteMount, unmount as svelteUnmount } from 'svelte';
     import App from ${JSON.stringify(abs)};
     export function mount(el) {
+      el.classList.add(${JSON.stringify(scope)});
       const app = svelteMount(App, { target: el });
-      return () => svelteUnmount(app);
+      return () => {
+        svelteUnmount(app);
+        el.classList.remove(${JSON.stringify(scope)});
+      };
     }`,
+  // The page's own module (vanilla-demo-samples.ts) mounts it, its style scope included.
+  vanilla: (abs) => `export { mount } from ${JSON.stringify(vanillaDemoId(abs))};`,
 };
 
-const demos = discoverSampleVariants(SAMPLES, ['react', 'vue', 'svelte']);
+const demos = discoverSampleVariants(SAMPLES, ['react', 'vue', 'svelte', 'vanilla']);
 const VIRTUAL_PREFIX = 'virtual:demo/';
+
+/** The framework-neutral `topic/base` of a demo (`topic/base.react`). */
+const demoKey = (demo: { name: string; fw: string }) => demo.name.slice(0, -(demo.fw.length + 1));
 
 function demoEntriesPlugin(): Plugin {
   return {
@@ -72,7 +103,7 @@ function demoEntriesPlugin(): Plugin {
       const name = id.slice(VIRTUAL_PREFIX.length + 1).replace(/\.entry\.js$/, '');
       const demo = demos.find((d) => d.name === name);
       if (!demo) return null;
-      return MOUNTABLE[demo.fw](demo.entry);
+      return MOUNTABLE[demo.fw](demo.entry, sampleScopeClass(demoKey(demo)));
     },
     writeBundle() {
       // The manifest the docs build reads to know which demos exist.
@@ -92,7 +123,19 @@ function demoEntriesPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [demoEntriesPlugin(), react(), vue(), svelte()],
+  plugins: [
+    demoEntriesPlugin(),
+    // A plain-HTML example as a module, its CDN script this site's viewer build.
+    vanillaSamplesPlugin({ samplesRoot: SAMPLES, viewerScript: VIEWER_SCRIPT }),
+    // `import './basic.css'`, scoped to its example (src/lib/sample-stylesheets.ts).
+    sampleStylesheetsPlugin({
+      samplesRoot: SAMPLES,
+      isExample: (key) => demos.some((demo) => demoKey(demo) === key),
+    }),
+    react(),
+    vue(),
+    svelte(),
+  ],
   base: '/demos/',
   worker: { format: 'es' },
   publicDir: false,
@@ -101,7 +144,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       // Vite's app builds drop entry exports (HTML entries don't need them);
-      // demo modules ARE their exports — keep mount().
+      // demo modules are their exports — keep mount().
       preserveEntrySignatures: 'strict',
       input: Object.fromEntries(demos.map((d) => [d.name, `${VIRTUAL_PREFIX}${d.name}.entry.js`])),
       output: {

@@ -1,31 +1,27 @@
 import {
   EngineError,
   EngineErrorCode,
-  decodeStableIdKey,
+  decodeAnnotKey,
   toPageRef,
   type AnnotationRef,
 } from '@embedpdf/engine-core/runtime';
 
 export function refFromKey(annotKey: string, pageObjectNumber: number): AnnotationRef {
-  const stableId = decodeStableIdKey(annotKey);
-  if (!stableId) {
+  const ref = decodeAnnotKey(toPageRef(pageObjectNumber), annotKey);
+  if (!ref) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `annotKey '${annotKey}' is not a valid stable-id key (expected 'obj:N' or 'nm:VALUE')`,
+      `annotKey '${annotKey}' is not a valid annotation key (expected 'obj:N' or 'base:N')`,
     );
   }
-  const page = toPageRef(pageObjectNumber);
-  if (stableId.kind === 'objectNumber') {
-    return { kind: 'objectNumber', page, annotObjectNumber: stableId.value };
-  }
-  return { kind: 'nm', page, nm: stableId.value };
+  return ref;
 }
 
 export function assertRefMatchesPage(ref: AnnotationRef, pageObjectNumber: number): void {
-  if (ref.page.pageObjectNumber !== pageObjectNumber) {
+  if (ref.page.objectNumber !== pageObjectNumber) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `ref.page ${ref.page.pageObjectNumber} != path :pageKey ${pageObjectNumber}`,
+      `ref.page ${ref.page.objectNumber} != path :pageKey ${pageObjectNumber}`,
     );
   }
 }

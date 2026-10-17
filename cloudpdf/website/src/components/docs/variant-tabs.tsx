@@ -9,7 +9,7 @@ import { Children, isValidElement, useState, type ReactNode } from 'react';
  * they stay readable where a stacked list does not — the annotation union
  * has nineteen branches.
  *
- * Unlike the SDK-language switcher this is deliberately NOT persisted:
+ * Unlike the SDK-language switcher this is deliberately not persisted:
  * which annotation subtype you were last reading says nothing about which
  * import source you want now.
  */

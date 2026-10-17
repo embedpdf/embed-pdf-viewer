@@ -1,0 +1,22 @@
+/** The link plugin's wiring to its siblings, run from the controller's `connect`. */
+import type { PluginContext } from '@embedpdf/core';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+
+/**
+ * Links are annotations: while a navigation tool is active the link layer
+ * owns their input (its anchors take the clicks), so the annotation plane
+ * stands down for them. A link still shows as the file draws it.
+ */
+export function connectLink(ctx: PluginContext<void>): void {
+  const annotation = ctx.tryGet(AnnotationToken);
+  if (!annotation) return;
+  const interaction = ctx.get(InteractionToken);
+  ctx.cleanup(
+    annotation.registerBehavior({
+      id: 'link-nav',
+      matches: (target) => target.subtype === 'link',
+      engaged: () => interaction.activeToolEnables('link-nav'),
+    }),
+  );
+}

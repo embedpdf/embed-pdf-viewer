@@ -114,17 +114,17 @@ const INSPECT_REFRESH_MS = 5_000;
  *
  * Lifecycle laws (each one exists because its absence was a review-found
  * bug):
- *  - The ready promise ROTATES to a new unresolved instance the moment
+ *  - The ready promise rotates to a new unresolved instance the moment
  *    the host exits — dispatches in the death→respawn gap park on it
  *    instead of racing a corpse.
  *  - The child reference nulls on exit and every handler/timer/pending
  *    call carries a generation; anything from a replaced child is
  *    ignored.
- *  - Every `send` has a callback that rejects ITS call — a closed IPC
+ *  - Every `send` has a callback that rejects its call — a closed IPC
  *    channel is a rejection, never a silent drop.
  *  - Pre-aborted dispatches reject locally and never reach the host;
  *    abort listeners are removed when their call settles.
- *  - `create()` is async and awaits the FIRST ready, so boot failures
+ *  - `create()` is async and awaits the first ready, so boot failures
  *    (bad fonts, missing native runtime) fail buildApp exactly like the
  *    inline pool's create() does.
  */
@@ -154,7 +154,7 @@ export class EngineHostClient implements EnginePool {
       // the first scrape (bounded: a slow host must not stall boot).
       await client.primeInspect(2_000);
     } catch (err) {
-      // First-boot failure must FAIL buildApp (bad fonts, missing native
+      // First-boot failure must fail buildApp (bad fonts, missing native
       // runtime) — and must not leave an orphan client respawning behind
       // the thrown exception.
       await client.destroy();
@@ -169,19 +169,19 @@ export class EngineHostClient implements EnginePool {
 
   // ---------------------------------------------------------------- spawn
 
-  /** Latest child memory heartbeat (protocol v3); null until the current
-   *  generation's first beat — a respawn resets it, so a reading can never
-   *  describe a dead child. */
+  /** Latest child memory heartbeat (the host's `memory` message); null
+   *  until the current generation's first beat — a respawn resets it, so a
+   *  reading can never describe a dead child. */
   private lastMemory: { rssBytes: number; heapUsedBytes: number; at: number } | null = null;
 
   /** Non-null while a controlled recycle exit is in progress. The exit
    *  handler consumes it: no crash-journal strike, no poison-document
-   *  attribution, no respawn backoff — a recycle is a REHEARSED crash and
+   *  attribution, no respawn backoff — a recycle is a rehearsed crash and
    *  must never look like an organic one to the supervision layers. */
   private plannedExit: RecycleReason | null = null;
-  /** True only when WE issued the kill (hard recycle, shutdown-timeout
+  /** True only when we issued the kill (hard recycle, shutdown-timeout
    *  escalation) — the exit is planned regardless of its code/signal. A
-   *  graceful shutdown REQUEST is planned only if the child exits 0:
+   *  graceful shutdown request is planned only if the child exits 0:
    *  an organic crash inside the shutdown window must still journal. */
   private plannedKill = false;
   private readonly recycleCounts: Record<RecycleReason, number> = {
@@ -198,18 +198,18 @@ export class EngineHostClient implements EnginePool {
     return { ...this.recycleCounts };
   }
 
-  /** Uptime of the CURRENT host generation; null unless ready. */
+  /** Uptime of the current host generation; null unless ready. */
   uptimeMs(): number | null {
     return this.state === 'ready' ? Date.now() - this.spawnedAt : null;
   }
 
   /**
    * Controlled recycle: drain gracefully or cut immediately, then the
-   * NORMAL death path minus journal/backoff. Returns false when the host
+   * normal death path minus journal/backoff. Returns false when the host
    * is not in a recyclable state (already down, restarting, destroyed) —
    * callers simply try again on a later tick.
    *
-   * Graceful: new dispatches PARK on the rotated ready promise (they
+   * Graceful: new dispatches park on the rotated ready promise (they
    * complete on the successor); in-flight work gets `settleWindowMs` to
    * finish, then the child is shut down anyway — a truncated write
    * retries exactly like a crash-window write (the write-generation fence
@@ -220,7 +220,7 @@ export class EngineHostClient implements EnginePool {
     reason: RecycleReason,
     opts: { graceful?: boolean; settleWindowMs?: number } = {},
   ): Promise<boolean> {
-    // A HARD decision may PREEMPT an in-progress graceful drain (memory
+    // A hard decision may preempt an in-progress graceful drain (memory
     // crossed the hard watermark mid-settle): cut now, keep the planned
     // classification, upgrade the recorded reason.
     if (this.state === 'recycling' && opts.graceful === false && this.child) {
@@ -232,17 +232,17 @@ export class EngineHostClient implements EnginePool {
     if (this.state !== 'ready' || !this.child) return false;
     const child = this.child;
     const gen = this.gen;
-    // Park new dispatches NOW: rotate ready + leave 'ready' state. From
+    // Park new dispatches now: rotate ready + leave 'ready' state. From
     // here the machine reads as a controlled respawn-in-progress.
-    // Deliberately NOT planned yet: an ORGANIC crash during the settle
+    // Deliberately not planned yet: an organic crash during the settle
     // window must journal/attribute/backoff like any crash — the planned
-    // markers are set only at the moment WE issue termination.
+    // markers are set only at the moment we issue termination.
     this.state = 'recycling';
     this.ready = deferred<void>();
     if (this.downSince === null) this.downSince = Date.now();
     if (opts.graceful !== false) {
       // Default 3s: settle + bounded shutdown + successor boot must fit
-      // inside the parked-dispatch deadline (10s) AND the readiness
+      // inside the parked-dispatch deadline (10s) and the readiness
       // persistence threshold (10s) — a longer drain would time parked
       // work out and flap /readyz, contradicting the parked-work promise.
       const deadline = Date.now() + (opts.settleWindowMs ?? 3_000);
@@ -260,7 +260,7 @@ export class EngineHostClient implements EnginePool {
       const callId = this.nextCallId++;
       const killTimer = setTimeout(() => {
         if (this.gen === gen && this.child) {
-          this.plannedKill = true; // OUR escalation — still planned
+          this.plannedKill = true; // our escalation — still planned
           this.child.kill('SIGKILL');
         }
       }, this.opts.shutdownTimeoutMs ?? 2_000);
@@ -278,7 +278,7 @@ export class EngineHostClient implements EnginePool {
     return true;
   }
 
-  /** Memory heartbeat of the CURRENT host generation, with its age. */
+  /** Memory heartbeat of the current host generation, with its age. */
   memory(): { rssBytes: number; heapUsedBytes: number; ageMs: number } | null {
     if (!this.lastMemory) return null;
     return {
@@ -357,16 +357,16 @@ export class EngineHostClient implements EnginePool {
 
   private onHostExit(code: number | null, signal: string | null): void {
     if (this.state === 'destroyed') return;
-    // Planned iff WE terminated it: a clean exit after our shutdown
+    // Planned iff we terminated it: a clean exit after our shutdown
     // request, or any exit after our own SIGKILL. A nonzero/uninvited
-    // exit during the shutdown window is an ORGANIC crash — journal it.
+    // exit during the shutdown window is an organic crash — journal it.
     const planned =
       this.plannedExit !== null && (code === 0 || this.plannedKill) ? this.plannedExit : null;
     this.plannedExit = null;
     this.plannedKill = false;
-    if (planned) this.recycleCounts[planned] += 1; // count COMPLETED recycles
+    if (planned) this.recycleCounts[planned] += 1; // count completed recycles
     this.child = null;
-    // A reading must never describe a dead child — clear HERE, not at
+    // A reading must never describe a dead child — clear here, not at
     // respawn: during crash backoff (seconds) a spawn-time reset would
     // keep exporting the corpse's RSS.
     this.lastMemory = null;
@@ -375,7 +375,7 @@ export class EngineHostClient implements EnginePool {
     if (this.healthyTimer) clearTimeout(this.healthyTimer);
     if (this.inspectTimer) clearInterval(this.inspectTimer);
 
-    // ROTATE FIRST: from this line on, every new dispatch parks on an
+    // Rotate first: from this line on, every new dispatch parks on an
     // unresolved promise instead of sailing into a dead child.
     const failedReady = this.ready;
     this.ready = deferred<void>();
@@ -403,9 +403,9 @@ export class EngineHostClient implements EnginePool {
 
     // Journal first (needs the pre-clear suspect view), forget second,
     // respawn third. Journal/restart hooks must never block or throw
-    // their way out of supervision. A PLANNED exit skips the journal
+    // their way out of supervision. A planned exit skips the journal
     // entirely (no strike, no attribution) and pays no backoff — but the
-    // forget-everything restart hook ALWAYS fires: the sessions died with
+    // forget-everything restart hook always fires: the sessions died with
     // the child either way.
     if (!planned) {
       try {
@@ -531,7 +531,7 @@ export class EngineHostClient implements EnginePool {
       if (outcome === 'timeout') {
         throw unavailable('engine host is unavailable (respawn did not complete in time)');
       }
-      // 'ready' or 'retry': loop re-checks state against the CURRENT world.
+      // 'ready' or 'retry': loop re-checks state against the current world.
     }
   }
 

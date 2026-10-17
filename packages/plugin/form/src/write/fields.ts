@@ -1,156 +1,243 @@
-/** Design mode: fields and widgets are created, patched, deleted, attached
- *  and detached through `doc.forms`; the widget plane is nudged to re-read
- *  pages whose widget population changed. */
-import { PluginError } from '@embedpdf/core';
-import type {
-  AnnotationRef,
-  FormFieldDraft,
-  FormFieldPatch,
-  FormFieldRef,
-  PageRef,
-  PdfRect,
+/**
+ * Building the form: every design verb is one change on the document's queue
+ * (`ctx.changes`). It shows at once (the fields mirror predicts it), it is a
+ * step of the history, and it resolves with the engine's answer. A create
+ * takes its field's and widgets' object numbers first, so their refs are final
+ * from the first frame and the new widget can be selected straight away.
+ */
+import {
+  PluginError,
+  toPluginError,
+  type ChangeLabel,
+  type OperationOptions,
+  type PendingChange,
+} from '@embedpdf/core';
+import {
+  draftWritesScripts,
+  writesScripts,
+  type ChangeItem,
+  type ChangeOp,
+  type FormFieldDTO,
+  type WidgetAnnotation,
+  type WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 
-import type { CreatedField, CreateFieldInput, FormCapability } from '../contract';
-import { fieldByKey, type Box } from '../core/model';
+import type { FormCapability, FormFieldResult } from '../contract';
+import { fieldByRef, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
-import type { FormHydration } from '../sync/hydration';
+import { createObjectNumbers } from '../services/object-numbers';
+import { undoLookOf } from '../sync/predict';
+import { nextInLine } from './next-in-line';
+
+/**
+ * A widget's look, as `addWidget()` copies it from the field's last widget onto the new one:
+ * the engine's widget style fields (`WIDGET_STYLE_NAMES`), and its turn.
+ */
+const LOOK = [
+  'color',
+  'interiorColor',
+  'strokeWidth',
+  'borderStyle',
+  'dashArray',
+  'fontFamily',
+  'fontSize',
+  'fontColor',
+  'textAlign',
+  'caption',
+  'checkStyle',
+  'rotation',
+] as const;
+
+const lookOf = (widget: WidgetAnnotation | undefined): Partial<WidgetPlacement> => {
+  if (!widget) return {};
+  const held = widget as unknown as Record<string, unknown>;
+  const look: Record<string, unknown> = {};
+  for (const name of LOOK)
+    if (held[name] !== undefined && held[name] !== null) look[name] = held[name];
+  return look as Partial<WidgetPlacement>;
+};
+
+/**
+ * The export value a field's new widget gets when none is given: a radio group's next free
+ * `Choice<n>` (the radio tool names its first button `Choice1`), a checkbox's own value, so
+ * the boxes check together. Other families take none.
+ */
+function exportValueFor(field: FormFieldDTO): string | undefined {
+  if (field.family === 'checkbox') return field.exportValue;
+  if (field.family !== 'radio') return undefined;
+  const taken = new Set(field.widgets.map((widget) => widget.exportValue));
+  let n = field.widgets.length + 1;
+  while (taken.has(`Choice${n}`)) n += 1;
+  return `Choice${n}`;
+}
+
+/** Whether the field's dictionary is its only widget's too, which adding a widget splits. */
+const isMerged = (field: FormFieldDTO): boolean =>
+  field.ref.kind === 'objectNumber' &&
+  field.widgets.some(
+    (widget) => widget.objectNumber === (field.ref as { objectNumber: number }).objectNumber,
+  );
+
+const MODIFY = 'doc.forms.modify';
+const SCRIPT = 'doc.forms.script';
+
+/** The answer's item for the change's only op, of the type it names. */
+type ItemOf<T extends ChangeItem['type']> = Extract<ChangeItem, { type: T }>;
 
 export function createFieldWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'store' | 'siblings' | 'enqueue'>,
-  hydration: FormHydration,
-  widgets: { pageBox(page: PageRef): Box | null },
+  { fields, enqueue }: Pick<FormServices, 'fields' | 'enqueue'>,
 ) {
-  const { model, apply, keyOf } = services.store;
-  const annotationHost = services.siblings.annotation;
-  const enqueueMutation = services.enqueue;
-  const { refresh } = hydration;
-  const { pageBox } = widgets;
+  const numbers = createObjectNumbers(ctx);
 
-  const nudgeAnnotations = (pages: Iterable<PageRef>): void => {
-    if (!annotationHost) return;
-    const seen = new Set<number>();
-    for (const page of pages) {
-      if (seen.has(page.pageObjectNumber)) continue;
-      seen.add(page.pageObjectNumber);
-      void annotationHost.reloadPage(page);
+  /** Refuse up front without `doc.forms.modify`, and without `doc.forms.script` when it writes scripts. */
+  const allow = (operation: string, scripts = false): void => {
+    ctx.assertAllowed(MODIFY, operation);
+    if (scripts) ctx.assertAllowed(SCRIPT, operation);
+  };
+
+  /** Stage one design op as its own change: it shows at once, and undoing it shows the form as it was. */
+  const stage = (verb: string, op: ChangeOp): PendingChange =>
+    ctx.changes.stage({
+      label: { key: `form.${verb}` } satisfies ChangeLabel,
+      ops: [op],
+      undo: undoLookOf(fields.view(), [op]),
+    });
+
+  /** The engine's answer to a staged design change: its one item. */
+  const answer = async <T extends ChangeItem['type']>(
+    change: PendingChange,
+    options?: OperationOptions,
+  ): Promise<ItemOf<T>> => {
+    try {
+      const result = await ctx.cancellable(options?.signal, change.result);
+      return result.items[0] as ItemOf<T>;
+    } catch (error) {
+      throw toPluginError('form', error);
     }
   };
 
-  /** Deterministic, collision-free auto-name: `text_1`, `text_2`, … counted
-   *  against the CURRENT snapshot (rename in the field panel). */
-  const autoName = (family: string): string => {
-    const names = new Set((model().snapshot?.fields ?? []).map((f) => f.name));
-    let n = 1;
-    while (names.has(`${family}_${n}`)) n++;
-    return `${family}_${n}`;
+  const create: FormCapability['create'] = async (draft, options) => {
+    allow('form.create', draftWritesScripts(draft));
+    // The field, then each widget, in the draft's order.
+    const count = 1 + (draft.widgets?.length ?? 0);
+    const [objectNumber, ...widgetObjectNumbers] =
+      numbers.takeNow(count) ?? (await numbers.take(count));
+    const change = stage('create', {
+      type: 'forms.create',
+      draft,
+      objectNumber,
+      widgetObjectNumbers,
+    });
+    const item = await answer<'forms.create'>(change, options);
+    return { field: item.field } satisfies FormFieldResult;
   };
 
-  const placeField = async (input: CreateFieldInput): Promise<CreatedField> => {
-    const doc = ctx.doc;
-    const page = input.page;
-    const pon = page.pageObjectNumber;
-    const space = ctx.geometry.tryForPage(page);
-    if (!doc || !space) {
-      throw new PluginError('not-ready', 'form', 'createField: document/page not ready');
-    }
-    // Placement is page-bound: intersect a (possibly overshooting) drag box
-    // with the page. Sizing policy is the CALLER's job (the place handler's
-    // click policy / drag rect) — a degenerate result is a caller bug.
-    const bounds = pageBox(page)!;
-    const x = Math.max(bounds.x, Math.min(input.bounds.x, bounds.width));
-    const y = Math.max(bounds.y, Math.min(input.bounds.y, bounds.height));
-    const box: Box = {
-      x,
-      y,
-      width: Math.max(0, Math.min(input.bounds.x + input.bounds.width, bounds.width) - x),
-      height: Math.max(0, Math.min(input.bounds.y + input.bounds.height, bounds.height) - y),
-    };
-    if (box.width < 1 || box.height < 1) {
+  const addWidget: FormCapability['addWidget'] = async (ref, placement = {}, options) => {
+    allow('form.addWidget', writesScripts(placement.actions));
+    const index = fields.view();
+    const field = fieldByRef(index, ref);
+    if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
+    const rows = field.widgets
+      .map((widget) => widgetRowOf(index, widget.objectNumber))
+      .filter((row): row is WidgetAnnotation => row !== null);
+    const last = rows.at(-1);
+    const page = placement.page ?? last?.page;
+    if (!page) {
       throw new PluginError(
         'invalid-input',
         'form',
-        'createField: degenerate bounds (size the box before placing)',
+        'the field shows on no page: give `page` and `rect`',
       );
     }
-    const { family, appearance } = input;
-    const name = input.name ?? autoName(family);
-    const placement = {
-      page,
-      rect: space.pageRectToPdf(box),
-      ...(appearance ? { appearance } : {}),
-    };
-    const draft: FormFieldDraft =
-      family === 'radio'
-        ? { family, name, widgets: [{ ...placement, onState: 'option1' }] }
-        : family === 'combobox' || family === 'listbox'
-          ? {
-              family,
-              name,
-              widget: placement,
-              options: input.options
-                ? input.options.map((o) => ({ ...o }))
-                : [
-                    { label: 'Option 1', value: 'Option 1' },
-                    { label: 'Option 2', value: 'Option 2' },
-                  ],
-            }
-          : { family, name, widget: placement };
-    const result = await doc.forms.createField(draft);
-    await refresh();
-    apply({ t: 'clearGeom', pageObjectNumber: pon });
-    // AWAIT the annotation-plane reload so the returned widget ref is already
-    // selectable — the caller's auto-select needs the model to know it.
-    if (annotationHost) await annotationHost.reloadPage(page);
-    const widget = result.field.widgets.find((w) => w.page?.pageObjectNumber === pon) ?? null;
-    return { field: result.field, widget };
-  };
-
-  const patchField = async (ref: FormFieldRef, patch: FormFieldPatch): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    await doc.forms.updateField(ref, patch);
-    await refresh();
-  };
-
-  const removeField = async (ref: FormFieldRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    const field = fieldByKey(model(), keyOf(ref));
-    const pages = field?.widgets.flatMap((w) => (w.page ? [w.page] : [])) ?? [];
-    await doc.forms.deleteField(ref);
-    await refresh();
-    for (const pon of new Set(pages.map((p) => p.pageObjectNumber))) {
-      apply({ t: 'clearGeom', pageObjectNumber: pon });
+    const size = ctx.getPage(page)?.size;
+    const onPage = rows.filter((row) => row.page.objectNumber === page.objectNumber);
+    const rect =
+      placement.rect ??
+      placement.box ??
+      (size && onPage.length > 0
+        ? nextInLine(
+            onPage.map((row) => row.box),
+            size,
+          )
+        : undefined);
+    if (!rect) {
+      throw new PluginError(
+        'invalid-input',
+        'form',
+        'no widget of the field on that page: give `rect`',
+      );
     }
-    nudgeAnnotations(pages);
-  };
-
-  const detachFromField = async (ref: FormFieldRef, widget: AnnotationRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    await doc.forms.detachWidget(ref, widget);
-    await refresh();
-    apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
-    nudgeAnnotations([widget.page]);
-  };
-  const attachToField = async (ref: FormFieldRef, widget: AnnotationRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    await doc.forms.attachWidget(ref, widget);
-    await refresh();
-    apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
-    nudgeAnnotations([widget.page]);
+    const exportValue = placement.exportValue ?? exportValueFor(field);
+    const split = isMerged(field);
+    const [objectNumber, splitObjectNumber] =
+      numbers.takeNow(split ? 2 : 1) ?? (await numbers.take(split ? 2 : 1));
+    const change = stage('addWidget', {
+      type: 'forms.addWidget',
+      field: field.ref,
+      placement: {
+        ...lookOf(last),
+        ...placement,
+        page,
+        ...(placement.box ? {} : { rect }),
+        ...(exportValue === undefined ? {} : { exportValue }),
+      },
+      objectNumber,
+      ...(split ? { splitObjectNumber } : {}),
+    });
+    const item = await answer<'forms.addWidget'>(change, options);
+    const widget =
+      item.widgets.find(
+        (row) => row.ref.kind === 'objectNumber' && row.ref.objectNumber === objectNumber,
+      ) ?? item.widgets.at(-1)!;
+    return { field: item.field, widget };
   };
 
   return {
     api: {
-      createField: (input) => enqueueMutation(() => placeField(input)),
-      updateField: (ref, patch) => enqueueMutation(() => patchField(ref, patch)),
-      deleteField: (ref) => enqueueMutation(() => removeField(ref)),
-      detachWidget: (ref, widget) => enqueueMutation(() => detachFromField(ref, widget)),
-      attachWidget: (ref, widget) => enqueueMutation(() => attachToField(ref, widget)),
+      create,
+      addWidget,
+      update: async (ref, patch, options) => {
+        allow('form.update', writesScripts(patch.actions));
+        const change = stage('update', { type: 'forms.update', field: ref, patch });
+        return { field: (await answer<'forms.update'>(change, options)).field };
+      },
+      reorderCalculations: async (fields, position, options) => {
+        allow('form.reorderCalculations');
+        const change = stage('reorderCalculations', {
+          type: 'forms.reorderCalculations',
+          fields,
+          position,
+        });
+        const item = await answer<'forms.reorderCalculations'>(change, options);
+        return { calculationOrder: item.calculationOrder };
+      },
+      delete: async (ref, options) => {
+        allow('form.delete');
+        await answer(stage('delete', { type: 'forms.delete', field: ref }), options);
+      },
+      removeWidget: async (ref, widget, options) => {
+        allow('form.removeWidget');
+        const change = stage('removeWidget', { type: 'forms.removeWidget', field: ref, widget });
+        return { field: (await answer<'forms.removeWidget'>(change, options)).field };
+      },
+      updateWidget: async (widget, patch, options) => {
+        allow('form.updateWidget');
+        const change = stage('updateWidget', { type: 'forms.updateWidget', widget, patch });
+        return { widget: (await answer<'forms.updateWidget'>(change, options)).widget };
+      },
+      deleteWidget: async (widget, options) => {
+        allow('form.deleteWidget');
+        const change = stage('deleteWidget', { type: 'forms.deleteWidget', widget });
+        return { field: (await answer<'forms.deleteWidget'>(change, options)).field };
+      },
+      // A repair reads the whole form and fixes it where it stands: not a change of ops.
+      repair: async (options) => {
+        allow('form.repair');
+        const { signal, ...repair } = options ?? {};
+        const run = () => (options ? ctx.doc.forms.repair(repair) : ctx.doc.forms.repair());
+        return enqueue(() => ctx.cancellable(signal, run()), options);
+      },
     } satisfies Partial<FormCapability>,
   };
 }

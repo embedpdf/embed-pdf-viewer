@@ -1,5 +1,18 @@
 # @embedpdf/core-acrojs
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Align Acrobat JavaScript form and annotation objects with the revised engine
+  field, page, and annotation references. Checkbox and radio scripts now read
+  widget export values in widget order and preserve the expected off value.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - A script reads a field's `display` as its first widget shows (`hidden`, `noPrint`, `noView` or `visible`), as Acrobat's `field.display` does. Every field read as visible, so a script that showed a hidden field changed nothing.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

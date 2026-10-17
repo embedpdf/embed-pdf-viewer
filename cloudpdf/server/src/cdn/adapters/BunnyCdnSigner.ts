@@ -4,13 +4,13 @@
  * Algorithm (Bunny's documented "Token Authentication" feature):
  *   token = base64url( sha256( zoneToken + path + expires ) )
  *
- * `path` is the URL path PREFIX the token authorizes — Bunny accepts
- * the same token for any URL whose path STARTS WITH the signed prefix,
+ * `path` is the URL path prefix the token authorizes — Bunny accepts
+ * the same token for any URL whose path starts with the signed prefix,
  * until `expires` passes.
  *
- * **Per-resource scope enforcement at the edge** (paths v2)
+ * **Per-resource scope enforcement at the edge**
  *
- * We do NOT sign a single doc-wide prefix. That would mean a caller
+ * We do not sign a single doc-wide prefix. That would mean a caller
  * granted only render also gets text/annotations/geometry through the
  * same token. Instead, we sign each cacheable resource's distinct
  * prefix separately — `/v1/docs/{id}/render/pages/`,
@@ -26,7 +26,7 @@
  * CDN-side setup: enable "Token Authentication" in the zone settings
  * and paste the same zoneToken.
  *
- * Purge: stub returns `no-op` here; real REST call lands in commit H.
+ * Purge is not implemented: it returns a `no-op` receipt.
  */
 
 import type { CdnAccessInfo } from '@embedpdf/engine-core/runtime';
@@ -76,8 +76,7 @@ export class BunnyCdnSigner implements CdnSigner {
   }
 
   async purge(_input: PurgeInput): Promise<PurgeReceipt> {
-    // Real REST call (DELETE https://api.bunny.net/purge?url=...) lands
-    // in commit H alongside the PurgeCoordinator + cdn_purge_jobs table.
+    // Does not call Bunny's purge API (DELETE https://api.bunny.net/purge?url=...).
     return { adapter: 'bunny', id: '', submittedAt: Date.now(), status: 'no-op' };
   }
 }

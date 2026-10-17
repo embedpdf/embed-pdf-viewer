@@ -1,11 +1,11 @@
 /**
- * The runtime's public build identity — a Node-only, SIDE-EFFECT-FREE
+ * The runtime's public build identity — a Node-only, side-effect-free
  * subpath (`@embedpdf/engine-runtime/build-id`): importing it never
  * touches native-addon loading, so supervisors and diagnostics can name
  * the engine without running it.
  *
  * The identity is `version:target` (e.g. `3.0.0-next.7:linux-arm64`),
- * BOTH axes on purpose: deployments sharing one database can run
+ * both axes on purpose: deployments sharing one database can run
  * different native binaries (multi-arch images, mixed node pools), and
  * native crashers can be target-specific — consumers keying state on the
  * engine identity (e.g. crash quarantine) must never pool evidence

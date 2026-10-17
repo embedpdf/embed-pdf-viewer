@@ -1,5 +1,5 @@
 /**
- * A document boot script failing must NEVER disable interactive filling —
+ * A document boot script failing must never disable interactive filling —
  * the invariant behind the i-140 class of bugs (Adobe's `!ADBE::…VersChk…`
  * boilerplate calling APIs we don't emulate). A boot error degrades to a
  * `script-error` diagnostic; the user's own commit still applies. Boot-phase
@@ -9,13 +9,13 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   toPageRef,
   type DocumentHandle,
-  type FormEffect,
+  type ChangeOp,
   type FormSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import type { ScriptInput, ScriptOutput } from '@embedpdf/core-acrojs';
 
-import { createFormScriptingController } from '../src/scripting/controller';
+import { engineScripts } from './helpers/engine-scripts';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const okEvent = (value: unknown = '') => ({
@@ -29,12 +29,13 @@ const okEvent = (value: unknown = '') => ({
 const output = (over: Partial<ScriptOutput> = {}): ScriptOutput => ({
   event: okEvent(),
   formEffects: [],
+  annotEffects: [],
   uiEffects: [],
   diagnostics: [],
   ...over,
 });
 
-/** A sandbox whose BOOT throws (script called an API we don't emulate). */
+/** A sandbox whose boot throws (script called an API we don't emulate). */
 function failingBootSandbox(): ScriptSandbox {
   return {
     disposed: false,
@@ -51,15 +52,22 @@ function failingBootSandbox(): ScriptSandbox {
 
 function textField(objnum: number, name: string) {
   return {
-    ref: { kind: 'objectNumber' as const, fieldObjectNumber: objnum },
-    fieldObjectNumber: objnum,
+    ref: { kind: 'objectNumber' as const, objectNumber: objnum },
     name,
     family: 'text' as const,
     origin: 'acroform' as const,
-    flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+    readOnly: false,
+    required: false,
+    noExport: false,
     alternateName: null,
     mappingName: null,
-    widgets: [{ annotObjectNumber: objnum + 100, page: toPageRef(3) }],
+    createdBy: null,
+    createdAt: null,
+    filledBy: null,
+    filledByName: null,
+    filledAt: null,
+    importedBy: null,
+    widgets: [{ objectNumber: objnum + 100, page: toPageRef(3) }],
     value: '',
     defaultValue: '',
     valueEntry: { kind: 'none' as const },
@@ -71,12 +79,12 @@ function textField(objnum: number, name: string) {
   };
 }
 
-function makeDoc(applied: FormEffect[][]) {
+function makeDoc(applied: ChangeOp[][]) {
   return {
     id: 'diag-doc',
     security: { identity: null },
     actions: {
-      read: async () => ({
+      get: async () => ({
         nameTreeScripts: [
           {
             name: '!ADBE::VersChk',
@@ -93,13 +101,11 @@ function makeDoc(applied: FormEffect[][]) {
         ],
       }),
     },
-    forms: {
-      list: async () => snapshot(),
-      applyEffects: vi.fn(async (effects: FormEffect[]) => {
-        applied.push(effects);
-        return { results: effects.map(() => ({ status: 'applied' as const })) };
-      }),
-    },
+    apply: vi.fn(async ({ ops }: { ops: ChangeOp[] }) => {
+      applied.push(ops);
+      return { items: [], meta: { undoable: true } as never };
+    }),
+    forms: { list: async () => snapshot() },
   } as unknown as DocumentHandle;
 }
 
@@ -109,16 +115,17 @@ const snapshot = (): FormSnapshot =>
     needsAppearances: false,
     calculationOrder: [],
     fields: [textField(7, 'First_Name')],
+    widgets: [],
   }) as unknown as FormSnapshot;
 
 describe('FormScriptingController — boot failures degrade, never brick', () => {
   it('a throwing boot script still lets the user commit (and again after)', async () => {
-    const applied: FormEffect[][] = [];
+    const applied: ChangeOp[][] = [];
     const doc = makeDoc(applied);
     const realm = standaloneRealm(doc, () => null, {
       sandboxFactory: async () => failingBootSandbox(),
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document: () => null,
       transaction: realm.transaction,
@@ -126,53 +133,54 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     });
 
     const first = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'HELLO' },
+      { kind: 'objectNumber', objectNumber: 7 },
+      { value: 'HELLO' },
     );
     expect(first.status).toBe('applied');
     expect(applied[0]).toEqual([
       {
-        kind: 'setValue',
-        ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
-        value: { type: 'text', value: 'HELLO' },
+        type: 'forms.setValue',
+        field: { kind: 'objectNumber', objectNumber: 7 },
+        value: { value: 'HELLO' },
       },
     ]);
-    // The failure is SURFACED, not swallowed — and not fatal.
-    expect(first.diagnostics.some((d) => d.code === 'script-error')).toBe(true);
+    // The failure is surfaced, not swallowed — and not fatal.
+    expect(first.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(true);
     // The bogus doc-open alert is tagged as boot-phase (suppressible).
     expect(first.uiEffects).toEqual([expect.objectContaining({ kind: 'alert', phase: 'boot' })]);
 
     // Boot ran once; the next commit neither retries nor fails.
     const second = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'WORLD' },
+      { kind: 'objectNumber', objectNumber: 7 },
+      { value: 'WORLD' },
     );
     expect(second.status).toBe('applied');
-    expect(second.diagnostics.some((d) => d.code === 'script-error')).toBe(false);
+    expect(second.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(false);
     controller.dispose();
   });
 
-  it('a failing doc.actions.read also degrades to a diagnostic', async () => {
-    const applied: FormEffect[][] = [];
+  it('a failing doc.actions.get also degrades to a diagnostic', async () => {
+    const applied: ChangeOp[][] = [];
     const doc = makeDoc(applied);
-    (doc.actions as { read: () => Promise<never> }).read = async () => {
+    // The fake's `read` is a plain async function, not an AbortablePromise.
+    (doc.actions as unknown as { get: () => Promise<never> }).get = async () => {
       throw new Error('actions unavailable');
     };
     const realm = standaloneRealm(doc, () => null, {
       sandboxFactory: async () => failingBootSandbox(),
     });
-    const controller = createFormScriptingController({
+    const controller = engineScripts({
       doc,
       document: () => null,
       transaction: realm.transaction,
       budget: realm.budget,
     });
     const result = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'HELLO' },
+      { kind: 'objectNumber', objectNumber: 7 },
+      { value: 'HELLO' },
     );
     expect(result.status).toBe('applied');
-    expect(result.diagnostics.some((d) => d.code === 'script-error')).toBe(true);
+    expect(result.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(true);
     controller.dispose();
   });
 });

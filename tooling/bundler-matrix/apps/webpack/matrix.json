@@ -1,4 +1,6 @@
 {
   "toolchain": "webpack 5",
+  "workerSrc": "'self'",
+  "trustedTypes": ["webpack"],
   "dist": "dist"
 }

@@ -5,7 +5,7 @@ import {
   AdminTokenRevokeRequestSchema,
   adminOperations,
 } from '@cloudpdf/contract';
-import { validateScopeArray } from '@embedpdf/engine-core/runtime';
+import { validateScopeArray, type Identity } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance } from 'fastify';
 
 import {
@@ -175,18 +175,8 @@ export async function registerAdminTokensRoutes(
   }
 }
 
-function identityExtras(body: {
-  userId?: string;
-  displayName?: string;
-  groupId?: string;
-  groups?: string[];
-}): Record<string, unknown> {
-  return {
-    ...(body.userId ? { user_id: body.userId } : {}),
-    ...(body.displayName ? { display_name: body.displayName } : {}),
-    ...(body.groupId ? { group_id: body.groupId } : {}),
-    ...(body.groups ? { groups: body.groups } : {}),
-  };
+function identityExtras(body: { identity?: Identity }): Record<string, unknown> {
+  return body.identity ? { identity: body.identity } : {};
 }
 
 function formatIssues(issues: Array<{ path: Array<string | number>; message: string }>): string {

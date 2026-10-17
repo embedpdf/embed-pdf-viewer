@@ -1,94 +1,100 @@
 /**
- * PDF date string format conversion utilities.
+ * PDF dates ↔ the engine's `IsoDateTime`.
  *
- * PDF stores timestamps as ASCII strings shaped like
- * `D:YYYYMMDDHHmmSSOHH'mm'`, where `O` is `+` / `-` / `Z` (Z means
- * UTC and omits the offset). See ISO 32000 §7.9.4.
- *
- * The wire format used by the engine DTOs is always ISO 8601;
- * readers convert PDF → ISO via {@link pdfDateToIso}, writers convert
- * the other way via {@link formatPdfDate}.
+ * PDF stores a moment as `D:YYYYMMDDHHmmSSOHH'mm'` (ISO 32000 §7.9.4), where
+ * `O` is `+`, `-` or `Z`, and every field after the year may be left out. The
+ * engine's data carries ISO 8601 strings instead, and keeps the offset the
+ * date was written with, so writing a read value back writes the same moment
+ * in the same zone: `D:20170712214438-07'00'` ↔ `2017-07-12T21:44:38-07:00`.
  */
+import {
+  EngineError,
+  EngineErrorCode,
+  type DateInput,
+  type IsoDateTime,
+} from '@embedpdf/engine-core/runtime';
 
 /**
- * Parse a PDF date string `D:YYYYMMDDHHmmSSOHH'mm'` to an ISO 8601
- * string. Returns null if the input is malformed.
- *
- * When the timezone is omitted, PDF defines the relationship to UTC as
- * unknown. Since the engine DTO wire format requires an absolute ISO 8601
- * timestamp, this converter retains the pre-existing fallback of treating
- * an omitted timezone as UTC.
+ * A PDF date as ISO 8601, keeping its offset: zero reads as `Z`, and a date
+ * without an offset reads without one. Fields the date leaves out take the
+ * spec's defaults (month and day 1, the rest 0). The `D:` prefix and the
+ * apostrophes of the offset are optional, as readers in the wild treat them.
+ * Returns `null` when the text isn't a date.
  */
-export function pdfDateToIso(pdf: string): string | null {
+export function pdfDateToIso(pdf: string): IsoDateTime | null {
   const match =
-    /^D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:(Z)|([+-])(\d{2})'(\d{2})')?$/.exec(pdf);
+    /^(?:D:)?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:([Zz])(?:00'?00'?)?|([+-])(\d{2})(?:'?(\d{2})'?)?)?$/.exec(
+      pdf.trim(),
+    );
   if (!match) return null;
+  const [, year, month = '01', day = '01', hour = '00', minute = '00', second = '00'] = match;
+  const [, , , , , , , zulu, sign, offsetHours, offsetMinutes = '00'] = match;
+  const fields = { year, month, day, hour, minute, second };
+  if (!validClock(fields)) return null;
 
-  const [, yText, moText, dText, HText, MText, SText, , sign, tzHText, tzMText] = match;
-  const y = Number(yText);
-  const mo = Number(moText) - 1;
-  const d = Number(dText);
-  const H = Number(HText);
-  const M = Number(MText);
-  const S = Number(SText);
-
-  // Construct the local wall-clock fields in UTC space. setUTCFullYear is
-  // intentional: Date.UTC maps years 0-99 to 1900-1999.
-  const wallClock = new Date(0);
-  wallClock.setUTCFullYear(y, mo, d);
-  wallClock.setUTCHours(H, M, S, 0);
-
-  // JavaScript normalizes invalid fields (for example February 31), so
-  // compare them after construction rather than accepting the rollover.
-  if (
-    wallClock.getUTCFullYear() !== y ||
-    wallClock.getUTCMonth() !== mo ||
-    wallClock.getUTCDate() !== d ||
-    wallClock.getUTCHours() !== H ||
-    wallClock.getUTCMinutes() !== M ||
-    wallClock.getUTCSeconds() !== S
-  ) {
-    return null;
+  let offset = '';
+  if (zulu) {
+    offset = 'Z';
+  } else if (sign) {
+    if (Number(offsetHours) > 23 || Number(offsetMinutes) > 59) return null;
+    offset =
+      Number(offsetHours) === 0 && Number(offsetMinutes) === 0
+        ? 'Z'
+        : `${sign}${offsetHours}:${offsetMinutes}`;
   }
-
-  let offsetMinutes = 0;
-  if (sign) {
-    const tzH = Number(tzHText);
-    const tzM = Number(tzMText);
-    if (tzH > 23 || tzM > 59) return null;
-
-    offsetMinutes = (tzH * 60 + tzM) * (sign === '+' ? 1 : -1);
-  }
-
-  return new Date(wallClock.getTime() - offsetMinutes * 60_000).toISOString();
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}${offset}`;
 }
 
 /**
- * Format a JS Date as a PDF date string `D:YYYYMMDDHHmmSSOHH'mm'`.
- *
- * Emits the offset in PDF's funny `OHH'mm'` form, where the apostrophe
- * after the hour is literal and the offset always carries a sign. UTC
- * is emitted as `+00'00'` (not `Z`) for maximum reader compatibility —
- * the `Z` shorthand is allowed by the spec but not universally
- * supported.
- *
- * Always uses the supplied Date's local fields and offset. For
- * server-side stamps callers typically pass `new Date()` (default).
+ * A moment as a PDF date. A string keeps its own offset (none if it has
+ * none); a `Date` is an instant, written in UTC. A fraction of a second is
+ * dropped: PDF dates have whole seconds. UTC is written as `+00'00'` rather
+ * than `Z`, which some readers don't accept.
  */
-export function formatPdfDate(d: Date = new Date()): string {
-  if (Number.isNaN(d.getTime())) throw new RangeError('Cannot format an invalid Date');
+export function formatPdfDate(value: DateInput = new Date()): string {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new RangeError('Cannot format an invalid Date');
+    const iso = value.toISOString();
+    return formatPdfDate(`${iso.slice(0, 19)}Z`);
+  }
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:([Zz])|([+-])(\d{2}):(\d{2}))?$/.exec(
+      value,
+    );
+  const fields = match && {
+    year: match[1]!,
+    month: match[2]!,
+    day: match[3]!,
+    hour: match[4]!,
+    minute: match[5]!,
+    second: match[6] ?? '00',
+  };
+  if (!match || !fields || !validClock(fields)) {
+    throw new EngineError(EngineErrorCode.InvalidArg, `not an ISO 8601 date and time: '${value}'`);
+  }
+  const [, , , , , , , zulu, sign, offsetHours, offsetMinutes] = match;
+  const offset = zulu ? "+00'00'" : sign ? `${sign}${offsetHours}'${offsetMinutes}'` : '';
+  const { year, month, day, hour, minute, second } = fields;
+  return `D:${year}${month}${day}${hour}${minute}${second}${offset}`;
+}
 
-  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
-  const year = d.getFullYear();
-  if (year < 0 || year > 9999) throw new RangeError('PDF dates require a four-digit year');
+interface ClockFields {
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+  second: string;
+}
 
-  const tzMinutes = -d.getTimezoneOffset();
-  const sign = tzMinutes >= 0 ? '+' : '-';
-  const tzH = pad(Math.floor(Math.abs(tzMinutes) / 60));
-  const tzM = pad(Math.abs(tzMinutes) % 60);
-  return (
-    `D:${pad(year, 4)}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
-    `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}` +
-    `${sign}${tzH}'${tzM}'`
-  );
+/** Whether the fields name a real date and time (no February 31, no hour 25). */
+function validClock({ year, month, day, hour, minute, second }: ClockFields): boolean {
+  const y = Number(year);
+  const mo = Number(month);
+  const d = Number(day);
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  const daysInMonth = new Date(Date.UTC(2000, mo, 0)).getUTCDate();
+  const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+  if (d > (mo === 2 && !leap ? 28 : daysInMonth)) return false;
+  return Number(hour) <= 23 && Number(minute) <= 59 && Number(second) <= 59;
 }

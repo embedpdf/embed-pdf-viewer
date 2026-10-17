@@ -1,0 +1,130 @@
+---
+title: Refs & identity
+description: What a page or annotation ref contains, how long it stays valid, and how to store one.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Refs & identity
+
+Pages and annotations are addressed by a **ref**: `page.ref`, `annotation.ref`. The engine hands
+you refs in everything it returns, and takes them in every call that works on a page or an
+annotation. You never build one; pass back the one you were given.
+
+```ts
+const { annotations } = await page.annotations.list();
+await page.annotations.update(annotations[0].ref, { contents: 'Seen' });
+```
+
+This page is about what's inside a ref, for when you store one or compare two.
+
+## Page refs
+
+A page ref is the page's number inside the PDF file (its object number), not its position:
+
+```ts
+page.ref; // { kind: 'objectNumber', objectNumber: 12 }
+```
+
+That's why a page ref stays valid when pages move: after you move page 3 to the front, its ref
+is the same, only its `index` in `doc.pages.list()` changes. A deleted page's number is never
+given to another page.
+
+When you already have a page's number (from your own database, say), `toPageRef(12)` makes the
+ref. To compare two, use `pageRefsEqual(a, b)`.
+
+## Annotation refs
+
+An annotation ref also says which page the annotation is on. It comes in two kinds, depending on
+how the annotation is stored in the file:
+
+| Kind           | Looks like                                         |
+| :------------- | :------------------------------------------------- |
+| `objectNumber` | `{ kind: 'objectNumber', page, objectNumber: 48 }` |
+| `baseIndex`    | `{ kind: 'baseIndex', page, baseIndex: 2 }`        |
+
+Annotations the engine creates always get an object number. PDF files from other tools don't
+always give their annotations one: an annotation stored without a number is named by the
+position it has on its page in the file you uploaded, its `baseIndex`.
+
+Both kinds name the annotation for life. Adding, moving or deleting other annotations never
+changes a ref, and neither does editing the annotation itself: an annotation the file stores
+without a number keeps its `baseIndex` even after the engine gives it a number of its own to
+save a change. A deleted annotation's ref is never given to another annotation.
+
+An annotation's `nm` (its name in the PDF) is data you can read and set, like its contents. It's
+not how the engine finds the annotation. An annotation the engine creates without one gets a fresh
+UUIDv7 name, and a copy made by an import with `attribution: 'stamp'` gets a new one.
+
+To use a ref as a key in a `Map` or an object, turn it into a string with `annotationKey(ref)`.
+
+## Naming an object before it exists
+
+A ref usually comes back from the call that creates the thing. When you need it sooner (to show the
+new annotation, select it or annotate a new page at once), take an object number from the
+document's pool and create the object at it:
+
+```ts
+const objectNumber = doc.objectNumbers.take(); // null when the pool is empty: await reserve(n)
+const pending = page.annotations.create({ subtype: 'square', box }, { objectNumber });
+
+const ref = { kind: 'objectNumber', page: page.ref, objectNumber } as const;
+await page.annotations.update(ref, { color: '#e11d48' }); // fine before the create answers
+```
+
+The object is made at exactly that number, so the ref is final from the start. Writes apply in the
+order you make them, so the update above runs after the create. Pages and form fields work the
+same way: `pages.insertBlank(spec, position, { objectNumbers })` names each new page, and
+`forms.create(draft, { objectNumber, widgetObjectNumbers })` names a field and its widgets.
+
+The numbers are this open document's alone: every `open()` has its own, even a second open of the
+same document. A create that names a number the `doc` doesn't hold (never taken from the pool, or
+already used) is refused with `ObjectNumberUnavailable` and `reason: 'not-held'`, and one a call
+uses twice with `reason: 'taken'`; nothing is written. Leave the number out and the engine picks
+one, as before. `doc.objectNumbers.reserve(n)` waits until at least `n` are held, for a large
+paste.
+
+A number you hold stays yours until a create uses it, except in two cases, which
+`doc.objectNumbers.onLost` reports:
+
+```ts
+doc.objectNumbers.onLost(({ numbers, reason }) => dropPending(numbers));
+```
+
+- **`'versioned'`:** a signature published a new version of the document, which numbers every
+  object anew.
+- **`'reclaimed'`:** on the cloud, the numbers belong to an editing session, which stays alive
+  while the document's event stream is connected or you keep writing. Left idle for 15 minutes
+  without the stream, it expires, and its numbers may go to someone else. The pool stops handing
+  out numbers it can no longer vouch for, and gets fresh ones with the next write or `reserve`.
+
+Drop anything you showed at a lost number; a create that names one is refused with `not-held`.
+
+## Other refs
+
+Form fields and attachments have refs too, handed out the same way:
+
+| Thing      | Its ref          | From a name you hold              |
+| :--------- | :--------------- | :-------------------------------- |
+| Form field | `field.ref`      | `toFieldRef('billing.name')`      |
+| Attachment | `attachment.ref` | `toAttachmentRef('figures.xlsx')` |
+
+Use the name helpers only for a name you stored yourself; see
+[Forms](/docs/engine/forms#find-a-field) and
+[Attachments](/docs/engine/documents/attachments#names-and-refs).
+
+## Storing refs
+
+A ref is plain data: store it as JSON and pass it back later, even after the document was saved
+and opened again. A ref to an annotation that no longer exists fails with `NotFound`.
+
+## Good to know
+
+- **Why not the current position?** Positions change whenever something is added, moved or
+  deleted. A `baseIndex` is the position in the file you uploaded, which never changes, so it
+  can't end up pointing at a different annotation.
+- **Why not the name?** Names are optional in PDF, and other tools don't always keep them unique.
+  The engine refuses to create an annotation whose `nm` is already used on its page, so names it
+  writes stay unique, but it never relies on them to find an annotation.

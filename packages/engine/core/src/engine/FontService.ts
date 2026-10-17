@@ -10,24 +10,26 @@ import type { AbortablePromise } from '../promise/AbortablePromise';
  * Availability is the deliberate local-vs-cloud split:
  *   - `@embedpdf/engine` (local/WASM) implements it: the developer embedding
  *     the viewer decides what fonts ship to the client runtime.
- *   - `@cloudpdf/engine` (cloud) does NOT expose it (`Engine.fonts` is
+ *   - `@cloudpdf/engine` (cloud) does not expose it (`Engine.fonts` is
  *     undefined). Fallback fonts are a server policy decision, loaded once on
  *     the server runtime; clients cannot influence them.
  *
  * `register` and `addFallback` are intentionally separate calls: registering a
  * font makes it available for explicit annotation authoring
- * (`FreeTextDraft.registeredFontKey`); adding it to the fallback chain *also*
+ * (a free text's `fontFamily`); adding it to the fallback chain *also*
  * makes it eligible for automatic missing-glyph substitution during page
  * rendering and appearance generation. Many fonts want one without the other.
  */
 export interface FontService {
   /**
-   * Register a single font. Idempotent: registering a font whose `key` (or, if
-   * `key` is omitted, whose content hash) is already known resolves to the
-   * existing handle without re-uploading bytes to the runtime.
+   * Register a single font under its `key`. Idempotent: registering a `key`
+   * already known resolves to the existing handle without re-uploading bytes
+   * to the runtime.
    *
    * Rejects with `EngineErrorCode.InvalidArg` when the runtime cannot load the
-   * font (corrupt file, unsupported format, no glyphs).
+   * font (corrupt file, unsupported format, no glyphs), and for a key that is
+   * empty or one of the 14 standard font names (`'helvetica'`, …), which a
+   * `fontFamily` always resolves to the standard font.
    */
   register(spec: FontSpec): AbortablePromise<FontHandle>;
 

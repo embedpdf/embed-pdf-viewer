@@ -1,7 +1,5 @@
-/* PAGE CSS — this styles the slotted widget. That it works is the point:
-   the child lives in the light DOM (the app's world), so ordinary app
-   stylesheets reach it even though it displays inside the viewer's shadow
-   toolbar. */
+/* The app's own components live in the page's DOM, so this stylesheet reaches them even
+   though they show inside the viewer. */
 body {
   margin: 0;
 }
@@ -35,8 +33,7 @@ body {
   border-radius: 9999px;
 }
 
-/* The REGION-slotted tab bar — deliberately nothing like the built-in one,
-   so "that's really ours" is visible at a glance. */
+/* The app's tab bar: nothing like the viewer's own, so it's plain which one shows. */
 .acme-tabs {
   display: flex;
   align-items: center;

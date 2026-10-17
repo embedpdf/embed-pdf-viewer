@@ -1,0 +1,72 @@
+/* Colors */
+:root {
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The reading progress, above the pages */
+.progress {
+  height: 5px;
+  margin-bottom: 12px;
+  background: var(--tint);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0876fd, #7db6ff);
+  transition: width 0.12s linear;
+}
+
+/* The scrollbar: the component places it, these rules give it its look */
+.scrollbar {
+  margin: 6px 2px;
+  border-radius: 999px;
+  transition:
+    opacity 0.2s,
+    background-color 0.15s ease;
+}
+
+.scrollbar:hover,
+.scrollbar[data-dragging] {
+  background: rgb(7 32 76 / 0.06);
+}
+
+.thumb {
+  --epdf-scrollbar-thumb: #9aaccc;
+  cursor: grab;
+}
+
+.scrollbar:hover .thumb,
+.scrollbar[data-dragging] .thumb {
+  --epdf-scrollbar-thumb: var(--accent);
+}
+
+.scrollbar[data-dragging] .thumb {
+  cursor: grabbing;
+}
+
+/* The pages */
+.stage {
+  height: 440px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

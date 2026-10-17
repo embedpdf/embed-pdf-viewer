@@ -1,0 +1,90 @@
+---
+title: Errors
+description: What each numbered error from the Angular package means, and how to fix it.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Errors
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+This page lists the numbered errors of the Angular package; switch the docs to Angular to read it.
+In <Framework />, a component used outside the viewer throws an error that says so; see
+[Setup](setup) for where the viewer goes.
+
+</Fw>
+
+<Fw only="angular">
+
+When the viewer is set up in a way that can't work, the Angular package throws an error with a
+number, such as `EPDF-101`, says how to fix it, and links here. Each section below is one number:
+what happened, and the fix.
+
+A document that isn't open yet, or a permission the user doesn't have, isn't a setup mistake: a
+plugin refuses those with a `PluginError` (`not-ready`, `permission-denied`), the same in every
+framework. See [Permissions](concepts/permissions).
+
+## EPDF-101
+
+**No viewer above it.** A service of the viewer (`inject(EpdfDocuments)`, `inject(EpdfViewer)`)
+or one of its components (`<epdf-stage>`, `*epdfDocumentGate`) found no `provideEmbedPdf()` in
+the component that uses it or in any component above it.
+
+Add `provideEmbedPdf()` to the `providers` of the component that shows the viewer. That component
+and everything in its template share the viewer, and the component can inject it itself:
+
+<Snippet name="errors/provide-viewer" />
+
+For one viewer in the whole app, put the same call in `app.config.ts`; for one per route, in the
+route's `providers`. A component outside the one that provides the viewer, such as a sibling in
+your layout, can't reach it: move `provideEmbedPdf()` up to a component both are inside.
+
+## EPDF-102
+
+**No viewer with this plugin.** A plugin's service (`inject(EpdfRender)`, `inject(EpdfSearch)`)
+found no viewer above it that has the plugin. Either there's no viewer above it at all, or the
+viewer's `provideEmbedPdf()` doesn't have the plugin's feature.
+
+Add the feature the error names to `provideEmbedPdf()`, in the component that provides the viewer
+or in your app config. `withRender()` gives `EpdfRender`, `withSearch()` gives `EpdfSearch`, and
+so on:
+
+<Snippet name="errors/add-feature" />
+
+## EPDF-103
+
+**A layer outside a page.** Something that draws on a page, such as `<epdf-render-layer>`, isn't
+inside a page. A layer needs the page it draws on, and only the Stage gives one.
+
+Put it inside `<ng-template epdfPage>` in an `<epdf-stage>`. The Stage draws that template once
+for every page on screen:
+
+<Snippet name="errors/layer-in-page" />
+
+## EPDF-104
+
+**Part of a Stage outside one.** UI that belongs to a Stage, such as `<epdf-scrollbar>` or
+`<epdf-anchored>`, isn't inside an `<epdf-stage>`. It scrolls that Stage, or follows its pages,
+so it needs to be in it.
+
+Put it between the Stage's tags, next to the page template. It sits over the pages, in the Stage's
+own box:
+
+<Snippet name="errors/inside-stage" />
+
+## EPDF-105
+
+**An engine call on the server.** Code called a method that needs the engine (`open()`, a page's
+picture, a zoom) while Angular rendered the page on the server. The engine only runs in the
+browser, so on the server the viewer renders its empty state and every such call throws.
+
+Call it from something that only happens in the browser: an event handler (`(click)`), or
+`afterNextRender()` for work when the component first shows:
+
+<Snippet name="errors/browser-only" />
+
+To keep the viewer out of the server render altogether, put it in a `@defer (on viewport)`
+block. See [Setup](setup#server-side-rendering).
+
+</Fw>

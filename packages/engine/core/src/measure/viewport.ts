@@ -1,15 +1,18 @@
 import type { PdfViewport } from '../dto/Measure';
-import type { PdfPoint } from '../geometry/primitives';
+import type { PagePoint } from '../geometry/pageSpace';
 
-/** Last containing viewport wins. A foreign measure still wins; never guess a fallback. */
+/**
+ * The last viewport whose box holds `point` (the one drawn on top), or
+ * `undefined`. A foreign measure still wins; never guess a fallback.
+ */
 export function viewportForPoint<T extends PdfViewport>(
   viewports: readonly T[],
-  point: PdfPoint,
+  point: PagePoint,
 ): T | undefined {
   return [...viewports]
     .reverse()
     .find(
       ({ bbox: b }) =>
-        point.x >= b.left && point.x <= b.right && point.y >= b.bottom && point.y <= b.top,
+        point.x >= b.x && point.x <= b.x + b.width && point.y >= b.y && point.y <= b.y + b.height,
     );
 }

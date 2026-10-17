@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
  * The bundler matrix runner. For each app under apps/: production build,
- * serve the output statically, open it headless, wait for the probe, record
- * what happened — result, timings, which origins were contacted, what was
- * emitted (JS / wasm bytes). Prints a markdown table and writes results.json.
+ * serve the output statically under the strict Content-Security-Policy, open
+ * it headless, wait for the probe, record what happened — result, timings,
+ * which origins were contacted, every policy violation, what was emitted
+ * (JS / wasm bytes). Prints a markdown table and writes results.json.
  *
  *   node run.mjs                 # every app
  *   node run.mjs --only vite,angular
  *   node run.mjs --script matrix:build:assets --only angular   # a variant
  */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +28,46 @@ function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
     e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)],
   );
+}
+
+/**
+ * The policy on docs/content/viewer/concepts/security.mdx, Trusted Types enforced, with what the
+ * app itself needs beside it. From its `matrix.json`: `workerSrc`, `'self'` where the bundler
+ * emits the engine's worker files and `'self' blob:` where the build starts them from blob: URLs
+ * (the portable engine); `trustedTypes`, the bundler's own policies; `enforceTrustedTypes: false`
+ * for a bundler whose runtime sets `script.src` without any policy. `scriptHashes` allow the
+ * inline scripts the build wrote into its HTML.
+ */
+function strictPolicy({
+  workerSrc,
+  trustedTypes = [],
+  enforceTrustedTypes = true,
+  scriptHashes = [],
+}) {
+  return [
+    "default-src 'self'",
+    ["script-src 'self' 'wasm-unsafe-eval'", ...scriptHashes].join(' '),
+    "style-src 'self'",
+    `worker-src ${workerSrc}`,
+    "img-src 'self' blob: data:",
+    "connect-src 'self'",
+    ...(enforceTrustedTypes ? ["require-trusted-types-for 'script'"] : []),
+    ['trusted-types embedpdf', ...trustedTypes].join(' '),
+  ].join('; ');
+}
+
+/**
+ * The `'sha256-…'` sources of the inline scripts in the build's `index.html` (an import map, a
+ * framework's bootstrap), as a static host with a strict policy lists them. A script added
+ * while the page runs matches none of them.
+ */
+function inlineScriptHashes(dist) {
+  const index = join(dist, 'index.html');
+  if (!existsSync(index)) return [];
+  const html = readFileSync(index, 'utf8');
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(([, attributes]) => !/(?:^|\s)src\s*=/i.test(attributes))
+    .map(([, , body]) => `'sha256-${createHash('sha256').update(body).digest('base64')}'`);
 }
 
 async function launch() {
@@ -67,13 +109,21 @@ try {
       continue;
     const dir = join(here, 'apps', name);
     const meta = JSON.parse(readFileSync(join(dir, 'matrix.json'), 'utf8'));
-    runs.push({ name, dir, meta, toolchain: meta.toolchain, script });
+    const csp = (entry) => ({
+      workerSrc: entry.workerSrc,
+      trustedTypes: entry.trustedTypes,
+      enforceTrustedTypes: entry.enforceTrustedTypes,
+    });
+    runs.push({ name, dir, meta, toolchain: meta.toolchain, script, csp: csp(meta) });
     // Variants: documented opt-ins measured beside the zero-config row.
     for (const v of meta.variants ?? [])
-      runs.push({ name: v.name, dir, meta, toolchain: v.toolchain, script: v.script });
+      runs.push({ name: v.name, dir, meta, toolchain: v.toolchain, script: v.script, csp: csp(v) });
   }
-  for (const { name, dir, meta, toolchain, script } of runs) {
-    const row = { app: name, toolchain, script };
+  for (const run of runs)
+    if (!run.csp.workerSrc)
+      throw new Error(`${run.name}: its matrix.json entry must give a workerSrc`);
+  for (const { name, dir, meta, toolchain, script, csp } of runs) {
+    const row = { app: name, toolchain, script, ok: false };
     process.stdout.write(`\n▶ ${name} (${toolchain}) — ${script}\n`);
     // Sizes are measured on the output directory: start it empty.
     rmSync(resolve(dir, meta.dist), { recursive: true, force: true });
@@ -94,8 +144,23 @@ try {
     row.build = 'ok';
     const dist = resolve(dir, meta.dist);
     row.emitted = emitted(dist);
-    const { server, origin } = await serve(dist);
+    const scriptHashes = inlineScriptHashes(dist);
+    const policy = strictPolicy({ ...csp, scriptHashes });
+    row.csp = { ...csp, scriptHashes: scriptHashes.length, policy, violations: [] };
+    const { server, origin } = await serve(dist, {
+      headers: { 'content-security-policy': policy },
+    });
     const page = await browser.newPage();
+    // Heard from the first script on: the init script runs before any of the app's own.
+    await page.exposeFunction('reportViolation', (report) => row.csp.violations.push(report));
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (event) =>
+        window.reportViolation(
+          `${event.effectiveDirective} blocked ${event.blockedURI || '(inline)'} at ` +
+            `${event.sourceFile}:${event.lineNumber} ${event.sample}`,
+        ),
+      );
+    });
     const responses = [];
     const failures = [];
     const consoleErrors = [];
@@ -108,16 +173,21 @@ try {
       }),
     );
     page.on('requestfailed', (r) => failures.push(`${r.url()} → ${r.failure()?.errorText}`));
-    page.on('console', (m) =>
+    page.on('console', (m) => {
+      // The browser also logs each violation, including ones inside a worker.
+      if (/Content Security Policy|Trusted ?Type|TrustedScript/i.test(m.text()))
+        row.csp.violations.push(m.text());
       (m.type() === 'error' ? consoleErrors : m.type() === 'warning' ? warnings : []).push(
         m.text(),
-      ),
-    );
+      );
+    });
     page.on('pageerror', (e) => consoleErrors.push(e.message));
     try {
       await page.goto(`${origin}/`);
       await page.waitForSelector('#probe[data-done]', { timeout: 90_000 });
       row.probe = await page.evaluate(() => window.__probe);
+      // Late work (the encoder worker, lazy chunks) can still report.
+      await page.waitForTimeout(1000);
     } catch (error) {
       row.probe = { ok: false, errors: [String(error)] };
     }
@@ -147,9 +217,13 @@ try {
     row.warnings = warnings.filter((w) => /embedpdf|wasm/i.test(w));
     await page.close();
     server.close();
+    // An app passes when it boots, stays on its origin, and nothing violates the policy.
+    row.ok = row.probe.ok && row.foreign.length === 0 && row.csp.violations.length === 0;
     console.log(
-      `  build ${Math.round(row.buildMs / 1000)}s · probe ${row.probe.ok ? 'OK' : 'FAILED'} in ${row.probe.ms ?? '?'} ms · wasm ${row.wasmFetched.join(', ') || 'none'} · foreign ${row.foreign.join(', ') || 'none'} · emitted js ${kb(row.emitted.js)} wasm ${kb(row.emitted.wasm)}`,
+      `  build ${Math.round(row.buildMs / 1000)}s · probe ${row.probe.ok ? 'OK' : 'FAILED'} in ${row.probe.ms ?? '?'} ms · CSP ${row.csp.violations.length ? `${row.csp.violations.length} violations` : 'clean'} · wasm ${row.wasmFetched.join(', ') || 'none'} · foreign ${row.foreign.join(', ') || 'none'} · emitted js ${kb(row.emitted.js)} wasm ${kb(row.emitted.wasm)}`,
     );
+    if (row.csp.violations.length)
+      console.log('  ' + row.csp.violations.join('\n  ').slice(0, 1500));
     if (!row.probe.ok)
       console.log(
         '  ' +
@@ -163,12 +237,30 @@ try {
 
 writeFileSync(join(here, 'results.json'), JSON.stringify(results, null, 2) + '\n');
 console.log(
-  '\n| Toolchain | Build | Probe | wasm delivery | wasm fetched from | Off-origin | Emitted JS | Emitted wasm |',
+  '\n| Toolchain | Result | Build | Probe | CSP (worker-src, additions) | wasm delivery | wasm fetched from | Off-origin | Emitted JS | Emitted wasm |',
 );
-console.log('| --- | --- | --- | --- | --- | --- | --- | --- |');
+console.log('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
 for (const r of results) {
   const probe = r.build !== 'ok' ? '—' : r.probe.ok ? `✅ ${r.probe.ms} ms` : '❌';
+  const additions = [
+    ...(r.csp?.trustedTypes ?? []).map((name) => `+ ${name}`),
+    ...(r.csp?.enforceTrustedTypes === false ? ['− require-trusted-types-for'] : []),
+    ...(r.csp?.scriptHashes ? [`+ ${r.csp.scriptHashes} script hashes`] : []),
+  ];
+  const csp = !r.csp
+    ? '—'
+    : `${r.csp.violations.length ? `❌ ${r.csp.violations.length} violations` : '✅'} (${[r.csp.workerSrc, ...additions].join(', ')})`;
   console.log(
-    `| ${r.toolchain} | ${r.build === 'ok' ? `✅ ${Math.round(r.buildMs / 1000)}s` : '❌'} | ${probe} | ${r.delivery ?? '—'} | ${(r.wasmFetched ?? []).join('<br>') || '—'} | ${(r.foreign ?? []).join('<br>') || 'none'} | ${r.emitted ? kb(r.emitted.js) : '—'} | ${r.emitted ? kb(r.emitted.wasm) : '—'} |`,
+    `| ${r.toolchain} | ${r.ok ? '✅' : '❌'} | ${r.build === 'ok' ? `✅ ${Math.round(r.buildMs / 1000)}s` : '❌'} | ${probe} | ${csp} | ${r.delivery ?? '—'} | ${(r.wasmFetched ?? []).join('<br>') || '—'} | ${(r.foreign ?? []).join('<br>') || 'none'} | ${r.emitted ? kb(r.emitted.js) : '—'} | ${r.emitted ? kb(r.emitted.wasm) : '—'} |`,
   );
+}
+
+// What the docs promise of every row, whether or not its zero-config boot works: no request
+// leaves the app's origin, and nothing violates the policy.
+const broken = results.filter((r) => r.foreign?.length || r.csp?.violations.length);
+if (broken.length) {
+  console.error(
+    `\n${broken.map((r) => r.app).join(', ')}: a request left the origin or the policy was violated`,
+  );
+  process.exitCode = 1;
 }

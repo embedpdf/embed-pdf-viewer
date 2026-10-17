@@ -1,0 +1,149 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* Two views side by side; on a narrow screen the overview becomes a row on top */
+.views {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.view {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.caption {
+  margin-right: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.button {
+  min-width: 38px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 1.1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.readout {
+  min-width: 44px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A page of the overview is a button: it moves the main view there */
+.page-button {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.page-button[aria-current='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.page-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.overview .stage {
+  height: 140px;
+}
+
+@container (min-width: 560px) {
+  .overview {
+    flex: 0 0 180px;
+  }
+
+  .main {
+    flex: 1 1 0;
+  }
+
+  .overview .stage {
+    height: 420px;
+  }
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

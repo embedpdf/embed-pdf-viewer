@@ -26,9 +26,9 @@ export namespace DocVersionsSignatures200Response {
     export namespace Signatures {
         export interface Item {
             index: number;
-            field: CloudPDF.DocVersionsSignatures200ResponseSignaturesItemField;
+            field: CloudPDF.FormFieldRef;
             fieldName: string;
-            widget: Item.Widget | null;
+            widget: CloudPDF.FormWidget | null;
             signed: boolean;
             kind: Item.Kind;
             filter: string | null;
@@ -46,26 +46,6 @@ export namespace DocVersionsSignatures200Response {
         }
 
         export namespace Item {
-            export interface Widget {
-                ref: CloudPDF.DocVersionsSignatures200ResponseSignaturesItemWidgetRef | null;
-                annotObjectNumber: number;
-                page: Widget.Page | null;
-            }
-
-            export namespace Widget {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-            }
-
             export const Kind = {
                 Signature: "signature",
                 Timestamp: "timestamp",
@@ -83,7 +63,7 @@ export namespace DocVersionsSignatures200Response {
                 reason: string | null;
                 location: string | null;
                 contactInfo: string | null;
-                claimedTime: string | null;
+                signedAt: string | null;
             }
 
             export interface FieldMdp {

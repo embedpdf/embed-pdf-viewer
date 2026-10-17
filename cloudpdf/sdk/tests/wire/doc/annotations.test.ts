@@ -10,64 +10,55 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            pages: [
+            annotations: [
                 {
-                    pageState: {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
+                    subtype: "highlight",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
+                    nm: "nm",
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
                     },
-                    annotations: [
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    color: "color",
+                    opacity: 1.1,
+                    quadPoints: [
                         {
-                            subtype: "highlight",
-                            ref: {
-                                kind: "objectNumber",
-                                page: { kind: "objectNumber", pageObjectNumber: 1 },
-                                annotObjectNumber: 1,
-                            },
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            index: 1,
-                            identityQuality: "durable",
-                            nm: null,
-                            flags: {
-                                invisible: true,
-                                hidden: true,
-                                print: true,
-                                noZoom: true,
-                                noRotate: true,
-                                noView: true,
-                                readOnly: true,
-                                locked: true,
-                                toggleNoView: true,
-                                lockedContents: true,
-                            },
-                            rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
-                            contents: null,
-                            subject: null,
-                            author: null,
-                            created: null,
-                            modified: null,
-                            blendMode: "normal",
-                            inReplyTo: null,
-                            replyType: null,
-                            color: { r: 1, g: 1, b: 1 },
-                            opacity: 1.1,
-                            quadPoints: [
-                                {
-                                    p1: { x: 1.1, y: 1.1 },
-                                    p2: { x: 1.1, y: 1.1 },
-                                    p3: { x: 1.1, y: 1.1 },
-                                    p4: { x: 1.1, y: 1.1 },
-                                },
-                            ],
+                            upperLeft: { x: 1.1, y: 1.1 },
+                            upperRight: { x: 1.1, y: 1.1 },
+                            lowerLeft: { x: 1.1, y: 1.1 },
+                            lowerRight: { x: 1.1, y: 1.1 },
                         },
                     ],
                 },
             ],
+            pages: [{ kind: "objectNumber", objectNumber: 1 }],
             auditHead: 1,
         };
 
@@ -135,68 +126,56 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            pageState: {
-                page: { kind: "objectNumber", pageObjectNumber: 1 },
-                revision: {
-                    docSessionId: "docSessionId",
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
-                    generation: 1,
-                },
-                weakAnnotationState: { kind: "unknown" },
-            },
             annotations: [
                 {
                     subtype: "highlight",
-                    ref: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
-                    index: 1,
-                    identityQuality: "durable",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
                     nm: "nm",
-                    flags: {
-                        invisible: true,
-                        hidden: true,
-                        print: true,
-                        noZoom: true,
-                        noRotate: true,
-                        noView: true,
-                        readOnly: true,
-                        locked: true,
-                        toggleNoView: true,
-                        lockedContents: true,
-                    },
-                    rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                     contents: "contents",
                     subject: "subject",
-                    author: "author",
-                    created: "2024-01-15T09:30:00Z",
-                    modified: "2024-01-15T09:30:00Z",
                     blendMode: "normal",
-                    inReplyTo: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
                     },
-                    replyType: "reply",
-                    userId: "userId",
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
                     createdBy: "createdBy",
-                    updatedBy: "updatedBy",
-                    color: { r: 1, g: 1, b: 1 },
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    color: "color",
                     opacity: 1.1,
                     quadPoints: [
                         {
-                            p1: { x: 1.1, y: 1.1 },
-                            p2: { x: 1.1, y: 1.1 },
-                            p3: { x: 1.1, y: 1.1 },
-                            p4: { x: 1.1, y: 1.1 },
+                            upperLeft: { x: 1.1, y: 1.1 },
+                            upperRight: { x: 1.1, y: 1.1 },
+                            lowerLeft: { x: 1.1, y: 1.1 },
+                            lowerRight: { x: 1.1, y: 1.1 },
                         },
                     ],
                 },
             ],
+            pages: [{ kind: "objectNumber", objectNumber: 1 }],
+            auditHead: 1,
         };
 
         server
@@ -243,31 +222,86 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
-            meta: {
-                affectedPages: [
+            annotation: {
+                subtype: "highlight",
+                ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                page: { kind: "objectNumber", objectNumber: 1 },
+                hasAppearance: true,
+                appearanceState: "appearanceState",
+                nm: "nm",
+                rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                contents: "contents",
+                subject: "subject",
+                blendMode: "normal",
+                invisible: true,
+                hidden: true,
+                print: true,
+                noZoom: true,
+                noRotate: true,
+                noView: true,
+                readOnly: true,
+                locked: true,
+                toggleNoView: true,
+                lockedContents: true,
+                reply: {
+                    to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    type: "reply",
+                },
+                popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                groupId: "groupId",
+                author: "author",
+                createdAt: "2024-01-15T09:30:00Z",
+                modifiedAt: "2024-01-15T09:30:00Z",
+                userId: "userId",
+                createdBy: "createdBy",
+                modifiedBy: "modifiedBy",
+                importedBy: "importedBy",
+                actions: {
+                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                color: "color",
+                opacity: 1.1,
+                quadPoints: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
+                        upperLeft: { x: 1.1, y: 1.1 },
+                        upperRight: { x: 1.1, y: 1.1 },
+                        lowerLeft: { x: 1.1, y: 1.1 },
+                        lowerRight: { x: 1.1, y: 1.1 },
                     },
                 ],
+            },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
 
@@ -355,30 +389,27 @@ describe("AnnotationsClient", () => {
 
         const rawResponseBody = {
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
 
@@ -428,31 +459,87 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
-            meta: {
-                affectedPages: [
+            annotation: {
+                subtype: "highlight",
+                ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                page: { kind: "objectNumber", objectNumber: 1 },
+                hasAppearance: true,
+                appearanceState: "appearanceState",
+                nm: "nm",
+                rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                contents: "contents",
+                subject: "subject",
+                blendMode: "normal",
+                invisible: true,
+                hidden: true,
+                print: true,
+                noZoom: true,
+                noRotate: true,
+                noView: true,
+                readOnly: true,
+                locked: true,
+                toggleNoView: true,
+                lockedContents: true,
+                reply: {
+                    to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    type: "reply",
+                },
+                popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                groupId: "groupId",
+                author: "author",
+                createdAt: "2024-01-15T09:30:00Z",
+                modifiedAt: "2024-01-15T09:30:00Z",
+                userId: "userId",
+                createdBy: "createdBy",
+                modifiedBy: "modifiedBy",
+                importedBy: "importedBy",
+                actions: {
+                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                color: "color",
+                opacity: 1.1,
+                quadPoints: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
+                        upperLeft: { x: 1.1, y: 1.1 },
+                        upperRight: { x: 1.1, y: 1.1 },
+                        lowerLeft: { x: 1.1, y: 1.1 },
+                        lowerRight: { x: 1.1, y: 1.1 },
                     },
                 ],
+            },
+            appearance: { action: "preserved", changed: true },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
 
@@ -542,31 +629,35 @@ describe("AnnotationsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            page: { kind: "objectNumber", objectNumber: 1 },
+            usage: "display",
+            results: [
+                {
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    status: "applied",
+                },
+            ],
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -644,6 +735,166 @@ describe("AnnotationsClient", () => {
                         key: "value",
                     },
                 },
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("reorder (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            refs: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            position: "start",
+        };
+        const rawResponseBody = {
+            order: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.annotations.reorder({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            refs: [
+                {
+                    kind: "objectNumber",
+                    page: {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reorder (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            refs: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.annotations.reorder({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                refs: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reorder (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            refs: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.annotations.reorder({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                refs: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
