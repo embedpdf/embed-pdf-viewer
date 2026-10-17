@@ -6,7 +6,8 @@
  * and lines. Everywhere it prints pictures: one sheet per page, the page's picture on a sheet of
  * the page's own size (`@page`), shrunk to fit when the browser prints on other paper. A desktop
  * browser prints the sheets from a hidden frame. iOS prints a frame as a picture of the page
- * around it, so there the sheets print from the page itself, hidden on screen.
+ * around it, so there the sheets print from the page itself, hidden on screen. Safari prints only
+ * from a tap, so there the printer says it `needsTap`.
  *
  * Structurally `HostPrinter` from `@embedpdf/core`, declared here so this package stays
  * dependency-free.
@@ -27,6 +28,7 @@ export interface WebStagedPrint {
 
 /** Structural twin of `HostPrinter` (`@embedpdf/core`). */
 export interface WebPrinter {
+  readonly needsTap?: boolean;
   stage(
     sheets: readonly WebPrintSheet[],
     options: { readonly name: string; readonly signal?: AbortSignal },
@@ -42,7 +44,7 @@ const PRINT_ROOT = 'data-epdf-print';
 
 /** The browser's printer: it prints PDFs where the browser's own PDF viewer does. */
 export function browserPrinter(): WebPrinter {
-  const printer: WebPrinter = { stage: stageSheets };
+  const printer: WebPrinter = { needsTap: printsOnlyFromATap(), stage: stageSheets };
   if (!printsPdfFiles()) return printer;
 
   // The viewer prints a PDF after `print()` returned, and removing its frame cancels that: the
@@ -330,6 +332,16 @@ function untilSettled<T>(work: Promise<T>, signal: AbortSignal | undefined): Pro
 function printsPdfFiles(): boolean {
   if (typeof navigator === 'undefined' || navigator.pdfViewerEnabled !== true) return false;
   return !printsFramesAsPictures() && !/Android/i.test(navigator.userAgent);
+}
+
+/**
+ * Whether this browser prints only while a tap or click is being handled: Safari's engine, whose
+ * vendor is Apple. On iOS a print that waited shows "This website has been blocked from
+ * automatically printing"; Safari on the Mac opens its print dialog, but with blank pages.
+ */
+function printsOnlyFromATap(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return navigator.vendor === 'Apple Computer, Inc.' || printsFramesAsPictures();
 }
 
 /**

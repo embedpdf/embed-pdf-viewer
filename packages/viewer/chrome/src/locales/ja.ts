@@ -234,6 +234,7 @@ export const ja: Locale = {
       annotations: '注釈を印刷',
       preparing: '準備中…',
       preparingPage: '{total} ページ中 {page} ページ目を準備中…',
+      ready: '印刷の準備ができました。',
       images: 'ページは {dpi} DPI の画像として印刷されます。',
       lowResolution: 'この文書は低解像度（{dpi} DPI）での印刷のみ許可されています。',
       failed: '印刷の準備ができませんでした。',

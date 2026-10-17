@@ -235,6 +235,7 @@ export const nl: Locale = {
       annotations: 'Annotaties afdrukken',
       preparing: 'Voorbereiden…',
       preparingPage: 'Pagina {page} van {total} voorbereiden…',
+      ready: 'Klaar om af te drukken.',
       images: 'Pagina’s worden als afbeeldingen afgedrukt op {dpi} DPI.',
       lowResolution: 'Dit document staat alleen afdrukken in lage resolutie toe ({dpi} DPI).',
       failed: 'De afdruk kon niet worden voorbereid.',

@@ -151,6 +151,22 @@ describe('browserPrinter on a desktop browser', () => {
   });
 });
 
+describe('browserPrinter and taps', () => {
+  it('needs a tap to print in Safari, on iOS and the Mac, and nowhere else', () => {
+    const browser = (userAgent: string, vendor: string, maxTouchPoints = 0) =>
+      vi.stubGlobal('navigator', { userAgent, vendor, maxTouchPoints, pdfViewerEnabled: true });
+    browser('Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15', '', 5);
+    expect(browserPrinter().needsTap).toBe(true);
+    // Safari on the Mac opens its print dialog without a tap, but with blank pages.
+    browser('Mozilla/5.0 (Macintosh) Version/26.0 Safari/605.1.15', 'Apple Computer, Inc.');
+    expect(browserPrinter().needsTap).toBe(true);
+    browser('Mozilla/5.0 (Macintosh) Chrome/146', 'Google Inc.');
+    expect(browserPrinter().needsTap).toBe(false);
+    browser('Mozilla/5.0 (Macintosh; rv:140.0) Gecko/20100101 Firefox/140.0', '');
+    expect(browserPrinter().needsTap).toBe(false);
+  });
+});
+
 describe('browserPrinter and PDFs', () => {
   const desktop = (pdfViewerEnabled: boolean, userAgent = 'Mozilla/5.0 (Macintosh) Chrome/146') =>
     vi.stubGlobal('navigator', { userAgent, maxTouchPoints: 0, pdfViewerEnabled });

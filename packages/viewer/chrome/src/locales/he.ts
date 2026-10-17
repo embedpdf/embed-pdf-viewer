@@ -235,6 +235,7 @@ export const he: Locale = {
       annotations: 'הדפסת ביאורים',
       preparing: 'בהכנה…',
       preparingPage: 'מכין את עמוד {page} מתוך {total}…',
+      ready: 'מוכן להדפסה.',
       images: 'העמודים מודפסים כתמונות ב-{dpi} DPI.',
       lowResolution: 'מסמך זה מתיר הדפסה ברזולוציה נמוכה בלבד ({dpi} DPI).',
       failed: 'לא ניתן היה להכין את ההדפסה.',

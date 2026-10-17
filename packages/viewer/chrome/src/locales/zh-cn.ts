@@ -234,6 +234,7 @@ export const zhCN: Locale = {
       annotations: '打印注释',
       preparing: '正在准备…',
       preparingPage: '正在准备第 {page} 页，共 {total} 页…',
+      ready: '已准备好打印。',
       images: '页面将以 {dpi} DPI 的图像打印。',
       lowResolution: '此文档仅允许低分辨率打印（{dpi} DPI）。',
       failed: '无法准备打印内容。',

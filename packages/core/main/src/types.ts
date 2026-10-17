@@ -655,13 +655,19 @@ export interface PrintOptions extends OperationOptions {
 
 /**
  * A print got ready by `documents.preparePrint()`. Everything slow already happened, so
- * `print()` opens the print dialog at once: call it from the user's tap, which some browsers
- * require for a print dialog.
+ * `print()` opens the print dialog at once.
  */
 export interface PreparedPrint {
   readonly quality: PrintQuality;
   /** How many pages it prints. */
   readonly pageCount: number;
+  /**
+   * Whether `print()` must run inside the user's tap or click: the printer's `needsTap`. Safari
+   * doesn't print what waited for its pages (iOS refuses the dialog, the Mac prints blank pages),
+   * so a dialog that prepared on a tap asks for another once the print is ready. When `false`,
+   * print as soon as it is ready.
+   */
+  readonly needsTap: boolean;
   /**
    * Open the print dialog. The document's own print actions run around it, when the actions
    * plugin is installed; when they, or anyone, change the document after it was prepared, it is
@@ -698,6 +704,11 @@ export interface StagedPrint {
  * own.
  */
 export interface HostPrinter {
+  /**
+   * `true` when this printer prints only while the user's tap or click is being handled (Safari),
+   * so a print that waited for its pages needs another tap. Default `false`.
+   */
+  readonly needsTap?: boolean;
   /**
    * Get the sheets ready to print, so `print()` on what it returns opens the dialog at once.
    * `name` names the print job. Rejects when `signal` fires.
@@ -856,7 +867,8 @@ export interface DocumentsCapability {
   /**
    * Prepare a print and print it: `preparePrint()`, then its `print()`. The document's own
    * print actions run around the dialog when the actions plugin is installed. Rejects as
-   * `preparePrint()` does.
+   * `preparePrint()` does. A printer that `needsTap` may refuse the dialog once preparing took a
+   * while: there, prepare first and print from a tap.
    */
   print(id?: string, options?: PrintOptions): Promise<void>;
   /** How a print of the document comes out for this user, or null when they can't print it. */

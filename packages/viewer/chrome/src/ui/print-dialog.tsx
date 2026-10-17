@@ -1,9 +1,11 @@
 /**
  * The Print dialog, which `document:print` opens: every page, the current page or a range of
- * them, and whether annotations print. It prepares the printout as soon as it opens, and again
- * whenever a choice changes (the old one is cancelled), so its Print button opens the browser's
- * dialog at once: iOS prints only from a tap that opens it directly. Form fields always print,
- * each as its own print setting says; annotations follow theirs.
+ * them, and whether annotations print. Nothing is made while the user chooses: Print prepares
+ * the printout the choices describe, shows how far that is, and opens the browser's print dialog
+ * as soon as it is ready. Safari prints only from a tap, and the one on Print was spent preparing,
+ * so there the printout waits for another (`PreparedPrint.needsTap`). Cancel stops it at any
+ * point. Form fields always print, each as its own print setting says; annotations follow
+ * theirs.
  */
 import { useT } from '@embedpdf/react/i18n';
 import {
@@ -17,14 +19,11 @@ import {
 } from '@embedpdf/react/runtime';
 import { useSurface } from '@embedpdf/react/shell';
 import { useStageState } from '@embedpdf/react/stage';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { PRINT_DIALOG } from '../config/commands';
 import { Dialog } from './dialog';
 import { pagesInRange } from './print-pages';
-
-/** How long a typed range rests before the dialog prepares its pages. */
-const RANGE_PAUSE_MS = 400;
 
 type PageChoice = 'all' | 'current' | 'range';
 
@@ -43,12 +42,29 @@ function chosenPages(
   return pagesInRange(range, pages.length)?.map((page) => pages[page - 1]!.ref) ?? null;
 }
 
-/** Where the printout is: on its way (with how far), ready to print, or not possible. */
+/**
+ * The printout: not asked for yet, on its way (with how far), ready and waiting for the tap
+ * Safari needs, being printed, or failed (the choices show again, to try once more).
+ */
 type Job =
+  | { readonly kind: 'choosing' }
   | { readonly kind: 'preparing'; readonly progress: PrintProgress | null }
   | { readonly kind: 'ready'; readonly prepared: PreparedPrint }
-  | { readonly kind: 'invalid-range' }
+  | { readonly kind: 'printing' }
   | { readonly kind: 'failed' };
+
+/** The printout the dialog holds: cancelled while on its way, freed once made. */
+interface HeldPrint {
+  readonly cancel: AbortController;
+  prepared: PreparedPrint | null;
+}
+
+/** Cancel the printout on its way, or free the one made. */
+function drop(held: { current: HeldPrint | null }) {
+  held.current?.cancel.abort();
+  held.current?.prepared?.dispose();
+  held.current = null;
+}
 
 export function PrintDialog() {
   const surface = useSurface(PRINT_DIALOG);
@@ -67,65 +83,65 @@ function PrintForm({ onClose }: { onClose: () => void }) {
   const [choice, setChoice] = useState<PageChoice>('all');
   const [range, setRange] = useState('');
   const [includeAnnotations, setIncludeAnnotations] = useState(true);
-  const [job, setJob] = useState<Job>({ kind: 'preparing', progress: null });
-  const [printing, setPrinting] = useState(false);
+  const [job, setJob] = useState<Job>({ kind: 'choosing' });
+  const held = useRef<HeldPrint | null>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const printButton = useRef<HTMLButtonElement>(null);
   const quality = documents.getPrintQuality(documentId ?? undefined);
+  const chosen = chosenPages(choice, pages, currentIndex, range);
 
-  // Prepare the printout the choices describe; a new choice cancels the one on its way and frees
-  // the one that was ready.
-  useEffect(() => {
-    const chosen = chosenPages(choice, pages, currentIndex, range);
-    if (chosen === null) {
-      setJob({ kind: 'invalid-range' });
-      return;
-    }
-    const cancel = new AbortController();
-    let prepared: PreparedPrint | null = null;
-    setJob({ kind: 'preparing', progress: null });
-    const start = () =>
-      documents
-        .preparePrint(documentId ?? undefined, {
-          ...(chosen ? { pages: chosen } : {}),
-          includeAnnotations,
-          signal: cancel.signal,
-          onProgress: (progress) => {
-            if (!cancel.signal.aborted) setJob({ kind: 'preparing', progress });
-          },
-        })
-        .then(
-          (ready) => {
-            if (cancel.signal.aborted) return ready.dispose();
-            prepared = ready;
-            setJob({ kind: 'ready', prepared: ready });
-          },
-          (error: unknown) => {
-            if (cancel.signal.aborted) return;
-            console.warn('[embedpdf] preparing the printout failed', error);
-            setJob({ kind: 'failed' });
-          },
-        );
-    // A typed range waits until typing pauses, so each keystroke doesn't draw pages.
-    const timer = setTimeout(start, choice === 'range' ? RANGE_PAUSE_MS : 0);
-    return () => {
-      clearTimeout(timer);
-      cancel.abort();
-      prepared?.dispose();
-    };
-  }, [documents, documentId, pages, currentIndex, choice, range, includeAnnotations]);
+  // Closing the dialog, by Cancel, Escape or a finished print, drops the printout.
+  useEffect(() => () => drop(held), []);
 
-  const print = () => {
-    if (job.kind !== 'ready') return;
-    setPrinting(true);
-    job.prepared.print().then(onClose, (error: unknown) => {
+  const print = (prepared: PreparedPrint) => {
+    setJob({ kind: 'printing' });
+    prepared.print().then(onClose, (error: unknown) => {
       console.warn('[embedpdf] print failed', error);
-      setPrinting(false);
       setJob({ kind: 'failed' });
     });
   };
 
+  const prepare = (pagesToPrint: readonly PageRef[] | undefined) => {
+    drop(held);
+    const job: HeldPrint = { cancel: new AbortController(), prepared: null };
+    const { signal } = job.cancel;
+    held.current = job;
+    setJob({ kind: 'preparing', progress: null });
+    documents
+      .preparePrint(documentId ?? undefined, {
+        ...(pagesToPrint ? { pages: pagesToPrint } : {}),
+        includeAnnotations,
+        signal,
+        onProgress: (progress) => {
+          if (!signal.aborted) setJob({ kind: 'preparing', progress });
+        },
+      })
+      .then(
+        (prepared) => {
+          if (signal.aborted) return prepared.dispose();
+          job.prepared = prepared;
+          if (prepared.needsTap) setJob({ kind: 'ready', prepared });
+          else print(prepared);
+        },
+        (error: unknown) => {
+          if (signal.aborted) return;
+          console.warn('[embedpdf] preparing the printout failed', error);
+          setJob({ kind: 'failed' });
+        },
+      );
+  };
+
+  // While the printout is made, the choices give way to its progress: focus goes to Cancel, and
+  // to Print once a printout waits for its tap.
+  useEffect(() => {
+    if (job.kind === 'preparing' && job.progress === null) cancelButton.current?.focus();
+    if (job.kind === 'ready') printButton.current?.focus();
+  }, [job]);
+
+  const choosing = job.kind === 'choosing' || job.kind === 'failed';
   const status =
     job.kind === 'preparing'
-      ? job.progress && job.progress.pageCount > 0
+      ? job.progress && job.progress.pagesRendered > 0
         ? t('print.preparingPage', {
             params: {
               page: Math.min(job.progress.pagesRendered + 1, job.progress.pageCount),
@@ -133,9 +149,11 @@ function PrintForm({ onClose }: { onClose: () => void }) {
             },
           })
         : t('print.preparing')
-      : job.kind === 'failed'
-        ? t('print.failed')
-        : null;
+      : job.kind === 'ready'
+        ? t('print.ready')
+        : job.kind === 'failed'
+          ? t('print.failed')
+          : null;
   // Pictures of the pages; a document that allows only low-resolution printing says so.
   const note =
     quality?.kind !== 'images'
@@ -148,87 +166,99 @@ function PrintForm({ onClose }: { onClose: () => void }) {
     <Dialog
       labelledBy={titleId}
       onClose={() => {
-        if (!printing) onClose();
+        if (job.kind !== 'printing') onClose();
       }}
       className="border-border bg-surface w-96 rounded-lg border p-4 shadow-xl"
     >
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          print();
+          if (job.kind === 'ready') print(job.prepared);
+          else if (choosing && chosen !== null) prepare(chosen);
         }}
       >
         <h2 id={titleId} className="text-fg text-base font-semibold">
           {t('print.title')}
         </h2>
-        <fieldset className="mt-3">
-          <legend className="text-fg-secondary text-sm font-medium">{t('print.pages')}</legend>
-          <div className="mt-1 flex flex-col gap-1">
-            <Choice
-              name={choiceName}
-              checked={choice === 'all'}
-              onChoose={() => setChoice('all')}
-              label={t('print.allPages')}
-            />
-            <Choice
-              name={choiceName}
-              checked={choice === 'current'}
-              onChoose={() => setChoice('current')}
-              label={t('print.currentPage')}
-            />
-            <div className="flex items-center gap-2">
-              <Choice
-                name={choiceName}
-                checked={choice === 'range'}
-                onChoose={() => setChoice('range')}
-                label={t('print.range')}
-                controls={rangeId}
-              />
+        {choosing ? (
+          <>
+            <fieldset className="mt-3">
+              <legend className="text-fg-secondary text-sm font-medium">{t('print.pages')}</legend>
+              <div className="mt-1 flex flex-col gap-1">
+                <Choice
+                  name={choiceName}
+                  checked={choice === 'all'}
+                  onChoose={() => setChoice('all')}
+                  label={t('print.allPages')}
+                />
+                <Choice
+                  name={choiceName}
+                  checked={choice === 'current'}
+                  onChoose={() => setChoice('current')}
+                  label={t('print.currentPage')}
+                />
+                <div className="flex items-center gap-2">
+                  <Choice
+                    name={choiceName}
+                    checked={choice === 'range'}
+                    onChoose={() => setChoice('range')}
+                    label={t('print.range')}
+                    controls={rangeId}
+                  />
+                  <input
+                    id={rangeId}
+                    type="text"
+                    inputMode="numeric"
+                    aria-label={t('print.rangeLabel')}
+                    aria-invalid={choice === 'range' && chosen === null}
+                    placeholder={t('print.rangePlaceholder')}
+                    value={range}
+                    onFocus={() => setChoice('range')}
+                    onChange={(event) => setRange(event.target.value)}
+                    className="border-border bg-surface text-fg focus:border-accent focus:ring-accent min-w-0 flex-1 rounded-md border px-1.5 py-1 text-sm tabular-nums outline-none focus:ring-1 aria-[invalid=true]:border-red-600"
+                  />
+                </div>
+                {choice === 'range' && chosen === null && range.trim() !== '' ? (
+                  <p className="text-xs text-red-600">
+                    {t('print.rangeInvalid', { params: { total: pages.length } })}
+                  </p>
+                ) : null}
+              </div>
+            </fieldset>
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
               <input
-                id={rangeId}
-                type="text"
-                inputMode="numeric"
-                aria-label={t('print.rangeLabel')}
-                aria-invalid={choice === 'range' && job.kind === 'invalid-range'}
-                placeholder={t('print.rangePlaceholder')}
-                value={range}
-                onFocus={() => setChoice('range')}
-                onChange={(event) => setRange(event.target.value)}
-                className="border-border bg-surface text-fg focus:border-accent focus:ring-accent min-w-0 flex-1 rounded-md border px-1.5 py-1 text-sm tabular-nums outline-none focus:ring-1 aria-[invalid=true]:border-red-600"
+                type="checkbox"
+                className="accent-accent"
+                checked={includeAnnotations}
+                onChange={(event) => setIncludeAnnotations(event.target.checked)}
               />
-            </div>
-            {choice === 'range' && job.kind === 'invalid-range' && range.trim() !== '' ? (
-              <p className="text-xs text-red-600">
-                {t('print.rangeInvalid', { params: { total: pages.length } })}
-              </p>
-            ) : null}
-          </div>
-        </fieldset>
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="accent-accent"
-            checked={includeAnnotations}
-            onChange={(event) => setIncludeAnnotations(event.target.checked)}
+              <span className="text-fg">{t('print.annotations')}</span>
+            </label>
+            {note ? <p className="text-fg-muted mt-3 text-xs">{note}</p> : null}
+          </>
+        ) : (
+          <ProgressBar
+            progress={job.kind === 'preparing' ? job.progress : null}
+            done={job.kind !== 'preparing'}
           />
-          <span className="text-fg">{t('print.annotations')}</span>
-        </label>
-        {note ? <p className="text-fg-muted mt-3 text-xs">{note}</p> : null}
+        )}
         <p role="status" className="text-fg-muted mt-2 min-h-5 text-sm">
           {status}
         </p>
         <div className="mt-3 flex justify-end gap-2">
           <button
+            ref={cancelButton}
             type="button"
-            disabled={printing}
+            disabled={job.kind === 'printing'}
             onClick={onClose}
             className="border-border text-fg hover:bg-hover rounded-md border px-3 py-1.5 text-sm"
           >
             {t('print.cancel')}
           </button>
           <button
+            ref={printButton}
             type="submit"
-            disabled={job.kind !== 'ready' || printing}
+            disabled={choosing ? chosen === null : job.kind !== 'ready'}
             className="bg-accent text-on-accent hover:bg-accent-hover rounded-md px-3 py-1.5 text-sm disabled:opacity-60"
           >
             {t('print.print')}
@@ -236,6 +266,26 @@ function PrintForm({ onClose }: { onClose: () => void }) {
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/**
+ * How far preparing got: the bar moves until the first page is ready (a PDF copy arrives all at
+ * once), then fills page by page. Full once the printout is made.
+ */
+function ProgressBar({ progress, done }: { progress: PrintProgress | null; done: boolean }) {
+  const fraction = done
+    ? 1
+    : progress && progress.pagesRendered > 0
+      ? progress.pagesRendered / progress.pageCount
+      : null;
+  return (
+    <div aria-hidden="true" className="bg-hover mt-4 h-1.5 overflow-hidden rounded-full">
+      <div
+        className={`bg-accent h-full rounded-full transition-[width] ${fraction === null ? 'w-full animate-pulse' : ''}`}
+        style={fraction === null ? undefined : { width: `${fraction * 100}%` }}
+      />
+    </div>
   );
 }
 

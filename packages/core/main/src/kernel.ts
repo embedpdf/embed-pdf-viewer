@@ -926,6 +926,7 @@ export function createKernel(config: {
           return printed;
         },
         pageCount,
+        needsTap: printer.needsTap === true,
         async print(printOptions) {
           if (disposed) {
             throw new PluginError('invalid-input', 'documents', 'this print was disposed');

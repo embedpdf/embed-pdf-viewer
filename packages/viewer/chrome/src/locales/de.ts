@@ -235,6 +235,7 @@ export const de: Locale = {
       annotations: 'Anmerkungen drucken',
       preparing: 'Wird vorbereitet…',
       preparingPage: 'Seite {page} von {total} wird vorbereitet…',
+      ready: 'Bereit zum Drucken.',
       images: 'Die Seiten werden als Bilder mit {dpi} DPI gedruckt.',
       lowResolution: 'Dieses Dokument erlaubt nur das Drucken in niedriger Auflösung ({dpi} DPI).',
       failed: 'Der Ausdruck konnte nicht vorbereitet werden.',

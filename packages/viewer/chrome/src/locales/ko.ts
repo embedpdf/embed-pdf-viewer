@@ -234,6 +234,7 @@ export const ko: Locale = {
       annotations: '주석 인쇄',
       preparing: '준비 중…',
       preparingPage: '{total}페이지 중 {page}페이지 준비 중…',
+      ready: '인쇄할 준비가 되었습니다.',
       images: '페이지가 {dpi} DPI 이미지로 인쇄됩니다.',
       lowResolution: '이 문서는 저해상도({dpi} DPI) 인쇄만 허용합니다.',
       failed: '인쇄물을 준비하지 못했습니다.',

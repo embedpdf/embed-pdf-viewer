@@ -235,6 +235,7 @@ export const ar: Locale = {
       annotations: 'طباعة التعليقات التوضيحية',
       preparing: 'جارٍ التحضير…',
       preparingPage: 'جارٍ تحضير الصفحة {page} من {total}…',
+      ready: 'جاهز للطباعة.',
       images: 'تُطبع الصفحات كصور بدقة {dpi} DPI.',
       lowResolution: 'يسمح هذا المستند بالطباعة بدقة منخفضة فقط ({dpi} DPI).',
       failed: 'تعذّر تحضير الطباعة.',

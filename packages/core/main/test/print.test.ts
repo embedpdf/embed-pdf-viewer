@@ -150,6 +150,15 @@ describe('printing', () => {
     expect(highKernel.documents.getPrintQuality()).toEqual({ kind: 'images', dpi: 300 });
   });
 
+  it('a prepared print says whether its printer needs a tap to open the dialog', async () => {
+    const anyTime = await open(printableHandle().handle, { printer: recordingPrinter().printer });
+    expect((await anyTime.documents.preparePrint()).needsTap).toBe(false);
+
+    const printer: HostPrinter = { ...recordingPrinter().printer, needsTap: true };
+    const onATap = await open(printableHandle().handle, { printer });
+    expect((await onATap.documents.preparePrint()).needsTap).toBe(true);
+  });
+
   it('settles first, draws every page by the print rules, and stages them with their sizes', async () => {
     const order: string[] = [];
     const holder: AnyPlugin = {

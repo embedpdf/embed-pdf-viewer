@@ -234,6 +234,7 @@ export const pt: Locale = {
       annotations: 'Imprimir anotações',
       preparing: 'Preparando…',
       preparingPage: 'Preparando a página {page} de {total}…',
+      ready: 'Pronto para imprimir.',
       images: 'As páginas são impressas como imagens a {dpi} DPI.',
       lowResolution: 'Este documento só permite impressão em baixa resolução ({dpi} DPI).',
       failed: 'Não foi possível preparar a impressão.',

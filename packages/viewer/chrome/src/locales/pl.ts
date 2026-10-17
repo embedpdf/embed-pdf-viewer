@@ -234,6 +234,7 @@ export const pl: Locale = {
       annotations: 'Drukuj adnotacje',
       preparing: 'Przygotowywanie…',
       preparingPage: 'Przygotowywanie strony {page} z {total}…',
+      ready: 'Gotowe do druku.',
       images: 'Strony są drukowane jako obrazy w rozdzielczości {dpi} DPI.',
       lowResolution: 'Ten dokument pozwala drukować tylko w niskiej rozdzielczości ({dpi} DPI).',
       failed: 'Nie udało się przygotować wydruku.',
