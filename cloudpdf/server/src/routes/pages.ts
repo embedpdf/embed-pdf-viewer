@@ -7,15 +7,17 @@ import {
   wirePack,
   type PageImageOptions,
   type PageNetworkRenderFormat,
+  type DocCapability,
   type PageDeleteInput,
+  type PageExtractInput,
   type PageFlattenInput,
   type PagePosition,
   type PageReorderInput,
   type PageNameInput,
   type PageRemoveNameInput,
-  type PageRef,
   type PageRotateInput,
   type WorkerJobId,
+  resolvePageExtract,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -42,6 +44,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
+  holdsCapability,
   requireLayerCapability,
   requireLayerDocAccessOnly,
   requireLayerResource,
@@ -609,23 +612,34 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       docId: string;
       layerName: string;
     };
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    // Extract egresses content bytes (a partial download) — gated by
-    // `doc.download` like /download, not `doc.pages.assemble`: it reads,
-    // never restructures. Mirrors the local engine's gate exactly.
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
-    const body = parseOrInvalidArg<{ pages: PageRef[] }>(
-      PageExtractInputSchema as unknown as SchemaLike<{ pages: PageRef[] }>,
+    const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(ctx, docId, layerName);
+    const protection = await documentService.getProtection(ctx, docId, layerName);
+    const body = parseOrInvalidArg<PageExtractInput>(
+      PageExtractInputSchema as unknown as SchemaLike<PageExtractInput>,
       req.body,
       'request body',
     );
+    // Extract egresses content bytes (a partial download) — gated by
+    // `doc.download` like /download, not `doc.pages.assemble`: it reads,
+    // never restructures. A flattened copy also passes on
+    // `doc.download.flattened`, and paints only what the caller may read.
+    // The same check as the local engine's (`resolvePageExtract`).
+    const holds = (capability: DocCapability) =>
+      holdsCapability(ctx, capability, pdfBits, protection);
+    const flatten = resolvePageExtract(body, {
+      download: holds('doc.download'),
+      downloadFlattened: holds('doc.download.flattened'),
+      annotations: holds('doc.annotate.read'),
+      formFields: holds('doc.forms.read'),
+    });
 
     const bytes = await documentService.extractLayerPages(
       ctx,
       docId,
       layerName,
       body.pages.map(resolvePageRefToNumber),
+      flatten,
       abortSignalOf(reply),
     );
     setNoStore(reply);

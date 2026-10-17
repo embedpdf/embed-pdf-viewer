@@ -1,10 +1,12 @@
 import { decodePng, type Raster } from './appearanceRasters';
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import type { PageExtractOptions } from '../dto/PageExtract';
 import type { PageLayout } from '../dto/PageLayout';
 import type { PageImageHandle, PageImageOptions, PrintDpi } from '../dto/PageRender';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import type { PageRef } from '../identity/PageRef';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { pageTransform } from '../geometry/pageTransform';
 
@@ -128,25 +130,7 @@ export function runPrintRenderConformance(
     };
 
     /** Which spots are dark in a picture of the small page made with `options`. */
-    const darkSpots = async (options: PageImageOptions): Promise<Record<Spot, boolean>> => {
-      const image = await doc.page(small.ref).render.image({ format: 'png', ...options });
-      const raster = await decode(image);
-      const dark = {} as Record<Spot, boolean>;
-      for (const spot of Object.keys(SPOTS) as Spot[]) {
-        const { x, y } = image.transform.pageToPixels(SPOTS[spot].at);
-        dark[spot] = isDark(pixel(raster, Math.floor(x), Math.floor(y)));
-      }
-      return dark;
-    };
-
-    const shown = (usage: 'display' | 'print', spots: readonly Spot[] = []) => {
-      const expected = {} as Record<Spot, boolean>;
-      for (const spot of Object.keys(SPOTS) as Spot[]) {
-        const layer = spot === 'layerPrintOnly' || spot === 'layerScreenOnly';
-        expected[spot] = (layer || spots.includes(spot)) && SPOTS[spot][usage];
-      }
-      return expected;
-    };
+    const darkSpots = (options: PageImageOptions) => darkSpotsOf(doc, small.ref, options);
 
     test('a print picture is the whole page at its DPI, with pageTransform as its transform', async () => {
       for (const dpi of [150, 300] as const) {
@@ -234,6 +218,185 @@ export function runPrintRenderConformance(
       });
     });
   });
+}
+
+/**
+ * The print copy on both engines: `pages.extract(pages, { flatten })` makes
+ * the pages as they draw for `flatten.usage`, so a print copy, printed, shows
+ * what a print picture of the page shows (layers by their print state,
+ * annotations and fields by their `print` flag), with nothing interactive
+ * left. `includeAnnotations` and `includeFormFields` choose what it paints,
+ * with a page picture's defaults; they take `flatten`. A flattened copy needs
+ * `doc.download` or `doc.download.flattened`, a plain one `doc.download`.
+ */
+export interface PrintCopyConformanceOptions extends PrintRenderConformanceOptions {
+  /** Open `bytes`, a copy the engine made, with every right. */
+  openCopy: (engine: Engine, bytes: Uint8Array) => Promise<DocumentHandle>;
+}
+
+export function runPrintCopyConformance(
+  runner: ConformanceTestRunner,
+  opts: PrintCopyConformanceOptions,
+): void {
+  const { describe, test, beforeAll, afterAll, expect } = runner;
+
+  describe(`print copy conformance: ${opts.label}`, () => {
+    let engine: Engine;
+    let doc: DocumentHandle;
+    let small: PageLayout;
+
+    beforeAll(async () => {
+      engine = await opts.makeEngine();
+      doc = await opts.open(engine, PRINT_SCOPES.everything);
+      small = (await doc.pages.list()).pages[0]!;
+    });
+
+    afterAll(async () => {
+      if (doc) await doc.close();
+      if (engine) await engine.destroy();
+    });
+
+    const as = async (
+      scope: readonly string[],
+      body: (doc: DocumentHandle) => Promise<void>,
+    ): Promise<void> => {
+      const restricted = await opts.open(engine, scope);
+      try {
+        await body(restricted);
+      } finally {
+        await restricted.close();
+      }
+    };
+
+    /** The spots dark in a picture (made with `picture`) of the copy `options` makes. */
+    const copySpots = async (
+      source: DocumentHandle,
+      options: PageExtractOptions,
+      picture: PageImageOptions,
+    ): Promise<{ dark: Record<Spot, boolean>; annotations: number }> => {
+      const bytes = await source.pages.extract([small.ref], options);
+      const copy = await opts.openCopy(engine, bytes);
+      try {
+        const { pages } = await copy.pages.list();
+        expect(pages).toHaveLength(1);
+        const page = pages[0]!;
+        const { annotations } = await copy.page(page.ref).annotations.list();
+        return {
+          dark: await darkSpotsOf(copy, page.ref, picture),
+          annotations: annotations.length,
+        };
+      } finally {
+        await copy.close();
+      }
+    };
+
+    test('a print copy, printed, shows what a print picture shows, with nothing interactive left', async () => {
+      const before = (await doc.page(small.ref).annotations.list()).annotations.length;
+      const all = [...ANNOTATION_SPOTS, ...FIELD_SPOTS];
+      const printed = await copySpots(doc, { flatten: { usage: 'print' } }, print(150));
+      expect(printed.dark).toEqual(shown('print', all));
+      expect(printed.annotations).toBe(0);
+      // A read: the source keeps its annotations.
+      expect((await doc.page(small.ref).annotations.list()).annotations.length).toBe(before);
+    });
+
+    test('a display copy shows what a screen picture shows', async () => {
+      const all = [...ANNOTATION_SPOTS, ...FIELD_SPOTS];
+      const shownCopy = await copySpots(doc, { flatten: {} }, {});
+      expect(shownCopy.dark).toEqual(shown('display', all));
+      expect(shownCopy.annotations).toBe(0);
+    });
+
+    test('includeAnnotations and includeFormFields choose what a copy paints', async () => {
+      const cases: Array<{ options: PageExtractOptions; spots: readonly Spot[] }> = [
+        { options: { includeAnnotations: false, includeFormFields: false }, spots: [] },
+        {
+          options: { includeAnnotations: true, includeFormFields: false },
+          spots: ANNOTATION_SPOTS,
+        },
+        { options: { includeAnnotations: false, includeFormFields: true }, spots: FIELD_SPOTS },
+      ];
+      for (const { options, spots } of cases) {
+        const { dark } = await copySpots(
+          doc,
+          { ...options, flatten: { usage: 'print' } },
+          print(150),
+        );
+        expect(dark).toEqual(shown('print', spots));
+      }
+    });
+
+    test('the include options take flatten', async () => {
+      for (const options of [{ includeAnnotations: false }, { includeFormFields: true }]) {
+        await expect(doc.pages.extract([small.ref], options)).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+      }
+    });
+
+    test('a flattened copy needs doc.download or doc.download.flattened, and paints what the caller may read', async () => {
+      const reads = ['doc.open', 'doc.render', 'doc.annotate.read', 'doc.forms.read'];
+      await as([...reads, 'doc.download.flattened'], async (flattenedOnly) => {
+        await expect(flattenedOnly.pages.extract([small.ref])).rejects.toMatchObject({
+          code: EngineErrorCode.Forbidden,
+        });
+        const bytes = await flattenedOnly.pages.extract([small.ref], {
+          flatten: { usage: 'print' },
+        });
+        expect(Array.from(bytes.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46]);
+      });
+      await as(reads, async (noDownload) => {
+        await expect(
+          noDownload.pages.extract([small.ref], { flatten: { usage: 'print' } }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.Forbidden });
+      });
+      // Without doc.annotate.read the annotations stay out, and asking for
+      // them is refused.
+      await as(
+        ['doc.open', 'doc.render', 'doc.forms.read', 'doc.download'],
+        async (noAnnotations) => {
+          await expect(
+            noAnnotations.pages.extract([small.ref], {
+              flatten: { usage: 'print' },
+              includeAnnotations: true,
+            }),
+          ).rejects.toMatchObject({ code: EngineErrorCode.Forbidden });
+          const { dark } = await copySpots(
+            noAnnotations,
+            { flatten: { usage: 'print' } },
+            print(150),
+          );
+          expect(dark).toEqual(shown('print', FIELD_SPOTS));
+        },
+      );
+    });
+  });
+}
+
+/** Which spots are dark in a picture of `ref` made with `options`. */
+async function darkSpotsOf(
+  doc: DocumentHandle,
+  ref: PageRef,
+  options: PageImageOptions,
+): Promise<Record<Spot, boolean>> {
+  const image = await doc.page(ref).render.image({ format: 'png', ...options });
+  const raster = await decode(image);
+  const dark = {} as Record<Spot, boolean>;
+  for (const spot of Object.keys(SPOTS) as Spot[]) {
+    const { x, y } = image.transform.pageToPixels(SPOTS[spot].at);
+    dark[spot] = isDark(pixel(raster, Math.floor(x), Math.floor(y)));
+  }
+  return dark;
+}
+
+/** The spots `usage` shows when a picture draws the layers and `spots`. */
+function shown(usage: 'display' | 'print', spots: readonly Spot[] = []): Record<Spot, boolean> {
+  const expected = {} as Record<Spot, boolean>;
+  for (const spot of Object.keys(SPOTS) as Spot[]) {
+    const layer = spot === 'layerPrintOnly' || spot === 'layerScreenOnly';
+    expected[spot] = (layer || spots.includes(spot)) && SPOTS[spot][usage];
+  }
+  return expected;
 }
 
 /** The options of a print picture at `dpi`. */

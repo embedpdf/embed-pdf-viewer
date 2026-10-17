@@ -124,6 +124,7 @@ import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
+import type { PageExtractInput } from '../dto/PageExtract';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { ListPosition } from '../mutation/ListPosition';
 import type { PageReorderInput } from '../mutation/PageReorderInput';
@@ -1650,10 +1651,21 @@ export const PageInsertBlankInputSchema: z.ZodType<{
   position: PagePositionSchema.optional(),
 });
 
-/** Page extract input: the pages to export, in the order they should appear. */
-export const PageExtractInputSchema: z.ZodType<{ pages: PageRef[] }> = z.object({
-  pages: z.array(PageRefSchema).min(1),
-});
+/**
+ * Page extract input: the pages to export, in the order they should appear,
+ * and `pages.extract()`'s options (`PageExtractOptions`).
+ */
+export const PageExtractInputSchema: z.ZodType<PageExtractInput> = z
+  .object({
+    pages: z.array(PageRefSchema).min(1),
+    flatten: z
+      .object({ usage: z.enum(['display', 'print']).optional() })
+      .strict()
+      .optional(),
+    includeAnnotations: z.boolean().optional(),
+    includeFormFields: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Page insert result — shared by bytes-insert and blank-insert: the fresh

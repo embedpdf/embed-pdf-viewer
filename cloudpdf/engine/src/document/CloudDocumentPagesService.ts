@@ -22,6 +22,8 @@ import {
   type SessionEventPublisher,
   type WriteOptions,
   type FlattenWriteOptions,
+  type PageExtractInput,
+  type PageExtractOptions,
   type PageInsertBlankOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -373,18 +375,20 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  extract(pages: PageRef[]): AbortablePromise<Uint8Array> {
+  extract(pages: PageRef[], options?: PageExtractOptions): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    // A read (gated by doc.download server-side): no absorb, no event —
-    // nothing about the document changed.
+    // A read (gated by doc.download server-side, or doc.download.flattened
+    // for a flattened copy): no absorb, no event — nothing about the
+    // document changed.
+    const body: PageExtractInput = { pages, ...options };
     return AbortablePromise.run<Uint8Array>(async (signal) =>
       this.http.postJsonBytes(
         wirePaths.layerPagesExtract(this.docId, this.layerName),
-        { pages },
+        body,
         signal,
       ),
     );

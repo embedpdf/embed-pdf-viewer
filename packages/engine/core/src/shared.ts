@@ -149,6 +149,13 @@ export {
   imageSourceOfBytes,
   resolvePageLayers,
 } from './dto/PageRender';
+export type {
+  PageExtractFlatten,
+  PageExtractInput,
+  PageExtractOptions,
+  PageExtractRights,
+} from './dto/PageExtract';
+export { resolvePageExtract } from './dto/PageExtract';
 export {
   ANNOTATION_APPEARANCE_MODES,
   appearanceModesOf,

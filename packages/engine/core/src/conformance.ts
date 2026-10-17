@@ -73,7 +73,9 @@ export {
 export {
   PRINT_RULES_PDF,
   PRINT_SCOPES,
+  runPrintCopyConformance,
   runPrintRenderConformance,
+  type PrintCopyConformanceOptions,
   type PrintRenderConformanceOptions,
 } from './conformance/runPrintRenderConformance';
 export {

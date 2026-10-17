@@ -3,8 +3,11 @@ import {
   EngineError,
   EngineErrorCode,
   opIdOf,
+  resolvePageExtract,
   wirePack,
   type DocumentPagesService,
+  type PageExtractFlatten,
+  type PageExtractOptions,
   type PageDeleteResult,
   type PageInsertBlankSpec,
   type PageInsertResult,
@@ -443,7 +446,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  extract(pages: PageRef[]): AbortablePromise<Uint8Array> {
+  extract(pages: PageRef[], options?: PageExtractOptions): AbortablePromise<Uint8Array> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -451,9 +454,17 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     // pages.extract egresses content bytes (a partial download), so it is
     // gated by `doc.download` — not `doc.pages.assemble`: it reads, never
-    // restructures. No event is published: nothing about the document changed.
+    // restructures. A flattened copy also passes on `doc.download.flattened`,
+    // and paints only what the caller may read. No event is published:
+    // nothing about the document changed.
+    let flatten: PageExtractFlatten | null;
     try {
-      this.guard.assertCapability('doc.download');
+      flatten = resolvePageExtract(options, {
+        download: this.guard.can('doc.download'),
+        downloadFlattened: this.guard.can('doc.download.flattened'),
+        annotations: this.guard.can('doc.annotate.read'),
+        formFields: this.guard.can('doc.forms.read'),
+      });
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
@@ -466,6 +477,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
           jobId,
           docId,
           pages,
+          ...(flatten ? { flatten } : {}),
         }),
     });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
