@@ -62,6 +62,13 @@ export interface DocumentManifest {
    */
   formsVersion: number;
   /**
+   * Doc-level pin for the immutable outline (`/outline@{outlineVersion,
+   * layoutVersion}`). Bumps only on outline writes. The outline is read in
+   * page space, so its URL also carries `layoutVersion`: a page delete or a
+   * box change moves what it reads without an outline write.
+   */
+  outlineVersion: number;
+  /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts
    * from `auditHead` can never miss a mutation between manifest fetch and

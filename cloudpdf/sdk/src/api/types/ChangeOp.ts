@@ -22,7 +22,11 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.FormsUpdateWidget
     | CloudPDF.ChangeOp.FormsSetSignatureAppearance
     | CloudPDF.ChangeOp.MetadataUpdate
-    | CloudPDF.ChangeOp.MetadataUpdateCustom;
+    | CloudPDF.ChangeOp.MetadataUpdateCustom
+    | CloudPDF.ChangeOp.OutlineCreate
+    | CloudPDF.ChangeOp.OutlineUpdate
+    | CloudPDF.ChangeOp.OutlineMove
+    | CloudPDF.ChangeOp.OutlineDelete;
 
 export namespace ChangeOp {
     export interface AnnotationsCreate {
@@ -183,5 +187,33 @@ export namespace ChangeOp {
     export interface MetadataUpdateCustom {
         type: "metadata.updateCustom";
         patch: Record<string, string | null>;
+    }
+
+    export interface OutlineCreate {
+        type: "outline.create";
+        parent: CloudPDF.OutlineItemRef | null;
+        position?: CloudPDF.OutlinePosition | undefined;
+        data: CloudPDF.OutlineItemDraft;
+        objectNumber?: number | undefined;
+    }
+
+    export interface OutlineUpdate {
+        type: "outline.update";
+        ref: CloudPDF.OutlineItemRef;
+        patch: CloudPDF.OutlineItemPatch;
+        expect?: CloudPDF.OutlineItemPatch | undefined;
+    }
+
+    export interface OutlineMove {
+        type: "outline.move";
+        refs: CloudPDF.OutlineItemRef[];
+        parent: CloudPDF.OutlineItemRef | null;
+        position: CloudPDF.OutlinePosition;
+    }
+
+    export interface OutlineDelete {
+        type: "outline.delete";
+        ref: CloudPDF.OutlineItemRef;
+        expect?: CloudPDF.OutlineItemPatch | undefined;
     }
 }

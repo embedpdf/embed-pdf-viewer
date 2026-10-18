@@ -52,6 +52,7 @@ const ALL_BASE = {
   attachments: 'base',
   metadata: 'base',
   actions: 'base',
+  outline: 'base',
 };
 
 interface Fixture {
@@ -259,6 +260,14 @@ describe('plane-scoped view sharing', () => {
         })
       ).status,
     ).toBe(200);
+
+    // The outline is read in page space (its targets name pages), so the base
+    // outline needs the layout plane too: refused for alice, shared for bob.
+    const outline = `${fx.baseUrl}/v1/docs/${docId}/outline@layoutVersion=1,outlineVersion=1`;
+    expect((await fetch(outline, { headers: aliceAuth })).status).toBe(404);
+    expect((await fetch(outline, { headers: auth(docToken(tenantId, docId, 'bob')) })).status).toBe(
+      200,
+    );
   });
 
   test('page delete removes content from the view: content+annotations+layout flip', async () => {
@@ -574,6 +583,60 @@ describe('attachments plane (independent axis)', () => {
     expect(grant.resourceIds).toEqual(
       expect.arrayContaining(['layer-metadata', 'layer-metadata-custom']),
     );
+  });
+
+  test('an outline write flips ONLY the outline plane', async () => {
+    const tenantId = 'tenant-outlineflip';
+    const docId = 'docoutline001';
+    await seedDocument(fx, tenantId, docId);
+
+    // Mint alice's layer row via an annotation write, then simulate an
+    // outline change's version bump (the stub worker applies no changes).
+    const created = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: {
+          ...auth(docToken(tenantId, docId, 'alice')),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(highlightDraft()),
+      },
+    );
+    expect(created.status).toBe(200);
+    await fx.db
+      .updateTable('layers')
+      .set({ outline_version: 2 })
+      .where('doc_id', '=', docId)
+      .where('name', '=', 'alice')
+      .execute();
+
+    const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
+    expect(alice.scopes).toEqual({ ...ALL_BASE, annotations: 'layer', outline: 'layer' });
+
+    // Origin: base outline refused for alice, granted for bob; the layer
+    // path serves alice at her own pins.
+    const url = `${fx.baseUrl}/v1/docs/${docId}/outline@layoutVersion=1,outlineVersion=1`;
+    const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
+    expect((await fetch(url, { headers: aliceAuth })).status).toBe(404);
+    expect((await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) })).status).toBe(
+      200,
+    );
+    const layerUrl = `${fx.baseUrl}/v1/docs/${docId}/layers/alice/outline@layoutVersion=1,outlineVersion=2`;
+    const layerRead = await fetch(layerUrl, { headers: aliceAuth });
+    expect(layerRead.status).toBe(200);
+    expect(await layerRead.json()).toEqual({ items: [], incomplete: false });
+
+    // Edge grant mirrors: the base outline withheld, the layer outline kept.
+    const res = await fetch(`${fx.baseUrl}/v1/access`, {
+      method: 'POST',
+      headers: { ...aliceAuth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ docId, layerName: 'alice' }),
+    });
+    expect(res.status).toBe(200);
+    const grant = fx.coverageLog[fx.coverageLog.length - 1]!;
+    expect(grant.resourceIds).not.toEqual(expect.arrayContaining(['outline']));
+    expect(grant.resourceIds).toEqual(expect.arrayContaining(['layer-outline']));
   });
 
   test('a CONTENT op leaves attachment sharing intact (cross-plane independence)', async () => {

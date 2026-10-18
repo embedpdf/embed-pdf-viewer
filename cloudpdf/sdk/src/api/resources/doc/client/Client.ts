@@ -11,6 +11,7 @@ import * as CloudPDF from "../../../index.js";
 import { AnnotationsClient } from "../resources/annotations/client/Client.js";
 import { FormsClient } from "../resources/forms/client/Client.js";
 import { MetadataClient } from "../resources/metadata/client/Client.js";
+import { OutlineClient } from "../resources/outline/client/Client.js";
 import { PagesClient } from "../resources/pages/client/Client.js";
 import { RedactionsClient } from "../resources/redactions/client/Client.js";
 import { SignaturesClient } from "../resources/signatures/client/Client.js";
@@ -27,6 +28,7 @@ export class DocClient {
     protected _annotations: AnnotationsClient | undefined;
     protected _forms: FormsClient | undefined;
     protected _metadata: MetadataClient | undefined;
+    protected _outline: OutlineClient | undefined;
     protected _pages: PagesClient | undefined;
     protected _redactions: RedactionsClient | undefined;
     protected _signatures: SignaturesClient | undefined;
@@ -46,6 +48,10 @@ export class DocClient {
 
     public get metadata(): MetadataClient {
         return (this._metadata ??= new MetadataClient(this._options));
+    }
+
+    public get outline(): OutlineClient {
+        return (this._outline ??= new OutlineClient(this._options));
     }
 
     public get pages(): PagesClient {
@@ -132,7 +138,7 @@ export class DocClient {
     }
 
     /**
-     * Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.
+     * Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.
      *
      * @param {CloudPDF.DocChangesRequest} request
      * @param {DocClient.RequestOptions} requestOptions - Request-specific configuration.

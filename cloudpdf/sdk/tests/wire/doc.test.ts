@@ -252,6 +252,7 @@ describe("DocClient", () => {
             attachmentsVersion: 1,
             annotationsVersion: 1,
             formsVersion: 1,
+            outlineVersion: 1,
             auditHead: 1,
             baseSha: "baseSha",
             layerVersion: 1,
@@ -265,6 +266,7 @@ describe("DocClient", () => {
                 attachments: "base",
                 metadata: "base",
                 actions: "base",
+                outline: "base",
             },
             protection: {
                 enforced: "none",

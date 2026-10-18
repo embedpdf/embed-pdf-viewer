@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.15",
-  "openapiSha256": "4c827c806d430330bae08a9620164df3c50ba27cad4b415c57cd515b3c81ad1f",
+  "openapiSha256": "f0f202cc1dda7999987ff07ca3206ceb4803ee313c05e6accb82753c2352e643",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -909,6 +909,43 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.metadata.custom.get(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
+        "frameLines": 7
+      }
+    },
+    "doc.outline.get": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.outline.get({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.outline.get(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->outline->get(\n    'docId',\n    'layerName',\n    new GetOutlineRequest([]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Outline.GetAsync(\n    new GetOutlineRequest { DocId = \"docId\", LayerName = \"layerName\" }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.GetOutlineRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n}\nclient.Doc.Outline.Get(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().outline().get(\n    \"docId\",\n    \"layerName\",\n    GetOutlineRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.outline.get(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
         "frameLines": 7
       }
     },

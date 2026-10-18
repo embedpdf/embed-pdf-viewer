@@ -47,6 +47,7 @@ export {
   OutlineMoveResultSchema,
   OutlineDeleteResultSchema,
   OutlineRestoreResultSchema,
+  OutlineWireComponents,
   AccessRequestSchema,
   AccessResponseSchema,
   EditSessionAccessSchema,
@@ -287,6 +288,8 @@ export {
   encodeFormExportToken,
   encodeActionsToken,
   encodeAttachmentsToken,
+  encodeOutlineToken,
+  decodeOutlineToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
@@ -450,7 +453,7 @@ export type {
   DocumentVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
-export type { AnnotationsExportToken, FormExportToken } from './wire/tokens';
+export type { AnnotationsExportToken, FormExportToken, OutlineToken } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';

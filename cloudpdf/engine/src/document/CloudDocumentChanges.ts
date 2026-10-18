@@ -213,6 +213,7 @@ function planesOf(result: ChangeResult): LayerScopePlane[] {
   for (const item of result.items) {
     if (isSkippedItem(item)) continue;
     if (item.type.startsWith('metadata.')) planes.add('metadata');
+    else if (item.type.startsWith('outline.')) planes.add('outline');
     else if (item.type.startsWith('forms.')) planes.add('forms');
     else planes.add('annotations');
   }

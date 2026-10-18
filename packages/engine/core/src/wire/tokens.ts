@@ -11,6 +11,7 @@ import {
   ActionsTokenSchema,
   FormExportTokenSchema,
   AttachmentsTokenSchema,
+  OutlineTokenSchema,
   ContentTokenSchema,
   DocTokenSchema,
   DownloadTokenSchema,
@@ -278,6 +279,25 @@ export const encodeActionsToken = (actionsVersion: number): string =>
   encodeToken(ActionsTokenSchema, { actionsVersion });
 export const decodeActionsToken = (raw: string): number =>
   decodePositiveInteger(decodeToken(ActionsTokenSchema, raw).actionsVersion, 'actionsVersion');
+
+/** What an outline leaf is: the outline's pin and the layout's. */
+export interface OutlineToken {
+  outlineVersion: number;
+  layoutVersion: number;
+}
+
+export const encodeOutlineToken = (token: OutlineToken): string =>
+  encodeToken(OutlineTokenSchema, {
+    layoutVersion: token.layoutVersion,
+    outlineVersion: token.outlineVersion,
+  });
+export const decodeOutlineToken = (raw: string): OutlineToken => {
+  const query = decodeToken(OutlineTokenSchema, raw);
+  return {
+    outlineVersion: decodePositiveInteger(query.outlineVersion, 'outlineVersion'),
+    layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
+  };
+};
 
 export const encodeAttachmentsToken = (attachmentsVersion: number): string =>
   encodeToken(AttachmentsTokenSchema, { attachmentsVersion });

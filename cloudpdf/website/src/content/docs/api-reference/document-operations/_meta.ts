@@ -9,6 +9,7 @@ export default {
   annotations: 'Annotations',
   forms: 'Forms',
   metadata: 'Metadata',
+  outline: 'Outline',
   pages: 'Pages',
   redactions: 'Redactions',
   signatures: 'Digital signatures',

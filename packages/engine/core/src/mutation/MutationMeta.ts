@@ -32,12 +32,13 @@ export interface CacheDelta {
    * New plane pins, present when this mutation bumped them: `layoutVersion`
    * for a page-structure write (move, rotate, delete, insert, names),
    * `metadataVersion` for a metadata write, `attachmentsVersion` for an
-   * attachment write. Absorbing them re-points the cached manifest's leaf
-   * without a refetch.
+   * attachment write, `outlineVersion` for an outline write. Absorbing them
+   * re-points the cached manifest's leaf without a refetch.
    */
   layoutVersion?: number;
   metadataVersion?: number;
   attachmentsVersion?: number;
+  outlineVersion?: number;
   /**
    * The layer's write serial after this mutation and whether an artifact
    * now exists (cloud only). Absorbing them keeps the client's cached

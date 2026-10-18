@@ -55,6 +55,14 @@ export const AttachmentsTokenSchema = {
 } as const satisfies TokenSchema;
 
 /**
+ * The outline leaf: its own pin and the layout pin. The outline is read in
+ * page space, so a page delete or a box change moves what it reads.
+ */
+export const OutlineTokenSchema = {
+  fields: ['layoutVersion', 'outlineVersion'],
+} as const satisfies TokenSchema;
+
+/**
  * Layer signature analysis: the working copy judged against the base,
  * pinned by `docVersion`; `since.signature` XOR `since.revision`; `level`
  * only in exploratory mode.

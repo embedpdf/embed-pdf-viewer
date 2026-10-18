@@ -26,7 +26,12 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.FormsReorderCalculations
     | CloudPDF.ChangeItem.FormsUpdateWidget
     | CloudPDF.ChangeItem.MetadataUpdate
-    | CloudPDF.ChangeItem.MetadataUpdateCustom;
+    | CloudPDF.ChangeItem.MetadataUpdateCustom
+    | CloudPDF.ChangeItem.OutlineCreate
+    | CloudPDF.ChangeItem.OutlineUpdate
+    | CloudPDF.ChangeItem.OutlineMove
+    | CloudPDF.ChangeItem.OutlineDelete
+    | CloudPDF.ChangeItem.OutlineRestore;
 
 export namespace ChangeItem {
     export interface Skipped {
@@ -57,8 +62,14 @@ export namespace ChangeItem {
             FormsSetSignatureAppearance: "forms.setSignatureAppearance",
             MetadataUpdate: "metadata.update",
             MetadataUpdateCustom: "metadata.updateCustom",
+            OutlineCreate: "outline.create",
+            OutlineUpdate: "outline.update",
+            OutlineMove: "outline.move",
+            OutlineDelete: "outline.delete",
             AnnotationsRestore: "annotations.restore",
             FormsRestore: "forms.restore",
+            FormsRestoreWidget: "forms.restoreWidget",
+            OutlineRestore: "outline.restore",
         } as const;
         export type Op = (typeof Op)[keyof typeof Op];
     }
@@ -264,5 +275,37 @@ export namespace ChangeItem {
         skipped?: string[] | undefined;
         custom: Record<string, string>;
         meta: CloudPDF.MutationMeta;
+    }
+
+    export interface OutlineCreate {
+        type: "outline.create";
+        item: CloudPDF.OutlineItem;
+        order: CloudPDF.OutlineOrder;
+        meta: CloudPDF.OutlineMutationMeta;
+    }
+
+    export interface OutlineUpdate {
+        type: "outline.update";
+        skipped?: string[] | undefined;
+        item: CloudPDF.OutlineItem;
+        meta: CloudPDF.OutlineMutationMeta;
+    }
+
+    export interface OutlineMove {
+        type: "outline.move";
+        orders: CloudPDF.OutlineOrder[];
+        meta: CloudPDF.OutlineMutationMeta;
+    }
+
+    export interface OutlineDelete {
+        type: "outline.delete";
+        meta: CloudPDF.OutlineMutationMeta;
+    }
+
+    export interface OutlineRestore {
+        type: "outline.restore";
+        items: CloudPDF.OutlineItem[];
+        order: CloudPDF.OutlineOrder;
+        meta: CloudPDF.OutlineMutationMeta;
     }
 }

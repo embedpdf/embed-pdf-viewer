@@ -1131,7 +1131,7 @@
         "x-fern-sdk-method-name": "changes",
         "x-docs-title": "Apply changes",
         "summary": "Apply user actions to a layer, each a change whose ops apply in order, all or none, or the undo of an earlier change.",
-        "description": "Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.",
+        "description": "Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.",
         "security": [
           {
             "apiToken": []
@@ -1145,7 +1145,8 @@
           "doc.annotate.modify",
           "doc.forms.fill",
           "doc.forms.modify",
-          "doc.metadata.modify"
+          "doc.metadata.modify",
+          "doc.outline.modify"
         ],
         "parameters": [
           {
@@ -2345,6 +2346,86 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocMetadataCustomGet404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/outline": {
+      "get": {
+        "operationId": "doc.outline.get",
+        "x-fern-sdk-group-name": ["doc", "outline"],
+        "x-fern-sdk-method-name": "get",
+        "x-docs-title": "Get outline",
+        "summary": "The document's outline (its bookmarks) for a layer: every item, depth first, with its parent, its target in page space, its look and whether it opens. Edit it with the outline ops of a change.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.open"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocOutlineGet200Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocOutlineGet404Response"
                 }
               }
             }
@@ -6904,6 +6985,9 @@
     "doc.metadata.custom": {
       "title": "Custom keys"
     },
+    "doc.outline": {
+      "title": "Outline"
+    },
     "doc.pages": {
       "title": "Pages"
     },
@@ -7082,6 +7166,11 @@
             "minimum": 0
           },
           "attachmentsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "outlineVersion": {
             "type": "integer",
             "exclusiveMinimum": true,
             "minimum": 0
@@ -20896,6 +20985,235 @@
         ],
         "additionalProperties": false
       },
+      "OutlineItemRef": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["objectNumber"]
+          },
+          "objectNumber": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          }
+        },
+        "required": ["kind", "objectNumber"],
+        "additionalProperties": false
+      },
+      "OutlineItem": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "$ref": "#/components/schemas/OutlineItemRef"
+          },
+          "parent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutlineItemRef"
+              }
+            ],
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "target": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfLinkTarget"
+              }
+            ],
+            "nullable": true
+          },
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionTree"
+              }
+            ],
+            "nullable": true
+          },
+          "open": {
+            "type": "boolean"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "nullable": true
+          },
+          "bold": {
+            "type": "boolean"
+          },
+          "italic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ref",
+          "parent",
+          "title",
+          "target",
+          "action",
+          "open",
+          "color",
+          "bold",
+          "italic"
+        ],
+        "additionalProperties": false
+      },
+      "DocumentOutline": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutlineItem"
+            }
+          },
+          "incomplete": {
+            "type": "boolean"
+          }
+        },
+        "required": ["items", "incomplete"],
+        "additionalProperties": false
+      },
+      "OutlineItemDraft": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 32767
+          },
+          "target": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfLinkTargetWritable"
+              }
+            ],
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "nullable": true
+          },
+          "bold": {
+            "type": "boolean"
+          },
+          "italic": {
+            "type": "boolean"
+          }
+        },
+        "required": ["title"],
+        "additionalProperties": false
+      },
+      "OutlineItemPatch": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 32767
+          },
+          "target": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfLinkTargetWritable"
+              }
+            ],
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "nullable": true
+          },
+          "bold": {
+            "type": "boolean"
+          },
+          "italic": {
+            "type": "boolean"
+          },
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OutlinePosition": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": ["start", "end"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#/components/schemas/OutlineItemRef"
+              },
+              "after": {
+                "$ref": "#/components/schemas/OutlineItemRef"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "OutlineOrder": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutlineItemRef"
+              }
+            ],
+            "nullable": true
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutlineItemRef"
+            }
+          }
+        },
+        "required": ["parent", "children"],
+        "additionalProperties": false
+      },
+      "OutlineMutationMeta": {
+        "type": "object",
+        "properties": {
+          "affectedPages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageRef"
+            }
+          },
+          "cacheDelta": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CacheDelta"
+              }
+            ],
+            "nullable": true
+          },
+          "opId": {
+            "type": "string"
+          },
+          "undoable": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutlineItemRef"
+            }
+          }
+        },
+        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changed"],
+        "additionalProperties": false
+      },
       "ChangeOp": {
         "anyOf": [
           {
@@ -21317,6 +21635,102 @@
             },
             "required": ["type", "patch"],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.create"]
+              },
+              "parent": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/OutlineItemRef"
+                  }
+                ],
+                "nullable": true
+              },
+              "position": {
+                "$ref": "#/components/schemas/OutlinePosition"
+              },
+              "data": {
+                "$ref": "#/components/schemas/OutlineItemDraft"
+              },
+              "objectNumber": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              }
+            },
+            "required": ["type", "parent", "data"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.update"]
+              },
+              "ref": {
+                "$ref": "#/components/schemas/OutlineItemRef"
+              },
+              "patch": {
+                "$ref": "#/components/schemas/OutlineItemPatch"
+              },
+              "expect": {
+                "$ref": "#/components/schemas/OutlineItemPatch"
+              }
+            },
+            "required": ["type", "ref", "patch"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.move"]
+              },
+              "refs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OutlineItemRef"
+                },
+                "minItems": 1
+              },
+              "parent": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/OutlineItemRef"
+                  }
+                ],
+                "nullable": true
+              },
+              "position": {
+                "$ref": "#/components/schemas/OutlinePosition"
+              }
+            },
+            "required": ["type", "refs", "parent", "position"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.delete"]
+              },
+              "ref": {
+                "$ref": "#/components/schemas/OutlineItemRef"
+              },
+              "expect": {
+                "$ref": "#/components/schemas/OutlineItemPatch"
+              }
+            },
+            "required": ["type", "ref"],
+            "additionalProperties": false
           }
         ]
       },
@@ -21352,8 +21766,14 @@
                   "forms.setSignatureAppearance",
                   "metadata.update",
                   "metadata.updateCustom",
+                  "outline.create",
+                  "outline.update",
+                  "outline.move",
+                  "outline.delete",
                   "annotations.restore",
-                  "forms.restore"
+                  "forms.restore",
+                  "forms.restoreWidget",
+                  "outline.restore"
                 ]
               },
               "meta": {
@@ -21917,6 +22337,103 @@
               }
             },
             "required": ["type", "custom", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.create"]
+              },
+              "item": {
+                "$ref": "#/components/schemas/OutlineItem"
+              },
+              "order": {
+                "$ref": "#/components/schemas/OutlineOrder"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/OutlineMutationMeta"
+              }
+            },
+            "required": ["type", "item", "order", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.update"]
+              },
+              "skipped": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/2/properties/skipped"
+              },
+              "item": {
+                "$ref": "#/components/schemas/OutlineItem"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/OutlineMutationMeta"
+              }
+            },
+            "required": ["type", "item", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.move"]
+              },
+              "orders": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OutlineOrder"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/OutlineMutationMeta"
+              }
+            },
+            "required": ["type", "orders", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.delete"]
+              },
+              "meta": {
+                "$ref": "#/components/schemas/OutlineMutationMeta"
+              }
+            },
+            "required": ["type", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["outline.restore"]
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OutlineItem"
+                }
+              },
+              "order": {
+                "$ref": "#/components/schemas/OutlineOrder"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/OutlineMutationMeta"
+              }
+            },
+            "required": ["type", "items", "order", "meta"],
             "additionalProperties": false
           }
         ]
@@ -23773,6 +24290,12 @@
             "minimum": 0,
             "default": 1
           },
+          "outlineVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "default": 1
+          },
           "auditHead": {
             "type": "integer",
             "minimum": 0
@@ -23818,6 +24341,9 @@
               },
               "actions": {
                 "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+              },
+              "outline": {
+                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
               }
             },
             "required": [
@@ -23827,7 +24353,8 @@
               "layout",
               "attachments",
               "metadata",
-              "actions"
+              "actions",
+              "outline"
             ],
             "additionalProperties": false
           },
@@ -23984,6 +24511,12 @@
         }
       },
       "DocMetadataCustomGet404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocOutlineGet200Response": {
+        "$ref": "#/components/schemas/DocumentOutline"
+      },
+      "DocOutlineGet404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocSignaturesList200Response": {

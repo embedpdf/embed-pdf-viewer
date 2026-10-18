@@ -232,6 +232,7 @@ describe('cdnCoverageForScope', () => {
     attachments: 'base',
     metadata: 'base',
     actions: 'base',
+    outline: 'base',
   } as const;
 
   it('scopes: an owned plane withholds exactly the doc-level resources depending on it', () => {
@@ -255,6 +256,7 @@ describe('cdnCoverageForScope', () => {
       'actions',
       'attachments',
       'attachment-files',
+      'outline',
     ] as const) {
       expect(shared.has(id)).toBe(true);
     }
@@ -372,6 +374,21 @@ describe('cdnCoverageForScope', () => {
     expect(metadataOwned.has('metadata')).toBe(false);
     expect(metadataOwned.has('metadata-custom')).toBe(false);
     expect(metadataOwned.has('page-render')).toBe(true);
+
+    // The outline is read in page space: owning its own plane or the layout
+    // withholds the shared outline; nothing else goes with it.
+    const outlineOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, outline: 'layer' },
+      }),
+    );
+    expect(outlineOwned.has('outline')).toBe(false);
+    expect(outlineOwned.has('layer-outline')).toBe(true);
+    expect(outlineOwned.has('metadata')).toBe(true);
+    expect(outlineOwned.has('layout')).toBe(true);
+    expect(layoutOwned.has('outline')).toBe(false);
   });
 
   it('a single capability scope covers both doc-level and layer-scoped variants gated by that capability', () => {
@@ -569,6 +586,8 @@ describe('cdnCoverageForScope', () => {
         'actions',
         'attachments',
         'layer-attachments',
+        'outline',
+        'layer-outline',
         // doc.forms.read (bit 6) covers the signature reads: the layer's
         // snapshot and analysis, and the version-scoped families that need
         // no download right (contents/digests, history).
@@ -698,6 +717,7 @@ describe('print pictures', () => {
           attachments: 'base',
           metadata: 'base',
           actions: 'base',
+          outline: 'base',
         },
       }),
     );

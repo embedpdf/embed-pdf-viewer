@@ -125,7 +125,12 @@ import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
 import type { PageExtractInput } from '../dto/PageExtract';
-import { OutlineItemSchema } from '../dto/DocumentOutline.schema';
+import {
+  DocumentOutlineSchema,
+  OutlineItemDraftSchema,
+  OutlineItemPatchSchema,
+  OutlineItemSchema,
+} from '../dto/DocumentOutline.schema';
 import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { ListPosition } from '../mutation/ListPosition';
@@ -546,6 +551,7 @@ export const LayerScopesSchema: z.ZodType<LayerScopes> = z.object({
   attachments: LayerScopeValueSchema,
   metadata: LayerScopeValueSchema,
   actions: LayerScopeValueSchema,
+  outline: LayerScopeValueSchema,
 });
 export type { LayerScopes, LayerScopePlane } from '../dto/LayerScopes';
 
@@ -578,6 +584,7 @@ export const DocumentManifestSchema = z.object({
   attachmentsVersion: z.number().int().positive().default(1),
   annotationsVersion: z.number().int().positive().default(1),
   formsVersion: z.number().int().positive().default(1),
+  outlineVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   // Signing fences (absent on pre-signature servers: unwritten, unknown length).
@@ -1020,6 +1027,7 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   layoutVersion: z.number().int().positive().optional(),
   metadataVersion: z.number().int().positive().optional(),
   attachmentsVersion: z.number().int().positive().optional(),
+  outlineVersion: z.number().int().positive().optional(),
   layerVersion: z.number().int().nonnegative().optional(),
   working: z.boolean().optional(),
   pages: z.array(
@@ -1768,6 +1776,22 @@ export const OutlineRestoreResultSchema: z.ZodType<OutlineRestoreResult> = z.obj
   order: OutlineOrderSchema,
   meta: OutlineMutationMetaSchema,
 });
+
+/**
+ * Stable public component names for the outline wire model, so an OpenAPI
+ * projection names each once (`OutlineItem`, not one type per response or op
+ * that carries one), like `AnnotationWireComponents`.
+ */
+export const OutlineWireComponents = {
+  OutlineItemRef: OutlineItemRefSchema,
+  OutlineItem: OutlineItemSchema,
+  DocumentOutline: DocumentOutlineSchema,
+  OutlineItemDraft: OutlineItemDraftSchema,
+  OutlineItemPatch: OutlineItemPatchSchema,
+  OutlinePosition: OutlinePositionSchema,
+  OutlineOrder: OutlineOrderSchema,
+  OutlineMutationMeta: OutlineMutationMetaSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 // ---------------------------------------------------------------------------
 // Digital signatures: the JSON forms of the two-phase signing DTOs.
