@@ -162,7 +162,7 @@ export class PagesInserter {
         { details: { field: 'objectNumbers' } },
       );
     }
-    for (const objectNumber of objectNumbers ?? []) this.session.useObjectNumber(objectNumber);
+    for (const objectNumber of objectNumbers ?? []) this.session.claimObjectNumber(objectNumber);
 
     // A failure takes back the pages already made: the job's layer
     // transaction aborts.
