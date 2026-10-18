@@ -13,13 +13,14 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { connectLink } from './connect';
-import type {
-  Link,
-  LinkActivateContext,
-  LinkActivatedEvent,
-  LinkActivation,
-  LinkLoadedEvent,
-  LinkResolution,
+import {
+  resolveLinkTarget,
+  type Link,
+  type LinkActivateContext,
+  type LinkActivatedEvent,
+  type LinkActivation,
+  type LinkLoadedEvent,
+  type LinkResolution,
 } from './contract';
 import type { LinkHostCapability, UriOpener } from './host-contract';
 import { linksOf } from './source';
@@ -114,21 +115,9 @@ export function createLinkController(ctx: PluginContext<void>) {
   // The framework's website openers, the latest first: the plugin never opens one itself.
   const uriOpeners: UriOpener[] = [];
 
-  const resolve = (target: PdfLinkTarget): LinkResolution => {
-    switch (target.kind) {
-      case 'goto':
-        // A page the document doesn't have can't be shown.
-        return ctx.getPage(target.destination.page)
-          ? { kind: 'destination', destination: target.destination }
-          : { kind: 'reported', target };
-      case 'uri':
-        return { kind: 'uri', uri: target.uri };
-      case 'named':
-        return { kind: 'named', name: target.name };
-      default:
-        return { kind: 'reported', target };
-    }
-  };
+  // A page the document doesn't have can't be shown.
+  const resolve = (target: PdfLinkTarget): LinkResolution =>
+    resolveLinkTarget(target, (page) => ctx.getPage(page) !== null);
 
   const perform = (target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation => {
     const actions = ctx.tryGet(ActionsToken);

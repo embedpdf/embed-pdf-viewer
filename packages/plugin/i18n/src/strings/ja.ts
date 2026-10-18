@@ -51,4 +51,5 @@ export const ja: EmbedpdfStrings = {
       'form-signature': '署名フィールド',
     },
   },
+  outline: { untitled: '無題' },
 };

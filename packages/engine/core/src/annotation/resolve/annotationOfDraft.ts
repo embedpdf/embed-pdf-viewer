@@ -1,3 +1,4 @@
+import { actionTreeOf } from '../../dto/PdfLinkTarget';
 import {
   DEFAULT_RICH_TEXT_BODY,
   type RichTextBody,
@@ -10,7 +11,7 @@ import { annotationDefaultsOf } from '../defaults';
 import type { DescribeFont } from '../fontFaces';
 import { kindFactsOf } from '../kind-facts';
 import type { AnnotationDraft, Annotation } from '../kinds';
-import { actionTreeOf, readValueOf } from './applyAnnotationPatch';
+import { readValueOf } from './applyAnnotationPatch';
 
 /** Who the engine stamps as creating an annotation, and when. */
 export type DraftAttribution = Readonly<

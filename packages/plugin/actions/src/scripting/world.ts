@@ -128,7 +128,9 @@ export function createScriptWorld(ctx: ActionsContext, { form }: Pick<ActionsSer
             ? 'Field'
             : actionContext.source.kind === 'link'
               ? 'Link'
-              : 'Annot'; // EmbedPDF extension — Acrobat has no plain-annot type
+              : actionContext.source.kind === 'outline'
+                ? 'Bookmark'
+                : 'Annot'; // EmbedPDF extension — Acrobat has no plain-annot type
     const name =
       provenance.scope === 'activate'
         ? 'Mouse Up'

@@ -28,6 +28,7 @@ export type {
   OutlineItemPatch,
 } from './dto/DocumentOutline';
 export { OUTLINE_READ_LIMITS } from './dto/DocumentOutline';
+export { outlineItemAfter, outlineItemOfDraft, outlineItemWithChildren } from './outline/predict';
 export type { MetadataPatch } from './dto/MetadataPatch';
 export type { CustomMetadata } from './dto/CustomMetadata';
 export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
@@ -519,6 +520,7 @@ export type {
   PdfLinkTargetWritable,
   PdfStandardNamedAction,
 } from './dto/PdfLinkTarget';
+export { actionTreeOf } from './dto/PdfLinkTarget';
 export type { CacheDelta, MutationMeta } from './mutation/MutationMeta';
 export type { AnnotationListMutationMeta } from './mutation/AnnotationListMutationMeta';
 export type {

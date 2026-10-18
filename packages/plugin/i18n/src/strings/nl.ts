@@ -51,4 +51,5 @@ export const nl: EmbedpdfStrings = {
       'form-signature': 'Handtekeningveld',
     },
   },
+  outline: { untitled: 'Naamloos' },
 };

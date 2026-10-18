@@ -48,6 +48,7 @@
       "@embedpdf/plugin-interaction",
       "@embedpdf/plugin-link",
       "@embedpdf/plugin-metadata",
+      "@embedpdf/plugin-outline",
       "@embedpdf/plugin-page-edit",
       "@embedpdf/plugin-redaction",
       "@embedpdf/plugin-render",

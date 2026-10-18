@@ -1,6 +1,11 @@
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
-import type { DocumentOutline, OutlineItem } from '../dto/DocumentOutline';
+import type {
+  DocumentOutline,
+  OutlineItem,
+  OutlineItemDraft,
+  OutlineItemPatch,
+} from '../dto/DocumentOutline';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -8,6 +13,7 @@ import type { DocumentEvent } from '../events/DocumentEvent';
 import { toOutlineItemRef, type OutlineItemRef } from '../identity/OutlineItemRef';
 import { toPageRef } from '../identity/PageRef';
 import type { OutlineOrder } from '../mutation/OutlineMutationResults';
+import { outlineItemAfter, outlineItemOfDraft } from '../outline/predict';
 
 /**
  * Two pages of 300 × 300 and an outline, five items showing when it opens:
@@ -239,6 +245,54 @@ export function runOutlineConformance(
         expect((await doc.outline.update(C, { open: true })).item.open).toBe(true);
         expect((await doc.outline.update(A, { open: false })).item.open).toBe(false);
         expect((await doc.outline.update(D, { open: true })).item.open).toBe(false);
+      });
+    });
+
+    test('a write answers what the prediction rules say it leaves', async () => {
+      await withOutline(async (doc) => {
+        const drafts: OutlineItemDraft[] = [
+          { title: 'Plain' },
+          {
+            title: 'To a spot',
+            target: {
+              kind: 'goto',
+              destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40, zoom: null },
+            },
+            color: '#00AAFF',
+            bold: true,
+          },
+          {
+            title: 'To a site',
+            target: { kind: 'uri', uri: 'https://example.com/' },
+            italic: true,
+          },
+          { title: 'Next', target: { kind: 'named', name: 'NextPage' } },
+          {
+            title: 'Fit',
+            target: { kind: 'goto', destination: { kind: 'fit', page: FIRST_PAGE } },
+          },
+        ];
+        for (const draft of drafts) {
+          const { item } = await doc.outline.create(draft, { parent: C });
+          expect(item).toEqual(outlineItemOfDraft(item.ref, C, draft));
+        }
+        const before = itemOf(await doc.outline.get(), B)!;
+        const patches: OutlineItemPatch[] = [
+          { title: 'Bee', italic: true },
+          { color: '#ABCDEF' },
+          { color: null, target: null, bold: false },
+          { target: { kind: 'named', name: 'LastPage' } },
+          { open: true },
+        ];
+        let current = before;
+        for (const patch of patches) {
+          const { item } = await doc.outline.update(B, patch);
+          expect(item).toEqual(outlineItemAfter(current, patch, false));
+          current = item;
+        }
+        const parent = itemOf(await doc.outline.get(), C)!;
+        const { item: opened } = await doc.outline.update(C, { open: true });
+        expect(opened).toEqual(outlineItemAfter(parent, { open: true }, true));
       });
     });
 

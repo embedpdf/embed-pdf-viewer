@@ -56,4 +56,5 @@ export const sv: EmbedpdfStrings = {
       'form-signature': 'Signaturfält',
     },
   },
+  outline: { untitled: 'Namnlös' },
 };

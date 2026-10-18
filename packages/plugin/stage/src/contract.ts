@@ -480,6 +480,13 @@ export interface StageCapability {
   isPageVisible(page: PageRef | number): boolean;
   /** What the viewer is looking at plus the zoom intent, for per-page view memory. */
   getViewpoint(): Viewpoint;
+  /**
+   * Where the view is, as a destination: the first page on screen, the point
+   * of it at the viewport's top-left corner, and no zoom, so following it
+   * keeps the reader's zoom. What `goToDestination` takes, and what a new
+   * outline item goes to. `null` before a page is on screen.
+   */
+  getCurrentDestination(): PageDestination | null;
   /** Serialisable view state — the unit of session persistence. */
   getViewState(): StageViewState;
   /** Restore a saved view state; the responsive rules re-assert on top of its settings. */

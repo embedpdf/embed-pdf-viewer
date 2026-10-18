@@ -46,4 +46,5 @@ export const zhCN: EmbedpdfStrings = {
       'form-signature': '签名字段',
     },
   },
+  outline: { untitled: '无标题' },
 };
