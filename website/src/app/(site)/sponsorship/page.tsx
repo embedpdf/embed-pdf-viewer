@@ -10,7 +10,7 @@ import { AlreadyShipped } from '@/components/site/sponsorship/shipped';
 import { SponsorTiers } from '@/components/site/sponsorship/tiers';
 
 export const metadata: Metadata = {
-  title: 'Sponsor EmbedPDF — Fund the Open-Source PDF SDK',
+  title: 'Sponsor EmbedPDF | Fund the Open-Source PDF SDK',
   description:
     'Help fund the Apache-2.0 PDF SDK that breaks the cycle of expensive vendor lock-in. Sponsor EmbedPDF development, steer the roadmap, and own your PDF technology.',
 };

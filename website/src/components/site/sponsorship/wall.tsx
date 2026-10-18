@@ -260,7 +260,7 @@ function GoldInvite() {
           </h3>
           <p className="text-ep-muted m-0 mt-2 max-w-[56ch] font-sans text-[15px] leading-[1.6]">
             Weekly access to the team, custom feature development, migration consulting and
-            co-marketing — plus the top spot on this wall.
+            co-marketing, plus the top spot on this wall.
           </p>
         </div>
         <a

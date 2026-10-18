@@ -14,7 +14,7 @@ const QUESTIONS: { q: string; a: ReactNode }[] = [
     a: (
       <>
         Look at the track record: 4K+ GitHub stars, more than a million npm downloads a month, and a
-        v3 that ships a ready-made viewer and headless components for five frameworks on our own
+        ready-made viewer plus headless components for five frameworks, running on our own
         PDFium-based engine. Sponsorship is what turns that momentum into a full-time team.
       </>
     ),
@@ -55,7 +55,7 @@ const QUESTIONS: { q: string; a: ReactNode }[] = [
     a: (
       <>
         Simple ROI: if you&apos;re paying $150K+ a year for a PDF SDK, sponsoring at $30K a year
-        saves $120K annually — and you lose the vendor risk, gain code ownership and can customize
+        saves $120K annually. You also lose the vendor risk, gain code ownership and can customize
         anything. I&apos;m happy to walk your finance team through the numbers on a call.
       </>
     ),
@@ -77,7 +77,7 @@ const QUESTIONS: { q: string; a: ReactNode }[] = [
         >
           browse the code
         </a>
-        . Use it, test it, deploy it to production — then decide whether to sponsor.
+        . Use it, test it, deploy it to production, then decide whether to sponsor.
       </>
     ),
   },
@@ -109,8 +109,8 @@ export function SponsorFaq() {
                 Something else on your mind?{' '}
                 <a href={`mailto:${CONTACT.email}`} className={LINK}>
                   Email me
-                </a>{' '}
-                — I answer every message personally.
+                </a>
+                . I answer every message personally.
               </>
             }
           />

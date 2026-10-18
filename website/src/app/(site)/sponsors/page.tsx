@@ -4,9 +4,9 @@ import { SponsorContact } from '@/components/site/sponsorship/contact';
 import { SponsorsHero, SponsorWall } from '@/components/site/sponsorship/wall';
 
 export const metadata: Metadata = {
-  title: 'Our Sponsors — EmbedPDF',
+  title: 'Our Sponsors | EmbedPDF',
   description:
-    'Meet the companies funding EmbedPDF, the Apache-2.0 open-source PDF viewer and SDK — and find out how to join them.',
+    'Meet the companies funding EmbedPDF, the Apache-2.0 open-source PDF viewer and SDK, and find out how to join them.',
 };
 
 export default function SponsorsPage() {

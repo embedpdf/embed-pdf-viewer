@@ -87,8 +87,8 @@ export function FundingGoal() {
                 </span>
               </div>
               <p className="text-ep-muted mb-0 mt-3 max-w-[52ch] font-sans text-[15px] leading-[1.55]">
-                {usd(FUNDING.goal)} a month pays for two senior engineers working full-time — the
-                output a big vendor needs a team of five to ten for.
+                {usd(FUNDING.goal)} a month pays for two senior engineers working full-time. At a
+                big vendor, that output takes a team of five to ten.
               </p>
             </div>
           </div>

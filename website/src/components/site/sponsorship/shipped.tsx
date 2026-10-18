@@ -84,7 +84,7 @@ export function AlreadyShipped() {
                 Not a pitch deck. <em className="ep-grad not-italic">A product.</em>
               </>
             }
-            lede="Sponsorship isn't a bet on slides. EmbedPDF v3 runs in production today — this is what your support builds on."
+            lede="Sponsorship isn't a bet on slides. EmbedPDF already runs in production, and this is what your support builds on."
           />
           <Link
             href="/demo"

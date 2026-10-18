@@ -63,7 +63,7 @@ export function FounderLetter() {
                 A letter from <em className="ep-grad not-italic">the founder</em>
               </>
             }
-            lede="EmbedPDF started as a refusal to rent a black box. The story is short — and every mark on it is drawn with an annotation the viewer ships."
+            lede="EmbedPDF started as a refusal to rent a black box. The story is short, and every mark on it is drawn with an annotation the viewer ships."
           />
           <ul className="m-0 mt-8 grid w-full list-none grid-cols-2 gap-2 p-0 min-[1101px]:grid-cols-1">
             {LEGEND.map((l) => (
@@ -207,12 +207,12 @@ function LetterPage() {
         </p>
         <p className="m-0">
           And the price wasn&apos;t even the worst part. Every option was a{' '}
-          <Highlight>black box</Highlight> — closed source you can&apos;t inspect, fix or truly own.
+          <Highlight>black box</Highlight>: closed source you can&apos;t inspect, fix or truly own.
           Your product ends up resting on code you&apos;re not allowed to read.
         </p>
         <p className="m-0">
           So I started building <Underline>an open-source alternative</Underline>. No vendor
-          lock-in. No black boxes. Just great PDF technology developers can trust — Apache-2.0, for
+          lock-in. No black boxes. Just great PDF technology developers can trust. Apache-2.0, for
           everyone, forever.
         </p>
         <p className="m-0">
@@ -260,8 +260,8 @@ function StickyNote() {
       </span>
       <span className="block rounded-xl border border-[#F3DFA6] bg-[#FFFBEA] px-3.5 py-3 font-sans text-[13px] leading-[1.5] text-[#5C4A12] shadow-[0_10px_24px_-12px_rgba(122,82,0,0.35)]">
         <b className="font-display mb-0.5 block text-xs font-bold text-[#7A5200]">Bob Singor</b>
-        The first {FOUNDING_SEATS} companies to sponsor for a year are recognized as founding
-        sponsors — permanently.
+        The first {FOUNDING_SEATS} companies to sponsor for a year are recognized permanently as
+        founding sponsors.
       </span>
     </aside>
   );

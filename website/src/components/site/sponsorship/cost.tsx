@@ -57,7 +57,7 @@ export function CostOfABlackBox() {
               The price of a <em className="ep-grad-blue not-italic">black box</em>
             </>
           }
-          lede="What commercial PDF SDKs charge per year — before you've written a line of your own code, and with no right to read theirs."
+          lede="What commercial PDF SDKs charge per year, before you've written a line of your own code and without the right to read theirs."
         />
 
         <figure className="m-0 mt-12 rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-[clamp(18px,3vw,34px)] backdrop-blur-[4px]">
@@ -95,7 +95,7 @@ export function CostOfABlackBox() {
             <Row label="EmbedPDF" sub="Apache-2.0" brand>
               <span className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-[3px] border-[#0B1530] bg-[#4AA3FF] shadow-[0_0_0_4px_rgba(74,163,255,0.25),0_0_24px_rgba(74,163,255,0.8)]" />
               <span className="font-display absolute left-7 top-1/2 -translate-y-1/2 whitespace-nowrap text-[13px] font-bold text-[#7BB2FF]">
-                $0<span className="max-[560px]:hidden"> — and the code is yours</span>
+                $0<span className="max-[560px]:hidden">, and the code is yours</span>
               </span>
             </Row>
           </div>
