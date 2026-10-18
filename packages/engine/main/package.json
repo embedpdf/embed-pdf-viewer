@@ -78,6 +78,7 @@
   },
   "devDependencies": {
     "@embedpdf/tooling-build": "workspace:*",
+    "@swc/core": "1.16.2",
     "esbuild": "^0.28.1",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",

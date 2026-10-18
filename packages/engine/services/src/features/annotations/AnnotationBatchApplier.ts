@@ -154,7 +154,7 @@ export class AnnotationBatchApplier {
           ? given
           : { ...given, nm: generateUuidV7() };
       if (create.objectNumber !== undefined) {
-        labelled(create.label, () => this.session.useObjectNumber(create.objectNumber!));
+        labelled(create.label, () => this.session.claimObjectNumber(create.objectNumber!));
       }
       const replyTo = create.replyTo && {
         type: create.replyTo.type,

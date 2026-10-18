@@ -21,10 +21,10 @@ export const FRAMEWORK_PAGE: Record<Framework, string> = {
   angular: '/angular-pdf-viewer',
 };
 
-/** The ready-made viewer's docs for a framework, at a topic. */
+/** The ready-made viewer's docs for a framework, at a topic; `''` is its overview. */
 export const viewerDocs = (framework: Framework, topic = 'quick-start') =>
-  `/docs/viewer/${framework}/${topic}`;
+  `/docs/viewer/${framework}${topic ? `/${topic}` : ''}`;
 
-/** The headless docs for a framework, at a topic. */
+/** The headless docs for a framework, at a topic; `''` is its overview. */
 export const headlessDocs = (framework: Framework, topic = 'quick-start') =>
-  `/docs/headless/${framework}/${topic}`;
+  `/docs/headless/${framework}${topic ? `/${topic}` : ''}`;

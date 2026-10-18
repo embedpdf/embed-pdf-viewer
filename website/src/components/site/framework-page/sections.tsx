@@ -44,7 +44,8 @@ export function FrameworkIcon({ framework, size = 16 }: { framework: Framework; 
   }
 }
 
-function Check({ color = '#0876FD' }: { color?: string }) {
+/** The brand's tinted check mark, for bullet lists. */
+export function Check({ color = '#0876FD' }: { color?: string }) {
   return (
     <svg
       width="22"
@@ -102,7 +103,7 @@ export function FrameworkHero({
   primary: { href: string; label: string };
   secondary?: { href: string; label: string };
   code: CodeFile;
-  /** The small floating card under the code: a title and three short lines. */
+  /** The small floating card under the viewer: a title and three short lines. */
   card: { title: string; items: string[] };
 }) {
   return (
@@ -118,7 +119,7 @@ export function FrameworkHero({
           <DotGrid />
         </div>
 
-        <div className="relative z-[1] grid items-center gap-[clamp(32px,4vw,64px)] min-[1025px]:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="relative z-[1] grid items-center gap-[clamp(24px,3vw,48px)] min-[1025px]:grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)]">
           <div className="flex min-w-0 flex-col gap-6">
             <div>
               <Eyebrow icon={<FrameworkIcon framework={framework} size={15} />}>{badge}</Eyebrow>
@@ -161,30 +162,32 @@ export function FrameworkHero({
             </div>
           </div>
 
-          <div className="relative min-w-0 pb-[clamp(0px,6vw,90px)] max-[1024px]:pb-0">
+          {/* The homepage's scene: the viewer, the framework's code over its
+              top-right corner, the checklist card under its bottom-right. */}
+          <div className="relative min-w-0 max-[1024px]:mt-4">
             <Image
               src="/PDF-Viewer.svg"
               alt={`The EmbedPDF viewer running in a ${badge.split(' ')[0]} app`}
               width={646}
               height={511}
-              className="border-ep-border ml-auto block aspect-[646/511] w-full max-w-[600px] rounded-[12px] border bg-white shadow-[0_4px_10px_rgba(163,163,163,0.22)] max-[1024px]:mx-auto"
+              className="border-ep-border block aspect-[646/511] w-full max-w-[590px] rounded-[10px] border bg-white shadow-[0_4px_10px_rgba(163,163,163,0.22)]"
               priority
             />
-            <div className="absolute bottom-0 left-0 z-[2] w-[min(440px,78%)] max-[1024px]:relative max-[1024px]:mx-auto max-[1024px]:-mt-16 max-[1024px]:w-full max-[1024px]:max-w-[560px]">
+            <div className="z-[2] w-[clamp(280px,30vw,400px)] max-[1024px]:relative max-[1024px]:-mt-10 max-[1024px]:ml-auto max-[1024px]:w-[min(100%,460px)] min-[1025px]:absolute min-[1025px]:right-[clamp(-40px,-1vw,0px)] min-[1025px]:top-[12%]">
               <CodeWindow file={code} compact />
             </div>
-            <div className="absolute right-[-8px] top-[18%] z-[3] w-[220px] rounded-xl border border-[#E9EEFF] bg-white p-4 shadow-[0_8px_28px_rgba(14,26,64,0.14)] max-[1180px]:hidden">
-              <div className="font-display text-ep-navy mb-3 text-[13px] font-extrabold tracking-[-0.005em]">
+            <div className="absolute bottom-[-40px] right-10 z-[3] w-[clamp(200px,19vw,240px)] rounded-xl border border-[#E9EEFF] bg-white p-[18px] shadow-[0_8px_28px_rgba(14,26,64,0.14)] max-[1024px]:hidden">
+              <div className="font-display text-ep-navy mb-3.5 text-sm font-extrabold tracking-[-0.005em]">
                 {card.title}
               </div>
-              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
                 {card.items.map((item) => (
                   <li
                     key={item}
-                    className="text-ep-ink flex items-center gap-2 font-sans text-[12.5px] font-medium leading-[1.35]"
+                    className="text-ep-ink flex items-center gap-2.5 font-sans text-[13px] font-medium leading-[1.35]"
                   >
-                    <span className="text-ep-blue inline-flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full bg-[rgba(8,118,253,0.12)]">
-                      <CheckIcon size={11} />
+                    <span className="text-ep-blue inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(8,118,253,0.12)]">
+                      <CheckIcon size={12} />
                     </span>
                     <span>{item}</span>
                   </li>
@@ -235,7 +238,7 @@ export function SectionHeading({
       <PillDivider gradient />
       {lead && (
         <p
-          className={`mb-0 mt-[18px] max-w-[600px] font-sans text-[17px] leading-[1.6] ${
+          className={`mb-0 mt-[18px] max-w-[600px] font-sans text-[17px] leading-[1.6] [text-wrap:balance] ${
             tone === 'dark' ? 'text-ep-faint' : 'text-ep-muted'
           }`}
         >
@@ -634,6 +637,143 @@ export function CompareTable({
             {note}
           </p>
         )}
+      </div>
+    </section>
+  );
+}
+
+// ── feature cards: the homepage's capability illustrations ──────────────────
+
+export type FeatureItem = { image: string; title: string; body: string; href: string };
+
+/**
+ * The homepage's capability cards (capabilities.tsx), centered under a
+ * heading: the same illustrations and card, without the per-framework docs
+ * row, because a framework page already is one framework. The whole card
+ * links to that feature's docs.
+ */
+export function FeatureRow({
+  eyebrow,
+  eyebrowIcon,
+  title,
+  lead,
+  items,
+}: {
+  eyebrow: string;
+  eyebrowIcon?: ReactNode;
+  title: ReactNode;
+  lead?: ReactNode;
+  items: FeatureItem[];
+}) {
+  return (
+    <section className={`bg-ep-bg ${SECTION_Y}`}>
+      <div className={PAGE_X}>
+        <SectionHeading eyebrow={eyebrow} eyebrowIcon={eyebrowIcon} title={title} lead={lead} />
+        <div className="mx-auto mt-12 grid max-w-[1200px] grid-cols-1 gap-4 min-[481px]:grid-cols-2 min-[961px]:grid-cols-4">
+          {items.map((item) => (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="border-ep-border group relative flex flex-col items-center overflow-hidden rounded-2xl border bg-white px-[18px] pb-[22px] pt-6 text-center transition-all duration-200 hover:-translate-y-[3px] hover:border-[rgba(8,118,253,0.30)] hover:shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(7,32,76,0.06),0_18px_36px_-16px_rgba(8,118,253,0.22)]"
+            >
+              <div className="mb-[18px] flex aspect-square max-h-[150px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#F4F8FF]">
+                <Image
+                  src={item.image}
+                  alt=""
+                  width={160}
+                  height={160}
+                  className="block h-auto w-[78%] max-w-[160px] rounded-lg"
+                />
+              </div>
+              <h3 className="font-display text-ep-navy m-0 mb-2 inline-flex items-center gap-1.5 text-[17px] font-extrabold leading-[1.2] tracking-[-0.01em]">
+                {item.title}
+                <span className="text-ep-blue -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100">
+                  <ArrowRightIcon size={14} strokeWidth={2.4} />
+                </span>
+              </h3>
+              <p className="text-ep-soft m-0 max-w-[26ch] font-sans text-sm leading-[1.5]">
+                {item.body}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── proof: numbers anyone can check ─────────────────────────────────────────
+
+export type ProofItem = {
+  icon: ReactNode;
+  stat: string;
+  label: string;
+  body: string;
+  href: string;
+  linkLabel: string;
+};
+
+/**
+ * Proof the page can stand behind: public numbers with a link to where
+ * anyone can check them. No quotes until there are real ones to show.
+ */
+export function ProofStrip({
+  eyebrow,
+  eyebrowIcon,
+  title,
+  lead,
+  items,
+}: {
+  eyebrow: string;
+  eyebrowIcon?: ReactNode;
+  title: ReactNode;
+  lead?: ReactNode;
+  items: ProofItem[];
+}) {
+  return (
+    <section className={`bg-white ${SECTION_Y}`}>
+      <div
+        className={`${PAGE_X} grid items-center gap-[clamp(36px,5vw,80px)] min-[1101px]:grid-cols-[minmax(280px,380px)_1fr]`}
+      >
+        <SectionHeading
+          eyebrow={eyebrow}
+          eyebrowIcon={eyebrowIcon}
+          title={title}
+          lead={lead}
+          align="left"
+        />
+        <div className="grid gap-4 min-[561px]:grid-cols-2">
+          {items.map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border-ep-border group flex flex-col gap-3 rounded-2xl border bg-white p-[22px] shadow-[0_1px_2px_rgba(7,32,76,0.04),0_12px_32px_-18px_rgba(7,32,76,0.10)] transition-all duration-200 hover:-translate-y-[3px] hover:border-[rgba(8,118,253,0.30)]"
+            >
+              <div className="flex items-center gap-4">
+                <span className="inline-flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-[14px] bg-[#F4F7FE]">
+                  {item.icon}
+                </span>
+                <div className="flex min-w-0 flex-col">
+                  <b className="font-display text-ep-navy text-[26px] font-extrabold leading-none tracking-[-0.02em]">
+                    {item.stat}
+                  </b>
+                  <span className="text-ep-muted mt-1 font-sans text-sm font-semibold">
+                    {item.label}
+                  </span>
+                </div>
+              </div>
+              <p className="text-ep-muted m-0 flex-1 font-sans text-[14.5px] leading-[1.55]">
+                {item.body}
+              </p>
+              <span className="text-ep-blue inline-flex items-center gap-1.5 font-sans text-[13px] font-medium transition-all duration-150 group-hover:gap-2">
+                {item.linkLabel}
+                <ArrowRightIcon size={12} strokeWidth={2.4} />
+              </span>
+            </a>
+          ))}
+        </div>
       </div>
     </section>
   );

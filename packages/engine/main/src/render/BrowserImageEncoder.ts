@@ -13,6 +13,14 @@ import { findEncoderWorkerFile } from '../worker-files';
 import { encodeBmp } from './bmp';
 import { encoderWorkerSource } from './encoder-worker-source';
 
+/**
+ * The encoder starts as a module worker, as the engine worker does. A dev
+ * server that compiles the file before serving it (`next dev` with Fast
+ * Refresh) appends `import.meta.webpackHot` code, which a module parses and
+ * skips, but which stops a classic worker from parsing at all.
+ */
+const MODULE_WORKER: WorkerOptions = { type: 'module' };
+
 export interface LocalImageEncoder {
   encode(
     raster: PageRaster,
@@ -227,12 +235,12 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   private createWorker(): Worker {
     const source = this.opts.worker;
     if (typeof source === 'function') return source();
-    if (this.configuredUrl !== null) return startWorker(this.configuredUrl);
+    if (this.configuredUrl !== null) return startWorker(this.configuredUrl, MODULE_WORKER);
     const file = source === undefined ? findEncoderWorkerFile() : null;
-    if (file !== null) return startWorker(file);
+    if (file !== null) return startWorker(file, MODULE_WORKER);
     // 'inline', or the bundled file is on another origin than the page.
     this.blob ??= createWorkerBlobUrl(encoderWorkerSource);
-    return startWorker(this.blob.url);
+    return startWorker(this.blob.url, MODULE_WORKER);
   }
 }
 
