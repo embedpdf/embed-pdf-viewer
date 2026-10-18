@@ -584,7 +584,7 @@ export class DocumentSession {
    * Nothing else creates objects at held numbers, so a held number is free
    * otherwise; the fork checks that again as it creates.
    */
-  useObjectNumber(objectNumber: number): void {
+  claimObjectNumber(objectNumber: number): void {
     if (!Number.isInteger(objectNumber) || objectNumber < 1) {
       throw new EngineError(EngineErrorCode.InvalidArg, `${objectNumber} is not an object number`, {
         details: { field: 'objectNumber' },

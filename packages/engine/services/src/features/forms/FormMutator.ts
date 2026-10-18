@@ -386,8 +386,8 @@ export class FormMutator {
         { details: { field: 'widgetObjectNumbers' } },
       );
     }
-    if (objectNumber !== undefined) this.session.useObjectNumber(objectNumber);
-    for (const number of widgetObjectNumbers ?? []) this.session.useObjectNumber(number);
+    if (objectNumber !== undefined) this.session.claimObjectNumber(objectNumber);
+    for (const number of widgetObjectNumbers ?? []) this.session.claimObjectNumber(number);
     throwIfAborted(signal);
 
     // A failure from here on aborts the job's layer transaction, which takes
@@ -795,10 +795,10 @@ export class FormMutator {
     // a new number in the same place in that page's /Annots.
     const mergedPage =
       before.widgets.find((w) => w.objectNumber === resolved.fieldObjectNumber)?.page ?? null;
-    if (numbers.objectNumber !== undefined) this.session.useObjectNumber(numbers.objectNumber);
+    if (numbers.objectNumber !== undefined) this.session.claimObjectNumber(numbers.objectNumber);
     // The split number is used only when the field is merged.
     const splitObjectNumber = mergedPage ? numbers.splitObjectNumber : undefined;
-    if (splitObjectNumber !== undefined) this.session.useObjectNumber(splitObjectNumber);
+    if (splitObjectNumber !== undefined) this.session.claimObjectNumber(splitObjectNumber);
     throwIfAborted(signal);
 
     // A failure from here on aborts the job's layer transaction.
