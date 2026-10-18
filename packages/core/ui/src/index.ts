@@ -121,3 +121,6 @@ export type {
 
 export { formatShortcut, matchShortcut, parseShortcut, sameShortcut } from './shortcuts';
 export type { KeyStroke, ParsedShortcut } from './shortcuts';
+
+export { treeKeyAction } from './tree-keys';
+export type { TreeKeyAction, TreeKeyOptions, TreeKeyRow } from './tree-keys';

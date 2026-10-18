@@ -31,6 +31,11 @@
       "svelte": "./src/metadata.ts",
       "default": "./src/metadata.ts"
     },
+    "./outline": {
+      "types": "./src/outline.ts",
+      "svelte": "./src/outline.ts",
+      "default": "./src/outline.ts"
+    },
     "./history": {
       "types": "./src/history.ts",
       "svelte": "./src/history.ts",
@@ -160,6 +165,11 @@
         "types": "./dist/metadata.d.ts",
         "svelte": "./dist/metadata.js",
         "default": "./dist/metadata.js"
+      },
+      "./outline": {
+        "types": "./dist/outline.d.ts",
+        "svelte": "./dist/outline.js",
+        "default": "./dist/outline.js"
       },
       "./history": {
         "types": "./dist/history.d.ts",
@@ -291,6 +301,7 @@
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
