@@ -14,6 +14,15 @@ const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
     ],
   },
   {
+    head: 'Frameworks',
+    links: [
+      { label: 'React PDF Viewer', href: '/react-pdf-viewer' },
+      { label: 'Vue PDF Viewer', href: '/vue-pdf-viewer' },
+      { label: 'Svelte PDF Viewer', href: '/svelte-pdf-viewer' },
+      { label: 'Angular PDF Viewer', href: '/angular-pdf-viewer' },
+    ],
+  },
+  {
     head: 'Developers',
     links: [
       { label: 'Documentation', href: '/docs' },
@@ -25,7 +34,8 @@ const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
   {
     head: 'Community',
     links: [
-      { label: 'Become a Sponsor', href: '/sponsors' },
+      { label: 'Become a Sponsor', href: '/sponsorship' },
+      { label: 'Our Sponsors', href: '/sponsors' },
       {
         label: 'Contributing',
         href: 'https://github.com/embedpdf/embed-pdf-viewer/blob/main/CONTRIBUTING.md',
@@ -43,7 +53,7 @@ export function Footer() {
   return (
     <footer className="bg-ep-navy w-full text-white">
       <div className="mx-auto w-full max-w-[1440px] px-[clamp(20px,4vw,80px)] py-[clamp(48px,6vw,80px)]">
-        <div className="grid gap-12 min-[901px]:grid-cols-[minmax(240px,1.2fr)_repeat(4,minmax(0,1fr))]">
+        <div className="grid gap-12 min-[901px]:grid-cols-3 min-[1181px]:grid-cols-[minmax(220px,1.1fr)_repeat(5,minmax(0,1fr))]">
           <div className="flex flex-col items-start gap-5">
             <Image
               src="/embedpdf-icon-dark.svg"
