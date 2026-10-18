@@ -129,6 +129,12 @@ export {
 } from './conformance/runChangeConformance';
 export { pdfOf } from './conformance/pdfOf';
 export {
+  BROKEN_OUTLINE_FIXTURE_PDF,
+  OUTLINE_FIXTURE_PDF,
+  runOutlineConformance,
+  type OutlineConformanceOptions,
+} from './conformance/runOutlineConformance';
+export {
   PERMISSION_TOKENS,
   runPermissionConformance,
   type PermissionConformanceOptions,

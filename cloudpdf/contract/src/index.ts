@@ -18,6 +18,7 @@ import {
   DocumentManifestSchema,
   CustomMetadataSchema,
   DocumentMetadataSchema,
+  DocumentOutlineSchema,
   EngineErrorPayloadSchema,
   FormResetBodySchema,
   FormWidgetDeleteResultSchema,
@@ -1474,6 +1475,23 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
+  'doc.outline.get': {
+    operationId: 'doc.outline.get',
+    title: 'Get outline',
+    summary:
+      "The document's outline (its bookmarks) for a layer: every item, depth first, with its parent, its target in page space, its look and whether it opens. Edit it with the outline ops of a change.",
+    method: 'GET',
+    path: wireTemplates.layerOutline,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: DocumentOutlineSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
   'doc.signatures.list': {
     operationId: 'doc.signatures.list',
     title: 'List signatures',
@@ -1788,6 +1806,7 @@ export const docOperations = {
       'doc.forms.fill',
       'doc.forms.modify',
       'doc.metadata.modify',
+      'doc.outline.modify',
     ],
     requestHeaders: [documentPasswordHeader],
     params: DocLayerParamsSchema,
@@ -1803,7 +1822,8 @@ export const docOperations = {
       'an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair ' +
       'or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own ' +
       'capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure ' +
-      "`doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's " +
+      "`doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`. Bytes (a stamp's drawing, an " +
+      "attached file, a signature's " +
       "artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
       'and each file as the part `resource:<key>`. ' +
       'At most 64 changes per request and 512 ops per change.',
@@ -2345,6 +2365,7 @@ export const docsGroups = {
   'doc.forms': { title: 'Forms' },
   'doc.metadata': { title: 'Metadata' },
   'doc.metadata.custom': { title: 'Custom keys' },
+  'doc.outline': { title: 'Outline' },
   'doc.pages': { title: 'Pages' },
   'doc.redactions': { title: 'Redactions' },
   'doc.signatures': { title: 'Digital signatures' },

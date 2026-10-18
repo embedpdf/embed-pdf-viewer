@@ -257,6 +257,13 @@ export function createDispatcher(
       }
       case 'page':
         return ctx.getPage(source.page)?.actions?.[source.event ?? 'open'] ?? null;
+      case 'outline': {
+        const { items } = await ctx.doc.outline.get();
+        const item = items.find(
+          (candidate) => candidate.ref.objectNumber === source.item.objectNumber,
+        );
+        return item?.action ?? null;
+      }
       case 'document': {
         const snapshot = await readDocumentActions();
         if (!snapshot) return null;

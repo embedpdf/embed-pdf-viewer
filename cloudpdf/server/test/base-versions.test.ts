@@ -339,6 +339,7 @@ describe('layers over base versions', () => {
       attachments: 'base',
       metadata: 'base',
       actions: 'base',
+      outline: 'base',
     });
     expect(await layerState.computeLayerScopesFromDb(DOC, 'alice')).toEqual({
       content: 'layer',
@@ -348,6 +349,7 @@ describe('layers over base versions', () => {
       attachments: 'layer',
       metadata: 'layer',
       actions: 'base',
+      outline: 'layer',
     });
     // A never-written layer name is trivially inherited.
     expect(await layerState.computeLayerScopesFromDb(DOC, 'carol')).toMatchObject({

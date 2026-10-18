@@ -52,6 +52,7 @@ export const en = {
       'form-signature': 'Signature field',
     },
   },
+  outline: { untitled: 'Untitled' },
 } as const;
 
 /** The strings every language has, with their text left open. */

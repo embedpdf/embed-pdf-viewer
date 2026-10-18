@@ -47,6 +47,30 @@ export type LinkResolution =
   | { kind: 'named'; name: string }
   | { kind: 'reported'; target: PdfLinkTarget };
 
+/**
+ * What activating a target would do, by the rule every link and outline item
+ * follows: a `goto` to a page `hasPage` knows is its destination, one to a
+ * page the document doesn't have is reported; a website and a named verb are
+ * handed on; anything else is reported.
+ */
+export function resolveLinkTarget(
+  target: PdfLinkTarget,
+  hasPage: (page: PageRef) => boolean,
+): LinkResolution {
+  switch (target.kind) {
+    case 'goto':
+      return hasPage(target.destination.page)
+        ? { kind: 'destination', destination: target.destination }
+        : { kind: 'reported', target };
+    case 'uri':
+      return { kind: 'uri', uri: target.uri };
+    case 'named':
+      return { kind: 'named', name: target.name };
+    default:
+      return { kind: 'reported', target };
+  }
+}
+
 export interface LinkActivateContext {
   /** The link's `/A` tree when it has one; the actions plugin runs it instead of the target. */
   activate?: PdfActionTree;

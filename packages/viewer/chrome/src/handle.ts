@@ -23,6 +23,7 @@ import { InteractionToken, type InteractionCapability } from '@embedpdf/react/in
 import { LinkToken, type LinkCapability } from '@embedpdf/react/link';
 import { MeasurementToken, type MeasurementCapability } from '@embedpdf/react/measurement';
 import { MetadataToken, type MetadataCapability } from '@embedpdf/react/metadata';
+import { OutlineToken, type OutlineCapability } from '@embedpdf/react/outline';
 import { PageEditToken, type PageEditCapability } from '@embedpdf/react/page-edit';
 import { RedactionToken, type RedactionCapability } from '@embedpdf/react/redaction';
 import { RenderToken, type RenderCapability } from '@embedpdf/react/render';
@@ -60,6 +61,8 @@ export interface ViewerPlugins {
   readonly pageEdit: PageEditCapability;
   /** The document's title, author and your own fields; `ensureLoaded()` reads them. */
   readonly metadata: MetadataCapability;
+  /** The document's outline (its bookmarks); reading its state reads it. */
+  readonly outline: OutlineCapability;
   readonly actions: ActionsCapability;
   readonly documents: DocumentsCapability;
   readonly interaction: InteractionCapability;
@@ -92,6 +95,7 @@ export const VIEWER_PLUGINS: {
   signature: SignatureToken,
   pageEdit: PageEditToken,
   metadata: MetadataToken,
+  outline: OutlineToken,
   actions: ActionsToken,
   documents: DocumentsToken,
   interaction: InteractionToken,

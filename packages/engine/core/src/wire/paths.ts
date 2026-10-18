@@ -7,7 +7,12 @@ import {
   type PagePrintTier,
   type PageRenderFamily,
 } from './renderFamilies';
-import type { AnalysisToken, AnnotationsExportToken, FormExportToken } from './tokens';
+import type {
+  AnalysisToken,
+  AnnotationsExportToken,
+  FormExportToken,
+  OutlineToken,
+} from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
  * @cloudpdf/server import these so they cannot drift.
@@ -81,6 +86,7 @@ import {
   encodeFormToken,
   encodeLayoutToken,
   encodeMetadataToken,
+  encodeOutlineToken,
   encodeRenderToken,
   encodeTokenText,
   encodeWidgetAppearancesRenderToken,
@@ -206,6 +212,21 @@ export const wirePaths = {
   /** Immutable base custom keys: the shared-URL twin of `layerCustomMetadata`. */
   docCustomMetadata: (docId: string, metadataVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/metadata/custom@${encodeMetadataToken(metadataVersion)}`,
+
+  /**
+   * GET: the layer's outline at its `outlineVersion` and `layoutVersion`
+   * (the outline is read in page space). Content-addressed: a stale pin 404s
+   * and the client refreshes its manifest.
+   */
+  layerOutline: (docId: string, layerName: string, token: OutlineToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/outline@${encodeOutlineToken(token)}`,
+
+  layerOutlineCurrent: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/outline`,
+
+  /** Immutable base outline: the shared-URL twin an outline-inheriting layer resolves at. */
+  docOutline: (docId: string, token: OutlineToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/outline@${encodeOutlineToken(token)}`,
 
   /** Immutable catalog-owned actions, independently pinned in the manifest. */
   layerActions: (docId: string, layerName: string, actionsVersion: number) =>
@@ -783,6 +804,7 @@ export const wireTemplates = {
   layerChanges: '/v1/docs/:docId/layers/:layerName/changes',
   layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
   layerCustomMetadata: '/v1/docs/:docId/layers/:layerName/metadata/custom',
+  layerOutline: '/v1/docs/:docId/layers/:layerName/outline',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',
   layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pageKey/data',
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',

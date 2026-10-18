@@ -241,6 +241,41 @@ describe('goToDestination', () => {
   });
 });
 
+describe('getCurrentDestination', () => {
+  it('is where goToDestination went: the point at the top-left, the zoom kept', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.goToDestination(
+      { kind: 'xyz', page: toPageRef(4), x: 100, y: 200, zoom: 2 },
+      { behavior: 'instant' },
+    );
+    const destination = stage.getCurrentDestination();
+    expect(destination).toMatchObject({ kind: 'xyz', page: toPageRef(4), zoom: null });
+    expect(destination?.kind === 'xyz' && destination.x).toBeCloseTo(100, 1);
+    expect(destination?.kind === 'xyz' && destination.y).toBeCloseTo(200, 1);
+    const camera = stage.getCamera();
+    stage.goToDestination(destination!, { behavior: 'instant' });
+    expect(stage.getCamera().x).toBeCloseTo(camera.x, 4);
+    expect(stage.getCamera().y).toBeCloseTo(camera.y, 4);
+  });
+
+  it('names the page that reaches past the top, not the one above it in the padding', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.goToDestination({ kind: 'xyz', page: toPageRef(3), x: 0, y: 0 }, { behavior: 'instant' });
+    expect(stage.getCurrentDestination()).toMatchObject({ page: toPageRef(3), x: 0, y: 0 });
+  });
+
+  it("names a point of the page: above the first page's top it is the top", () => {
+    const { stage } = harness(PORTRAIT);
+    expect(stage.getCurrentDestination()).toEqual({
+      kind: 'xyz',
+      page: toPageRef(1),
+      x: 0,
+      y: 0,
+      zoom: null,
+    });
+  });
+});
+
 describe('fit modes use the document max page (not the current page)', () => {
   const MIXED = [
     { width: 600, height: 800 },

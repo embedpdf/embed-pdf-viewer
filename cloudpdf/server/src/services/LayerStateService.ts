@@ -66,6 +66,7 @@ const ALL_BASE_SCOPES: LayerScopes = {
   attachments: 'base',
   metadata: 'base',
   actions: 'base',
+  outline: 'base',
 };
 
 /**
@@ -129,6 +130,7 @@ export class LayerStateService {
         attachmentsVersion: row.attachmentsVersion,
         annotationsVersion: row.annotationsVersion,
         formsVersion: row.formsVersion,
+        outlineVersion: row.outlineVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -197,6 +199,7 @@ export class LayerStateService {
       | 'attachmentsVersion'
       | 'annotationsVersion'
       | 'formsVersion'
+      | 'outlineVersion'
       | 'baseSha'
     > | null,
     layerPages: DurablePageRow[],
@@ -210,6 +213,7 @@ export class LayerStateService {
       | 'attachmentsVersion'
       | 'annotationsVersion'
       | 'formsVersion'
+      | 'outlineVersion'
     > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
@@ -226,6 +230,7 @@ export class LayerStateService {
         attachments: 'layer',
         metadata: 'layer',
         actions: 'base',
+        outline: 'layer',
       };
     }
     const base = head ?? { ...INITIAL_BASE_POINTERS, sha256: layer.baseSha ?? '' };
@@ -251,6 +256,7 @@ export class LayerStateService {
       attachments: layer.attachmentsVersion === base.attachmentsVersion ? 'base' : 'layer',
       metadata: layer.metadataVersion === base.metadataVersion ? 'base' : 'layer',
       actions: 'base',
+      outline: layer.outlineVersion === base.outlineVersion ? 'base' : 'layer',
     };
   }
 
@@ -290,6 +296,7 @@ export class LayerStateService {
       attachmentsVersion: version.attachmentsVersion,
       annotationsVersion: version.annotationsVersion,
       formsVersion: version.formsVersion,
+      outlineVersion: version.outlineVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -317,6 +324,7 @@ export class LayerStateService {
       | 'attachmentsVersion'
       | 'annotationsVersion'
       | 'formsVersion'
+      | 'outlineVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -337,6 +345,7 @@ export class LayerStateService {
       attachmentsVersion: layer.attachmentsVersion,
       annotationsVersion: layer.annotationsVersion,
       formsVersion: layer.formsVersion,
+      outlineVersion: layer.outlineVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,

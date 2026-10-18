@@ -137,8 +137,9 @@ one the document doesn't have fails with `NotFound`.
 await doc.pages.delete([page.ref]);
 ```
 
-A page's annotations go with it. A document keeps at least one page: deleting every page fails
-with `InvalidArg`.
+A page's annotations go with it. Outline items that go to it stay, and their target reads
+`unsupported` from then on (see [Outline](/docs/engine/documents/outline#pages-that-are-gone)). A
+document keeps at least one page: deleting every page fails with `InvalidArg`.
 
 ## Insert another PDF
 

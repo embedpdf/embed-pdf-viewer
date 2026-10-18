@@ -2,6 +2,7 @@ import type { DocumentEventInit } from './DocumentEvent';
 import { deletedAnnotationsOf } from '../mutation/AnnotationMutationResults';
 import { isSkippedItem, type ChangeItem, type ChangeResult } from '../mutation/Change';
 import { deletedFieldOf, formResetFacts } from '../mutation/FormMutationResults';
+import { deletedOutlineItemsOf } from '../mutation/OutlineMutationResults';
 import { annotationImportFacts } from '../transfer/annotationImport';
 import { formImportFacts, formValuesImportFacts } from '../transfer/formImport';
 
@@ -120,6 +121,26 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
     case 'metadata.updateCustom': {
       const { type: _type, skipped: _skipped, ...result } = item;
       return [{ type: 'metadata.customUpdated', ...result }];
+    }
+    case 'outline.create': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'outline.created', ...result }];
+    }
+    case 'outline.update': {
+      const { type: _type, skipped: _skipped, ...result } = item;
+      return [{ type: 'outline.updated', ...result }];
+    }
+    case 'outline.move': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'outline.moved', ...result }];
+    }
+    case 'outline.delete': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'outline.deleted', deleted: deletedOutlineItemsOf(result), ...result }];
+    }
+    case 'outline.restore': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'outline.restored', ...result }];
     }
   }
 }

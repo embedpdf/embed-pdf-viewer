@@ -66,6 +66,8 @@ import down033 from './033_change_outcomes.down.sql';
 import sql033 from './033_change_outcomes.sql';
 import down034 from './034_forms_version.down.sql';
 import sql034 from './034_forms_version.sql';
+import down035 from './035_outline_version.down.sql';
+import sql035 from './035_outline_version.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -133,5 +135,11 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '034_forms_version.sql',
     sql: sql034,
     down: down034,
+  },
+  {
+    version: '035',
+    name: '035_outline_version.sql',
+    sql: sql035,
+    down: down035,
   },
 ];

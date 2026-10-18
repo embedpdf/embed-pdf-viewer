@@ -1146,6 +1146,20 @@ parentPort.on('message', (msg) => {
       });
       return;
     }
+    case 'outline.read': {
+      // Base-session capable like attachments.list: no layerName resolves the
+      // doc's base session.
+      if (!openDocs.get(sessionKey(msg))) {
+        rejectNotOpen(msg);
+        return;
+      }
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: { tag: 'outline.read', outline: { items: [], incomplete: false } },
+      });
+      return;
+    }
     case 'layer.close':
       // The reload seam: close exactly ONE layer session, leaving the
       // base session, sibling layers, and the pool binding intact.

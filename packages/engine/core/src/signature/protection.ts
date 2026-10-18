@@ -132,6 +132,7 @@ export const PROTECTABLE_CAPABILITIES = [
   'doc.pages.assemble',
   'doc.redact',
   'doc.attachments.modify',
+  'doc.outline.modify',
   'doc.forms.modify',
   'doc.forms.script',
   'doc.annotate.modify',
@@ -158,7 +159,7 @@ export function isProtectableCapability(
  * Only what was declared is refused: a refusal is a promise a signer made,
  * never a guess about a validator. A certification (or a lock with /P)
  * declares what may follow, and everything outside that — page edits,
- * redaction, field authoring, attachments, and below P=3 annotations, below
+ * redaction, field authoring, attachments, the outline, and below P=3 annotations, below
  * P=2 form fill — is refused. A plain approval signature declares nothing:
  * the same edits stay possible and are then judged, the verdict saying the
  * signature no longer holds, exactly as Acrobat does. The one exception is a
@@ -174,6 +175,7 @@ export function protectedCapabilities(protection: DocumentProtection | null): Se
   out.add('doc.pages.assemble');
   out.add('doc.redact');
   out.add('doc.attachments.modify');
+  out.add('doc.outline.modify');
   out.add('doc.forms.modify');
   out.add('doc.forms.script');
   if (!levelAllows(protection.enforced, 'annotate')) {

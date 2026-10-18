@@ -2,6 +2,7 @@ import type { DocumentActionsService } from './DocumentActionsService';
 import type { DocumentAnnotationsService } from './DocumentAnnotationsService';
 import type { DocumentAttachmentsService } from './DocumentAttachmentsService';
 import type { DocumentFormsService } from './DocumentFormsService';
+import type { DocumentOutlineService } from './DocumentOutlineService';
 import type { DocumentPagesService } from './DocumentPagesService';
 import type { DocumentRedactionService } from './DocumentRedactionService';
 import type { DocumentRenderService } from './DocumentRenderService';
@@ -38,6 +39,8 @@ export interface DocumentHandle {
   readonly attachments: DocumentAttachmentsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */
   readonly forms: DocumentFormsService;
+  /** The document's outline (`/Root /Outlines`, the bookmarks): its items, read and written. */
+  readonly outline: DocumentOutlineService;
   /** Document text search: budgeted, cursor-resumable slices. */
   readonly search: DocumentSearchService;
   /**

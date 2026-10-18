@@ -83,6 +83,9 @@ export type DocResourceId =
   | 'metadata-custom'
   | 'actions'
   | 'attachments'
+  // The outline: pinned by its own version and the layout's (it is read in
+  // page space), so its own family and prefix.
+  | 'outline'
   | 'attachment-files'
   // Layer-scoped variants of the page resources. Same capability
   // gates as their doc-level cousins (the layer just provides a
@@ -138,6 +141,7 @@ export type DocResourceId =
   // must never authorize the byte prefix.
   | 'layer-attachments'
   | 'layer-attachment-files'
+  | 'layer-outline'
   | 'download-current'
   | 'download-versioned';
 
@@ -468,6 +472,17 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  outline: {
+    id: 'outline',
+    pathPattern: '/v1/docs/{docId}/outline@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/outline@*`,
+    pathPrefix: '/v1/docs/{docId}/outline@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/outline@`,
+    // Part of opening the document, like the metadata.
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
   'attachment-files': {
     id: 'attachment-files',
     pathPattern: '/v1/docs/{docId}/attachment-files/*',
@@ -488,6 +503,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/layers/{layerName}/attachments@',
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/attachments@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-outline': {
+    id: 'layer-outline',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/outline@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/outline@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/outline@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/outline@`,
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'versioned-read',
     cdnCacheable: true,

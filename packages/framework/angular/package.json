@@ -71,6 +71,10 @@
       "types": "./dist/metadata/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-metadata.mjs"
     },
+    "./outline": {
+      "types": "./dist/outline/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-angular-outline.mjs"
+    },
     "./history": {
       "types": "./dist/history/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-history.mjs"
@@ -138,6 +142,7 @@
     "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",

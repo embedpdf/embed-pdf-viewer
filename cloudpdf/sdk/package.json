@@ -118,6 +118,17 @@
             },
             "default": "./dist/cjs/api/resources/doc/resources/metadata/exports.js"
         },
+        "./doc/outline": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/outline/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/outline/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/outline/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/outline/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/outline/exports.js"
+        },
         "./doc/pages": {
             "import": {
                 "types": "./dist/esm/api/resources/doc/resources/pages/exports.d.mts",

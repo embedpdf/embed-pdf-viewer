@@ -1,3 +1,4 @@
+import type { PdfActionNode, PdfActionTree } from './PdfAction';
 import type { PageDestination } from './PdfDestination';
 
 /**
@@ -49,3 +50,20 @@ export type PdfStandardNamedAction = 'NextPage' | 'PrevPage' | 'FirstPage' | 'La
 export type PdfLinkTargetWritable<Destination = PageDestination> =
   | Extract<PdfLinkTarget<Destination>, { kind: 'goto' | 'uri' }>
   | { kind: 'named'; name: PdfStandardNamedAction };
+
+/**
+ * The action tree the engine writes for a target a write can make: one URI,
+ * GoTo or Named action, as a read of it returns it. Links and outline items
+ * both write their targets this way.
+ */
+export function actionTreeOf<Destination>(
+  target: PdfLinkTargetWritable<Destination>,
+): PdfActionTree<Destination> {
+  const root: PdfActionNode<Destination> =
+    target.kind === 'uri'
+      ? { type: 'uri', subtype: 'URI', uri: target.uri, isMap: false, next: [] }
+      : target.kind === 'goto'
+        ? { type: 'goto', subtype: 'GoTo', destination: target.destination, next: [] }
+        : { type: 'named', subtype: 'Named', name: target.name, next: [] };
+  return { root, incomplete: false, warningFlags: 0, warnings: [] };
+}

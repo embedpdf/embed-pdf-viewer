@@ -43,6 +43,7 @@ import { I18nToken } from '@embedpdf/react/i18n';
 import type { Feature } from '../features';
 import { openModeSurfaceOf } from './modes';
 import { openFileCommand } from './open-files';
+import { outlineCommands } from './outline';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
@@ -438,6 +439,9 @@ export const defaultCommands: CommandDef[] = [
     icon: 'viewSettings',
     menu: 'view',
   },
+
+  // ── the outline ─────────────────────────────────────────────────────────
+  ...outlineCommands,
 
   // ── document actions ────────────────────────────────────────────────────
   openFileCommand,

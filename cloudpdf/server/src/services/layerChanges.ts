@@ -78,6 +78,8 @@ export interface ChangeFacts {
   readonly form: boolean;
   /** The document's metadata (`metadata_version`). */
   readonly metadata: boolean;
+  /** The document's outline (`outline_version`). */
+  readonly outline: boolean;
 }
 
 /** The facts of every item that wrote. */
@@ -87,6 +89,7 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
   let annotationList = false;
   let form = false;
   let metadata = false;
+  let outline = false;
   for (const item of results.flatMap((result) => result.items)) {
     if (isSkippedItem(item)) continue;
     const pages = item.meta.affectedPages.map((page) => page.objectNumber);
@@ -98,6 +101,8 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
       form = true;
     } else if (item.type === 'metadata.update' || item.type === 'metadata.updateCustom') {
       metadata = true;
+    } else if (item.type.startsWith('outline.')) {
+      outline = true;
     }
   }
   return {
@@ -106,6 +111,7 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
     annotationList,
     form,
     metadata,
+    outline,
   };
 }
 

@@ -146,6 +146,7 @@ The plugins have new names:
 | `zoom`, `scroll`, `spread`, `rotate`, `viewport` | `stage` |
 | `render`, `tiling` | `render` |
 | `thumbnail` | `thumbnails` |
+| `bookmark` | `outline`, which also adds, renames, moves and deletes items |
 | `document-manager`, `export` | `documents` |
 | `interaction-manager`, `pan` | `interaction`, whose `pan` tool is the hand |
 | `ui` | `shell` for what's open, and the config's `layout` for what goes where |
@@ -338,9 +339,8 @@ What 2.x had that 3.0 doesn't:
 - **Marquee zoom, and the screenshot tool** (the `capture` plugin).
 - **Protect.** 2.x's Protect dialog, `setDocumentEncryption()` and `removeEncryption()`: 3.0 can't
   add or remove a document's password.
-- **The outline and attachments panels, for now.** The engine doesn't read a document's outline
-  yet, and no plugin lists its attached files, so these two panels don't show (2.x's `bookmark`
-  and `attachment` plugins).
+- **The attachments panel, for now.** No plugin lists a document's attached files yet, so this
+  panel doesn't show (2.x's `attachment` plugin).
 - **Swedish and Traditional Chinese.** They aren't built in: add them with
   [`strings`](customize/translations#a-language-of-your-own).
 - **Theme events:** `themechange`, `activeColorScheme` and `themePreference`.

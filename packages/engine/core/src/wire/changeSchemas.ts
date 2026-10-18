@@ -26,6 +26,12 @@ import {
   MetadataPatchSchema,
   MetadataUpdateResultSchema,
   MutationMetaSchema,
+  OutlineCreateResultSchema,
+  OutlineDeleteResultSchema,
+  OutlineMoveResultSchema,
+  OutlinePositionSchema,
+  OutlineRestoreResultSchema,
+  OutlineUpdateResultSchema,
 } from './schemas';
 import { AnnotationRefSchema } from '../annotation/base.schema';
 import {
@@ -34,6 +40,7 @@ import {
   AnnotationSchema,
 } from '../annotation/kinds';
 import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
+import { OutlineItemDraftSchema, OutlineItemPatchSchema } from '../dto/DocumentOutline.schema';
 import {
   FormFieldDraftSchema,
   FormFieldDTOSchema,
@@ -42,6 +49,7 @@ import {
   WidgetPlacementSchema,
 } from '../forms/schema';
 import { FormFieldRefSchema } from '../identity/FormFieldRef.schema';
+import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import type { ChangeItemType } from '../mutation/Change';
 import { AnnotationResourceKeysSchema, AppearanceResourceKeysSchema } from './resourceKeys';
@@ -171,6 +179,30 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     type: z.literal('metadata.updateCustom'),
     patch: CustomMetadataPatchSchema,
   }),
+  z.object({
+    type: z.literal('outline.create'),
+    parent: OutlineItemRefSchema.nullable(),
+    position: OutlinePositionSchema.optional(),
+    data: OutlineItemDraftSchema,
+    objectNumber: z.number().int().positive().optional(),
+  }),
+  z.object({
+    type: z.literal('outline.update'),
+    ref: OutlineItemRefSchema,
+    patch: OutlineItemPatchSchema,
+    expect: OutlineItemPatchSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('outline.move'),
+    refs: z.array(OutlineItemRefSchema).min(1),
+    parent: OutlineItemRefSchema.nullable(),
+    position: OutlinePositionSchema,
+  }),
+  z.object({
+    type: z.literal('outline.delete'),
+    ref: OutlineItemRefSchema,
+    expect: OutlineItemPatchSchema.optional(),
+  }),
 ]);
 
 /**
@@ -207,6 +239,8 @@ const ChangeItemTypeSchema = z.enum([
   ...ChangeOpWireSchema.options.map((op) => op.shape.type.value),
   'annotations.restore',
   'forms.restore',
+  'forms.restoreWidget',
+  'outline.restore',
 ] as unknown as [ChangeItemType, ...ChangeItemType[]]);
 
 /** What an undo left alone, by name. */
@@ -270,6 +304,11 @@ export const ChangeItemSchema = z.union([
   itemOf('metadata.updateCustom', CustomMetadataUpdateResultSchema, {
     skipped: SkippedFieldsSchema,
   }),
+  itemOf('outline.create', OutlineCreateResultSchema),
+  itemOf('outline.update', OutlineUpdateResultSchema, { skipped: SkippedFieldsSchema }),
+  itemOf('outline.move', OutlineMoveResultSchema),
+  itemOf('outline.delete', OutlineDeleteResultSchema),
+  itemOf('outline.restore', OutlineRestoreResultSchema),
 ]);
 
 /** What a change did: one item per op (per step of an undo), and its meta. */

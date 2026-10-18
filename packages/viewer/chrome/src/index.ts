@@ -95,6 +95,7 @@ export { InteractionToken } from '@embedpdf/react/interaction';
 export { I18nToken } from '@embedpdf/react/i18n';
 export { ShellToken } from '@embedpdf/react/shell';
 export { MetadataToken } from '@embedpdf/react/metadata';
+export { OutlineToken } from '@embedpdf/react/outline';
 export { RenderToken } from '@embedpdf/react/render';
 export { LinkToken } from '@embedpdf/react/link';
 export { PageEditToken } from '@embedpdf/react/page-edit';

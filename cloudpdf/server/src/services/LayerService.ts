@@ -419,6 +419,7 @@ export class LayerService {
             attachmentsVersion: base.attachmentsVersion,
             annotationsVersion: base.annotationsVersion,
             formsVersion: base.formsVersion,
+            outlineVersion: base.outlineVersion,
           }
         : {}),
     });
@@ -2182,6 +2183,9 @@ export class LayerService {
           if (bumped.versions.metadata_version !== undefined) {
             cacheDelta = { ...cacheDelta, metadataVersion: bumped.versions.metadata_version };
           }
+          if (bumped.versions.outline_version !== undefined) {
+            cacheDelta = { ...cacheDelta, outlineVersion: bumped.versions.outline_version };
+          }
           const artifactFields = {
             layer,
             nextVersion,
@@ -2304,7 +2308,8 @@ export class LayerService {
    * The version bumps a commit's facts call for, read inside its transaction:
    * the document version always; each touched page's pin of the family that
    * changed on it (`annotation_version`, `widget_version`); the annotation
-   * list and the form when they changed; the metadata when it changed.
+   * list and the form when they changed; the metadata and the outline when
+   * they changed.
    */
   private async bumpChangeVersions(
     trx: Transaction<Schema>,
@@ -2318,12 +2323,19 @@ export class LayerService {
       annotations_version?: number;
       forms_version?: number;
       metadata_version?: number;
+      outline_version?: number;
     };
     pages: DurablePageRow[];
   }> {
     const current = await trx
       .selectFrom('layers')
-      .select(['doc_version', 'annotations_version', 'forms_version', 'metadata_version'])
+      .select([
+        'doc_version',
+        'annotations_version',
+        'forms_version',
+        'metadata_version',
+        'outline_version',
+      ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
     if (!current) throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
@@ -2362,6 +2374,7 @@ export class LayerService {
           : {}),
         ...(facts.form ? { forms_version: Number(current.forms_version ?? 1) + 1 } : {}),
         ...(facts.metadata ? { metadata_version: Number(current.metadata_version) + 1 } : {}),
+        ...(facts.outline ? { outline_version: Number(current.outline_version ?? 1) + 1 } : {}),
       },
       pages,
     };
@@ -4320,6 +4333,7 @@ export class LayerService {
           attachmentsVersion: layer.attachmentsVersion,
           annotationsVersion: layer.annotationsVersion,
           formsVersion: layer.formsVersion + 1,
+          outlineVersion: layer.outlineVersion,
           createdAt: now,
         });
 
@@ -4475,6 +4489,7 @@ export class LayerService {
       attachments_version?: number;
       annotations_version?: number;
       forms_version?: number;
+      outline_version?: number;
     },
     lastAuditId: number,
     now: number,

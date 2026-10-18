@@ -47,6 +47,16 @@ import {
   updateWidget,
 } from './internal/formChanges';
 import { revertMetadata, updateCustomMetadata, updateMetadata } from './internal/metadataChanges';
+import {
+  createOutlineItem,
+  deleteOutlineItem,
+  moveOutlineItems,
+  moveOutlineItemsBack,
+  removeOutlineItem,
+  restoreOutlineItem,
+  revertOutlineItem,
+  updateOutlineItem,
+} from './internal/outlineChanges';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -190,15 +200,27 @@ function runOp(
       return updateMetadata(ctx, op, at);
     case 'metadata.updateCustom':
       return updateCustomMetadata(ctx, op);
+    case 'outline.create':
+      return createOutlineItem(ctx, op);
+    case 'outline.update':
+      return updateOutlineItem(ctx, op, at);
+    case 'outline.move':
+      return moveOutlineItems(ctx, op);
+    case 'outline.delete':
+      return deleteOutlineItem(ctx, op, at);
   }
 }
 
 function runStep(ctx: ChangeContext, step: ReverseStep): Done {
   switch (step.kind) {
     case 'objects.revert':
-      return 'annotation' in step.subject
-        ? revertAnnotation(ctx, { ...step, subject: step.subject })
-        : revertForm(ctx, { ...step, subject: step.subject });
+      if ('annotation' in step.subject) {
+        return revertAnnotation(ctx, { ...step, subject: step.subject });
+      }
+      if ('outlineItem' in step.subject) {
+        return revertOutlineItem(ctx, { ...step, subject: step.subject });
+      }
+      return revertForm(ctx, { ...step, subject: step.subject });
     case 'annotation.remove':
       return removeAnnotation(ctx, step);
     case 'annotation.restore':
@@ -217,5 +239,11 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return restoreCalculationOrder(ctx, step);
     case 'metadata.revert':
       return revertMetadata(ctx, step);
+    case 'outline.remove':
+      return removeOutlineItem(ctx, step);
+    case 'outline.restore':
+      return restoreOutlineItem(ctx, step);
+    case 'outline.move':
+      return moveOutlineItemsBack(ctx, step);
   }
 }

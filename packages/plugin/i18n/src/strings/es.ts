@@ -56,4 +56,5 @@ export const es: EmbedpdfStrings = {
       'form-signature': 'Campo de firma',
     },
   },
+  outline: { untitled: 'Sin título' },
 };

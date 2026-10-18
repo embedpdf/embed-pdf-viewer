@@ -21,6 +21,14 @@ export type {
   TokenSource,
 } from './dto/OpenInput';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
+export type {
+  DocumentOutline,
+  OutlineItem,
+  OutlineItemDraft,
+  OutlineItemPatch,
+} from './dto/DocumentOutline';
+export { OUTLINE_READ_LIMITS } from './dto/DocumentOutline';
+export { outlineItemAfter, outlineItemOfDraft, outlineItemWithChildren } from './outline/predict';
 export type { MetadataPatch } from './dto/MetadataPatch';
 export type { CustomMetadata } from './dto/CustomMetadata';
 export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
@@ -212,6 +220,8 @@ export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
 export type { PageRef } from './identity/PageRef';
 export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
+export type { OutlineItemRef } from './identity/OutlineItemRef';
+export { toOutlineItemRef, outlineItemRefsEqual } from './identity/OutlineItemRef';
 export { generateUuid, generateUuidV7 } from './identity/uuid';
 export type { AnnotationRef } from './identity/AnnotationRef';
 export {
@@ -510,6 +520,7 @@ export type {
   PdfLinkTargetWritable,
   PdfStandardNamedAction,
 } from './dto/PdfLinkTarget';
+export { actionTreeOf } from './dto/PdfLinkTarget';
 export type { CacheDelta, MutationMeta } from './mutation/MutationMeta';
 export type { AnnotationListMutationMeta } from './mutation/AnnotationListMutationMeta';
 export type {
@@ -803,6 +814,7 @@ export type {
   AnnotationPosition,
   FieldPosition,
   ListPosition,
+  OutlinePosition,
   PagePosition,
 } from './mutation/ListPosition';
 export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
@@ -867,6 +879,16 @@ export type {
   RedactionApplyResult,
 } from './mutation/RedactionApplyResult';
 export type { MetadataUpdateResult } from './mutation/MetadataUpdateResult';
+export type {
+  OutlineCreateResult,
+  OutlineDeleteResult,
+  OutlineMoveResult,
+  OutlineMutationMeta,
+  OutlineOrder,
+  OutlineRestoreResult,
+  OutlineUpdateResult,
+} from './mutation/OutlineMutationResults';
+export { deletedOutlineItemsOf } from './mutation/OutlineMutationResults';
 export type { CustomMetadataUpdateResult } from './mutation/CustomMetadataUpdateResult';
 
 export type {

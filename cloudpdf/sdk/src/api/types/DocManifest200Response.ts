@@ -10,6 +10,7 @@ export interface DocManifest200Response {
     attachmentsVersion?: number | undefined;
     annotationsVersion?: number | undefined;
     formsVersion?: number | undefined;
+    outlineVersion?: number | undefined;
     auditHead: number;
     baseSha: string;
     layerVersion?: number | undefined;
@@ -29,6 +30,7 @@ export namespace DocManifest200Response {
         attachments: Scopes.Attachments;
         metadata: Scopes.Metadata;
         actions: Scopes.Actions;
+        outline: Scopes.Outline;
     }
 
     export namespace Scopes {
@@ -67,6 +69,11 @@ export namespace DocManifest200Response {
             Layer: "layer",
         } as const;
         export type Actions = (typeof Actions)[keyof typeof Actions];
+        export const Outline = {
+            Base: "base",
+            Layer: "layer",
+        } as const;
+        export type Outline = (typeof Outline)[keyof typeof Outline];
     }
 
     export interface Protection {

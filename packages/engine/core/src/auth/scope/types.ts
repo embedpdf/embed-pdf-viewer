@@ -48,6 +48,9 @@ export type DocCapability =
   // Attachments (document-level embedded files, PDF bit 4)
   | 'doc.attachments.modify' // add/remove /EmbeddedFiles entries (PDF bit 4)
 
+  // Outline (the document's bookmarks, PDF bit 4 or 11)
+  | 'doc.outline.modify' // create, change, move and delete outline items (PDF bit 4; bit 11, assembling the document, includes creating outline items)
+
   // Redaction apply (destructive content modification, PDF bit 4)
   | 'doc.redact'
 

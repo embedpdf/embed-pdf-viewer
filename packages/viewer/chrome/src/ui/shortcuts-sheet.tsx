@@ -39,7 +39,7 @@ const GROUPS: readonly { readonly titleKey: string; readonly areas: readonly str
   },
   {
     titleKey: 'shortcuts.editing',
-    areas: ['history', 'tool', 'selection', 'annotation', 'redaction', 'measurement'],
+    areas: ['history', 'tool', 'selection', 'annotation', 'redaction', 'measurement', 'outline'],
   },
 ];
 /** Every other command, yours among them. */

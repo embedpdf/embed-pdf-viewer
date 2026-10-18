@@ -97,6 +97,30 @@ export function importField(runtime: PdfRuntimeModule, docPtr: Ptr, capture: Uin
   });
 }
 
+/** An outline item as its delete removes it: the item, the items under it, its place. */
+export function exportOutlineItem(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  objectNumber: number,
+): Uint8Array {
+  return takeOwned(runtime, `outline item ${objectNumber}`, (sizePtr) =>
+    runtime.fn.EPDFOutline_ExportItemRawToOwnedBuffer(docPtr, objectNumber, sizePtr),
+  );
+}
+
+/** Puts the outline item of `capture` back, with the items under it, at its place. */
+export function importOutlineItem(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  capture: Uint8Array,
+): void {
+  withBytes(runtime, capture, (ptr) => {
+    if (!runtime.fn.EPDFOutline_ImportItemRaw(docPtr, ptr, capture.byteLength)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFOutline_ImportItemRaw refused a capture');
+    }
+  });
+}
+
 /** The bytes of a buffer an export returned, which is then released. */
 function takeOwned(
   runtime: PdfRuntimeModule,

@@ -59,4 +59,5 @@ export const de: EmbedpdfStrings = {
       'form-signature': 'Unterschriftsfeld',
     },
   },
+  outline: { untitled: 'Unbenannt' },
 };

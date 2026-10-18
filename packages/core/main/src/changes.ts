@@ -31,6 +31,7 @@ import {
   type ChangeResult,
   type DocumentHandle,
   type FormFieldDTO,
+  type OutlineItem,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -64,6 +65,13 @@ export type PredictedOp =
       readonly widget: WidgetAnnotation;
       /** Its field as the restore leaves it, with the widget back; `null` when it had none. */
       readonly field: FormFieldDTO | null;
+    }
+  | {
+      readonly type: 'outline.restore';
+      /** The items as they were: the item first, then the items under it, depth first. */
+      readonly items: readonly OutlineItem[];
+      /** The item's place among its parent's children. */
+      readonly index: number;
     };
 
 /** One user action, as a plugin stages it. */

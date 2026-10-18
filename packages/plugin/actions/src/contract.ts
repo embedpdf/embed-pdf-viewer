@@ -23,6 +23,7 @@ import type {
   FormFieldRef,
   FormSubmissionEntry,
   FormSubmissionReceipt,
+  OutlineItemRef,
   PageRef,
   PdfActionNode,
   PdfActionTargetRef,
@@ -50,6 +51,8 @@ export type ActionOrigin = 'user' | 'hover' | 'lifecycle';
 export type ActionSource =
   | { kind: 'widget'; field: FormFieldRef; annotation: AnnotationRef; page: PageRef }
   | { kind: 'link'; annotation?: AnnotationRef; page?: PageRef }
+  /** An outline item the user followed: its /A, run as a link's is. */
+  | { kind: 'outline'; item: OutlineItemRef }
   /** A non-widget annotation's own /AA event (E/X on squares, stamps, …). */
   | { kind: 'annotation'; annotation: AnnotationRef; page: PageRef }
   /** A page /AA tree (O/C) inside a page-trigger fan-out. */
@@ -106,7 +109,9 @@ export type ActionTreeSource =
     }
   | { kind: 'field'; field: FormFieldRef; event: PdfFieldEventKind }
   | { kind: 'page'; page: PageRef; event?: 'open' | 'close' }
-  | { kind: 'document'; event?: DocumentTriggerEvent };
+  | { kind: 'document'; event?: DocumentTriggerEvent }
+  /** An outline item's /A. */
+  | { kind: 'outline'; item: OutlineItemRef };
 
 /** The document-open sequence has run (once per document). */
 export interface OpenSequenceCompletedEvent {

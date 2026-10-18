@@ -56,6 +56,7 @@
     "@embedpdf/plugin-link": "workspace:*",
     "@embedpdf/plugin-measurement": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-outline": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",

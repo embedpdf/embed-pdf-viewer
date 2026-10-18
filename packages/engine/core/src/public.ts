@@ -21,12 +21,18 @@ export { isLocalPage } from './engine/LocalPageHandle';
 export { toPageRef, pageRefsEqual } from './identity/PageRef';
 export { OBJECT_NUMBER_CEILING } from './identity/ObjectNumbers';
 export { toFieldRef } from './identity/FormFieldRef';
+export { toOutlineItemRef, outlineItemRefsEqual } from './identity/OutlineItemRef';
 export { toAttachmentRef } from './dto/Attachment';
 export { annotationKey } from './identity/annotationKey';
 
 // Positions: where rows go in their list (a reorder, an insert).
 export { anchorOf, reorderedList } from './mutation/ListPosition';
-export type { AnnotationPosition, ListPosition, PagePosition } from './mutation/ListPosition';
+export type {
+  AnnotationPosition,
+  ListPosition,
+  OutlinePosition,
+  PagePosition,
+} from './mutation/ListPosition';
 
 // Permissions.
 export { caps, collab } from './auth/scope/builders';
@@ -102,6 +108,8 @@ export type {
   // Services.
   MetadataService,
   CustomMetadataService,
+  DocumentOutlineService,
+  OutlineCreateOptions,
   DocumentPagesService,
   DocumentAnnotationsService,
   PageAnnotationsService,
@@ -199,6 +207,18 @@ export type {
   Attachment,
   AttachmentList,
   AttachmentRef,
+  DocumentOutline,
+  OutlineItem,
+  OutlineItemDraft,
+  OutlineItemPatch,
+  OutlineItemRef,
+  OutlineCreateResult,
+  OutlineUpdateResult,
+  OutlineMoveResult,
+  OutlineDeleteResult,
+  OutlineRestoreResult,
+  OutlineOrder,
+  OutlineMutationMeta,
   DocumentEvent,
   DocumentEventOf,
   DocumentEventType,

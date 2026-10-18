@@ -9,8 +9,12 @@ import type {
   FormFieldPatch,
   FormFieldValue,
   MetadataPatch,
+  OutlineItem,
+  OutlineItemPatch,
+  OutlineItemRef,
   PageRef,
   PdfCoordinates,
+  PdfDestination,
   WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -38,7 +42,10 @@ export type ReverseStep =
   | WidgetRestoreStep
   | WidgetDeleteStep
   | CalculationOrderStep
-  | MetadataRevertStep;
+  | MetadataRevertStep
+  | OutlineRemoveStep
+  | OutlineRestoreStep
+  | OutlineMoveStep;
 
 /**
  * One dictionary a change wrote, as it was before (the capture, with the
@@ -64,8 +71,11 @@ export interface ObjectsRevertStep {
   /** What its item reports doing: the op it puts back, or its opposite (a widget's add undoes its removal). */
   readonly reports: ChangeItemType;
   readonly objects: readonly CapturedObject[];
-  /** What the item reads back: the annotation, or the form fields. */
-  readonly subject: { readonly annotation: AnnotationRef } | { readonly fields: readonly number[] };
+  /** What the item reads back: the annotation, the form fields, or the outline item. */
+  readonly subject:
+    | { readonly annotation: AnnotationRef }
+    | { readonly fields: readonly number[] }
+    | { readonly outlineItem: OutlineItemRef };
   /** Whether the op changed what the annotation shows (its update's `appearance.changed`). */
   readonly appearanceChanged?: boolean;
   readonly fallback?: RevertFallback;
@@ -89,6 +99,13 @@ export type RevertFallback =
       readonly restore: FormFieldPatch;
       /** The values it left in them: a property still holding its value is put back. */
       readonly left: FormFieldPatch;
+    }
+  | {
+      readonly kind: 'outline';
+      /** The old values of the fields an outline item update changed, as a patch. */
+      readonly restore: OutlineItemPatch<PdfDestination>;
+      /** The values it left in them: a field still holding its value is put back. */
+      readonly left: OutlineItemPatch<PdfDestination>;
     }
   | {
       readonly kind: 'value';
@@ -227,6 +244,53 @@ export interface MetadataRevertStep {
   readonly left: MetadataPatch | CustomMetadataPatch;
 }
 
+/**
+ * Deletes outline items a create or a restore brought back, when nobody
+ * changed them since: the item and the items under it read exactly as the
+ * change left them. Undoing a create never deletes an item someone gave a
+ * child, or renamed, since.
+ */
+export interface OutlineRemoveStep {
+  readonly kind: 'outline.remove';
+  readonly ref: OutlineItemRef;
+  /** The item and the items under it, depth first, as the change left them. */
+  readonly left: readonly OutlineItem<PdfDestination>[];
+}
+
+/**
+ * Brings back what an outline delete removed: the same items, at the same
+ * numbers, at the place the item had (`EPDFOutline_ImportItemRaw`). Left
+ * alone when its parent is gone or it is back already.
+ */
+export interface OutlineRestoreStep {
+  readonly kind: 'outline.restore';
+  readonly ref: OutlineItemRef;
+  /** Its parent when it went; `null` for the top level. */
+  readonly parent: OutlineItemRef | null;
+  readonly capture: Uint8Array;
+}
+
+/**
+ * Puts outline items back where they were before a move: its reverse, and,
+ * the other way round, its redo. Each item goes only while it is still under
+ * the parent the move left it under, and its parent is still there.
+ */
+export interface OutlineMoveStep {
+  readonly kind: 'outline.move';
+  /**
+   * Where each goes back to, by object number (parent 0: the top level;
+   * after 0: first), in document order, so an anchor is placed before what
+   * follows it.
+   */
+  readonly placements: readonly {
+    readonly item: number;
+    readonly parent: number;
+    readonly after: number;
+  }[];
+  /** The parent each was left under (0: the top level). */
+  readonly left: readonly { readonly item: number; readonly parent: number }[];
+}
+
 /** The bytes a record's captures hold. */
 export function recordBytes(record: ChangeRecord): number {
   let bytes = 0;
@@ -243,6 +307,7 @@ export function recordBytes(record: ChangeRecord): number {
         objects(step.unlinked);
         break;
       case 'field.restore':
+      case 'outline.restore':
         bytes += step.capture.byteLength;
         break;
       default:

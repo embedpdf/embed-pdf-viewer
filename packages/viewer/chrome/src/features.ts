@@ -26,7 +26,7 @@ export const FEATURE_PARTS = {
   text: ['selection', 'copy'],
   search: [],
   thumbnails: [],
-  outline: [],
+  outline: ['editing'],
   documents: ['open', 'download', 'print', 'tabs'],
 } as const;
 
@@ -54,6 +54,7 @@ export const READ_ONLY_FEATURES: readonly Feature[] = [
   'measurement',
   'pages',
   'attachments.adding',
+  'outline.editing',
 ];
 
 const isInside = (feature: string, outer: string): boolean =>

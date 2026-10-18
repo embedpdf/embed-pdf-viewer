@@ -70,6 +70,10 @@ error. The document is as it was before the call.
 | `forms.setAppearanceText`      | `field`, `text`                                           | Sets the text a field shows without changing its value, as a format script does |
 | `metadata.update`              | `patch`, `expect`                                         | `doc.metadata.update(patch)`                                                    |
 | `metadata.updateCustom`        | `patch`                                                   | `doc.metadata.custom.update(patch)`                                             |
+| `outline.create`               | `parent`, `position`, `data`, `objectNumber`              | `doc.outline.create(data, { parent, position, objectNumber })`                 |
+| `outline.update`               | `ref`, `patch`, `expect`                                  | `doc.outline.update(ref, patch)`                                                |
+| `outline.move`                 | `refs`, `parent`, `position`                              | `doc.outline.move(refs, parent, position)`                                      |
+| `outline.delete`               | `ref`, `expect`                                           | `doc.outline.delete(ref)`                                                       |
 
 Put everything one action does into one change: it's one step in the user's undo history, and
 its events arrive together.
@@ -342,8 +346,8 @@ several changes.
 
 A change fires the events its ops' calls fire, in op order, all with the change's `opId` in
 `origin.tx`. An undo fires what it did: `annotations.updated` for a field put back,
-`annotations.deleted` for a create taken back, `annotations.restored` and `forms.restored` for
-what came back. Its events carry `origin.undoOf`, the `opId` of the change it undid. See
+`annotations.deleted` for a create taken back, `annotations.restored`, `forms.restored` and
+`outline.restored` for what came back. Its events carry `origin.undoOf`, the `opId` of the change it undid. See
 [Events](/docs/engine/concepts/events).
 
 ### How the engine puts things back

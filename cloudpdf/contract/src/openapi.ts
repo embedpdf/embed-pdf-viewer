@@ -15,6 +15,7 @@ import {
   DocumentWireComponents,
   EngineErrorPayloadSchema,
   FormWireComponents,
+  OutlineWireComponents,
   PdfActionWireComponents,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
@@ -62,6 +63,7 @@ const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   PdfActionWireComponents,
   AnnotationWireComponents,
   FormWireComponents,
+  OutlineWireComponents,
   ChangeWireComponents,
 ]);
 

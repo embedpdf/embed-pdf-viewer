@@ -69,6 +69,7 @@ import { registerEventsRoutes } from '../routes/events';
 import { registerFormRoutes } from '../routes/forms';
 import { registerMetadataRoutes } from '../routes/metadata';
 import { registerObjectNumberRoutes } from '../routes/object-numbers';
+import { registerOutlineRoutes } from '../routes/outline';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
@@ -1352,6 +1353,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerChangeRoutes(app, { documentService, layerService });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
+      await registerOutlineRoutes(app, { service: documentService });
       await registerSignatureRoutes(app, { service: documentService, layerService });
       await registerPageRoutes(app, {
         documentService,

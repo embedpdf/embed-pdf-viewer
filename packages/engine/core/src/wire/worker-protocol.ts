@@ -13,6 +13,7 @@ import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attac
 import type { CustomMetadata } from '../dto/CustomMetadata';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
+import type { DocumentOutline } from '../dto/DocumentOutline';
 import type { FontIdentityInfo } from '../dto/FontSpec';
 import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
 import type { MetadataPatch } from '../dto/MetadataPatch';
@@ -409,6 +410,15 @@ export interface MetadataUpdateCustomWorkerRequest extends WriteJobFields {
 
 export interface ActionsReadWorkerRequest {
   kind: 'actions.read';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/** The document's outline: every item, depth first (no page is loaded). */
+export interface OutlineReadWorkerRequest {
+  kind: 'outline.read';
   effect: 'read';
   jobId: WorkerJobId;
   docId: string;
@@ -1585,6 +1595,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | MetadataReadCustomWorkerRequest
   | MetadataUpdateCustomWorkerRequest
   | ActionsReadWorkerRequest
+  | OutlineReadWorkerRequest
   | AnnotationsListWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
   | AnnotationsRenderAppearancesEncodedWorkerRequest
@@ -1738,6 +1749,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot<C['destination']> }
+  | { tag: 'outline.read'; outline: DocumentOutline<C['destination']> }
   | {
       tag: 'metadata.update';
       result: MetadataUpdateResult;

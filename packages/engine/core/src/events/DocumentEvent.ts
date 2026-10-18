@@ -1,6 +1,7 @@
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import type { OutlineItemRef } from '../identity/OutlineItemRef';
 import type { PageRef } from '../identity/PageRef';
 import type {
   AnnotationCreateResult,
@@ -32,6 +33,13 @@ import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormFieldDTO } from '../forms/field';
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
+import type {
+  OutlineCreateResult,
+  OutlineDeleteResult,
+  OutlineMoveResult,
+  OutlineRestoreResult,
+  OutlineUpdateResult,
+} from '../mutation/OutlineMutationResults';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
@@ -187,6 +195,23 @@ export type DocumentEvent =
     } & AttachmentDeleteResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
   | ({ type: 'metadata.customUpdated'; origin: EventOrigin } & CustomMetadataUpdateResult)
+  | ({ type: 'outline.created'; origin: EventOrigin } & OutlineCreateResult)
+  | ({ type: 'outline.updated'; origin: EventOrigin } & OutlineUpdateResult)
+  | ({ type: 'outline.moved'; origin: EventOrigin } & OutlineMoveResult)
+  | ({
+      type: 'outline.deleted';
+      origin: EventOrigin;
+      /** What was deleted: the item first, then the items under it (see `deletedOutlineItemsOf`). */
+      deleted: OutlineItemRef[];
+    } & OutlineDeleteResult)
+  | ({
+      /**
+       * An undo brought deleted outline items back: the same items, under the
+       * refs they had, at the place the item had among its parent's children.
+       */
+      type: 'outline.restored';
+      origin: EventOrigin;
+    } & OutlineRestoreResult)
   | ({ type: 'forms.valueSet'; origin: EventOrigin } & FormSetValueResult)
   | ({ type: 'forms.repaired'; origin: EventOrigin } & FormRepairResult)
   | ({ type: 'forms.created'; origin: EventOrigin } & FormFieldCreateResult)

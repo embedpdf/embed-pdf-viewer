@@ -6,6 +6,7 @@ import {
   EngineErrorCode,
   EventHub,
   SessionEventPublisher,
+  outlineVerbs,
   subscribeToType,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -15,6 +16,7 @@ import {
   type DocumentEventStream,
   type DocumentFormsService,
   type DocumentHandle,
+  type DocumentOutlineService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
   type DocumentRenderService,
@@ -46,6 +48,7 @@ import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsServi
 import { CloudDocumentAttachmentsService } from './CloudDocumentAttachmentsService';
 import { changeSender, CloudDocumentChanges } from './CloudDocumentChanges';
 import { CloudDocumentFormsService } from './CloudDocumentFormsService';
+import { readCloudOutline } from './CloudDocumentOutlineService';
 import { CloudDocumentPagesService } from './CloudDocumentPagesService';
 import { CloudDocumentRedactionService } from './CloudDocumentRedactionService';
 import { CloudDocumentSearchService } from './CloudDocumentSearchService';
@@ -94,6 +97,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly metadata: CloudMetadataService;
   readonly annotations: DocumentAnnotationsService;
   readonly actions: DocumentActionsService;
+  readonly outline: DocumentOutlineService;
   readonly attachments: DocumentAttachmentsService;
   readonly signatures: DocumentSignaturesService;
   readonly forms: DocumentFormsService;
@@ -280,6 +284,10 @@ export class CloudDocumentHandle implements DocumentHandle {
       layerName,
       () => this.closed,
       this.manifestAccessor,
+    );
+    this.outline = outlineVerbs(
+      () => readCloudOutline(http, id, layerName, () => this.closed, this.manifestAccessor),
+      (change, options) => this.apply(change, options),
     );
     this.attachments = new CloudDocumentAttachmentsService(
       http,
@@ -501,13 +509,14 @@ export class CloudDocumentHandle implements DocumentHandle {
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
       ...(delta?.formsVersion !== undefined ? { formsVersion: delta.formsVersion } : {}),
-      // The plane pins a page-structure, metadata or attachment write bumps:
+      // The plane pins a page-structure, metadata, attachment or outline write bumps:
       // absorbed so the next read addresses the fresh leaf.
       ...(delta?.layoutVersion !== undefined ? { layoutVersion: delta.layoutVersion } : {}),
       ...(delta?.metadataVersion !== undefined ? { metadataVersion: delta.metadataVersion } : {}),
       ...(delta?.attachmentsVersion !== undefined
         ? { attachmentsVersion: delta.attachmentsVersion }
         : {}),
+      ...(delta?.outlineVersion !== undefined ? { outlineVersion: delta.outlineVersion } : {}),
       // The signing fences: every ordinary commit writes an artifact
       // (`working`), and the layer's write serial when the delta names it.
       ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),

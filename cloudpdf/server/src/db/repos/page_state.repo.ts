@@ -106,6 +106,8 @@ export interface LayerRow {
   annotationsVersion: number;
   /** Form pointer — see `LayersTable.forms_version`. */
   formsVersion: number;
+  /** Outline pointer — see `LayersTable.outline_version`. */
+  outlineVersion: number;
   /** Audit-log head at this layer's state — the manifest's `auditHead`. */
   lastAuditId: number;
   currentVersion: number;
@@ -136,6 +138,7 @@ export interface CreateLayerInput {
   attachmentsVersion?: number;
   annotationsVersion?: number;
   formsVersion?: number;
+  outlineVersion?: number;
 }
 
 export class LayersRepo {
@@ -165,6 +168,7 @@ export class LayersRepo {
         attachments_version: input.attachmentsVersion ?? 1,
         annotations_version: input.annotationsVersion ?? 1,
         forms_version: input.formsVersion ?? 1,
+        outline_version: input.outlineVersion ?? 1,
         layout_version: input.layoutVersion ?? 1,
         metadata_version: input.metadataVersion ?? 1,
         last_audit_id: 0,
@@ -297,6 +301,7 @@ function mapLayerRow(row: {
   attachments_version: number;
   annotations_version?: number | bigint;
   forms_version?: number | bigint;
+  outline_version?: number | bigint;
   current_version: number;
   current_artifact_key: string | null;
   current_artifact_sha: string | null;
@@ -317,6 +322,7 @@ function mapLayerRow(row: {
     attachmentsVersion: Number(row.attachments_version),
     annotationsVersion: Number(row.annotations_version ?? 1),
     formsVersion: Number(row.forms_version ?? 1),
+    outlineVersion: Number(row.outline_version ?? 1),
     lastAuditId: Number(row.last_audit_id ?? 0),
     currentVersion: Number(row.current_version),
     currentArtifactKey: row.current_artifact_key,

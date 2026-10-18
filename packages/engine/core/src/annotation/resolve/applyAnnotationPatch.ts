@@ -1,5 +1,6 @@
 import type { AttachmentFileInfo } from '../../dto/Attachment';
-import type { PdfActionNode, PdfActionTree, PdfAnnotationActions } from '../../dto/PdfAction';
+import type { PdfAnnotationActions } from '../../dto/PdfAction';
+import { actionTreeOf } from '../../dto/PdfLinkTarget';
 import {
   DEFAULT_RICH_TEXT_BODY,
   type RichTextDocument,
@@ -104,15 +105,4 @@ function followingReads(
   const actions: PdfAnnotationActions<unknown> =
     target === null ? others : { ...others, activate: actionTreeOf(target) };
   return { actions: Object.keys(actions).length > 0 ? actions : null };
-}
-
-/** The action tree the engine writes for a link target: one URI or GoTo action. */
-export function actionTreeOf(
-  target: { kind: 'uri'; uri: string } | { kind: 'goto'; destination: unknown },
-): PdfActionTree<unknown> {
-  const root: PdfActionNode<unknown> =
-    target.kind === 'uri'
-      ? { type: 'uri', subtype: 'URI', uri: target.uri, isMap: false, next: [] }
-      : { type: 'goto', subtype: 'GoTo', destination: target.destination, next: [] };
-  return { root, incomplete: false, warningFlags: 0, warnings: [] };
 }

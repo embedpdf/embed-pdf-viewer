@@ -56,4 +56,5 @@ export const fr: EmbedpdfStrings = {
       'form-signature': 'Champ de signature',
     },
   },
+  outline: { untitled: 'Sans titre' },
 };

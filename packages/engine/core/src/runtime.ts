@@ -70,6 +70,8 @@ export type { JobTarget, Place, Placed, RankedJob, ViewSets } from './scheduling
 export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { MetadataService } from './engine/MetadataService';
+export type { DocumentOutlineService, OutlineCreateOptions } from './engine/DocumentOutlineService';
+export { outlineVerbs } from './engine/outlineVerbs';
 export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';
@@ -126,6 +128,7 @@ export type {
   MetadataReadCustomWorkerRequest,
   MetadataUpdateCustomWorkerRequest,
   ActionsReadWorkerRequest,
+  OutlineReadWorkerRequest,
   AnnotationsListWorkerRequest,
   AnnotationsRenderAppearancesWorkerRequest,
   AnnotationsRenderAppearancesEncodedWorkerRequest,

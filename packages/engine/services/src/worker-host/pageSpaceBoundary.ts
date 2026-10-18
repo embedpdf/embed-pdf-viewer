@@ -8,12 +8,16 @@ import {
   pageFormSnapshotOf,
   pageGeometryOf,
   pageListOf,
+  pageOutlineItemOf,
+  pageOutlineOf,
   pageSearchSliceOf,
   pageViewportsOf,
   pdfAnnotationDraftOf,
   pdfAnnotationPatchOf,
   pdfFormFieldDraftOf,
   pdfMeasureOf,
+  pdfOutlineDraftOf,
+  pdfOutlinePatchOf,
   pdfWidgetPlacementOf,
   pageWidgetOf,
   pdfRenderTargetOf,
@@ -91,6 +95,8 @@ export function resultInPageSpace(
     }
     case 'actions.read':
       return { ...payload, snapshot: mapDocumentActions(payload.snapshot, toPage) };
+    case 'outline.read':
+      return { ...payload, outline: pageOutlineOf(payload.outline, boxOf) };
     case 'annotations.list':
       return {
         ...payload,
@@ -322,8 +328,22 @@ function opInFileSpace(
         ? { ...rest, expect: pdfWidgetPatchOf(expect, boxOf(op.widget.page), boxOf) }
         : rest;
     }
+    case 'outline.create':
+      return { ...op, data: pdfOutlineDraftOf(op.data, boxOf) };
+    case 'outline.update': {
+      const { expect, ...rest } = op;
+      return {
+        ...rest,
+        patch: pdfOutlinePatchOf(op.patch, boxOf),
+        ...(expect ? { expect: pdfOutlinePatchOf(expect, boxOf) } : {}),
+      };
+    }
+    case 'outline.delete': {
+      const { expect, ...rest } = op;
+      return expect ? { ...rest, expect: pdfOutlinePatchOf(expect, boxOf) } : rest;
+    }
     default:
-      // The rest hold no places: values, flags, names, metadata.
+      // The rest hold no places: values, flags, names, metadata, outline moves.
       return op;
   }
 }
@@ -383,8 +403,13 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
         field: item.field && pageFormFieldOf(item.field, boxOf),
         widgets: widgets(item.widgets),
       };
+    case 'outline.create':
+    case 'outline.update':
+      return { ...item, item: pageOutlineItemOf(item.item, boxOf) } as ChangeItem;
+    case 'outline.restore':
+      return { ...item, items: item.items.map((read) => pageOutlineItemOf(read, boxOf)) };
     default:
-      // The rest hold no places: deletes, metadata.
+      // The rest hold no places: deletes, metadata, outline moves.
       return item;
   }
 }

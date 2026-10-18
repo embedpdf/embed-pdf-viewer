@@ -601,8 +601,8 @@ export function requireCollabAction(
 /**
  * Whether the token may make new objects on the document, so its editing
  * session is handed object numbers: create annotations (as itself, in its
- * own group), insert pages, or add form fields. What the document's
- * signatures forbid doesn't count. A tenant owns its documents.
+ * own group), insert pages, add form fields, or add outline items. What the
+ * document's signatures forbid doesn't count. A tenant owns its documents.
  */
 export function mayCreateObjects(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
@@ -611,7 +611,14 @@ export function mayCreateObjects(
 ): boolean {
   if (ctx.mode === 'tenant') return true;
   const { scope, identity } = ctx.jwt;
-  if (checkAnyCapability(['doc.pages.assemble', 'doc.forms.modify'], scope, pdfBits, protection)) {
+  if (
+    checkAnyCapability(
+      ['doc.pages.assemble', 'doc.forms.modify', 'doc.outline.modify'],
+      scope,
+      pdfBits,
+      protection,
+    )
+  ) {
     return true;
   }
   if (protection && protectedCapabilities(protection).has('doc.annotate.modify')) return false;

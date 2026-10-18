@@ -72,6 +72,7 @@ const PLUGINS = [
   'Link',
   'Measurement',
   'Metadata',
+  'Outline',
   'PageEdit',
   'Redaction',
   'Render',

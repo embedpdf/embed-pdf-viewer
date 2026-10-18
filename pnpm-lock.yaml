@@ -1387,6 +1387,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -1517,6 +1520,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -1638,6 +1644,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -1759,6 +1768,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit
@@ -2130,6 +2142,46 @@ importers:
         specifier: workspace:*
         version: link:../../core/main
     devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
+  packages/plugin/outline:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../actions
+      '@embedpdf/plugin-i18n':
+        specifier: workspace:*
+        version: link:../i18n
+      '@embedpdf/plugin-link':
+        specifier: workspace:*
+        version: link:../link
+      '@embedpdf/plugin-selection':
+        specifier: workspace:*
+        version: link:../selection
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../stage
+    devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
@@ -2553,6 +2605,9 @@ importers:
       '@embedpdf/plugin-metadata':
         specifier: workspace:*
         version: link:../../plugin/metadata
+      '@embedpdf/plugin-outline':
+        specifier: workspace:*
+        version: link:../../plugin/outline
       '@embedpdf/plugin-page-edit':
         specifier: workspace:*
         version: link:../../plugin/page-edit

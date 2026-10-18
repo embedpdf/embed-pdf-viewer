@@ -13,6 +13,7 @@ import { panelCommandOf, type LayoutData, type LayoutPanel } from '@embedpdf/cor
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import type { CommandDef } from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
+import { OutlineToken } from '@embedpdf/react/outline';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken } from '@embedpdf/react/shell';
@@ -74,9 +75,16 @@ const FIND_COMMAND: CommandDef = {
 
 const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, PanelCommandFacts>([
   ['thumbnails', { categories: ['thumbnails'] }],
-  // The engine reads no outline, and no plugin lists the document's attached files: these two
-  // panels have nothing to show, so they never show.
-  ['outline', { categories: ['outline'], visible: () => false }],
+  // The outline panel shows whenever the plugin is there, even for a document without one: its
+  // button stays put from document to document, and the panel says there is none.
+  [
+    'outline',
+    {
+      categories: ['outline'],
+      visible: (commandContext) => commandContext.tryGet(OutlineToken) != null,
+    },
+  ],
+  // No plugin lists the document's attached files: the panel has nothing to show, so it never shows.
   ['attachments', { categories: ['attachments'], visible: () => false }],
   // Without searching the panel has no job; its button puts the cursor in the field, as Find does.
   [SEARCH_PANEL, { ...SEARCHES, focus: true }],

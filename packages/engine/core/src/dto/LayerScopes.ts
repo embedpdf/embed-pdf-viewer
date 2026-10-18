@@ -10,7 +10,7 @@
  * inherited: text, geometry and the page-only picture depend on `content`;
  * each other picture on `content` plus the planes it draws
  * (`PAGE_RENDER_FAMILIES`); the form on `forms`; the full-document download
- * on all seven.
+ * on all eight.
  *
  * Present on layer manifests only. Absent on base manifests (meaningless
  * there) and on pre-plane servers — consumers treat absence as all-`'layer'`
@@ -44,6 +44,8 @@ export interface LayerScopes {
   metadata: 'base' | 'layer';
   /** The /actions snapshot — `actionsVersion`. */
   actions: 'base' | 'layer';
+  /** The /outline read — `outlineVersion` (its URL also pins `layout`). */
+  outline: 'base' | 'layer';
 }
 
 /** One plane a resource read can depend on. */

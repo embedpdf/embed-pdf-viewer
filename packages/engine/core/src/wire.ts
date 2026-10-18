@@ -39,6 +39,15 @@ export {
   CustomMetadataSchema,
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
+  OutlineMutationMetaSchema,
+  OutlineOrderSchema,
+  OutlinePositionSchema,
+  OutlineCreateResultSchema,
+  OutlineUpdateResultSchema,
+  OutlineMoveResultSchema,
+  OutlineDeleteResultSchema,
+  OutlineRestoreResultSchema,
+  OutlineWireComponents,
   AccessRequestSchema,
   AccessResponseSchema,
   EditSessionAccessSchema,
@@ -279,6 +288,8 @@ export {
   encodeFormExportToken,
   encodeActionsToken,
   encodeAttachmentsToken,
+  encodeOutlineToken,
+  decodeOutlineToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
@@ -442,13 +453,20 @@ export type {
   DocumentVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
-export type { AnnotationsExportToken, FormExportToken } from './wire/tokens';
+export type { AnnotationsExportToken, FormExportToken, OutlineToken } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';
 
 export { PageScaleResultSchema } from './wire/schemas';
 export { PageRefSchema } from './identity/PageRef.schema';
+export { OutlineItemRefSchema } from './identity/OutlineItemRef.schema';
+export {
+  DocumentOutlineSchema,
+  OutlineItemDraftSchema,
+  OutlineItemPatchSchema,
+  OutlineItemSchema,
+} from './dto/DocumentOutline.schema';
 export {
   CHANGE_REQUEST_LIMITS,
   ChangeAnswerSchema,

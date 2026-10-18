@@ -86,6 +86,8 @@ const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>
   actions: ['actions'],
   attachments: ['attachments'],
   'attachment-files': ['attachments'],
+  // Read in page space: a page delete or a box change moves it too.
+  outline: ['outline', 'layout'],
 };
 
 export function cdnCoverageForScope(

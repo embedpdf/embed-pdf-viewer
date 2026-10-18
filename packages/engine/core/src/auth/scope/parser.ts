@@ -35,6 +35,7 @@ const KNOWN_CAPABILITIES: ReadonlySet<DocCapability> = new Set([
   'doc.annotate.import',
   'doc.metadata.modify',
   'doc.attachments.modify',
+  'doc.outline.modify',
   'doc.redact',
   'doc.sign',
   'doc.sign.certify',

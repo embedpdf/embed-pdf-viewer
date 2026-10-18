@@ -7,7 +7,7 @@
 import { useT } from '@embedpdf/react/i18n';
 import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { StageToken, useStageState } from '@embedpdf/react/stage';
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * Stands in for the number while the sentence around it is translated, so it can split there:
@@ -29,7 +29,8 @@ export function PageNumber() {
   const refocus = useRef(false);
   const editing = draft !== null;
 
-  useEffect(() => {
+  // In the commit that swaps the field and the number, so focus is never left nowhere.
+  useLayoutEffect(() => {
     if (editing) {
       field.current?.focus();
       field.current?.select();

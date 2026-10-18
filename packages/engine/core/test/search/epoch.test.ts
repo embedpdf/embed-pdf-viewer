@@ -14,6 +14,7 @@ function manifest(
     attachmentsVersion: 0,
     annotationsVersion: 0,
     formsVersion: 0,
+    outlineVersion: 0,
     auditHead: 42,
     baseSha: 'abc',
     layerVersion: 0,

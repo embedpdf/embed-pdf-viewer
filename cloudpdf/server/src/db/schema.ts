@@ -141,6 +141,11 @@ export interface LayersTable {
    * and flatten; never on an annotation write.
    */
   forms_version: number;
+  /**
+   * Outline pointer epoch for `/outline@{layoutVersion, outlineVersion}`
+   * (migration 035): bumps only on outline writes.
+   */
+  outline_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */
@@ -505,6 +510,7 @@ export interface BaseVersionsTable {
   attachments_version: number;
   annotations_version: number;
   forms_version: number;
+  outline_version: number;
   created_at: number;
 }
 

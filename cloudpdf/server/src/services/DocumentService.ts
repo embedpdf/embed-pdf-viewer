@@ -14,6 +14,7 @@ import {
   type DocumentSecurityState,
   type CustomMetadata,
   type DocumentMetadata,
+  type DocumentOutline,
   type DocumentActionsSnapshot,
   type DocumentSecurityProbeInfo,
   type PageListSnapshot,
@@ -601,6 +602,7 @@ export class DocumentService {
           attachmentsVersion: headVersion.attachmentsVersion,
           annotationsVersion: headVersion.annotationsVersion,
           formsVersion: headVersion.formsVersion,
+          outlineVersion: headVersion.outlineVersion,
           lastAuditId: 0,
           currentVersion: 0,
           currentArtifactKey: null,
@@ -963,6 +965,34 @@ export class DocumentService {
       );
     }
     return result.metadata;
+  }
+
+  /** The document's outline, read the same way as `readLayerMetadata`. */
+  async readLayerOutline(
+    ctx: OpenContext,
+    docId: string,
+    /** Omit for the base view (shared reads use no layer session). */
+    layerName?: string,
+    signal?: AbortSignal,
+  ): Promise<DocumentOutline> {
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'outline.read' as const,
+        effect: 'read' as const,
+        jobId,
+        docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+      });
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
+    if (result.tag !== 'outline.read') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected outline payload: ${result.tag}`,
+      );
+    }
+    return result.outline;
   }
 
   /** The Info dict's custom keys, read the same way as `readLayerMetadata`. */
@@ -2361,6 +2391,7 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
     attachmentsVersion: 1,
     annotationsVersion: 1,
     formsVersion: 1,
+    outlineVersion: 1,
     createdAt: row.createdAt,
   };
 }

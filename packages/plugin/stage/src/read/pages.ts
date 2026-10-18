@@ -23,7 +23,13 @@ import {
   snapToDevice,
 } from '@embedpdf/core-geometry';
 import type { Point } from '@embedpdf/core-geometry';
-import { memo, toPageRef, type PluginContext, type PageRef } from '@embedpdf/core';
+import {
+  memo,
+  toPageRef,
+  type PageDestination,
+  type PluginContext,
+  type PageRef,
+} from '@embedpdf/core';
 
 import type { Viewpoint, VisiblePage } from '../contract';
 import type { StageHostCapability } from '../host-contract';
@@ -313,6 +319,36 @@ export function createPageReads(
         return 'mode' in zoom ? zoom.mode : 'custom';
       },
       getViewpoint: (): Viewpoint => ({ anchor: currentAnchor(), zoom: state().zoom }),
+      getCurrentDestination: (): PageDestination | null => {
+        // Where `goToDestination` puts a destination's point: a padding in from the viewport's
+        // top-left. The page read is the first one reaching past that point; the one above it
+        // may still show in the padding.
+        const inset = padding();
+        const current = camera();
+        const first = visiblePages()
+          .filter((page) => {
+            const corner = toScreen(current, { x: page.x + page.width, y: page.y + page.height });
+            return corner.x > inset && corner.y > inset;
+          })
+          .sort((left, right) => left.pageIndex - right.pageIndex)[0];
+        const size = first && ctx.getPage(first.ref)?.size;
+        if (!first || !size) return null;
+        // That point on the page's plane, then the nearest point of the page: a quarter-turn
+        // keeps the page's edges on the axes, so clamping each axis is exact.
+        const corner = first.transform.viewToPage({
+          x: inset - first.screenX,
+          y: inset - first.screenY,
+        });
+        const clamp = (value: number, max: number) =>
+          Math.round(Math.min(Math.max(value, 0), max) * 100) / 100;
+        return {
+          kind: 'xyz',
+          page: first.ref,
+          x: clamp(corner.x, size.width),
+          y: clamp(corner.y, size.height),
+          zoom: null,
+        };
+      },
     } satisfies Partial<StageHostCapability>,
   };
 }
