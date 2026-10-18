@@ -254,6 +254,12 @@ export const DEFAULT_LAYOUT: LayoutData = {
       ['zoom:in', 'zoom:out'],
       ['zoom:fit-page', 'zoom:fit-width', 'zoom:automatic'],
     ],
+    // A row of the outline panel: its menu button and a right-click on it open this.
+    'outline-item': [
+      ['outline:add', 'outline:add-child'],
+      ['outline:rename', 'outline:set-destination', 'outline:properties'],
+      ['outline:delete'],
+    ],
   },
 
   // Each panel's button is its `panel:<id>` command, titled and drawn as the panel is

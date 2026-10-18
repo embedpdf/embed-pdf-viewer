@@ -47,6 +47,7 @@ const SignaturesPanel = lazyComponent(() =>
 const RedactionPanel = lazyComponent(() =>
   import('./redaction-panel').then((ui) => ui.RedactionPanel),
 );
+const OutlinePanel = lazyComponent(() => import('./outline-panel').then((ui) => ui.OutlinePanel));
 const FormDesignPanel = lazyComponent(() =>
   import('./form-design-panel').then((ui) => ui.FormDesignPanel),
 );
@@ -60,6 +61,8 @@ interface BuiltInContent {
 
 const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, BuiltInContent>([
   ['thumbnails', { draw: () => <ThumbnailList />, list: true }],
+  // Each document's own outline, its filter and its rows.
+  ['outline', { draw: (documentId) => <OutlinePanel key={documentId ?? 'none'} />, list: true }],
   // These read the document as they mount, so each document gets its own.
   ['search', { draw: (documentId) => <SearchPanel key={documentId ?? 'none'} />, list: true }],
   ['comments', { draw: (documentId) => <CommentsPanel key={documentId ?? 'none'} /> }],

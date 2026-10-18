@@ -33,6 +33,7 @@ import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
 import { metadataPlugin } from '@embedpdf/react/metadata';
+import { outlinePlugin } from '@embedpdf/react/outline';
 import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
 import { selectionPlugin } from '@embedpdf/react/selection';
 import { AnnotationToken, annotationPlugin } from '@embedpdf/react/annotation';
@@ -445,6 +446,8 @@ export function FullViewer({
     // The document's title, author and your own fields, read the first time something asks
     // (`viewer.get('metadata').ensureLoaded()`, `useMetadataState()`), never as a document opens.
     metadataPlugin(),
+    // The document's outline, read the first time its panel or its state asks for it.
+    outlinePlugin(),
     interactionPlugin(settings.interaction),
     // Platform haptics, default-on: the Vibration API where it exists
     // (Android), a safe silent no-op elsewhere — iOS Safari included, until

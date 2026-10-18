@@ -258,6 +258,12 @@ describe('getCurrentDestination', () => {
     expect(stage.getCamera().y).toBeCloseTo(camera.y, 4);
   });
 
+  it('names the page that reaches past the top, not the one above it in the padding', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.goToDestination({ kind: 'xyz', page: toPageRef(3), x: 0, y: 0 }, { behavior: 'instant' });
+    expect(stage.getCurrentDestination()).toMatchObject({ page: toPageRef(3), x: 0, y: 0 });
+  });
+
   it("names a point of the page: above the first page's top it is the top", () => {
     const { stage } = harness(PORTRAIT);
     expect(stage.getCurrentDestination()).toEqual({

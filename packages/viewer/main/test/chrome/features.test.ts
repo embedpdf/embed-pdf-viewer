@@ -44,6 +44,7 @@ describe('disabledSettingsOf', () => {
       'measurement',
       'pages',
       'attachments.adding',
+      'outline.editing',
     ]);
   });
 

@@ -41,6 +41,7 @@ import { useSurface } from '@embedpdf/react/shell';
 import { Scrollbar, Stage } from '@embedpdf/react/stage';
 import { useRef, type ReactNode } from 'react';
 
+import { OUTLINE_PROPERTIES_DIALOG } from './config/outline';
 import { useLayoutEnv, useResolvedLayout } from './config-context';
 import { LayoutRoot } from './layout-root';
 import { EdgeBars, FloatingBars } from './places';
@@ -91,6 +92,11 @@ const SignatureInspector = lazyComponent(
 const PrintDialog = lazyComponent(() => import('./ui/print-dialog').then((ui) => ui.PrintDialog), {
   shownWhile: usePrintDialogOpen,
 });
+const useOutlinePropertiesOpen = () => useSurface(OUTLINE_PROPERTIES_DIALOG).isOpen;
+const OutlinePropertiesDialog = lazyComponent(
+  () => import('./ui/outline-properties').then((ui) => ui.OutlinePropertiesDialog),
+  { shownWhile: useOutlinePropertiesOpen },
+);
 
 /** The document tabs, as the layout says: always, while more than one document is open, or never. */
 function DocumentTabs() {
@@ -268,6 +274,7 @@ export function Shell({ components }: { components?: PlacedComponents }) {
               <CalibrationDialog />
               <GoToPageDialog />
               <PrintDialog />
+              <OutlinePropertiesDialog />
               <ShortcutsSheet />
               {/* signatures: plugin intents → surfaces; the dialogs they open */}
               <SignatureBridge />
