@@ -68,7 +68,7 @@ export class OutlineMutator {
     const children = tree.childrenOf(parentNumber);
     const at = positionIndex(children.map(toOutlineItemRef), position, keyOf);
     const after = at === 0 ? 0 : children[at - 1]!;
-    if (objectNumber !== undefined) this.session.useObjectNumber(objectNumber);
+    if (objectNumber !== undefined) this.session.claimObjectNumber(objectNumber);
 
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
