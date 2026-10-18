@@ -74,6 +74,8 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 | `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |
 | `metadata.updated`                                                        | The title, author or another standard metadata field.                                     |
 | `metadata.customUpdated`                                                  | Your own metadata keys.                                                                   |
+| `outline.created`, `.updated`, `.moved`, `.deleted`                      | An outline item was added, changed, moved or deleted.                                     |
+| `outline.restored`                                                        | An undo brought back deleted outline items.                                               |
 | `redaction.applied`                                                       | Redactions were applied.                                                                  |
 | `signatures.prepared`, `.completed`, `.cancelled`                         | A signature was started or finished.                                                      |
 | `document.versioned`                                                      | A new version of the document was saved, such as after signing. Read what you show again. |

@@ -9,6 +9,6 @@
  */
 export const VIEWER_PENDING = {
   'customize/panels': {
-    N4: 'the outline and attachments panels: the engine reads no outline, and no plugin lists the attached files',
+    N4: 'the attachments panel: no plugin lists the attached files',
   },
 };

@@ -55,6 +55,35 @@ export const BROKEN_OUTLINE_FIXTURE_PDF = pdfOf([
   '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] >>',
 ]);
 
+/**
+ * Targets stored every way files store them, on the same two pages:
+ *
+ * - Shared one (6) and Shared two (7): one action object (11), page 3 at
+ *   (10, 290) in the file, which the link on page 3 (14) also uses.
+ * - Hyperref (8): an action written into the item, going to the named
+ *   destination `section.1` of the `/Names` tree (page 4 at (0, 200)).
+ * - Old dests (9): the name `/chapter`, from the catalog's `/Dests`
+ *   dictionary, written as `<< /D [...] >>` (page 4, `/FitH` 250).
+ * - By number (10): a destination naming its page by index, 1 (page 4).
+ */
+export const OUTLINE_TARGETS_FIXTURE_PDF = pdfOf([
+  '<< /Type /Catalog /Pages 2 0 R /Outlines 5 0 R /Names << /Dests 12 0 R >> /Dests 13 0 R >>',
+  '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Annots [14 0 R] >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] >>',
+  '<< /Type /Outlines /First 6 0 R /Last 10 0 R /Count 5 >>',
+  '<< /Title (Shared one) /Parent 5 0 R /Next 7 0 R /A 11 0 R >>',
+  '<< /Title (Shared two) /Parent 5 0 R /Prev 6 0 R /Next 8 0 R /A 11 0 R >>',
+  '<< /Title (Hyperref) /Parent 5 0 R /Prev 7 0 R /Next 9 0 R ' +
+    '/A << /S /GoTo /D (section.1) >> >>',
+  '<< /Title (Old dests) /Parent 5 0 R /Prev 8 0 R /Next 10 0 R /Dest /chapter >>',
+  '<< /Title (By number) /Parent 5 0 R /Prev 9 0 R /Dest [1 /Fit] >>',
+  '<< /S /GoTo /D [3 0 R /XYZ 10 290 null] >>',
+  '<< /Names [(section.1) [4 0 R /XYZ 0 200 null]] >>',
+  '<< /chapter << /D [4 0 R /FitH 250] >> >>',
+  '<< /Type /Annot /Subtype /Link /Rect [0 0 50 50] /P 3 0 R /A 11 0 R >>',
+]);
+
 const A = toOutlineItemRef(6);
 const B = toOutlineItemRef(7);
 const C = toOutlineItemRef(8);
@@ -63,6 +92,12 @@ const A1 = toOutlineItemRef(10);
 const C1 = toOutlineItemRef(11);
 const FIRST_PAGE = toPageRef(3);
 const SECOND_PAGE = toPageRef(4);
+
+const SHARED_ONE = toOutlineItemRef(6);
+const SHARED_TWO = toOutlineItemRef(7);
+const HYPERREF = toOutlineItemRef(8);
+const OLD_DESTS = toOutlineItemRef(9);
+const BY_NUMBER = toOutlineItemRef(10);
 
 export interface OutlineConformanceOptions {
   label: string;
@@ -86,6 +121,13 @@ const orderOf = (orders: readonly OutlineOrder[], parent: OutlineItemRef | null)
   orders
     .find((order) => numberOf(order.parent) === numberOf(parent))
     ?.children.map((ref) => ref.objectNumber);
+/** Where the document's one link goes. */
+const linkTargetOf = async (doc: DocumentHandle) => {
+  const link = (await doc.annotations.list()).annotations.find(
+    (annotation) => annotation.subtype === 'link',
+  );
+  return link?.subtype === 'link' ? link.target : undefined;
+};
 
 /**
  * The document's outline (`doc.outline`), the same on every engine:
@@ -98,6 +140,9 @@ const orderOf = (orders: readonly OutlineOrder[], parent: OutlineItemRef | null)
  *   an undo brings the same items back.
  * - Each write publishes its `outline.*` event; without `doc.outline.modify`
  *   every write is refused and reading still works.
+ * - A target reads the same however the file stores it: written into the
+ *   item or shared, named in the `/Names` tree or the old `/Dests`, a page
+ *   by index. A new target or an undo never changes an action an item shares.
  * - A broken outline reads what it can and says `incomplete`.
  */
 export function runOutlineConformance(
@@ -168,6 +213,65 @@ export function runOutlineConformance(
           action: { root: { type: 'javascript', script: 'app.alert(1)' } },
         });
       });
+    });
+
+    test('a target reads the same however the file stores it', async () => {
+      await withOutline(async (doc) => {
+        const outline = await doc.outline.get();
+        expect(outline.incomplete).toBe(false);
+        const shared = {
+          kind: 'goto',
+          destination: { kind: 'xyz', page: FIRST_PAGE, x: 10, y: 10 },
+        };
+        expect(itemOf(outline, SHARED_ONE)).toMatchObject({
+          target: shared,
+          action: { root: { type: 'goto' } },
+        });
+        expect(itemOf(outline, SHARED_TWO)).toMatchObject({ target: shared });
+        expect(await linkTargetOf(doc)).toMatchObject(shared);
+        expect(itemOf(outline, HYPERREF)).toMatchObject({
+          target: { kind: 'goto', destination: { kind: 'xyz', page: SECOND_PAGE, x: 0, y: 100 } },
+          action: { root: { type: 'goto' } },
+        });
+        expect(itemOf(outline, OLD_DESTS)).toMatchObject({
+          target: { kind: 'goto', destination: { kind: 'fitH', page: SECOND_PAGE, y: 50 } },
+          action: null,
+        });
+        expect(itemOf(outline, BY_NUMBER)).toMatchObject({
+          target: { kind: 'goto', destination: { kind: 'fit', page: SECOND_PAGE } },
+        });
+      }, OUTLINE_TARGETS_FIXTURE_PDF);
+    });
+
+    test('a new target leaves an action the item shared alone, and an undo brings it back', async () => {
+      await withOutline(async (doc) => {
+        const before = await doc.outline.get();
+        const link = await linkTargetOf(doc);
+        const changed = await doc.outline.update(SHARED_ONE, {
+          target: { kind: 'uri', uri: 'https://example.com/' },
+        });
+        expect(changed.item.target).toEqual({ kind: 'uri', uri: 'https://example.com/' });
+        const after = await doc.outline.get();
+        expect(itemOf(after, SHARED_TWO)).toEqual(itemOf(before, SHARED_TWO));
+        expect(await linkTargetOf(doc)).toEqual(link);
+        await doc.apply({ undoOf: changed.meta.opId });
+        expect(await doc.outline.get()).toEqual(before);
+      }, OUTLINE_TARGETS_FIXTURE_PDF);
+    });
+
+    test('a delete and its undo keep a target however the file stored it', async () => {
+      await withOutline(async (doc) => {
+        const before = await doc.outline.get();
+        const link = await linkTargetOf(doc);
+        for (const ref of [SHARED_TWO, HYPERREF, OLD_DESTS, BY_NUMBER]) {
+          const deleted = await doc.outline.delete(ref);
+          expect(itemOf(await doc.outline.get(), ref)).toBe(undefined);
+          await doc.apply({ undoOf: deleted.meta.opId });
+          expect(await doc.outline.get()).toEqual(before);
+        }
+        // The action Shared two used is still there for the link.
+        expect(await linkTargetOf(doc)).toEqual(link);
+      }, OUTLINE_TARGETS_FIXTURE_PDF);
     });
 
     test('a document without an outline reads an empty one', async () => {

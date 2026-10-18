@@ -271,6 +271,16 @@ stage.goToDestination({ kind: 'xyz', page: pages[4].ref, x: 72, y: 100, zoom: 2 
 
 Any of `x`, `y` and `zoom` can be `null` or left out: the view keeps what it has on that axis.
 
+`getCurrentDestination()` goes the other way: where the view is now, as a destination. It names
+the page reaching past the top of the view and the spot `goToDestination()` would put at the
+top-left, with `zoom: null`, so going back keeps the reader's zoom. It's what a new
+[bookmark](/docs/headless/documents/outline) goes to:
+
+```ts
+const here = stage.getCurrentDestination(); // { kind: 'xyz', page, x, y, zoom: null }, or null
+stage.goToDestination(here!); // the view doesn't move
+```
+
 <Example name="stage/destination" />
 
 ## Make it feel right
@@ -410,6 +420,7 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 | `canGoNext()`, `canGoPrevious()`                         | Whether there's a page after or before the current one, to disable your buttons                                                                                   |
 | `reveal(page, options?)`                                 | Brings a page into view, scrolling only as far as needed. With `rect`, `zoom` or `anchor`, it lands on that spot. [Jump to an exact spot](#jump-to-an-exact-spot) |
 | `goToDestination(destination)`                           | Goes where a link, a bookmark or the document's opening view points. [Follow a destination](#follow-a-destination)                                                |
+| `getCurrentDestination()`                                | Where the view is now, as a destination that keeps the zoom; `null` before a page shows. [Follow a destination](#follow-a-destination)                          |
 | `scrollTo({ left, top })`, `scrollBy({ left, top })`     | Scrolls like a scrolling element does, in screen pixels. It jumps unless you pass `behavior: 'smooth'`. [Scrollbars](#scrollbars)                                  |
 | `panBy(x, y)`                                            | Moves the view by `x` and `y` screen pixels                                                                                                                       |
 | `resetView()`                                            | Jumps back to the first page and keeps the zoom mode                                                                                                              |

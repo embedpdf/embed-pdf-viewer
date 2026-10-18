@@ -77,6 +77,7 @@ To list what the user was given (for a "you can…" panel), read `doc.security.s
 | `doc.sign`               | Sign the document.                                                                                         |
 | `doc.sign.certify`       | Sign as the certifying signature.                                                                          |
 | `doc.metadata.modify`    | Change the title, author and other metadata.                                                               |
+| `doc.outline.modify`     | Add, change, move and delete outline items (bookmarks).                                                    |
 | `doc.attachments.modify` | Add and remove attached files.                                                                             |
 | `doc.redact`             | Apply redactions.                                                                                          |
 | `pdf.permissions`        | What the PDF file itself allows (its permission flags); see [below](#the-pdfs-own-restrictions).           |
@@ -196,11 +197,11 @@ security summary for the file:
 | :----------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
 | Printing                             | `doc.print`, and `doc.print.high` when it allows printing at full quality                                                                |
 | Content copying                      | `doc.text.copy` and `doc.content.copy`, and with them a search's snippets                                                                |
-| Changing the document                | `doc.pages.modify`, `doc.pages.assemble`, `doc.redact`, `doc.metadata.modify`, `doc.attachments.modify`, `doc.forms.fill` and `doc.sign` |
+| Changing the document                | `doc.pages.modify`, `doc.pages.assemble`, `doc.redact`, `doc.metadata.modify`, `doc.attachments.modify`, `doc.outline.modify`, `doc.forms.fill` and `doc.sign` |
 | Commenting                           | `doc.annotate.modify`, `doc.forms.fill` and `doc.sign`                                                                                   |
 | Changing the document and commenting | all of those, and `doc.forms.modify`                                                                                                     |
 | Filling in form fields               | `doc.forms.fill` and `doc.sign`                                                                                                          |
-| Document assembly                    | `doc.pages.assemble`                                                                                                                     |
+| Document assembly                    | `doc.pages.assemble` and `doc.outline.modify`                                                                                            |
 
 It always gives `doc.open`, `doc.render`, `doc.annotate.read`, `doc.forms.read`, `doc.text.select`
 and `doc.text.search` too: the file's restrictions are about changing it and taking its content

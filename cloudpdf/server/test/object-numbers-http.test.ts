@@ -411,6 +411,21 @@ describe('the bulk reservation', () => {
     });
     expect(viewer.status).toBe(403);
   });
+
+  test('a caller that may only change the outline is handed numbers too', async () => {
+    const layer = 'bulk-outline';
+    const scope = ['doc.open', 'doc.outline.modify'];
+    const opened = await access({ layer, session: 'cloud:outline', scope });
+    expect(objectNumbersIn(opened.body.edit.objectNumbers)).toHaveLength(8);
+    const reserved = await call('POST', '/object-numbers', {
+      layer,
+      session: 'cloud:outline',
+      scope,
+      body: { count: 10 },
+    });
+    expect(reserved.status).toBe(200);
+    expect(count(reserved.body.objectNumbers)).toBeGreaterThanOrEqual(10);
+  });
 });
 
 describe('the event stream', () => {

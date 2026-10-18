@@ -56,6 +56,10 @@ export const REFERENCE = [
     pages: ['headless/documents/metadata.mdx'],
   },
   {
+    capability: 'plugin/outline/src/contract.ts#OutlineCapability',
+    pages: ['headless/documents/outline.mdx'],
+  },
+  {
     capability: 'plugin/actions/src/contract.ts#ActionsCapability',
     pages: ['headless/documents/actions.mdx'],
   },

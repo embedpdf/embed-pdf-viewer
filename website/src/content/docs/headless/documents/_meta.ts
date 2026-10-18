@@ -5,5 +5,6 @@ export default {
   saving: 'Saving & downloading',
   pages: 'Organizing pages',
   metadata: 'Metadata',
+  outline: 'Outline',
   actions: 'Actions & scripts',
 };
