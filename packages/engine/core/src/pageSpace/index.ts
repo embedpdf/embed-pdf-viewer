@@ -38,6 +38,13 @@ export {
   pdfWidgetPlacementOf,
 } from './forms';
 export { pageMeasureOf, pageViewportsOf, pdfMeasureOf } from './measure';
+export {
+  mapOutlineItem,
+  pageOutlineItemOf,
+  pageOutlineOf,
+  pdfOutlineDraftOf,
+  pdfOutlinePatchOf,
+} from './outline';
 export type { PagePointTurn } from './helpers';
 export {
   annotationOfDraft,

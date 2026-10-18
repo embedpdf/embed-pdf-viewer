@@ -128,6 +128,15 @@ describe('pdf.permissions expansion — bit-derived', () => {
     expect(checkCapability('doc.pages.assemble', ['pdf.permissions'], onlyB4)).toBe(true);
   });
 
+  it('bit 11 or bit 4 grants doc.outline.modify: assembling includes outline items', () => {
+    const onlyB11 = decodePdfBits(PDF_BITS.ASSEMBLE);
+    const onlyB4 = decodePdfBits(PDF_BITS.MODIFY);
+    const onlyB6 = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+    expect(checkCapability('doc.outline.modify', ['pdf.permissions'], onlyB11)).toBe(true);
+    expect(checkCapability('doc.outline.modify', ['pdf.permissions'], onlyB4)).toBe(true);
+    expect(checkCapability('doc.outline.modify', ['pdf.permissions'], onlyB6)).toBe(false);
+  });
+
   it('bit 6 grants doc.annotate.read AND doc.annotate.modify', () => {
     const bits = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
     expect(checkCapability('doc.annotate.read', ['pdf.permissions'], bits)).toBe(true);

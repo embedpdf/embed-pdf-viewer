@@ -62,6 +62,7 @@ describe('deriveProtection: enforced vs judged', () => {
     expect(protectedCapabilities(p3).has('doc.annotate.import')).toBe(false);
     // A declaration refuses everything outside what it permits: structure too.
     expect(protectedCapabilities(p3).has('doc.pages.assemble')).toBe(true);
+    expect(protectedCapabilities(p3).has('doc.outline.modify')).toBe(true);
     expect(protectedCapabilities(p3).has('doc.forms.modify')).toBe(true);
     // Writing scripts into the form is designing it.
     expect(protectedCapabilities(p3).has('doc.forms.script')).toBe(true);

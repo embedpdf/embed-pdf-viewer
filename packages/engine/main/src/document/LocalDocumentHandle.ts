@@ -6,10 +6,12 @@ import {
   EngineErrorCode,
   EventHub,
   SessionEventPublisher,
+  outlineVerbs,
   wirePack,
   type DocumentAnnotationsService,
   type DocumentActionsService,
   type DocumentEventStream,
+  type DocumentOutlineService,
   type ObjectNumberPool,
   type ObjectNumberRange,
   LOCAL_ENGINE_BRAND,
@@ -39,6 +41,7 @@ import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsServi
 import { LocalDocumentChanges } from './LocalDocumentChanges';
 import { LocalDocumentFontSettings } from './LocalDocumentFontSettings';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
+import { readLocalOutline } from './LocalDocumentOutlineService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
 import { LocalDocumentRedactionService } from './LocalDocumentRedactionService';
 import { LocalDocumentSearchService } from './LocalDocumentSearchService';
@@ -79,6 +82,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly annotations: DocumentAnnotationsService;
   readonly attachments: LocalDocumentAttachmentsService;
   readonly actions: DocumentActionsService;
+  readonly outline: DocumentOutlineService;
   readonly forms: LocalDocumentFormsService;
   readonly fonts: LocalDocumentFontSettings;
   readonly search: LocalDocumentSearchService;
@@ -167,6 +171,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, publisher);
     this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, publisher);
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
+    this.outline = outlineVerbs(
+      () => readLocalOutline(id, queue, view, guard),
+      (change, options) => this.apply(change, options),
+    );
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
     this.fonts = new LocalDocumentFontSettings(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);

@@ -55,6 +55,9 @@ export const caps = {
     attachments: {
       modify: () => 'doc.attachments.modify' as const,
     },
+    outline: {
+      modify: () => 'doc.outline.modify' as const,
+    },
     redact: () => 'doc.redact' as const,
     sign: Object.assign(() => 'doc.sign' as const, {
       certify: () => 'doc.sign.certify' as const,
@@ -191,8 +194,12 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
     out.add('doc.metadata.modify');
     out.add('doc.attachments.modify');
   }
-  // Bit 11 assembles pages even when bit 4 is clear; bit 4 includes it.
-  if (b.bit4 || b.bit11) out.add('doc.pages.assemble');
+  // Bit 11 assembles pages, and creates outline items, even when bit 4 is
+  // clear; bit 4 includes it.
+  if (b.bit4 || b.bit11) {
+    out.add('doc.pages.assemble');
+    out.add('doc.outline.modify');
+  }
   if (b.bit6) out.add('doc.annotate.modify');
   // Signing a signature field is filling it in. Acrobat (and PDFium's form
   // filler) let any of the three bits fill in.

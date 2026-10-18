@@ -71,6 +71,7 @@ import {
   type MetadataReadCustomWorkerRequest,
   type MetadataUpdateCustomWorkerRequest,
   type ActionsReadWorkerRequest,
+  type OutlineReadWorkerRequest,
   type OpenWorkerRequest,
   type PagesListWorkerRequest,
   type PagesGeometryWorkerRequest,
@@ -169,6 +170,7 @@ import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../feat
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
 import { MetadataReader } from '../features/metadata';
+import { OutlineReader } from '../features/outline';
 import {
   PagesExtractor,
   PagesFlattener,
@@ -527,6 +529,9 @@ export class WorkerHost {
           break;
         case 'actions.read':
           resultPack = this.handleActionsRead(msg, ctrl.signal);
+          break;
+        case 'outline.read':
+          resultPack = this.handleOutlineRead(msg, ctrl.signal);
           break;
         case 'annotations.list':
           resultPack = this.handleAnnotationsList(msg, ctrl.signal);
@@ -1132,6 +1137,15 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const snapshot = new DocumentActionsReader(this.runtime, session).read(signal);
     return wirePack({ tag: 'actions.read', snapshot });
+  }
+
+  private handleOutlineRead(
+    req: OutlineReadWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const outline = new OutlineReader(this.runtime, session).read(signal);
+    return wirePack({ tag: 'outline.read', outline });
   }
 
   private handleAnnotationsList(

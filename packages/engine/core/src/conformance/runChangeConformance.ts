@@ -7,6 +7,7 @@ import type { DocumentEvent } from '../events/DocumentEvent';
 import type { PageBox } from '../geometry/pageSpace';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import { toOutlineItemRef } from '../identity/OutlineItemRef';
 import { toPageRef } from '../identity/PageRef';
 import {
   isSkippedItem,
@@ -66,6 +67,18 @@ const BLUE = '#0000ff';
 /** A calculate script: a field with one is in the form's calculation order. */
 const CALCULATE = { type: 'javascript', script: 'event.value = 1;' } as const;
 const box = (x: number, y = 120): PageBox => ({ x, y, width: 40, height: 30 });
+
+/** A new outline item at `objectNumber`, last under `parent` (a number; the top level without one). */
+const outlineItem = (
+  objectNumber: number | undefined,
+  title: string,
+  parent?: number,
+): ChangeOp => ({
+  type: 'outline.create',
+  parent: parent === undefined ? null : toOutlineItemRef(parent),
+  data: { title, target: { kind: 'goto', destination: { kind: 'fit', page: PAGE } } },
+  ...(objectNumber === undefined ? {} : { objectNumber }),
+});
 
 export interface ChangeConformanceOptions {
   label: string;
@@ -285,6 +298,50 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
   'metadata.updateCustom': {
     ops: () => [{ type: 'metadata.updateCustom', patch: { project: 'apply' } }],
   },
+  'outline.create': {
+    // The file has no outline: the first item makes one.
+    ops: ([item]) => [outlineItem(item, 'Chapter')],
+  },
+  'outline.update': {
+    setup: ([item]) => [outlineItem(item, 'Chapter')],
+    ops: ([item]) => [
+      {
+        type: 'outline.update',
+        ref: toOutlineItemRef(item!),
+        patch: {
+          title: 'Renamed',
+          color: '#e11d48',
+          bold: true,
+          target: { kind: 'uri', uri: 'https://example.com/' },
+        },
+      },
+    ],
+  },
+  'outline.move': {
+    // The child goes from the first item to the end of the second, a leaf.
+    setup: ([first, second, child]) => [
+      outlineItem(first, 'First'),
+      outlineItem(second, 'Second'),
+      outlineItem(child, 'Child', first),
+    ],
+    ops: ([, second, child]) => [
+      {
+        type: 'outline.move',
+        refs: [toOutlineItemRef(child!)],
+        parent: toOutlineItemRef(second!),
+        position: 'end',
+      },
+    ],
+  },
+  'outline.delete': {
+    // An open item goes with its child; the undo brings both back, open.
+    setup: ([parent, child]) => [
+      outlineItem(parent, 'Parent'),
+      outlineItem(child, 'Child', parent),
+      { type: 'outline.update', ref: toOutlineItemRef(parent!), patch: { open: true } },
+    ],
+    ops: ([parent]) => [{ type: 'outline.delete', ref: toOutlineItemRef(parent!) }],
+  },
 };
 
 /**
@@ -337,12 +394,13 @@ export function runChangeConformance(
 
     /** Everything a change can write, as the document reads it. */
     const factsOf = async (doc: DocumentHandle) => {
-      const [onPage, onEmptyPage, form, metadata, custom] = await Promise.all([
+      const [onPage, onEmptyPage, form, metadata, custom, outline] = await Promise.all([
         doc.page(PAGE).annotations.list(),
         doc.page(EMPTY_PAGE).annotations.list(),
         doc.forms.list(),
         doc.metadata.get(),
         doc.metadata.custom.get(),
+        doc.outline.get(),
       ]);
       return {
         annotations: [onPage.annotations, onEmptyPage.annotations],
@@ -351,6 +409,7 @@ export function runChangeConformance(
         calculationOrder: form.calculationOrder,
         metadata: { title: metadata.title, subject: metadata.subject },
         custom,
+        outline,
       };
     };
 

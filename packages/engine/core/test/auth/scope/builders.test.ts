@@ -250,6 +250,7 @@ describe('caps — covers every capability', () => {
       'doc.annotate.import': true,
       'doc.metadata.modify': true,
       'doc.attachments.modify': true,
+      'doc.outline.modify': true,
       'doc.redact': true,
       'doc.sign': true,
       'doc.sign.certify': true,

@@ -39,6 +39,14 @@ export {
   CustomMetadataSchema,
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
+  OutlineMutationMetaSchema,
+  OutlineOrderSchema,
+  OutlinePositionSchema,
+  OutlineCreateResultSchema,
+  OutlineUpdateResultSchema,
+  OutlineMoveResultSchema,
+  OutlineDeleteResultSchema,
+  OutlineRestoreResultSchema,
   AccessRequestSchema,
   AccessResponseSchema,
   EditSessionAccessSchema,
@@ -449,6 +457,13 @@ export * from './dto/Measure.schema';
 
 export { PageScaleResultSchema } from './wire/schemas';
 export { PageRefSchema } from './identity/PageRef.schema';
+export { OutlineItemRefSchema } from './identity/OutlineItemRef.schema';
+export {
+  DocumentOutlineSchema,
+  OutlineItemDraftSchema,
+  OutlineItemPatchSchema,
+  OutlineItemSchema,
+} from './dto/DocumentOutline.schema';
 export {
   CHANGE_REQUEST_LIMITS,
   ChangeAnswerSchema,

@@ -20,9 +20,16 @@ import type {
   FormWidgetsReorderResult,
   FormWidgetUpdateResult,
 } from './FormMutationResults';
-import type { AnnotationPosition, FieldPosition } from './ListPosition';
+import type { AnnotationPosition, FieldPosition, OutlinePosition } from './ListPosition';
 import type { MetadataUpdateResult } from './MetadataUpdateResult';
 import type { MutationMeta } from './MutationMeta';
+import type {
+  OutlineCreateResult,
+  OutlineDeleteResult,
+  OutlineMoveResult,
+  OutlineRestoreResult,
+  OutlineUpdateResult,
+} from './OutlineMutationResults';
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
 import type { AnnotationActor } from '../auth/scope/types';
@@ -35,6 +42,7 @@ import {
   type WireAnnotationResources,
 } from '../annotation/resources';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
+import type { OutlineItemDraft, OutlineItemPatch } from '../dto/DocumentOutline';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
@@ -44,6 +52,7 @@ import type { FormFieldPatch } from '../forms/patch';
 import type { FormFieldValue } from '../forms/value';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import type { OutlineItemRef } from '../identity/OutlineItemRef';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { SignatureAppearanceInput } from '../signature/types';
@@ -201,6 +210,40 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
   | {
       readonly type: 'metadata.updateCustom';
       readonly patch: CustomMetadataPatch;
+    }
+  | {
+      /**
+       * A new outline item under `parent` (`null`: the top level), at
+       * `position` among its children: at the end when left out.
+       */
+      readonly type: 'outline.create';
+      readonly parent: OutlineItemRef | null;
+      readonly position?: OutlinePosition;
+      readonly data: OutlineItemDraft<C['destination']>;
+      readonly objectNumber?: number;
+    }
+  | {
+      readonly type: 'outline.update';
+      readonly ref: OutlineItemRef;
+      readonly patch: OutlineItemPatch<C['destination']>;
+      readonly expect?: OutlineItemPatch<C['destination']>;
+    }
+  | {
+      /**
+       * The items go together, in the order given and each with the items
+       * under it, under `parent` (`null`: the top level), at `position` among
+       * its children.
+       */
+      readonly type: 'outline.move';
+      readonly refs: readonly OutlineItemRef[];
+      readonly parent: OutlineItemRef | null;
+      readonly position: OutlinePosition;
+    }
+  | {
+      /** The item goes, with the items under it. */
+      readonly type: 'outline.delete';
+      readonly ref: OutlineItemRef;
+      readonly expect?: OutlineItemPatch<C['destination']>;
     };
 
 /**
@@ -266,7 +309,8 @@ export type ChangeItemType =
   | RecordedOp['type']
   | 'annotations.restore'
   | 'forms.restore'
-  | 'forms.restoreWidget';
+  | 'forms.restoreWidget'
+  | 'outline.restore';
 
 /**
  * An op an undo left alone entirely: the document no longer showed what the
@@ -351,6 +395,16 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
       /** The keys an undo left alone. */
       skipped?: readonly string[];
     } & CustomMetadataUpdateResult)
+  | ({ type: 'outline.create' } & OutlineCreateResult<C['destination']>)
+  | ({
+      type: 'outline.update';
+      /** The fields an undo left alone: they no longer showed what the change had set. */
+      skipped?: readonly string[];
+    } & OutlineUpdateResult<C['destination']>)
+  | ({ type: 'outline.move' } & OutlineMoveResult)
+  | ({ type: 'outline.delete' } & OutlineDeleteResult)
+  /** An undo of a delete: the items it brought back. */
+  | ({ type: 'outline.restore' } & OutlineRestoreResult<C['destination']>)
   | SkippedChangeItem;
 
 /** Whether an item is an op an undo left alone entirely. */
@@ -426,6 +480,9 @@ export function objectNumbersNamedBy<C extends Coordinates, R>(
       case 'forms.addWidget':
         if (op.objectNumber !== undefined) named.push(op.objectNumber);
         if (op.splitObjectNumber !== undefined) named.push(op.splitObjectNumber);
+        break;
+      case 'outline.create':
+        if (op.objectNumber !== undefined) named.push(op.objectNumber);
         break;
       default:
         break;
