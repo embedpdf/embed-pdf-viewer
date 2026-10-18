@@ -24,11 +24,20 @@ import {
 } from '@/components/site/framework-page/framework';
 import { CustomViewerLazy, ReadyMadeViewerLazy } from '@/components/site/framework-page/live/lazy';
 import {
+  AntDesignLogo,
+  ChakraLogo,
+  MuiLogo,
+  RadixLogo,
+  ShadcnLogo,
+  TailwindLogo,
+} from '@/components/site/framework-page/library-logos';
+import {
   ClosingCta,
   FaqList,
   FeatureRow,
   FrameworkHero,
   FrameworkJsonLd,
+  LogoStrip,
   ProofStrip,
   TextLink,
   type Faq,
@@ -103,11 +112,6 @@ const FAQS: Faq[] = [
     answer:
       'Yes. EmbedPDF is open source under the Apache-2.0 license. You can use it in commercial and closed-source products without paying, and without having to open source your own code.',
   },
-  {
-    question: 'I use @embedpdf/react-pdf-viewer from version 2. How do I move?',
-    answer:
-      'The package is now called @embedpdf/viewer-react. Install it in place of the old one and follow the migration guide in the docs, which maps each old config key and call to its new name.',
-  },
 ];
 
 export default function ReactPdfViewerPage() {
@@ -149,6 +153,18 @@ export function App() {
           title: 'Fits your React stack',
           items: ['React 18 and 19', 'Next.js and Vite', 'Every prop typed'],
         }}
+      />
+
+      <LogoStrip
+        label="Works with the React UI libraries you already use"
+        logos={[
+          { name: 'Tailwind CSS', logo: <TailwindLogo /> },
+          { name: 'shadcn/ui', logo: <ShadcnLogo /> },
+          { name: 'Material UI', logo: <MuiLogo /> },
+          { name: 'Chakra UI', logo: <ChakraLogo /> },
+          { name: 'Ant Design', logo: <AntDesignLogo /> },
+          { name: 'Radix UI', logo: <RadixLogo /> },
+        ]}
       />
 
       <OptionCards

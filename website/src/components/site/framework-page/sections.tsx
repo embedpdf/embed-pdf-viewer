@@ -201,6 +201,43 @@ export function FrameworkHero({
   );
 }
 
+// ── logo strip: what it works with ──────────────────────────────────────────
+
+/**
+ * A band of logos right under the hero: the libraries a framework's
+ * developers already use. "Works with", never "trusted by": these are
+ * compatible tools, not customers. Muted until hovered, as logo rows are.
+ */
+export function LogoStrip({
+  label,
+  logos,
+}: {
+  label: string;
+  logos: { name: string; logo: ReactNode }[];
+}) {
+  return (
+    <section className="border-ep-border border-y bg-white py-9">
+      <div className={PAGE_X}>
+        <p className="font-display text-ep-soft m-0 mb-6 text-center text-xs font-bold uppercase tracking-[0.1em]">
+          {label}
+        </p>
+        <ul className="m-0 flex list-none flex-wrap items-center justify-center gap-x-10 gap-y-5 p-0">
+          {logos.map(({ name, logo }) => (
+            <li key={name} className="group inline-flex items-center gap-2.5">
+              <span className="text-ep-navy inline-flex h-7 w-7 items-center justify-center opacity-60 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0 [&>svg]:h-full [&>svg]:w-full">
+                {logo}
+              </span>
+              <span className="font-display group-hover:text-ep-navy text-[15px] font-bold tracking-[-0.005em] text-[#3D4E75] transition-colors duration-200">
+                {name}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 // ── section heading ─────────────────────────────────────────────────────────
 
 export function SectionHeading({
