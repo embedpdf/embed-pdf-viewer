@@ -78,7 +78,6 @@ export function App() {
   return (
     <PDFViewer
       documents={[
-        { src: '/outline-test.pdf', name: 'Outline' },
         { src: '/testlab.pdf', name: 'Proposal' },
         { src: '/testlab.pdf', name: 'Contract' },
       ]}
