@@ -68,6 +68,7 @@ const useCalibrating = () => useMeasurementState((state) => state.calibrationReq
 const useSignDialogOpen = () => useSurface('signature-sign').isOpen;
 const useSignatureMakerOpen = () => useSurface('signature-maker').isOpen;
 const useSignatureInspectorOpen = () => useSurface('signature-inspector').isOpen;
+const usePrintDialogOpen = () => useSurface('print').isOpen;
 const RedactConfirmModal = lazyComponent(
   () => import('./ui/redact-confirm').then((ui) => ui.RedactConfirmModal),
   { shownWhile: useRedactConfirmOpen },
@@ -87,6 +88,9 @@ const SignatureInspector = lazyComponent(
   () => import('./ui/signature-inspector').then((ui) => ui.SignatureInspector),
   { shownWhile: useSignatureInspectorOpen },
 );
+const PrintDialog = lazyComponent(() => import('./ui/print-dialog').then((ui) => ui.PrintDialog), {
+  shownWhile: usePrintDialogOpen,
+});
 
 /** The document tabs, as the layout says: always, while more than one document is open, or never. */
 function DocumentTabs() {
@@ -263,6 +267,7 @@ export function Shell({ components }: { components?: PlacedComponents }) {
               <RedactConfirmModal />
               <CalibrationDialog />
               <GoToPageDialog />
+              <PrintDialog />
               <ShortcutsSheet />
               {/* signatures: plugin intents → surfaces; the dialogs they open */}
               <SignatureBridge />

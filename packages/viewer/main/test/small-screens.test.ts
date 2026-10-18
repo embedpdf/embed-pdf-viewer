@@ -655,6 +655,13 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('small screens', () => {
         .get('shell')
         .open('signature-maker'),
     );
+    // The maker's code is a chunk of its own, which may still be on its way: wait for its dialog.
+    await tab.waitForFunction(
+      () =>
+        document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelector('[role="dialog"][aria-modal="true"]') !== null,
+    );
     await frames(tab);
     const inDialog = () =>
       tab.evaluate(() => {

@@ -2,13 +2,12 @@
  * @embedpdf/plugin-commands/standard — the commands every viewer has: zoom,
  * pages, view rotation, a command for every tool, copy, delete, download and
  * print, with shortcuts, and labels in EmbedPDF's eight languages (the i18n
- * plugin has the strings). Three of them reach the browser (the clipboard, a
- * file download, the print dialog), which plugins never touch, so each
- * framework's `/commands` builds them with its platform: that is the
- * `standardCommands` an app imports.
+ * plugin has the strings). Two of them reach the browser (the clipboard, a
+ * file download), which plugins never touch, so each framework's `/commands`
+ * builds them with its platform: that is the `standardCommands` an app
+ * imports. Print goes through the kernel, which has the host's printer.
  */
 import { DocumentsToken } from '@embedpdf/core';
-import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { InteractionToken, type Tool } from '@embedpdf/plugin-interaction/contract';
 import { SelectionToken, type SelectionCapability } from '@embedpdf/plugin-selection/contract';
@@ -22,8 +21,6 @@ export interface StandardCommandsPlatform {
   copySelection(selection: SelectionCapability): Promise<unknown>;
   /** Give the user the bytes as a file download. */
   saveFile(bytes: Uint8Array, fileName: string): void;
-  /** Open the print dialog. */
-  print(): void;
 }
 
 const stageOf = (context: CommandContext) => context.tryGet(StageToken);
@@ -252,12 +249,11 @@ export function createStandardCommands(
       categories: ['document'],
       allowed: (context) => context.tryGet(DocumentsToken)?.canPrint() ?? true,
       notAllowedKey: 'commands.notAllowed.doc-print',
-      // The document's own print actions run around the dialog when the
-      // actions plugin is there.
-      run: (context) => {
-        const actions = context.tryGet(ActionsToken);
-        if (actions) return actions.runDocumentVerb('print', () => platform.print());
-        platform.print();
+      // The kernel prints the document's pages, and runs the document's own
+      // print actions around the dialog when the actions plugin is there.
+      run: async (context) => {
+        const documents = context.get(DocumentsToken);
+        await documents.print(context.documentId ?? undefined, { signal: context.signal });
       },
       enabled: (context) => context.documentId !== null,
     },

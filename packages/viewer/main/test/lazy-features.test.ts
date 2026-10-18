@@ -1,7 +1,7 @@
 /**
  * A feature's interface isn't part of the viewer's first load: the search, comments, style,
- * stamps, signatures, redaction and measurement panels and the signature and redaction dialogs
- * are chunks of their own. None loads before the document shows; once it has and the browser is
+ * stamps, signatures, redaction and measurement panels and the signature, redaction and print
+ * dialogs are chunks of their own. None loads before the document shows; once it has and the browser is
  * idle, the viewer fetches them in the background, so opening one afterwards fetches nothing. A
  * module is known by a translation key only it asks for.
  *
@@ -59,6 +59,7 @@ const FEATURES = [
     open: { surface: 'redact-confirm' },
     marker: 'demo.redactConfirmTitle',
   },
+  { name: 'print dialog', open: { surface: 'print' }, marker: 'print.preparingPage' },
 ] as const;
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8">

@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react';
 
 import { DotGrid } from './dot-grid';
 import { ArrowRightIcon } from './icons';
+import { COMMUNITY_LAUNCHED } from './launch';
 
 type Testimonial = {
   step: string;
@@ -254,19 +255,21 @@ export function Testimonials() {
           ))}
         </div>
 
-        <footer className="mt-14 flex items-center justify-center">
-          <Link
-            href="/community"
-            className="group inline-flex items-center gap-4 rounded-full py-2 pl-1 pr-2 transition-all duration-200 hover:gap-[22px]"
-          >
-            <span className="text-ep-navy font-sans text-base font-medium">
-              Read more stories from our community
-            </span>
-            <span className="border-ep-border text-ep-blue group-hover:border-ep-blue group-hover:bg-ep-blue inline-flex h-10 w-10 items-center justify-center rounded-full border bg-white shadow-[0_4px_10px_rgba(14,26,64,0.06)] transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-white">
-              <ArrowRightIcon size={18} strokeWidth={2.5} />
-            </span>
-          </Link>
-        </footer>
+        {COMMUNITY_LAUNCHED && (
+          <footer className="mt-14 flex items-center justify-center">
+            <Link
+              href="/community"
+              className="group inline-flex items-center gap-4 rounded-full py-2 pl-1 pr-2 transition-all duration-200 hover:gap-[22px]"
+            >
+              <span className="text-ep-navy font-sans text-base font-medium">
+                Read more stories from our community
+              </span>
+              <span className="border-ep-border text-ep-blue group-hover:border-ep-blue group-hover:bg-ep-blue inline-flex h-10 w-10 items-center justify-center rounded-full border bg-white shadow-[0_4px_10px_rgba(14,26,64,0.06)] transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-white">
+                <ArrowRightIcon size={18} strokeWidth={2.5} />
+              </span>
+            </Link>
+          </footer>
+        )}
       </div>
     </section>
   );

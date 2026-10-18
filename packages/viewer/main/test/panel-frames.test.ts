@@ -159,8 +159,23 @@ const execute = (tab: Page, command: string) =>
     command,
   );
 
-/** Wait out a slide or a fade. */
-const settle = (tab: Page) => tab.waitForTimeout(350);
+/**
+ * Wait out a slide or a fade: the time one takes, then until none is still running in the viewer
+ * (a busy machine starts one late). Endless animations, a spinner's, don't count.
+ */
+const settle = async (tab: Page) => {
+  await tab.waitForTimeout(350);
+  await tab.waitForFunction(() =>
+    document
+      .querySelector('embedpdf-viewer')!
+      .shadowRoot!.getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== 'running' ||
+          animation.effect?.getComputedTiming().endTime === Infinity,
+      ),
+  );
+};
 
 const widthOf = (box: Box) => Math.round(box.right - box.left);
 

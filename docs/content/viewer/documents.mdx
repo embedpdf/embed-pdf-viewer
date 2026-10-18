@@ -179,15 +179,28 @@ viewer.documents.close(document.id);
 ## Download and print
 
 The document menu has **Download** and **Print**, and `Ctrl`/`Cmd`+`S` and `Ctrl`/`Cmd`+`P` work
-while the viewer has focus. Both include every annotation, form value and signature. When the
-scope doesn't allow printing, or you [turn it off](features/turning-off), **Print** isn't there, and
-`Ctrl`/`Cmd`+`P` says so instead of printing the web page.
+while the viewer has focus. A download includes every annotation, form value and signature.
+
+**Print** opens a dialog: every page, the current page or pages such as `1-3, 5`, and whether
+annotations print. Nothing is made while the user chooses: its **Print** button prepares those
+pages, shows how far it is, and opens the browser's print dialog when they're ready. Safari prints
+only from a tap, so there the dialog says the pages are ready and prints from the next tap on
+**Print**. Pages print as the PDF says they print: an annotation or a form field that is
+set not to print stays off the paper. On a desktop browser with its own PDF viewer, a document that
+allows high-quality printing and downloading prints as a PDF, with sharp text and lines. Everywhere
+else the pages print as pictures, at 300 DPI, or at 150 DPI when the document allows only
+low-resolution printing; the dialog says which.
+
+When the scope doesn't allow printing, or you [turn it off](features/turning-off), **Print** isn't
+there, and `Ctrl`/`Cmd`+`P` says so instead of printing the web page.
 
 To run them from your own button, use the commands `document:download` and `document:print`, or
-call them from code:
+call them from code. The command opens the dialog; `documents.print()` prints every page without
+it:
 
 ```js
 viewer.commands.execute('document:print');
+await viewer.documents.print();
 ```
 
 ## Save to your server

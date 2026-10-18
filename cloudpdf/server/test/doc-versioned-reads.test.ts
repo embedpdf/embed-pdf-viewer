@@ -358,6 +358,59 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     }
   });
 
+  test("each print picture takes its family's rights and its tier's, at both tiers", async () => {
+    const tenantId = 'tenant-printperm';
+    const docId = 'doctxx010';
+    await seedDocument(fx, tenantId, docId);
+    const fetchAs = (scope: string[], path: string) =>
+      fetch(`${fx.baseUrl}/v1/docs/${docId}${path}`, {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, { scope })}` },
+      });
+    const families = [
+      { path: 'pages', pins: 'contentVersion=1', reads: [] },
+      {
+        path: 'annotations/pages',
+        pins: 'annotationVersion=1,contentVersion=1',
+        reads: ['doc.annotate.read'],
+      },
+      { path: 'fields/pages', pins: 'contentVersion=1,widgetVersion=1', reads: ['doc.forms.read'] },
+      {
+        path: 'all/pages',
+        pins: 'annotationVersion=1,contentVersion=1,widgetVersion=1',
+        reads: ['doc.annotate.read', 'doc.forms.read'],
+      },
+    ];
+    const tiers = [
+      { tier: 'print', rights: ['doc.print'] },
+      { tier: 'print-high', rights: ['doc.print', 'doc.print.high'] },
+    ];
+
+    for (const { tier, rights } of tiers) {
+      for (const family of families) {
+        // A print picture's token is its pins and its format, nothing else.
+        const token = [...family.pins.split(','), 'format=png'].sort().join(',');
+        for (const path of [
+          `/render/${tier}/${family.path}/obj:1/data@${token}`,
+          `/layers/default/render/${tier}/${family.path}/obj:1/data@${token}`,
+        ]) {
+          const scope = ['doc.open', 'doc.render', ...family.reads, ...rights];
+          const res = await fetchAs(scope, path);
+          expect(res.status).toBe(200);
+          expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
+          for (const missing of new Set([...family.reads, ...rights])) {
+            const short = scope.filter((s) => s !== missing);
+            expect((await fetchAs(short, path)).status).toBe(403);
+          }
+        }
+      }
+    }
+
+    // What sizes a screen picture has no place in a print picture's token.
+    const everything = ['doc.open', 'doc.render', 'doc.print'];
+    const sized = 'contentVersion=1,format=png,viewport.kind=width,viewport.width=320';
+    expect((await fetchAs(everything, `/render/print/pages/obj:1/data@${sized}`)).status).toBe(400);
+  });
+
   test('missing Authorization header returns 401', async () => {
     const tenantId = 'tenant-tunauth';
     const docId = 'doctxx008';

@@ -42,6 +42,7 @@ export {
   pdfTurnOfUpright,
 } from './pointTurn';
 export { renderSize } from './renderSize';
+export { PRINT_PAPER, printScale } from './printSize';
 export type {
   PageRenderMatrix,
   PageRenderTransform,

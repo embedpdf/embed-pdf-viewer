@@ -1915,9 +1915,6 @@ importers:
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui
-      '@embedpdf/plugin-actions':
-        specifier: workspace:*
-        version: link:../actions
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../annotation
