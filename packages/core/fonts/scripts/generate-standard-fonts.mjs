@@ -543,7 +543,8 @@ function sfnt(version, tables) {
  * The last-resort program: glyph 1 is a box (an outlined rectangle), and a
  * format 13 cmap maps every code point from U+0020 up, surrogates left out,
  * to it. TrueType outlines, so it has no CFF to parse; an OS/2 table, which
- * browsers' font sanitizers require.
+ * browsers' font sanitizers require, whose fsType asks never to subset it: a
+ * writer embeds its one box whole instead of walking all its code points.
  */
 function lastResortFont() {
   const box = [
@@ -626,7 +627,7 @@ function lastResortFont() {
     .i16(700)
     .u16(400)
     .u16(5)
-    .u16(0) // fsType: installable
+    .u16(0x0100) // fsType: installable, never subset (it is one box)
     .i16(650)
     .i16(600)
     .i16(0)

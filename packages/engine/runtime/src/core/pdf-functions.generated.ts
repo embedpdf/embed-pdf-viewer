@@ -293,7 +293,7 @@ export interface PdfFunctions {
   EPDFDoc_SetTypographicFeatures: (arg0: Ptr, arg1: boolean) => boolean;
   EPDFDoc_StartLoadPageByObjectNumber: (arg0: Ptr, arg1: number, arg2: boolean) => Ptr;
   EPDFDocument_ClearEmbedMetadata: (arg0: Ptr) => boolean;
-  EPDFFont_AddFallbackFont: (arg0: number) => boolean;
+  EPDFFont_AddFallbackFont: (arg0: number, arg1: number) => boolean;
   EPDFFont_AuthorizeEditing: (arg0: number) => boolean;
   EPDFFont_ClearFallbackFonts: () => void;
   EPDFFont_ClearRegisteredFonts: () => void;
@@ -301,6 +301,7 @@ export interface PdfFunctions {
   EPDFFont_GetEmbeddingPermission: (arg0: number) => number;
   EPDFFont_GetFallbackOrder: (arg0: number, arg1: boolean, arg2: Ptr, arg3: number) => number;
   EPDFFont_GetFamilyName: (arg0: number, arg1: Ptr, arg2: number) => number;
+  EPDFFont_GetLastResortFont: () => number;
   EPDFFont_GetMetrics: (arg0: number, arg1: Ptr, arg2: Ptr) => boolean;
   EPDFFont_GetPostScriptName: (arg0: number, arg1: Ptr, arg2: number) => number;
   EPDFFont_GetProgramData: (arg0: number, arg1: Ptr, arg2: number) => number;
@@ -313,6 +314,7 @@ export interface PdfFunctions {
   EPDFFont_RegisterFont: (arg0: string, arg1: number, arg2: number, arg3: Ptr) => number;
   EPDFFont_RegisterMemFont: (arg0: string, arg1: number, arg2: number, arg3: Ptr, arg4: number) => number;
   EPDFFont_RegisterMemFont64: (arg0: string, arg1: number, arg2: number, arg3: Ptr, arg4: number) => number;
+  EPDFFont_SetLastResortFont: (arg0: number) => boolean;
   EPDFFontFaces_Close: (arg0: Ptr) => void;
   EPDFFontFaces_Count: (arg0: Ptr) => number;
   EPDFFontFaces_CountPrograms: (arg0: Ptr, arg1: number) => number;
@@ -1348,7 +1350,7 @@ export const pdfFunctionSignatures = {
   EPDFDoc_SetTypographicFeatures: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFDoc_StartLoadPageByObjectNumber: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}}], result: {"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}} },
   EPDFDocument_ClearEmbedMetadata: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
-  EPDFFont_AddFallbackFont: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
+  EPDFFont_AddFallbackFont: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFFont_AuthorizeEditing: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFFont_ClearFallbackFonts: { params: [], result: null },
   EPDFFont_ClearRegisteredFonts: { params: [], result: null },
@@ -1356,6 +1358,7 @@ export const pdfFunctionSignatures = {
   EPDFFont_GetEmbeddingPermission: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFFont_GetFallbackOrder: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFFont_GetFamilyName: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"cstring","cwrap":"number"},"native":{"kind":"cstring","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
+  EPDFFont_GetLastResortFont: { params: [], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFFont_GetMetrics: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFFont_GetPostScriptName: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"cstring","cwrap":"number"},"native":{"kind":"cstring","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFFont_GetProgramData: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
@@ -1368,6 +1371,7 @@ export const pdfFunctionSignatures = {
   EPDFFont_RegisterFont: { params: [{"ts":"string","wasm":{"kind":"cstring","cwrap":"string"},"native":{"kind":"cstring","cwrap":"string"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFFont_RegisterMemFont: { params: [{"ts":"string","wasm":{"kind":"cstring","cwrap":"string"},"native":{"kind":"cstring","cwrap":"string"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFFont_RegisterMemFont64: { params: [{"ts":"string","wasm":{"kind":"cstring","cwrap":"string"},"native":{"kind":"cstring","cwrap":"string"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
+  EPDFFont_SetLastResortFont: { params: [{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFFontFaces_Close: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: null },
   EPDFFontFaces_Count: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFFontFaces_CountPrograms: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },

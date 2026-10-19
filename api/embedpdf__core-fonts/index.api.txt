@@ -1,6 +1,6 @@
 # @embedpdf/core-fonts — .
 
-LAST_RESORT_HASH [VariableDeclaration] (from packages/core/fonts/src/last-resort.generated.ts): LAST_RESORT_HASH = 'c718626de61d5cad90f79ea6013ec01b29186f85796ecefa3ede1dd9072c14c3'
+LAST_RESORT_HASH [VariableDeclaration] (from packages/core/fonts/src/last-resort.generated.ts): LAST_RESORT_HASH = 'e9d14973462069b4906f8d22a9aaec2d6ec9eb02ac31d697631783316d8b8768'
 MountableFontProgram [InterfaceDeclaration] (from packages/core/fonts/src/standard/programs.ts): export interface MountableFontProgram{ readonly hash: string; readonly family: string; readonly weight: number; readonly style: 'normal' | 'italic'; load(): Promise<Uint8Array>; }
 StandardFontCss [InterfaceDeclaration] (from packages/core/fonts/src/standard/css.ts): export interface StandardFontCss{ readonly fontFamily: string; readonly fontWeight: number; readonly fontStyle: 'normal' | 'italic'; }
 StandardFontMetrics [InterfaceDeclaration] (from packages/core/fonts/src/standard/metrics.ts): export interface StandardFontMetrics{ readonly font: StandardFont; readonly ascent: number; readonly descent: number; readonly codePoints: readonly number[]; advance(codePoint: number): number | null; }
