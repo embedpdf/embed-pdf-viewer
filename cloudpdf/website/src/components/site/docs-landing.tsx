@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { getOperationCount, getSdkLanguages } from '@/lib/api-reference';
 import {
   DOCS_INTEGRATION_LABELS,
-  docsGettingStartedHref,
+  docsEntryHref,
   PRODUCT_INTEGRATIONS,
   type DocsIntegration,
   type FanoutDocsProduct,
@@ -64,7 +64,7 @@ function FrameworkLink({
   const s = toneStyles[tone];
   return (
     <Link
-      href={docsGettingStartedHref(product, integration)}
+      href={docsEntryHref(product, integration)}
       className={`group flex items-center gap-2.5 rounded-xl border px-3 py-3 no-underline transition-all ${s.fwLink} ${
         integration === 'vanilla' ? 'col-span-2' : ''
       }`}

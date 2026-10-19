@@ -6,7 +6,7 @@ import { withScratch } from './scratch';
 /**
  * Read a PDFium UTF-16LE string getter that uses the standard
  * (probe length, allocate, read) ABI. `call(buf, capacity)` must invoke
- * the native function and return the length in BYTES including the
+ * the native function and return the length in bytes including the
  * trailing NUL (the value PDFium reports when `capacity` is 0).
  *
  * `emptyAs` decides what a present-but-empty value (`len === 2`, a lone
@@ -65,6 +65,16 @@ export function writeUtf16String(
   const ptr = mem.writeU16String(value);
   try {
     return set(ptr);
+  } finally {
+    mem.free(ptr);
+  }
+}
+
+/** A UTF-16 copy of `value` in runtime memory (an `FPDF_WIDESTRING`) for the duration of `fn`. */
+export function withUtf16String<T>(mem: PdfRuntimeMemory, value: string, fn: (ptr: Ptr) => T): T {
+  const ptr = mem.writeU16String(value);
+  try {
+    return fn(ptr);
   } finally {
     mem.free(ptr);
   }

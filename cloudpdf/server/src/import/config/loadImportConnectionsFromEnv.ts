@@ -23,7 +23,7 @@
  * default credential chain (IAM role / env) — nothing credential-
  * shaped lives here.
  *
- * All validation is BOOT-TIME fail-closed: unknown kinds, mismatched
+ * All validation is boot-time fail-closed: unknown kinds, mismatched
  * scope variables, template violations, tenant-jwt-on-whole-bucket,
  * and normalized env-name collisions (`customer-archive` vs
  * `customer_archive` both normalize to CUSTOMER_ARCHIVE) refuse to

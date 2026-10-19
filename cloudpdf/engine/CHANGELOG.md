@@ -1,5 +1,75 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Address annotations by their life-long ref on every call: updates, deletes and resource reads go to `obj:N` or `base:N`. Remove weak edit sessions (`doc.annotations.beginEdit`) and `capabilities`; a bare HTTP 409 maps to `LayerVersionConflict`.
+
+  Every write takes its options last, with an `opId`; the events of this session's writes carry it as `origin.tx`, and every event from another session carries one too. A create's bytes go in the options (`{ resources }`).
+
+  A document's writes go out one at a time, in the order they were called, each with its `opId` as `Idempotency-Key`; a write lost on the network is sent again under the same key, and the server applies it once. `X-Engine-Session-Id` goes only where the server reads it: writes, `/access`, the event stream and the bulk reservation, so other reads stay plain requests a CDN can answer without a preflight. Only reads (`GET`, `HEAD`) go to the CDN: a write whose path matches a read the CDN serves now reaches the server.
+
+  `doc.objectNumbers` holds this editing session's object numbers. An open that may create calls `/access` for the first 8; a write tops the pool up when it runs low; the event stream's `session` events keep it in step with the server, and `reserve(n)` calls `POST …/object-numbers`. Creates send the numbers they name (`objectNumber`, `objectNumbers`, `widgetObjectNumbers`, `splitObjectNumber`). `onLost` reports numbers the session can no longer use: `'reclaimed'` when the server took them back after the session expired, `'versioned'` after a signature published a new version.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `renderAppearances()` returns every look an annotation has, each image labelled with its `mode` and `state`, and takes `modes` as a filter. Page renders show form fields with the annotations unless `includeFormFields` is `false`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add `doc.apply(change, options)` to the cloud engine: each change takes its place in the document's line of writes, and changes called while an earlier write is in flight go out together as one `POST …/changes` (one request in flight per document, at most 64 changes each; a change carrying bytes goes in a request of its own). Each call resolves with its own answer, and a change and its undo can share a request. A change is checked against what a request may hold before it joins one, so a malformed change is refused alone. A request lost on the network goes again with the same `opId`s, and a change asked again gets the first answer without publishing its events twice.
+
+  Another session's changes arrive as the events of their items, and an undo's events carry `origin.undoOf`. Results' `meta` carry `opId` and `undoable`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Field groups on the cloud engine:
+  - `doc.security.allowsField(...)` answers per field, from the token's scope.
+  - The token's `identity` no longer carries `groups`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.reorderCalculations()`, and `forms.calculationsReordered` from other sessions.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.export`, `doc.forms.import` and `doc.forms.importValues` over HTTP: the export read at the manifest's pins with the stale-pin retry, the imports as one multipart request each, checked against the server's limits first. Audit rows `form.import` and `form.importValues` become one `forms.created` or `forms.valueSet` event per field.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.list()` reads the immutable `form@formsVersion` leaf (the base's while the layer inherits the `forms` plane); `page.forms.renderAppearances()` reads `form/pages/{p}/appearances@`. `doc.forms.updateWidget()`. Form writes absorb the form's pins and own the `forms` plane, so a fill leaves every annotation URL shared.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `doc.forms.deleteWidget()` on the cloud engine (`DELETE …/form/widgets/{pageKey}/{annotKey}`); remote `form.deleteWidget` rows become `forms.widgetDeleted`, and widget restores move the form's pins.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - `doc.security.fieldRights()`: the groups the handle may fill in, sign and assign.
+  - `doc.forms.applyEffects` is removed: write a script run's effects as one change with `doc.apply`. The `forms.effectsApplied` event is gone with it.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - `PageLayout.tabOrder` and a list box's `topIndex`.
+  - A widget's `fontFamily` reads back as a free text's does. Changing a widget's colour or size keeps its font.
+  - Setting a field to the value it holds writes nothing and can't be undone.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `baseUrl` is optional: an engine that names no server connects to CloudPDF SaaS, `https://engine.cloudpdf.com` (exported as `CLOUDPDF_SAAS_URL`). `cloudEngine()` takes no options at all for the SaaS; your own `@cloudpdf/server` still names itself, `cloudEngine({ baseUrl })`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `page.render.image()` draws form fields, as the local engine does. A left-out option draws what the token may read, and the picture is fetched from its family's path (`render/pages`, `render/annotations`, `render/fields` or `render/all`), shared from the base while the layer inherits every plane it draws.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Page handles and page services take `PageRef` addresses, request pages as `/pages/obj:N/…`, and surface the new page-identity record shapes and events.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Align cloud document operations with the revised engine API, including durable
+  page references, annotation transfer and drawing data, form and signature
+  operations, and page-space coordinates. Add custom metadata operations and
+  keep cloud document handles and event delivery in sync with these contracts.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The cloud engine's `pages.reorder()`, `annotations.reorder()` and `forms.reorderWidgets()`, with positions on insert. A reorder moves only its own family's pins; remote `annot.reorder`, `pages.reorder` and `form.reorderWidgets` rows become the same events as locally.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The cloud engine says `canOpenFiles: false`: it opens the documents your server holds (`'id'`, `'token'`, `'share'`), never a file's bytes, so a viewer on it offers no way to open a file from the user's computer.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Reads the import limits from `/v1/access`'s `bundleLimits`. Bundle exports and imports share one multipart reader and writer.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `forms.attachWidget` and `forms.detachWidget` send the widget's `AnnotationRef` as `body.widget`; widget records on the wire carry `ref`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Sends and reads every multipart message in the one envelope: a `body` part naming each file by role, and `resource:<key>` file parts. A single-file write keys its file by its role's name.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Page renders draw annotations only when a document token's scope (or `/access`) says the caller may read them; without either, the server decides. `includeFormFields: true` is refused: cloud pictures don't draw form fields yet. `security.allowsAnnotation` treats widgets as form design. Rows the server withholds from the event stream advance the cached manifest's pins and publish no events.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Every open document is its own editing session, with its own session id and HTTP client, even when one engine opens the same document twice. Before, an engine's opens shared one session: two opens of one document could be handed the same object numbers, so one of their creates was refused, and each dropped the other's changes as its own echo. Documents opened by id with the engine's token also shared one CDN binding, so all but the last read from the origin. A document opened with its own token now keeps the engine's `docAffinityHeader` and `onRetry`.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – The cloud engine takes its document event stream and its ids from `@embedpdf/engine-core`, so it no longer imports `@embedpdf/engine-services`, the local engine's host.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Widgets turn by `rotation` (quarter turns, clockwise), and a box kind can be created by its `rect` with a quarter turn.
+
 ## 3.0.0-next.14
 
 ### Minor Changes

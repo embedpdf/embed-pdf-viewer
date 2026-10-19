@@ -1,0 +1,13 @@
+---
+'@embedpdf/plugin-form': minor
+---
+
+The form capability takes the names the forms pages use. Reads: `list(filter?)` (was `listFields`), `get(ref)` (was `getField`), new `getFormKind()`, `getSelectedField()` (the field of the selected widget in design mode) and `validate()` → `{ valid, missing }` (the empty required fields, in page order). `listWidgets(page)`, `getWidgetAt(page, point)` and `list({ page })` take a page ref or an index, and each widget now carries its `look` (border, background, text color and font, `null` where the field has none of its own). A field is found by its full name too: `toFieldRef(name)` is exported from the contract (`fieldRef` is gone), and `get`, `getValue` and every write resolve it. `getValue` keeps one object per field while the field stays the same.
+
+Filling: `setValue(ref, { value | checked | selectedValues })` is the one value write and resolves `{ field, status }`; `setText`, `setChecked`, `setChoice` and `setValueRaw` are gone. Whether the form's scripts run is the `validation` setting, read at each write. `reset(refs?)` replaces `reset(ref)` and `resetAll()` and resolves `{ fields }`, the fields it changed. `exportValues()` gives plain values (`'Ada'`, `true`, `['a', 'b']`) and `importValues()` takes them, skipping names the form doesn't have and values a field can't take. `export(format?)` and `import(bytes)` replace `exportData` and `importData`; `import` tells FDF from XFDF by itself.
+
+Building: `create(draft)` takes the engine's field draft (every setting: `required`, `readOnly`, `options`, an `exportValue` per radio button) and resolves `{ field }` (was `createField({ family, page, bounds })`); `update` and `removeWidget` (was `detachWidget`) resolve `{ field }`, `delete` replaces `deleteField`. Every building verb is refused up front without `doc.forms.modify`, naming the permission. The palette tools follow the annotation plugin's `afterCreate` setting (select the new widget, stay or go back to the default tool).
+
+Settings: `formPlugin({ validation, focus: { color }, fields: { border, background, color } })` with `getSettings`, `updateSettings`, `resetSettings` and `onSettingsChanged`; `focus.color` and `fields.border` follow the viewer's accent while `null`. `formState` declares the State table (`fields`, `status`, `formKind`, `selectedField`). Events carry what their table lists: `onValueChanged { field, origin }`, `onFieldCreated` and `onFieldUpdated { field, origin }`, `onFieldDeleted { ref, origin }`, `onValidationRejected { field, issues }`. Every async verb takes a `signal`.
+
+Host (`/contract/host`): `listFillItems` and `getFillItem` are gone (`listWidgets` is public); `FillItem` is `FormWidgetItem`.

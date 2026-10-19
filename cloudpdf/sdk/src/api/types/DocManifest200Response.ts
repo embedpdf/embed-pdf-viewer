@@ -9,12 +9,15 @@ export interface DocManifest200Response {
     actionsVersion?: number | undefined;
     attachmentsVersion?: number | undefined;
     annotationsVersion?: number | undefined;
+    formsVersion?: number | undefined;
+    outlineVersion?: number | undefined;
     auditHead: number;
     baseSha: string;
     layerVersion?: number | undefined;
     working?: boolean | undefined;
     baseByteLength?: number | undefined;
     scopes?: DocManifest200Response.Scopes | undefined;
+    protection: DocManifest200Response.Protection | null;
     pages: DocManifest200Response.Pages.Item[];
 }
 
@@ -22,10 +25,12 @@ export namespace DocManifest200Response {
     export interface Scopes {
         content: Scopes.Content;
         annotations: Scopes.Annotations;
+        forms: Scopes.Forms;
         layout: Scopes.Layout;
         attachments: Scopes.Attachments;
         metadata: Scopes.Metadata;
         actions: Scopes.Actions;
+        outline: Scopes.Outline;
     }
 
     export namespace Scopes {
@@ -39,6 +44,11 @@ export namespace DocManifest200Response {
             Layer: "layer",
         } as const;
         export type Annotations = (typeof Annotations)[keyof typeof Annotations];
+        export const Forms = {
+            Base: "base",
+            Layer: "layer",
+        } as const;
+        export type Forms = (typeof Forms)[keyof typeof Forms];
         export const Layout = {
             Base: "base",
             Layer: "layer",
@@ -59,60 +69,89 @@ export namespace DocManifest200Response {
             Layer: "layer",
         } as const;
         export type Actions = (typeof Actions)[keyof typeof Actions];
+        export const Outline = {
+            Base: "base",
+            Layer: "layer",
+        } as const;
+        export type Outline = (typeof Outline)[keyof typeof Outline];
+    }
+
+    export interface Protection {
+        enforced: Protection.Enforced | null;
+        judged: Protection.Judged | null;
+        certification: Protection.Certification | null;
+        fieldLocks: Protection.FieldLocks.Item[];
+        policyVersion: number;
+    }
+
+    export namespace Protection {
+        export const Enforced = {
+            None: "none",
+            Lta: "lta",
+            Fill: "fill",
+            Annotate: "annotate",
+        } as const;
+        export type Enforced = (typeof Enforced)[keyof typeof Enforced];
+        export const Judged = {
+            None: "none",
+            Lta: "lta",
+            Fill: "fill",
+            Annotate: "annotate",
+        } as const;
+        export type Judged = (typeof Judged)[keyof typeof Judged];
+
+        export interface Certification {
+            signatureIndex: number;
+            permission: number;
+        }
+
+        export type FieldLocks = FieldLocks.Item[];
+
+        export namespace FieldLocks {
+            export interface Item {
+                signatureIndex: number;
+                source: Item.Source;
+                spec: Item.Spec;
+            }
+
+            export namespace Item {
+                export const Source = {
+                    Fieldmdp: "fieldmdp",
+                    Lock: "lock",
+                } as const;
+                export type Source = (typeof Source)[keyof typeof Source];
+
+                export interface Spec {
+                    action: Spec.Action;
+                    fields: string[];
+                    permission?: number | undefined;
+                }
+
+                export namespace Spec {
+                    export const Action = {
+                        All: "all",
+                        Include: "include",
+                        Exclude: "exclude",
+                    } as const;
+                    export type Action = (typeof Action)[keyof typeof Action];
+                }
+            }
+        }
     }
 
     export type Pages = Pages.Item[];
 
     export namespace Pages {
         export interface Item {
-            state: Item.State;
+            page: CloudPDF.PageRef;
             cache: Item.Cache;
         }
 
         export namespace Item {
-            export interface State {
-                page: State.Page;
-                revision: State.Revision;
-                weakAnnotationState: CloudPDF.DocManifest200ResponsePagesItemStateWeakAnnotationState;
-            }
-
-            export namespace State {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
-
             export interface Cache {
                 contentVersion: number;
                 annotationVersion: number;
+                widgetVersion: number;
             }
         }
     }

@@ -1,4 +1,4 @@
-import type { TextAlignment } from '@embedpdf/engine-core/runtime';
+import type { RichTextAlign, TextAlignment } from '@embedpdf/engine-core/runtime';
 
 /**
  * `/Q` quadding codes (ISO 32000 §12.7.3.3) mapped to the wire-stable
@@ -6,12 +6,14 @@ import type { TextAlignment } from '@embedpdf/engine-core/runtime';
  * PDFium-free (mirrors `lineEnding.ts`).
  *
  *   Left=0, Center=1, Right=2
+ *
+ * Justify has no code: `/Q` says left, and the rich text body justifies.
  */
 const Q_LEFT = 0;
 const Q_CENTER = 1;
 const Q_RIGHT = 2;
 
-export function textAlignmentToCode(align: TextAlignment): number {
+export function textAlignmentToCode(align: RichTextAlign): number {
   switch (align) {
     case 'center':
       return Q_CENTER;

@@ -1,4 +1,4 @@
-import type { Vec } from '@embedpdf/core-annotation';
+import type { Point } from '@embedpdf/core-annotation';
 import { toPageRef, type AttachmentFileSource } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
@@ -7,7 +7,7 @@ import type { AnnotationContext } from './context';
 import type { ResolvedTool } from '../tools/definitions';
 
 /**
- * The ONE file-picker port (a DOM file dialog, wired by the framework
+ * The one file-picker port (a DOM file dialog, wired by the framework
  * adapter): every click-then-pick tool — a stamp `'prompt'` source, the file
  * attachment tool — resolves its bytes through this slot. See
  * {@link FilePickerProvider}.
@@ -31,29 +31,29 @@ export function createFilePickerPort(ctx: Pick<AnnotationContext, 'doc' | 'tryGe
    */
   const promptAt = (
     tool: ResolvedTool,
-    pon: number,
-    point: Vec,
+    pageObjectNumber: number,
+    point: Point,
     place: (picked: AttachmentFileSource) => void,
   ): boolean => {
     const current = provider;
     if (!current) return false;
     const spec = tool.source;
-    const req: FilePromptRequest = {
+    const request: FilePromptRequest = {
       toolId: tool.id,
       subtype: tool.subtype,
       accept: spec?.kind === 'prompt' ? spec.accept : undefined,
-      page: toPageRef(pon),
+      page: toPageRef(pageObjectNumber),
       point,
     };
     const docAtClick = ctx.doc;
-    current(req).then(
+    current(request).then(
       (picked) => {
         if (!picked) return; // cancelled
         if (ctx.doc !== docAtClick) return; // document changed underneath
         if (ctx.tryGet(InteractionToken)?.getActiveToolId() !== tool.id) return; // tool changed
         place(picked);
       },
-      (err) => console.error('[annotation] file-picker provider failed:', err),
+      (error) => console.error('[annotation] file-picker provider failed:', error),
     );
     return true;
   };

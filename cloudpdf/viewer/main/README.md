@@ -1,31 +1,51 @@
 # @cloudpdf/viewer
 
-The full EmbedPDF viewer wired to the CloudPDF engine, delivered as one CDN
-artifact: `cloudpdf.js`. There is no WebAssembly and no Web Worker in this
-bundle — rendering happens on a CloudPDF deployment (the SaaS at
-`api.cloudpdf.com`, or your own [`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server)),
-so the only thing that crosses the network is HTTPS API traffic.
+The full EmbedPDF viewer with the CloudPDF engine as its default: the same
+`<embedpdf-viewer>` element and `init()` as
+[`@embedpdf/viewer`](https://www.npmjs.com/package/@embedpdf/viewer), whose
+documents live on CloudPDF (the SaaS, or your own
+[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server)). Opening
+and reading a document is HTTPS API traffic only. The one exception is stamps:
+a stamp library is a PDF cut into stamps in the browser, so the first time
+someone opens Stamps or Signatures the viewer loads the local engine
+(`embedpdf.wasm`, shipped in the same folder). Pass
+`plugins: { stamp: { assetEngine } }` to supply your own.
 
 ## Usage
 
 ```html
-<div id="viewer" style="height: 100vh"></div>
-<script type="module">
-  import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@VERSION/dist/cloudpdf.js';
+<embedpdf-viewer id="viewer" style="height: 100vh"></embedpdf-viewer>
 
-  CloudPDF.init({
-    target: '#viewer',
-    baseUrl: 'https://api.cloudpdf.com',
-    docToken: '<doc-scoped JWT>',
-  });
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  document.getElementById('viewer').src = { shareToken: 'shr_…' };
 </script>
 ```
 
-- `docToken` opens one document by its doc-scoped JWT.
-- `docId` opens by cloud document id (the engine-level `token` must authorize it).
-- Every customization option of the open-source viewer — chrome schema,
-  commands, icons, themes, locales — rides along verbatim; see the
-  [EmbedPDF docs](https://www.embedpdf.com/docs) for the vocabulary.
+A cloud document isn't a URL, so it's given from script, not as an attribute.
+Or create the viewer from script:
+
+```js
+import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+CloudPDF.init({ target: '#viewer', src: { token: '<document token>' } });
+```
+
+`src` is the document: `{ token }` with a document token your backend creates
+for the user (a string, or a function that gives a fresh one), `{ id }` when the
+engine's own `token` already allows it, or `{ shareToken }` with a share link
+from the dashboard. Another `src` opens in its place. For several documents at
+once, pass `documents`: entries of `{ src, name, password, active }`.
+
+The viewer connects to CloudPDF SaaS (`https://engine.cloudpdf.com`). Your own
+[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server) goes in the
+engine's settings: `engine: { baseUrl: 'https://pdf.example.com' }`, with the
+engine's own `token` and `fetch` beside it.
+
+Every customization option of the open-source viewer (the layout, commands,
+icons, themes, languages) rides along verbatim; see the
+[EmbedPDF docs](https://www.embedpdf.com/docs) for the vocabulary.
 
 From npm instead of the CDN:
 

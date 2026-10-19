@@ -1,6 +1,6 @@
 import type {
   DocumentProtection,
-  IdentityClaims,
+  Identity,
   PdfBits,
   SignedDocumentPolicy,
 } from '@embedpdf/engine-core/runtime';
@@ -18,7 +18,7 @@ import type {
  */
 export interface HandleScopeContext {
   readonly scope: ReadonlyArray<string>;
-  readonly identity: IdentityClaims;
+  readonly identity: Identity;
   readonly pdfBits: PdfBits;
   /**
    * What the document's signatures forbid, as probed at open. The second

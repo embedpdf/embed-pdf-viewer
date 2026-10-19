@@ -1,0 +1,33 @@
+import { Component } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
+import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { cloudEngine } from '@cloudpdf/engine';
+import { fetchDocumentToken } from './api';
+
+@Component({
+  selector: 'app-root',
+  imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
+  providers: [
+    provideEmbedPdf(
+      {
+        engine: () => cloudEngine({ baseUrl: 'https://pdf.example.com' }),
+        initialDocuments: [
+          { source: { kind: 'token', token: () => fetchDocumentToken('contract') } },
+        ],
+      },
+      withStage(),
+      withRender(),
+    ),
+  ],
+  template: `
+    <epdf-stage *epdfDocumentGate="let document; fallback: opening" style="height: 600px">
+      <ng-template epdfPage>
+        <epdf-render-layer />
+      </ng-template>
+    </epdf-stage>
+
+    <ng-template #opening><p>Opening…</p></ng-template>
+  `,
+})
+export class App {}

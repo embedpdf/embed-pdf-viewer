@@ -1,6 +1,5 @@
 ---
 '@embedpdf/engine': patch
-'@embedpdf/engine-services': patch
 ---
 
-Widget records are built through `formWidget` everywhere the engine reads or echoes them, so `ref` is always present; attach and detach resolve the widget from its annotation address.
+`forms.attachWidget` and `forms.detachWidget` take the widget's annotation address (`AnnotationRef`) and resolve the widget from it.

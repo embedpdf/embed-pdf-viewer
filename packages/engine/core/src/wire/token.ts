@@ -5,7 +5,7 @@ export type TokenQuery = Record<string, string>;
 export interface TokenSchema {
   /**
    * Allowed field names. Field names are dotted paths of camelCase segments
-   * (e.g. `viewport.kind`, `target.rect.left`). `=` is reserved as the
+   * (e.g. `viewport.kind`, `target.rect.x`). `=` is reserved as the
    * key/value delimiter and `,` as the pair separator, so neither may appear
    * in field names. `.` is the path separator that lets dotted keys round-
    * trip generically through `flatten`/`unflatten`.

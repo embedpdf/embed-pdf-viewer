@@ -1,0 +1,42 @@
+{
+  "name": "@embedpdf/default-signature-fonts",
+  "version": "1.0.0-next.1",
+  "private": false,
+  "description": "Three handwriting fonts for typed signatures and initials, Allura, Great Vibes and Caveat (SIL Open Font License), as TrueType files and as lazy modules any bundler code-splits, for @embedpdf/plugin-signature to draw a typed mark with.",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "fonts",
+    "licenses",
+    "modules",
+    "library.js",
+    "library.d.ts",
+    "README.md"
+  ],
+  "exports": {
+    "./fonts/Allura-Regular.ttf": "./fonts/Allura-Regular.ttf",
+    "./fonts/GreatVibes-Regular.ttf": "./fonts/GreatVibes-Regular.ttf",
+    "./fonts/Caveat-Regular.ttf": "./fonts/Caveat-Regular.ttf",
+    "./library": {
+      "types": "./library.d.ts",
+      "default": "./library.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/default-signature-fonts"
+  },
+  "license": "(Apache-2.0 AND OFL-1.1)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "clean": "rimraf modules"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0"
+  }
+}

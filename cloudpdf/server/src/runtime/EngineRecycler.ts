@@ -6,18 +6,18 @@ import type { EngineHostClient, RecycleReason } from './EngineHostClient';
  * `EngineHostClient.recycle()`, which is a rehearsed crash: no journal
  * strike, no attribution, no backoff).
  *
- * Policy law (review-corrected): the CGROUP triggers, RSS attributes.
- * Total pressure is this container's working set over its limit —
- * individual process RSS double-counts shared pages and is only used to
- * pick the victim (largest heartbeat). The explicit per-host RSS limit
- * is a SECONDARY guard; lifetime recycling (jittered) is the cheap hedge
- * against slow leaks and ships OFF until soak data sets a default.
+ * Policy law: the cgroup triggers, RSS attributes. Total pressure is
+ * this container's working set over its limit — individual process RSS
+ * double-counts shared pages, so it only picks the victim (largest
+ * heartbeat). The explicit per-host RSS limit is a secondary guard;
+ * lifetime recycling (jittered) is the cheap hedge against slow leaks
+ * and is off by default.
  *
- * OPT-IN: the recycler runs only when explicitly configured
+ * Opt-in: the recycler runs only when explicitly configured
  * (`CLOUDPDF_ENGINE_RECYCLE=1` or any knob env present). Telemetry
  * (heartbeat + gauges) ships regardless of whether recycling is enabled.
  *
- * Honest limits: pressure includes the API process's own memory — if the
+ * Limits: pressure includes the API process's own memory — if the
  * API alone exceeds the watermark, recycling engines cannot relieve it;
  * the cooldown keeps that from becoming a recycle storm, and the gauges
  * make it visible.
@@ -29,7 +29,7 @@ export interface EngineRecyclePolicy {
   hardPct?: number; // default 85
   /** Optional per-host RSS secondary guard (graceful). */
   maxRssBytes?: number;
-  /** Jittered max host lifetime; 0/undefined = off (soak decides the default). */
+  /** Jittered max host lifetime; 0/undefined = off (the default). */
   maxLifetimeMs?: number;
   /** In-flight settle window for graceful recycles. Default 3s: settle +
    *  bounded shutdown + successor boot must fit inside the parked-dispatch
@@ -39,7 +39,7 @@ export interface EngineRecyclePolicy {
   intervalMs?: number; // default 10_000
   /** Minimum spacing between recycles — the thrash guard. */
   cooldownMs?: number; // default 60_000
-  /** Spacing for HARD (kill-now) decisions: sustained hard cgroup
+  /** Spacing for hard (kill-now) decisions: sustained hard cgroup
    *  pressure must not wait a full soft cooldown between shard kills —
    *  re-evaluate shortly after each replacement is ready. */
   cooldownHardMs?: number; // default 10_000
@@ -55,12 +55,12 @@ export interface RecycleDecision {
 export class EngineRecycler {
   private timer: NodeJS.Timeout | undefined;
   private lastRecycleAt = 0;
-  /** The most recent victim. NO further decision of any kind until its
+  /** The most recent victim. No further decision of any kind until its
    *  successor reports ready — otherwise, under sustained pressure, the
    *  mid-respawn victim has no RSS reading, victim selection falls on a
-   *  SIBLING, and the recycler cascades holes through the fleet (one
+   *  sibling, and the recycler cascades holes through the fleet (one
    *  concurrent hole is the whole contract). A crash-looping successor
-   *  deliberately pins recycling OFF — recycling beside a crash loop is
+   *  deliberately pins recycling off — recycling beside a crash loop is
    *  noise on top of an incident. */
   private lastVictim: EngineHostClient | null = null;
   /** Per-host jittered lifetime deadline, keyed by client identity. */
@@ -106,10 +106,10 @@ export class EngineRecycler {
     this.timer = undefined;
   }
 
-  /** One evaluation; exposed for tests. At most ONE recycle per tick. */
+  /** One evaluation; exposed for tests. At most one recycle per tick. */
   async tick(now = Date.now()): Promise<RecycleDecision | null> {
-    // Recovery gate FIRST: the previous victim's successor must be ready
-    // before ANY new decision (see `lastVictim`). recycle() refusing the
+    // Recovery gate first: the previous victim's successor must be ready
+    // before any new decision (see `lastVictim`). recycle() refusing the
     // same non-ready host is not enough — decide() would simply pick a
     // sibling and open a second concurrent hole.
     if (this.lastVictim !== null) {
@@ -121,7 +121,7 @@ export class EngineRecycler {
     const clients = this.hosts();
     const decision = this.decide(clients, now);
     if (!decision) return null;
-    // Soft/lifetime decisions respect the full cooldown; HARD pressure
+    // Soft/lifetime decisions respect the full cooldown; hard pressure
     // only waits the short one — plus the recovery gate above.
     if (decision.graceful && sinceLast < this.cfg.cooldownMs) return null;
     const ok = await decision.victim.recycle(decision.reason, {

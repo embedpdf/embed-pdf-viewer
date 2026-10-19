@@ -3,11 +3,11 @@
  *
  * A PDF has two distinct password moments:
  *   1. **Required** — the document is encrypted and we couldn't read
- *      anything anonymously. The dev MUST gather a password and call
+ *      anything anonymously. The dev must gather a password and call
  *      `unlock()` before any other operation succeeds.
  *   2. **Optional** — the document is open and readable, but more
  *      permissions become available with the owner password. The dev
- *      MAY surface an "unlock for full access" affordance.
+ *      may surface an "unlock for full access" affordance.
  *
  * Plus the trivial third state: **none** — nothing to do.
  *
@@ -26,14 +26,23 @@ import type { DocumentSecurityState } from './DocumentSecurityService';
 
 export type PasswordPrompt =
   | { readonly state: 'none' }
-  | { readonly state: 'required'; readonly hint: 'user' | 'owner' | null }
+  | {
+      readonly state: 'required';
+      readonly hint: 'user' | 'owner' | null;
+      /**
+       * The last password tried (at `open()` or `unlock()`) was wrong, so a
+       * prompt can say so. A wrong password opens the document locked, as no
+       * password does: one path for "this file needs a password".
+       */
+      readonly incorrect: boolean;
+    }
   | { readonly state: 'optional'; readonly hint: 'owner' };
 
 /**
  * Derive the high-level password prompt from the raw security state.
  *
  * The function is pure and total — every `DocumentSecurityState`
- * maps to exactly one `PasswordPrompt`. Use this as the SINGLE source
+ * maps to exactly one `PasswordPrompt`. Use this as the single source
  * of truth wherever the SDK exposes a "do you need a password?" flag:
  * both `LocalDocumentSecurityService` and `CloudDocumentSecurityService`
  * call it, so the contract can never drift.
@@ -63,17 +72,20 @@ export type PasswordPrompt =
  *
  *   6. fallthrough → { state: 'none' }   open and nothing more available
  */
-export function passwordPromptFromState(state: DocumentSecurityState): PasswordPrompt {
+export function passwordPromptFromState(
+  state: DocumentSecurityState,
+  incorrect = false,
+): PasswordPrompt {
   if (state.encryption.state === 'none') {
     return { state: 'none' };
   }
 
   if (!state.permissions.known) {
-    return { state: 'required', hint: null };
+    return { state: 'required', hint: null, incorrect };
   }
 
   if (state.encryption.requiresPassword && state.permissions.openedAs === 'none') {
-    return { state: 'required', hint: 'user' };
+    return { state: 'required', hint: 'user', incorrect };
   }
 
   if (state.permissions.openedAs === 'owner') {

@@ -12,7 +12,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { Kysely } from 'kysely';
 import { buildDetachedCms, createTestSigner, profileFor } from '@embedpdf/core-signature';
-import type { SignatureSubFilter } from '@embedpdf/engine-core/runtime';
+import {
+  objectNumbersIn,
+  type ObjectNumberRange,
+  type SignatureSubFilter,
+} from '@embedpdf/engine-core/runtime';
 import { decodePrepared, SignaturePreparedWireSchema, toBase64 } from '@embedpdf/engine-core/wire';
 import {
   createSqliteDb,
@@ -28,7 +32,18 @@ import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturePath = resolve(here, '..', '..', '..', 'packages', 'engine', 'main', 'test', 'fixtures', 'unsigned_sigfield.pdf');
+const fixturePath = resolve(
+  here,
+  '..',
+  '..',
+  '..',
+  'packages',
+  'engine',
+  'main',
+  'test',
+  'fixtures',
+  'unsigned_sigfield.pdf',
+);
 const SECRET = 'signatures-replicas-secret';
 const TENANT = 'tenant-sign-replicas';
 const DOC = 'doc-sign-replicas';
@@ -74,12 +89,26 @@ beforeAll(async () => {
   b = await addReplica('b');
   const bytes = new Uint8Array(await readFile(fixturePath));
   seeded = { sha: sha256(bytes), size: bytes.byteLength };
-  await new FsObjectStore({ root: storageRoot }).put(StorageKeys.basePdf(TENANT, DOC), bytes, { contentLength: bytes.byteLength });
+  await new FsObjectStore({ root: storageRoot }).put(StorageKeys.basePdf(TENANT, DOC), bytes, {
+    contentLength: bytes.byteLength,
+  });
   await a.db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
   const now = Date.now();
   await a.db
     .insertInto('documents')
-    .values({ id: DOC, tenant_id: TENANT, state: 'ready', base_sha: seeded.sha, storage_size_bytes: bytes.byteLength, metadata_json: null, idempotency_key: null, failure_reason: null, created_at: now, updated_at: now, created_by: null })
+    .values({
+      id: DOC,
+      tenant_id: TENANT,
+      state: 'ready',
+      base_sha: seeded.sha,
+      storage_size_bytes: bytes.byteLength,
+      metadata_json: null,
+      idempotency_key: null,
+      failure_reason: null,
+      created_at: now,
+      updated_at: now,
+      created_by: null,
+    })
     .execute();
 });
 
@@ -91,16 +120,33 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-const token = (layer: string) => signDevToken(SECRET, { sub: `user-${layer}`, tenant_id: TENANT, doc_id: DOC, layer_name: layer, scope: ['*'] });
+const token = (layer: string) =>
+  signDevToken(SECRET, {
+    sub: `user-${layer}`,
+    tenant_id: TENANT,
+    doc_id: DOC,
+    layer_name: layer,
+    scope: ['*'],
+  });
 
-async function call(replica: Replica, method: string, path: string, layer: string, body?: BodyInit, contentType?: string): Promise<Response> {
+async function call(
+  replica: Replica,
+  method: string,
+  path: string,
+  layer: string,
+  body?: BodyInit,
+  contentType?: string,
+): Promise<Response> {
   return fetch(`${replica.baseUrl}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${token(layer)}`, ...(contentType ? { 'Content-Type': contentType } : {}) },
+    headers: {
+      Authorization: `Bearer ${token(layer)}`,
+      ...(contentType ? { 'Content-Type': contentType } : {}),
+    },
     ...(body !== undefined ? { body } : {}),
   });
 }
-const json = async <T,>(res: Response, status = 200): Promise<T> => {
+const json = async <T>(res: Response, status = 200): Promise<T> => {
   const text = await res.text();
   expect(res.status, text).toBe(status);
   return JSON.parse(text) as T;
@@ -112,57 +158,199 @@ const prepareForm = (body: unknown) => {
 };
 const layer = `/v1/docs/${DOC}/layers/alice`;
 
+/** `/access` on the layer as editing session `session`: the numbers handed out, if any. */
+async function handOut(replica: Replica, session: string): Promise<number[] | null> {
+  const answer = await json<{ edit?: { objectNumbers: ObjectNumberRange[] } }>(
+    await fetch(`${replica.baseUrl}${layer}/access`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token('alice')}`,
+        'Content-Type': 'application/json',
+        'X-Engine-Session-Id': session,
+      },
+      body: JSON.stringify({ objectNumbers: 8 }),
+    }),
+  );
+  return answer.edit ? objectNumbersIn(answer.edit.objectNumbers) : null;
+}
+
+/** The layer's object number counter and the blocks handed out on it. */
+async function layerNumbers(): Promise<{ counter: number; blocks: number }> {
+  const row = await a.db
+    .selectFrom('layers')
+    .select(['id', 'next_object_number'])
+    .where('doc_id', '=', DOC)
+    .where('name', '=', 'alice')
+    .executeTakeFirstOrThrow();
+  const blocks = await a.db
+    .selectFrom('object_number_blocks')
+    .select('first')
+    .where('layer_id', '=', row.id)
+    .execute();
+  return { counter: Number(row.next_object_number), blocks: blocks.length };
+}
+
 describe('signing across replicas', () => {
   test('prepared on A, completed on B; A follows the published version on its next read', async () => {
     const signer = await createTestSigner({ commonName: 'Replica Signer' });
     // A holds the layer session and edits it.
-    await json(await call(a, 'POST', `${layer}/form/fields/${encodeURIComponent('fqn:group.total')}/value`, 'alice',
-      JSON.stringify({ value: { type: 'text', value: 'from A' } }), 'application/json'));
-    const prepared = decodePrepared(SignaturePreparedWireSchema.parse(await json(
-      await call(a, 'POST', `${layer}/signatures/prepare`, 'alice', prepareForm({ field: { kind: 'fqn', name: 'sig' }, certify: { permission: 2 } })),
-    )));
+    await json(
+      await call(
+        a,
+        'POST',
+        `${layer}/form/fields/${encodeURIComponent('fqn:group.total')}/value`,
+        'alice',
+        JSON.stringify({ value: { value: 'from A' } }),
+        'application/json',
+      ),
+    );
+    const prepared = decodePrepared(
+      SignaturePreparedWireSchema.parse(
+        await json(
+          await call(
+            a,
+            'POST',
+            `${layer}/signatures/prepare`,
+            'alice',
+            prepareForm({ field: { kind: 'fqn', name: 'sig' }, certify: { permission: 2 } }),
+          ),
+        ),
+      ),
+    );
     expect(prepared.expectedVersion).toEqual({ baseSha256: seeded.sha, editsVersion: 2 });
     // The tail is durable: B can see it without ever having opened the document.
-    expect(await new FsObjectStore({ root: storageRoot }).exists(StorageKeys.signingTail(TENANT, DOC, prepared.signingId))).toBe(true);
+    expect(
+      await new FsObjectStore({ root: storageRoot }).exists(
+        StorageKeys.signingTail(TENANT, DOC, prepared.signingId),
+      ),
+    ).toBe(true);
     // B refuses writes on the layer too (the row is the guard, not the session).
-    const blocked = await call(b, 'POST', `${layer}/form/fields/${encodeURIComponent('fqn:group.total')}/value`, 'alice',
-      JSON.stringify({ value: { type: 'text', value: 'from B' } }), 'application/json');
+    const blocked = await call(
+      b,
+      'POST',
+      `${layer}/form/fields/${encodeURIComponent('fqn:group.total')}/value`,
+      'alice',
+      JSON.stringify({ value: { value: 'from B' } }),
+      'application/json',
+    );
     expect(blocked.status).toBe(409);
+    // An editing session holds numbers on the layer.
+    const before = (await handOut(b, 'cloud:editor'))!;
+    expect(before).toHaveLength(8);
+    expect((await layerNumbers()).blocks).toBeGreaterThan(0);
 
-    const cms = await buildDetachedCms({ digest: prepared.digest, hash: prepared.algorithm, profile: profileFor(prepared.subFilter as SignatureSubFilter), signer });
+    const cms = await buildDetachedCms({
+      digest: prepared.digest,
+      hash: prepared.algorithm,
+      profile: profileFor(prepared.subFilter as SignatureSubFilter),
+      signer,
+    });
     // Both replicas race to complete with the same CMS: exactly one publishes, the other replays.
     const [ra, rb] = await Promise.all([
-      call(a, 'POST', `${layer}/signatures/${prepared.signingId}/complete`, 'alice', JSON.stringify({ cms: toBase64(cms), expectedVersion: prepared.expectedVersion }), 'application/json'),
-      call(b, 'POST', `${layer}/signatures/${prepared.signingId}/complete`, 'alice', JSON.stringify({ cms: toBase64(cms), expectedVersion: prepared.expectedVersion }), 'application/json'),
+      call(
+        a,
+        'POST',
+        `${layer}/signatures/${prepared.signingId}/complete`,
+        'alice',
+        JSON.stringify({ cms: toBase64(cms), expectedVersion: prepared.expectedVersion }),
+        'application/json',
+      ),
+      call(
+        b,
+        'POST',
+        `${layer}/signatures/${prepared.signingId}/complete`,
+        'alice',
+        JSON.stringify({ cms: toBase64(cms), expectedVersion: prepared.expectedVersion }),
+        'application/json',
+      ),
     ]);
-    const results = await Promise.all([ra, rb].map((r) => json<{ status: string; version: { sha256: string; byteLength: number } }>(r)));
+    const results = await Promise.all(
+      [ra, rb].map((r) =>
+        json<{ status: string; version: { sha256: string; byteLength: number } }>(r),
+      ),
+    );
     expect(results.map((r) => r.status).sort()).toEqual(['already-completed', 'completed']);
     expect(results[0]!.version).toEqual(results[1]!.version);
     const version = results[0]!.version;
-    const rows = await a.db.selectFrom('base_versions').select(['number', 'sha256']).where('doc_id', '=', DOC).orderBy('number').execute();
-    expect(rows.map((r) => [Number(r.number), r.sha256])).toEqual([[1, seeded.sha], [2, version.sha256]]);
-    expect(await new FsObjectStore({ root: storageRoot }).exists(StorageKeys.signingTail(TENANT, DOC, prepared.signingId))).toBe(true);
+    const rows = await a.db
+      .selectFrom('base_versions')
+      .select(['number', 'sha256'])
+      .where('doc_id', '=', DOC)
+      .orderBy('number')
+      .execute();
+    expect(rows.map((r) => [Number(r.number), r.sha256])).toEqual([
+      [1, seeded.sha],
+      [2, version.sha256],
+    ]);
+    expect(
+      await new FsObjectStore({ root: storageRoot }).exists(
+        StorageKeys.signingTail(TENANT, DOC, prepared.signingId),
+      ),
+    ).toBe(true);
 
     // Whoever lost the race (and never heard a bus signal) still answers from
     // the published version: the manifest is durable truth, and its layer
     // session is reloaded because the layer's version moved.
     const winner = results[0]!.status === 'completed' ? 'a' : 'b';
-    for (const [name, replica] of [['a', a], ['b', b]] as const) {
-      const manifest = await json<{ baseSha: string; working: boolean; layerVersion: number }>(await call(replica, 'GET', `${layer}/manifest`, 'alice'));
+    for (const [name, replica] of [
+      ['a', a],
+      ['b', b],
+    ] as const) {
+      const manifest = await json<{ baseSha: string; working: boolean; layerVersion: number }>(
+        await call(replica, 'GET', `${layer}/manifest`, 'alice'),
+      );
       expect(manifest).toMatchObject({ baseSha: version.sha256, working: false, layerVersion: 3 });
-      const snapshot = await json<{ signatures: Array<{ fieldName: string; signed: boolean; coverage: string | null }> }>(await call(replica, 'GET', `${layer}/signatures`, 'alice'));
-      expect(snapshot.signatures, `replica ${name} (winner ${winner})`).toEqual([expect.objectContaining({ fieldName: 'sig', signed: true, coverage: 'whole-revision' })]);
-      const form = await json<{ fields: Array<{ name: string; value: unknown }> }>(await call(replica, 'GET', `${layer}/form`, 'alice'));
-      expect(JSON.stringify(form.fields.find((f) => f.name === 'group.total')?.value)).toContain('from A');
-      const download = await call(replica, 'GET', `/v1/docs/${DOC}/versions/download/${version.sha256}`, 'alice');
+      const snapshot = await json<{
+        signatures: Array<{ fieldName: string; signed: boolean; coverage: string | null }>;
+      }>(await call(replica, 'GET', `${layer}/signatures`, 'alice'));
+      expect(snapshot.signatures, `replica ${name} (winner ${winner})`).toEqual([
+        expect.objectContaining({ fieldName: 'sig', signed: true, coverage: 'whole-revision' }),
+      ]);
+      const form = await json<{ fields: Array<{ name: string; value: unknown }> }>(
+        await call(replica, 'GET', `${layer}/form`, 'alice'),
+      );
+      expect(JSON.stringify(form.fields.find((f) => f.name === 'group.total')?.value)).toContain(
+        'from A',
+      );
+      const download = await call(
+        replica,
+        'GET',
+        `/v1/docs/${DOC}/versions/download/${version.sha256}`,
+        'alice',
+      );
       expect(sha256(new Uint8Array(await download.arrayBuffer()))).toBe(version.sha256);
     }
 
+    // The publish numbered the version's objects anew: every number handed
+    // out on the layer is gone, and new ones would start past all of them.
+    const published = await layerNumbers();
+    expect(published.blocks).toBe(0);
+    expect(published.counter).toBeGreaterThan(Math.max(...before));
+    const versionBytes = Buffer.from(
+      await (
+        await call(a, 'GET', `/v1/docs/${DOC}/versions/download/${version.sha256}`, 'alice')
+      ).arrayBuffer(),
+    ).toString('latin1');
+    // The last trailer's /Size is one past the version's last object number.
+    const size = Number([...versionBytes.matchAll(/\/Size (\d+)/g)].at(-1)![1]);
+    expect(published.counter).toBeGreaterThanOrEqual(size);
+    // The certification forbids creating anything: no editing session, on
+    // the replica that published it.
+    expect(await handOut(winner === 'a' ? a : b, 'cloud:editor')).toBeNull();
+
     // A new signing on the published version works from either replica; a
     // fence recorded by A is checked by B.
-    const second = await json<{ signatures: Array<{ fieldName: string; signed: boolean }> }>(await call(b, 'GET', `${layer}/signatures`, 'alice'));
+    const second = await json<{ signatures: Array<{ fieldName: string; signed: boolean }> }>(
+      await call(b, 'GET', `${layer}/signatures`, 'alice'),
+    );
     expect(second.signatures.every((s) => s.signed)).toBe(true);
-    const refused = await call(b, 'POST', `${layer}/signatures/prepare`, 'alice', prepareForm({ field: { kind: 'fqn', name: 'sig' } }));
+    const refused = await call(
+      b,
+      'POST',
+      `${layer}/signatures/prepare`,
+      'alice',
+      prepareForm({ field: { kind: 'fqn', name: 'sig' } }),
+    );
     expect(refused.status).toBe(422);
   });
 });

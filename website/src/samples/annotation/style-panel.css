@@ -1,0 +1,176 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --text: #3b4b7a;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* Any color */
+.color {
+  width: 34px;
+  height: 30px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* The style panel: a row per property */
+.properties {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.property {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.property dt {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.property dd {
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+
+.property input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pair input[type='range'] {
+  width: 90px;
+  accent-color: var(--accent);
+}
+
+.value {
+  min-width: 30px;
+  font-size: 12px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.select,
+.text {
+  max-width: 130px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 4px 6px;
+}
+
+.toggle {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.toggle[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.link {
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* The pages and the panel: stacked, and side by side where there's room */
+.viewer {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stage,
+.panel {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.stage {
+  height: 340px;
+  background: var(--canvas);
+}
+
+.panel {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 12px;
+  background: var(--surface);
+}
+
+@container (min-width: 620px) {
+  .stage {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 420px;
+  }
+
+  .panel {
+    flex: 0 0 260px;
+    max-height: 420px;
+  }
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

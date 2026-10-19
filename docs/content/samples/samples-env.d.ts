@@ -5,9 +5,5 @@ declare module '@embedpdf/engine/worker-entry?worker' {
   export default EngineWorker;
 }
 
-/** Vite's `?inline` CSS import — returns the processed stylesheet as a string,
- * emitting nothing. The demo kit injects it into a scoped `<style>`. */
-declare module '*.css?inline' {
-  const css: string;
-  export default css;
-}
+/** An example's own stylesheet, imported for its effect: `import './basic.css'`. */
+declare module '*.css';

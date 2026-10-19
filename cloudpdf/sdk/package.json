@@ -1,6 +1,6 @@
 {
     "name": "@cloudpdf/sdk",
-    "version": "3.0.0-next.14",
+    "version": "3.0.0-next.15",
     "private": false,
     "license": "Apache-2.0",
     "type": "commonjs",
@@ -118,6 +118,17 @@
             },
             "default": "./dist/cjs/api/resources/doc/resources/metadata/exports.js"
         },
+        "./doc/outline": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/outline/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/outline/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/outline/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/outline/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/outline/exports.js"
+        },
         "./doc/pages": {
             "import": {
                 "types": "./dist/esm/api/resources/doc/resources/pages/exports.d.mts",
@@ -161,6 +172,17 @@
                 "default": "./dist/cjs/api/resources/doc/resources/versions/exports.js"
             },
             "default": "./dist/cjs/api/resources/doc/resources/versions/exports.js"
+        },
+        "./doc/metadata/custom": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/metadata/resources/custom/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/metadata/resources/custom/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.js"
         },
         "./package.json": "./package.json"
     },

@@ -27,8 +27,6 @@ export namespace EngineErrorPayload {
         NotFound: "NotFound",
         WireFormat: "WireFormat",
         RuntimeUnavailable: "RuntimeUnavailable",
-        InvalidReference: "InvalidReference",
-        WeakAnnotationSessionConflict: "WeakAnnotationSessionConflict",
         LayerVersionConflict: "LayerVersionConflict",
         NotImplemented: "NotImplemented",
         MalformedPdf: "MalformedPdf",
@@ -38,6 +36,12 @@ export namespace EngineErrorPayload {
         SignatureRefused: "SignatureRefused",
         ProtectedDocument: "ProtectedDocument",
         StaleBase: "StaleBase",
+        PayloadTooLarge: "PayloadTooLarge",
+        ObjectNumberUnavailable: "ObjectNumberUnavailable",
+        LayerFull: "LayerFull",
+        ChangeConflict: "ChangeConflict",
+        UndoUnavailable: "UndoUnavailable",
+        IdempotencyKeyReused: "IdempotencyKeyReused",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

@@ -1,8 +1,17 @@
-import type { Color, RedactDraft, RedactPatch } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_DEFAULTS,
+  EngineError,
+  EngineErrorCode,
+  type Color,
+  type RedactDraft,
+  type RedactPatch,
+  type PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
-import { DEFAULT_STANDARD_FONT } from '../standardFont';
+import { readDefaultAppearance } from '../read/annotationReadPrimitives';
+import { standardFontFromCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import {
@@ -16,23 +25,14 @@ import {
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { applyDefaultAppearance } from './writeDefaultAppearance';
-import { DEFAULT_OPACITY } from './writeStyle';
 import {
   appendQuadPoints,
   replaceQuadPoints,
   setRectFromQuadPoints,
 } from './writeTextMarkupAnnotation';
 
-/** Default `/C` marking outline: red — the redaction marking convention (and
- *  the AP generator's default). */
-const DEFAULT_REDACT_COLOR: Color = { r: 255, g: 0, b: 0 };
-
-/** Default `/DA` label colour: black, mirroring free text. Tools that pair a
- *  label with a dark `interiorColor` should set a light `fontColor`
- *  explicitly. */
-const DEFAULT_LABEL_COLOR: Color = { r: 0, g: 0, b: 0 };
-
-const DEFAULT_FONT_SIZE = 12;
+/** A redaction's defaults (`annotation/defaults.ts`): a red outline, a black 12 pt label. */
+const DEFAULTS = ANNOTATION_DEFAULTS.redact;
 
 /**
  * True when the draft/patch carries the label or any `/DA` member — i.e. the
@@ -54,6 +54,17 @@ function touchesLabelStyle(p: {
   );
 }
 
+/** A redaction marks an area: a create gives its `rect`, or quads it is worked out from. */
+export function preflightRedactDraft(draft: RedactDraft<PdfCoordinates>): void {
+  if (draft.rect === undefined && (draft.quadPoints ?? []).length === 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'redact create needs a rect or at least one of quadPoints',
+      { details: { field: 'rect' } },
+    );
+  }
+}
+
 /**
  * Apply a redact draft to a freshly-created annotation. Colour model:
  *   - `color` -> `/C` marking-stage outline.
@@ -63,7 +74,7 @@ function touchesLabelStyle(p: {
  *
  * Order:
  *   1. base author-metadata (contents/nm/flags)
- *   2. `/Rect` (required — supplied by the caller; never derived)
+ *   2. `/Rect` (the caller's, else the quads' bounds)
  *   3. `/QuadPoints` (text redactions only)
  *   4. `/C` outline + `/CA` opacity + `/IC` fill
  *   5. `/OverlayText` + `/Repeat`
@@ -74,23 +85,24 @@ export function applyRedactDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: RedactDraft,
+  draft: RedactDraft<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
-  if (draft.quadPoints && draft.quadPoints.length > 0) {
-    appendQuadPoints(fn, mem, annotPtr, draft.quadPoints);
-  }
+  const quads = draft.quadPoints ?? [];
+  if (quads.length > 0) appendQuadPoints(fn, mem, annotPtr, quads);
+  // `preflightRedactDraft` refused a draft with neither.
+  if (draft.rect) setAnnotRect(fn, mem, annotPtr, draft.rect);
+  else setRectFromQuadPoints(fn, mem, annotPtr, quads);
 
-  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_REDACT_COLOR, FPDFANNOT_COLORTYPE.Color);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
+  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULTS.color, FPDFANNOT_COLORTYPE.Color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
   const fill = draft.interiorColor ?? null;
   if (fill !== null) {
     setAnnotColor(fn, annotPtr, fill, FPDFANNOT_COLORTYPE.InteriorColor);
   }
 
-  if (draft.overlayText !== undefined && draft.overlayText.length > 0) {
+  if (draft.overlayText != null && draft.overlayText.length > 0) {
     setOverlayText(fn, mem, annotPtr, draft.overlayText);
   }
   if (draft.repeat) {
@@ -100,9 +112,9 @@ export function applyRedactDraft(
     applyDefaultAppearance(
       fn,
       annotPtr,
-      draft.fontFamily ?? DEFAULT_STANDARD_FONT,
-      draft.fontSize ?? DEFAULT_FONT_SIZE,
-      draft.fontColor ?? DEFAULT_LABEL_COLOR,
+      draft.fontFamily ?? DEFAULTS.fontFamily,
+      draft.fontSize ?? DEFAULTS.fontSize,
+      draft.fontColor ?? DEFAULTS.fontColor,
       ctx,
     );
   }
@@ -115,15 +127,14 @@ export function applyRedactDraft(
  * Apply a redact patch to an existing annotation. Only present fields are
  * touched. `/DA` follows the free-text triple rule: send `fontFamily` +
  * `fontSize` + `fontColor` together when changing any of them. `quadPoints`
- * shares the text-markup no-shrink constraint (PDFium can grow but not
- * shrink the attachment-points list); patching quads re-derives `/Rect` from
- * their bounds unless the patch also carries an explicit `rect`.
+ * replace the list whole; patching quads re-derives `/Rect` from their
+ * bounds unless the patch also carries an explicit `rect`.
  */
 export function applyRedactPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: RedactPatch,
+  patch: RedactPatch<PdfCoordinates>,
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
@@ -161,12 +172,16 @@ export function applyRedactPatch(
     setOverlayTextRepeat(fn, annotPtr, patch.repeat);
   }
   if (touchesLabelStyle(patch)) {
+    // `/DA` packs the label's font, size and color into one string: a patch
+    // that names some keeps the others as they are (a size of 0 fits the
+    // label to the region, so it is kept too).
+    const current = readDefaultAppearance(fn, mem, annotPtr);
     applyDefaultAppearance(
       fn,
       annotPtr,
-      patch.fontFamily ?? DEFAULT_STANDARD_FONT,
-      patch.fontSize ?? DEFAULT_FONT_SIZE,
-      patch.fontColor ?? DEFAULT_LABEL_COLOR,
+      patch.fontFamily ?? (current ? standardFontFromCode(current.fontCode) : DEFAULTS.fontFamily),
+      patch.fontSize ?? current?.fontSize ?? DEFAULTS.fontSize,
+      patch.fontColor ?? current?.color ?? DEFAULTS.fontColor,
       ctx,
     );
   }

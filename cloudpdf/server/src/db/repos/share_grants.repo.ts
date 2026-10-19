@@ -65,7 +65,7 @@ export function newShareGrantId(): string {
 
 /**
  * Share grants: the stored decisions behind the public embed flow.
- * Lookup by primary key IS the token check — a row that exists and is
+ * Lookup by primary key is the token check — a row that exists and is
  * enabled authorizes exchange; deleting the row is revocation.
  */
 export class ShareGrantsRepo {

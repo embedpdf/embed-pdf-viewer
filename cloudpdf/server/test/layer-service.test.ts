@@ -77,8 +77,6 @@ describe('LayerService lazy materialization', () => {
       pageObjectNumber: 22,
       contentVersion: 4,
       annotationVersion: 3,
-      annotationGeneration: 2,
-      hasWeakAnnotations: true,
     });
   });
 
@@ -133,15 +131,11 @@ async function seedBasePages(db: Kysely<DbSchema>): Promise<void> {
       pageObjectNumber: 11,
       contentVersion: 9,
       annotationVersion: 7,
-      annotationGeneration: 5,
-      hasWeakAnnotations: false,
     },
     {
       pageObjectNumber: 22,
       contentVersion: 4,
       annotationVersion: 3,
-      annotationGeneration: 2,
-      hasWeakAnnotations: true,
     },
   ]);
 }

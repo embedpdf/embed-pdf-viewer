@@ -1,0 +1,11 @@
+<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 100vh">
+  <span slot="item:status" class="status">Draft</span>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  document.getElementById('viewer').config = {
+    layout: (layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' }),
+  };
+</script>

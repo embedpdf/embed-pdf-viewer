@@ -5,24 +5,25 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
+import { EVERY_PERMISSION } from './fixtureScope';
 
 /** `%PDF` — every extracted document must lead with the PDF header. */
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46];
 
 /**
- * Page extract conformance suite. `pages.extract?` is OPTIONAL on the
+ * Page extract conformance suite. `pages.extract?` is optional on the
  * contract (the `downloadLayer?` pattern) — the suite runs only when the
  * implementation provides it, so a cloud engine that has not shipped the
  * server endpoint yet skips cleanly instead of failing.
  *
  * Invariants:
  *   1. `pages.extract([pon])` returns standalone PDF bytes (magic header).
- *   2. The SOURCE document is untouched: identical layout before/after,
+ *   2. The source document is untouched: identical layout before/after,
  *      and page revisions do not bump (extract is a read).
  *   3. Caller order is preserved and page geometry survives the copy
  *      (asserted by re-opening the extracted bytes — bytes-open engines
  *      only, since a cloud engine cannot re-open loose bytes).
- *   4. Empty / duplicate PONs reject `InvalidArg`; unknown PONs reject
+ *   4. Empty / duplicate page object numbers reject `InvalidArg`; unknown page object numbers reject
  *      `NotFound` (or `InvalidArg`); abort propagates as `AbortError`.
  */
 export function runPageExtractConformance(
@@ -52,10 +53,10 @@ export function runPageExtractConformance(
         expect(bytes.length > PDF_MAGIC.length).toBe(true);
         expect(Array.from(bytes.slice(0, PDF_MAGIC.length))).toEqual(PDF_MAGIC);
 
-        // Extract is a READ: the source layout is exactly what it was.
+        // Extract is a read: the source layout is exactly what it was.
         const after = await doc.pages.list();
-        expect(after.pages.map((p) => p.ref.pageObjectNumber)).toEqual(
-          before.pages.map((p) => p.ref.pageObjectNumber),
+        expect(after.pages.map((p) => p.ref.objectNumber)).toEqual(
+          before.pages.map((p) => p.ref.objectNumber),
         );
         expect(after.pageCount).toBe(before.pageCount);
       } finally {
@@ -70,12 +71,15 @@ export function runPageExtractConformance(
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;
-        // Reversed order on purpose: output order is CALLER order.
+        // Reversed order on purpose: output order is caller order.
         const p0 = list.pages[0];
         const p1 = list.pages[1];
         const bytes = await doc.pages.extract([p1.ref, p0.ref]);
 
-        extracted = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-extracted`, bytes });
+        extracted = await engine.open(
+          { kind: 'bytes', id: `${opts.fixture.id}-extracted`, bytes },
+          EVERY_PERMISSION,
+        );
         const out = await extracted.pages.list();
         expect(out.pageCount).toBe(2);
         expect(out.pages[0].size).toEqual(p1.size);
@@ -105,10 +109,10 @@ export function runPageExtractConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.objectNumber;
         let caught: unknown;
         try {
-          await doc.pages.extract([toPageRef(pon), toPageRef(pon)]);
+          await doc.pages.extract([toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)]);
         } catch (err) {
           caught = err;
         }
@@ -123,7 +127,7 @@ export function runPageExtractConformance(
       try {
         const list = await doc.pages.list();
         let bogus = 0;
-        for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
+        for (const p of list.pages) bogus = Math.max(bogus, p.ref.objectNumber);
         bogus += 9999;
 
         let caught: unknown;
@@ -158,7 +162,7 @@ export function runPageExtractConformance(
 async function openFixture(engine: Engine, opts: ConformanceOptions): Promise<DocumentHandle> {
   if (opts.openKind === 'bytes') {
     const bytes = await opts.fixture.bytes();
-    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes });
+    return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
 }

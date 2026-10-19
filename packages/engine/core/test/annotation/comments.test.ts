@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildCommentThreads, isStateAnnotation } from '../../src/shared';
-import type { AnnotationDTO, AnnotationRef } from '../../src/shared';
+import type { Annotation, AnnotationRef } from '../../src/shared';
 
 /* The composer only reads identity, relationship, state, and attribution
  * fields; fixtures cast focused literals rather than materialise the full
@@ -9,34 +9,30 @@ import type { AnnotationDTO, AnnotationRef } from '../../src/shared';
 
 const ref = (n: number): AnnotationRef => ({
   kind: 'objectNumber',
-  page: { kind: 'objectNumber', pageObjectNumber: 1 },
-  annotObjectNumber: n,
+  page: { kind: 'objectNumber', objectNumber: 1 },
+  objectNumber: n,
 });
 
-let autoIndex = 0;
-const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
+const annot = (n: number, over: Record<string, unknown> = {}): Annotation =>
   ({
     subtype: 'highlight',
     ref: ref(n),
-    page: { kind: 'objectNumber', pageObjectNumber: 1 },
-    index: autoIndex++,
+    page: { kind: 'objectNumber', objectNumber: 1 },
     nm: null,
     contents: `annot ${n}`,
     author: null,
-    created: null,
-    modified: null,
-    inReplyTo: null,
-    replyType: null,
+    createdAt: null,
+    modifiedAt: null,
+    reply: null,
     ...over,
-  }) as unknown as AnnotationDTO;
+  }) as unknown as Annotation;
 
-const reply = (n: number, parent: number, over: Record<string, unknown> = {}): AnnotationDTO =>
+const reply = (n: number, parent: number, over: Record<string, unknown> = {}): Annotation =>
   annot(n, {
     subtype: 'text',
     state: null,
     stateModel: null,
-    inReplyTo: ref(parent),
-    replyType: 'reply',
+    reply: { to: ref(parent), type: 'reply' },
     ...over,
   });
 
@@ -44,18 +40,17 @@ const state = (
   n: number,
   parent: number | null,
   fields: { state?: string | null; stateModel?: string | null; by?: string; at?: string },
-): AnnotationDTO =>
+): Annotation =>
   annot(n, {
     subtype: 'text',
-    inReplyTo: parent === null ? null : ref(parent),
-    replyType: parent === null ? null : 'reply',
+    reply: parent === null ? null : { to: ref(parent), type: 'reply' },
     state: fields.state ?? null,
     stateModel: fields.stateModel ?? null,
     userId: fields.by,
-    modified: fields.at ?? null,
+    modifiedAt: fields.at ?? null,
   });
 
-const num = (r: AnnotationRef): number => (r.kind === 'objectNumber' ? r.annotObjectNumber : -1);
+const num = (r: AnnotationRef): number => (r.kind === 'objectNumber' ? r.objectNumber : -1);
 
 describe('isStateAnnotation', () => {
   it('requires a text subtype with a non-empty state or stateModel', () => {
@@ -72,8 +67,8 @@ describe('buildCommentThreads — threading', () => {
   it('composes a simple thread with chronological replies', () => {
     const threads = buildCommentThreads([
       annot(1),
-      reply(2, 1, { created: '2026-08-28T10:05:00Z' }),
-      reply(3, 1, { created: '2026-08-28T10:01:00Z' }),
+      reply(2, 1, { createdAt: '2026-08-28T10:05:00Z' }),
+      reply(3, 1, { createdAt: '2026-08-28T10:01:00Z' }),
     ]);
     expect(threads).toHaveLength(1);
     expect(num(threads[0]!.root.ref)).toBe(1);
@@ -83,9 +78,9 @@ describe('buildCommentThreads — threading', () => {
   it('flattens reply-to-reply chains into one chronological list', () => {
     const threads = buildCommentThreads([
       annot(1),
-      reply(2, 1, { created: '2026-08-28T10:01:00Z' }),
-      reply(3, 2, { created: '2026-08-28T10:02:00Z' }), // replies to the reply
-      reply(4, 3, { created: '2026-08-28T10:03:00Z' }),
+      reply(2, 1, { createdAt: '2026-08-28T10:01:00Z' }),
+      reply(3, 2, { createdAt: '2026-08-28T10:02:00Z' }), // replies to the reply
+      reply(4, 3, { createdAt: '2026-08-28T10:03:00Z' }),
     ]);
     expect(threads).toHaveLength(1);
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([2, 3, 4]);
@@ -96,7 +91,7 @@ describe('buildCommentThreads — threading', () => {
       annot(1),
       reply(2, 1), // undated, earlier z-order
       reply(3, 1), // undated, later z-order
-      reply(4, 1, { created: '2026-08-28T10:00:00Z' }),
+      reply(4, 1, { createdAt: '2026-08-28T10:00:00Z' }),
     ]);
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([4, 2, 3]);
   });
@@ -104,7 +99,7 @@ describe('buildCommentThreads — threading', () => {
   it('folds /RT /Group subordinates into groupedParts, never replies', () => {
     const threads = buildCommentThreads([
       annot(1, { subtype: 'strikeout' }),
-      annot(2, { subtype: 'caret', inReplyTo: ref(1), replyType: 'group' }),
+      annot(2, { subtype: 'caret', reply: { to: ref(1), type: 'group' } }),
       reply(3, 1),
     ]);
     expect(threads).toHaveLength(1);
@@ -112,11 +107,12 @@ describe('buildCommentThreads — threading', () => {
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([3]);
   });
 
-  it('excludes widgets, links, and unsupported (incl. popups) entirely', () => {
+  it('excludes widgets, links, popups and unsupported entirely', () => {
     const threads = buildCommentThreads([
       annot(1, { subtype: 'widget' }),
       annot(2, { subtype: 'link' }),
-      annot(3, { subtype: 'unsupported', rawSubtypeCode: 16 }),
+      annot(3, { subtype: 'unsupported', rawSubtypeCode: 99 }),
+      annot(5, { subtype: 'popup', parent: ref(4) }),
       annot(4),
     ]);
     expect(threads).toHaveLength(1);
@@ -130,27 +126,12 @@ describe('buildCommentThreads — threading', () => {
 
   it('survives an /IRT cycle: first member promotes, back-edge dies', () => {
     const threads = buildCommentThreads([
-      annot(1, { inReplyTo: ref(2), replyType: 'reply' }),
-      annot(2, { inReplyTo: ref(1), replyType: 'reply' }),
+      annot(1, { reply: { to: ref(2), type: 'reply' } }),
+      annot(2, { reply: { to: ref(1), type: 'reply' } }),
     ]);
     expect(threads).toHaveLength(1);
     expect(num(threads[0]!.root.ref)).toBe(1);
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([2]);
-  });
-
-  it('resolves a parent addressed by /NM when its own ref is objectNumber-form', () => {
-    const threads = buildCommentThreads([
-      annot(1, { nm: 'root-nm' }),
-      reply(2, 0, {
-        inReplyTo: {
-          kind: 'nm',
-          page: { kind: 'objectNumber', pageObjectNumber: 1 },
-          nm: 'root-nm',
-        },
-      }),
-    ]);
-    expect(threads).toHaveLength(1);
-    expect(threads[0]!.replies).toHaveLength(1);
   });
 });
 
@@ -191,7 +172,7 @@ describe('buildCommentThreads — review status', () => {
     const review = threads[0]!.review;
     expect(review.byReviewer['alice']?.state).toBe('rejected');
     expect(review.lastChange?.state).toBe('rejected');
-    // Membership keeps BOTH links of the chain — thread deletion needs the
+    // Membership keeps both links of the chain — thread deletion needs the
     // superseded state annotation too, even though the summary dropped it.
     expect(review.statusRefs.map(num)).toEqual([2, 3]);
   });
@@ -288,12 +269,11 @@ describe('buildCommentThreads — review status', () => {
       state(2, 1, { state: 'accepted', stateModel: 'review', at: '2026-08-28T10:00:00Z' }),
       annot(3, {
         subtype: 'text',
-        inReplyTo: ref(1),
-        replyType: 'reply',
+        reply: { to: ref(1), type: 'reply' },
         state: 'rejected',
         stateModel: 'review',
         author: 'Alice (T)',
-        modified: '2026-08-28T09:00:00Z',
+        modifiedAt: '2026-08-28T09:00:00Z',
       }),
     ]);
     const review = threads[0]!.review;
@@ -325,8 +305,7 @@ describe('buildCommentThreads — review status', () => {
       annot(1),
       annot(2, {
         subtype: 'text',
-        inReplyTo: ref(1),
-        replyType: 'reply',
+        reply: { to: ref(1), type: 'reply' },
         state: '',
         stateModel: '',
         contents: 'just a reply',

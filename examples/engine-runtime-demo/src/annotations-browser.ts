@@ -1,6 +1,6 @@
 import { createLocalEngineWithWorker } from '@embedpdf/engine';
 import EngineWorker from '@embedpdf/engine/worker-entry?worker';
-import { runAnnotationsDemo, summarizeRawAll } from './annotations-demo.ts';
+import { runAnnotationsDemo, summarizeList } from './annotations-demo.ts';
 
 const out = document.getElementById('out');
 if (!out) throw new Error('out element not found');
@@ -20,19 +20,11 @@ try {
     label: result.label,
     docId: result.docId,
     elapsedMs: result.elapsedMs,
-    summary: summarizeRawAll(result.rawAll),
-    pageStateByPon: Object.fromEntries(
-      Object.entries(result.fullByPage).map(([pon, page]) => [
-        pon,
-        {
-          pageObjectNumber: page.pageState.pageObjectNumber,
-          hasAnyWeakAnnotations:
-            page.pageState.weakAnnotationState.kind === 'known'
-              ? page.pageState.weakAnnotationState.hasAnyWeakAnnotations
-              : null,
-          generation: page.pageState.revision.generation,
-          count: page.annotations.length,
-        },
+    summary: summarizeList(result.all),
+    countByPon: Object.fromEntries(
+      Object.entries(result.byPage).map(([pageObjectNumber, list]) => [
+        pageObjectNumber,
+        list.annotations.length,
       ]),
     ),
   };

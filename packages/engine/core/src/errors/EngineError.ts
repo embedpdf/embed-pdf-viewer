@@ -8,10 +8,12 @@ export interface EngineErrorOptions {
 /**
  * Single error class shared across engine implementations. Has a stable
  * machine-readable `code` (see EngineErrorCode) so callers can match without
- * sniffing message strings.
+ * sniffing message strings. Every failure the engine reports is one: the
+ * named subclasses (`PermissionDenied`, `InvalidScope`, `MissingIdentity`,
+ * `AbortError`) only preset the code and keep their name for stack traces.
  */
 export class EngineError extends Error {
-  override readonly name = 'EngineError';
+  override readonly name: string = 'EngineError';
   readonly code: EngineErrorCode;
   readonly details?: Record<string, unknown>;
 

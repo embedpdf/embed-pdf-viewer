@@ -1,8 +1,12 @@
-/** The one normalized submit INTENT, from either source (an action node's
+/** The one normalized submit intent, from either source (an action node's
  *  payload or a script `doc.submitForm()` effect), and the engine request
  *  shape the document's home receives. Pure. */
 import type { ScriptUiEffect } from '@embedpdf/core-acrojs';
-import type { FormSubmissionRequest, SubmitFormPayload } from '@embedpdf/engine-core/runtime';
+import type {
+  FormSubmissionRequest,
+  IsoDateTime,
+  SubmitFormPayload,
+} from '@embedpdf/engine-core/runtime';
 
 import type { ActionSubmitRequest, SubmitIntent } from '../contract';
 
@@ -19,7 +23,7 @@ export const intentOfPayload = (payload: SubmitFormPayload): SubmitIntent => ({
 
 export const toFormSubmissionRequest = (
   request: ActionSubmitRequest,
-  clientTimeMs: number,
+  sentAt: IsoDateTime,
 ): FormSubmissionRequest => ({
   entries: request.entries,
   intent: {
@@ -30,7 +34,7 @@ export const toFormSubmissionRequest = (
     ...(request.charSet === undefined ? {} : { charSet: request.charSet }),
   },
   origin: request.origin,
-  clientTimeMs,
+  sentAt,
 });
 
 /** Script `doc.submitForm(...)` → the one normalized intent. Script field

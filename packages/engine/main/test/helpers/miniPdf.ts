@@ -107,7 +107,7 @@ export function appendSignedField(
 }
 
 /**
- * Sign an EXISTING signature field in one appended revision: the field
+ * Sign an existing signature field in one appended revision: the field
  * dictionary is rewritten as `fieldDict` plus `/V`, the value carries a
  * placeholder CMS with a whole-revision /ByteRange.
  */

@@ -1,0 +1,98 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --focus: #7db6ff;
+  --accent: #0876fd;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* Which layers draw on the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 11px;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.option:has(input:checked) {
+  background: var(--tint);
+  border-color: var(--focus);
+}
+
+.option input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* The overlay: a menu attached to the selected text */
+.menu {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px -8px rgb(7 32 76 / 0.3);
+}
+
+.menu button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+
+.menu button:hover {
+  background: var(--tint);
+}
+
+.menu button:focus-visible {
+  outline: 2px solid var(--focus);
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

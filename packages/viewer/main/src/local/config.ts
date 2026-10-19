@@ -1,5 +1,5 @@
 /**
- * The LOCAL door's vocabulary. It lives here — next to `register.ts`, the only
+ * The local door's vocabulary. It lives here — next to `register.ts`, the only
  * code that can interpret it — and not in the kernel, because the options bag
  * below is meaningless anywhere the built-in engine was not imported.
  */
@@ -34,7 +34,8 @@ export interface ViewerConfig extends ViewerConfigBase {
   /**
    * The engine seam. Omit for the built-in local engine with its defaults;
    * pass a {@link LocalEngineConfig} to configure it (self-hosted wasm,
-   * strict-CSP workers, fallback fonts, ...); or inject a different
+   * strict-CSP workers, fallback fonts, ...: its `fonts` the style panel
+   * offers for text boxes, too); or inject a different
    * implementation entirely — an `Engine` instance (borrowed: you own its
    * lifetime) or an `EngineFactory` thunk (viewer-owned: created on mount,
    * destroyed on unmount), e.g. a cloud engine.

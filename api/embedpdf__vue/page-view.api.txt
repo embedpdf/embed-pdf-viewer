@@ -1,0 +1,3 @@
+# @embedpdf/vue — ./page-view
+
+PageView [VueComponent] (from packages/framework/vue/src/page-view/PageView.vue): props { page: PageRef | number; documentId?: string; width?: number; pageFrame?: Partial<PageFrame>; }; defaults { width: 240}; slots { default?(props:{ page: PageContextValue} ): unknown; 'page-chrome'?(props:{ page: PageContextValue} ): unknown; fallback?(): unknown; }; options { inheritAttrs: false}

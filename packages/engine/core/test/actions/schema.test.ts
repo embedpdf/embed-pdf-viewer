@@ -13,11 +13,11 @@ const ARM_FIXTURES: PdfActionNode[] = [
     subtype: 'GoTo',
     destination: {
       kind: 'fitR',
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
-      left: 1,
-      bottom: 2,
-      right: 3,
-      top: 4,
+      page: { kind: 'objectNumber', objectNumber: 3 },
+      x: 1,
+      y: 2,
+      width: 3,
+      height: 4,
     },
     next: [],
   },
@@ -141,7 +141,7 @@ describe('PDF action schemas', () => {
     expect(decodeSubmitFormFlags(bit(3)).format).toBe('html');
 
     // GetMethod (bit 4) is meaningful only for HTML — and stays alive under
-    // SubmitPDF per the bit-9 "all other flags ignored EXCEPT GetMethod"
+    // SubmitPDF per the bit-9 "all other flags ignored except GetMethod"
     // rule. For FDF/XFDF it decodes to post.
     expect(decodeSubmitFormFlags(bit(4) | bit(3)).method).toBe('get');
     expect(decodeSubmitFormFlags(bit(4) | bit(9)).method).toBe('get');
@@ -156,7 +156,7 @@ describe('PDF action schemas', () => {
     expect(decodeSubmitFormFlags(bit(14)).embedForm).toBe(true);
     expect(decodeSubmitFormFlags(8192).embedForm).toBe(true);
 
-    // Exclude is DERIVED from bit 1 — the raw word is the single source.
+    // Exclude is derived from bit 1 — the raw word is the single source.
     const excluding = decodeSubmitFormFlags(
       bit(1) | bit(2) | bit(5) | bit(7) | bit(8) | bit(10) | bit(11),
     );
@@ -219,9 +219,9 @@ describe('PDF action schemas', () => {
   test('carries a destination-form OpenAction and rejects both forms at once', () => {
     const destination = {
       kind: 'xyz' as const,
-      page: { kind: 'objectNumber', pageObjectNumber: 5 },
-      left: 10,
-      top: 700,
+      page: { kind: 'objectNumber', objectNumber: 5 },
+      x: 10,
+      y: 92,
       zoom: 1.5,
     };
     const withDestination = {

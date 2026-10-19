@@ -8,7 +8,7 @@ export interface DocSignaturesComplete200Response {
     version: DocSignaturesComplete200Response.Version;
     previous: DocSignaturesComplete200Response.Previous;
     protection: DocSignaturesComplete200Response.Protection;
-    meta: DocSignaturesComplete200Response.Meta;
+    meta: CloudPDF.MutationMeta;
 }
 
 export namespace DocSignaturesComplete200Response {
@@ -20,9 +20,9 @@ export namespace DocSignaturesComplete200Response {
 
     export interface Signature {
         index: number;
-        field: CloudPDF.DocSignaturesComplete200ResponseSignatureField;
+        field: CloudPDF.FormFieldRef;
         fieldName: string;
-        widget: Signature.Widget | null;
+        widget: CloudPDF.FormWidget | null;
         signed: boolean;
         kind: Signature.Kind;
         filter: string | null;
@@ -40,26 +40,6 @@ export namespace DocSignaturesComplete200Response {
     }
 
     export namespace Signature {
-        export interface Widget {
-            ref: CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef | null;
-            annotObjectNumber: number;
-            page: Widget.Page | null;
-        }
-
-        export namespace Widget {
-            export interface Page {
-                kind: Page.Kind;
-                pageObjectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
-        }
-
         export const Kind = {
             Signature: "signature",
             Timestamp: "timestamp",
@@ -77,7 +57,7 @@ export namespace DocSignaturesComplete200Response {
             reason: string | null;
             location: string | null;
             contactInfo: string | null;
-            claimedTime: string | null;
+            signedAt: string | null;
         }
 
         export interface FieldMdp {
@@ -191,96 +171,6 @@ export namespace DocSignaturesComplete200Response {
                         Exclude: "exclude",
                     } as const;
                     export type Action = (typeof Action)[keyof typeof Action];
-                }
-            }
-        }
-    }
-
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
-    }
-
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                page: Item.Page;
-                revision: Item.Revision;
-                weakAnnotationState: CloudPDF.DocSignaturesComplete200ResponseMetaAffectedPagesItemWeakAnnotationState;
-            }
-
-            export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
-        }
-
-        export interface CacheDelta {
-            previousDocVersion: number;
-            docVersion: number;
-            annotationsVersion?: number | undefined;
-            layerVersion?: number | undefined;
-            working?: boolean | undefined;
-            pages: CacheDelta.Pages.Item[];
-        }
-
-        export namespace CacheDelta {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    page: Item.Page;
-                    cache: Item.Cache;
-                }
-
-                export namespace Item {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-
-                    export interface Cache {
-                        contentVersion: number;
-                        annotationVersion: number;
-                    }
                 }
             }
         }

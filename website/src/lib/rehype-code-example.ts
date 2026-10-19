@@ -1,4 +1,9 @@
 import {
+  codePanelAttributes,
+  codePanelsDir,
+  writeCodePanels,
+} from '@embedpdf/docs-kit/mdx/code-panels';
+import {
   createFilesAttribute,
   getDocsHighlighter,
   highlightCodeFile,
@@ -14,28 +19,43 @@ interface FileInfo {
   highlightedCode?: string;
 }
 
+interface RehypeCodeExampleOptions {
+  /**
+   * The code panel store `<Example>` and `<Snippet>` files are written to: next.config passes the
+   * one `openCodePanels` opened. Defaults to the site's (`.next/cache/docs-code`).
+   */
+  panelsDir?: string;
+}
+
 /**
  * Rehype pass over the code collected by `remarkCodeExample`. This file only
  * finds nodes and attaches props — the highlighter, theme, and whitespace
  * rules are the kit's (`@embedpdf/docs-kit/mdx/highlight`), shared with
  * cloudpdf.com so a rendering fix lands exactly once.
  */
-export const rehypeCodeExample = () => {
+export const rehypeCodeExample = (options: RehypeCodeExampleOptions = {}) => {
+  const panelsDir = options.panelsDir ?? codePanelsDir();
   return async (tree: any) => {
     const highlighter = await getDocsHighlighter();
     const nodesToProcess: Array<{ node: any; files: FileInfo[] }> = [];
-    const exampleNodes: Array<{ node: any; byFramework: Record<string, FileInfo[]> }> = [];
+    const exampleNodes: Array<{
+      node: any;
+      sample: string;
+      byFramework: Record<string, FileInfo[]>;
+    }> = [];
 
     visit(tree, (node: any) => {
       if (node.type !== 'mdxJsxFlowElement') return;
 
-      // Framework-resolved samples (<Example name="…">): highlight every
-      // framework's files; the client picks by pathname.
-      if (node.name === 'Example') {
+      // Framework-resolved samples (<Example name="…">, <Snippet name="…">): highlight every
+      // framework's files and store them; the page keeps a reference and its route reads its
+      // framework's files at render (RouteExample).
+      if (node.name === 'Example' || node.name === 'Snippet') {
         const attr = node.attributes?.find((a: any) => a.name === '__fwFiles');
-        if (!attr?.value) return;
+        const sample = node.attributes?.find((a: any) => a.name === '__sample')?.value;
+        if (!attr?.value || typeof sample !== 'string') return;
         try {
-          exampleNodes.push({ node, byFramework: JSON.parse(attr.value) });
+          exampleNodes.push({ node, sample, byFramework: JSON.parse(attr.value) });
         } catch {
           console.warn('[rehype-code-example] Could not parse __fwFiles');
         }
@@ -72,19 +92,17 @@ export const rehypeCodeExample = () => {
       node.attributes.push(createFilesAttribute(highlightedFiles));
     }
 
-    for (const { node, byFramework } of exampleNodes) {
+    // Every framework's highlighted files go to the code panel store, not into the page: with
+    // four frameworks a page module grew to megabytes, and the docs route compiles every page.
+    for (const { node, sample, byFramework } of exampleNodes) {
       const highlighted: Record<string, FileInfo[]> = {};
       for (const [fw, files] of Object.entries(byFramework)) {
         highlighted[fw] = files.map((file) => highlightCodeFile(highlighter, file));
       }
       node.attributes = node.attributes.filter(
-        (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__fwFiles',
+        (attr: any) => !['__needsHighlighting', '__fwFiles', '__sample'].includes(attr.name),
       );
-      node.attributes.push({
-        type: 'mdxJsxAttribute',
-        name: 'filesByFramework',
-        value: JSON.stringify(highlighted),
-      });
+      node.attributes.push(...codePanelAttributes(writeCodePanels(panelsDir, sample, highlighted)));
     }
   };
 };

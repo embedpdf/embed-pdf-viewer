@@ -3,14 +3,15 @@ import { foldText } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../document-session/DocumentSession';
+import type { Slices } from '../../../shared/slices';
 import { PageTextReader } from '../../text/PageTextReader';
 
 export interface PageCorpus {
-  /** Default-fold (`{}`) corpus; `folded.original` IS `snapshot.text`. */
+  /** Default-fold (`{}`) corpus; `folded.original` is `snapshot.text`. */
   folded: FoldedText;
   /**
    * The page text snapshot the corpus was folded from — carried so match
-   * ranges (text space) can be converted to CHARACTER space via the
+   * ranges (text space) can be converted to character space via the
    * engine-core charmap helpers without re-reading the page.
    */
   snapshot: PageTextSnapshot;
@@ -23,12 +24,12 @@ interface PageCorpusEntry extends PageCorpus {
 
 /**
  * Per-session, per-page search corpus: the page's text snapshot plus its
- * DEFAULT fold (the one literal queries with default options search).
+ * default fold (the one literal queries with default options search).
  * This is the local engine's in-memory equivalent of the server's corpus
  * artifacts — same fold version, same shape, built lazily on first search
  * and reused across slices and re-queries.
  *
- * Version-keyed on `DocumentSession.mutationSeq()` per PAGE (not per
+ * Version-keyed on `DocumentSession.cacheSeq()` per page (not per
  * session): a form fill or annotation edit bumps the sequence, and only
  * the pages actually re-read after that pay the re-extraction — untouched
  * cache entries for other pages are refreshed lazily as they're revisited.
@@ -41,13 +42,14 @@ const MAX_CACHED_PAGES = 512;
 
 const cache = new WeakMap<DocumentSession, Map<PageObjectNumber, PageCorpusEntry>>();
 
-export function acquirePageCorpus(
+export async function acquirePageCorpus(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
   pageObjectNumber: PageObjectNumber,
   signal: AbortSignal,
-): PageCorpus {
-  const seq = session.mutationSeq();
+  slices: Slices,
+): Promise<PageCorpus> {
+  const seq = session.cacheSeq();
   let pages = cache.get(session);
   if (!pages) {
     pages = new Map();
@@ -57,7 +59,11 @@ export function acquirePageCorpus(
   const hit = pages.get(pageObjectNumber);
   if (hit && hit.seq === seq) return hit;
 
-  const snapshot = new PageTextReader(runtime, session).read(pageObjectNumber, signal);
+  const snapshot = await new PageTextReader(runtime, session).read(
+    pageObjectNumber,
+    signal,
+    slices,
+  );
   const entry: PageCorpusEntry = { seq, folded: foldText(snapshot.text), snapshot };
 
   pages.delete(pageObjectNumber); // re-insert = most recently used

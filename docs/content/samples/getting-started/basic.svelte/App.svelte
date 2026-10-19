@@ -1,30 +1,34 @@
-<script lang="ts">
-  import { onMount } from 'svelte';
+<script lang="ts" module>
+  import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
+  import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { localEngine } from '@embedpdf/engine';
-  import type { DocumentHandle, OpenInput } from '@embedpdf/engine';
-  import PdfPage from './PdfPage.svelte';
 
-  // The Svelte adapter is in progress — this drives the framework-free engine
-  // directly: App owns the engine and the document, PdfPage renders one page.
-  let doc = $state<DocumentHandle>();
-
-  // The engine is created synchronously and costs nothing until first use —
-  // only opening a document does real work.
+  // The engine is created synchronously and costs nothing until first use, so
+  // a module-scope `const engine = …` is safe — even under SSR. Only opening a
+  // document does real work: the UI renders at t≈0.
   const engine = localEngine();
+  const plugins = [stagePlugin(), renderPlugin()];
 
-  onMount(async () => {
-    // [!doc-source ebook]
-    // The local engine opens bytes — fetch the sample and hand them over.
-    const ebook: OpenInput = await fetch('https://snippet.embedpdf.com/ebook.pdf')
-      .then((response) => response.arrayBuffer())
-      .then((buffer) => ({ kind: 'bytes', id: 'ebook', bytes: new Uint8Array(buffer) }));
-    // [!/doc-source]
-    doc = await engine.open(ebook);
-  });
+  // [!doc-source ebook]
+  // The local engine opens bytes: fetch lazily, under the loading tab.
+  const ebook = async (): Promise<OpenInput> => {
+    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  };
+  // [!/doc-source]
 </script>
 
-{#if doc}
-  <PdfPage {doc} pageNumber={1} />
-{:else}
-  <p>Opening document…</p>
-{/if}
+<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+  <div style="height: 500px">
+    <!-- Document UI is defined over a document — gate it on having one. -->
+    <DocumentGate>
+      {#snippet fallback()}
+        <p>Loading…</p>
+      {/snippet}
+      <Stage style="height: 100%">
+        <RenderLayer />
+      </Stage>
+    </DocumentGate>
+  </div>
+</Viewer>

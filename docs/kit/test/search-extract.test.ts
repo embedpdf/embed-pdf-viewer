@@ -133,3 +133,40 @@ title: Getting started
     expect(sections[0].contentPath).toBe('docs/headless/getting-started');
   });
 });
+
+describe('the publish gate', () => {
+  const gated = (published: string[]): SearchExtractSite => ({
+    ...site,
+    publishedIntegrations: (_contentPath, integrations) =>
+      integrations.filter((integration) => integration && published.includes(integration)),
+  });
+  const PAGE = `# Search\n\n## Find text\n\n<Fw only="react">Use the React hook.</Fw><Fw only="vue">Use the Vue composable.</Fw>\n`;
+
+  it('indexes a page only for the frameworks it is published for', () => {
+    const [section] = extractPageSections(gated(['react']), {
+      sourceCode: PAGE,
+      contentPath: 'docs/headless/text/search',
+    });
+
+    expect(section.prose).toBe('Use the React hook.');
+    expect(section.variantProse.vue).toBeUndefined();
+    expect(section.withheldFrom).toEqual(['vue', 'svelte', 'angular']);
+  });
+
+  it('leaves out a page published for no framework', () => {
+    expect(
+      extractPageSections(gated([]), {
+        sourceCode: PAGE,
+        contentPath: 'docs/headless/text/search',
+      }),
+    ).toEqual([]);
+  });
+
+  it('marks nothing on a page published everywhere', () => {
+    const [section] = extractPageSections(gated(FRAMEWORKS), {
+      sourceCode: PAGE,
+      contentPath: 'docs/headless/text/search',
+    });
+    expect(section.withheldFrom).toBeUndefined();
+  });
+});

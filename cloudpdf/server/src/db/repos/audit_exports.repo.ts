@@ -1,5 +1,6 @@
 import type { Kysely, Selectable, Transaction } from 'kysely';
 import type { AuditExportStatus, Database as Schema } from '../schema';
+import { isUniqueViolation } from '../uniqueViolation';
 
 export type { AuditExportStatus } from '../schema';
 
@@ -192,9 +193,4 @@ function toErrorJson(error: unknown): Record<string, unknown> {
     return { name: error.name, message: error.message, stack: error.stack };
   }
   return { message: String(error) };
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  const err = error as { code?: string; message?: string };
-  return err.code === '23505' || /unique/i.test(err.message ?? '');
 }

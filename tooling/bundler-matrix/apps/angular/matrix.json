@@ -1,15 +1,18 @@
 {
   "toolchain": "Angular CLI 20 (application builder)",
+  "workerSrc": "'self' blob:",
   "dist": "dist",
   "variants": [
     {
       "name": "angular+assets",
       "toolchain": "Angular CLI 20 + angular.json asset glob + assetsUrl (documented fast path)",
+      "workerSrc": "'self' blob:",
       "script": "matrix:build:assets"
     },
     {
       "name": "angular+portable",
       "toolchain": "Angular CLI 20 + `@embedpdf/engine/portable` (zero config)",
+      "workerSrc": "'self' blob:",
       "script": "matrix:build:portable"
     }
   ]

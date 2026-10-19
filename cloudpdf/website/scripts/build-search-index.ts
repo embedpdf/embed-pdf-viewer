@@ -3,7 +3,7 @@
  *
  * Runs before `next build` in the deploy pipeline (and on `pnpm dev` start),
  * so the artifact always describes exactly the content the deployment
- * renders — docs pages AND the generated API reference, which indexes
+ * renders — docs pages and the generated API reference, which indexes
  * through the same component projections the `.md` export uses. Sections
  * are content-hashed against the previous artifact, so a rebuild only pays
  * for embeddings that actually changed — and with no OPENAI_API_KEY it

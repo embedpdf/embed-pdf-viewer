@@ -1,0 +1,368 @@
+---
+title: Moving from 2.x
+description: From EmbedPDF 2.x's viewer to 3.0's, name by name. The new packages, every config key and what replaces it, what 3.0 doesn't have, and what changes for your security policy.
+engines: [local]
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Moving from 2.x
+
+3.0's viewer replaces the one in EmbedPDF 2.x: `@embedpdf/snippet`, and the
+`@embedpdf/react-pdf-viewer`, `@embedpdf/vue-pdf-viewer` and `@embedpdf/svelte-pdf-viewer`
+packages. It's still one tag and one config, but most names changed. Every config key is a prop,
+the toolbar is a layout you change in the config, and you reach each plugin by its name. This page
+maps each 2.x name to its 3.0 one.
+
+## The packages
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `@embedpdf/snippet` | `@embedpdf/viewer` |
+| `https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js` | `https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js` |
+| `@embedpdf/react-pdf-viewer` | `@embedpdf/viewer-react` |
+| `@embedpdf/vue-pdf-viewer` | `@embedpdf/viewer-vue` |
+| `@embedpdf/svelte-pdf-viewer` | `@embedpdf/viewer-svelte` |
+| `@embedpdf/snippet`, called from an Angular component | `@embedpdf/viewer-angular` |
+
+Remove the 2.x package, and install the new one:
+
+<Snippet name="viewer/start/install" />
+
+The new package brings the PDF engine and its WebAssembly. If you installed `@embedpdf/engines`,
+`@embedpdf/pdfium` or `@embedpdf/models` only for the 2.x viewer, remove them too.
+
+## The viewer
+
+The 2.x code is the comment at the top. The 3.0 code below it does the same:
+
+<Snippet name="viewer/migrate/report" />
+
+- **No `config` prop.** Each key is a prop of its own. A config you keep in an object still works:
+  spread it into the viewer, as in the [Quick start](quick-start#3-make-it-yours). In plain HTML,
+  `init()` still takes the whole config, without `type: 'container'`, and `target` can be a
+  selector.
+- **`onReady` gives you the `viewer`**, not the plugin registry. See [From code](#from-code).
+- **The viewer is one element, `<embedpdf-viewer>`.** 2.x's framework packages put an
+  `<embedpdf-container>` inside a `<div>` of their own. Now there's no `<div>`: your class and style
+  go on the viewer itself.
+- **Five keys follow their prop:** `src`, `theme`, `locale`, `disable` and `readOnly`. 2.x's
+  framework packages read the config once. Every other key is still read once: see
+  [Change the config later](setup#change-the-config-later).
+- **Server-side rendering needs no wrapper.** Every framework package is safe to import on the
+  server, so a `<ClientOnly>` or a dynamic import around the viewer can go. See
+  [Setup](setup#server-side-rendering).
+
+<Fw only="angular">
+
+2.x had no Angular package. In 3.0, the viewer is the `EpdfPdfViewer` component,
+`<epdf-pdf-viewer>`: each config key is an input, or give them all at once with `[config]`.
+
+</Fw>
+
+## The config, key by key
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `src` | `src`: a URL, a `File` or bytes |
+| `documentManager.initialDocuments` | `documents`, each with `src`, `name`, `password` and `active`, in place of `url`, `name`, `password` and `autoActivate` |
+| `tabBar` | `layout.tabs()` in the [layout](customize/layout): `'always'`, `'multiple'` (the default) or `'never'` |
+| `theme` | `theme`, with new keys: see [Theme](#theme) |
+| `icons` | `icons`, as path data: see [Buttons and the toolbar](#buttons-and-the-toolbar) |
+| `commands.commands` | `commands`, a list |
+| `ui.schema` | `layout` |
+| `disabledCategories` | `disable`, with new names: see [Turn features off](#turn-features-off) |
+| `permissions` | `scope`: see [Permissions](#permissions) |
+| `i18n.defaultLocale` | `locale` |
+| `i18n.locales` | `strings`: words by language code, with a button's label under its command's id |
+| `annotations.annotationAuthor` | `identity: { displayName }` |
+| `wasmUrl` | `engine.wasmUrl`. The file is `embedpdf.wasm` now, from `@embedpdf/engine-runtime-wasm32`, in place of `pdfium.wasm`. |
+| `fontFallback` | `engine.fallbackFonts`: font files, each with a `key` and a `url` |
+| `fonts.ui` | `theme.tokens.font` |
+| `fonts.signature` | `plugins.signature.fonts`: font files, each with a `key`, a `label` and a `url` |
+| `stamp.manifests` | `plugins.stamp.standard`: `true`, a URL, or `false` for none |
+| Every other plugin's key: `zoom`, `scroll`, `annotations`, … | `plugins`, under the 3.0 plugin's name: see [Plugin settings](#plugin-settings) |
+
+### Plugin settings
+
+The plugins' settings are new too. `plugins` takes them under the 3.0 plugin's name, as its page in
+the headless docs lists them, with plain strings where 2.x had enums. The ones 2.x apps set most:
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `zoom: { defaultZoomLevel: ZoomMode.FitWidth }` | `stage: { zoom: { mode: 'fit-width' } }` |
+| `scroll: { defaultStrategy: ScrollStrategy.Horizontal }` | `stage: { layout: 'horizontal' }` |
+| `scroll: { defaultPageGap: 20 }` | `stage: { gap: 20 }` |
+| `spread: { defaultSpreadMode: SpreadMode.Odd }` | `stage: { spread: 'odd' }` |
+| `rotation: { defaultRotation: Rotation.Degree90 }` | `stage: { viewRotation: 90 }` |
+| `pan: { defaultMode: 'always' }` | `interaction: { defaultTool: 'pan' }` |
+| `thumbnails: { width: 120 }` | `thumbnails: { zoom: { pageWidth: 120 } }` |
+| `annotations: { selectAfterCreate: false }` | `annotation: { afterCreate: { select: false } }` |
+| `annotations: { deactivateToolAfterCreate: true }` | `annotation: { afterCreate: { tool: 'default' } }` |
+| `stamp: { manifests: [] }` | `stamp: { standard: false }` |
+
+All of them in one 3.0 config:
+
+```js
+{
+  plugins: {
+    stage: {
+      zoom: { mode: 'fit-width' },
+      layout: 'horizontal',
+      gap: 20,
+      spread: 'odd',
+      viewRotation: 90,
+    },
+    interaction: { defaultTool: 'pan' },
+    thumbnails: { zoom: { pageWidth: 120 } },
+    annotation: { afterCreate: { select: false, tool: 'default' } },
+    stamp: { standard: false },
+  },
+}
+```
+
+[Plugins](code/plugins#every-plugin) links each plugin to its settings.
+
+## From code
+
+<Snippet name="viewer/migrate/print-button" />
+
+`onReady` gives you the [`viewer`](code/viewer) once it's live. `viewer.get('search')` is what
+`registry.getPlugin('search').provides()` gave you in 2.x, and `viewer.documents` and
+`viewer.commands` need no call at all.
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `await container.registry`, or a ref's `registry` | `onReady`. In plain HTML, also `element.viewer` once the element fires `epdf:ready`. |
+| `registry.getPlugin(id).provides()` | `viewer.get(name)` |
+| `.forDocument(documentId)` on a plugin | `viewer.forDocument(documentId).get(name)` |
+| `onInit`, with the container | None: what you did with the container is config now (`theme`, `icons`) |
+| `registry.getEngine()` | None: the viewer keeps its engine. Read the document through the plugins instead, such as `viewer.get('metadata')`, and get the file with `viewer.documents.download()`. |
+
+The plugins have new names:
+
+| 2.x plugin | 3.0 plugin |
+| :-- | :-- |
+| `zoom`, `scroll`, `spread`, `rotate`, `viewport` | `stage` |
+| `render`, `tiling` | `render` |
+| `thumbnail` | `thumbnails` |
+| `bookmark` | `outline`, which also adds, renames, moves and deletes items |
+| `document-manager`, `export` | `documents` |
+| `interaction-manager`, `pan` | `interaction`, whose `pan` tool is the hand |
+| `ui` | `shell` for what's open, and the config's `layout` for what goes where |
+| `print`, `fullscreen`, `history` | No plugin: run their commands, `document:print`, `view:fullscreen`, `history:undo` and `history:redo` |
+| `annotation`, `search`, `selection`, `form`, `redaction`, `stamp`, `signature`, `i18n`, `commands` | The same name |
+
+Their methods are new as well, each on its plugin's page in the headless docs. The calls 2.x code
+makes most:
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `openDocumentUrl({ url })` | `viewer.documents.open({ kind: 'url', url })` |
+| `openDocumentBuffer({ buffer, name })` | `viewer.documents.open({ kind: 'bytes', bytes: buffer }, { name })` |
+| `setActiveDocument(id)`, `closeDocument(id)` | `viewer.documents.setActive(id)`, `viewer.documents.close(id)` |
+| `onDocumentOpened(callback)` | `viewer.documents.onOpened(({ documentId }) => …)` |
+| `saveAsCopy()` | `viewer.documents.download()`: the PDF's bytes |
+| `download()` | `viewer.commands.execute('document:download')` |
+| `scrollToPage({ pageNumber: 5 })` | `viewer.get('stage').goToPage(4)`: pages count from 0 |
+| `setLocale('de')` | The `locale` prop |
+
+## Theme
+
+2.x set colors per mode, in groups: `theme.light.accent.primary`. 3.0 has one set of tokens for both
+modes, and `dark` for what's different in dark mode:
+
+```js
+{
+  theme: {
+    preference: 'system',
+    accent: '#9333ea',
+    tokens: { canvas: '#f5f3ff' },
+    dark: { accent: '#a855f7', canvas: '#1e1b2e' },
+  },
+}
+```
+
+2.x's `light` colors go in `tokens`, and its `dark` ones in `dark`:
+
+| 2.x color | 3.0 token |
+| :-- | :-- |
+| `accent.primary` | `accent` |
+| `background.app` | `canvas` |
+| `background.surface` | `surface` |
+| `background.elevated` | `surface-raised` |
+| `foreground.primary` | `text` |
+| `foreground.secondary` | `text-muted` |
+| `border.default` | `border` |
+| `interactive.hover` | `hover` |
+
+The other 2.x colors, such as `accent.primaryHover` or `state.error`, have no token. For what tokens
+don't cover, restyle a part with `::part()`: see [Theming](customize/theming#restyle-a-part).
+The container's `setTheme()` is the `theme` prop now, which follows its value.
+
+## Buttons and the toolbar
+
+2.x changed the toolbar after the viewer started: `registerCommand()`, `registerIcon()`, then
+`mergeSchema()` with a copy of the toolbar's items. In 3.0 all three are config, and the layout is
+a function that gets the default and returns yours. Here is 2.x's example, a smiley in place of the
+comments button:
+
+```js
+{
+  icons: {
+    smiley: [
+      'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0',
+      'M9 10l.01 0',
+      'M15 10l.01 0',
+      'M9.5 15a3.5 3.5 0 0 0 5 0',
+    ],
+  },
+  commands: [{ id: 'acme:hello', label: 'Say hello', icon: 'smiley', run: () => alert('Hello!') }],
+  layout: (layout) => layout.replace('panel:comments', 'acme:hello'),
+}
+```
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `commands.registerCommand(command)` | `commands: [command]` |
+| A command's `action` | `run` |
+| `disabled` | `enabled`, which says the opposite |
+| `shortcuts` | `shortcut` |
+| `registry` and `state`, in a command's functions | `get`, which gives you any plugin by its name |
+| The container's `registerIcon(name, { viewBox, paths })` | `icons`: 24 × 24 path data, each path a string |
+| `ui.mergeSchema({ toolbars })` | `layout: (layout) => layout.add(…)`, `.remove(…)`, `.replace(…)` |
+| `ui.toggleMenu()` in a command | `menu: 'id'` on the command |
+| A `{ type: 'custom', componentId }` item | `{ custom: 'id' }`, with [your own component](customize/components) |
+
+A command's `label`, `labelKey`, `icon`, `active`, `visible` and `categories` keep their names.
+The ids changed:
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `main-toolbar` | `main` |
+| `annotation-toolbar`, `shapes-toolbar`, `insert-toolbar`, `form-toolbar`, `redaction-toolbar` | `annotate`, `shapes`, `insert`, `form`, `redact` |
+| `document-menu`, `zoom-menu`, `page-settings-menu` | `document`, `zoom`, `view` |
+| The `selection` and `annotation` selection menus | The `selection` and `annotation` bars |
+| `document:export`, `document:fullscreen` | `document:download`, `view:fullscreen` |
+| `annotation:add-highlight`, `panel:toggle-search`, `scroll:next-page` | `tool:highlight`, `panel:search`, `page:next` |
+
+Every 3.0 id is on [Layout](customize/layout#every-built-in-id) and
+[Buttons & commands](customize/commands#every-built-in-command).
+
+## Turn features off
+
+`disabledCategories` is `disable`. It takes 3.0's [features](features/turning-off), with their parts
+after a dot, and single commands by their id:
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| `annotation` | `annotations` and `shapes`: 2.x's shapes were annotations |
+| `annotation-highlight` | `annotations.highlight` |
+| `annotation-ink` | `annotations.drawing` |
+| `annotation-shape` | `shapes` |
+| `insert-rubber-stamp`, `insert-image` | `stamps` |
+| `insert-signature` | `signatures.signing` |
+| `form` | `forms` |
+| `redaction` | `redaction` |
+| `panel-search` | `search` |
+| `panel-comment` | `comments` |
+| `selection-copy` | `text.copy` |
+| `document-open`, `document-export`, `document-print` | `documents.open`, `documents.download`, `documents.print` |
+| `zoom`, `rotate`, `spread`, `scroll`, `pan` | No feature: [remove](customize/layout#remove-buttons) their buttons, or disable each command, such as `'zoom:in'` |
+
+New in 3.0, `readOnly: true` turns off everything that changes the document.
+
+## Permissions
+
+2.x's `permissions` changed what the viewer offered. 3.0's `scope` is the list of what the user
+[may do](features/turning-off#what-a-user-may-do), and the engine checks it on every call:
+
+| 2.x | 3.0 |
+| :-- | :-- |
+| No `permissions`: the PDF's own restrictions count | No `scope`: the same |
+| `enforceDocumentPermissions: false` | `scope: ['*']`: the user may do everything |
+| `overrides: { print: true }` | `'doc.print'` added to the default scope, which [Permissions](/docs/headless/concepts/permissions) lists |
+| `overrides: { print: false }` | A scope that leaves out both `'doc.print'` and `'pdf.permissions'`, or, for the button only, `disable: ['documents.print']` |
+
+2.x's `print` is `doc.print` in a scope, `printHighQuality` is `doc.print.high`, `copyContents` is
+`doc.text.copy`, `modifyAnnotations` is `doc.annotate.modify`, `fillForms` is `doc.forms.fill` and
+`assembleDocument` is `doc.pages.assemble`. See [Permissions](/docs/headless/concepts/permissions).
+
+## Security and self-hosting
+
+### Nothing from a third party
+
+2.x fetched several files from public servers. 3.0 fetches nothing from a third party unless you
+point it there:
+
+| 2.x fetched | 3.0 |
+| :-- | :-- |
+| `pdfium.wasm`, from jsDelivr | `embedpdf.wasm`, a file of your build |
+| Fallback fonts, from jsDelivr | None, unless you give `engine.fallbackFonts` |
+| The UI font and the signature fonts, from Google Fonts | The system font. The signature fonts are lazy chunks of your build. |
+| The standard stamps, from jsDelivr | A lazy chunk of your build |
+
+So a PDF whose text needs a font it doesn't embed, such as Chinese or Japanese, needs a fallback
+font you give the engine: see [Fonts](/docs/engine/documents/fonts). Every file and its setting is
+on [Self-hosting](self-hosting).
+
+### Content Security Policy
+
+2.x drew its styles from a `<style>` element in its shadow root, so a strict policy needed
+`style-src 'unsafe-inline'`, and it started the engine's workers from `blob:` URLs. 3.0 needs no
+`'unsafe-inline'` or `'unsafe-eval'` and runs with Trusted Types on. Installed from npm, its workers
+are files of your build, under `worker-src 'self'`; from the CDN they still start from `blob:` URLs.
+The policy to copy is on [Security & CSP](concepts/security).
+
+### The page around it
+
+- 2.x added its font stylesheets to your page's `<head>`. 3.0 adds nothing to your page: its styles
+  stay in its own shadow DOM.
+- Menus and tooltips open in the browser's top layer, so your page's headers never cover them,
+  while panels and dialogs stay inside the viewer's box. See
+  [How it works](concepts/how-it-works#its-own-box).
+- 3.0 needs Chrome and Edge 114, Firefox 125 or Safari 17, or newer: see
+  [Setup](setup#what-it-needs-from-the-browser).
+
+## Not in 3.0
+
+What 2.x had that 3.0 doesn't:
+
+- **Loading in parts.** 2.x's `mode: 'range-request'` fetched a big file a piece at a time. The
+  built-in engine downloads the whole file first: see [Big files](documents#big-files).
+- **Request options.** For headers or credentials (`requestOptions`), fetch the file yourself and
+  give `src` its bytes or a `File`.
+- **A limit on open documents** (`maxDocuments`).
+- **The engine on the page's own thread** (`worker: false`), and its log (`log`). The engine
+  always runs in a worker.
+- **Zoom limits and steps:** `minZoom`, `maxZoom`, `zoomStep`, `zoomRanges` and `presets`.
+- **Marquee zoom, and the screenshot tool** (the `capture` plugin).
+- **Protect.** 2.x's Protect dialog, `setDocumentEncryption()` and `removeEncryption()`: 3.0 can't
+  add or remove a document's password.
+- **The attachments panel, for now.** No plugin lists a document's attached files yet, so this
+  panel doesn't show (2.x's `attachment` plugin).
+- **Swedish and Traditional Chinese.** They aren't built in: add them with
+  [`strings`](customize/translations#a-language-of-your-own).
+- **Theme events:** `themechange`, `activeColorScheme` and `themePreference`.
+- **A few settings:** `export.defaultFileName`, `fullscreen.targetElement`, `i18n.fallbackLocale`
+  (English is the fallback) and `i18n.paramResolvers`.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Quick start"
+    description="Install, show a PDF, add your color and your own button."
+    href="quick-start"
+  />
+  <Card
+    title="Layout"
+    description="Toolbars at any edge, several of them, and every button where you want it."
+    href="customize/layout"
+  />
+  <Card
+    title="The viewer in code"
+    description="Open documents, run commands and use any plugin from your app."
+    href="code/viewer"
+  />
+</Cards>

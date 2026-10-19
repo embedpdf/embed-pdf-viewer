@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { createLatestLane } from '../src/lanes';
 import { isPluginError } from '../src/errors';
 
-/** G4: a superseded run cannot publish, in every settle order. */
+/** A superseded run cannot publish, in every settle order. */
 
 function deferred<T>() {
-  let resolve!: (v: T) => void;
-  let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
+  let resolve!: (value: T) => void;
+  let reject!: (event: unknown) => void;
+  const promise = new Promise<T>((result, rej) => {
+    resolve = result;
     reject = rej;
   });
   return { promise, resolve, reject };
@@ -18,25 +18,25 @@ describe('createLatestLane', () => {
   it('newest wins: the older run cannot commit and rejects operation-cancelled', async () => {
     const lifetime = new AbortController();
     const lane = createLatestLane(lifetime.signal, 'test', 'session');
-    const a = deferred<string>();
-    const b = deferred<string>();
+    const requestA = deferred<string>();
+    const requestB = deferred<string>();
     const published: string[] = [];
 
     const runA = lane.run(async (run) => {
-      const v = await a.promise;
-      run.commit(() => published.push(v));
-      return v;
+      const value = await requestA.promise;
+      run.commit(() => published.push(value));
+      return value;
     });
     const runB = lane.run(async (run) => {
-      const v = await b.promise;
-      run.commit(() => published.push(v));
-      return v;
+      const value = await requestB.promise;
+      run.commit(() => published.push(value));
+      return value;
     });
 
-    // A settles AFTER B started, in both orders
-    a.resolve('A');
-    await expect(runA).rejects.toSatisfy((e) => isPluginError(e, 'operation-cancelled'));
-    b.resolve('B');
+    // A settles after B started, in both orders
+    requestA.resolve('A');
+    await expect(runA).rejects.toSatisfy((error) => isPluginError(error, 'operation-cancelled'));
+    requestB.resolve('B');
     await expect(runB).resolves.toBe('B');
     expect(published).toEqual(['B']);
   });
@@ -44,11 +44,11 @@ describe('createLatestLane', () => {
   it('a superseded run whose promise rejects still reports cancellation, not failure', async () => {
     const lifetime = new AbortController();
     const lane = createLatestLane(lifetime.signal, 'test', 'session');
-    const a = deferred<string>();
-    const runA = lane.run(async () => a.promise);
+    const requestA = deferred<string>();
+    const runA = lane.run(async () => requestA.promise);
     void lane.run(async () => 'B');
-    a.reject(new Error('network'));
-    await expect(runA).rejects.toSatisfy((e) => isPluginError(e, 'operation-cancelled'));
+    requestA.reject(new Error('network'));
+    await expect(runA).rejects.toSatisfy((error) => isPluginError(error, 'operation-cancelled'));
   });
 
   it('aborts the older run’s signal and exposes superseded', async () => {
@@ -74,13 +74,13 @@ describe('createLatestLane', () => {
     const lane = createLatestLane(lifetime.signal, 'test', 'session');
     const fn = vi.fn(async () => 'x');
     const running = lane.run(async () => {
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
       return 'running';
     });
     const caller = new AbortController();
     caller.abort();
-    await expect(lane.run(fn, { signal: caller.signal })).rejects.toSatisfy((e) =>
-      isPluginError(e, 'operation-cancelled'),
+    await expect(lane.run(fn, { signal: caller.signal })).rejects.toSatisfy((error) =>
+      isPluginError(error, 'operation-cancelled'),
     );
     expect(fn).not.toHaveBeenCalled();
     await expect(running).resolves.toBe('running');
@@ -93,9 +93,9 @@ describe('createLatestLane', () => {
     const run = lane.run(async () => gate.promise);
     lifetime.abort();
     gate.resolve('late');
-    await expect(run).rejects.toSatisfy((e) => isPluginError(e, 'instance-closed'));
-    await expect(lane.run(async () => 'x')).rejects.toSatisfy((e) =>
-      isPluginError(e, 'instance-closed'),
+    await expect(run).rejects.toSatisfy((error) => isPluginError(error, 'instance-closed'));
+    await expect(lane.run(async () => 'x')).rejects.toSatisfy((error) =>
+      isPluginError(error, 'instance-closed'),
     );
   });
 
@@ -106,6 +106,6 @@ describe('createLatestLane', () => {
       lane.run(async () => {
         throw new Error('boom');
       }),
-    ).rejects.toSatisfy((e) => isPluginError(e, 'operation-failed'));
+    ).rejects.toSatisfy((error) => isPluginError(error, 'operation-failed'));
   });
 });

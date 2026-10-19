@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    // In this workspace the viewer's types reach its chrome's source, which is React (`.tsx`).
+    "jsx": "react-jsx"
+  },
+  "include": ["./**/*.ts", "./**/*.svelte", "../vitest.config.ts"],
+  "exclude": ["pages/dist"]
+}

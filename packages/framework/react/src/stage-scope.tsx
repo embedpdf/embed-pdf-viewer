@@ -1,5 +1,5 @@
 /**
- * StageScope — binds a subtree to a stage LENS so the stage hooks and the
+ * StageScope — binds a subtree to a stage lens so the stage hooks and the
  * stage-bound chrome (`<Scrollbar>`, `<SelectionHandles>`) need no positional
  * token. `<Stage>` installs one for its own pages and overlay; an app wraps a
  * second lens (a thumbnail rail) in `<StageScope token={thumbs}>` and writes

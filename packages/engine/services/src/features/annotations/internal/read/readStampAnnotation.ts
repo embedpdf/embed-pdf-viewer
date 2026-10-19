@@ -1,34 +1,48 @@
-import type { AnnotationBase, StampAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  StampAnnotation,
+  StampFit,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotName, readAnnotOpacity } from './annotationReadPrimitives';
-import {
-  readAnnotationRotation,
-  readAnnotationUnrotatedRect,
-} from './readAnnotationTransformMetadata';
+import { readAnnotationBox } from './readAnnotationTurn';
+import { readEmbedMetadataString } from './readEmbedMetadata';
+
+/** `/EMBD_Metadata/AppearanceFit`: how a stamp's drawing fills its box. */
+export const KEY_APPEARANCE_FIT = 'AppearanceFit';
+
+const STAMP_FITS: readonly string[] = ['contain', 'cover', 'fill'];
+
+/** The fit a stamp records, or `null` when it records none (or one we don't know). */
+export function readStampFit(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+): StampFit | null {
+  const value = readEmbedMetadataString(fn, mem, annotPtr, KEY_APPEARANCE_FIT);
+  return value !== undefined && STAMP_FITS.includes(value) ? (value as StampFit) : null;
+}
 
 /**
- * Stamp DTO: base + `/Name` (standard or custom identifier, verbatim) + `/CA`
- * opacity + transform metadata. The visual content
- * stays in the `/AP` stream — rendered via `renderAppearanceImages()`,
+ * Stamp DTO: base + `/Name` (standard or custom identifier, verbatim) +
+ * its box and turn + the recorded fit + `/CA`. The visual content
+ * stays in the `/AP` stream — rendered via `renderAppearances()`,
  * never surfaced as DTO data.
  */
 export function readStamp(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): StampAnnotationDTO {
-  const rotation = readAnnotationRotation(fn, mem, annotPtr);
-  const unrotatedRect = readAnnotationUnrotatedRect(fn, mem, annotPtr);
-  const ca = readAnnotOpacity(fn, mem, annotPtr);
-  const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
+  base: AnnotationBase<PdfCoordinates>,
+): StampAnnotation<PdfCoordinates> {
   return {
     ...base,
     subtype: 'stamp',
     name: readAnnotName(fn, mem, annotPtr),
-    opacity,
-    ...(rotation != null ? { rotation } : {}),
-    ...(unrotatedRect != null ? { unrotatedRect } : {}),
+    fit: readStampFit(fn, mem, annotPtr),
+    opacity: readAnnotOpacity(fn, mem, annotPtr) ?? 1,
+    ...readAnnotationBox(fn, mem, annotPtr),
   };
 }

@@ -3,9 +3,9 @@
  * reply/group threads. No PDFium, no browser, no zod — safe to import from
  * the cloud SDK, the local engine, and any UI plugin.
  *
- * The engine surfaces `/IRT` + `/RT` as flat edges on every DTO
- * ({@link AnnotationBase.inReplyTo} / {@link AnnotationBase.replyType}); it
- * deliberately does NOT nest replies/group members, because each of those
+ * The engine surfaces `/IRT` + `/RT` as a flat edge on every DTO
+ * ({@link AnnotationBase.reply}); it
+ * deliberately does not nest replies/group members, because each of those
  * is itself a first-class annotation in the page list. This module turns
  * those edges into the shape a comments sidebar wants.
  *
@@ -15,7 +15,8 @@
  */
 
 import type { AnnotationBase } from './base';
-import type { AnnotationDTO } from './kinds';
+import type { Annotation } from './kinds';
+import type { PdfCoordinates } from '../pageSpace/coordinates';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
 
@@ -34,11 +35,9 @@ export type AnnotationRelationKind = 'top-level' | 'reply' | 'grouped-subordinat
  * a grouped subordinate; anything else with an `/IRT` is a reply (the
  * engine has already normalized a missing `/RT` to `'reply'`).
  */
-export function classifyRelation(
-  a: Pick<AnnotationBase, 'inReplyTo' | 'replyType'>,
-): AnnotationRelationKind {
-  if (!a.inReplyTo) return 'top-level';
-  return a.replyType === 'group' ? 'grouped-subordinate' : 'reply';
+export function classifyRelation(a: Pick<AnnotationBase, 'reply'>): AnnotationRelationKind {
+  if (!a.reply) return 'top-level';
+  return a.reply.type === 'group' ? 'grouped-subordinate' : 'reply';
 }
 
 /**
@@ -46,16 +45,16 @@ export function classifyRelation(
  * point at it.
  *
  *   - `groupedParts` (`/RT /Group`) are visual/helper parts of one logical
- *     annotation — a sidebar should fold them into the primary, NOT list
+ *     annotation — a sidebar should fold them into the primary, not list
  *     them as separate comments. Group-level fields (Contents, T, Subj, …)
  *     come from the primary; the subordinate's copies are ignored.
  *   - `replies` (`/RT /R`) are real comment-thread entries shown threaded
  *     under the primary.
  *
- * A primary may legitimately have BOTH (e.g. a StrikeOut with a Caret
- * group part and a Text reply).
+ * A primary may legitimately have both (e.g. a replace-text Caret with its
+ * StrikeOut group part and a Text reply).
  */
-export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
+export interface AnnotationThread<T extends Annotation = Annotation> {
   primary: T;
   /** `/RT /Group` children — merge into the primary, don't list separately. */
   groupedParts: T[];
@@ -64,8 +63,8 @@ export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
 }
 
 /**
- * Compose a flat annotation list (one page, or a whole document via
- * `listRawAll()` flattened) into {@link AnnotationThread}s in primary
+ * Compose a flat annotation list (one page, or a whole document from
+ * `annotations.list()`) into {@link AnnotationThread}s in primary
  * order.
  *
  * Rules (ISO 32000 §12.5.6.2 + the spec's UI rule):
@@ -81,21 +80,13 @@ export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
  * sidebar of "most annotations, not widgets/popups" should pre-filter the
  * input; this helper is intentionally unopinionated about eligibility.
  */
-export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationThread[] {
-  const byKey = new Map<string, AnnotationDTO>();
-  for (const a of annotations) {
-    byKey.set(annotationKey(a.ref), a);
-    // Index under /NM too, so a child that points at the parent by name
-    // still resolves when the parent's own ref is objectNumber-form.
-    if (a.nm && a.nm.length > 0) {
-      byKey.set(`nm:${a.ref.page.pageObjectNumber}:${a.nm}`, a);
-    }
-  }
+export function buildThreads(annotations: readonly Annotation[]): AnnotationThread[] {
+  const byKey = new Map(annotations.map((a) => [annotationKey(a.ref), a]));
 
   const threads: AnnotationThread[] = [];
   const threadByPrimaryKey = new Map<string, AnnotationThread>();
 
-  const primaryThread = (primary: AnnotationDTO): AnnotationThread => {
+  const primaryThread = (primary: Annotation): AnnotationThread => {
     const key = annotationKey(primary.ref);
     let thread = threadByPrimaryKey.get(key);
     if (!thread) {
@@ -108,14 +99,14 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
 
   // Pass 1: every top-level annotation seeds a thread, preserving order.
   for (const a of annotations) {
-    if (!a.inReplyTo) primaryThread(a);
+    if (!a.reply) primaryThread(a);
   }
 
   // Pass 2: attach children to their primary; orphans become primaries.
   for (const a of annotations) {
-    if (!a.inReplyTo) continue;
-    const parent = byKey.get(annotationKey(a.inReplyTo));
-    if (!parent || parent.inReplyTo) {
+    if (!a.reply) continue;
+    const parent = byKey.get(annotationKey(a.reply.to));
+    if (!parent || parent.reply) {
       // Parent missing from the set, or itself a child (one-level-deep
       // limitation): surface the annotation as its own primary so it is
       // never silently dropped.
@@ -123,9 +114,63 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
       continue;
     }
     const thread = primaryThread(parent);
-    if (a.replyType === 'group') thread.groupedParts.push(a);
+    if (a.reply.type === 'group') thread.groupedParts.push(a);
     else thread.replies.push(a);
   }
 
   return threads;
+}
+
+/**
+ * An annotation and everything deleted with it: every annotation whose
+ * `reply.to` leads to it (replies, their replies, grouped parts, review
+ * states) and every popup of these. A reply left behind would point at
+ * nothing and show as a note of its own in other viewers; a popup left
+ * behind would show nobody's text. Children come before their parent and a
+ * popup before the annotation it shows, so the annotation itself is last.
+ * Empty when `ref` names nothing in `annotations`.
+ */
+export function deletedWith<A extends Annotation | Annotation<PdfCoordinates>>(
+  annotations: readonly A[],
+  ref: AnnotationRef,
+): A[] {
+  const byKey = new Map(
+    annotations.map((annotation) => [annotationKey(annotation.ref), annotation]),
+  );
+  const target = byKey.get(annotationKey(ref));
+  if (!target) return [];
+
+  const children = new Map<A, A[]>();
+  const popups = new Map<A, A[]>();
+  const add = (map: Map<A, A[]>, key: A, value: A) =>
+    map.set(key, [...(map.get(key) ?? []), value]);
+  for (const annotation of annotations) {
+    const parent = annotation.reply ? byKey.get(annotationKey(annotation.reply.to)) : undefined;
+    if (parent && parent !== annotation) add(children, parent, annotation);
+    // A popup belongs to the annotation it shows, by its `/Parent` or by
+    // that annotation's `/Popup`.
+    const shows =
+      annotation.subtype === 'popup' && annotation.parent
+        ? byKey.get(annotationKey(annotation.parent))
+        : undefined;
+    if (shows && shows !== annotation) add(popups, shows, annotation);
+    const own = annotation.popup ? byKey.get(annotationKey(annotation.popup)) : undefined;
+    if (own && own !== annotation && own.subtype === 'popup') add(popups, annotation, own);
+  }
+
+  const members: A[] = [];
+  const seen = new Set<A>();
+  const visit = (annotation: A): void => {
+    if (seen.has(annotation)) return;
+    seen.add(annotation);
+    for (const child of children.get(annotation) ?? []) visit(child);
+    for (const popup of popups.get(annotation) ?? []) {
+      if (seen.has(popup)) continue;
+      seen.add(popup);
+      members.push(popup);
+    }
+    members.push(annotation);
+  };
+  visit(target);
+  return members;
 }

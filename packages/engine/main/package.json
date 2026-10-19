@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine",
-  "version": "3.0.0-next.14",
+  "version": "3.0.0-next.15",
   "private": false,
   "description": "Engine v3 local implementation: the EmbedPDF Runtime (our PDFium fork) as WASM inside a Web Worker (or inline for Node), driven by an O(log n) abort-aware WorkerQueue. Speaks the same Engine interface as the cloud engine.",
   "type": "module",
@@ -24,6 +24,16 @@
     "./worker-source": {
       "types": "./workers/embedpdf-worker.source.d.ts",
       "default": "./workers/embedpdf-worker.source.js"
+    },
+    "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
+    "./workers/encoder-worker.js": "./workers/encoder-worker.js",
+    "./workers/inline-transport.node.js": "./workers/inline-transport.node.js"
+  },
+  "imports": {
+    "#inline-transport": {
+      "node": "./workers/inline-transport.node.js",
+      "browser": "./workers/inline-transport.js",
+      "default": "./workers/inline-transport.node.js"
     }
   },
   "scripts": {
@@ -32,7 +42,8 @@
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "test:high-heap": "vitest run --config vitest.high-heap.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json"
   },
   "files": [
     "dist",
@@ -67,6 +78,7 @@
   },
   "devDependencies": {
     "@embedpdf/tooling-build": "workspace:*",
+    "@swc/core": "1.16.2",
     "esbuild": "^0.28.1",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
@@ -89,15 +101,24 @@
       "./worker-source": {
         "types": "./workers/embedpdf-worker.source.d.ts",
         "default": "./workers/embedpdf-worker.source.js"
-      }
+      },
+      "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
+      "./workers/encoder-worker.js": "./workers/encoder-worker.js",
+      "./workers/inline-transport.node.js": "./workers/inline-transport.node.js"
     }
   },
   "epdf": {
     "rawExports": [
       "./worker-entry",
-      "./worker-source"
+      "./worker-source",
+      "./workers/embedpdf-worker.js",
+      "./workers/encoder-worker.js",
+      "./workers/inline-transport.node.js"
     ],
     "devExports": "development",
+    "neverBundle": [
+      "#inline-transport"
+    ],
     "conditions": {
       ".": {
         "es2020": "./dist/portable.js"

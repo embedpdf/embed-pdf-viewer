@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { rectContains, rectFromCorners, rectsOverlap } from '../src/index';
-import { edgesOfQuad, edgesOverlap } from '../src/page-space';
+import { containedRect, rectContains, rectFromCorners, rectsOverlap } from '../src/index';
 
 describe('rect algebra (y-down rects)', () => {
   it('spans two corners in any order', () => {
@@ -14,27 +13,30 @@ describe('rect algebra (y-down rects)', () => {
   });
 
   it('contains points on its edges and rejects those outside', () => {
-    const r = { x: 0, y: 0, width: 10, height: 5 };
-    expect(rectContains(r, { x: 10, y: 5 })).toBe(true);
-    expect(rectContains(r, { x: 10.1, y: 5 })).toBe(false);
+    const rect = { x: 0, y: 0, width: 10, height: 5 };
+    expect(rectContains(rect, { x: 10, y: 5 })).toBe(true);
+    expect(rectContains(rect, { x: 10.1, y: 5 })).toBe(false);
   });
 
   it('overlaps only with positive area', () => {
-    const r = { x: 0, y: 0, width: 10, height: 10 };
-    expect(rectsOverlap(r, { x: 9, y: 9, width: 5, height: 5 })).toBe(true);
-    expect(rectsOverlap(r, { x: 10, y: 0, width: 5, height: 5 })).toBe(false); // abutting
-  });
-});
-
-describe('PDF edges (y-up)', () => {
-  it('overlap only with positive area — the collateral rule', () => {
-    const a = { left: 0, bottom: 0, right: 10, top: 10 };
-    expect(edgesOverlap(a, { left: 9, bottom: 9, right: 20, top: 20 })).toBe(true);
-    expect(edgesOverlap(a, { left: 10, bottom: 0, right: 20, top: 10 })).toBe(false);
+    const rect = { x: 0, y: 0, width: 10, height: 10 };
+    expect(rectsOverlap(rect, { x: 9, y: 9, width: 5, height: 5 })).toBe(true);
+    expect(rectsOverlap(rect, { x: 10, y: 0, width: 5, height: 5 })).toBe(false); // abutting
   });
 
-  it('encloses a quad in its axis-aligned edges', () => {
-    const quad = { p1: { x: 1, y: 8 }, p2: { x: 9, y: 9 }, p3: { x: 2, y: 1 }, p4: { x: 8, y: 2 } };
-    expect(edgesOfQuad(quad)).toEqual({ left: 1, right: 9, bottom: 1, top: 9 });
+  it('contains a shape at its proportions, centred, as CSS object-fit does', () => {
+    const box = { x: 10, y: 20, width: 100, height: 40 };
+    // Wider box: full height, centred across.
+    expect(containedRect({ width: 2, height: 2 }, box)).toEqual({
+      x: 40,
+      y: 20,
+      width: 40,
+      height: 40,
+    });
+    // Taller box: full width, centred down.
+    expect(
+      containedRect({ width: 50, height: 10 }, { x: 0, y: 0, width: 100, height: 100 }),
+    ).toEqual({ x: 0, y: 40, width: 100, height: 20 });
+    expect(containedRect({ width: 0, height: 5 }, box)).toBe(box);
   });
 });

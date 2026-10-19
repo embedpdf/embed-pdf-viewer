@@ -1,0 +1,73 @@
+{
+  "name": "@cloudpdf/viewer-vue",
+  "version": "3.0.0-next.15",
+  "private": false,
+  "description": "The full viewer as a Vue component with the CloudPDF engine as its default: the same <PDFViewer> as @embedpdf/viewer-vue, rendering on CloudPDF SaaS or your own @cloudpdf/server over HTTPS, the local engine loaded only when stamps need it.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/viewer/vue"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "viewer",
+    "vue",
+    "cloud"
+  ],
+  "dependencies": {
+    "@cloudpdf/viewer": "workspace:*",
+    "@embedpdf/viewer-vue": "workspace:*"
+  },
+  "peerDependencies": {
+    "vue": ">=3.4"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "rimraf": "^5.0.0",
+    "typescript": "~5.8.3",
+    "vue": "^3.5.13",
+    "vue-tsc": "^3.2.4"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "epdf": {
+    "devExports": "development"
+  }
+}

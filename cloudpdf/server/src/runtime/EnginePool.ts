@@ -48,7 +48,7 @@ export interface EnginePool {
   /**
    * Monotonic engine generation: bumps on every engine (re)spawn. The
    * The write pipeline captures it at write-alignment time and refuses
-   * to bless a session created under a LATER generation (see
+   * to bless a session created under a later generation (see
    * `DocumentService.advanceLayerSession`). Inline pool: constant 0 —
    * the fence is vacuously satisfied and pre-host semantics are
    * untouched.
@@ -74,11 +74,11 @@ export interface EnginePool {
 }
 
 /**
- * One-shot `DocNotOpen` recovery for READ dispatches. A read that PARKED
+ * One-shot `DocNotOpen` recovery for read dispatches. A read that parked
  * across an engine respawn (crash or planned recycle) dispatches into a
  * successor that no longer holds the document — the pre-dispatch ensure
  * ran against the old world. Re-ensure (the restart hook already cleared
- * the service caches, so this genuinely reopens) and retry ONCE.
+ * the service caches, so this genuinely reopens) and retry once.
  * Mutations never use this: their retry path uses generation fencing and rebase.
  */
 export async function runReadWithReopen(

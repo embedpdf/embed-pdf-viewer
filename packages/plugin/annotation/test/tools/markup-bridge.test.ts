@@ -1,26 +1,23 @@
-import { textQuadFromRect } from '@embedpdf/core-geometry';
-import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
+import { quadFromRect } from '@embedpdf/core-geometry';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { InteractionHostCapability } from '@embedpdf/plugin-interaction/contract/host';
 import type { SelectionHostCapability } from '@embedpdf/plugin-selection/contract/host';
 import { describe, expect, it, vi } from 'vitest';
 
-import { wireMarkup } from '../../src/tools/markup-bridge';
 import type { AnnotationHostCapability } from '../../src/host-contract';
+import { wireMarkup } from '../../src/tools/markup-bridge';
 
 describe('selection authoring bridge', () => {
-  it('previews and commits Replace Text from its declarative tool recipe', () => {
-    const seg = (r: { x: number; y: number; width: number; height: number }) => ({
-      quad: textQuadFromRect(r),
-      rect: r,
-      advance: 1 as const,
-    });
-    const page1 = [seg({ x: 10, y: 20, width: 50, height: 12 })];
-    const page2 = [
-      seg({ x: 10, y: 20, width: 80, height: 12 }),
-      seg({ x: 10, y: 34, width: 30, height: 12 }),
+  /** The bridge wired to fakes; its listeners, to fire by hand. */
+  const wired = (options: { gestureActive?: boolean } = {}) => {
+    const listeners = { changed: () => {}, committed: () => {}, toolChanged: () => {} };
+    const segments = [
+      {
+        quad: quadFromRect({ x: 10, y: 20, width: 50, height: 12 }),
+        rect: { x: 10, y: 20, width: 50, height: 12 },
+        advance: 1 as const,
+      },
     ];
-    let onChange: () => void = () => {};
-    let onCommit: () => void = () => {};
     const annotation = {
       getResolvedTool: () => ({
         id: 'replace-text',
@@ -30,70 +27,59 @@ describe('selection authoring bridge', () => {
       }),
       previewMarkup: vi.fn(),
       clearMarkupPreview: vi.fn(),
-      createReplaceText: vi.fn(),
+      applyToolToSelection: vi.fn(() => true),
     } as unknown as AnnotationHostCapability;
     const selection = {
       hasSelection: () => true,
-      getSnapshot: () => ({
-        pages: [
-          { page: toPageRef(1), segments: page1, rects: page1.map((s) => s.rect) },
-          { page: toPageRef(2), segments: page2, rects: page2.map((s) => s.rect) },
-        ],
-        start: {
-          page: toPageRef(1),
-          glyphQuad: page1[0].quad,
-          advance: 1 as const,
-          rect: page1[0].rect,
-        },
-        end: {
-          page: toPageRef(2),
-          glyphQuad: page2[1].quad,
-          advance: 1 as const,
-          rect: page2[1].rect,
-        },
-        direction: 'forward' as const,
-      }),
-      listSegments: (page: PageRef) => (page.pageObjectNumber === 1 ? page1 : page2),
+      isSelecting: () => options.gestureActive ?? false,
+      getSnapshot: () => ({ pages: [{ page: toPageRef(1), segments }] }),
       setHighlightVisible: vi.fn(),
-      clear: vi.fn(),
-      onChanged: (cb: () => void) => {
-        onChange = cb;
+      onChanged: (callback: () => void) => {
+        listeners.changed = callback;
         return () => {};
       },
-      onCommitted: (cb: () => void) => {
-        onCommit = cb;
+      onCommitted: (callback: () => void) => {
+        listeners.committed = callback;
         return () => {};
       },
     } as unknown as SelectionHostCapability;
     const interaction = {
       getActiveToolId: () => 'replace-text',
-      onToolChanged: vi.fn(() => () => {}),
+      onToolChanged: (callback: () => void) => {
+        listeners.toolChanged = callback;
+        return () => {};
+      },
     } as unknown as InteractionHostCapability;
-
     wireMarkup(annotation, selection, interaction);
-    onChange();
+    return { annotation, selection, listeners, segments };
+  };
+
+  it('previews the selection as the text tool’s markup while it is dragged', () => {
+    const { annotation, selection, listeners, segments } = wired();
+    listeners.changed();
     expect(selection.setHighlightVisible).toHaveBeenCalledWith(false);
     expect(annotation.previewMarkup).toHaveBeenCalledWith(
       'strikeout',
-      { 1: page1.map((s) => s.quad), 2: page2.map((s) => s.quad) },
+      { 1: segments.map((segment) => segment.quad) },
       'replace-text',
     );
+  });
 
-    onCommit();
-    expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
-      1,
-      toPageRef(1),
-      page1.map((s) => s.quad),
-      { glyphQuad: page1[0].quad, advance: 1 },
-      'replace-text',
-    );
-    expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
-      2,
-      toPageRef(2),
-      page2.map((s) => s.quad),
-      { glyphQuad: page2[1].quad, advance: 1 },
-      'replace-text',
-    );
-    expect(selection.clear).toHaveBeenCalledOnce();
+  it('a selection committed with a text tool active becomes its markup', () => {
+    const { annotation, listeners } = wired();
+    listeners.committed();
+    expect(annotation.applyToolToSelection).toHaveBeenCalledWith('replace-text');
+  });
+
+  it('picking a text tool with text selected makes its markup at once', () => {
+    const { annotation, listeners } = wired();
+    listeners.toolChanged();
+    expect(annotation.applyToolToSelection).toHaveBeenCalledWith('replace-text');
+  });
+
+  it('picking a text tool mid-drag waits: the drag’s end makes it', () => {
+    const { annotation, listeners } = wired({ gestureActive: true });
+    listeners.toolChanged();
+    expect(annotation.applyToolToSelection).not.toHaveBeenCalled();
   });
 });

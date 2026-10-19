@@ -20,7 +20,7 @@ export class CloudDocumentActionsService implements DocumentActionsService {
     private readonly manifest: ManifestAccessor,
   ) {}
 
-  read(): AbortablePromise<DocumentActionsSnapshot> {
+  get(): AbortablePromise<DocumentActionsSnapshot> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),

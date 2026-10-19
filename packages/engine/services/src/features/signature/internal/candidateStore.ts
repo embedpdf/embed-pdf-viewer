@@ -118,7 +118,7 @@ function writeContentsInHeap(
 }
 
 /**
- * Hex-encode `cms` into the /Contents hole of a candidate FILE, in place.
+ * Hex-encode `cms` into the /Contents hole of a candidate file, in place.
  * Only the hole (`<`, the hex digits, `>`) is read and written back; the
  * delimiters are checked so a wrong offset patches nothing.
  */

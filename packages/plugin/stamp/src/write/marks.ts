@@ -4,67 +4,51 @@
  * selection" exports), a page of a PDF as a single-page PDF, and the bytes
  * an asset is made from.
  */
-import { EngineError, EngineErrorCode, resolveBinarySource } from '@embedpdf/engine-core/runtime';
+import { resolveBinarySource } from '@embedpdf/engine-core/runtime';
 
 import { blankLibraryPdf } from '../blank-library';
 import type { AddAssetInput, MarkSource } from '../contract';
 import type { StampServices } from '../services';
+import { stampError } from '../services/errors';
 
-/** `#rrggbb` → the engine's sRGB triplet. */
-const hexColor = (hex: string): { r: number; g: number; b: number } => {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m)
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `[stamp] mark color must be #rrggbb, got '${hex}'`,
-    );
-  const n = parseInt(m[1], 16);
-  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+/** A mark's `#rrggbb` color, checked before anything is drawn. */
+const hexColor = (hex: string): string => {
+  const color = hex.trim();
+  if (!/^#[0-9a-f]{6}$/i.test(color)) {
+    throw stampError('invalid-input', `mark color must be #rrggbb, got '${hex}'`);
+  }
+  return color;
 };
 
 /** An exact ArrayBuffer over a view (the engine's binary idiom). */
 const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
-  const out = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(out).set(bytes);
-  return out;
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 };
 
-/** The rect an ink mark occupies, padded by its stroke. */
-const inkBounds = (
+/** An ink mark's strokes, as the engine takes them; a mark needs at least one point. */
+const inkListOf = (
   strokes: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>,
-  strokeWidth: number,
-): { left: number; bottom: number; right: number; top: number } => {
-  let left = Infinity;
-  let bottom = Infinity;
-  let right = -Infinity;
-  let top = -Infinity;
-  for (const stroke of strokes) {
-    for (const { x, y } of stroke) {
-      if (x < left) left = x;
-      if (x > right) right = x;
-      if (y < bottom) bottom = y;
-      if (y > top) top = y;
-    }
-  }
-  if (!Number.isFinite(left)) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      '[stamp] an ink mark needs at least one point',
-    );
-  }
-  const pad = strokeWidth;
-  return { left: left - pad, bottom: bottom - pad, right: right + pad, top: top + pad };
+): { x: number; y: number }[][] => {
+  if (!strokes.some((stroke) => stroke.length > 0))
+    throw stampError('invalid-input', 'an ink mark needs at least one point');
+  return strokes.map((stroke) => stroke.map(({ x, y }) => ({ x, y })));
 };
 
-/** A generous box for typed text; the export crops to the glyphs. */
+/**
+ * A generous box for typed text. The export keeps the whole box, so the
+ * text is centered in it: the mark then sits in the middle of a preview
+ * or a signature field.
+ */
 const textBounds = (
   text: string,
   fontSize: number,
-): { left: number; bottom: number; right: number; top: number } => ({
-  left: 0,
-  bottom: 0,
-  right: Math.max(1, text.length) * fontSize * 0.75 + fontSize,
-  top: fontSize * 1.6,
+): { x: number; y: number; width: number; height: number } => ({
+  x: 0,
+  y: 0,
+  width: Math.max(1, text.length) * fontSize * 0.75 + fontSize,
+  height: fontSize * 1.6,
 });
 
 export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>) {
@@ -83,21 +67,14 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
     try {
       const layout = await doc.pages.list();
       const scratch = layout.pages[0];
-      if (!scratch) throw new EngineError(EngineErrorCode.Unknown, '[stamp] no scratch page');
+      if (!scratch) throw stampError('operation-failed', 'the scratch document has no page');
       const page = doc.page(scratch.ref);
-      if (!page.annotations.exportAppearance) {
-        throw new EngineError(
-          EngineErrorCode.NotImplemented,
-          '[stamp] authoring a mark needs an asset engine that can export annotation appearances',
-        );
-      }
       const color = hexColor(mark.color ?? '#1d2b53');
       const created =
         mark.kind === 'ink'
           ? await page.annotations.create({
               subtype: 'ink',
-              inkList: mark.strokes.map((stroke) => stroke.map(({ x, y }) => ({ x, y }))),
-              rect: inkBounds(mark.strokes, mark.strokeWidth ?? 2),
+              inkList: inkListOf(mark.strokes),
               color,
               strokeWidth: mark.strokeWidth ?? 2,
             })
@@ -107,12 +84,13 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
               contents: mark.text,
               fontFamily: mark.fontFamily,
               fontSize: mark.fontSize ?? 36,
-              textAlign: 'left',
-              rect: textBounds(mark.text, mark.fontSize ?? 36),
+              textAlign: 'center',
+              verticalAlign: 'middle',
+              box: textBounds(mark.text, mark.fontSize ?? 36),
               fontColor: color,
               strokeWidth: 0,
             });
-      return new Uint8Array(await page.annotations.exportAppearance([created.created.ref]));
+      return new Uint8Array(await page.annotations.exportAppearance([created.annotation.ref]));
     } finally {
       await doc.close();
     }
@@ -125,9 +103,9 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
       const layout = await doc.pages.list();
       const page = layout.pages[pageIndex];
       if (!page) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `[stamp] the PDF has no page ${pageIndex} (${layout.pageCount} pages)`,
+        throw stampError(
+          'invalid-input',
+          `the PDF has no page ${pageIndex} (${layout.pageCount} pages)`,
         );
       }
       return await doc.pages.extract([page.ref]);
@@ -141,10 +119,7 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
     input: AddAssetInput,
   ): Promise<{ bytes: ArrayBuffer; mimeType?: string }> => {
     if ((input.source === undefined) === (input.mark === undefined)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        '[stamp] addAsset takes exactly one of `source` / `mark`',
-      );
+      throw stampError('invalid-input', 'createAsset takes exactly one of `source` / `mark`');
     }
     if (input.source !== undefined) return resolveBinarySource(input.source);
     const mark = input.mark!;

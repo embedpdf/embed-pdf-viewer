@@ -1,8 +1,8 @@
 import type { DocumentManifest, LayerScopePlane } from '@embedpdf/engine-core/wire';
 
 /**
- * Plane-scope resolution — THE one rule every cloud service uses to pick a
- * path family: a read resolves at the DOC-LEVEL (shared base) path iff EVERY
+ * Plane-scope resolution — the one rule every cloud service uses to pick a
+ * path family: a read resolves at the doc-level (shared base) path iff every
  * plane it depends on is inherited (`'base'`) by this layer. One owned plane
  * → the layer-scoped path.
  *

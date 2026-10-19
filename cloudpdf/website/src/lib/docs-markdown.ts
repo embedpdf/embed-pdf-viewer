@@ -1,4 +1,5 @@
 import {
+  releasedMarkdownSource,
   renderDocsMarkdownWith,
   resolveDocsTreeWith,
   type AstNode,
@@ -14,9 +15,11 @@ import {
   docsIntegrationHref,
   fanoutProductFromPath,
   isDocsIntegration,
-  isHeadlessIntegration,
 } from './docs-integrations';
+import { reactVersionHref, type DocsRelease } from './docs-release';
 import { collectSampleFiles, readDocsCodeFile } from './docs-samples';
+
+const SITE_ORIGIN = 'https://www.cloudpdf.com';
 
 /**
  * CloudPDF's binding of the kit Markdown projection. The `.md` route passes
@@ -25,14 +28,14 @@ import { collectSampleFiles, readDocsCodeFile } from './docs-samples';
  * (API reference, engine, server) carry no integration and no variant line.
  */
 const site: DocsMarkdownSite = {
-  siteOrigin: 'https://www.cloudpdf.com',
+  siteOrigin: SITE_ORIGIN,
   engine: DOCS_SITE.engine,
   resolveExampleFiles: (name, integration) =>
     integration && isDocsIntegration(integration)
       ? collectSampleFiles(name)[integration]
       : undefined,
   readCodeFile: (codePath) => readDocsCodeFile(codePath),
-  isFramework: (value) => isHeadlessIntegration(value),
+  isFramework: (value) => isDocsIntegration(value),
   variantLabel: (integration) =>
     isDocsIntegration(integration) ? DOCS_INTEGRATION_LABELS[integration] : integration,
   resolveContentHref: (url, integration) =>
@@ -40,10 +43,27 @@ const site: DocsMarkdownSite = {
   projectComponent: projectCloudPdfComponent,
 };
 
-export function renderDocsMarkdown(options: Omit<RenderDocsMarkdownOptions, 'variantKey'>) {
+/**
+ * The route's Markdown: what its page shows, in full or held back by the publish gate
+ * (`release`; without it, in full).
+ */
+export function renderDocsMarkdown({
+  release,
+  ...options
+}: Omit<RenderDocsMarkdownOptions, 'variantKey'> & { release?: DocsRelease }) {
   const product = fanoutProductFromPath(options.canonicalPath);
+  const react = release && reactVersionHref(options.canonicalPath, release);
   return renderDocsMarkdownWith(site, {
     ...options,
+    sourceCode: release
+      ? releasedMarkdownSource({
+          sourceCode: options.sourceCode,
+          title: typeof options.metadata?.title === 'string' ? options.metadata.title : undefined,
+          framework: isDocsIntegration(options.integration) ? options.integration : undefined,
+          release,
+          reactUrl: react ? `${SITE_ORIGIN}${react}` : null,
+        })
+      : options.sourceCode,
     variantKey: product === 'headless' ? 'framework' : 'integration',
   });
 }

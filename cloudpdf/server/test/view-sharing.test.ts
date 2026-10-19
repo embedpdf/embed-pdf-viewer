@@ -23,9 +23,9 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
  * Plane-scoped view sharing. The rule under test: a layer is a set of
- * per-plane DELTAS over the immutable base; every read resolves at the
- * doc-level (shared) URL iff EVERY plane it depends on is inherited, executes
- * on the BASE worker session while it does, and each mutation kind flips
+ * per-plane deltas over the immutable base; every read resolves at the
+ * doc-level (shared) URL iff every plane it depends on is inherited, executes
+ * on the base worker session while it does, and each mutation kind flips
  * exactly the planes it owns. The manifest advertises `scopes`; the origin
  * guards are the truth; the `/v1/access` grant is the TTL-bounded edge
  * optimization.
@@ -37,17 +37,22 @@ const SECRET = 'view-sharing-secret';
 /** Canonical lattice token: durable read-through → countable single render. */
 const W320_TOKEN =
   'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
-/** The annotated twin — its own path family (`/render/annotated/…`). */
-const W320_ANNOTATED_TOKEN =
+/** The picture with annotations: its own path (`/render/annotations/…`), its own pins. */
+const W320_ANNOTATIONS_TOKEN =
   'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
+/** The picture with form fields (`/render/fields/…`). */
+const W320_FIELDS_TOKEN =
+  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320,widgetVersion=1';
 
 const ALL_BASE = {
   content: 'base',
   annotations: 'base',
+  forms: 'base',
   layout: 'base',
   attachments: 'base',
   metadata: 'base',
   actions: 'base',
+  outline: 'base',
 };
 
 interface Fixture {
@@ -99,6 +104,7 @@ describe('plane-scoped view sharing', () => {
       `/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
       `/v1/docs/${docId}/actions@actionsVersion=1`,
       `/v1/docs/${docId}/metadata@metadataVersion=1`,
+      `/v1/docs/${docId}/metadata/custom@metadataVersion=1`,
     ];
     for (const path of sharedReads) {
       const a = await fetch(`${fx.baseUrl}${path}`, {
@@ -111,13 +117,17 @@ describe('plane-scoped view sharing', () => {
       expect(b.status, path).toBe(200);
       const bytesA = Buffer.from(await a.arrayBuffer());
       const bytesB = Buffer.from(await b.arrayBuffer());
-      // Identical views → identical bytes at ONE URL: the CDN cache line.
+      // Identical views → identical bytes at one URL: the CDN cache line.
       expect(bytesA.equals(bytesB), path).toBe(true);
     }
 
-    // The annotated render family shares too — a base's own annotations are
-    // visible through every pristine layer (content + annotations planes).
-    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${W320_ANNOTATED_TOKEN}`;
+    // The pictures that draw annotations or fields share too — a base's own
+    // annotations and form are visible through every pristine layer.
+    const fields = `${fx.baseUrl}/v1/docs/${docId}/render/fields/pages/obj:1/data@${W320_FIELDS_TOKEN}`;
+    expect(
+      (await fetch(fields, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
+    ).toBe(200);
+    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotations/pages/obj:1/data@${W320_ANNOTATIONS_TOKEN}`;
     expect(
       (await fetch(annotated, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
     ).toBe(200);
@@ -126,11 +136,11 @@ describe('plane-scoped view sharing', () => {
     ).toBe(200);
 
     // The key sharing property: 1,000 pristine visitors are
-    // this test's two — ZERO layer worker sessions were ever created, and
+    // this test's two — zero layer worker sessions were ever created, and
     // the durable read-through collapsed the annotation-free render into a
-    // single worker render.
+    // single worker render. Each picture family is one more at most.
     expect(spy.count('open.layerFileBase')).toBe(0);
-    expect(spy.count('pages.render')).toBeLessThanOrEqual(2);
+    expect(spy.count('pages.render')).toBeLessThanOrEqual(3);
   });
 
   test('annotation writes own the annotations plane only', async () => {
@@ -153,7 +163,7 @@ describe('plane-scoped view sharing', () => {
 
     const manifest = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(manifest.scopes).toEqual({ ...ALL_BASE, annotations: 'layer' });
-    const page1 = manifest.pages.find((p) => p.state.page.pageObjectNumber === 1)!;
+    const page1 = manifest.pages.find((p) => p.page.objectNumber === 1)!;
     expect(page1.cache.annotationVersion).toBeGreaterThan(1);
     expect(page1.cache.contentVersion).toBe(1);
 
@@ -186,11 +196,14 @@ describe('plane-scoped view sharing', () => {
       ).status,
     ).toBe(200);
 
-    // The annotated render family depends on content+annotations → refused
-    // for alice, still shared for bob.
-    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${W320_ANNOTATED_TOKEN}`;
+    // The picture with annotations depends on content+annotations → refused
+    // for alice, still shared for bob. The picture with fields doesn't draw
+    // annotations, so alice still shares it.
+    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotations/pages/obj:1/data@${W320_ANNOTATIONS_TOKEN}`;
     expect((await fetch(annotated, { headers: aliceAuth })).status).toBe(404);
     expect((await fetch(annotated, { headers: bobAuth })).status).toBe(200);
+    const fields = `${fx.baseUrl}/v1/docs/${docId}/render/fields/pages/obj:1/data@${W320_FIELDS_TOKEN}`;
+    expect((await fetch(fields, { headers: aliceAuth })).status).toBe(200);
   });
 
   test('move/rotate own the LAYOUT plane only: normalized artifacts keep sharing', async () => {
@@ -205,7 +218,7 @@ describe('plane-scoped view sharing', () => {
     });
     expect(rotated.status).toBe(200);
 
-    // Rotation is presentation metadata over NORMALIZED artifacts (the
+    // Rotation is presentation metadata over normalized artifacts (the
     // SDK's own absorbPageStructure law): only the layout plane flips.
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(alice.scopes).toEqual({ ...ALL_BASE, layout: 'layer' });
@@ -247,6 +260,14 @@ describe('plane-scoped view sharing', () => {
         })
       ).status,
     ).toBe(200);
+
+    // The outline is read in page space (its targets name pages), so the base
+    // outline needs the layout plane too: refused for alice, shared for bob.
+    const outline = `${fx.baseUrl}/v1/docs/${docId}/outline@layoutVersion=1,outlineVersion=1`;
+    expect((await fetch(outline, { headers: aliceAuth })).status).toBe(404);
+    expect((await fetch(outline, { headers: auth(docToken(tenantId, docId, 'bob')) })).status).toBe(
+      200,
+    );
   });
 
   test('page delete removes content from the view: content+annotations+layout flip', async () => {
@@ -266,6 +287,7 @@ describe('plane-scoped view sharing', () => {
       ...ALL_BASE,
       content: 'layer',
       annotations: 'layer',
+      forms: 'layer',
       layout: 'layer',
     });
 
@@ -324,7 +346,9 @@ describe('plane-scoped view sharing', () => {
     expect(before.resourceIds).toEqual(
       expect.arrayContaining([
         'page-render',
-        'page-render-annotated',
+        'page-render-annotations',
+        'page-render-fields',
+        'page-render-all',
         'page-annotations',
         'page-text',
         'page-geometry',
@@ -344,9 +368,17 @@ describe('plane-scoped view sharing', () => {
     });
     const afterAnno = await accessFor('alice');
     expect(afterAnno.resourceIds).not.toEqual(expect.arrayContaining(['page-annotations']));
-    expect(afterAnno.resourceIds).not.toEqual(expect.arrayContaining(['page-render-annotated']));
+    for (const gone of ['page-render-annotations', 'page-render-all']) {
+      expect(afterAnno.resourceIds, gone).not.toEqual(expect.arrayContaining([gone]));
+    }
     expect(afterAnno.resourceIds).toEqual(
-      expect.arrayContaining(['page-render', 'page-text', 'attachments', 'layout']),
+      expect.arrayContaining([
+        'page-render',
+        'page-render-fields',
+        'page-text',
+        'attachments',
+        'layout',
+      ]),
     );
 
     // Page delete: the content trio + layout follow.
@@ -366,7 +398,7 @@ describe('plane-scoped view sharing', () => {
     // Bob's untouched layer keeps the full grant.
     const bob = await accessFor('bob');
     expect(bob.resourceIds).toEqual(
-      expect.arrayContaining(['page-render', 'page-render-annotated', 'page-annotations']),
+      expect.arrayContaining(['page-render', 'page-render-annotations', 'page-annotations']),
     );
   });
 
@@ -383,7 +415,7 @@ describe('plane-scoped view sharing', () => {
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
     const shared = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`;
 
-    // Locked: the shared read refuses until alice unlocks HER layer.
+    // Locked: the shared read refuses until alice unlocks her layer.
     const blocked = await fetch(shared, { headers: aliceAuth });
     expect(blocked.status, await blocked.clone().text()).toBe(422);
 
@@ -469,12 +501,12 @@ describe('attachments plane (independent axis)', () => {
       .execute();
 
     // The attachments plane flips (annotations flipped by the minting
-    // write); the CONTENT plane is untouched.
+    // write); the content plane is untouched.
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(alice.scopes).toEqual({ ...ALL_BASE, annotations: 'layer', attachments: 'layer' });
 
     // Origin: base attachments refused for alice, granted for bob; base
-    // CONTENT still fine for alice (the guards are per-plane).
+    // content still fine for alice (the guards are per-plane).
     const attUrl = `${fx.baseUrl}/v1/docs/${docId}/attachments@${ATT_TOKEN}`;
     expect(
       (await fetch(attUrl, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
@@ -499,6 +531,114 @@ describe('attachments plane (independent axis)', () => {
     expect(grant.resourceIds).toEqual(expect.arrayContaining(['page-render', 'layer-attachments']));
   });
 
+  test('a metadata write flips the metadata plane for both halves of the Info dict', async () => {
+    const tenantId = 'tenant-metaflip';
+    const docId = 'docmetaflip01';
+    await seedDocument(fx, tenantId, docId);
+
+    // Mint alice's layer row via an annotation write, then simulate a
+    // metadata write's version bump: standard fields and custom keys live in
+    // one Info dict, so either write moves the one metadataVersion pointer.
+    const created = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: {
+          ...auth(docToken(tenantId, docId, 'alice')),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(highlightDraft()),
+      },
+    );
+    expect(created.status).toBe(200);
+    await fx.db
+      .updateTable('layers')
+      .set({ metadata_version: 2 })
+      .where('doc_id', '=', docId)
+      .where('name', '=', 'alice')
+      .execute();
+
+    const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
+    expect(alice.scopes).toEqual({ ...ALL_BASE, annotations: 'layer', metadata: 'layer' });
+
+    // Origin: both base halves refused for alice, granted for bob.
+    for (const path of ['metadata', 'metadata/custom']) {
+      const url = `${fx.baseUrl}/v1/docs/${docId}/${path}@metadataVersion=1`;
+      const aliceRead = await fetch(url, { headers: auth(docToken(tenantId, docId, 'alice')) });
+      expect(aliceRead.status, path).toBe(404);
+      const bobRead = await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) });
+      expect(bobRead.status, path).toBe(200);
+    }
+
+    // Edge grant mirrors: the base pair withheld, the layer pair kept.
+    const res = await fetch(`${fx.baseUrl}/v1/access`, {
+      method: 'POST',
+      headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ docId, layerName: 'alice' }),
+    });
+    expect(res.status).toBe(200);
+    const grant = fx.coverageLog[fx.coverageLog.length - 1]!;
+    expect(grant.resourceIds).not.toEqual(expect.arrayContaining(['metadata']));
+    expect(grant.resourceIds).not.toEqual(expect.arrayContaining(['metadata-custom']));
+    expect(grant.resourceIds).toEqual(
+      expect.arrayContaining(['layer-metadata', 'layer-metadata-custom']),
+    );
+  });
+
+  test('an outline write flips ONLY the outline plane', async () => {
+    const tenantId = 'tenant-outlineflip';
+    const docId = 'docoutline001';
+    await seedDocument(fx, tenantId, docId);
+
+    // Mint alice's layer row via an annotation write, then simulate an
+    // outline change's version bump (the stub worker applies no changes).
+    const created = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: {
+          ...auth(docToken(tenantId, docId, 'alice')),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(highlightDraft()),
+      },
+    );
+    expect(created.status).toBe(200);
+    await fx.db
+      .updateTable('layers')
+      .set({ outline_version: 2 })
+      .where('doc_id', '=', docId)
+      .where('name', '=', 'alice')
+      .execute();
+
+    const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
+    expect(alice.scopes).toEqual({ ...ALL_BASE, annotations: 'layer', outline: 'layer' });
+
+    // Origin: base outline refused for alice, granted for bob; the layer
+    // path serves alice at her own pins.
+    const url = `${fx.baseUrl}/v1/docs/${docId}/outline@layoutVersion=1,outlineVersion=1`;
+    const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
+    expect((await fetch(url, { headers: aliceAuth })).status).toBe(404);
+    expect((await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) })).status).toBe(
+      200,
+    );
+    const layerUrl = `${fx.baseUrl}/v1/docs/${docId}/layers/alice/outline@layoutVersion=1,outlineVersion=2`;
+    const layerRead = await fetch(layerUrl, { headers: aliceAuth });
+    expect(layerRead.status).toBe(200);
+    expect(await layerRead.json()).toEqual({ items: [], incomplete: false });
+
+    // Edge grant mirrors: the base outline withheld, the layer outline kept.
+    const res = await fetch(`${fx.baseUrl}/v1/access`, {
+      method: 'POST',
+      headers: { ...aliceAuth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ docId, layerName: 'alice' }),
+    });
+    expect(res.status).toBe(200);
+    const grant = fx.coverageLog[fx.coverageLog.length - 1]!;
+    expect(grant.resourceIds).not.toEqual(expect.arrayContaining(['outline']));
+    expect(grant.resourceIds).toEqual(expect.arrayContaining(['layer-outline']));
+  });
+
   test('a CONTENT op leaves attachment sharing intact (cross-plane independence)', async () => {
     const tenantId = 'tenant-attkeep';
     const docId = 'docattkeep001';
@@ -514,7 +654,7 @@ describe('attachments plane (independent axis)', () => {
     expect(deleted.status).toBe(200);
 
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
-    // Content flipped, attachments did NOT — a redacted/edited layer still
+    // Content flipped, attachments did not — a redacted/edited layer still
     // shares the base attachments it never touched.
     expect(alice.scopes?.content).toBe('layer');
     expect(alice.scopes?.attachments).toBe('base');
@@ -676,7 +816,7 @@ async function seedDocument(
 interface WireManifest {
   scopes?: Record<string, string>;
   pages: Array<{
-    state: { page: { pageObjectNumber: number } };
+    state: { page: { objectNumber: number } };
     cache: { contentVersion: number; annotationVersion: number };
   }>;
 }
@@ -720,7 +860,12 @@ function highlightDraft(): unknown {
   return {
     subtype: 'highlight',
     quadPoints: [
-      { p1: { x: 0, y: 0 }, p2: { x: 10, y: 0 }, p3: { x: 0, y: 10 }, p4: { x: 10, y: 10 } },
+      {
+        upperLeft: { x: 0, y: 0 },
+        upperRight: { x: 10, y: 0 },
+        lowerLeft: { x: 0, y: 10 },
+        lowerRight: { x: 10, y: 10 },
+      },
     ],
   };
 }

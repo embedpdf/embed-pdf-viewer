@@ -1,13 +1,12 @@
 import { SecurityCheckIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { EpButton } from './button';
 import { DotGrid } from './dot-grid';
 import { Eyebrow } from './eyebrow';
-import { ArrowRightIcon, ExtLinkIcon, GitHubIcon } from './icons';
+import { ExtLinkIcon, GitHubIcon } from './icons';
 
 function NpmMark({ size = 52 }: { size?: number }) {
   return (
@@ -187,13 +186,15 @@ export function Trust() {
             <EpButton href="/docs" variant="primary" icon="arrow">
               Get Started
             </EpButton>
-            <Link
-              href="/docs"
+            <a
+              href="https://github.com/embedpdf/embed-pdf-viewer"
+              target="_blank"
+              rel="noopener noreferrer"
               className="font-display text-ep-blue hover:text-ep-blue700 inline-flex items-center gap-1.5 text-[15px] font-semibold transition-all duration-200 hover:gap-2.5"
             >
-              Read the docs
-              <ArrowRightIcon size={14} strokeWidth={2.4} />
-            </Link>
+              View on GitHub
+              <ExtLinkIcon size={13} strokeWidth={2.4} />
+            </a>
           </div>
         </header>
 

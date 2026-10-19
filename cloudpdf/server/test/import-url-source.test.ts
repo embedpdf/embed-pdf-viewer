@@ -2,11 +2,11 @@
  * UrlImportSource unit tests: the SSRF posture (scheme allowlist,
  * private-network vetting, redirect refusal), the open-then-read
  * length contract, and the sanitized-diagnostics rule (no query
- * strings anywhere — a presigned query string IS the credential).
+ * strings anywhere — a presigned query string is the credential).
  *
  * A local node:http server plays the source; those tests run with
  * `allowHttp` + `allowPrivateNetworks` (the dev/MinIO posture).
- * Default-policy tests assert rejection BEFORE any connection.
+ * Default-policy tests assert rejection before any connection.
  */
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -151,7 +151,7 @@ describe('UrlImportSource policy gates (no connection attempted)', () => {
   test('private literals and loopback hostnames are refused before connecting', async () => {
     const literal = new UrlImportSource({
       // Port 1 would be an instant connection error — a 'policy' code
-      // proves the vet fired BEFORE any connection was attempted.
+      // proves the vet fired before any connection was attempted.
       url: 'https://127.0.0.1:1/a.pdf',
       policy: defaultImportPolicy(),
     });

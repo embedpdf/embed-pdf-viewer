@@ -5,12 +5,9 @@ import type {
   PdfActionTree,
   PdfActionType,
   PdfActionWarning,
+  PdfDestination,
 } from '@embedpdf/engine-core/runtime';
-import {
-  decodeSubmitFormFlags,
-  EngineError,
-  EngineErrorCode,
-} from '@embedpdf/engine-core/runtime';
+import { decodeSubmitFormFlags, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
   type PdfFunctions,
@@ -75,7 +72,7 @@ export function isValidActionNodeId(raw: number): boolean {
 }
 
 /** Mutable aggregate budget shared by every action model in one read job.
- *  Payload budgets are RESERVED before the backing buffer is allocated. */
+ *  Payload budgets are reserved before the backing buffer is allocated. */
 export class ActionReadBudgetTracker {
   private models = 0;
   private nodes = 0;
@@ -96,13 +93,13 @@ export class ActionReadBudgetTracker {
     this.assertWithinBudget();
   }
 
-  /** Charge target entries BEFORE the target array is walked. */
+  /** Charge target entries before the target array is walked. */
   reserveTargets(count: number): void {
     this.targetEntries += count;
     this.assertWithinBudget();
   }
 
-  /** Charge payload text BEFORE the scratch buffer for it is allocated. */
+  /** Charge payload text before the scratch buffer for it is allocated. */
   reservePayloadBytes(length: number): void {
     this.payloadCodeUnits += length;
     this.assertWithinBudget();
@@ -153,7 +150,7 @@ export function readActionModel(
   docPtr: Ptr,
   modelPtr: Ptr,
   budget: ActionReadBudgetTracker,
-): PdfActionTree | null {
+): PdfActionTree<PdfDestination> | null {
   if (modelPtr === NULL_PTR) return null;
   try {
     const nodeCount = fn.EPDFAction_GetNodeCount(modelPtr);
@@ -168,7 +165,7 @@ export function readActionModel(
     const visiting = new Set<number>();
     let payloadDropped = false;
 
-    /** Probe the two-call length first and charge the budget BEFORE the
+    /** Probe the two-call length first and charge the budget before the
      *  scratch buffer for the value is allocated. */
     const readPayloadString = (call: (buf: Ptr, capacity: number) => number): string | null => {
       const length = call(NULL_PTR, 0);
@@ -208,9 +205,7 @@ export function readActionModel(
       return targets;
     };
 
-    const readResetFormState = (
-      nodeId: number,
-    ): { hasFields: boolean; exclude: boolean } | null =>
+    const readResetFormState = (nodeId: number): { hasFields: boolean; exclude: boolean } | null =>
       withScratchN(mem, [I32_BYTES, I32_BYTES], ([hasFieldsPtr, excludePtr]) => {
         if (!fn.EPDFAction_GetNodeResetForm(modelPtr, nodeId, hasFieldsPtr, excludePtr)) {
           return null;
@@ -232,7 +227,7 @@ export function readActionModel(
         };
       });
 
-    const readNode = (nodeId: number): PdfActionNode => {
+    const readNode = (nodeId: number): PdfActionNode<PdfDestination> => {
       if (visiting.has(nodeId)) {
         throw malformedActionModel('native action model contains a cycle', { nodeId });
       }
@@ -248,7 +243,7 @@ export function readActionModel(
         if (!Number.isInteger(nextCount) || nextCount < 0) {
           throw malformedActionModel('invalid action child count', { nodeId, nextCount });
         }
-        const next: PdfActionNode[] = [];
+        const next: PdfActionNode<PdfDestination>[] = [];
         for (let index = 0; index < nextCount; index++) {
           const childId = normalizeNodeId(
             fn.EPDFAction_GetNextAt(modelPtr, nodeId, index),
@@ -257,7 +252,7 @@ export function readActionModel(
           next.push(readNode(childId));
         }
 
-        const degraded = (): PdfActionNode => {
+        const degraded = (): PdfActionNode<PdfDestination> => {
           payloadDropped = true;
           return { type: 'unknown', subtype, next };
         };
@@ -328,12 +323,12 @@ export function readActionModel(
           case 'submit-form': {
             // Feature-detect: an older runtime payload (pin lag) exposes no
             // submit getters — the node stays payload-less recognized-inert,
-            // the pre-payload behavior, NOT a degraded unknown.
+            // the pre-payload behavior, not a degraded unknown.
             if (typeof fn.EPDFAction_GetNodeSubmitForm !== 'function') {
               return { type, subtype, next };
             }
             const state = readSubmitFormState(nodeId);
-            // The getter refuses when the REQUIRED /F did not resolve to a
+            // The getter refuses when the required /F did not resolve to a
             // URL: the native side withheld the payload — the atomic rule
             // degrades the whole node, never a half payload.
             if (state === null) return degraded();

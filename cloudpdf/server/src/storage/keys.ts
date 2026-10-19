@@ -1,4 +1,10 @@
+import type { PageRenderFamily } from '@embedpdf/engine-core/wire';
 import { createHash } from 'node:crypto';
+
+/** A picture family's part of a stored render's key: `pages`, `annotations/pages`, … */
+function familyPath(family: PageRenderFamily): string {
+  return family === 'pages' ? 'pages' : `${family}/pages`;
+}
 
 /**
  * Single source of truth for storage key construction.
@@ -17,7 +23,7 @@ import { createHash } from 'node:crypto';
  * directories. The 2-char shard prevents `ls <tenant>/docs/` from
  * blowing up at tens of millions of docs.
  *
- * `<cd>` is the first 2 hex chars of `sha256(docId)` — NEVER a slice of
+ * `<cd>` is the first 2 hex chars of `sha256(docId)` — never a slice of
  * the id itself. Sharding must not depend on id format: prefixed ids
  * (`doc_…`) have a constant head, and time-ordered ids (ULID/UUIDv7)
  * have a timestamp head — both collapse slice-sharding into one bucket.
@@ -62,9 +68,9 @@ export const StorageKeys = {
     return `${tenantId}/docs/${shard(docId)}/${docId}/signings/${signingId}.tail`;
   },
   /**
-   * Base-tier derived render: sha-addressed WITHIN the
+   * Base-tier derived render: sha-addressed within the
    * tenant (cross-tenant sha-sharing would leak document existence), the
-   * canonical render token IS the filename — the key is the request. The
+   * canonical render token is the filename — the key is the request. The
    * token charset ([A-Za-z0-9.=,-]) is object-key-safe on fs/S3/GCS/Azure.
    */
   derivedRenderBase(
@@ -72,19 +78,18 @@ export const StorageKeys = {
     baseSha: string,
     pageObjectNumber: number,
     token: string,
-    /** Render FAMILY (token/path law): annotatedness lives in the key path
-     *  like it lives in the URL path, never inside the token. The sha
-     *  subtree still covers both families, so per-sha GC sweeps stay one
-     *  prefix. */
-    annotated = false,
+    /** The picture family: in the key's path, as in the URL's, never inside
+     *  the token. The sha subtree still covers every family, so per-sha GC
+     *  sweeps stay one prefix. */
+    family: PageRenderFamily,
   ): string {
-    return `${tenantId}/derived/render/${baseSha}/${annotated ? 'annotated/' : ''}pages/${pageObjectNumber}/${token}.webp`;
+    return `${tenantId}/derived/render/${baseSha}/${familyPath(family)}/${pageObjectNumber}/${token}.webp`;
   },
   /**
-   * Layer-tier derived render: under the DOC prefix so the
+   * Layer-tier derived render: under the doc prefix so the
    * `documents.delete` prefix cascade reaps it for free. Version pins ride
-   * inside the token (contentVersion / annotationVersion); the render
-   * FAMILY rides the path, mirroring the URL grammar.
+   * inside the token (the family's pins); the family rides the path,
+   * mirroring the URL grammar.
    */
   derivedRenderLayer(
     tenantId: string,
@@ -92,16 +97,16 @@ export const StorageKeys = {
     layerName: string,
     pageObjectNumber: number,
     token: string,
-    annotated = false,
+    family: PageRenderFamily,
   ): string {
     return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(
       layerName,
-    )}/derived/render/${annotated ? 'annotated/' : ''}pages/${pageObjectNumber}/${token}.webp`;
+    )}/derived/render/${familyPath(family)}/${pageObjectNumber}/${token}.webp`;
   },
   /**
-   * Per-ATTEMPT layer artifact key: `v{version}-{attempt}.layer`.
+   * Per-attempt layer artifact key: `v{version}-{attempt}.layer`.
    *
-   * Mutations upload their artifact BEFORE the commit transaction decides
+   * Mutations upload their artifact before the commit transaction decides
    * whether they won the version CAS. Two replicas racing the same
    * `nextVersion` must therefore never share a key — the loser's upload
    * would overwrite the winner's committed bytes and the layer would fail
@@ -122,6 +127,23 @@ export const StorageKeys = {
     }
     const base = layerArtifactKey(tenantId, docId, layerName, version);
     return `${base.slice(0, -'.layer'.length)}-${attempt}.layer`;
+  },
+  /**
+   * What a change captured so it can be undone (one blob per change). Each
+   * attempt writes its own key: a request that loses its commit reruns with
+   * a fresh one, and a key no commit claims is deleted.
+   */
+  changeCapture(
+    tenantId: string,
+    docId: string,
+    layerName: string,
+    opId: string,
+    attempt: string,
+  ): string {
+    if (!/^[a-z0-9]{1,32}$/.test(attempt)) {
+      throw new Error(`changeCapture: bad attempt nonce "${attempt}"`);
+    }
+    return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(layerName)}/changes/${encodeURIComponent(opId)}-${attempt}.capture`;
   },
   /** @deprecated Use `layerArtifact()`. */
   layerPdf(tenantId: string, docId: string, layerName: string, version: number): string {

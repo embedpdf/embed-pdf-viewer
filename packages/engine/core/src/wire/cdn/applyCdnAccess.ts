@@ -4,11 +4,11 @@
  * effects to attach. Used by both:
  *   - the @cloudpdf/engine HttpClient (to actually route requests through
  *     the CDN edge when an /access response says it can)
- *   - the smoke/diagnostic inspector (to PREVIEW what the SDK would do
+ *   - the smoke/diagnostic inspector (to preview what the SDK would do
  *     for a given path, with no network)
  *
  * Keeping this in engine-core means cloud-side request routing and
- * server-side test fixtures use the SAME algorithm. If a regression
+ * server-side test fixtures use the same algorithm. If a regression
  * sneaks in, both ends break together.
  *
  * Selection rules
@@ -22,7 +22,7 @@
  *      origin — that's how scope narrowing works at the edge: the
  *      server only emits overrides for resources the caller's scope
  *      grants.
- *   3. Find the LONGEST-matching `signedPathPolicies` entry (its
+ *   3. Find the longest-matching `signedPathPolicies` entry (its
  *      `pathPrefix` is a prefix of the request path). Append its
  *      `queryParams`. No match falls back to `signedQueryParams` if
  *      the adapter emitted a global token.
@@ -62,7 +62,7 @@ export interface ApplyCdnAccessInput {
   readonly path: string;
   /** API server origin the SDK would normally hit, e.g. `https://api.example.com`. */
   readonly originUrl: string;
-  /** Doc id used to resolve resource path prefixes. */
+  /** Doc id that resource path prefixes resolve against. */
   readonly docId: string;
   /** Layer name for layer-scoped resources (defaults to `'default'`). */
   readonly layerName?: string;
@@ -178,8 +178,8 @@ export function applyCdnAccess(input: ApplyCdnAccessInput): ApplyCdnAccessResult
  * is a (longest) prefix of `path`. Returns null when no resource
  * matches — admin routes, /access, /warm fall into this bucket.
  *
- * Each cacheable resource has a DISTINCT prefix (paths v2 invariant),
- * so longest-match is deterministic.
+ * Each cacheable resource has a distinct prefix, so longest-match is
+ * deterministic.
  */
 export function resolveResourceIdForPath(
   path: string,

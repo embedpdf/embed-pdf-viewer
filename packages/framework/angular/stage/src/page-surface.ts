@@ -1,18 +1,18 @@
 /**
- * INTERNAL page shell — one per visible page, tracked by its page address so the instance
- * (and everything below) survives camera motion and page reorders.
+ * One page on a Stage: its box, its shadow, its turned content, and the page and chrome
+ * templates drawn into them. The Stage tracks surfaces by the page's object number, so a
+ * surface (and every layer in it) lives while its page is on screen, through camera moves and
+ * page reorders.
  *
- * THE STABILITY INVARIANT (see page-context.ts): `page` (the context) and
- * `pageInjector` are created ONCE per surface. Camera frames arrive as new
- * `vp` input values; only the signals inside the context change. Changing the
- * injector or context object identity would make `NgTemplateOutlet` recreate
- * the embedded views — destroying layers at 120Hz. Don't.
+ * The page context and the injector that provides it are made once per surface; camera frames
+ * arrive as new `visiblePage` input values and change only the signals inside the context. A
+ * new context or injector would make the template outlet recreate every layer on every frame.
  *
- * Geometry mirrors React's PageSurface: the outer box = content footprint +
- * reserved chrome bands; the shadow is axis-aligned and stays put under
- * rotation; the content wrapper is the ONLY thing rotation turns, and carries
- * no transform at rotation 0 so it pixel-snaps like the shadow behind it.
- * All numbers come from the transform — never re-derive `* zoom` / `* dpr`.
+ * The geometry is every framework's (`pageSurfaceLayout` from `@embedpdf/web`): the outer box
+ * is the page's footprint plus the reserved chrome bands; the shadow is axis-aligned and stays
+ * put when the page turns; only the content box turns, and at rotation 0 it carries no
+ * transform, so it snaps to pixels like the shadow behind it. Every number comes from the page
+ * transform.
  */
 import { NgTemplateOutlet } from '@angular/common';
 import {
@@ -26,54 +26,57 @@ import {
   viewChild,
   type TemplateRef,
 } from '@angular/core';
-import type { PageFrame, VisiblePage } from '@embedpdf/plugin-stage';
+import { toPageRef } from '@embedpdf/core';
+import type { PageRef, ViewerPageSettings } from '@embedpdf/core';
+import type { PageFrame } from '@embedpdf/core-geometry';
+import type { VisiblePage } from '@embedpdf/plugin-stage';
+import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
+import { pageSurfaceLayout, paint, stagePageDemand } from '@embedpdf/web';
 import { createPageContext, EPDF_PAGE, type EpdfPageContext } from '@embedpdf/angular/runtime';
 import type { EpdfPageTemplateContext } from './templates';
 
 @Component({
   selector: 'epdf-page-surface',
-  standalone: true,
   imports: [NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     style: 'position: absolute; display: block;',
-    '[style.left.px]': 'left()',
-    '[style.top.px]': 'top()',
-    '[style.width.px]': 'outerWidth()',
-    '[style.height.px]': 'outerHeight()',
+    '[style.left.px]': 'layout().outer.left',
+    '[style.top.px]': 'layout().outer.top',
+    '[style.width.px]': 'layout().outer.width',
+    '[style.height.px]': 'layout().outer.height',
   },
   template: `
-    <!-- drop shadow ONLY — axis-aligned at the content box (inset by the frame),
-         transparent fill so it can never peek out behind the bitmap, and it
-         stays put under rotation. -->
+    <!-- The shadow only: axis-aligned at the content box, with no fill that could show behind
+         the picture, and it stays put when the page turns. -->
     <div
-      style="position: absolute; box-shadow: var(--epdf-page-shadow, 0 6px 18px rgba(0, 0, 0, 0.18));"
-      [style.left.px]="frame().left"
-      [style.top.px]="frame().top"
-      [style.width.px]="t().viewWidth"
-      [style.height.px]="t().viewHeight"
+      style="position: absolute"
+      [style.left.px]="layout().shadow.left"
+      [style.top.px]="layout().shadow.top"
+      [style.width.px]="layout().shadow.width"
+      [style.height.px]="layout().shadow.height"
+      [style.box-shadow]="shadow()"
     ></div>
-    <!-- the page: white backing + content as ONE box — the only thing rotation
-         turns. We render our own selection highlights, so native selection is
-         suppressed on the whole page subtree. -->
+    <!-- The page: its background and content as one box, the only thing that turns. The layers
+         draw their own selection, so the browser's is off for the whole page. -->
     <div
       #content
-      style="position: absolute; background: #fff; user-select: none; -webkit-user-select: none;"
-      [style.left.px]="contentLeft()"
-      [style.top.px]="contentTop()"
-      [style.width.px]="t().contentWidth"
-      [style.height.px]="t().contentHeight"
-      [style.transform]="rotate()"
+      style="position: absolute; user-select: none; -webkit-user-select: none"
+      [style.left.px]="layout().content.left"
+      [style.top.px]="layout().content.top"
+      [style.width.px]="layout().content.width"
+      [style.height.px]="layout().content.height"
+      [style.background]="background()"
+      [style.transform]="layout().turn"
     >
       <ng-container
-        [ngTemplateOutlet]="pageTpl()"
+        [ngTemplateOutlet]="pageTemplate()"
         [ngTemplateOutletContext]="templateContext"
         [ngTemplateOutletInjector]="pageInjector"
       />
     </div>
-    <!-- box-space chrome — fills the outer box, NEVER rotates. Bands are plain
-         regions: a label is bottom: 0; height: frame().bottom. -->
-    @if (chromeTpl(); as chrome) {
+    <!-- Around the page: fills the outer box, never turns. -->
+    @if (chromeTemplate(); as chrome) {
       <ng-container
         [ngTemplateOutlet]="chrome"
         [ngTemplateOutletContext]="templateContext"
@@ -83,51 +86,56 @@ import type { EpdfPageTemplateContext } from './templates';
   `,
 })
 export class EpdfPageSurface {
-  readonly vp = input.required<VisiblePage>();
+  readonly visiblePage = input.required<VisiblePage>();
+  /** The bands reserved around the page, in screen pixels. */
   readonly frame = input.required<PageFrame>();
   readonly documentId = input.required<string>();
-  readonly pageTpl = input.required<TemplateRef<EpdfPageTemplateContext>>();
-  readonly chromeTpl = input<TemplateRef<EpdfPageTemplateContext> | null>(null);
+  /** The Stage's view; the tile demand reads what's on screen from it when asked. */
+  readonly stage = input.required<StageHostCapability>();
+  /** The viewer's `page` settings: the background and the shadow. */
+  readonly look = input.required<ViewerPageSettings>();
+  readonly pageTemplate = input.required<TemplateRef<EpdfPageTemplateContext>>();
+  readonly chromeTemplate = input<TemplateRef<EpdfPageTemplateContext> | null>(null);
 
-  protected readonly t = computed(() => this.vp().transform);
+  protected readonly transform = computed(() => this.visiblePage().transform);
 
-  // Outer box = display footprint + reserved chrome bands; screenX/screenY are
-  // the device-snapped footprint top-left, so the box sits one frame further out.
-  protected readonly left = computed(() => this.vp().screenX - this.frame().left);
-  protected readonly top = computed(() => this.vp().screenY - this.frame().top);
-  protected readonly outerWidth = computed(
-    () => this.t().viewWidth + this.frame().left + this.frame().right,
-  );
-  protected readonly outerHeight = computed(
-    () => this.t().viewHeight + this.frame().top + this.frame().bottom,
-  );
-  // Center the (possibly rotated) content box on the display box and rotate
-  // about its center — NO translate(), so rotation 0 carries no transform.
-  protected readonly contentLeft = computed(
-    () => this.frame().left + (this.t().viewWidth - this.t().contentWidth) / 2,
-  );
-  protected readonly contentTop = computed(
-    () => this.frame().top + (this.t().viewHeight - this.t().contentHeight) / 2,
-  );
-  protected readonly rotate = computed(() => {
-    const rotation = this.vp().rotation;
-    return rotation ? `rotate(${rotation}deg)` : null;
+  // The outer box, the shadow and the turned content box, from `@embedpdf/web`'s layout, shared
+  // by every framework; screenX/screenY are the footprint's device-snapped corner.
+  protected readonly layout = computed(() => {
+    const visiblePage = this.visiblePage();
+    return pageSurfaceLayout(this.transform(), this.frame(), {
+      x: visiblePage.screenX,
+      y: visiblePage.screenY,
+    });
   });
+  // The settings, unless CSS sets `--epdf-page-shadow` or `--epdf-page-background`.
+  protected readonly shadow = computed(() => paint('page-shadow', this.look().shadow));
+  protected readonly background = computed(() => paint('page-background', this.look().background));
 
-  private readonly contentEl = viewChild.required<ElementRef<HTMLDivElement>>('content');
+  private readonly content = viewChild.required<ElementRef<HTMLDivElement>>('content');
+  private pageRef: PageRef | null = null;
 
-  /** ONE stable context per surface — volatile parts are signals inside it. */
+  /** The page context, one for the surface's lifetime. */
   readonly page: EpdfPageContext = createPageContext({
     documentId: () => this.documentId(),
-    ref: () => this.vp().ref,
-    pageIndex: computed(() => this.vp().pageIndex),
+    // The Stage builds a new ref each frame; the surface keeps the first, so layers can key
+    // their work on it.
+    ref: () => (this.pageRef ??= toPageRef(this.visiblePage().ref.objectNumber)),
+    view: () => this.stage().getLensId(),
+    pageIndex: computed(() => this.visiblePage().pageIndex),
     frame: this.frame,
-    transform: this.t,
-    getRect: () => this.contentEl().nativeElement.getBoundingClientRect(),
+    transform: this.transform,
+    getRect: () => this.content().nativeElement.getBoundingClientRect(),
+    // Read live from the Stage: off screen, the page wants nothing (an empty rect).
+    getViewDemand: () =>
+      stagePageDemand(
+        this.stage(),
+        this.visiblePage().ref.objectNumber,
+        this.transform().deviceWidth,
+      ),
   });
 
-  /** ONE stable injector per surface (see the invariant above), parented to
-   *  this surface's node injector so layers also reach the kernel host. */
+  /** One injector for the surface's lifetime, under this surface, so layers reach the viewer too. */
   protected readonly pageInjector = Injector.create({
     providers: [{ provide: EPDF_PAGE, useValue: this.page }],
     parent: inject(Injector),

@@ -1,17 +1,20 @@
 /**
- * `<epdf-stage>` — virtualizes and positions page surfaces by the camera, and
- * stamps each one with YOUR `<ng-template epdfPage>` — you bring the layers.
+ * `<epdf-stage>`: shows the document's pages. It lays them out, keeps only the visible ones
+ * mounted, handles scrolling, zoom and page navigation by mouse, keyboard and touch, and draws
+ * each page with your `<ng-template epdfPage>`.
  *
- * NULL-SAFE BY DESIGN (a deliberate deviation from React's strict Stage):
- * Angular instantiates projected content eagerly, so a stage constructed
- * before any document exists must not crash — it renders zero pages and its
- * listeners no-op until the document arrives. Teach the document gate anyway:
- * document CHROME (toolbars, panels) still belongs behind `*epdfDocumentGate`.
+ * The component is the Stage's API, `EpdfStageRef`'s (`stage-ref.ts`): every method of the
+ * Stage page's Methods table, every value of its State table as a signal, its settings as
+ * `settings()`, and its events as streams (`pageChanged$`). From around it, a template reference
+ * (`<epdf-stage #stage="epdfStage">`, then `stage.zoomIn()` and `stage.zoomLevel()`) or
+ * `viewChild(EpdfStage)` reaches it; from inside it, `inject(EpdfStageRef)`. `[(page)]` and
+ * `[(zoom)]` bind the current page index and the zoom level.
  *
- * ZONE RULE: every DOM listener here attaches OUTSIDE Angular's zone — a
- * 120Hz pointermove stream must never trigger app-wide change detection.
- * State flows kernel → tick signal → computeds → bindings, so the adapter is
- * zone-agnostic (zoneless recommended, zone.js tolerated).
+ * `[document]` opens a document for this Stage and follows the value: a new source opens, the
+ * old document closes. `[token]` makes it a second view, registered with `withStage({ token })`.
+ *
+ * Without a document it shows no pages and its signals read their empty values; a method
+ * called then refuses with `not-ready`.
  */
 import { isPlatformBrowser } from '@angular/common';
 import {
@@ -23,180 +26,316 @@ import {
   ElementRef,
   forwardRef,
   inject,
+  Injectable,
   input,
-  NgZone,
+  output,
   PLATFORM_ID,
+  signal,
+  untracked,
+  type Signal,
+  type TemplateRef,
 } from '@angular/core';
-import { StageToken, createScrollHandler } from '@embedpdf/plugin-stage';
+import { shallowEqual } from '@embedpdf/core';
+import type { OpenSource } from '@embedpdf/core';
+import type { PageFrame } from '@embedpdf/core-geometry';
+import { createScrollHandler, StageToken } from '@embedpdf/plugin-stage';
 import type { VisiblePage } from '@embedpdf/plugin-stage';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+import { createStageSurface, stageViewProjector } from '@embedpdf/web';
 import {
-  injectDocumentId,
-  injectKernelHost,
-  injectOptionalCapability,
-  injectOptionalCapabilityFor,
-  injectOptionalSelectorFor,
-  type CapabilityToken,
+  CapabilityBinding,
+  EPDF_DOCUMENT_SCOPE,
+  EPDF_SCOPED_SERVICES,
+  type EpdfDocumentScopeRef,
 } from '@embedpdf/angular/runtime';
-import type { PageFrame } from '@embedpdf/plugin-stage';
-import { createStageSurface } from '@embedpdf/web';
-import { EpdfPageChrome, EpdfPageTemplate } from './templates';
+import { EPDF_PROJECTOR, type EpdfProjectorBinding } from '@embedpdf/angular/anchored';
 import { EpdfPageSurface } from './page-surface';
+import { EpdfStageRef, type StageTokenProp } from './stage-ref';
+import { EpdfPageChrome, EpdfPageTemplate, type EpdfPageTemplateContext } from './templates';
 
-/** Which stage lens to bind to. Defaults to the main StageToken — pass a custom
- *  token to drive an additional lens (e.g. a wrapped thumbnail sidebar). */
-import { EPDF_STAGE_SCOPE, type EpdfStageScopeRef, type StageTokenProp } from './scope';
+const NO_PAGES: readonly VisiblePage[] = Object.freeze([]);
+const NO_FRAME: PageFrame = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
+const frameEqual = (left: PageFrame, right: PageFrame) =>
+  left.top === right.top &&
+  left.right === right.right &&
+  left.bottom === right.bottom &&
+  left.left === right.left;
 
-export type { StageTokenProp } from './scope';
-
-const EMPTY_PAGES: VisiblePage[] = [];
-const NO_FRAME: PageFrame = { top: 0, right: 0, bottom: 0, left: 0 };
-const frameEqual = (a: PageFrame, b: PageFrame) =>
-  a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
+/**
+ * The document a Stage shows: the one its `[document]` opened, else its scope's. The Stage and
+ * what's inside it read it, so it's made before the Stage itself.
+ */
+@Injectable()
+class StageDocument implements EpdfDocumentScopeRef {
+  private readonly parent = inject(EPDF_DOCUMENT_SCOPE, { optional: true, skipSelf: true });
+  /** The document `[document]` opened, once it has its id. */
+  readonly opened = signal<string | null>(null);
+  readonly id = computed(() => this.opened() ?? this.parent?.id() ?? null);
+}
 
 @Component({
   selector: 'epdf-stage',
-  standalone: true,
+  exportAs: 'epdfStage',
   imports: [EpdfPageSurface],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // Everything projected into the stage binds to THIS lens by default
-  // (React's `<Stage>` installing a `<StageScope>` for its overlay).
-  providers: [{ provide: EPDF_STAGE_SCOPE, useExisting: forwardRef(() => EpdfStage) }],
+  providers: [
+    // The services inside act on this Stage's document. After them, so it wins over the
+    // `EpdfStageRef` among them: what's inside injects this Stage as `EpdfStageRef`, talks to
+    // its document, and projects anchored UI through its camera.
+    EPDF_SCOPED_SERVICES,
+    StageDocument,
+    { provide: EPDF_DOCUMENT_SCOPE, useExisting: StageDocument },
+    { provide: EpdfStageRef, useExisting: forwardRef(() => EpdfStage) },
+    { provide: EPDF_PROJECTOR, useFactory: () => inject(EpdfStage).projection },
+  ],
   host: {
-    style: 'position: relative; overflow: hidden; touch-action: none; display: block;',
+    style: 'position: relative; display: block; overflow: hidden; touch-action: none;',
     '[style.cursor]': 'cursor()',
   },
   template: `
-    @if (pageTemplate(); as tpl) {
-      @for (p of pages(); track p.ref.pageObjectNumber) {
+    @if (pageTemplate(); as template) {
+      @for (visiblePage of pages(); track visiblePage.ref.objectNumber) {
         <epdf-page-surface
-          [vp]="p"
+          [visiblePage]="visiblePage"
           [frame]="frame()"
           [documentId]="documentId() ?? ''"
-          [pageTpl]="tpl"
-          [chromeTpl]="chromeTemplate()"
+          [stage]="hostCapability()!"
+          [look]="look()"
+          [pageTemplate]="template"
+          [chromeTemplate]="chromeTemplate()"
         />
       }
     }
-    <!-- viewport-space overlay UI: anything projected into <epdf-stage>
-         renders above the pages (menus, controls, scrollbars). -->
+    <!-- What you put inside <epdf-stage> sits over the pages, in the Stage's own box. -->
     <ng-content />
   `,
 })
-export class EpdfStage implements EpdfStageScopeRef {
-  /**
-   * Route this Stage's pointer events to the interaction hub (page-resolved via
-   * `pageAt`) — AND register this lens's tool-gated pan-scroll handler with it
-   * (lens-scoped, so multiple stages on one document never pan each other).
-   * Pan is then the `pan` tool's job and dragging in `pointer` mode selects
-   * text (incl. across pages).
-   *
-   * Default TRUE: registering `interactionPlugin()` is the one opt-in — tools
-   * just work; without the hub this is inert and the stage falls back to
-   * built-in drag-to-pan, so a hub-less setup costs nothing. Set `false` on
-   * SECONDARY lenses (a thumbnail rail) that should stay click-to-navigate
-   * instead of feeding the document's tools.
-   */
-  readonly interaction = input(true);
-  /**
-   * With `interaction`: let drags over page GAPS pan regardless of the active
-   * tool (and show a grab cursor there) — the gutter always pans; there is
-   * nothing to draw/select outside a page. Default true.
-   */
-  readonly panFallback = input(true);
-  /**
-   * Ambient ZOOM gestures on this stage: ctrl/cmd+wheel and trackpad pinch
-   * (Safari gesture events included). Default true. Turn OFF for follower
-   * lenses with a fixed magnification (a thumbnail rail should scroll under
-   * cmd+wheel, not zoom); pinches are still swallowed either way.
-   */
-  readonly zoomGestures = input(true);
-  /** The stage lens to drive (default: the nearest `[epdfStageScope]`, else the main StageToken). */
+export class EpdfStage extends EpdfStageRef {
+  /** The view to drive: a token registered with `withStage({ token })`; the main view without one. */
   readonly token = input<StageTokenProp | undefined>(undefined);
-  private readonly parentScope = inject(EPDF_STAGE_SCOPE, { optional: true, skipSelf: true });
-  /** The resolved lens — what this stage provides to its content. */
-  readonly stageToken = computed(
-    () => this.token() ?? this.parentScope?.stageToken() ?? StageToken,
-  );
+  /** A document to open for this Stage. A new value opens it and closes the one before. */
+  readonly document = input<OpenSource | null | undefined>(undefined);
+  /** The current page's index, from 0: `[(page)]`. Setting it goes to that page. */
+  readonly page = input<number | undefined>(undefined);
+  /** Another page became the current one: its index. The output half of `[(page)]`. */
+  readonly pageChange = output<number>();
+  /** The zoom level, `1` for 100%: `[(zoom)]`. Setting it zooms there. */
+  readonly zoom = input<number | undefined>(undefined);
+  /** The zoom level changed. The output half of `[(zoom)]`. */
+  readonly zoomChange = output<number>();
 
-  private readonly host = injectKernelHost();
-  // The surface is a HOST of the lens: it reports viewport size, drives gestures
-  // and reads the lens id. The host contract is the same runtime token, typed wider.
-  private readonly stage = injectOptionalCapabilityFor(
-    () => this.stageToken() as unknown as CapabilityToken<StageHostCapability>,
-  );
-  private readonly ix = injectOptionalCapability(InteractionToken);
-  private readonly useHub = computed(() => this.interaction() && this.ix() !== null);
-  // The hub's resolved cursor (text/grab/…), applied to the viewport when driving.
-  private readonly hubCursor = this.host.value(() => this.ix()?.getCursor() ?? 'default');
-  protected readonly cursor = computed(() => (this.useHub() ? this.hubCursor() : null));
+  private readonly ownDocument = inject(StageDocument);
+  /** The document this Stage shows, for what's inside it: its own `[document]`, else its scope's. */
+  readonly documentScope: EpdfDocumentScopeRef = this.ownDocument;
+  /** The view's capability, or null without a document. */
+  protected readonly hostCapability = this.binding.capability;
 
-  protected readonly documentId = injectDocumentId();
-  // visiblePages already folds in the camera (each page carries its
-  // device-snapped screenX/screenY + transform), so panning re-emits the list —
-  // no separate camera subscription needed for positioning. The capability
-  // memoizes, so Object.is equality suffices.
-  protected readonly pages = injectOptionalSelectorFor(
-    () => this.stageToken(),
-    (c) => c.listVisiblePages(),
-    EMPTY_PAGES,
+  protected override view(): StageTokenProp {
+    return this.token() ?? StageToken;
+  }
+
+  protected override usedAs(): string {
+    return '<epdf-stage>';
+  }
+
+  // ── what the template draws ──────────────────────────────────────────────────
+
+  /** The pages on screen, each with its place and transform: a new list every camera frame. */
+  protected readonly pages = this.binding.select(
+    (stage) => stage.listVisiblePages(),
+    NO_PAGES,
+    Object.is,
   );
-  // Reserved chrome bands (screen px), uniform across pages — the frame the
-  // outer box reserves and the chrome template paints into.
-  protected readonly frame = injectOptionalSelectorFor(
-    () => this.stageToken(),
-    (c) => c.getSettings().pageFrame,
+  protected readonly frame = this.binding.select(
+    (stage) => stage.getSettings().pageFrame,
     NO_FRAME,
     frameEqual,
   );
+  protected readonly documentId = this.host.read(
+    (kernel) => this.documentScope.id() ?? kernel.documents.getActiveId(),
+    () => null,
+  );
+  /** The viewer's `page` settings: each page's background and shadow. */
+  protected readonly look = computed(() => this.host.viewerSettings().page, {
+    equal: shallowEqual,
+  });
+  private readonly pageTemplateDirective = contentChild(EpdfPageTemplate);
+  private readonly chromeTemplateDirective = contentChild(EpdfPageChrome);
+  // Typed, so the built declarations name `EpdfPageTemplateContext` from this file instead of
+  // importing this entry point by its own package name.
+  protected readonly pageTemplate: Signal<TemplateRef<EpdfPageTemplateContext> | null> = computed(
+    () => this.pageTemplateDirective()?.template ?? null,
+  );
+  protected readonly chromeTemplate: Signal<TemplateRef<EpdfPageTemplateContext> | null> = computed(
+    () => this.chromeTemplateDirective()?.template ?? null,
+  );
 
-  private readonly pageTemplateDir = contentChild(EpdfPageTemplate);
-  private readonly chromeTemplateDir = contentChild(EpdfPageChrome);
-  protected readonly pageTemplate = computed(() => this.pageTemplateDir()?.template ?? null);
-  protected readonly chromeTemplate = computed(() => this.chromeTemplateDir()?.template ?? null);
+  // ── input ────────────────────────────────────────────────────────────────────
+  // How this view takes pointer input is its own settings: a change binds the surface again.
+
+  private readonly interaction = this.binding.select(
+    (stage) => stage.getSettings().interaction,
+    true,
+  );
+  private readonly panFallback = this.binding.select(
+    (stage) => stage.getSettings().panFallback,
+    true,
+  );
+  private readonly zoomGestures = this.binding.select(
+    (stage) => stage.getSettings().zoomGestures,
+    true,
+  );
+  /** The interaction hub of this Stage's document: the active tool takes the pointer. */
+  private readonly hub = new CapabilityBinding(
+    this.host,
+    () => InteractionToken,
+    this.documentScope.id,
+  ).capability;
+  private readonly usesHub = computed(() => this.interaction() && this.hub() !== null);
+  private readonly hubCursor = this.host.read(
+    () => this.hub()?.getCursor() ?? 'default',
+    () => 'default',
+  );
+  /** The hub's cursor (text, grab, a tool's own), while the hub takes this Stage's pointer. */
+  protected readonly cursor = computed(() => (this.usesHub() ? this.hubCursor() : null));
+
+  // ── anchored UI ──────────────────────────────────────────────────────────────
+
+  /**
+   * How anchored UI (`<epdf-anchored>`) inside the Stage follows the camera: a projection
+   * through the view, and the visible pages as its revision, so the pages and the UI on them
+   * update in the same change detection pass and never a frame apart.
+   */
+  readonly projection: EpdfProjectorBinding = {
+    // `@embedpdf/web`'s Stage projection, shared by every framework: page boxes to the Stage's
+    // own coordinates.
+    projector: computed(() => {
+      const stage = this.hostCapability();
+      return stage ? stageViewProjector(() => stage) : null;
+    }),
+    revision: this.pages,
+    shownPages: computed(
+      () => {
+        const shown = this.pages().map((visible) => visible.ref.objectNumber);
+        return new Set(shown);
+      },
+      // The same set until a page comes on screen or leaves it.
+      {
+        equal: (left, right) =>
+          left.size === right.size && [...left].every((objectNumber) => right.has(objectNumber)),
+      },
+    ),
+  };
 
   constructor() {
-    if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
-    const el = inject(ElementRef).nativeElement as HTMLElement;
-    const zone = inject(NgZone);
+    super();
+    this.followDocumentInput();
+    this.followPageAndZoom();
+    if (isPlatformBrowser(inject(PLATFORM_ID))) this.bindSurface();
+  }
 
-    // Rebinds when the stage capability (document open/close/switch, token
-    // change), hub, or gesture flags change — the Angular spelling of the React
-    // Stage effect and its dependency array.
+  /** `[document]`: open it for this Stage once the viewer runs; close it when the value changes. */
+  private followDocumentInput(): void {
     effect((onCleanup) => {
-      const stage = this.stage();
-      const ix = this.ix();
-      const useHub = this.interaction() && !!ix;
+      const source = this.document();
+      const kernel = this.host.kernel();
+      if (!source || !kernel || this.host.status() !== 'ready') return;
+      untracked(() => {
+        const cancel = new AbortController();
+        const opening = kernel.documents.open(source, { signal: cancel.signal });
+        // The new tab is the active one at once; its id is final when the open resolves.
+        let id = kernel.documents.getActiveId();
+        opening.then(
+          ({ document }) => {
+            id = document.id;
+            if (!cancel.signal.aborted) this.ownDocument.opened.set(document.id);
+          },
+          () => {
+            // Its tab shows why it couldn't be opened.
+          },
+        );
+        onCleanup(() => {
+          cancel.abort();
+          this.ownDocument.opened.set(null);
+          if (id && kernel.documents.has(id)) void kernel.documents.close(id).catch(() => {});
+        });
+      });
+    });
+  }
+
+  /**
+   * `[(page)]` and `[(zoom)]`. A value from the parent moves the view there; a move of the view
+   * (scroll, pinch, a button) goes out as `pageChange` and `zoomChange`. When the Stage changes
+   * documents (another tab), the new document keeps its own place and reports it.
+   */
+  private followPageAndZoom(): void {
+    let previous: StageHostCapability | null = null;
+    effect(() => {
+      const stage = this.hostCapability();
+      const page = this.page();
+      const zoom = this.zoom();
+      untracked(() => {
+        const switched = previous !== null && stage !== null && stage !== previous;
+        previous = stage;
+        if (!stage) return;
+        if (switched) {
+          if (page !== undefined && page !== stage.getCurrentPageIndex()) {
+            this.pageChange.emit(stage.getCurrentPageIndex());
+          }
+          if (zoom !== undefined && zoom !== stage.getZoomLevel()) {
+            this.zoomChange.emit(stage.getZoomLevel());
+          }
+          return;
+        }
+        if (page !== undefined && page !== stage.getCurrentPageIndex()) stage.goToPage(page);
+        if (zoom !== undefined && zoom !== stage.getZoomLevel()) stage.zoomTo(zoom);
+      });
+    });
+    effect((onCleanup) => {
+      const stage = this.hostCapability();
+      if (!stage) return;
+      const offPage = stage.onPageChanged(({ pageIndex }) => this.pageChange.emit(pageIndex));
+      const offZoom = stage.onZoomChanged(({ level }) => this.zoomChange.emit(level));
+      onCleanup(() => {
+        offPage();
+        offZoom();
+      });
+    });
+  }
+
+  /**
+   * The browser side: the viewport size and pixel ratio, wheel and touch gestures, and the
+   * pointer going to the interaction hub. All of it is `@embedpdf/web`'s, shared by every
+   * framework, so the Stage feels the same everywhere; this binds it again when the view, the
+   * hub or the input settings change.
+   */
+  private bindSurface(): void {
+    const element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    effect((onCleanup) => {
+      const stage = this.hostCapability();
+      const hub = this.hub();
+      const usesHub = this.usesHub();
       const panFallback = this.panFallback();
       const zoomGestures = this.zoomGestures();
-      if (!stage) return; // no document yet — nothing to drive
-
-      const cleanups: Array<() => void> = [];
-      zone.runOutsideAngular(() => {
-        // The WHOLE browser binding — viewport/DPR reporting, sample
-        // normalization, gesture controller — is the shared @embedpdf/web
-        // surface, so every framework adapter has one feel. This component
-        // keeps only Angular glue.
-        cleanups.push(
-          createStageSurface(el, stage, {
-            hub: useHub ? ix : null,
-            source: stage.getLensId(),
-            zoomGestures,
-          }),
-        );
-        // Interaction opt-in lives WITH the sample source: the same knob that
-        // forwards this lens's samples also registers its pan-scroll handler,
-        // lens-scoped — two stages on one document can never pan each other.
-        if (useHub && ix) {
-          cleanups.push(
-            ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
-              source: stage.getLensId(),
-            }),
-          );
-        }
+      if (!stage) return;
+      const detachSurface = createStageSurface(element, stage, {
+        hub: usesHub ? hub : null,
+        source: stage.getLensId(),
+        zoomGestures,
       });
-      onCleanup(() => cleanups.forEach((fn) => fn()));
+      // The pointer and this view's drag-to-scroll go to the hub together, for this view only,
+      // so two Stages on one document never scroll each other.
+      const offScroll =
+        usesHub && hub
+          ? hub.registerHandler(createScrollHandler(stage, hub, { panFallback }), {
+              source: stage.getLensId(),
+            })
+          : null;
+      onCleanup(() => {
+        offScroll?.();
+        detachSurface();
+      });
     });
   }
 }

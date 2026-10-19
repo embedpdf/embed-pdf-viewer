@@ -21,30 +21,11 @@ export const EngineErrorCode = {
   WireFormat: 'WireFormat',
   RuntimeUnavailable: 'RuntimeUnavailable',
   /**
-   * Annotation/page reference could not be resolved. Surfaced when:
-   *   - `AnnotationRef.kind === 'objectNumber'` but the document has no
-   *     annotation with that indirect object number on the addressed page
-   *   - `AnnotationRef.kind === 'nm'` but no annotation on the page has
-   *     that `/NM`
-   *   - `AnnotationRef.kind === 'index'` but the supplied `RevisionToken`
-   *     does not match the current per-page generation
-   *   - `AnnotationRef.kind === 'index'` but `index` is out of range for
-   *     the page's current annotation count
-   */
-  InvalidReference: 'InvalidReference',
-  /**
-   * A weak-annotation structural edit (delete/move) was attempted while the
-   * caller does not have sole active edit presence for that page. This is a
-   * collaboration guard for index-addressed annotations; stable pages and
-   * non-shifting annotation updates do not use it.
-   */
-  WeakAnnotationSessionConflict: 'WeakAnnotationSessionConflict',
-  /**
    * A layer write lost its optimistic-concurrency check: the layer's
    * durable version advanced (another writer — typically another server
    * replica — committed) between the operation's prepare and its commit,
    * and the server exhausted its rebase-and-retry budget. Retryable: the
-   * operation was NOT applied; re-issue it against the new state.
+   * operation was not applied; re-issue it against the new state.
    */
   LayerVersionConflict: 'LayerVersionConflict',
   /**
@@ -72,7 +53,7 @@ export const EngineErrorCode = {
   MalformedPdf: 'MalformedPdf',
   /**
    * A signing candidate is parked on this session: every mutation is
-   * refused until `signatures.complete` or `signatures.abort`.
+   * refused until `signatures.complete` or `signatures.cancel`.
    */
   SigningPending: 'SigningPending',
   /** The candidate's TTL elapsed; prepare again. */
@@ -94,8 +75,9 @@ export const EngineErrorCode = {
   SignatureRefused: 'SignatureRefused',
   /**
    * A signature already in the document forbids this change (a
-   * certification's permission, a FieldMDP or `/Lock`, or the approval
-   * baseline). The message names the signature and the restriction. The
+   * certification's permission, or a FieldMDP or `/Lock`; the approval
+   * baseline is judged, never refused). The message names the signature and
+   * the restriction. The
    * engine option `signedDocumentPolicy: 'permit'` disables the guard.
    */
   ProtectedDocument: 'ProtectedDocument',
@@ -105,6 +87,45 @@ export const EngineErrorCode = {
    * edited but not signed from.
    */
   StaleBase: 'StaleBase',
+  /**
+   * A payload passed one of its limits: an annotation bundle's bytes,
+   * counts or image pixels. Nothing was read past the limit and nothing was
+   * written. `details` has the `limit`, its `max` and the `value` found.
+   */
+  PayloadTooLarge: 'PayloadTooLarge',
+  /**
+   * A create named an object number it can't use. `details.objectNumber`
+   * is the number; `details.reason` is `'not-held'` when the caller's
+   * session doesn't hold it (never reserved, already spent, or lost to
+   * another session) and `'taken'` when an object is already at it. Nothing
+   * was written.
+   */
+  ObjectNumberUnavailable: 'ObjectNumberUnavailable',
+  /**
+   * The document would pass the highest object number a file should have
+   * (`OBJECT_NUMBER_CEILING`): no more numbers are handed out, and a write
+   * that needs more is refused. `details.lastObjectNumber` is the document's
+   * last number. A compacted copy of the document starts afresh.
+   */
+  LayerFull: 'LayerFull',
+  /**
+   * An op's `expect` didn't match what the document holds: the change was
+   * refused whole. `details.opIndex` names the op and `details.fields` the
+   * fields that differ.
+   */
+  ChangeConflict: 'ChangeConflict',
+  /**
+   * `{ undoOf }` named a change that can no longer be undone.
+   * `details.reason` says why: `'final-change'` (a redaction apply, flatten,
+   * signing or form repair came after it), `'base-changed'` (a new version
+   * was published since) or `'expired'` (past retention).
+   */
+  UndoUnavailable: 'UndoUnavailable',
+  /**
+   * An `opId` that already has an answer came again with a different
+   * payload. Nothing ran; a retry must send the same change.
+   */
+  IdempotencyKeyReused: 'IdempotencyKeyReused',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

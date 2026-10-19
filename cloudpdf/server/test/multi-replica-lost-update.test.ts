@@ -1,4 +1,5 @@
 import { runMultiReplicaSuite } from './_helpers/multi-replica-suite';
+import { runObjectNumberReplicaSuite } from './_helpers/object-numbers-replica-suite';
 import { sqliteReplicaFactory } from './_helpers/two-replica-harness';
 
 /**
@@ -9,3 +10,4 @@ import { sqliteReplicaFactory } from './_helpers/two-replica-harness';
  * the engine production multi-replica actually mandates.
  */
 runMultiReplicaSuite(sqliteReplicaFactory());
+runObjectNumberReplicaSuite(sqliteReplicaFactory());

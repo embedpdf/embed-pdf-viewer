@@ -1,5 +1,21 @@
 # @embedpdf/plugin-shell
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The shell's surface and menu changes are named state transitions and its events are derived from them. The `/internal` entry is removed, and `ShellState` and `ShellAction` are no longer exported.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – The shell plugin now follows the 3.0 public contract: `getSurface(id)` (folds in `surfaceProps`), `listOpenSurfaces` (was `openSurfaces`), `listOpenMenus` (was `openMenus`), `updateSurfaceProps`, `closeAll`, `getSnapshot` / `applySnapshot`, and the event hooks `onSurfaceOpened` / `onSurfaceClosed` / `onMenuOpened` / `onMenuClosed`. The package gains a `./contract/host` entry.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `shellState` declares the shell's state for every framework: `openSurfaces` and `openMenus`, both empty without a document. Each event has its own payload: `onSurfaceOpened` carries `id` and `props` (`SurfaceOpenedEvent`), and `onSurfaceClosed`, `onMenuOpened` and `onMenuClosed` carry `id` (`SurfaceClosedEvent`, `MenuOpenedEvent`, `MenuClosedEvent`); `SurfaceEvent` and `MenuEvent` are gone.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – `open(id, { focus: true })` and `toggle(id, { focus: true })` ask for the cursor: each raises the surface's `focusRequest` by one, also when it is open already, and closing it sets the request back to 0. The element that follows the request takes focus (the framework packages' surface-focus hooks); a plain open never moves the cursor. `focusRequest` is a moment, not state to keep: `getSnapshot()` leaves it out, and `applySnapshot()` starts every surface at 0.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The plugin's definition takes its types from its token, state and settings instead of type arguments. It declares no settings of its own, so its definition's settings type is `NoSettings`.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

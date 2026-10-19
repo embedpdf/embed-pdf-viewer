@@ -1,28 +1,25 @@
-import { Viewer, DocumentGate, useSelector } from '@embedpdf/react/runtime';
+import { useEffect } from 'react';
+import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, usePageList, usePages } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   SelectionLayer,
-  SelectionToken,
   selectionPlugin,
   useSelection,
+  useSelectionState,
 } from '@embedpdf/react/selection';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Badge,
-  Button,
-  Demo,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './programmatic.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
+
+// On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
+const TITLE = { start: 10, count: 52 };
+const POINT = { x: 260, y: 242 };
 
 // [!doc-source ebook]
 const ebook = async (): Promise<OpenInput> => {
@@ -31,52 +28,91 @@ const ebook = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
+// Every button selects on the cover, the first page: by its ref, or by its index, 0.
 function SelectionToolbar() {
-  const { currentPage } = usePages();
-  const { pages } = usePageList();
   const selection = useSelection();
-  const hasSelection = useSelector(SelectionToken, (value) => value.hasSelection());
+  const { hasSelection, range, pages } = useSelectionState();
+  const cover = usePageList()[0]?.ref;
 
-  const selectCurrentPage = () => {
-    const page = pages[currentPage];
-    if (page) selection.select({ page: page.ref, start: 0, count: 120 });
-  };
+  // The title is selected on load.
+  useEffect(() => {
+    if (cover) selection.select({ page: cover, ...TITLE });
+  }, [selection, cover]);
+
+  const canSelect = selection.canSelect();
+  let summary = 'Nothing selected';
+  if (pages.length > 1) summary = `On ${pages.length} pages`;
+  else if (range) summary = `${range.end.index - range.start.index} characters`;
 
   return (
-    <Toolbar>
-      <Button onClick={selectCurrentPage} disabled={!selection.canSelect()}>
-        Select first 120 characters
-      </Button>
-      <Button onClick={() => selection.selectAll()} disabled={!selection.canSelect()}>
-        Select all
-      </Button>
-      <Button onClick={() => selection.clear()} disabled={!hasSelection}>
+    <div className="toolbar">
+      <button
+        type="button"
+        className="button"
+        disabled={!canSelect || !cover}
+        onClick={() => cover && selection.select({ page: cover, ...TITLE })}
+      >
+        Title
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={!canSelect}
+        onClick={() => selection.selectWordAt(0, POINT)}
+      >
+        Word
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={!canSelect}
+        onClick={() => selection.selectLineAt(0, POINT)}
+      >
+        Line
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={!canSelect}
+        onClick={() => selection.selectPage(0)}
+      >
+        Page
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={!canSelect}
+        onClick={() => selection.selectAll()}
+      >
+        Everything
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={!hasSelection}
+        onClick={() => selection.clear()}
+      >
         Clear
-      </Button>
-      <Spacer />
-      <Badge>{hasSelection ? 'Selection active' : 'Nothing selected'}</Badge>
-    </Toolbar>
+      </button>
+      <output className="badge">{summary}</output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <SelectionToolbar />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer />
-                  <SelectionLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <SelectionToolbar />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer />
+              <SelectionLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

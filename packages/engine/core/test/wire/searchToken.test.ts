@@ -35,9 +35,9 @@ describe('search token codec', () => {
     const token: SearchToken = {
       epoch: 'a1b2c3d4e5f60718',
       query: { text: 'net income', wholeWord: true },
-      startPage: 3056,
+      from: 3056,
       skip: 128,
-      budget: { maxPages: 1, maxMatches: 50 },
+      limit: { matches: 50, pages: 1 },
     };
     expect(decodeSearchToken(encodeSearchToken(token))).toEqual(token);
   });
@@ -89,7 +89,7 @@ describe('search token codec', () => {
   });
 
   test('carries the result-format marker and rejects other formats', () => {
-    // ALWAYS encoded (the deliberate exception to omit-defaults): the marker
+    // Always encoded (the deliberate exception to omit-defaults): the marker
     // exists to change the token bytes — and therefore the CDN cache key —
     // whenever the result representation changes.
     const token = encodeSearchToken({ epoch: 'e', query: { text: 'x' }, skip: 0 });

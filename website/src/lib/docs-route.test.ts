@@ -22,4 +22,16 @@ describe('documentation route fan-out', () => {
       mdxPath: ['docs', 'viewer', 'angular', 'getting-started'],
     });
   });
+
+  it('fans a product index out per framework, with no bare route left', () => {
+    const params = expandDocsStaticParams([{ mdxPath: ['docs', 'headless'] }]);
+
+    expect(params).toHaveLength(4);
+    expect(params).toContainEqual({ mdxPath: ['docs', 'headless', 'react'] });
+    expect(params).not.toContainEqual({ mdxPath: ['docs', 'headless'] });
+    expect(resolveDocsPath(['docs', 'headless', 'vue'])).toEqual({
+      contentPath: ['docs', 'headless'],
+      integration: 'vue',
+    });
+  });
 });

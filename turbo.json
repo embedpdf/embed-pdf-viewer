@@ -8,7 +8,10 @@
     },
     "@embedpdf/engine#build": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/engine/runtime/npm/wasm32/lib/embedpdf.browser.js"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/engine/runtime/npm/wasm32/lib/embedpdf.browser.js"
+      ],
       "outputs": ["dist/**", "workers/**", "src/generated/**"]
     },
     "@embedpdf/engine-runtime#build": {
@@ -51,8 +54,37 @@
     "@embedpdf/default-stamps#build": {
       "outputs": ["locales/**"]
     },
+    "@embedpdf/default-signature-fonts#build": {
+      "outputs": ["modules/**"]
+    },
     "@embedpdf/viewer#test": {
       "dependsOn": ["build"]
+    },
+    "@embedpdf/viewer-angular#typecheck": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-react#typecheck": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-angular#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-react#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-svelte#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/viewer-vue#test": {
+      "dependsOn": ["^build", "build"]
+    },
+    "@embedpdf/engine#test": {
+      "dependsOn": ["^build", "build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/core/annotation/src/**",
+        "$TURBO_ROOT$/packages/plugin/annotation/src/**"
+      ]
     }
   }
 }

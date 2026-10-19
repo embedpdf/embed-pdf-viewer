@@ -1,29 +1,39 @@
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
 import type { AnyPlugin } from '../src/types';
+import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
- * `tryCapability` + `documents.openAll` — the kernel-owned halves of what the
- * framework adapters used to re-derive:
+ * `tryCapability` + `documents.openAll` — resolution and boot policy owned by
+ * the kernel, so framework adapters never re-derive them:
  *
- *   - tryCapability is TOTAL (null, never throws) and reference-stable, so an
+ *   - tryCapability is total (null, never throws) and reference-stable, so an
  *     adapter can expose it as a plain equality-cached reactive read. The
- *     null→instance flip at promote time IS the re-render signal — no adapter
+ *     null→instance flip at promote time is the re-render signal — no adapter
  *     may need to know when resolution changes.
  *   - openAll is the boot policy (order, single activation, failure
  *     containment) stated once, kernel-side.
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-const page = (pon: number, index: number): PageLayout => ({
+const page = (pageObjectNumber: number, index: number): PageLayout => ({
   index,
-  pageObjectNumber: pon,
+  ref: toPageRef(pageObjectNumber),
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,
   userUnit: 1,
-  boxes: { media: { ...box }, crop: { ...box } },
+  tabOrder: null,
+  boxes: pageSpaceBoxesOf({
+    media: { ...box },
+    crop: { ...box },
+    bleed: { ...box },
+    trim: { ...box },
+    art: { ...box },
+  }),
+  pdfCropBox: { ...box },
 });
 
 function makeHandle(id: string): DocumentHandle {
@@ -61,17 +71,17 @@ function controllableEngine() {
 }
 
 const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: new Uint8Array() });
-const settle = () => new Promise((r) => setTimeout(r, 0));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const docToken = { name: 'stage' };
 const docPlugin: AnyPlugin = {
   id: 'stage',
   scope: 'document',
   token: docToken,
-  capability: () => ({}),
+  create: () => ({ api: {} }),
 };
 const wsToken = { name: 'shell' };
-const wsPlugin: AnyPlugin = { id: 'shell', token: wsToken, capability: () => ({ ws: true }) };
+const wsPlugin: AnyPlugin = { id: 'shell', token: wsToken, create: () => ({ api: { ws: true } }) };
 
 describe('kernel: tryCapability', () => {
   it('is null while pending, reference-stable once ready, null again after close', async () => {
@@ -113,14 +123,18 @@ describe('kernel: documents.openAll', () => {
       { source: bytesInput('b'), active: true },
       { source: bytesInput('c') },
     ]);
-    expect(kernel.documents.list().map((d) => d.id)).toEqual(['a', 'b', 'c']);
+    expect(kernel.documents.list().map((documentInfo) => documentInfo.id)).toEqual(['a', 'b', 'c']);
     expect(kernel.documents.getActiveId()).toBe('b');
 
     resolve('c'); // completion order must change nothing
     resolve('a');
     resolve('b');
     await settle();
-    expect(kernel.documents.list().map((d) => d.status)).toEqual(['ready', 'ready', 'ready']);
+    expect(kernel.documents.list().map((documentInfo) => documentInfo.status)).toEqual([
+      'ready',
+      'ready',
+      'ready',
+    ]);
     expect(kernel.documents.getActiveId()).toBe('b');
   });
 
@@ -134,10 +148,104 @@ describe('kernel: documents.openAll', () => {
     reject('b', new Error('boom')); // contained: openAll never surfaces a rejection
     resolve('a');
     await settle();
-    expect(kernel.documents.list().map((d) => [d.id, d.status])).toEqual([
+    expect(
+      kernel.documents.list().map((documentInfo) => [documentInfo.id, documentInfo.status]),
+    ).toEqual([
       ['a', 'ready'],
       ['b', 'error'],
     ]);
     expect(kernel.documents.getActiveId()).toBe('a');
+  });
+});
+
+describe("kernel: listeners while a document's plugins are built", () => {
+  it("hear of a create()'s writes once every plugin is built, and the plugin is built once", async () => {
+    const { engine, resolve } = controllableEngine();
+    const token = { name: 'records' };
+    let creates = 0;
+    let status: (() => string) | null = null;
+    const plugin: AnyPlugin = {
+      id: 'records',
+      scope: 'document',
+      token,
+      state: () => ({ count: 0 }),
+      create: (ctx) => {
+        creates += 1;
+        const mirror = ctx.mirror({
+          name: 'list',
+          initial: () => 0,
+          load: async () => ({ value: 1 }),
+          fold: (value: number) => value,
+        });
+        status = mirror.getStatus;
+        // A store write from inside `create`: a listener reading the plugin at once would find
+        // it half-built.
+        ctx.state.update((state: { count: number }) => ({ count: state.count + 1 }));
+        return { api: { getStatus: mirror.getStatus } };
+      },
+    };
+    const kernel = createKernel({ engine, plugins: [plugin] });
+    const reads: unknown[] = [];
+    kernel.subscribe(() => {
+      try {
+        reads.push(kernel.capability(token, 'a'));
+      } catch (error) {
+        reads.push((error as { code?: string }).code ?? 'threw');
+      }
+    });
+    const open = kernel.documents.open(bytesInput('a'));
+    resolve('a');
+    await open;
+    await settle();
+    expect(creates).toBe(1);
+    // The listener never read it half-built.
+    expect(reads).not.toContain('not-ready');
+    // The one instance is connected, so its mirror loaded.
+    expect(status!()).toBe('ready');
+    expect(kernel.tryCapability(token, 'a')).toBe(kernel.capability(token, 'a'));
+  });
+
+  it('never build a plugin before the ones it finds while it is created', async () => {
+    const { engine, resolve } = controllableEngine();
+    const earlier = { name: 'annotation' };
+    const later = { name: 'form' };
+    // The earlier plugin writes state as it's created; the later one looks for it as it's
+    // created, as the form plugin looks for the annotation plugin.
+    const annotation: AnyPlugin = {
+      id: 'annotation',
+      scope: 'document',
+      token: earlier,
+      state: () => ({ ready: false }),
+      create: (ctx) => {
+        ctx.state.update(() => ({ ready: true }));
+        return { api: { kind: 'annotation' } };
+      },
+    };
+    let found: unknown = 'not created';
+    const form: AnyPlugin = {
+      id: 'form',
+      scope: 'document',
+      token: later,
+      optional: [earlier],
+      create: (ctx) => {
+        found = ctx.tryGet(earlier);
+        return { api: { kind: 'form' } };
+      },
+    };
+    const kernel = createKernel({ engine, plugins: [annotation, form] });
+    // A listener that reads the later plugin on every change, as the commands plugin reads
+    // the form plugin to say whether a command may run.
+    kernel.subscribe(() => {
+      try {
+        kernel.capability(later, 'a');
+      } catch {
+        // not open yet
+      }
+    });
+    const open = kernel.documents.open(bytesInput('a'));
+    resolve('a');
+    await open;
+    await settle();
+    expect(found).toEqual({ kind: 'annotation' });
   });
 });

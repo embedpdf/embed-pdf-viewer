@@ -100,7 +100,11 @@ export async function searchIndex(
   const { sections } = data.meta;
   const candidates: number[] = [];
   for (let index = 0; index < sections.length; index++) {
-    if (!product || sections[index].product === product) candidates.push(index);
+    const section = sections[index];
+    if (product && section.product !== product) continue;
+    // A page held back for the reader's framework isn't there for them to find.
+    if (readerIntegration && section.withheldFrom?.includes(readerIntegration)) continue;
+    candidates.push(index);
   }
 
   const lexical = rankLexical(data.lexical, terms, candidates, CANDIDATE_DEPTH);

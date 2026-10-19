@@ -1,0 +1,13 @@
+<embedpdf-viewer src="/report.pdf" style="height: 100vh">
+  <div slot="item:reviewers" class="reviewers">
+    <img src="/avatars/ada.png" alt="Ada" title="Ada" />
+    <img src="/avatars/grace.png" alt="Grace" title="Grace" />
+  </div>
+</embedpdf-viewer>
+
+<style>
+  /* The viewer sets data-orientation and data-edge on your element. */
+  .reviewers[data-orientation='vertical'] {
+    flex-direction: column;
+  }
+</style>

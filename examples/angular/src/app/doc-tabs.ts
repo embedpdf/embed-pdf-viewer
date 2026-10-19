@@ -1,15 +1,13 @@
 /**
- * Workspace chrome: the reactive document registry (tabs) + an open action.
- * Lives OUTSIDE the document gate — it renders while no document exists and
- * while the engine is still booting.
+ * The tabs: every open document and an open button. Workspace UI, so it renders while no
+ * document is open and while the engine is still starting.
  */
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { injectDocuments } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { EpdfDocuments } from '@embedpdf/angular/runtime';
 import { sampleSource } from './engine';
 
 @Component({
   selector: 'app-doc-tabs',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host {
@@ -42,33 +40,33 @@ import { sampleSource } from './engine';
     }
   `,
   template: `
-    @for (doc of documents.docs(); track doc.id) {
+    @for (document of documents.documents(); track document.id) {
       <button
         class="tab"
-        [class.active]="doc.id === documents.activeId()"
-        (click)="documents.setActive(doc.id)"
+        [class.active]="document.id === documents.activeId()"
+        (click)="documents.setActive(document.id)"
       >
-        {{ doc.name ?? doc.id }} · {{ doc.pageCount }}p
+        {{ document.name ?? document.id }} · {{ document.pageCount }}p
       </button>
     }
     <button class="open" [disabled]="opening()" (click)="openCopy()">＋ Open copy</button>
   `,
 })
 export class DocTabs {
-  protected readonly documents = injectDocuments();
+  protected readonly documents = inject(EpdfDocuments);
   protected readonly opening = signal(false);
-  private seq = 0;
+  private copies = 0;
 
   protected async openCopy(): Promise<void> {
     this.opening.set(true);
     try {
-      this.seq += 1;
-      const id = `ebook-copy-${this.seq}`;
-      await this.documents.open(await sampleSource(id, '/ebook.pdf'), {
-        name: `Copy ${this.seq}`,
+      this.copies += 1;
+      const id = `ebook-copy-${this.copies}`;
+      await this.documents.open(() => sampleSource(id, '/ebook.pdf'), {
+        name: `Copy ${this.copies}`,
       });
-    } catch (err) {
-      console.error('[example] open failed', err);
+    } catch (error) {
+      console.error('[example] open failed', error);
     } finally {
       this.opening.set(false);
     }

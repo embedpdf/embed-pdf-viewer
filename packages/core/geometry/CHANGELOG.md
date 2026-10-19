@@ -1,5 +1,23 @@
 # @embedpdf/core-geometry
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `containedRect(content, box)`: the largest rect of `content`'s proportions inside `box`, centred, as CSS `object-fit: contain` places it.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Rect algebra: `rectFromCorners`, `rectContains`, `rectsOverlap` for y-down rects, and `edgesOverlap`, `edgesOfQuad` for PDF edges.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Add `pageSpace(crop)`, the one owner of page ↔ PDF conversion for a page (points, rectangles and quads both ways), plus the `PagePoint`, `PageRect` and `PageQuad` aliases for page space.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Expose page-space geometry and text quadrilaterals with corners named in
+  reading order. Update page transforms and coordinate helpers so callers can
+  convert between page, content, view, and pixel coordinates consistently.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Add `samePagePlacement(left, right)`: whether two page transforms place things on the page the same (scale, zoom, turn and content box), so a layer redraws only when what it draws moved, not on a plain scroll.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

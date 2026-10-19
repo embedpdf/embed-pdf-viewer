@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@embedpdf/angular": ["./src/public_api.ts"],
+      "@embedpdf/angular/*": ["./*/src/public_api.ts"]
+    }
+  },
+  "include": ["*/src/**/*.ts"],
+  "exclude": ["node_modules", "dist"],
+  "angularCompilerOptions": {
+    "compilationMode": "full",
+    "strictTemplates": true,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true
+  }
+}

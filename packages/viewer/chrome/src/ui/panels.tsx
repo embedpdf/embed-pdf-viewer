@@ -1,71 +1,192 @@
 /**
- * The static chrome around the toolbars: the left/right sidebars (shell
- * surfaces) and the bottom page-controls overlay. Deliberately minimal —
- * chrome-parity scope. Panels read their open state from plugin-shell; the
- * app owns their DOM.
+ * The layout's panels, drawn: on each side of the pages, the panel open on
+ * that side, in the frame that opens it (docked beside the pages, over them,
+ * or as a sheet: panel-frame.tsx). The panels on one side take turns: opening
+ * one closes the other, however it was opened. The header switches between
+ * the panels on the side; the body is the slot `panel:<id>`, which holds the
+ * built-in content, so content of your own replaces it, and a panel of your
+ * own with nothing in its slot is empty.
  *
- * There is no built-in header: branding, a locale picker and a theme switch
- * are the EMBEDDER's chrome, not the viewer's. The frame keeps a `header`
- * socket for a slotted one (see Shell).
+ * Which panels are open is each document's own (the shell plugin keeps them
+ * per document), so switching documents brings back that document's panels.
+ * A panel whose button no longer shows (its feature turned off, or not
+ * allowed) closes.
  */
-import { useEffect } from 'react';
-import { useSelector, useDocumentId } from '@embedpdf/react/runtime';
-import { Stage, StageToken, usePages } from '@embedpdf/react/stage';
-import { RenderLayer } from '@embedpdf/react/render';
-import { useSurface } from '@embedpdf/react/shell';
+import { panelCommandOf } from '@embedpdf/core-ui';
+import { useCommands } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
-import { ThumbsStageToken } from '../config/stage';
-import { Icon } from './icons';
-import { AnnotationStylePanel } from './annotation-style';
-import { CommentsPanel } from './comments-panel';
-import { MeasurementSection } from './measurement';
-import { RedactionPanel } from './redaction-panel';
-import { SearchPanel } from './search-panel';
-import { StampsPanel } from './stamps-panel';
-import { SignaturesPanel } from './signatures-panel';
+import { RenderLayer } from '@embedpdf/react/render';
+import { useDocumentId, useKernelValue, useOptionalCapability } from '@embedpdf/react/runtime';
+import { ShellToken, useShellEvent } from '@embedpdf/react/shell';
+import { Stage, useStage, useStageState } from '@embedpdf/react/stage';
+import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 
-// ── left sidebar (thumbnails / outline tabs) ─────────────────────────────────
-export function LeftSidebar() {
+import { panelsOnSide } from '../config/panels';
+import { ThumbsStageToken } from '../config/stage';
+import { useResolvedLayout } from '../config-context';
+import { lazyComponent } from './lazy';
+import { PanelFrame, useCloseOnPick } from './panel-frame';
+import type { PanelSide } from './panel-layout';
+import { PanelSwitcher } from './panel-switcher';
+
+// Each feature's panel loads the first time it opens.
+const SearchPanel = lazyComponent(() => import('./search-panel').then((ui) => ui.SearchPanel));
+const CommentsPanel = lazyComponent(() =>
+  import('./comments-panel').then((ui) => ui.CommentsPanel),
+);
+const MeasurementSection = lazyComponent(() =>
+  import('./measurement').then((ui) => ui.MeasurementSection),
+);
+const AnnotationStylePanel = lazyComponent(() =>
+  import('./annotation-style').then((ui) => ui.AnnotationStylePanel),
+);
+const StampsPanel = lazyComponent(() => import('./stamps-panel').then((ui) => ui.StampsPanel));
+const SignaturesPanel = lazyComponent(() =>
+  import('./signatures-panel').then((ui) => ui.SignaturesPanel),
+);
+const RedactionPanel = lazyComponent(() =>
+  import('./redaction-panel').then((ui) => ui.RedactionPanel),
+);
+const OutlinePanel = lazyComponent(() => import('./outline-panel').then((ui) => ui.OutlinePanel));
+const FormDesignPanel = lazyComponent(() =>
+  import('./form-design-panel').then((ui) => ui.FormDesignPanel),
+);
+
+/** What a built-in panel draws in its slot. */
+interface BuiltInContent {
+  readonly draw: (documentId: string | null) => ReactNode;
+  /** It holds a list: in a sheet or an overlay, picking one of its items closes the panel. */
+  readonly list?: boolean;
+}
+
+const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, BuiltInContent>([
+  ['thumbnails', { draw: () => <ThumbnailList />, list: true }],
+  // Each document's own outline, its filter and its rows.
+  ['outline', { draw: (documentId) => <OutlinePanel key={documentId ?? 'none'} />, list: true }],
+  // These read the document as they mount, so each document gets its own.
+  ['search', { draw: (documentId) => <SearchPanel key={documentId ?? 'none'} />, list: true }],
+  ['comments', { draw: (documentId) => <CommentsPanel key={documentId ?? 'none'} /> }],
+  ['measurement', { draw: (documentId) => <MeasurementSection key={documentId ?? 'none'} /> }],
+  ['style', { draw: () => <AnnotationStylePanel /> }],
+  ['stamps', { draw: () => <StampsPanel /> }],
+  ['signatures', { draw: () => <SignaturesPanel /> }],
+  ['redaction', { draw: () => <RedactionPanel /> }],
+  // The form's fields and their settings: each document's own.
+  ['form-design', { draw: (documentId) => <FormDesignPanel key={documentId ?? 'none'} /> }],
+]);
+
+const NONE: readonly string[] = [];
+
+const sameStrings = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((value, i) => value === right[i]);
+
+/** One side's panels: which show (their buttons do), which are turned off, which are open. */
+interface SideState {
+  readonly shown: readonly string[];
+  readonly off: readonly string[];
+  readonly open: readonly string[];
+}
+
+const sameSide = (left: SideState, right: SideState): boolean =>
+  sameStrings(left.shown, right.shown) &&
+  sameStrings(left.off, right.off) &&
+  sameStrings(left.open, right.open);
+
+/** The panel open on one side of the pages, if any, of the layout's panels on that side. */
+export function SidePanel({ side }: { side: PanelSide }) {
+  const { data } = useResolvedLayout();
+  const commands = useCommands();
+  const shell = useOptionalCapability(ShellToken);
+  const documentId = useDocumentId();
+  const ids = useMemo(() => panelsOnSide(data, side), [data, side]);
+  const { shown, off, open } = useKernelValue((): SideState => {
+    const visibleOf = (id: string) =>
+      commands.resolveCommand(panelCommandOf(id), documentId ?? undefined)?.visible;
+    return {
+      shown: ids.filter((id) => visibleOf(id) === true),
+      // A panel whose command isn't registered is neither: it isn't drawn, and it isn't closed.
+      off: ids.filter((id) => visibleOf(id) === false),
+      open: shell ? ids.filter((id) => shell.isOpen(id)) : NONE,
+    };
+  }, sameSide);
+
+  // Opening a panel closes the one open on its side, however it was opened.
+  useShellEvent(
+    (current) => current.onSurfaceOpened,
+    (event) => {
+      if (!shell || !ids.includes(event.id)) return;
+      for (const id of ids) if (id !== event.id && shell.isOpen(id)) shell.close(id);
+    },
+  );
+
+  // The first open panel that shows is drawn. A turned-off one closes, and so does any other
+  // open on this side (opened while another document showed).
+  const current = open.find((id) => shown.includes(id)) ?? null;
+  useLayoutEffect(() => {
+    if (!shell) return;
+    for (const id of open) {
+      if (id !== current && (current !== null || off.includes(id))) shell.close(id);
+    }
+  }, [shell, open, off, current]);
+
+  if (current === null) return null;
+  return <OpenPanel key={current} id={current} side={side} siblings={shown} />;
+}
+
+/** One open panel in its frame: its title or the switcher in the header, its slot as the body. */
+function OpenPanel({
+  id,
+  side,
+  siblings,
+}: {
+  id: string;
+  side: PanelSide;
+  siblings: readonly string[];
+}) {
   const t = useT();
-  const sidebar = useSurface('sidebar');
-  if (!sidebar.isOpen) return null;
+  const panel = useResolvedLayout().data.panels?.[id];
+  const shell = useOptionalCapability(ShellToken);
+  const documentId = useDocumentId();
+  if (!panel) return null;
+  const title = panel.title ?? (panel.titleKey !== undefined ? t(panel.titleKey) : id);
+  const content = BUILT_IN_CONTENT.get(id);
   return (
-    <aside className="border-border-subtle bg-surface flex w-60 shrink-0 flex-col border-r">
-      <div className="border-border-subtle flex items-center gap-1 border-b p-2">
-        <span className="bg-accent-light text-accent rounded-md px-2 py-1 text-xs font-medium">
-          {t('demo.thumbnails')}
-        </span>
-        <span className="text-fg-muted rounded-md px-2 py-1 text-xs font-medium">
-          {t('demo.outline')}
-        </span>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={sidebar.close}
-          className="text-fg-muted hover:bg-hover grid h-7 w-7 place-items-center rounded-md"
-        >
-          <Icon name="x" size={16} />
-        </button>
-      </div>
-      <ThumbnailList />
-    </aside>
+    <PanelFrame
+      id={id}
+      side={side}
+      present={panel.present}
+      width={panel.width}
+      resizable={panel.resizable}
+      title={title}
+      header={
+        siblings.length > 1 ? <PanelSwitcher id={id} title={title} panels={siblings} /> : undefined
+      }
+      list={content?.list}
+      onClose={() => shell?.close(id)}
+    >
+      <slot name={`panel:${id}`}>{content?.draw(documentId)}</slot>
+    </PanelFrame>
   );
 }
 
-// The thumbnail rail: the SAME document through the thumbnail Stage lens (a
-// single-column, fixed-zoom grid — see App's `stage-thumbs` plugin). Click a
-// thumb to navigate the MAIN lens; the rail follows the main view. Read-only —
-// no page edits (rotate/move/delete), just the page bitmap and its number.
+// The thumbnail rail: the same document through the thumbnail Stage lens (a
+// fixed-zoom grid that wraps into as many columns as the panel's width fits —
+// see the viewer's `thumbnails` plugin). Click a thumb to navigate the main
+// lens; the rail follows the main view. Read-only — no page edits
+// (rotate/move/delete), just the page bitmap and its number.
 function ThumbnailList() {
-  const { currentPage, goToPage } = usePages(); // the MAIN lens
-  const { reveal } = usePages(ThumbsStageToken); // the SIDEBAR lens
+  const t = useT();
+  const main = useStage(); // the main lens
+  const thumbs = useStage(ThumbsStageToken); // the sidebar lens
+  const currentPage = useStageState((state) => state.currentPageIndex);
+  // A sheet or an overlay closes once a page is picked, so you see where it took you.
+  const closeOnPick = useCloseOnPick();
   // Follow the main view: when its current page changes, make that thumb visible —
   // minimal movement, zero when it's already on screen.
-  useEffect(() => reveal(currentPage), [currentPage, reveal]);
+  useEffect(() => thumbs.reveal(currentPage), [currentPage, thumbs]);
   return (
     <Stage
       token={ThumbsStageToken}
-      zoomGestures={false} // fixed-magnification rail: cmd+wheel/pinch scrolls, never zooms
       className="flex-1"
       style={{ position: 'relative' }}
       pageChrome={(page) => (
@@ -74,23 +195,23 @@ function ThumbnailList() {
               box; the number sits in the reserved bottom band. Neither rotates. */}
           <button
             type="button"
-            onClick={() => goToPage(page.pageIndex)}
-            title={`Page ${page.pageIndex + 1}`}
+            onClick={() => {
+              main.goToPage(page.pageIndex);
+              closeOnPick();
+            }}
+            title={t('thumbnails.page', { params: { page: page.pageIndex + 1 } })}
+            // The current page in the accent with a tint around it, the others in a light line.
+            className={`box-border cursor-pointer rounded ${
+              page.pageIndex === currentPage
+                ? 'border-accent ring-accent-light border-2 ring-2'
+                : 'border-border-subtle border'
+            }`}
             style={{
               position: 'absolute',
               top: page.frame.top,
               left: page.frame.left,
               right: page.frame.right,
               bottom: page.frame.bottom,
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-              borderRadius: 4,
-              border:
-                page.pageIndex === currentPage
-                  ? '2px solid var(--ep-accent)'
-                  : '1px solid var(--ep-border-subtle)',
-              boxShadow:
-                page.pageIndex === currentPage ? '0 0 0 2px var(--ep-accent-light)' : 'none',
             }}
           />
           <div
@@ -104,7 +225,7 @@ function ThumbnailList() {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 11,
-              color: 'var(--ep-fg-muted)',
+              color: 'var(--epdf-text-muted)',
               pointerEvents: 'none',
             }}
           >
@@ -116,112 +237,5 @@ function ThumbnailList() {
       {/* page-space content: the bitmap, which rotates with the page */}
       {() => <RenderLayer />}
     </Stage>
-  );
-}
-
-// ── right sidebar (search / comment / style / redaction / stamps) ────────────
-export function RightSidebar() {
-  const t = useT();
-  // Keys the SearchPanel below: the panel seeds its query box from the active
-  // document's search state on mount, so it must remount when the active
-  // document changes (switching tabs with the sidebar open) to re-seed.
-  const documentId = useDocumentId();
-  const search = useSurface('search');
-  const comment = useSurface('comment');
-  const style = useSurface('annotation-style');
-  const redaction = useSurface('redaction');
-  const measurement = useSurface('measurement');
-  const stamps = useSurface('stamps');
-  const signatures = useSurface('signatures');
-  const active = measurement.isOpen
-    ? 'measurement'
-    : search.isOpen
-      ? 'search'
-      : comment.isOpen
-        ? 'comment'
-        : style.isOpen
-          ? 'style'
-          : redaction.isOpen
-            ? 'redaction'
-            : stamps.isOpen
-              ? 'stamps'
-              : signatures.isOpen
-                ? 'signatures'
-                : null;
-  if (!active) return null;
-
-  const titleKey =
-    active === 'measurement'
-      ? 'measurement.title'
-      : active === 'search'
-        ? 'demo.searchTitle'
-        : active === 'comment'
-          ? 'demo.commentsTitle'
-          : active === 'redaction'
-            ? 'demo.redactionTitle'
-            : active === 'stamps'
-              ? 'demo.stampsTitle'
-              : active === 'signatures'
-                ? 'demo.signaturesTitle'
-                : 'demo.styleTitle';
-  const close =
-    active === 'measurement'
-      ? measurement.close
-      : active === 'search'
-        ? search.close
-        : active === 'comment'
-          ? comment.close
-          : active === 'redaction'
-            ? redaction.close
-            : active === 'stamps'
-              ? stamps.close
-              : active === 'signatures'
-                ? signatures.close
-                : style.close;
-
-  return (
-    <aside className="border-border-subtle bg-surface flex w-72 shrink-0 flex-col border-l">
-      <div className="border-border-subtle flex items-center justify-between border-b p-3">
-        <span className="text-fg text-sm font-semibold">{t(titleKey)}</span>
-        <button
-          type="button"
-          onClick={close}
-          className="text-fg-muted hover:bg-hover grid h-7 w-7 place-items-center rounded-md"
-        >
-          <Icon name="x" size={16} />
-        </button>
-      </div>
-      {active === 'measurement' ? (
-        <MeasurementSection key={documentId ?? 'none'} />
-      ) : active === 'style' ? (
-        <AnnotationStylePanel />
-      ) : active === 'search' ? (
-        <SearchPanel key={documentId ?? 'none'} />
-      ) : active === 'redaction' ? (
-        <RedactionPanel />
-      ) : active === 'stamps' ? (
-        <StampsPanel />
-      ) : active === 'signatures' ? (
-        <SignaturesPanel />
-      ) : (
-        <CommentsPanel key={documentId ?? 'none'} />
-      )}
-    </aside>
-  );
-}
-
-// ── bottom page-controls overlay ─────────────────────────────────────────────
-export function PageControls() {
-  const t = useT();
-  // the Stage cursor is a 0-based display index; people count from 1
-  const current = useSelector(StageToken, (c) => c.getCurrentPageIndex() + 1);
-  const { pageCount: total } = usePages();
-  if (!total) return null;
-  return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center">
-      <div className="border-border-subtle bg-elevated/95 text-fg-secondary pointer-events-auto rounded-full border px-4 py-1.5 text-sm shadow-lg backdrop-blur">
-        {t('demo.page', { params: { current, total } })}
-      </div>
-    </div>
   );
 }

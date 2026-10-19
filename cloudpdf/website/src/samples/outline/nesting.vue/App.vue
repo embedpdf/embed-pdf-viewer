@@ -1,0 +1,23 @@
+<script setup lang="ts">
+import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
+import type { OpenInput } from '@embedpdf/vue/runtime';
+import { outlinePlugin } from '@embedpdf/vue/outline';
+import { cloudEngine } from '@cloudpdf/engine';
+import OutlineEditor from './OutlineEditor.vue';
+
+import '../nesting.css';
+
+const engine = cloudEngine();
+const plugins = [outlinePlugin()];
+
+const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+</script>
+
+<template>
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+    <DocumentGate>
+      <template #fallback><p class="loading">Loading…</p></template>
+      <OutlineEditor />
+    </DocumentGate>
+  </Viewer>
+</template>

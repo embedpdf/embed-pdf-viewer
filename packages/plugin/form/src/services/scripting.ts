@@ -1,34 +1,77 @@
 /**
- * The K/V/C/F seam. Scripting rides the actions plugin's per-document realm:
- * the transaction port's PRESENCE is the "JavaScript is on" signal (D8 — the
- * switch lives on `actionsPlugin({ javascript })`; form owns only the
- * keystroke / validate / calculate / format pipeline).
+ * The keystroke, validate, calculate and format script pipeline. Scripts run
+ * in the actions plugin's per-document realm: when that realm offers a
+ * transaction port, JavaScript is on (the switch is
+ * `actionsPlugin({ javascript })`). The `validation` setting decides, at each
+ * write, whether the pipeline runs; this plugin owns only the pipeline.
  */
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
+import type { ScriptCommitSurface } from '@embedpdf/plugin-actions/contract/host';
 
-import type { FormCommitResult, FormConfig } from '../contract';
-import { createFormScriptingController } from '../scripting/controller';
+import { formHasScripts, type FieldIndex } from '../model';
+import {
+  createFormScriptingController,
+  type FormScriptingController,
+} from '../scripting/controller';
 import type { FormContext } from './context';
 import type { FormSiblings } from './siblings';
 
-export function createScriptingSeam(ctx: FormContext, config: FormConfig, siblings: FormSiblings) {
-  const actionsHost = siblings.actions;
-  const realm = actionsHost?.scriptRealm ?? null;
-  const scripting =
-    realm && ctx.doc && config.validation !== 'none'
-      ? createFormScriptingController({
-          doc: ctx.doc,
-          document: () => ctx.document(),
-          transaction: realm.transaction.bind(realm),
-          budget: realm.budget,
-        })
-      : null;
-  if (scripting) ctx.cleanup(() => scripting.dispose());
-  /** Every script surface (UI effects, diagnostics, errors) flows through
-   *  the actions plugin's ONE port — origin/phase attached (D9). */
-  const surfaceViaActions = (result: FormCommitResult, origin: ActionOrigin): void => {
-    actionsHost?.surfaceScriptCommit(result, { origin, realm: 'document' });
+export function createScriptingSeam(ctx: FormContext, siblings: FormSiblings) {
+  // The pipeline over the actions plugin's realm, made the first time one is there.
+  let pipeline: FormScriptingController | null = null;
+  const pipelineOf = (): FormScriptingController | null => {
+    if (pipeline) return pipeline;
+    const realm = siblings.actions()?.scriptRealm ?? null;
+    if (!realm) return null;
+    const made = createFormScriptingController({
+      document: () => ctx.document(),
+      transaction: realm.transaction.bind(realm),
+      budget: realm.budget,
+    });
+    ctx.cleanup(() => made.dispose());
+    pipeline = made;
+    return made;
   };
-  return { controller: scripting, surface: surfaceViaActions };
+  const settings = ctx.settings();
+  const controller = (): FormScriptingController | null =>
+    settings.get().validation === 'scripts' ? pipelineOf() : null;
+
+  // A one-shot developer hint: a form with scripts and no realm fills without them.
+  let warnedNoRealm = false;
+  const scriptsFor = (form: FieldIndex): FormScriptingController | null => {
+    if (!formHasScripts(form)) return null;
+    if (!pipelineOf() && !warnedNoRealm && settings.get().validation === 'scripts') {
+      warnedNoRealm = true;
+      console.warn(
+        "[form] this form has scripts, but they don't run: add the actions plugin with " +
+          'JavaScript on (`actionsPlugin({ javascript: { enabled: true, sandboxFactory } })`), ' +
+          "or set the form's `validation` to 'none' to fill it in without them.",
+      );
+    }
+    return controller();
+  };
+
+  let warmed = false;
+  return {
+    /** The script pipeline when the document's scripts run, else `null`. */
+    controller,
+    /** The script pipeline for a write to this form: `null` too when no field has a script. */
+    scriptsFor,
+    /** Start the realm before the first write needs it, once, when the form has scripts. */
+    warm(form: FieldIndex): void {
+      if (warmed || !form.snapshot) return;
+      const scripts = scriptsFor(form);
+      if (!scripts) return;
+      warmed = true;
+      void scripts.warm(form.snapshot).catch(() => {
+        /* the first write starts the realm, and reports why it can't */
+      });
+    },
+    /** Script results (UI effects, diagnostics, errors) are surfaced through the
+     *  actions plugin, with the origin that caused them. */
+    surface: (result: ScriptCommitSurface, origin: ActionOrigin): void => {
+      siblings.actions()?.surfaceScriptCommit(result, { origin, realm: 'document' });
+    },
+  };
 }
 export type FormScripting = ReturnType<typeof createScriptingSeam>;

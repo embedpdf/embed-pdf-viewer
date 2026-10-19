@@ -1,14 +1,11 @@
+// Generated from docs/content — edit there, then `pnpm docs:sync`.
 export default {
-  index: {
-    title: 'Overview',
-    type: 'doc',
-  },
-  'getting-started': {
-    title: 'Getting Started',
-    type: 'doc',
-  },
-  'core-concepts': {
-    title: 'Core concepts',
-    type: 'doc',
-  },
+  index: 'Overview',
+  'quick-start': 'Quick start',
+  setup: 'Setup',
+  documents: 'Documents',
+  text: 'Text',
+  annotations: 'Annotations',
+  forms: 'Forms & signatures',
+  concepts: 'Good to know',
 };

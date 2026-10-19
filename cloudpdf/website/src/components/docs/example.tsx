@@ -1,6 +1,11 @@
 'use client';
 
-import { CodeExampleCard, type ExampleFile, type ExampleMode } from '@embedpdf/docs-kit';
+import {
+  CodeExampleCard,
+  type ExampleFile,
+  type ExampleFrame,
+  type ExampleMode,
+} from '@embedpdf/docs-kit';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -14,10 +19,10 @@ import {
   isDocsIntegration,
 } from '@/lib/docs-integrations';
 
-/** Mounts a built demo module (public/demos/…) via a NATIVE dynamic import —
+/** Mounts a built demo module (public/demos/…) via a native dynamic import —
  * the module carries its own framework runtime, so Vue/Svelte/Angular demos
  * run inside the Next site with no bundler integration at all. Import cost is
- * deferred until the preview is open AND near the viewport; once mounted, a
+ * deferred until the preview is open and near the viewport; once mounted, a
  * collapse keeps the instance alive (state survives toggling). */
 function DemoMount({ url, active }: { url: string; active: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -65,8 +70,8 @@ function DemoMount({ url, active }: { url: string; active: boolean }) {
   }, [started, url]);
 
   return (
-    <div className="relative">
-      <div ref={ref} className="min-h-[220px]" />
+    <div className="relative h-full">
+      <div ref={ref} className="h-full min-h-[220px]" />
       {!loaded && !error ? (
         <p className="text-cp-muted absolute inset-0 m-0 flex animate-pulse items-center justify-center font-sans text-sm">
           Loading live preview…
@@ -82,7 +87,25 @@ function DemoMount({ url, active }: { url: string; active: boolean }) {
 }
 
 /**
- * The route-variant-resolved sample display. This site's job is RESOLUTION —
+ * A bigger preview than an example gets by default: `tall`, or `wide`, which is as tall and on a
+ * wide screen also takes the table of contents' column (the card covers it while it scrolls by).
+ */
+export type ExampleSize = 'tall' | 'wide';
+
+/**
+ * The preview's frame: a ready-made viewer example (`viewer/…`) fills a frame that suits the docs
+ * column, which `size` makes bigger; other examples are as tall as they are, unless `size` says.
+ */
+function frameOf(name: string | undefined, size: ExampleSize | undefined): ExampleFrame {
+  if (size === 'tall' || size === 'wide') return 'tall';
+  return name?.startsWith('viewer/') ? 'viewer' : 'content';
+}
+
+/** The table of contents' column (the kit's `Toc`) and the gap before it (mdx.tsx). */
+const WIDE = 'relative z-10 xl:w-[calc(100%+232px+clamp(28px,4vw,60px))]';
+
+/**
+ * The route-variant-resolved sample display. This site's job is resolution —
  * which framework's files, which built demo — and the honest not-yet-ported
  * fallback; the kit's CodeExampleCard owns every pixel of the shell, so the
  * "View code" chrome is identical on both docs sites.
@@ -91,10 +114,25 @@ export function Example({
   filesByFramework,
   demosByFramework,
   mode = 'default',
+  kind = 'example',
+  available,
+  name,
+  size,
 }: {
   filesByFramework?: string;
   demosByFramework?: string;
   mode?: ExampleMode;
+  /** A `<Snippet>` is code only; its gap note says so. */
+  kind?: 'example' | 'snippet';
+  /**
+   * The frameworks that have a version, when the server only sent the route's framework's files
+   * (`RouteExample`); the "not available yet" note picks its link from it.
+   */
+  available?: readonly string[];
+  /** The sample's name, as the page writes it (`viewer/quick-start/customized`). */
+  name?: string;
+  /** A bigger preview (`<Example size="tall">`). */
+  size?: ExampleSize;
 }) {
   const pathname = usePathname();
   const product = fanoutProductFromPath(pathname);
@@ -115,9 +153,8 @@ export function Example({
   const demoUrl = demos[variant];
 
   if (!files || files.length === 0) {
-    const fallback = byFramework[defaultIntegration]?.length
-      ? defaultIntegration
-      : Object.keys(byFramework)[0];
+    const versions = available ?? Object.keys(byFramework).filter((fw) => byFramework[fw]?.length);
+    const fallback = versions.includes(defaultIntegration) ? defaultIntegration : versions[0];
     const fallbackIntegration = isDocsIntegration(fallback) ? fallback : null;
     const fallbackLabel = fallbackIntegration ? DOCS_INTEGRATION_LABELS[fallbackIntegration] : null;
     const fallbackHref = fallbackIntegration
@@ -125,7 +162,8 @@ export function Example({
       : null;
     return (
       <div className="mt-6 max-w-[72ch] rounded-[14px] border border-[#C9DEFF] bg-[#F2F7FF] px-[18px] py-4 font-sans text-[15px] leading-[1.6] text-[#2A4574]">
-        This example isn&rsquo;t available for <b>{label}</b> yet.
+        {kind === 'snippet' ? 'This code isn’t written for ' : 'This example isn’t available for '}
+        <b>{label}</b> yet.
         {fallback && fallbackHref && fallbackLabel ? (
           <>
             {' '}
@@ -143,11 +181,13 @@ export function Example({
     );
   }
 
-  return (
+  const card = (
     <CodeExampleCard
       files={files}
       mode={mode}
+      frame={frameOf(name, size)}
       demo={demoUrl ? (active) => <DemoMount url={demoUrl} active={active} /> : undefined}
     />
   );
+  return size === 'wide' ? <div className={WIDE}>{card}</div> : card;
 }

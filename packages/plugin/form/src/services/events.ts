@@ -1,8 +1,8 @@
-/** The six confirmed-change hooks; disposed with the plugin. */
-import { createEventHook } from '@embedpdf/core';
-
+/** The form plugin's events. Fact events fire from the fields mirror; see `sync/fields.ts`. */
 import type {
-  FormFieldChangedEvent,
+  FormFieldCreatedEvent,
+  FormFieldDeletedEvent,
+  FormFieldUpdatedEvent,
   FormResyncedEvent,
   FormValidationRejectedEvent,
   FormValueChangedEvent,
@@ -10,24 +10,13 @@ import type {
 import type { FormContext } from './context';
 
 export function createEvents(ctx: FormContext) {
-  const reportListener = (error: unknown) => console.error('[form] event listener failed:', error);
-  const valueChanged = createEventHook<FormValueChangedEvent>(reportListener);
-  const fieldCreated = createEventHook<FormFieldChangedEvent>(reportListener);
-  const fieldUpdated = createEventHook<FormFieldChangedEvent>(reportListener);
-  const fieldDeleted = createEventHook<FormFieldChangedEvent>(reportListener);
-  const validationRejected = createEventHook<FormValidationRejectedEvent>(reportListener);
-  const resynced = createEventHook<FormResyncedEvent>(reportListener);
-  ctx.cleanup(() => {
-    for (const hook of [
-      valueChanged,
-      fieldCreated,
-      fieldUpdated,
-      fieldDeleted,
-      validationRejected,
-      resynced,
-    ])
-      hook.dispose();
-  });
-  return { valueChanged, fieldCreated, fieldUpdated, fieldDeleted, validationRejected, resynced };
+  return {
+    valueChanged: ctx.events.source<FormValueChangedEvent>(),
+    fieldCreated: ctx.events.source<FormFieldCreatedEvent>(),
+    fieldUpdated: ctx.events.source<FormFieldUpdatedEvent>(),
+    fieldDeleted: ctx.events.source<FormFieldDeletedEvent>(),
+    validationRejected: ctx.events.source<FormValidationRejectedEvent>(),
+    resynced: ctx.events.source<FormResyncedEvent>(),
+  };
 }
 export type FormEvents = ReturnType<typeof createEvents>;

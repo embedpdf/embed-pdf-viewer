@@ -1,11 +1,15 @@
 /**
- * The actions plane's seams into the form owner: the form-effects commit
- * sink (script `setValue` / `setDisplay` / reset effects land through the
- * owner, so the engine write and the visible model can never diverge) and
- * the submit dataset resolver (D7: a FRESH engine read, then the pure ISO
- * builder).
+ * The actions plugin's seams into the form plugin: the form-effects commit
+ * sink (script `setValue`, `setDisplay` and reset effects are written through
+ * the plugin that owns the fields, as one fill with the calculations they
+ * cause) and the submit dataset resolver.
  */
-import type { FormEffectsResult } from '@embedpdf/engine-core/runtime';
+import {
+  formEffectOps,
+  serializeError,
+  type FormEffect,
+  type FormFieldRef,
+} from '@embedpdf/engine-core/runtime';
 import type {
   ActionContext,
   ActionDiagnostic,
@@ -15,40 +19,41 @@ import type {
 
 import { buildSubmitEntries } from '../field-selection';
 import type { FormHostCapability } from '../host-contract';
+import { fieldByRef } from '../model';
 import type { FormContext, FormServices } from '../services';
-import type { FormHydration } from '../sync/hydration';
+import type { Fills } from './fill';
+
+/** The fields a script's effects write to. */
+const refsOf = (effects: readonly FormEffect[]): FormFieldRef[] =>
+  effects.flatMap((effect) => (effect.kind === 'reset' ? effect.refs : [effect.ref]));
 
 export function createScriptEffects(
   ctx: FormContext,
-  { siblings }: Pick<FormServices, 'siblings'>,
-  hydration: FormHydration,
+  { fields, rights, enqueue }: Pick<FormServices, 'fields' | 'rights' | 'enqueue'>,
+  { fillSoon }: Fills,
 ) {
-  const annotationHost = siblings.annotation;
-  const { refresh } = hydration;
-
   /**
-   * The submit dataset resolver (Phase 4, D7): a FRESH engine read — never
-   * the cached model, so no staleness class exists — then the pure ISO
-   * builder. Selection/veto/value semantics live in `field-selection.ts`;
-   * this door only supplies the live fields and assembles the request.
+   * The submit dataset: the fields as the user sees them once every fill on its way is
+   * answered, then the pure ISO builder. Selection, veto and value semantics live in
+   * `field-selection.ts`; this only supplies the fields and assembles the request.
    */
   const resolveSubmitDataset = async (
     intent: SubmitIntent,
-    actionCtx: ActionContext,
+    actionContext: ActionContext,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('no document');
-    const snapshot = await doc.forms.list();
+    await enqueue.idle();
+    await ctx.changes.whenSettled();
+    if (!fields.view().snapshot) await fields.settled();
     return {
       url: intent.url,
       method: intent.method,
       format: intent.format,
       flagsRaw: intent.flagsRaw,
       ...(intent.charSet === undefined ? {} : { charSet: intent.charSet }),
-      entries: buildSubmitEntries(snapshot.fields, intent, diagnose),
-      origin: actionCtx.origin,
-      event: actionCtx.event,
+      entries: buildSubmitEntries(fields.view().snapshot?.fields ?? [], intent, diagnose),
+      origin: actionContext.origin,
+      event: actionContext.event,
     };
   };
 
@@ -56,54 +61,28 @@ export function createScriptEffects(
     api: {
       resolveSubmitDataset,
       commitScriptFormEffects: async (effects) => {
-        const doc = ctx.doc;
-        if (!doc?.forms.applyEffects) {
-          // Sink contract: never throw — shape an all-failed batch honestly.
-          return {
-            results: effects.map((_, index) => ({
-              index,
-              status: 'failed' as const,
-              fields: [],
-              changedWidgets: [],
-              error: { code: 'NotSupported', message: 'no form-effects batch door' } as never,
-            })),
-            changedWidgets: [],
-            meta: null,
-          };
-        }
-        let result: FormEffectsResult;
         try {
-          result = await doc.forms.applyEffects(effects);
-        } catch (error) {
-          // Sink contract: never throw. An authority pre-check rejection
-          // (PermissionDenied) becomes an all-failed batch, honestly.
-          const message = error instanceof Error ? error.message : String(error);
-          return {
-            results: effects.map((_, index) => ({
-              index,
-              status: 'failed' as const,
-              fields: [],
-              changedWidgets: [],
-              error: { code: 'Refused', message } as never,
-            })),
-            changedWidgets: [],
-            meta: null,
-          };
-        }
-        // Reconcile OUR model — the owner folds its own writes (the effects
-        // listener deliberately ignores local events) — and the ANNOTATION
-        // plane's view of any changed widgets (setDisplay flips widget /F
-        // bits, and widget pixels live on that plane).
-        await refresh();
-        if (annotationHost) {
-          const seen = new Set<number>();
-          for (const widget of result.changedWidgets) {
-            if (!widget.page || seen.has(widget.page.pageObjectNumber)) continue;
-            seen.add(widget.page.pageObjectNumber);
-            await annotationHost.reloadPage(widget.page);
+          // A field the session may not fill in is refused here, at once: the script learns
+          // its write failed, as it would from the engine.
+          for (const ref of refsOf(effects)) {
+            const field = fieldByRef(fields.view(), ref);
+            if (field) rights.assertMayFill(field, 'form.fill');
           }
+          // The script's realm transaction is still running: the effects show at once, and
+          // the calculations a value causes run once it ends, in the same change.
+          const recalculates = effects.some(
+            (effect) => effect.kind === 'setValue' || effect.kind === 'reset',
+          );
+          fillSoon({
+            ops: formEffectOps(effects),
+            scripts: recalculates ? { kind: 'recalculate' } : null,
+            origin: 'user',
+          });
+          return { status: 'applied' };
+        } catch (error) {
+          // The sink never throws: a change it can't stage reports why.
+          return { status: 'failed', error: serializeError(error).message };
         }
-        return result;
       },
     } satisfies Partial<FormHostCapability>,
   };

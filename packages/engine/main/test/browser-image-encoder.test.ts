@@ -1,24 +1,40 @@
 /**
- * The encoder-worker pool contract — above all, the REGRESSION that made the
- * pool dead code for every default consumer: the literal source `'inline'`
- * is a string, and a branch-order slip resolved it as the URL "/inline"
- * (HTML → SyntaxError → permanent main-thread fallback). These tests pin
- * which worker each source kind constructs and that the pool round-trip is
- * actually used.
+ * The encoder-worker pool contract: which worker each source kind
+ * constructs, and that the pool round-trip is actually used. Above all, the
+ * literal source `'inline'` is a string, and must never be fetched as the URL
+ * "/inline" (HTML → SyntaxError → permanent main-thread fallback).
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PageRaster } from '@embedpdf/engine-core/runtime';
 import { EngineError } from '@embedpdf/engine-core/runtime';
 import { BrowserImageEncoder } from '../src/render/BrowserImageEncoder';
 
+const files = vi.hoisted(() => ({ encoder: null as string | null }));
+
+// Stands in for the bundler: the file it emitted, or none a worker could start from.
+vi.mock('../src/worker-files', async () => {
+  const { allowWorkerUrl } = await import('../src/trusted-types');
+  return {
+    findEngineWorkerFile: () => null,
+    findEncoderWorkerFile: () => {
+      if (files.encoder !== null) allowWorkerUrl(files.encoder);
+      return files.encoder;
+    },
+  };
+});
+
+const BUNDLED_FILE = 'https://app.test/assets/encoder-worker-abc.js';
+
 const constructed: string[] = [];
+const workerTypes: (WorkerType | undefined)[] = [];
 let respond = true;
 
 class FakeWorker {
   onmessage: ((e: { data: unknown }) => void) | null = null;
   onerror: ((e: { message: string }) => void) | null = null;
-  constructor(url: string | URL) {
+  constructor(url: string | URL, options?: WorkerOptions) {
     constructed.push(String(url));
+    workerTypes.push(options?.type);
   }
   postMessage(msg: { id: string }): void {
     if (!respond) return;
@@ -42,7 +58,9 @@ const options = { format: 'webp' as const };
 
 beforeEach(() => {
   constructed.length = 0;
+  workerTypes.length = 0;
   respond = true;
+  files.encoder = BUNDLED_FILE;
   (globalThis as Record<string, unknown>).Worker = FakeWorker;
   (globalThis as Record<string, unknown>).OffscreenCanvas = class {};
 });
@@ -53,23 +71,33 @@ afterEach(() => {
 });
 
 describe('BrowserImageEncoder worker sourcing', () => {
-  it("the DEFAULT ('inline') builds the bundled blob worker — never fetches '/inline'", async () => {
+  it('the default starts the bundled encoder-worker.js', async () => {
     const encoder = new BrowserImageEncoder();
     const result = await encoder.encode(raster, options, new AbortController().signal);
     expect(constructed.length).toBeGreaterThan(0);
-    for (const url of constructed) {
-      expect(url.startsWith('blob:')).toBe(true);
-      expect(url.includes('inline')).toBe(false);
-    }
+    expect(constructed.every((url) => url === BUNDLED_FILE)).toBe(true);
     // …and the pool actually did the work (the fake pool round-tripped).
     expect(result.source.kind).toBe('bytes');
     encoder.destroy();
   });
 
-  it("an explicit 'inline' behaves identically to the default", async () => {
+  it('the default starts from a blob: URL where the bundled file is on another origin', async () => {
+    files.encoder = null;
+    const encoder = new BrowserImageEncoder();
+    await encoder.encode(raster, options, new AbortController().signal);
+    expect(constructed.length).toBeGreaterThan(0);
+    expect(constructed.every((url) => url.startsWith('blob:'))).toBe(true);
+    encoder.destroy();
+  });
+
+  it("an explicit 'inline' always starts from a blob: URL — never fetches '/inline'", async () => {
     const encoder = new BrowserImageEncoder({ worker: 'inline' });
     await encoder.encode(raster, options, new AbortController().signal);
-    expect(constructed.every((u) => u.startsWith('blob:'))).toBe(true);
+    expect(constructed.length).toBeGreaterThan(0);
+    for (const url of constructed) {
+      expect(url.startsWith('blob:')).toBe(true);
+      expect(url.includes('inline')).toBe(false);
+    }
     encoder.destroy();
   });
 
@@ -78,6 +106,21 @@ describe('BrowserImageEncoder worker sourcing', () => {
     await encoder.encode(raster, options, new AbortController().signal);
     expect(constructed.length).toBeGreaterThan(0);
     expect(constructed.every((u) => u.endsWith('/workers/encoder-worker.js'))).toBe(true);
+    encoder.destroy();
+  });
+
+  // A classic worker can't even parse a file a dev server appended `import.meta` code to
+  // (`next dev` with Fast Refresh does), so every worker the encoder starts is a module.
+  it.each([
+    ['the bundled file', undefined, BUNDLED_FILE],
+    ['a blob: URL', 'inline', null],
+    ['a configured URL', '/workers/encoder-worker.js', null],
+  ] as const)('starts %s as a module worker', async (_, worker, file) => {
+    files.encoder = file;
+    const encoder = new BrowserImageEncoder(worker === undefined ? {} : { worker });
+    await encoder.encode(raster, options, new AbortController().signal);
+    expect(workerTypes.length).toBeGreaterThan(0);
+    expect(workerTypes.every((type) => type === 'module')).toBe(true);
     encoder.destroy();
   });
 

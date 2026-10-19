@@ -1,21 +1,22 @@
+import type { TextRange } from './TextRange';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 
 /**
- * Character↔text index translation — the ONE place the two text index
+ * Character↔text index translation — the one place the two text index
  * spaces of a page meet.
  *
  * A page has two index spaces:
  *
- *   - CHARACTER space: PDFium's internal character list, the space geometry
- *     runs tile (`PageGeometryRun.charStart`), hit-testing addresses, and
+ *   - character space: PDFium's internal character list, the space geometry
+ *     runs tile (`PageGeometryRun.start`), hit-testing addresses, and
  *     selection ranges live in. Size: `PageTextSnapshot.charCount`.
- *   - TEXT space: UTF-16 code-unit offsets into the extracted string
+ *   - text space: UTF-16 code-unit offsets into the extracted string
  *     `PageTextSnapshot.text` — what search matching and slicing operate on.
  *
  * They diverge in exactly two ways, both encoded by `charMap` anchors:
  *   - a non-printing character occupies a character slot but contributes
- *     ZERO text units (PDFium's `char_indices_` skip list);
- *   - a supplementary-plane character contributes TWO text units (a
+ *     zero text units (PDFium's `char_indices_` skip list);
+ *   - a supplementary-plane character contributes two text units (a
  *     surrogate pair) once extraction is UTF-16-faithful.
  *
  * `charMap` semantics (see {@link CharMapAnchor}): an implicit head anchor
@@ -26,7 +27,7 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
  * the wire schema and engine builders share — malformed maps are rejected,
  * never silently repaired.
  *
- * Boundary model: a "character boundary" `c` ∈ [0, charCount] sits BEFORE
+ * Boundary model: a "character boundary" `c` ∈ [0, charCount] sits before
  * character `c`; `boundaryTextOffset(s, charCount) === text.length` always.
  * All ranges are half-open in both spaces.
  */
@@ -78,17 +79,17 @@ export function boundaryTextOffset(snapshot: PageTextSnapshot, boundary: number)
 /**
  * The character boundary for a text offset, with explicit plateau bias:
  *
- *   - `'start'`: the GREATEST boundary whose text offset is <= `offset` —
+ *   - `'start'`: the greatest boundary whose text offset is <= `offset` —
  *     scans forward past zero-width characters, so a range start never
  *     includes a dropped character that precedes its first real unit.
- *   - `'end'`: the SMALLEST boundary whose text offset is >= `offset` —
+ *   - `'end'`: the smallest boundary whose text offset is >= `offset` —
  *     stops before zero-width characters, so a range end never swallows a
  *     dropped character that follows its last real unit.
  *
  * An offset inside a surrogate pair resolves outward under both biases
  * (start → the pair's character, end → past it), so a clipped astral
  * character is always covered whole. Prefer {@link charRangeForTextOffsets}
- * — the two biases exist to be used as a PAIR.
+ * — the two biases exist to be used as a pair.
  */
 export function charBoundaryAtTextOffset(
   snapshot: PageTextSnapshot,
@@ -118,47 +119,38 @@ export function charBoundaryAtTextOffset(
 }
 
 /**
- * The character range whose text projection is exactly
- * `text.slice(startOffset, endOffset)` — THE inverse used by search-hit
- * conversion and select-by-text. Start is right-biased and end left-biased
- * (see {@link charBoundaryAtTextOffset}), so zero-width characters adjacent
- * to the range fall OUTSIDE it on both sides.
+ * The character range whose text projection is exactly the string range
+ * `offsets` (`text.slice(offsets.start, offsets.start + offsets.count)`) —
+ * the inverse used by search-hit conversion and select-by-text. Start is
+ * right-biased and end left-biased (see {@link charBoundaryAtTextOffset}), so
+ * zero-width characters adjacent to the range fall outside it on both sides.
  *
  * A non-empty text range can never invert: `end > start` implies
  * `B(end) >= endOffset > startOffset >= B(start)`, which forces
- * `end > start` by monotonicity. Empty input (`endOffset <= startOffset`)
- * normalizes to the end-rule boundary of `startOffset` on both sides.
+ * `end > start` by monotonicity. An empty input normalizes to the end-rule
+ * boundary of its start, with `count` 0.
  */
-export function charRangeForTextOffsets(
-  snapshot: PageTextSnapshot,
-  startOffset: number,
-  endOffset: number,
-): { start: number; end: number } {
+export function charRangeForTextOffsets(snapshot: PageTextSnapshot, offsets: TextRange): TextRange {
+  const startOffset = offsets.start;
+  const endOffset = offsets.start + offsets.count;
   if (endOffset <= startOffset) {
-    const b = charBoundaryAtTextOffset(snapshot, startOffset, 'end');
-    return { start: b, end: b };
+    return { start: charBoundaryAtTextOffset(snapshot, startOffset, 'end'), count: 0 };
   }
-  return {
-    start: charBoundaryAtTextOffset(snapshot, startOffset, 'start'),
-    end: charBoundaryAtTextOffset(snapshot, endOffset, 'end'),
-  };
+  const start = charBoundaryAtTextOffset(snapshot, startOffset, 'start');
+  return { start, count: charBoundaryAtTextOffset(snapshot, endOffset, 'end') - start };
 }
 
 /**
- * THE copy primitive: the text projection of the half-open character range
- * `[charStart, charEnd)`. Dropped characters inside the range contribute
- * nothing; a supplementary character contributes its full surrogate pair.
- * `sliceTextByChars(s, 0, s.charCount) === s.text` always.
+ * The copy primitive: the text of a character range. Dropped characters
+ * inside the range contribute nothing; a supplementary character contributes
+ * its full surrogate pair.
+ * `sliceText(s, { start: 0, count: s.charCount }) === s.text` always.
  */
-export function sliceTextByChars(
-  snapshot: PageTextSnapshot,
-  charStart: number,
-  charEnd: number,
-): string {
-  if (charEnd <= charStart) return '';
+export function sliceText(snapshot: PageTextSnapshot, range: TextRange): string {
+  if (range.count <= 0) return '';
   return snapshot.text.slice(
-    boundaryTextOffset(snapshot, charStart),
-    boundaryTextOffset(snapshot, charEnd),
+    boundaryTextOffset(snapshot, range.start),
+    boundaryTextOffset(snapshot, range.start + range.count),
   );
 }
 

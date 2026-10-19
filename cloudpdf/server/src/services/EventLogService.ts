@@ -217,6 +217,7 @@ export function toJsonlEvent(event: AuditLogRow): Record<string, unknown> {
     artifactSize: event.artifactSize,
     idempotencyKey: event.idempotencyKey ?? null,
     originSessionId: event.originSessionId ?? null,
+    undoOf: event.undoOf ?? null,
     payload: event.payload,
   };
 }

@@ -1,5 +1,54 @@
 # @embedpdf/plugin-actions
 
+## 3.0.0-next.15
+
+### Minor Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The actions plugin keeps no state of its own: `ActionsAction` and `ActionsState` are no longer exported. The per-page trigger cache is cleared by flattens, redactions and new document versions, and a read that was in flight when its page changed no longer fills the cache with a stale tree. `ScriptRealmTarget.document()` needs only a document's name, page count and pages (`ScriptDocument`). The `/internal` entry is removed; hosts use `/contract/host`.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – The actions plugin now follows the 3.0 public contract.
+  - `ActionsPluginConfig` is `ActionsConfig`; `policy` accepts row-wise patches (name only the origins you change).
+  - `onAction` is `onExecuted`. New `onOpenSequenceCompleted({ result })` fires once the document-open sequence has run.
+  - New public methods: `executeNamed(name, context?)` runs a Named verb without building a tree; `getActionTree(source)` reads the raw `/A` or `/AA` tree of an annotation, field, page or the document; `getPolicy()` / `updatePolicy(patch)` read and change the effective policy live; `isScriptingEnabled()` reports whether a script realm exists.
+  - `registerExecutor` is public (application code can interpret or override an action type); `ActionExecutor` / `ActionExecutorResult` are exported from `/contract`, as are `ActionTriggerEvent`, `eventOf`, `ActionTreeSource`, `ActionPolicyPatch`, `PdfFieldEventKind`, `PdfNamedAction` and `OpenSequenceCompletedEvent`.
+  - `originOf(trigger)` is `triggerOriginOf` so it no longer shadows the kernel's `originOf(event)` through the framework barrels.
+  - The plugin is defined on `create()`.
+  - Internal layout: `contract` / `host-contract` / `model` / `controller` with `services`, `submit`, `scripting`, `dispatch` and `lifecycle` areas. The `/internal` entry is removed; hosts use `/contract/host`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – `documents.download()` and `downloadLayer()` run the document's save actions (WillSave, then the read, then DidSave) by themselves, so an app no longer wraps a download in `runDocumentVerb('save', …)`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A form commit sink resolves `{ status: 'applied' | 'failed', error? }` (`FormCommitSinkResult`): a script run's form effects are one change, written whole or not at all.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) –
+  - `registerFormReader()`: scripts, widget events, field actions and Hide actions read the form plugin's form, with the fills still on their way, instead of reading it from the engine each time.
+  - The form commit sink answers once the effects are staged: `applied` means they show and are on their way, and a refusal arrives through the change queue.
+
+- [#830](https://github.com/embedpdf/embed-pdf-viewer/pull/830) by [@bobsingor](https://github.com/bobsingor) – Action sources, triggers, hover targets and page-state reports identify pages with `page: PageRef` (`currentPage`, `visiblePages`); annotation commit entries carry `page`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The actions plugin has live settings: `policy`, `triggers`, `openSequence` and `javascript` (`enabled`, `identity`), with `getSettings()`, `updateSettings()`, `resetSettings()` and `onSettingsChanged`. `actionsPlugin(config)` registers them over `ACTIONS_DEFAULTS`; the script environment (`sandboxFactory`, `now`, `budget`, …) stays registration-only beside `javascript`'s settings. A policy or trigger change applies to the next action, a new `javascript.identity` to the next script, and `javascript.enabled` to the documents opened after it. `getPolicy()` and `updatePolicy()` are gone.
+
+  The events are `onExecuted { tree, result, source }`, `onDiagnosticReported { code, action, source }`, `onScriptDiagnosticReported { code, message }` and `onScriptFailed { error, source }` (were `onDiagnostic`, `onScriptDiagnostic` and `onScriptError`). A `'block'` rule stops an action quietly; `'report'` reports it.
+
+  `canExecuteNamed(name, context?)` answers whether `executeNamed()` would run a viewer action; `'Print'` also needs `doc.print`. `execute`, `executeNamed`, `dispatch`, `getActionTree`, `runDocumentVerb` and `prepareClose` take a `signal`: `execute` rejects `operation-cancelled`, and a tree that is running stops before its next node; `dispatch` and `prepareClose` never reject and resolve `cancelled`. The contract exports `PdfActionTree`, `PdfActionNode` and `PdfActionType`.
+
+### Patch Changes
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Match annotations by `annotationKey`, for the two ref kinds an annotation can have.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The token lists the methods that return a promise, so without a document they reject with `not-ready` in every framework instead of throwing.
+
+- [#869](https://github.com/embedpdf/embed-pdf-viewer/pull/869) by [@bobsingor](https://github.com/bobsingor) – Internal: the controller composes through the kernel's `composeApi`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – The plugin's definition takes its types from its token, state and settings instead of type arguments. It declares no settings of its own, so its definition's settings type is `NoSettings`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Follows the removal of `forms.imported`: a form import now fires one `forms.created` or `forms.valueSet` per field.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – A widget's actions are read from the form's widget rows, so a session that may only fill still finds them; an annotation's from the page's annotations.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Page actions are read again after `forms.widgetDeleted` and `forms.widgetRestored`.
+
+- [#841](https://github.com/embedpdf/embed-pdf-viewer/pull/841) by [@bobsingor](https://github.com/bobsingor) – Page actions are read again after `annotations.reordered` and `forms.widgetsReordered`.
+
 ## 3.0.0-next.14
 
 ## 3.0.0-next.13

@@ -1,12 +1,19 @@
-import type { PageHandle, PageRef } from '@embedpdf/engine-core/runtime';
-import type { SessionEventPublisher } from '@embedpdf/engine-services';
+import type {
+  PageHandle,
+  PageLayerRights,
+  PagePrintRights,
+  PageLayout,
+  PageRef,
+  SessionEventPublisher,
+} from '@embedpdf/engine-core/runtime';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { CloudPageAnnotationsService } from './CloudPageAnnotationsService';
-import { CloudPageGeometryService } from './CloudPageGeometryService';
+import { CloudPageFormsService } from './CloudPageFormsService';
 import { CloudPageRenderService } from './CloudPageRenderService';
 import { CloudPageTextService } from './CloudPageTextService';
 import { CloudPageMeasureService } from './CloudPageMeasureService';
+import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -17,20 +24,23 @@ import type { HttpClient } from '../transport/HttpClient';
  */
 export class CloudPageHandle implements PageHandle {
   readonly annotations: CloudPageAnnotationsService;
+  readonly forms: CloudPageFormsService;
   readonly text: CloudPageTextService;
-  readonly geometry: CloudPageGeometryService;
   readonly render: CloudPageRenderService;
   readonly measure: CloudPageMeasureService;
 
   constructor(
     readonly ref: PageRef,
-    readonly pageIndex: number,
     http: HttpClient,
     docId: string,
     layerName: string,
     isClosed: () => boolean,
     manifest: ManifestAccessor,
     publisher: SessionEventPublisher,
+    writes: CloudWrites,
+    layout: (signal: AbortSignal) => Promise<PageLayout>,
+    layerRights: () => PageLayerRights | null,
+    printRights: () => PagePrintRights | null,
   ) {
     this.measure = new CloudPageMeasureService(
       http,
@@ -40,6 +50,7 @@ export class CloudPageHandle implements PageHandle {
       isClosed,
       manifest,
       publisher,
+      writes,
     );
     this.annotations = new CloudPageAnnotationsService(
       http,
@@ -49,9 +60,20 @@ export class CloudPageHandle implements PageHandle {
       isClosed,
       manifest,
       publisher,
+      writes,
     );
+    this.forms = new CloudPageFormsService(http, docId, layerName, ref, isClosed, manifest);
     this.text = new CloudPageTextService(http, docId, layerName, ref, isClosed, manifest);
-    this.geometry = new CloudPageGeometryService(http, docId, layerName, ref, isClosed, manifest);
-    this.render = new CloudPageRenderService(http, docId, layerName, ref, isClosed, manifest);
+    this.render = new CloudPageRenderService(
+      http,
+      docId,
+      layerName,
+      ref,
+      isClosed,
+      manifest,
+      layout,
+      layerRights,
+      printRights,
+    );
   }
 }

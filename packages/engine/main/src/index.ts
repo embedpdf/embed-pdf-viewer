@@ -1,12 +1,12 @@
 /**
- * @embedpdf/engine - Engine v3 local implementation.
+ * @embedpdf/engine - the local engine implementation.
  *
  * Public API:
  *   localEngine(options?)               -> LocalEngine (Web Worker; boots lazily on first use)
  *   createLocalEngine()                 -> LocalEngine using inline transport (Node, tests)
  *   createLocalEngineWithWorker(worker) -> LocalEngine using a caller-supplied Web Worker
  *
- * All three construct SYNCHRONOUSLY and allocate nothing until the first
+ * All three construct synchronously and allocate nothing until the first
  * operation (or `engine.warmup()`): readiness lives inside {@link LazyTransport},
  * so no caller ever awaits engine construction.
  */
@@ -19,24 +19,21 @@ import {
   type WorkerRequest,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
-import { createPdfRuntime, type CreatePdfRuntimeOptions } from '@embedpdf/engine-runtime';
+import type { CreatePdfRuntimeOptions } from '@embedpdf/engine-runtime';
 
-import { LocalEngine, type LocalEngineOptions } from './LocalEngine';
 import type { LocalFontService } from './fonts/LocalFontService';
-import { BrowserWorkerTransport, watchWorkerReady } from './transport/BrowserWorkerTransport';
-import { InlineTransport } from './transport/InlineTransport';
-import { LazyTransport, type LazyTransportOptions } from './transport/LazyTransport';
-import type { Transport } from './transport/Transport';
-import { nextJobId } from './worker/jobIds';
-import type { EngineWorkerInit } from './worker/bootstrap';
-import type { JobId } from './worker/protocol';
+import { LocalEngine, type LocalEngineOptions } from './LocalEngine';
 import {
   BrowserImageEncoder,
   type EncoderWorkerSource,
   type LocalImageEncoder,
 } from './render/BrowserImageEncoder';
+import { BrowserWorkerTransport, watchWorkerReady } from './transport/BrowserWorkerTransport';
+import { LazyTransport, type LazyTransportOptions } from './transport/LazyTransport';
+import type { Transport } from './transport/Transport';
+import { allowWorkerUrl, createWorkerBlobUrl, startWorker } from './trusted-types';
 import {
-  resolveInlineWasmSource,
+  resolveDefaultWasmSource,
   resolveWasmSource,
   resolveWasmSourceAsync,
   toAbsoluteUrl,
@@ -44,47 +41,34 @@ import {
   type WasmSourceOptions,
   type WorkerSource,
 } from './wasm-source';
+import type { EngineWorkerInit } from './worker/bootstrap';
+import { nextJobId } from './worker/jobIds';
+import type { JobId } from './worker/protocol';
+import { findEngineWorkerFile } from './worker-files';
 
-// Re-export the shared engine runtime surface so consumers (and code that
-// must stay engine-flavor-portable, like the docs samples) can name every
-// public document type from `@embedpdf/engine` itself — mirroring the
-// `@cloudpdf/engine` entrypoint — instead of reaching into the transitive
-// `@embedpdf/engine-core` dep.
-export type {
-  Engine,
-  EngineFactory,
-  DocumentHandle,
-  DocumentCapabilities,
-  PageHandle,
-  OpenInput,
-  OpenInputShare,
-  OpenOptions,
-  TokenSource,
-} from '@embedpdf/engine-core/runtime';
+// The developer-facing surface both engine packages share (errors, refs,
+// helpers, the document types), from one list in engine-core, so code names
+// everything from `@embedpdf/engine` exactly as it would from
+// `@cloudpdf/engine`.
+export * from '@embedpdf/engine-core/public';
 export { LocalEngine } from './LocalEngine';
 export type { LocalEngineOptions } from './LocalEngine';
 export type { Transport } from './transport/Transport';
-export { InlineTransport } from './transport/InlineTransport';
 export { BrowserWorkerTransport } from './transport/BrowserWorkerTransport';
 export { LazyTransport } from './transport/LazyTransport';
-export { Priority } from './worker/Priority';
 export type { WorkerRequest, WorkerResponse } from './worker/protocol';
 export type { EngineWorkerInit } from './worker/bootstrap';
-export { LocalDocumentHandle } from './document/LocalDocumentHandle';
 export { LocalDocumentAnnotationsService } from './document/LocalDocumentAnnotationsService';
 export { LocalDocumentPagesService } from './document/LocalDocumentPagesService';
-export { LocalPageHandle } from './document/LocalPageHandle';
-export { LocalPageAnnotationsService } from './document/LocalPageAnnotationsService';
-export { LocalPageGeometryService } from './document/LocalPageGeometryService';
-export { LocalPageRenderService } from './document/LocalPageRenderService';
 export { BrowserImageEncoder } from './render/BrowserImageEncoder';
+export { PortableImageEncoder, encodePng } from './render/PortableImageEncoder';
 export type {
   BrowserImageEncoderOptions,
   EncoderWorkerSource,
   LocalImageEncoder,
 } from './render/BrowserImageEncoder';
 export { LocalFontService } from './fonts/LocalFontService';
-export { resolveWasmSource, resolveWasmSourceAsync, resolveInlineWasmSource } from './wasm-source';
+export { resolveWasmSource, resolveWasmSourceAsync, resolveDefaultWasmSource } from './wasm-source';
 export type { ResolvedWasmSource, WasmSourceOptions, WorkerSource } from './wasm-source';
 
 export interface CreateLocalEngineOptions extends Omit<LocalEngineOptions, 'transport'> {
@@ -100,16 +84,13 @@ export interface CreateLocalEngineOptions extends Omit<LocalEngineOptions, 'tran
  * first operation, inside the engine's {@link LazyTransport}.
  */
 export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEngine {
-  const transport = new LazyTransport(
-    async () => new InlineTransport(await createPdfRuntime(opts.runtime ?? {})),
-  );
+  const transport = new LazyTransport(() => startInlineTransport(opts.runtime));
   return LocalEngine.fromTransport({
     transport,
     concurrency: opts.concurrency,
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
     signedDocumentPolicy: opts.signedDocumentPolicy,
-    sessionKind: opts.sessionKind,
   });
 }
 
@@ -137,7 +118,6 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
     signedDocumentPolicy: opts.signedDocumentPolicy,
-    sessionKind: opts.sessionKind,
   });
 }
 
@@ -145,31 +125,30 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
  * Resolve a `worker` option into a boot-time transport factory plus
  * LazyTransport options — the one place the delivery asymmetries are handled:
  *
- *   - LIVE `Worker`: it began initializing at `new Worker()`, and its
+ *   - live `Worker`: it began initializing at `new Worker()`, and its
  *     `ready`/`init-error` message is dropped if nothing is listening when it
- *     fires. So the init message is posted and the handshake latched HERE,
+ *     fires. So the init message is posted and the handshake latched here,
  *     synchronously at engine construction, and the latch is what the
  *     deferred spawn awaits. The abandon hook terminates the worker if the
  *     engine is destroyed without ever booting (the boot factory never ran,
  *     so nobody else would).
- *   - Thunk / URL / default inline: nothing exists until boot, so nothing can
- *     race and nothing needs reclaiming.
+ *   - Thunk / URL / the bundled file / `'inline'`: nothing exists until boot,
+ *     so nothing can race and nothing needs reclaiming.
  *
- * The wasm source rides the same decision: only the inline blob worker (which
- * has no meaningful location of its own) receives the default — the sibling
- * the consumer's bundler emitted, and nothing after it (see
- * resolveInlineWasmSource); every other delivery self-resolves `embedpdf.wasm`
- * as a sibling of the worker script when no explicit source is configured.
+ * The wasm source rides the same decision: the default and `'inline'`
+ * deliveries (a bundler-renamed file or a blob, neither with the wasm beside
+ * it) receive the default, the sibling the consumer's bundler emitted, and
+ * nothing after it (see resolveDefaultWasmSource); a configured URL or a
+ * caller-built worker self-resolves `embedpdf.wasm` as a sibling of the worker
+ * script when no explicit source is configured.
  */
 function workerBoot(
-  source: WorkerSource | undefined,
+  delivery: WorkerSource | undefined,
   wasmOptions: WasmSourceOptions,
 ): {
   spawn: () => Promise<Transport>;
   lazyOptions: LazyTransportOptions;
 } {
-  const delivery = source ?? 'inline';
-
   // A live Worker is the only object-typed delivery (duck-typed rather than
   // `instanceof Worker` so non-DOM environments and test doubles work).
   if (typeof delivery === 'object' && delivery !== null) {
@@ -202,19 +181,24 @@ function workerBoot(
     };
   }
 
+  // A configured URL is allowed now, as the embedder gave it: the one place it is decided.
+  const configuredUrl =
+    typeof delivery === 'string' && delivery !== 'inline' ? toAbsoluteUrl(delivery) : null;
+  if (configuredUrl !== null) allowWorkerUrl(configuredUrl);
+
   return {
     spawn: async () => {
-      // Resolve BEFORE spawning: if the sibling-url module can't load, no
-      // worker is left orphaned. Only the inline blob worker gets the default.
-      // No extra tick for explicit sources: a thunk/URL worker boots on the
-      // same schedule as before; only a lazy `wasmLoader` awaits its bytes.
+      // Resolve before spawning: if the sibling-url module can't load, no
+      // worker is left orphaned. No extra tick for explicit sources: a
+      // thunk/URL source resolves synchronously; only a lazy `wasmLoader`
+      // awaits its bytes.
       const wasm =
-        delivery === 'inline'
-          ? await resolveInlineWasmSource(wasmOptions)
+        delivery === undefined || delivery === 'inline'
+          ? await resolveDefaultWasmSource(wasmOptions)
           : wasmOptions.wasmLoader
             ? await resolveWasmSourceAsync(wasmOptions)
             : resolveWasmSource(wasmOptions);
-      const spawned = await createEngineWorker(delivery as Exclude<WorkerSource, Worker>);
+      const spawned = await createEngineWorker(delivery, configuredUrl);
       postWorkerInit(spawned.worker, wasm);
       try {
         const transport = await BrowserWorkerTransport.spawn(spawned.worker);
@@ -223,7 +207,14 @@ function workerBoot(
       } catch (error) {
         spawned.dispose();
         spawned.worker.terminate();
-        throw error;
+        if (spawned.file === null) throw error;
+        throw new Error(
+          `[embedpdf] the engine worker did not start from ${spawned.file}, where your bundler ` +
+            "was to put @embedpdf/engine's workers/embedpdf-worker.js. If it cannot emit that " +
+            'file, import `localEngine` from `@embedpdf/engine/portable`, or copy the file and ' +
+            'pass its URL as `worker`. See https://www.embedpdf.com/docs/viewer/self-hosting',
+          { cause: error },
+        );
       }
     },
     lazyOptions: {},
@@ -236,20 +227,40 @@ function postWorkerInit(worker: Worker, wasm: ResolvedWasmSource): void {
   worker.postMessage(init, wasm.wasmBinary ? [wasm.wasmBinary] : []);
 }
 
+interface CreatedWorker {
+  worker: Worker;
+  /** Runs once the handshake settles: revokes a blob: URL. */
+  dispose: () => void;
+  /** The bundled file it started from, for the error when it never starts. */
+  file: string | null;
+}
+
 /**
- * Create the worker for a non-live delivery. The default (`'inline'`) path
- * lazily imports the worker source string — its own module, so bundlers emit
- * it as a separate chunk that is only ever downloaded when this line runs —
- * and spawns it from a blob URL (revoked once the handshake settles).
+ * Create the worker for a non-live delivery. The default starts the bundled
+ * `workers/embedpdf-worker.js` (see {@link findEngineWorkerFile}). Where no
+ * worker can start from that file (the scripts on another origin than the
+ * page), and for `'inline'`, the worker starts from a blob: URL of the same
+ * bundle as a string — its own lazily imported module, so bundlers emit it as
+ * a separate chunk that is only downloaded when this line runs. The blob URL
+ * is revoked once the handshake settles.
  */
 async function createEngineWorker(
-  delivery: Exclude<WorkerSource, Worker>,
-): Promise<{ worker: Worker; dispose: () => void }> {
+  delivery: Exclude<WorkerSource, Worker> | undefined,
+  configuredUrl: string | null,
+): Promise<CreatedWorker> {
   if (typeof delivery === 'function') {
-    return { worker: delivery(), dispose: () => {} };
+    return { worker: delivery(), dispose: () => {}, file: null };
   }
-  if (typeof delivery === 'string' && delivery !== 'inline') {
-    return { worker: new Worker(toAbsoluteUrl(delivery), { type: 'module' }), dispose: () => {} };
+  if (configuredUrl !== null) {
+    return {
+      worker: startWorker(configuredUrl, { type: 'module' }),
+      dispose: () => {},
+      file: null,
+    };
+  }
+  const file = delivery === undefined ? findEngineWorkerFile() : null;
+  if (file !== null) {
+    return { worker: startWorker(file, { type: 'module' }), dispose: () => {}, file };
   }
 
   let source: string;
@@ -263,18 +274,18 @@ async function createEngineWorker(
       { cause },
     );
   }
-  const blobUrl = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+  const blob = createWorkerBlobUrl(source);
   try {
-    const worker = new Worker(blobUrl, { type: 'module' });
-    return { worker, dispose: () => URL.revokeObjectURL(blobUrl) };
+    const worker = startWorker(blob.url, { type: 'module' });
+    return { worker, dispose: blob.revoke, file: null };
   } catch (cause) {
-    URL.revokeObjectURL(blobUrl);
+    blob.revoke();
     throw new Error(
-      '[embedpdf] could not create the engine worker from a blob: URL — most likely your ' +
-        'Content-Security-Policy omits `worker-src blob:`. Self-host the worker instead: copy ' +
-        "@embedpdf/engine's workers/embedpdf-worker.js and embedpdf.wasm into one served directory " +
-        "and pass `worker: '/that/directory/embedpdf-worker.js'` to localEngine(). " +
-        'See https://www.embedpdf.com/docs/viewer/self-hosting',
+      '[embedpdf] could not start the engine worker from a blob: URL, which it uses when ' +
+        "the viewer's scripts are on another origin than the page (a browser starts a worker " +
+        "only from the page's own) or when `worker` is `'inline'`. Allow `worker-src blob:`, or " +
+        "serve the viewer's files from your own origin. See " +
+        'https://www.embedpdf.com/docs/viewer/concepts/security',
       { cause },
     );
   }
@@ -301,32 +312,33 @@ export interface RecipeFontSpec {
 
 export interface LocalEngineRecipeOptions extends WasmSourceOptions {
   /**
-   * The worker backing the engine — see {@link WorkerSource}. Omit (or pass
-   * `'inline'`) for the zero-config default: the worker source shipped inside
-   * this package, spawned from a blob URL (requires `worker-src blob:` under
-   * a strict CSP). Pass a same-origin URL string to a copied
-   * `workers/embedpdf-worker.js` for strict-CSP setups, or a `() => Worker`
-   * thunk (called once at boot) for full control — CSP nonces, a custom
-   * worker build, a shared lifecycle, ... A live `Worker` also works, but the
-   * thunk form keeps construction fully allocation-free.
+   * The worker backing the engine — see {@link WorkerSource}. Omit for the
+   * zero-config default: this package's `workers/embedpdf-worker.js`, which
+   * your bundler emits as a file of your build (`worker-src 'self'`), or a
+   * blob: URL when the scripts are on another origin than the page. Pass a
+   * same-origin URL to a copied `workers/embedpdf-worker.js` to serve it
+   * yourself, or a `() => Worker` thunk (called once at boot) for full
+   * control — a custom worker build, a shared lifecycle, ... A live `Worker`
+   * also works, but the thunk form keeps construction fully allocation-free.
    */
   worker?: WorkerSource;
   /**
    * The image-encoder worker pool's delivery — see
-   * {@link EncoderWorkerSource}. Omit for the inline default (with automatic
-   * main-thread fallback if a strict CSP blocks blob workers); pass a
-   * same-origin URL to a copied `workers/encoder-worker.js`, or `false` to
-   * always encode on the main thread. Ignored when `imageEncoder` is set.
+   * {@link EncoderWorkerSource}. Omit for the default, delivered like
+   * `worker` (with a main-thread fallback if the workers cannot start);
+   * pass a same-origin URL to a copied `workers/encoder-worker.js`, or
+   * `false` to always encode on the main thread. Ignored when `imageEncoder`
+   * is set.
    */
   encoderWorker?: EncoderWorkerSource;
   /**
-   * Fonts registered AND appended to the ordered glyph-fallback chain, in
-   * order — the ones used to substitute missing glyphs during rendering and
+   * Fonts registered and appended to the ordered glyph-fallback chain, in
+   * order — the ones that substitute missing glyphs during rendering and
    * appearance generation (e.g. a CJK fallback). This is the common case.
    */
   fallbackFonts?: RecipeFontSpec[];
   /**
-   * Fonts registered but NOT added to the fallback chain — available for
+   * Fonts registered but not added to the fallback chain — available for
    * explicit annotation authoring (a FreeText `fontFamily`) without affecting
    * automatic substitution.
    */
@@ -342,12 +354,22 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    * {@link LocalEngineOptions.renderPolicy}. Default: `continuous`.
    */
   renderPolicy?: EngineRenderPolicy;
+  /** How a signed document's protection is applied. See {@link LocalEngineOptions.signedDocumentPolicy}. */
+  signedDocumentPolicy?: LocalEngineOptions['signedDocumentPolicy'];
+  /**
+   * Where there is no `Worker` (Node), PDFium runs in this thread: natively
+   * when this platform has a build, as WebAssembly otherwise. `runtime`
+   * chooses (`{ prefer: 'wasm' }`). Ignored where the engine runs a worker.
+   */
+  runtime?: CreatePdfRuntimeOptions;
 }
 
 /**
- * Create a local (PDFium-in-a-Worker) {@link LocalEngine}.
+ * Create a local {@link LocalEngine}: PDFium in a Web Worker in the browser,
+ * in this thread where there is no `Worker` (Node, natively when the
+ * platform has a build). One factory for every environment.
  *
- * SYNCHRONOUS AND CHEAP: the returned object is a fully usable {@link Engine},
+ * Synchronous and cheap: the returned object is a fully usable {@link Engine},
  * but it allocates nothing — no Worker, no WASM — until the first operation
  * (or an explicit `engine.warmup()`). That makes it safe to create at module
  * scope, including on a server (Next/Nuxt SSR): nothing browser-specific runs
@@ -372,7 +394,9 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
  * ```
  */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
-  const boot = workerBoot(options.worker, options);
+  const boot = runsInThisThread(options)
+    ? { spawn: () => startInlineTransport(options.runtime, options), lazyOptions: {} }
+    : workerBoot(options.worker, options);
   const transport = new LazyTransport(async () => {
     // Spawn and font fetches run in parallel; nothing queued by the caller can
     // reach the worker until this factory resolves.
@@ -404,8 +428,36 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
         ? new BrowserImageEncoder({ worker: options.encoderWorker })
         : undefined),
     renderPolicy: options.renderPolicy,
+    signedDocumentPolicy: options.signedDocumentPolicy,
   });
   return engine;
+}
+
+/**
+ * The transport to PDFium in this thread. Its module holds the engine host and
+ * the runtime, the bulk of the engine's code, and is imported only here, when
+ * such an engine boots: the main thread of a page whose engine runs in a
+ * worker never downloads them. In a browser it is one self-contained file
+ * (`#inline-transport`, `src/transport/inline-browser.ts`), so an app's
+ * bundler never resolves the packages behind it, and its wasm is resolved
+ * here, from `wasm`, as a worker's is.
+ */
+async function startInlineTransport(
+  runtime: CreatePdfRuntimeOptions = {},
+  wasm: WasmSourceOptions = {},
+): Promise<Transport> {
+  const { createInlineTransport } = await import('#inline-transport');
+  return createInlineTransport(runtime, () => resolveDefaultWasmSource(wasm));
+}
+
+/**
+ * No `Worker` global and no worker of the caller's own (Node, Deno, a test
+ * runner): PDFium runs in this thread instead of in a worker. `'inline'` only
+ * says how to make the worker where there is one.
+ */
+function runsInThisThread(options: LocalEngineRecipeOptions): boolean {
+  const ownWorker = options.worker !== undefined && options.worker !== 'inline';
+  return !ownWorker && typeof Worker === 'undefined';
 }
 
 interface ResolvedRecipeFont {
@@ -429,7 +481,7 @@ async function resolveRecipeFonts(
 }
 
 /**
- * Register boot-config fonts by RAW transport send, bypassing the WorkerQueue.
+ * Register boot-config fonts by raw transport send, bypassing the WorkerQueue.
  *
  * The bypass is load-bearing, not an optimization: during boot the queue's
  * concurrency slot may already be held by a buffered user `open()`, so a
@@ -445,7 +497,7 @@ async function registerBootFonts(
   fonts: ResolvedRecipeFont[],
 ): Promise<void> {
   for (const { spec, fallback } of fonts) {
-    // Seed BEFORE the raw send: seeding copies the bytes, and the wire buffer
+    // Seed before the raw send: seeding copies the bytes, and the wire buffer
     // is transferred (neutered) by the worker transport.
     fontService.seedRegistered(spec, { fallback });
     const bytes = toStandaloneArrayBuffer(spec.data);
@@ -453,6 +505,7 @@ async function registerBootFonts(
       wirePack(
         {
           kind: 'fonts.register',
+          effect: 'runtimeWrite',
           jobId,
           fontKey: spec.key,
           familyName: spec.familyName ?? '',
@@ -468,7 +521,7 @@ async function registerBootFonts(
     }
     if (fallback) {
       await requestOverTransport(transport, (jobId) =>
-        wirePack({ kind: 'fonts.addFallback', jobId, fontKey: spec.key }),
+        wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: spec.key }),
       );
     }
   }

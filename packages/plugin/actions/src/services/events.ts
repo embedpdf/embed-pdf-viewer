@@ -1,37 +1,40 @@
-/** The five observability hooks; disposed with the plugin. */
-import { createEventHook } from '@embedpdf/core';
-import type { ScriptDiagnostic, ScriptExecutionError } from '@embedpdf/core-acrojs';
+/** The plugin's events, disposed with it, and the one way a diagnostic is reported. */
+import type { PdfActionType } from '@embedpdf/engine-core/runtime';
 
 import type {
   ActionDiagnostic,
-  ActionDispatchEvent,
+  ActionDiagnosticReportedEvent,
+  ActionExecutedEvent,
+  ActionSource,
   OpenSequenceCompletedEvent,
+  ScriptDiagnosticReportedEvent,
+  ScriptFailedEvent,
 } from '../contract';
 import type { ActionsContext } from './context';
 
+/** Which action a diagnostic is about, and what started it, when one is concerned. */
+export interface DiagnosticPlace {
+  readonly action?: PdfActionType | null;
+  readonly source?: ActionSource | null;
+}
+
 export function createEvents(ctx: ActionsContext) {
-  const actionHook = createEventHook<ActionDispatchEvent>((error) =>
-    globalThis.console?.error('[actions] onExecuted observer failed:', error),
-  );
-  const openSequenceHook = createEventHook<OpenSequenceCompletedEvent>((error) =>
-    console.error('[actions] onOpenSequenceCompleted listener threw', error),
-  );
-  const diagnosticHook = createEventHook<ActionDiagnostic>((error) =>
-    globalThis.console?.error('[actions] onDiagnostic observer failed:', error),
-  );
-  const scriptDiagnosticHook = createEventHook<ScriptDiagnostic>((error) =>
-    globalThis.console?.error('[actions] onScriptDiagnostic observer failed:', error),
-  );
-  const scriptErrorHook = createEventHook<ScriptExecutionError>((error) =>
-    globalThis.console?.error('[actions] onScriptError observer failed:', error),
-  );
-  ctx.cleanup(() => {
-    actionHook.dispose();
-    diagnosticHook.dispose();
-    scriptDiagnosticHook.dispose();
-    scriptErrorHook.dispose();
-    openSequenceHook.dispose();
-  });
-  return { actionHook, openSequenceHook, diagnosticHook, scriptDiagnosticHook, scriptErrorHook };
+  const executed = ctx.events.source<ActionExecutedEvent>();
+  const diagnosticReported = ctx.events.source<ActionDiagnosticReportedEvent>();
+  return {
+    executed,
+    diagnosticReported,
+    scriptDiagnosticReported: ctx.events.source<ScriptDiagnosticReportedEvent>(),
+    scriptFailed: ctx.events.source<ScriptFailedEvent>(),
+    openSequenceCompleted: ctx.events.source<OpenSequenceCompletedEvent>(),
+    /** Fire `onDiagnosticReported` with the action and source it concerns (`null` for none). */
+    reportDiagnostic(diagnostic: ActionDiagnostic, place: DiagnosticPlace = {}): void {
+      diagnosticReported.emit({
+        code: diagnostic.code,
+        action: place.action ?? null,
+        source: place.source ?? null,
+      });
+    },
+  };
 }
 export type ActionsEvents = ReturnType<typeof createEvents>;

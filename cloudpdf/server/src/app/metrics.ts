@@ -15,7 +15,7 @@ export interface MetricsOptions {
   engineRestarts?: () => number;
   /** Host mode with db: active quarantine count. */
   crashJournal?: CrashJournal;
-  /** Host mode: latest child memory heartbeat (protocol v3). */
+  /** Host mode: latest child memory heartbeat (the host's `memory` message). */
   engineMemory?: () => { rssBytes: number; heapUsedBytes: number; ageMs: number } | null;
   /** Operational counters (monotonic totals via collect, like restarts). */
   counters?: EngineCounters;
@@ -42,7 +42,7 @@ export interface MetricsOptions {
  * Minimal Prometheus surface, opt-in via `metrics: true`
  * (`CLOUDPDF_METRICS=1`). Deliberately small: default process metrics
  * (CPU, RSS, event loop lag), an HTTP duration histogram labelled by
- * ROUTE PATTERN (never the raw URL — docIds in label values would blow
+ * route pattern (never the raw URL — docIds in label values would blow
  * up cardinality), worker-pool occupancy gauges, and the license access
  * level. The route is unauthenticated when enabled — expose it inside
  * the private network / cluster only, like every other /metrics.

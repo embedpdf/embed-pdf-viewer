@@ -36,3 +36,18 @@ export function withScratchN<T>(
     }
   }
 }
+
+/**
+ * Write `values` as an `int32_t` array into a scratch buffer, run `body`
+ * with it and the count, and free it. An empty array still gets a buffer.
+ */
+export function withI32Array<T>(
+  mem: PdfRuntimeMemory,
+  values: readonly number[],
+  body: (arrayPtr: Ptr, count: number) => T,
+): T {
+  return withScratch(mem, Math.max(1, values.length) * 4, (arrayPtr) => {
+    values.forEach((value, at) => mem.poke(arrayPtr, 'i32', value, at * 4));
+    return body(arrayPtr, values.length);
+  });
+}

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, test } from 'vitest';
 import { sql } from 'kysely';
 import { createPostgresDb, migrate, postgresMigrations } from '../src/index';
 import { runMultiReplicaSuite } from './_helpers/multi-replica-suite';
+import { runObjectNumberReplicaSuite } from './_helpers/object-numbers-replica-suite';
 import type { ReplicaDbFactory } from './_helpers/two-replica-harness';
 
 /**
@@ -85,6 +86,7 @@ function postgresReplicaFactory(): ReplicaDbFactory {
 
 if (RUN_PG) {
   runMultiReplicaSuite(postgresReplicaFactory());
+  runObjectNumberReplicaSuite(postgresReplicaFactory());
 } else {
   describe('multi-replica layer writes [postgres] (skipped)', () => {
     test('docker unavailable — PG multi-replica suite skipped', () => {

@@ -1,5 +1,5 @@
 /**
- * The user's stamp libraries live in the browser (IndexedDB): restored ONCE
+ * The user's stamp libraries live in the browser (IndexedDB): restored once
  * per workspace, written on every change, for as long as the viewer lives —
  * a signature made while the stamps sidebar is closed is persisted exactly
  * like a stamp imported while it is open. The built-in library is never

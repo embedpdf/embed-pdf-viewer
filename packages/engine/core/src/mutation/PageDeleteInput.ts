@@ -8,7 +8,7 @@ import type { PageRef } from '../identity/PageRef';
  */
 export interface PageDeleteInput {
   /**
-   * Pages to delete. Duplicates and unknown PONs are rejected with
+   * Pages to delete. Duplicates and unknown page object numbers are rejected with
    * `EngineError(InvalidArg)` / `EngineError(NotFound)`.
    */
   pages: PageRef[];

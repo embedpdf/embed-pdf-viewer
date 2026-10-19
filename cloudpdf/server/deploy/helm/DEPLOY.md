@@ -185,9 +185,9 @@ is still native code in the pod; `runtimeClassName` (gVisor/Kata) adds
 kernel-exploit containment for the WHOLE pod (pod-to-node isolation — it
 does not separate engine from API within the pod) at syscall-emulation
 cost — measure with the drills before committing. See
-[engine-host-isolation.md](../../../../.agents/skills/embedpdf-conventions/references/engine-host-isolation.md)
+[engine-host-isolation.md](../../../../docs/conventions/engine-host-isolation.md)
 for the full threat model and
-[runtime-confinement.md](../../../../.agents/skills/embedpdf-conventions/references/runtime-confinement.md)
+[runtime-confinement.md](../../../../docs/conventions/runtime-confinement.md)
 for PDFium's worker ownership contract.
 
 ## Sizing
@@ -214,7 +214,7 @@ Independent of Helm, the migrator holds a Postgres advisory lock across
 discovery + execution — two releases sharing a database, a manual
 `migrate up`, and racing auto-migrations all serialize at the database.
 Rollback runbook:
-[server-migrations.md](../../../../.agents/skills/embedpdf-conventions/references/server-migrations.md)
+[server-migrations.md](../../../../docs/conventions/server-migrations.md)
 (there is no automatic
 `migrate down` hook, by design).
 

@@ -1,9 +1,7 @@
-/** Result shaping for the scripting transaction: errors, budgets, page numbers, statuses. */
+/** Result shaping for the scripting transaction: errors, budgets, page numbers. */
 import type { DocumentMeta } from '@embedpdf/core';
 import type { ScriptExecutionError } from '@embedpdf/core-acrojs';
-import type { FormEffectsResult, FormFieldDTO } from '@embedpdf/engine-core/runtime';
-
-import type { FormCommitResult } from '../contract';
+import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
 
 export function scriptError(message: string): ScriptExecutionError {
   return { kind: 'invalid-output', message };
@@ -23,19 +21,12 @@ export function utf8Length(value: string): number {
   return length;
 }
 
-export function pageNumberFor(meta: DocumentMeta | null, field: FormFieldDTO): number {
+export function pageNumberFor(
+  meta: Pick<DocumentMeta, 'pages'> | null,
+  field: FormFieldDTO,
+): number {
   const placed = field.widgets.find((widget) => widget.page !== null)?.page;
   if (!meta || !placed) return 0;
-  const index = meta.pages.findIndex(
-    (page) => page.ref.pageObjectNumber === placed.pageObjectNumber,
-  );
+  const index = meta.pages.findIndex((page) => page.ref.objectNumber === placed.objectNumber);
   return Math.max(0, index);
-}
-
-export function statusFromEffects(result: FormEffectsResult): FormCommitResult['status'] {
-  if (result.results.some(({ status }) => status === 'failed' || status === 'skipped')) {
-    return 'failed';
-  }
-  if (result.results.some(({ status }) => status === 'rejected')) return 'failed';
-  return result.results.some(({ status }) => status === 'applied') ? 'applied' : 'unchanged';
 }

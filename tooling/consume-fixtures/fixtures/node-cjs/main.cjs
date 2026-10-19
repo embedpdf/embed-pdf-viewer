@@ -19,8 +19,13 @@ const reactRuntime = require('@embedpdf/react/runtime');
 const cloudSdk = require('@cloudpdf/sdk');
 const cloudEngine = require('@cloudpdf/engine');
 
+// A React component is a function, or the object `forwardRef` / `memo` returns.
+const isComponent = (value) =>
+  typeof value === 'function' ||
+  (typeof value === 'object' && value !== null && '$$typeof' in value);
+
 ok(typeof engineCoreRuntime.AbortablePromise === 'function', 'AbortablePromise via require');
-ok(typeof reactRuntime.Viewer === 'function', 'Viewer via require');
+ok(isComponent(reactRuntime.Viewer), 'Viewer via require');
 for (const [label, ns] of Object.entries({
   geometry,
   kernel,

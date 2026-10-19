@@ -1,11 +1,11 @@
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFileAccessHandle, PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
+
+import { loadFailure } from '../../runtime/loadError';
 import { withUtf8CString } from '../../runtime/memory/strings';
 
 export type OpenedPdfDocumentKind = 'fat-memory' | 'layer';
-
-const FPDF_ERR_PASSWORD = 4;
 
 /**
  * Where a session's bytes come from, retained for the session's lifetime
@@ -92,12 +92,11 @@ export function openFatMemoryDocument(
       // Distinguish "locked" from "broken": a password failure is a
       // recoverable state the caller can act on (prompt + unlock), never
       // a generic open failure.
-      if (fn.FPDF_GetLastError() === FPDF_ERR_PASSWORD) {
-        throw password
-          ? new EngineError(EngineErrorCode.DocPasswordIncorrect, 'incorrect document password')
-          : new EngineError(EngineErrorCode.DocPasswordRequired, 'document requires a password');
-      }
-      throw new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open document');
+      throw loadFailure(
+        fn,
+        password,
+        new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open document'),
+      );
     }
     setRuntimeOwnerPermissionsIfEncrypted(runtime, docPtr);
     stack.push(() => fn.FPDF_CloseDocument(docPtr));

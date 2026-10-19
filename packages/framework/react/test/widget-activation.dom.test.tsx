@@ -11,7 +11,7 @@ import { pageTransform } from '@embedpdf/core-geometry';
 import type { Kernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin, ActionsToken } from '@embedpdf/plugin-actions';
-import type { ActionDispatchEvent } from '@embedpdf/plugin-actions';
+import type { ActionExecutedEvent } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { formPlugin, FormToken } from '@embedpdf/plugin-form';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
@@ -34,12 +34,12 @@ const fixturePath = resolve(
 );
 
 /**
- * THE regression net the Test Lab exposed: every prior proof activated
+ * The regression net the Test Lab exposed: every prior proof activated
  * widgets through `form.activateWidget(...)` directly, so the DOM
  * click→activate routing was never exercised — and a real-world "fake
- * button" (a READ-ONLY /FT /Tx field carrying a widget /A, the Test Lab's
+ * button" (a read-only /FT /Tx field carrying a widget /A, the Test Lab's
  * Reset/Next/Hide shape) was dead in the viewer. This test goes through the
- * REAL DOM: a rendered FormLayer over a real kernel + real engine, a click
+ * real DOM: a rendered FormLayer over a real kernel + real engine, a click
  * on the fake button's box, and the dispatcher's own event stream as proof
  * the /A Hide executed.
  */
@@ -72,7 +72,7 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
       const engine = await createLocalEngine({ runtime: { prefer: 'wasm', wasmBinary } });
       const plugins = [
         interactionPlugin(),
-        actionsPlugin({ openSequence: 'off' }), // scripting OFF — Hide is native
+        actionsPlugin({ openSequence: 'off' }), // scripting off — Hide is native
         annotationPlugin(),
         formPlugin(),
       ];
@@ -80,10 +80,10 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
       let kernel: Kernel | null = null;
       let setPage!: (page: PageContextValue) => void;
       function Grab() {
-        const k = useKernel();
+        const current = useKernel();
         useEffect(() => {
-          kernel = k;
-        }, [k]);
+          kernel = current;
+        }, [current]);
         return null;
       }
       function Stagelet() {
@@ -122,10 +122,10 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
         await form.refresh();
         const snapshot = form.getSnapshot();
         const fake = snapshot?.fields.find((field) => field.name === 'fakeButton');
-        expect(fake?.flags.readOnly).toBe(true); // the Test Lab shape, pinned
+        expect(fake?.readOnly).toBe(true); // the Test Lab shape, pinned
         const page = fake!.widgets[0]!.page!;
 
-        const dispatched: ActionDispatchEvent[] = [];
+        const dispatched: ActionExecutedEvent[] = [];
         actions.onExecuted((event) => dispatched.push(event));
 
         // A synthetic page context — the layer only needs the transform seam.
@@ -158,22 +158,22 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
           ),
         );
 
-        // The fake button renders as a fill TEXT control (disabled editor,
-        // pointer-transparent); its BOX owns activation.
+        // The fake button renders as a fill text control (disabled editor,
+        // pointer-transparent); its box owns activation.
         const input = await waitFor(() => screen.getByLabelText('fakeButton'));
         expect((input as HTMLInputElement).disabled).toBe(true);
 
         fireEvent.click(input.parentElement!);
 
         // The full chain, proven at the dispatcher's own event stream: the
-        // widget /A resolved and its Hide EXECUTED.
+        // widget /A resolved and its Hide executed.
         await waitFor(() => {
           const hide = dispatched.find((event) => event.tree.root?.type === 'hide');
           expect(hide).toBeTruthy();
           expect(hide!.result.nodes).toEqual([
             expect.objectContaining({ type: 'hide', status: 'executed' }),
           ]);
-          expect(hide!.ctx.origin).toBe('user');
+          expect(hide!.source).toMatchObject({ kind: 'widget' });
         });
       } finally {
         view.unmount();

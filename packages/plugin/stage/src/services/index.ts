@@ -1,33 +1,27 @@
 /**
- * Plugin-private services every area is built on (NOT the kernel): the
- * diffing context + change hooks, the host timing seam, the placement latch
- * and the scene model.
+ * Plugin-private services every area is built on: the events, the host's
+ * clock, the placement latch and the scene model.
  */
-import type { StageConfig } from '../contract';
-import type { StageContext } from './context';
+import type { PluginClock, PluginContext } from '@embedpdf/core';
+
+import type { StageState } from '../model';
 import { createEvents, type StageEvents } from './events';
 import { createPlacementLatch, type PlacementLatch } from './placement-latch';
 import { createScene, type StageScene } from './scene';
-import { createScheduler, type StageScheduler } from './scheduler';
-
-export type { StageContext } from './context';
 
 export interface StageServices {
-  /** The diffing context: every area's `ctx.dispatch` emits the change events. */
-  readonly ctx: StageContext;
   readonly events: StageEvents;
-  readonly scheduler: StageScheduler;
+  /** Time, from the host (`ctx.clock`): the tweens, flings and the rest countdown run on it. */
+  readonly clock: PluginClock;
   readonly placement: PlacementLatch;
   readonly scene: StageScene;
 }
 
-export function createServices(rawCtx: StageContext, config: StageConfig): StageServices {
-  const events = createEvents(rawCtx);
+export function createServices(ctx: PluginContext<StageState>): StageServices {
   return {
-    ctx: events.ctx,
-    events,
-    scheduler: createScheduler(config),
+    events: createEvents(ctx),
+    clock: ctx.clock,
     placement: createPlacementLatch(),
-    scene: createScene(events.ctx),
+    scene: createScene(ctx),
   };
 }

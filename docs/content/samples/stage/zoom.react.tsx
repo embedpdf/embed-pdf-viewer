@@ -1,19 +1,10 @@
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useZoom } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Demo,
-  Toolbar,
-  Button,
-  Segmented,
-  Readout,
-  Spacer,
-  StageFrame,
-  stageFill,
-} from './_shared/chrome';
+import './zoom.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
@@ -26,46 +17,57 @@ const ebook = async (): Promise<OpenInput> => {
 // [!/doc-source]
 
 function ZoomToolbar() {
-  const { zoom, mode, zoomIn, zoomOut, fitPage, fitWidth, automatic } = useZoom();
-  const setFit = (next: string) => {
-    if (next === 'automatic') automatic();
-    else if (next === 'fit-page') fitPage();
-    else if (next === 'fit-width') fitWidth();
-  };
+  const stage = useStage();
+  const { zoomLevel, zoomMode } = useStageState();
+
   return (
-    <Toolbar>
-      <Button icon onClick={zoomOut} title="Zoom out">
+    <div className="toolbar">
+      <button
+        type="button"
+        className="button"
+        aria-label="Zoom out"
+        onClick={() => stage.zoomOut()}
+      >
         −
-      </Button>
-      <Readout>{Math.round(zoom * 100)}%</Readout>
-      <Button icon onClick={zoomIn} title="Zoom in">
+      </button>
+      <output className="readout">{Math.round(zoomLevel * 100)}%</output>
+      <button type="button" className="button" aria-label="Zoom in" onClick={() => stage.zoomIn()}>
         +
-      </Button>
-      <Spacer />
-      <Segmented
-        value={mode}
-        onChange={setFit}
-        options={[
-          { value: 'automatic', label: 'Automatic' },
-          { value: 'fit-page', label: 'Fit page' },
-          { value: 'fit-width', label: 'Fit width' },
-        ]}
-      />
-    </Toolbar>
+      </button>
+      <div className="segmented" role="group" aria-label="Fit">
+        <button
+          type="button"
+          aria-pressed={zoomMode === 'automatic'}
+          onClick={() => stage.fitAutomatic()}
+        >
+          Automatic
+        </button>
+        <button
+          type="button"
+          aria-pressed={zoomMode === 'fit-page'}
+          onClick={() => stage.fitPage()}
+        >
+          Fit page
+        </button>
+        <button
+          type="button"
+          aria-pressed={zoomMode === 'fit-width'}
+          onClick={() => stage.fitWidth()}
+        >
+          Fit width
+        </button>
+      </div>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <ZoomToolbar />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <ZoomToolbar />
+        <Stage className="stage">{() => <RenderLayer />}</Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

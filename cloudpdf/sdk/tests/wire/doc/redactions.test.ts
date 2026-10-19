@@ -8,33 +8,40 @@ describe("RedactionsClient", () => {
     test("apply (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { key: "value" };
+        const rawRequestBody = {};
         const rawResponseBody = {
-            meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
+            scope: {
+                pages: [{ kind: "objectNumber", objectNumber: 1 }],
+                annotations: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 ],
+            },
+            results: [
+                { page: { kind: "objectNumber", objectNumber: 1 }, status: "applied", removedAnnotationCount: 1 },
+            ],
+            removedAnnotationCount: 1,
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    outlineVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -50,9 +57,6 @@ describe("RedactionsClient", () => {
         const response = await client.doc.redactions.apply({
             docId: "docId",
             layerName: "layerName",
-            body: {
-                key: "value",
-            },
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -60,7 +64,7 @@ describe("RedactionsClient", () => {
     test("apply (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
+        const rawRequestBody = {};
         const rawResponseBody = { key: "value" };
 
         server
@@ -76,11 +80,6 @@ describe("RedactionsClient", () => {
             return await client.doc.redactions.apply({
                 docId: "docId",
                 layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
-                    },
-                },
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
     });
@@ -88,7 +87,7 @@ describe("RedactionsClient", () => {
     test("apply (3)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
+        const rawRequestBody = {};
         const rawResponseBody = { key: "value" };
 
         server
@@ -104,11 +103,6 @@ describe("RedactionsClient", () => {
             return await client.doc.redactions.apply({
                 docId: "docId",
                 layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
-                    },
-                },
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

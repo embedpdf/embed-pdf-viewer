@@ -1,8 +1,8 @@
 /**
  * The signature plugin's UI intents → shell surfaces. The plugin owns the
- * act and says WHAT happened; the chrome decides WHAT OPENS:
+ * act and says what happened; the chrome decides what opens:
  *
- *   target  (a "sign here" click)      → the signatures panel, right side
+ *   target  (a "sign here" click)      → the signatures panel
  *   ask     (mode 'ask' met a field)   → the sign dialog (modal)
  *   inspect (a signed field clicked)   → the validation popover
  *
@@ -14,13 +14,13 @@ import { useShell } from '@embedpdf/react/shell';
 export function SignatureBridge() {
   const shell = useShell();
   useSignatureEvent(
-    (c) => c.onTargetChanged,
+    (signature) => signature.onTargetChanged,
     (event) => {
-      if (event.field) shell.open('signatures', { exclusive: 'right' });
+      if (event.field) shell.open('signatures');
     },
   );
   useSignatureEvent(
-    (c) => c.onSignRequested,
+    (signature) => signature.onSignRequested,
     (event) =>
       shell.open('signature-sign', {
         exclusive: 'modal',
@@ -28,13 +28,13 @@ export function SignatureBridge() {
       }),
   );
   useSignatureEvent(
-    (c) => c.onInspectionRequested,
+    (signature) => signature.onInspectionRequested,
     (event) => shell.open('signature-inspector', { props: { field: event.field } }),
   );
   // The notice lives in the signatures panel; make sure it is seen.
   useSignatureEvent(
-    (c) => c.onInvalidating,
-    () => shell.open('signatures', { exclusive: 'right' }),
+    (signature) => signature.onInvalidationPredicted,
+    () => shell.open('signatures'),
   );
   return null;
 }

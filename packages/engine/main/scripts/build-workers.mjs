@@ -3,24 +3,37 @@
  * tsdown's dist clean never wipes them and publint sees them — this script
  * runs BEFORE epdf-build):
  *
- *   - embedpdf-worker.js         self-contained ESM worker: bootstrap +
+ *   - embedpdf-worker.js         self-contained worker: bootstrap +
  *                              engine-services + the Emscripten glue statically
  *                              bundled; only embedpdf.wasm stays external (the
- *                              worker init message says where it lives).
- *                              This file is ALSO what strict-CSP users copy
- *                              next to embedpdf.wasm as a same-origin worker.
- *   - embedpdf-worker.source.js  the same bundle as a string module — the
- *                              default inline delivery. localEngine() lazily
- *                              imports it (its own chunk in every bundler) and
- *                              spawns a blob worker from it.
+ *                              worker init message says where it lives, or the
+ *                              glue finds it as the script's sibling). The
+ *                              default delivery: src/worker-files.ts points the
+ *                              consumer's bundler at it, which copies it
+ *                              verbatim. Self-hosters copy it too.
+ *   - embedpdf-worker.source.js  the same bundle as a string module, for the
+ *                              blob: delivery (`worker: 'inline'`, and the
+ *                              viewer loaded from another origin than the page).
+ *   - inline-transport.js      the engine with no worker, in a browser: the
+ *                              same host and glue as one self-contained module,
+ *                              imported (`#inline-transport`) only when an
+ *                              engine boots in the page's own thread.
+ *     inline-transport.node.js the same module for Node, its packages imported.
  *   - encoder-worker.js        the image-encoder worker, emitted verbatim from
  *                              src/render/encoder-worker-source.ts so the blob
- *                              and static deliveries can never drift.
+ *                              and file deliveries can never drift.
  *
+ * The engine worker holds no `import.meta`: the glue's own reference becomes
+ * `self.location.href` (the same URL in a worker), so a bundler that parses
+ * the file instead of copying it finds no asset reference to resolve, and the
+ * file runs as a module or a classic script alike. It is an IIFE, so a dev
+ * server that compiles it with React Fast Refresh finds nothing to register
+ * (checked at the end of this script).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { transform } from '@swc/core';
 import esbuild from 'esbuild';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -39,21 +52,22 @@ for (const legacy of ['pdfium-worker.js', 'pdfium-worker.source.js', 'pdfium-wor
 }
 
 // ── engine worker: self-contained bundle + string module ────────────────────
+// An IIFE, not ESM: nothing is declared at the file's top level (see the dev
+// server check below). It still starts as a module worker or a classic one.
 await esbuild.build({
   entryPoints: [path.join(packageRoot, 'src', 'worker', 'worker-entry.ts')],
   outfile: path.join(workersDir, 'embedpdf-worker.js'),
   bundle: true,
-  format: 'esm',
+  format: 'iife',
   platform: 'browser',
   target: 'es2020',
   minify: true,
   legalComments: 'none',
-  // The glue's own `new URL('embedpdf.wasm', import.meta.url)` fallback stays in
-  // the bundle deliberately: when this file runs as a real URL worker (static
-  // copy or bundler-emitted) with no explicit wasm source configured, sibling
-  // resolution is exactly right. The inline blob delivery always receives an
-  // explicit wasmUrl instead (see src/wasm-source.ts).
-  logOverride: { 'empty-import-meta': 'silent' },
+  // The glue's `new URL('embedpdf.wasm', import.meta.url)` fallback stays, as
+  // `self.location.href`: a copied worker with no wasm source configured finds
+  // the wasm as its sibling. The bundled-file and blob deliveries always send
+  // an explicit wasmUrl instead (see src/wasm-source.ts).
+  define: { 'import.meta.url': 'self.location.href' },
 });
 
 const workerCode = fs.readFileSync(path.join(workersDir, 'embedpdf-worker.js'), 'utf8');
@@ -67,6 +81,44 @@ fs.writeFileSync(
   `/** workers/embedpdf-worker.js as a string — the inline worker delivery. */\n` +
     `declare const source: string;\nexport default source;\n`,
 );
+
+// ── engine in this thread: the no-worker fallback ──────────────────────────
+// What `#inline-transport` (package.json `imports`) names. A browser gets one
+// self-contained file, as the worker is: the engine host, PDFium's runtime,
+// the schemas and zod inlined, no bare import and no asset reference left, so
+// an app's bundler only copies it into a lazy chunk and never sees a package
+// behind it. The wasm's location comes from the engine (src/index.ts), so the
+// glue's own `import.meta.url` goes, as in the worker. Node gets the module as
+// it is, its packages imported (dist's CommonJS build imports it with
+// `import()` too).
+await esbuild.build({
+  entryPoints: [path.join(packageRoot, 'src', 'transport', 'inline-browser.ts')],
+  outfile: path.join(workersDir, 'inline-transport.js'),
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target: 'es2020',
+  minify: true,
+  legalComments: 'none',
+  define: { 'import.meta.url': 'self.location.href' },
+  // Where this file runs in Node anyway (a resolver that asked for `browser` alone), it hands
+  // over to the Node build. The path is joined at run time and annotated, so no bundler follows
+  // it; a banner, because the minifier drops comments.
+  banner: {
+    js:
+      'const loadNodeBuild = () => import(/* webpackIgnore: true */ /* @vite-ignore */ ' +
+      "['@embedpdf/engine', 'workers', 'inline-transport.node.js'].join('/'));",
+  },
+});
+await esbuild.build({
+  entryPoints: [path.join(packageRoot, 'src', 'transport', 'InlineTransport.ts')],
+  outfile: path.join(workersDir, 'inline-transport.node.js'),
+  bundle: true,
+  packages: 'external',
+  format: 'esm',
+  platform: 'node',
+  target: 'es2022',
+});
 
 // ── encoder worker: the shared source string, verbatim ──────────────────────
 const encoderBundle = await esbuild.build({
@@ -86,9 +138,47 @@ fs.writeFileSync(
     encoderModule.encoderWorkerSource.trimStart(),
 );
 
+// ── dev server check: React Fast Refresh adds nothing to the workers ────────
+// An app's bundler copies these files as they are, but `next dev` compiles
+// one first when it transpiles the package (`transpilePackages`, or a linked
+// copy outside node_modules), with React Fast Refresh on. Fast Refresh
+// registers every top-level function with a capitalized name as a component
+// and every function that calls a `use…()` as a hook, and the calls it adds,
+// `$RefreshReg$` and `$RefreshSig$`, don't exist in a worker: the worker
+// throws on its first line and the engine never starts. So the engine worker
+// is an IIFE and calls no `use…` method, and this runs Fast Refresh's own
+// transform over both workers to keep it that way.
+const refreshOptions = {
+  isModule: true,
+  jsc: {
+    parser: { syntax: 'ecmascript', jsx: true },
+    target: 'es2020',
+    transform: { react: { refresh: true, development: true, runtime: 'automatic' } },
+  },
+};
+const refreshCalls = async (code) =>
+  ((await transform(code, refreshOptions)).code.match(/\$Refresh(?:Reg|Sig)\$\(/g) ?? []).length;
+
+// A component Fast Refresh must register: if it registers nothing, these
+// options no longer turn it on, and the check below would pass for nothing.
+if ((await refreshCalls('function Viewer() { return null; }')) === 0) {
+  throw new Error('[build-workers] the Fast Refresh check registered no component in its control');
+}
+for (const file of ['embedpdf-worker.js', 'encoder-worker.js']) {
+  const calls = await refreshCalls(fs.readFileSync(path.join(workersDir, file), 'utf8'));
+  if (calls > 0) {
+    throw new Error(
+      `[build-workers] React Fast Refresh adds ${calls} $RefreshReg$/$RefreshSig$ call(s) to ` +
+        `workers/${file}, which would stop it starting under \`next dev\`. Keep the worker an ` +
+        'IIFE, and rename any method it calls whose name starts with `use` and a capital.',
+    );
+  }
+}
+
 const size = (file) => `${(fs.statSync(path.join(workersDir, file)).size / 1024).toFixed(0)} kB`;
 console.log(
   `[build-workers] embedpdf-worker.js ${size('embedpdf-worker.js')}, ` +
     `embedpdf-worker.source.js ${size('embedpdf-worker.source.js')}, ` +
+    `inline-transport.js ${size('inline-transport.js')}, ` +
     `encoder-worker.js ${size('encoder-worker.js')}`,
 );

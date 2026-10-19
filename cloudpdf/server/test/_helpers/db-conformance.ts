@@ -11,7 +11,7 @@ import { migrate } from '../../src/db/migrator/runner';
  *
  * Both `db-sqlite.test.ts` and `db-postgres.test.ts` import this and
  * pass their own `setup` that builds a Kysely instance + applies the
- * dialect's migration set. The assertions below MUST pass identically
+ * dialect's migration set. The assertions below must pass identically
  * against either dialect — that's the whole point of the abstraction.
  *
  * To prove the suite actually catches dialect drift, add an assertion

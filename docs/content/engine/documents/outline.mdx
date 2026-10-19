@@ -1,0 +1,207 @@
+---
+title: Outline
+description: Read a document's outline (its bookmarks), and add, change, move and delete its items.
+---
+
+# Outline
+
+A document's outline is its table of contents: titled items, nested, each going to a place in the
+document. PDF apps show it in a side panel; Acrobat calls the items bookmarks.
+
+```ts
+const { items } = await doc.outline.get();
+for (const item of items) console.log(item.title);
+
+await doc.outline.create({ title: 'Appendix', target: { kind: 'goto', destination } });
+```
+
+## Read
+
+`get()` lists every item, depth first: a parent before its children, siblings in their order. An
+item names its `parent` (`null` at the top level), so you can build the tree from the list:
+
+```ts
+const { items } = await doc.outline.get();
+const childrenOf = (parent: OutlineItemRef | null) =>
+  items.filter((item) => item.parent?.objectNumber === parent?.objectNumber);
+
+const chapters = childrenOf(null);
+```
+
+| Field    | What it is                                                                                   |
+| :------- | :------------------------------------------------------------------------------------------- |
+| `ref`    | The item's ref: `{ kind: 'objectNumber', objectNumber }`. It never changes.                  |
+| `parent` | The item it sits under, or `null` at the top level.                                          |
+| `title`  | Its title, as written.                                                                       |
+| `target` | Where it goes, read the way a link's target is (see below), or `null` when it goes nowhere. |
+| `action` | Its action as a tree, to run it the way a link's is, or `null`.                              |
+| `open`   | Whether its children show when the document opens. Always `false` for an item without any.   |
+| `color`  | The colour of its title, as `'#rrggbb'`, or `null` when the file sets none.                  |
+| `bold`   | Whether its title is bold.                                                                   |
+| `italic` | Whether its title is italic.                                                                 |
+
+`get()` also says `incomplete: true` when part of the outline couldn't be read; the rest is
+listed. See [What a read leaves out](#what-a-read-leaves-out).
+
+## Where an item goes
+
+`target` is the same shape as a link's: `goto` with a destination in
+[page space](/docs/engine/concepts/coordinates), `uri` for a website, `named` for a viewer verb
+such as `'NextPage'`, and `javascript`, `goto-remote`, `launch` or `unsupported` for the rest. An
+item that goes to a named destination reads as the place that name points at.
+
+```ts
+if (item.target?.kind === 'goto') {
+  const { destination } = item.target;
+  console.log(destination.page, destination.kind); // the page's ref, and how close: 'xyz', 'fit', …
+}
+```
+
+`action` is the item's whole action, for an item that runs one: a script, or several actions in a
+row. Run it as you would a link's. An item that only names a place has a `target` and no
+`action`.
+
+## Add an item
+
+`create()` adds an item and returns it, with its parent's children as they are now:
+
+```ts
+const { item, order } = await doc.outline.create(
+  { title: 'Results', target: { kind: 'goto', destination: { kind: 'fit', page: page.ref } } },
+  { parent: chapter.ref, position: { after: intro.ref } },
+);
+order.children; // the chapter's children, the new item among them
+```
+
+`parent` is the item it goes under (the top level when you leave it out), and `position` its
+place among that parent's children: `'start'`, `'end'` (the default), `{ before: ref }` or
+`{ after: ref }`. A position names a neighbour, not a number, so it keeps its meaning when other
+items come and go.
+
+What a new item takes:
+
+| Field    | What it is                                                                                         |
+| :------- | :------------------------------------------------------------------------------------------------- |
+| `title`  | Its title. Up to 32,767 characters.                                                                |
+| `target` | Where it goes: a `goto` destination, a `uri`, or one of `NextPage`, `PrevPage`, `FirstPage`, `LastPage`. |
+| `color`  | `'#rrggbb'`, or leave it out for the viewer's own text colour.                                    |
+| `bold`   | Bold title.                                                                                        |
+| `italic` | Italic title.                                                                                      |
+
+A new item has no children yet, so it isn't open. A parent or a neighbour the outline doesn't
+have fails with `NotFound`.
+
+## Change an item
+
+`update()` changes the fields you pass and leaves the others. `null` removes a target or a
+colour:
+
+```ts
+const { item } = await doc.outline.update(results.ref, {
+  title: 'Results (revised)',
+  color: '#c92a2a',
+  target: null, // goes nowhere now
+});
+```
+
+`open` sets whether an item's children show when the document opens. It takes effect only on an
+item with children: a leaf has no open state, and reads `false`.
+
+## Move items
+
+`move()` moves items together, in the order you give them, each with the items under it:
+
+```ts
+const { orders } = await doc.outline.move([appendixA.ref, appendixB.ref], null, 'end');
+```
+
+`orders` lists the children of every parent the move changed: the parents the items left and the
+one they went to. An item that loses its last child is no longer open.
+
+A move is refused with `InvalidArg` when it would put an item under itself or under an item it
+holds, names an item twice, names an item together with one under it, or uses one of the moved
+items as the neighbour.
+
+## Delete an item
+
+`delete()` takes an item and every item under it:
+
+```ts
+const { meta } = await doc.outline.delete(chapter.ref);
+meta.changed; // the chapter first, then the items under it
+```
+
+An undo brings the same items back, under the refs they had, at the place the item had. See
+[Changes & undo](/docs/engine/documents/changes).
+
+## In a change
+
+Each call above is a one-op change. To make several edits one step of the history, put their ops
+in one change:
+
+| Op `type`        | Its fields                                     | The call it stands for                                       |
+| :--------------- | :--------------------------------------------- | :----------------------------------------------------------- |
+| `outline.create` | `parent`, `position`, `data`, `objectNumber`   | `doc.outline.create(data, { parent, position, objectNumber })` |
+| `outline.update` | `ref`, `patch`, `expect`                       | `doc.outline.update(ref, patch)`                             |
+| `outline.move`   | `refs`, `parent`, `position`                   | `doc.outline.move(refs, parent, position)`                   |
+| `outline.delete` | `ref`, `expect`                                | `doc.outline.delete(ref)`                                    |
+
+To add an item and items under it in one change, name the new item before it exists:
+
+```ts
+await doc.objectNumbers.reserve(1);
+const objectNumber = doc.objectNumbers.take()!;
+const chapter = { kind: 'objectNumber', objectNumber } as const;
+
+await doc.apply({
+  ops: [
+    { type: 'outline.create', parent: null, data: { title: 'Chapter 3' }, objectNumber },
+    { type: 'outline.create', parent: chapter, data: { title: '3.1 Method' } },
+    { type: 'outline.update', ref: chapter, patch: { open: true } },
+  ],
+});
+```
+
+The last op opens the chapter: an item is open only once it has children, so the open state comes
+after them. See [Refer to something an earlier op makes](/docs/engine/documents/changes#refer-to-something-an-earlier-op-makes).
+
+## Permissions
+
+Reading the outline needs `doc.open`. Changing it needs `doc.outline.modify`; without it, every
+write fails with `Forbidden`.
+
+A file's own permissions give `doc.outline.modify` when it allows changing the document, or
+document assembly: Acrobat's assembly permission covers adding bookmarks. A certified document
+can forbid changing the outline for everyone; a write then fails with `ProtectedDocument`. See
+[What signatures forbid](/docs/engine/concepts/permissions#what-signatures-forbid).
+
+## Good to know
+
+### What a read leaves out
+
+A read stops at 50,000 items and 128 levels deep, and skips what isn't an item: a loop in the
+outline's links, or an entry that isn't a separate object in the file (with the items under it).
+It then lists what it could read and says `incomplete: true`. Writes still work on the items it
+lists.
+
+### Pages that are gone
+
+Deleting a page doesn't delete the items that go to it. Their `target` reads `unsupported` from
+then on, so you can find them:
+
+```ts
+const lost = items.filter((item) => item.target?.kind === 'unsupported');
+```
+
+### Where it's stored
+
+The outline is the file's `/Outlines` tree: each item an object with `/Title`, linked to its
+parent and siblings (`/Parent`, `/First`, `/Next`, …). The engine keeps those links and each
+item's `/Count` right on every write, and writes only what changed. A target is written as an
+action (`/A`), as a link's is; a file's `/Dest` reads as the same `goto`.
+
+### Events
+
+Writes fire `outline.created`, `outline.updated`, `outline.moved` and `outline.deleted`, and an
+undo of a delete fires `outline.restored`. Each event carries the call's result, so a parent's
+`order` or a move's `orders` say where items are now. See [Events](/docs/engine/concepts/events).

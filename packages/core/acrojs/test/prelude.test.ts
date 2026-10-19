@@ -85,7 +85,7 @@ describe('AcroJS prelude', () => {
       ),
     );
     expect(out.formEffects).toEqual([
-      { kind: 'setValue', ref: ref('total'), value: { type: 'text', value: '36' } },
+      { kind: 'setValue', ref: ref('total'), value: { value: '36' } },
     ]);
   });
 
@@ -202,7 +202,7 @@ describe('AcroJS prelude', () => {
 
     expect(out.formEffects).toEqual([
       { kind: 'reset', refs: [ref('name')] },
-      { kind: 'setValue', ref: ref('total'), value: { type: 'text', value: '42' } },
+      { kind: 'setValue', ref: ref('total'), value: { value: '42' } },
       { kind: 'setDisplay', ref: ref('total'), display: 'hidden' },
     ]);
   });
@@ -223,7 +223,7 @@ describe('AcroJS prelude', () => {
       {
         kind: 'setValue',
         ref: ref('total'),
-        value: { type: 'text', value: '$680.00' },
+        value: { value: '$680.00' },
       },
     ]);
   });
@@ -245,7 +245,7 @@ describe('AcroJS prelude', () => {
     expect(out.formEffects[0]).toEqual({
       kind: 'setValue',
       ref: ref('total'),
-      value: { type: 'text', value: '12.5' },
+      value: { value: '12.5' },
     });
   });
 

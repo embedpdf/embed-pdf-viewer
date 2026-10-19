@@ -15,7 +15,7 @@ import { ogBrand } from './og-brand';
 /**
  * This site's binding of the kit's social card.
  *
- * The snippet comes from the SAME markdown pass that renders the `.md`
+ * The snippet comes from the same markdown pass that renders the `.md`
  * export and feeds the search index, so a card cannot advertise code the
  * page does not show — and the API reference gets real per-SDK snippets for
  * free, because `<ApiOperation>` projects them through that pass already.

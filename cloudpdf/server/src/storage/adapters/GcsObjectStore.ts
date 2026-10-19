@@ -10,10 +10,11 @@
  * we don't branch; the SDK's credential chain picks whichever is
  * present.
  *
- * Presigned URLs: `getSignedUrl({ version: 'v4' })` signs locally when
- * ADC found a private key (key-file path), and falls back to the IAM
- * `signBlob` API when only metadata-server creds are available
- * (keyless path). The SDK auto-detects; we just request v4 signing.
+ * Presigned URLs: `getSignedUrl` with GCS's V4 signing scheme signs
+ * locally when ADC found a private key (key-file path), and falls back
+ * to the IAM `signBlob` API when only metadata-server creds are
+ * available (keyless path). The SDK auto-detects; we just request V4
+ * signing.
  * Keyless presigning needs the runtime identity to hold
  * `iam.serviceAccounts.signBlob` (roles/iam.serviceAccountTokenCreator).
  *
@@ -50,7 +51,7 @@ import {
   streamingSha256,
 } from './_internal';
 
-// Type-only — does NOT trigger the runtime import (see ADAPTERS.md).
+// Type-only — does not trigger the runtime import (see `docs/conventions/server-adapters.md`).
 type StorageModule = typeof import('@google-cloud/storage');
 type Bucket = ReturnType<InstanceType<StorageModule['Storage']>['bucket']>;
 
@@ -191,7 +192,7 @@ export class GcsObjectStore implements ObjectStore {
       expires: expiresAt,
       contentType: opts.contentType,
     });
-    // The client MUST send the same Content-Type it was signed with;
+    // The client must send the same Content-Type it was signed with;
     // GCS rejects the PUT otherwise. Content-Length is required by the
     // HTTP PUT; Content-MD5 is optional integrity at the edge.
     return {

@@ -1,6 +1,7 @@
+'use client';
 /**
  * @embedpdf/viewer-react — the full viewer as a React component, with the
- * built-in LOCAL engine (PDFium wasm in a worker) as the default.
+ * built-in local engine (PDFium wasm in a worker) as the default.
  *
  * ```tsx
  * import { PDFViewer } from '@embedpdf/viewer-react';
@@ -14,24 +15,17 @@
  * instead, which is the same component with PDFium structurally absent.
  *
  * The component itself lives in `./component` and is engine-blind; the one
- * import below is what makes THIS entry the local-engine door.
+ * import below is what makes this entry the local-engine door.
  */
 import '@embedpdf/viewer';
 
 import type { ViewerConfig } from '@embedpdf/viewer';
 
-import type { PDFViewerExtras } from './component';
+import { PDFViewer as PDFViewerImpl, type PDFViewerExtras } from './parts';
 
-// The whole customization vocabulary (plus the LOCAL engine's config types)
-// rides along, so apps import ONE package.
 export * from '@embedpdf/viewer';
-export { PDFViewer } from './component';
-export type { PDFViewerExtras } from './component';
+export * from './parts';
 
-/**
- * Props on THIS door: `engine` is OPTIONAL — omit it for the built-in local
- * engine (zero bundler config; your bundler ships `embedpdf.wasm` inside your own
- * build, sibling-first with a pinned-CDN fetch-failure fallback), or pass its
- * options bag (`{ wasmUrl }` / `{ assetsUrl }` / worker URLs for strict CSP).
- */
 export type PDFViewerProps = ViewerConfig & PDFViewerExtras;
+
+export const PDFViewer: (props: PDFViewerProps) => ReturnType<typeof PDFViewerImpl> = PDFViewerImpl;

@@ -1,5 +1,5 @@
 /**
- * The image-encoder worker, as source text — ONE definition serving both
+ * The image-encoder worker, as source text — one definition serving both
  * deliveries so they can never drift:
  *
  *   - at runtime, `BrowserImageEncoder` spawns it from a blob URL (default);

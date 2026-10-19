@@ -16,7 +16,7 @@ import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
- * Phase 2 — RevokedJtisGuard + `/v1/tenants/tenant-rev/tokens/:jti/revoke`
+ * RevokedJtisGuard + `/v1/tenants/tenant-rev/tokens/:jti/revoke`
  *
  * These tests cover the full request path: a token containing `jti`
  * is rejected the moment the revoke endpoint flips its bit. We also
@@ -98,7 +98,7 @@ describe('RevokedJtisGuard (unit)', () => {
     await guard.revoke({ jti: 'jti-local', tenantId: 't', expiresAt: exp });
     expect(pushed).toEqual([{ jti: 'jti-local', expiresAt: exp }]);
 
-    // 2. Warm the NEGATIVE cache for a jti, then simulate a SIBLING
+    // 2. Warm the negative cache for a jti, then simulate a sibling
     //    replica's revoke arriving as a push: the LRU flips to revoked
     //    immediately — no 60s negative-TTL window, and no DB row needed
     //    locally to prove the cache (not the DB) answered.

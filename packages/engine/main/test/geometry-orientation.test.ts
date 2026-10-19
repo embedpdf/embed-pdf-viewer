@@ -33,7 +33,7 @@ const fixtures: PageGeometryOrientationFixture[] = [
     pageObjectNumber: 3,
     expectation: {
       kind: 'rotated',
-      rotations: [Math.PI / 4, -Math.PI / 4, (3 * Math.PI) / 4, (-3 * Math.PI) / 4],
+      rotations: [315, 45, 225, 135],
       ascentFlip: false,
       minRotatedRuns: 4,
     },
@@ -53,10 +53,10 @@ const fixtures: PageGeometryOrientationFixture[] = [
     bytes: fixtureBytes('mirrored_text.pdf'),
     expected: {},
     pageObjectNumber: 3,
-    expectation: { kind: 'rotated', rotations: [Math.PI], ascentFlip: true },
+    expectation: { kind: 'rotated', rotations: [180], ascentFlip: true },
   },
   {
-    // Vertical CJK writing uses an UPRIGHT matrix — the guard that vertical
+    // Vertical CJK writing uses an upright matrix — the guard that vertical
     // text stays on the unchanged upright path.
     id: 'vertical-text',
     bytes: fixtureBytes('vertical_text.pdf'),

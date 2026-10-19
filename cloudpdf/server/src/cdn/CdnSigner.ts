@@ -48,8 +48,8 @@ export interface SignInput {
    *
    * Prefix-matching signers populate one `signedPathPolicies` entry
    * per coverage entry, so a render token can't authorize text
-   * requests at the edge (and vice versa) — the URL restructure
-   * (paths v2) guarantees each resource lives at a distinct prefix.
+   * requests at the edge (and vice versa) — the URL layout gives each
+   * resource a distinct prefix (`DOC_RESOURCES` in engine-core/wire).
    */
   readonly coverage: ReadonlyArray<CdnCoverageEntry>;
   /** Session expiry (epoch seconds). Signed URLs must not outlive the JWT. */
