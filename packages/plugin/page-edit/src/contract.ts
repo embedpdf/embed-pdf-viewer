@@ -1,26 +1,22 @@
 /**
  * @embedpdf/plugin-page-edit/contract — the document's page structure, edited:
- * rotate, reorder, delete, insert, duplicate and extract. A page argument is a
- * `PageRef` or an index; refs are what to keep, because an index shifts the
- * moment a page before it moves or goes. Page changes are announced by
- * `documents.onPagesChanged`; this plugin adds no events of its own.
+ * rotate, reorder, delete, insert, duplicate and extract, and which pages are
+ * selected. A page argument is a `PageRef` or an index, the page at that index
+ * when the verb is called; refs are what to keep, because an index shifts the
+ * moment a page before it moves or goes. A position names its page by ref. Page
+ * changes are announced by `documents.onPagesChanged`; this plugin adds no
+ * events of its own.
  */
-import type { OperationOptions, PageRef, PdfRotation, PdfSize } from '@embedpdf/core';
+import type { OperationOptions, PagePosition, PageRef, PdfRotation, PdfSize } from '@embedpdf/core';
 
 export { PageEditToken } from './token';
-export type { PdfRotation, PdfSize } from '@embedpdf/core';
-
 /**
- * Where pages land: right after or before a page, or at the start or the end.
- * A page named by its index is the page at that index when the verb is
- * called, the page the user clicked; from then on it is that page, so the
- * placement stays right when pages are reordered before the edit runs.
+ * `PagePosition` is where pages go, the engine's: right after or before a
+ * page (`{ after: pageRef }`, `{ before: pageRef }`), or `'start'` / `'end'`.
+ * It names a neighbour, so it stays right when pages move before the edit
+ * applies.
  */
-export type PagePlacement =
-  | { readonly after: PageRef | number }
-  | { readonly before: PageRef | number }
-  | 'start'
-  | 'end';
+export type { PagePosition, PdfRotation, PdfSize } from '@embedpdf/core';
 
 /** What an insert resolves: the new pages, in the order they were inserted. */
 export interface PageEditInsertResult {
@@ -30,8 +26,8 @@ export interface PageEditInsertResult {
 /** Options of `insertBlank()`. */
 export interface PageInsertBlankOptions extends OperationOptions {
   /** Where the new pages go. Default `'end'`. */
-  readonly placement?: PagePlacement;
-  /** The page size, in points. Default: the size of the page the new pages are placed next to. */
+  readonly position?: PagePosition;
+  /** The page size, in points. Default: the size of the page the new pages go next to. */
   readonly size?: PdfSize;
   /** How many blank pages. Default 1. */
   readonly count?: number;
@@ -42,20 +38,28 @@ export interface PageInsertFromBytesOptions extends OperationOptions {
   /** Only the source PDF's pages at these indexes, in this order. Default: every page. */
   readonly pageIndexes?: readonly number[];
   /** Where the new pages go. Default `'end'`. */
-  readonly placement?: PagePlacement;
+  readonly position?: PagePosition;
 }
 
 /** Options of the verbs that copy pages in: `insertFromDocument()` and `duplicate()`. */
-export interface PagePlacementOptions extends OperationOptions {
-  readonly placement?: PagePlacement;
+export interface PagePositionOptions extends OperationOptions {
+  readonly position?: PagePosition;
 }
 
 /**
- * Every edit runs in the order it was called, after the edits before it.
+ * Every edit is one change: one step of the history, so undo brings the
+ * pages back as they were, a deleted page with its annotations under its old
+ * ref. It shows once the engine answers. Edits apply in the order they were
+ * called, except that the verbs that copy pages first (`duplicate()`,
+ * `insertFromDocument()`, `insertFromBytes()` with `pageIndexes`) take their
+ * place once the copy is made.
+ *
  * Every verb rejects `permission-denied` (with `error.permission`) when the
- * session may not do it, `not-found` for a page the document doesn't have,
- * `invalid-input` for no pages, and `operation-cancelled` when its `signal`
- * fires; a refusal changes nothing.
+ * session may not do it, `not-found` for a page the document doesn't have and
+ * `invalid-input` for no pages; a refusal changes nothing. An edit the engine
+ * refuses rejects with the engine's reason. When the `signal` fires the verb
+ * rejects `operation-cancelled`: before its change is made nothing changes,
+ * after it the change still applies.
  */
 export interface PageEditCapability {
   /** Whether rotating, reordering, deleting and inserting pages is allowed (`doc.pages.assemble`). */
@@ -66,7 +70,16 @@ export interface PageEditCapability {
    */
   canExtract(): boolean;
 
-  /** Turn each page by a quarter or half turn from its own rotation. */
+  /** The selected pages, in the order they were selected; pages the document no longer has drop out. */
+  getSelected(): readonly PageRef[];
+  /** Make these pages the selection; `[]` clears it. Pages the document doesn't have are left out. */
+  select(pages: readonly (PageRef | number)[]): void;
+
+  /**
+   * Turn each page by a quarter or half turn from its rotation, the one it
+   * has once the edits on their way apply: two quick quarter turns are a
+   * half turn.
+   */
   rotateBy(
     pages: readonly (PageRef | number)[],
     delta: 90 | -90 | 180,
@@ -78,10 +91,10 @@ export interface PageEditCapability {
     rotation: PdfRotation,
     options?: OperationOptions,
   ): Promise<void>;
-  /** Move pages to the placement; several pages keep their order and land together. */
+  /** Move pages to `position`; several pages keep their order and land together. */
   reorder(
     pages: readonly (PageRef | number)[],
-    placement: PagePlacement,
+    position: PagePosition,
     options?: OperationOptions,
   ): Promise<void>;
   /** Delete pages. Deleting every page is refused (`invalid-input`): a document keeps one. */
@@ -100,13 +113,19 @@ export interface PageEditCapability {
   insertFromDocument(
     documentId: string,
     pages: readonly (PageRef | number)[],
-    options?: PagePlacementOptions,
+    options?: PagePositionOptions,
   ): Promise<PageEditInsertResult>;
-  /** Copy pages, right after the last of them unless a placement says otherwise. */
+  /**
+   * Copy pages as they show, with the edits on their way, right after the
+   * last of them unless `position` says otherwise.
+   */
   duplicate(
     pages: readonly (PageRef | number)[],
-    options?: PagePlacementOptions,
+    options?: PagePositionOptions,
   ): Promise<PageEditInsertResult>;
-  /** Copy pages into a new PDF and resolve its bytes. This document doesn't change. */
+  /**
+   * Copy pages into a new PDF, as they show with the edits on their way, and
+   * resolve its bytes. This document doesn't change.
+   */
   extract(pages: readonly (PageRef | number)[], options?: OperationOptions): Promise<Uint8Array>;
 }

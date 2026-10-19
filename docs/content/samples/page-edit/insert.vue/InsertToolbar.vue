@@ -30,19 +30,21 @@ watch(
   (cover) => {
     if (inserted || !cover) return;
     inserted = true;
-    void pageEdit.insertBlank({ placement: { after: cover.ref } }).then(show);
+    void pageEdit.insertBlank({ position: { after: cover.ref } }).then(show);
   },
   { immediate: true },
 );
 
 const positions = computed(() =>
   added.value
-    .map((each) => pages.value.findIndex((entry) => entry.ref.objectNumber === each.objectNumber) + 1)
+    .map(
+      (each) => pages.value.findIndex((entry) => entry.ref.objectNumber === each.objectNumber) + 1,
+    )
     .filter((position) => position > 0),
 );
 
 function insertBlankAfter(after: PageRef) {
-  void pageEdit.insertBlank({ placement: { after } }).then(show);
+  void pageEdit.insertBlank({ position: { after } }).then(show);
 }
 
 function duplicate(target: PageRef) {
@@ -53,7 +55,7 @@ async function insertFromOtherPdf(after: PageRef) {
   show(
     await pageEdit.insertFromBytes(await otherPdf(), {
       pageIndexes: [0, 2],
-      placement: { after },
+      position: { after },
     }),
   );
 }
@@ -61,12 +63,7 @@ async function insertFromOtherPdf(after: PageRef) {
 
 <template>
   <div v-if="page" class="toolbar">
-    <button
-      type="button"
-      class="button"
-      :disabled="!canEdit"
-      @click="insertBlankAfter(page.ref)"
-    >
+    <button type="button" class="button" :disabled="!canEdit" @click="insertBlankAfter(page.ref)">
       + Blank page after
     </button>
     <button
@@ -77,12 +74,7 @@ async function insertFromOtherPdf(after: PageRef) {
     >
       Duplicate page
     </button>
-    <button
-      type="button"
-      class="button"
-      :disabled="!canEdit"
-      @click="insertFromOtherPdf(page.ref)"
-    >
+    <button type="button" class="button" :disabled="!canEdit" @click="insertFromOtherPdf(page.ref)">
       + Pages 1 and 3 of another PDF
     </button>
     <span class="spacer" />

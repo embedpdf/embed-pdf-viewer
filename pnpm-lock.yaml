@@ -2198,6 +2198,15 @@ importers:
         specifier: workspace:*
         version: link:../../core/main
     devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput, PageRef } from '@embedpdf/react/runtime';
 import { PageView } from '@embedpdf/react/page-view';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
-import { pageEditPlugin, usePageEdit } from '@embedpdf/react/page-edit';
+import { pageEditPlugin, usePageEdit, usePageEditState } from '@embedpdf/react/page-edit';
 import { cloudEngine } from '@cloudpdf/engine';
 
 import './organize.css';
@@ -19,14 +19,16 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
 function PageOrganizer() {
   const pageEdit = usePageEdit();
   const pages = usePageList();
-  const canEdit = pageEdit.canEdit();
-  // The second and third pages start selected. Refs, not indexes: they still name the
-  // same pages after a reorder.
-  const [selected, setSelected] = useState(() => pages.slice(1, 3).map((page) => page.ref));
+  const { selected, canEdit } = usePageEditState();
+  // The second and third pages start selected. The selection holds refs: it names the same
+  // pages after a reorder, and a deleted page leaves it.
+  useEffect(() => {
+    pageEdit.select([1, 2]);
+  }, [pageEdit]);
 
   const isSelected = (page: PageRef) => selected.some((ref) => sameRef(ref, page));
   const toggle = (page: PageRef) =>
-    setSelected(
+    pageEdit.select(
       isSelected(page) ? selected.filter((ref) => !sameRef(ref, page)) : [...selected, page],
     );
   const count = selected.length;
@@ -67,10 +69,7 @@ function PageOrganizer() {
           className="button danger"
           // A document keeps at least one page.
           disabled={!canEdit || count === 0 || count === pages.length}
-          onClick={async () => {
-            await pageEdit.delete(selected);
-            setSelected([]);
-          }}
+          onClick={() => pageEdit.delete(selected)}
         >
           Delete
         </button>

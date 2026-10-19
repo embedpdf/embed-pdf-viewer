@@ -16,7 +16,7 @@ const ebook = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// Pick a page, then move it. Each button uses another placement.
+// Pick a page, then move it. Each button uses another position.
 function PageOrder() {
   const pageEdit = usePageEdit();
   const pages = usePageList();

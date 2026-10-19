@@ -233,6 +233,25 @@ describe('EpdfPageEdit', () => {
     expect(pageEdit.canEdit()).toBe(false);
     expect(pageEdit.canExtract()).toBe(false);
   });
+
+  it('has the selection as a signal, which follows select()', async () => {
+    const fixture = await mount(
+      viewerHost({
+        template: '',
+        features: [withPageEdit()],
+        config: { engine: documentsEngine() },
+      }),
+    );
+    const pageEdit = fixture.debugElement.injector.get(EpdfPageEdit);
+    expect(pageEdit.selected()).toEqual([]);
+    const kernel = kernelOf(fixture);
+    await kernel.documents.open(bytesInput('a'));
+    const [, second] = kernel.documents.listPages();
+    pageEdit.select([1]);
+    expect(pageEdit.selected()).toEqual([second!.ref]);
+    pageEdit.select([]);
+    expect(pageEdit.selected()).toEqual([]);
+  });
 });
 
 /** A link to a website, as a PDF carries it, and a click on it. */

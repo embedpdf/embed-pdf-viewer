@@ -87,7 +87,7 @@ export class InsertToolbar {
   }
 
   protected async insertBlankAfter(page: PageRef) {
-    this.show(await this.pageEdit.insertBlank({ placement: { after: page } }));
+    this.show(await this.pageEdit.insertBlank({ position: { after: page } }));
   }
 
   protected async duplicate(page: PageRef) {
@@ -98,7 +98,7 @@ export class InsertToolbar {
     this.show(
       await this.pageEdit.insertFromBytes(await otherPdf(), {
         pageIndexes: [0, 2],
-        placement: { after: page },
+        position: { after: page },
       }),
     );
   }
