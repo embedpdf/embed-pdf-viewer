@@ -195,8 +195,8 @@ describe('the page menu', () => {
   it('holds the page commands, for the thumbnails panel', () => {
     const ids = new Set(defaultCommands.map((command) => command.id));
     const menu = DEFAULT_LAYOUT.menus![PAGE_MENU]!.flatMap((section) =>
-      Array.isArray(section) ? section : section.items,
-    ) as string[];
+      'items' in section ? section.items : section,
+    );
     expect(menu.filter((id) => !ids.has(id))).toEqual([]);
     expect(menu).toEqual([
       'page:rotate-clockwise',
