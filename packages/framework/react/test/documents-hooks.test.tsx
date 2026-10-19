@@ -11,7 +11,13 @@ import {
   useMetadata,
   useMetadataState,
 } from '../src/metadata';
-import { pageEditPlugin, usePageEdit } from '../src/page-edit';
+import {
+  pageEditPlugin,
+  pageEditState,
+  PageEditToken,
+  usePageEdit,
+  usePageEditState,
+} from '../src/page-edit';
 import {
   ACTIONS_DEFAULTS,
   actionsPlugin,
@@ -23,8 +29,8 @@ import { viewerWith } from './counter-plugin';
 
 /**
  * The page edit, metadata and actions hooks against a real kernel: the
- * capability with and without a document, the metadata's declared state, and
- * the actions settings before any document opens.
+ * capability with and without a document, the metadata's and the page edits'
+ * declared state, and the actions settings before any document opens.
  */
 
 const box = { x: 0, y: 0, width: 600, height: 800 };
@@ -98,6 +104,23 @@ describe('useMetadataState', () => {
       custom: { contractId: 'C-2026-114' },
       status: 'ready',
     });
+  });
+});
+
+describe('usePageEditState', () => {
+  it("has exactly the page's State fields, and follows the selection", async () => {
+    const renders: unknown[] = [];
+    const { kernel } = await viewerWith(
+      plugins,
+      <Probe read={() => usePageEditState()} renders={renders} />,
+      engine,
+    );
+    expect(latest(renders)).toBe(pageEditState.empty);
+
+    await act(() => kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() }));
+    expect(latest(renders)).toEqual({ selected: [], canEdit: true, canExtract: true });
+    act(() => kernel.capability(PageEditToken).select([0]));
+    expect(latest(renders)).toEqual({ selected: [toPageRef(1)], canEdit: true, canExtract: true });
   });
 });
 

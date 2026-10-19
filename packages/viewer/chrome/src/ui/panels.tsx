@@ -15,19 +15,17 @@
 import { panelCommandOf } from '@embedpdf/core-ui';
 import { useCommands } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
-import { RenderLayer } from '@embedpdf/react/render';
 import { useDocumentId, useKernelValue, useOptionalCapability } from '@embedpdf/react/runtime';
 import { ShellToken, useShellEvent } from '@embedpdf/react/shell';
-import { Stage, useStage, useStageState } from '@embedpdf/react/stage';
-import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, type ReactNode } from 'react';
 
 import { panelsOnSide } from '../config/panels';
-import { ThumbsStageToken } from '../config/stage';
 import { useResolvedLayout } from '../config-context';
 import { lazyComponent } from './lazy';
-import { PanelFrame, useCloseOnPick } from './panel-frame';
+import { PanelFrame } from './panel-frame';
 import type { PanelSide } from './panel-layout';
 import { PanelSwitcher } from './panel-switcher';
+import { ThumbnailList } from './thumbnail-list';
 
 // Each feature's panel loads the first time it opens.
 const SearchPanel = lazyComponent(() => import('./search-panel').then((ui) => ui.SearchPanel));
@@ -166,76 +164,5 @@ function OpenPanel({
     >
       <slot name={`panel:${id}`}>{content?.draw(documentId)}</slot>
     </PanelFrame>
-  );
-}
-
-// The thumbnail rail: the same document through the thumbnail Stage lens (a
-// fixed-zoom grid that wraps into as many columns as the panel's width fits —
-// see the viewer's `thumbnails` plugin). Click a thumb to navigate the main
-// lens; the rail follows the main view. Read-only — no page edits
-// (rotate/move/delete), just the page bitmap and its number.
-function ThumbnailList() {
-  const t = useT();
-  const main = useStage(); // the main lens
-  const thumbs = useStage(ThumbsStageToken); // the sidebar lens
-  const currentPage = useStageState((state) => state.currentPageIndex);
-  // A sheet or an overlay closes once a page is picked, so you see where it took you.
-  const closeOnPick = useCloseOnPick();
-  // Follow the main view: when its current page changes, make that thumb visible —
-  // minimal movement, zero when it's already on screen.
-  useEffect(() => thumbs.reveal(currentPage), [currentPage, thumbs]);
-  return (
-    <Stage
-      token={ThumbsStageToken}
-      className="flex-1"
-      style={{ position: 'relative' }}
-      pageChrome={(page) => (
-        <>
-          {/* BOX-SPACE chrome: the click target + selection border hug the page
-              box; the number sits in the reserved bottom band. Neither rotates. */}
-          <button
-            type="button"
-            onClick={() => {
-              main.goToPage(page.pageIndex);
-              closeOnPick();
-            }}
-            title={t('thumbnails.page', { params: { page: page.pageIndex + 1 } })}
-            // The current page in the accent with a tint around it, the others in a light line.
-            className={`box-border cursor-pointer rounded ${
-              page.pageIndex === currentPage
-                ? 'border-accent ring-accent-light border-2 ring-2'
-                : 'border-border-subtle border'
-            }`}
-            style={{
-              position: 'absolute',
-              top: page.frame.top,
-              left: page.frame.left,
-              right: page.frame.right,
-              bottom: page.frame.bottom,
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: page.frame.bottom,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 11,
-              color: 'var(--epdf-text-muted)',
-              pointerEvents: 'none',
-            }}
-          >
-            {page.pageIndex + 1}
-          </div>
-        </>
-      )}
-    >
-      {/* page-space content: the bitmap, which rotates with the page */}
-      {() => <RenderLayer />}
-    </Stage>
   );
 }

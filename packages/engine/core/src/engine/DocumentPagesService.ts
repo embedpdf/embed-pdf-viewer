@@ -30,6 +30,10 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * number) everywhere except `list()`, which exposes display order through
  * `PageLayout.index`. Structure verbs never change the names of the
  * annotations on surviving pages.
+ *
+ * Each structure verb is a one-op change through `doc.apply` (`pageVerbs`):
+ * its `opId` undoes it, and an undo of a delete brings the same pages back
+ * (`pages.restored`).
  */
 export interface DocumentPagesService {
   /**
@@ -126,8 +130,8 @@ export interface DocumentPagesService {
    * (default `'end'`). The pages are copied in; the inserted copies get
    * fresh object numbers, returned in insertion order. Bytes are a call
    * argument (the same law as annotation binaries): the local engine
-   * transfers them to its worker, the cloud engine ships them as a
-   * multipart mutation (POST /pages/insert).
+   * transfers them to its worker, the cloud engine ships them as a part of
+   * its change request.
    *
    * Required-parity, delivered — a cloud viewer must be able to add pages,
    * so this is a mandatory member: any engine implements it or is not a
@@ -143,9 +147,9 @@ export interface DocumentPagesService {
    * Create `spec.count` (default 1) blank pages of `spec.size` (PDF points)
    * at `position` (default `'end'`). The blank-page sibling of `insert`:
    * same gate (`doc.pages.assemble`), same result shape, same
-   * `pages.inserted` event — it is a separate verb because its wire is pure
-   * parameters where `insert`'s is a binary payload (cloud: JSON
-   * POST /pages/insert-blank). Every pre-existing page keeps its identity.
+   * `pages.inserted` event — it is a separate verb because it takes pure
+   * parameters where `insert` takes a binary payload. Every pre-existing
+   * page keeps its identity.
    * Mandatory, like `insert`.
    *
    * `options.objectNumbers` names the new pages, one number per page in

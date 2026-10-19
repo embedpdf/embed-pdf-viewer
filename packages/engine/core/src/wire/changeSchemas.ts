@@ -32,6 +32,13 @@ import {
   OutlinePositionSchema,
   OutlineRestoreResultSchema,
   OutlineUpdateResultSchema,
+  PageDeleteResultSchema,
+  PageInsertBlankSpecSchema,
+  PageInsertResultSchema,
+  PagePositionSchema,
+  PageReorderResultSchema,
+  PageRestoreResultSchema,
+  PageRotateResultSchema,
 } from './schemas';
 import { AnnotationRefSchema } from '../annotation/base.schema';
 import {
@@ -48,17 +55,23 @@ import {
   FormFieldValueSchema,
   WidgetPlacementSchema,
 } from '../forms/schema';
+import { PdfRotationSchema } from '../geometry/schemas';
 import { FormFieldRefSchema } from '../identity/FormFieldRef.schema';
 import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import type { ChangeItemType } from '../mutation/Change';
-import { AnnotationResourceKeysSchema, AppearanceResourceKeysSchema } from './resourceKeys';
+import {
+  AnnotationResourceKeysSchema,
+  AppearanceResourceKeysSchema,
+  SourceResourceKeysSchema,
+} from './resourceKeys';
 
 /**
  * `POST /v1/docs/{docId}/layers/{layerName}/changes`: a request's changes and
  * their answers. A change's bytes (a stamp's drawing, an attached file, a
- * signature's artwork) travel as multipart parts beside the JSON
- * (`resource:{key}`), which names them by key where the change takes them.
+ * signature's artwork, a PDF whose pages come in) travel as multipart parts
+ * beside the JSON (`resource:{key}`), which names them by key where the change
+ * takes them.
  */
 
 /** An op's id for its change: 1 to 255 visible ASCII characters, as `opId` always is. */
@@ -203,6 +216,32 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     ref: OutlineItemRefSchema,
     expect: OutlineItemPatchSchema.optional(),
   }),
+  z.object({
+    type: z.literal('pages.rotate'),
+    pages: z.array(PageRefSchema).min(1),
+    rotation: PdfRotationSchema,
+  }),
+  z.object({
+    type: z.literal('pages.reorder'),
+    pages: z.array(PageRefSchema).min(1),
+    position: PagePositionSchema,
+  }),
+  z.object({
+    type: z.literal('pages.delete'),
+    pages: z.array(PageRefSchema).min(1),
+  }),
+  z.object({
+    type: z.literal('pages.insertBlank'),
+    spec: PageInsertBlankSpecSchema,
+    position: PagePositionSchema.optional(),
+    objectNumbers: z.array(z.number().int().positive()).optional(),
+  }),
+  z.object({
+    type: z.literal('pages.insert'),
+    /** The PDF whose pages come in, as the key of its multipart part. */
+    resources: SourceResourceKeysSchema,
+    position: PagePositionSchema.optional(),
+  }),
 ]);
 
 /**
@@ -241,6 +280,7 @@ const ChangeItemTypeSchema = z.enum([
   'forms.restore',
   'forms.restoreWidget',
   'outline.restore',
+  'pages.restore',
 ] as unknown as [ChangeItemType, ...ChangeItemType[]]);
 
 /** What an undo left alone, by name. */
@@ -309,6 +349,15 @@ export const ChangeItemSchema = z.union([
   itemOf('outline.move', OutlineMoveResultSchema),
   itemOf('outline.delete', OutlineDeleteResultSchema),
   itemOf('outline.restore', OutlineRestoreResultSchema),
+  itemOf('pages.rotate', PageRotateResultSchema, {
+    pages: z.array(PageRefSchema),
+    rotation: PdfRotationSchema,
+  }),
+  itemOf('pages.reorder', PageReorderResultSchema),
+  itemOf('pages.delete', PageDeleteResultSchema, { pages: z.array(PageRefSchema) }),
+  itemOf('pages.insertBlank', PageInsertResultSchema),
+  itemOf('pages.insert', PageInsertResultSchema),
+  itemOf('pages.restore', PageRestoreResultSchema),
 ]);
 
 /** What a change did: one item per op (per step of an undo), and its meta. */

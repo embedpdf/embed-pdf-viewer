@@ -2,13 +2,8 @@
 export default {
   'set-scale': 'Set Scale',
   viewports: 'Viewports',
-  delete: 'Delete',
   extract: 'Extract',
   flatten: 'Flatten',
-  insert: 'Insert',
-  'insert-blank': 'Insert Blank',
   'set-name': 'Set Name',
   'remove-name': 'Remove Name',
-  reorder: 'Reorder',
-  rotate: 'Rotate',
 };

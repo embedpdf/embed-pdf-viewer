@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  signal,
-  ViewEncapsulation,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, ViewEncapsulation } from '@angular/core';
 import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
 import { EpdfPageView } from '@embedpdf/angular/page-view';
@@ -26,7 +20,8 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let canEdit = pageEdit.canEdit();
-    @let count = selected().length;
+    @let selected = pageEdit.selected();
+    @let count = selected.length;
     <div class="toolbar">
       <output class="readout">{{ count }} of {{ document.pages().length }} selected</output>
       <span class="spacer"></span>
@@ -34,7 +29,7 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
         type="button"
         class="button"
         [disabled]="!canEdit || count === 0"
-        (click)="pageEdit.rotateBy(selected(), -90)"
+        (click)="pageEdit.rotateBy(selected, -90)"
       >
         ⟲ Rotate left
       </button>
@@ -42,7 +37,7 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
         type="button"
         class="button"
         [disabled]="!canEdit || count === 0"
-        (click)="pageEdit.rotateBy(selected(), 90)"
+        (click)="pageEdit.rotateBy(selected, 90)"
       >
         ⟳ Rotate right
       </button>
@@ -50,7 +45,7 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
         type="button"
         class="button"
         [disabled]="!canEdit || count === 0"
-        (click)="pageEdit.reorder(selected(), 'start')"
+        (click)="pageEdit.reorder(selected, 'start')"
       >
         Move to front
       </button>
@@ -59,7 +54,7 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
         type="button"
         class="button danger"
         [disabled]="!canEdit || count === 0 || count === document.pages().length"
-        (click)="deleteSelected()"
+        (click)="pageEdit.delete(selected)"
       >
         Delete
       </button>
@@ -91,28 +86,22 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
 export class PageOrganizer {
   protected readonly pageEdit = inject(EpdfPageEdit);
   protected readonly document = inject(EpdfDocument);
-  // The second and third pages start selected. Refs, not indexes: they still name the
-  // same pages after a reorder.
-  protected readonly selected = signal<PageRef[]>(
-    this.document
-      .pages()
-      .slice(1, 3)
-      .map((page) => page.ref),
-  );
+
+  constructor() {
+    // The second and third pages start selected. The selection holds refs: it names the same
+    // pages after a reorder, and a deleted page leaves it.
+    this.pageEdit.select([1, 2]);
+  }
 
   protected isSelected(page: PageRef): boolean {
-    return this.selected().some((ref) => sameRef(ref, page));
+    return this.pageEdit.selected().some((ref) => sameRef(ref, page));
   }
 
   protected toggle(page: PageRef) {
-    this.selected.update((selected) =>
+    const selected = this.pageEdit.selected();
+    this.pageEdit.select(
       this.isSelected(page) ? selected.filter((ref) => !sameRef(ref, page)) : [...selected, page],
     );
-  }
-
-  protected async deleteSelected() {
-    await this.pageEdit.delete(this.selected());
-    this.selected.set([]);
   }
 }
 

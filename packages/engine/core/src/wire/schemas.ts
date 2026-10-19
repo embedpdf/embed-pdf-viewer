@@ -123,6 +123,7 @@ import type { PageDeleteInput } from '../mutation/PageDeleteInput';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
+import type { PageRestoreResult } from '../mutation/PageRestoreResult';
 import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
 import type { PageExtractInput } from '../dto/PageExtract';
 import {
@@ -1655,23 +1656,24 @@ export const PageInsertInputSchema: z.ZodType<{
   .strict();
 
 /**
- * Blank-page insert input — plain JSON, pages.insert minus the bytes.
- * `size` is in PDF points (un-rotated); `count` shares the contract cap
- * with the worker so a request the schema accepts cannot then fail the
- * worker's own guard.
+ * What blank pages to make (`PageInsertBlankSpec`). `size` is in PDF points
+ * (un-rotated); `count` shares the contract cap with the worker so a request
+ * the schema accepts cannot then fail the worker's own guard.
  */
-export const PageInsertBlankInputSchema: z.ZodType<{
-  size: { width: number; height: number };
-  count?: number;
-  position?: ListPosition<PageRef>;
-}> = z.object({
+export const PageInsertBlankSpecSchema = z.object({
   size: z.object({
     width: z.number().positive().finite(),
     height: z.number().positive().finite(),
   }),
   count: z.number().int().min(1).max(PAGE_INSERT_BLANK_MAX_COUNT).optional(),
-  position: PagePositionSchema.optional(),
 });
+
+/** Blank-page insert input — plain JSON, pages.insert minus the bytes. */
+export const PageInsertBlankInputSchema: z.ZodType<{
+  size: { width: number; height: number };
+  count?: number;
+  position?: ListPosition<PageRef>;
+}> = PageInsertBlankSpecSchema.extend({ position: PagePositionSchema.optional() });
 
 /**
  * Page extract input: the pages to export, in the order they should appear,
@@ -1695,6 +1697,13 @@ export const PageExtractInputSchema: z.ZodType<PageExtractInput> = z
  */
 export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
   insertedPages: z.array(PageRefSchema),
+  layout: PageListSnapshotSchema,
+  meta: MutationMetaSchema,
+});
+
+/** Page restore result: the pages an undo brought back (see `PageRestoreResult`). */
+export const PageRestoreResultSchema: z.ZodType<PageRestoreResult> = z.object({
+  pages: z.array(PageRefSchema),
   layout: PageListSnapshotSchema,
   meta: MutationMetaSchema,
 });

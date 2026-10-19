@@ -18,7 +18,7 @@ const ebook = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-// Pick a page, then move it. Each button uses another placement.
+// Pick a page, then move it. Each button uses another position.
 function PageOrder() {
   const pageEdit = usePageEdit();
   const pages = usePageList();

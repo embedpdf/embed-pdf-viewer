@@ -121,6 +121,26 @@ export function importOutlineItem(
   });
 }
 
+/** A page as its delete removes it: the page, what it reaches, its names, its place. */
+export function exportPage(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  pageObjectNumber: number,
+): Uint8Array {
+  return takeOwned(runtime, `page ${pageObjectNumber}`, (sizePtr) =>
+    runtime.fn.EPDFPage_ExportRawToOwnedBuffer(docPtr, pageObjectNumber, sizePtr),
+  );
+}
+
+/** Puts the page of `capture` back into the page tree, at its place, with its names. */
+export function importPage(runtime: PdfRuntimeModule, docPtr: Ptr, capture: Uint8Array): void {
+  withBytes(runtime, capture, (ptr) => {
+    if (!runtime.fn.EPDFPage_ImportRaw(docPtr, ptr, capture.byteLength)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFPage_ImportRaw refused a capture');
+    }
+  });
+}
+
 /** The bytes of a buffer an export returned, which is then released. */
 function takeOwned(
   runtime: PdfRuntimeModule,

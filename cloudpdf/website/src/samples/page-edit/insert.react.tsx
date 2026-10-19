@@ -36,7 +36,7 @@ function InsertToolbar() {
   useEffect(() => {
     if (inserted.current || !pages[0]) return;
     inserted.current = true;
-    void pageEdit.insertBlank({ placement: { after: pages[0].ref } }).then(show);
+    void pageEdit.insertBlank({ position: { after: pages[0].ref } }).then(show);
   });
 
   if (!page) return null;
@@ -51,7 +51,7 @@ function InsertToolbar() {
         type="button"
         className="button"
         disabled={!canEdit}
-        onClick={() => pageEdit.insertBlank({ placement: { after: page.ref } }).then(show)}
+        onClick={() => pageEdit.insertBlank({ position: { after: page.ref } }).then(show)}
       >
         + Blank page after
       </button>
@@ -71,7 +71,7 @@ function InsertToolbar() {
           show(
             await pageEdit.insertFromBytes(await otherPdf(), {
               pageIndexes: [0, 2],
-              placement: { after: page.ref },
+              position: { after: page.ref },
             }),
           )
         }

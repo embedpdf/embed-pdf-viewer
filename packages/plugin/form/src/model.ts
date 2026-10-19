@@ -288,11 +288,12 @@ function foldFormFacts(index: FieldIndex, event: DocumentEvent): FieldIndex | Mi
             event.calculationOrder,
           )
         : reload();
-    // A repair reports only counts; the others remove pages, or paint their
+    // A repair reports only counts; the others add or remove pages, or paint their
     // widgets into the content.
     case 'forms.repaired':
     case 'pages.deleted':
     case 'pages.inserted':
+    case 'pages.restored':
     case 'pages.flattened':
     case 'annotations.flattened':
     case 'redaction.applied':

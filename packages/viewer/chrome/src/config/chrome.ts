@@ -182,7 +182,6 @@ export const DEFAULT_LAYOUT: LayoutData = {
         style,
       ],
     },
-
     // ── over the pages ────────────────────────────────────────────────────────
     pager: {
       place: { float: 'bottom' },
@@ -259,6 +258,13 @@ export const DEFAULT_LAYOUT: LayoutData = {
       ['outline:add', 'outline:add-child'],
       ['outline:rename', 'outline:set-destination', 'outline:properties'],
       ['outline:delete'],
+    ],
+    // A page of the thumbnails panel: its menu button, a right-click and a long-press open this.
+    page: [
+      ['page:rotate-clockwise', 'page:rotate-counterclockwise'],
+      ['page:insert-blank', 'page:insert-file', 'page:duplicate'],
+      ['page:extract'],
+      ['page:delete'],
     ],
   },
 

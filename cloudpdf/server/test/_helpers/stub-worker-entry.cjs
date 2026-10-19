@@ -7,8 +7,8 @@
  *
  *   - `open.fatMem` / `open.layer*` -> opens a session (layer sessions
  *     seed their annotation state from the artifact they open FROM)
- *   - annotation mutations -> mutate per-session state and serialize it
- *     into the returned layer artifact
+ *   - `document.applyChanges` -> annotation and page ops mutate
+ *     per-session state and serialize it into the returned layer artifact
  *   - `layer.close` -> closes ONE layer session (reload seam)
  *   - `close` -> closes every session of the doc
  *   - `shutdown` -> exits after acking
@@ -91,9 +91,6 @@ function ponOf(page) {
 }
 function pageRef(pon) {
   return { kind: 'objectNumber', objectNumber: pon };
-}
-function ponsOf(msg) {
-  return msg.pages.map(ponOf);
 }
 
 /** Serialize session annotation state into the v2 artifact format. */
@@ -408,13 +405,66 @@ function changeOps(msg) {
   return (msg.changes ?? []).flatMap((entry) => entry.change.ops ?? []);
 }
 
+/** The session's pages by object number, in display order. */
+function pageOrderOf(meta) {
+  return meta.pageOrder ?? Array.from({ length: meta.pageCount }, (_, i) => i + 1);
+}
+
+/** A page op leaves every per-page pin alone: no affected pages. */
+function pageOpMeta(stamp) {
+  return { affectedPages: [], cacheDelta: null, ...stamp };
+}
+
 /**
- * One annotation op of a change, on the session's state, as the real
+ * One annotation or page op of a change, on the session's state, as the real
  * mutator answers it: its item, or a thrown refusal.
  */
 function applyStubOp(meta, op, opId) {
   const stamp = { opId, undoable: false };
   switch (op.type) {
+    case 'pages.reorder': {
+      const movingPons = op.pages.map(ponOf);
+      const moving = new Set(movingPons);
+      const remaining = pageOrderOf(meta).filter((pon) => !moving.has(pon));
+      const at = positionIn(remaining, op.position, ponOf);
+      meta.pageOrder = [...remaining.slice(0, at), ...movingPons, ...remaining.slice(at)];
+      return {
+        type: op.type,
+        pages: movingPons.map(pageRef),
+        layout: layoutSnapshot(meta),
+        meta: pageOpMeta(stamp),
+      };
+    }
+    case 'pages.rotate': {
+      // Rotation is presentation metadata: same pages, same order, new
+      // per-page rotation values.
+      meta.pageRotations = { ...meta.pageRotations };
+      for (const page of op.pages) meta.pageRotations[ponOf(page)] = op.rotation;
+      return {
+        type: op.type,
+        pages: op.pages,
+        rotation: op.rotation,
+        layout: layoutSnapshot(meta),
+        meta: pageOpMeta(stamp),
+      };
+    }
+    case 'pages.delete': {
+      const current = pageOrderOf(meta);
+      const deleting = new Set(op.pages.map(ponOf));
+      const unknown = [...deleting].find((pon) => !current.includes(pon));
+      if (unknown !== undefined) throw stubError('NotFound', `no page ${unknown}`);
+      // A document keeps at least one page.
+      if (deleting.size >= current.length) {
+        throw stubError('InvalidArg', 'pages.delete would remove every page');
+      }
+      meta.pageOrder = current.filter((pon) => !deleting.has(pon));
+      return {
+        type: op.type,
+        pages: current.filter((pon) => deleting.has(pon)).map(pageRef),
+        layout: layoutSnapshot(meta),
+        meta: pageOpMeta(stamp),
+      };
+    }
     case 'annotations.create': {
       const pon = ponOf(op.page);
       meta.annots = meta.annots ?? [];
@@ -784,7 +834,12 @@ parentPort.on('message', (msg) => {
       const outcomes = [];
       let wrote = false;
       for (const entry of msg.changes) {
-        const before = { annots: [...(meta.annots ?? [])], seq: meta.seq };
+        const before = {
+          annots: [...(meta.annots ?? [])],
+          seq: meta.seq,
+          pageOrder: meta.pageOrder,
+          pageRotations: meta.pageRotations,
+        };
         try {
           if (!entry.change.ops) {
             throw stubError('NotImplemented', 'stub worker: undo is not implemented');
@@ -810,6 +865,8 @@ parentPort.on('message', (msg) => {
         } catch (err) {
           meta.annots = before.annots;
           meta.seq = before.seq;
+          meta.pageOrder = before.pageOrder;
+          meta.pageRotations = before.pageRotations;
           if (!err.code || !KEPT_REFUSALS.has(err.code)) {
             parentPort.postMessage({ kind: 'reject', jobId: msg.jobId, error: serializedOf(err) });
             return;
@@ -821,82 +878,6 @@ parentPort.on('message', (msg) => {
         tag: 'document.applyChanges',
         outcomes,
         ...(wrote ? { artifact: layerArtifact(msg, meta) } : {}),
-      });
-      return;
-    }
-    case 'pages.reorder': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const current = meta.pageOrder ?? Array.from({ length: meta.pageCount }, (_, i) => i + 1);
-      const movingPons = ponsOf(msg);
-      const moving = new Set(movingPons);
-      const remaining = current.filter((pon) => !moving.has(pon));
-      const at = positionIn(remaining, msg.position, ponOf);
-      const next = [...remaining.slice(0, at), ...movingPons, ...remaining.slice(at)];
-      meta.pageOrder = next;
-      // A reorder returns geometry, not liveness: the new layout + empty meta
-      // (the server fills in the real coherence pins on commit).
-      const result = {
-        pages: movingPons.map(pageRef),
-        layout: layoutSnapshot(meta),
-        meta: { affectedPages: [], cacheDelta: null },
-      };
-      resolveMutation(msg, {
-        tag: 'pages.reorder',
-        result,
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'pages.rotate': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      // Rotation is presentation metadata: same pages, same order, new
-      // per-page rotation values (the real mutator's exact contract).
-      meta.pageRotations = meta.pageRotations ?? {};
-      for (const pon of ponsOf(msg)) {
-        meta.pageRotations[pon] = msg.rotation;
-      }
-      resolveMutation(msg, {
-        tag: 'pages.rotate',
-        result: { layout: layoutSnapshot(meta), meta: { affectedPages: [], cacheDelta: null } },
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'pages.delete': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const current = meta.pageOrder ?? Array.from({ length: meta.pageCount }, (_, i) => i + 1);
-      const deletingPons = ponsOf(msg);
-      if (deletingPons.length >= current.length) {
-        // Mirrors PagesMutator: a document must keep at least one page.
-        parentPort.postMessage({
-          kind: 'reject',
-          jobId: msg.jobId,
-          error: {
-            name: 'EngineError',
-            message: 'pages.delete would remove every page',
-            code: 'InvalidArg',
-          },
-        });
-        return;
-      }
-      const deleting = new Set(deletingPons);
-      meta.pageOrder = current.filter((pon) => !deleting.has(pon));
-      resolveMutation(msg, {
-        tag: 'pages.delete',
-        result: { layout: layoutSnapshot(meta), meta: { affectedPages: [], cacheDelta: null } },
-        artifact: layerArtifact(msg, meta),
       });
       return;
     }

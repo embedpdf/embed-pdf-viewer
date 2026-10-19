@@ -43,9 +43,6 @@ import type {
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items          — collection (create)
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/{key}    — member
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/reorder  — stacking order
- *   /v1/docs/{id}/layers/{L}/pages/reorder                        — page order
- *   /v1/docs/{id}/layers/{L}/pages/rotate                         — batch absolute rotation
- *   /v1/docs/{id}/layers/{L}/pages/delete                         — batch page delete
  *   /v1/docs/{id}/form@{ver}                                      — the form: fields + widget rows (read)
  *   /v1/docs/{id}/form/pages/{N}/appearances@{ver}                — a page's widget images (read)
  *   /v1/docs/{id}/layers/{L}/form@{ver}
@@ -708,14 +705,6 @@ export const wirePaths = {
   layerPageScale: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${encodeURIComponent(encodePageKey(page))}/scale`,
 
-  layerPagesReorder: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/reorder`,
-
-  layerPagesRotate: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/rotate`,
-
-  layerPagesDelete: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/delete`,
   /** POST: register/rename a `/Names /Pages` entry — a page-structure
    *  mutation (docVersion + layoutVersion advance; reads ride `/layout`). */
   layerPagesNames: (docId: string, layerName: string) =>
@@ -726,17 +715,6 @@ export const wirePaths = {
 
   layerPagesFlatten: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/flatten`,
-
-  /**
-   * POST (multipart mutation envelope): copy every page of the `source`
-   * resource part (a standalone PDF) in at the body's `toIndex`.
-   */
-  layerPagesInsert: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/insert`,
-
-  /** POST (plain JSON): create blank pages — pages.insert minus the bytes. */
-  layerPagesInsertBlank: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/insert-blank`,
 
   /**
    * POST (plain JSON → `application/pdf` bytes): export the listed pages,
@@ -831,14 +809,9 @@ export const wireTemplates = {
   layerFormImportValues: '/v1/docs/:docId/layers/:layerName/form/import-values',
   layerPageViewports: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/viewports',
   layerPageScale: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/scale',
-  layerPagesReorder: '/v1/docs/:docId/layers/:layerName/pages/reorder',
-  layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
-  layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',
   layerPagesNames: '/v1/docs/:docId/layers/:layerName/pages/names',
   layerPagesNamesDelete: '/v1/docs/:docId/layers/:layerName/pages/names/delete',
   layerPagesFlatten: '/v1/docs/:docId/layers/:layerName/pages/flatten',
-  layerPagesInsert: '/v1/docs/:docId/layers/:layerName/pages/insert',
-  layerPagesInsertBlank: '/v1/docs/:docId/layers/:layerName/pages/insert-blank',
   layerPagesExtract: '/v1/docs/:docId/layers/:layerName/pages/extract',
   layerRedactionsApply: '/v1/docs/:docId/layers/:layerName/redactions/apply',
   layerDownload: '/v1/docs/:docId/layers/:layerName/download',

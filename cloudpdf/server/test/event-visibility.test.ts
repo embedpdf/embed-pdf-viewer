@@ -80,7 +80,9 @@ describe('visibleRow', () => {
   });
 
   it('sends what neither capability guards to everyone', () => {
-    const rotate = row('pages.rotate', { layout: { pages: [] } });
+    const rotate = row('change', {
+      items: [{ type: 'pages.rotate', pages: [], rotation: 90, layout: { pages: [] } }],
+    });
     expect(visibleRow(rotate, { annotations: false, forms: false })).toBe(rotate);
   });
 });

@@ -184,7 +184,7 @@ const thumbsOf = (tab: Page) =>
   tab.evaluate(() => {
     const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
     const thumbs = [
-      ...root.querySelectorAll('[data-epdf-panel="thumbnails"] button[title^="Page "]'),
+      ...root.querySelectorAll('[data-epdf-panel="thumbnails"] [role="option"]'),
     ].map((thumb) => thumb.getBoundingClientRect());
     return {
       columns: new Set(thumbs.map((rect) => Math.round(rect.left))).size,

@@ -68,13 +68,8 @@ export function resultInPageSpace(
   switch (payload.tag) {
     case 'pages.list':
       return { ...payload, snapshot: pageListOf(payload.snapshot) };
-    case 'pages.reorder':
-    case 'pages.rotate':
-    case 'pages.delete':
     case 'pages.setName':
     case 'pages.removeName':
-    case 'pages.insert':
-    case 'pages.insertBlank':
       return {
         ...payload,
         result: { ...payload.result, layout: pageListOf(payload.result.layout) },
@@ -343,7 +338,7 @@ function opInFileSpace(
       return expect ? { ...rest, expect: pdfOutlinePatchOf(expect, boxOf) } : rest;
     }
     default:
-      // The rest hold no places: values, flags, names, metadata, outline moves.
+      // The rest hold no places: values, flags, names, metadata, outline and page moves.
       return op;
   }
 }
@@ -408,6 +403,13 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
       return { ...item, item: pageOutlineItemOf(item.item, boxOf) } as ChangeItem;
     case 'outline.restore':
       return { ...item, items: item.items.map((read) => pageOutlineItemOf(read, boxOf)) };
+    case 'pages.rotate':
+    case 'pages.reorder':
+    case 'pages.delete':
+    case 'pages.insertBlank':
+    case 'pages.insert':
+    case 'pages.restore':
+      return { ...item, layout: pageListOf(item.layout) } as ChangeItem;
     default:
       // The rest hold no places: deletes, metadata, outline moves.
       return item;

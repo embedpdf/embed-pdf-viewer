@@ -96,6 +96,17 @@ export class CloudDocumentChanges {
    */
   private absorb(opId: string, change: Change, result: ChangeResult): void {
     this.manifest.apply(result.meta, planesOf(result));
+    // A change of the page set patches the manifest's page rows, as its single verbs did.
+    for (const item of result.items) {
+      if (item.type === 'pages.delete') this.manifest.applyPageDelete(result.meta, item.pages);
+      else if (
+        item.type === 'pages.insert' ||
+        item.type === 'pages.insertBlank' ||
+        item.type === 'pages.restore'
+      ) {
+        this.manifest.applyPageInsert(result.meta);
+      }
+    }
     if (this.published.has(opId)) return;
     this.published.add(opId);
     if (this.published.size > PUBLISHED_MEMORY) {
@@ -183,6 +194,10 @@ function changeRequestOf(changes: readonly SentChange[]): {
           resources: { appearance: part(appearance.pdf.slice().buffer as ArrayBuffer) },
         };
       }
+      case 'pages.insert': {
+        const { source, ...rest } = op;
+        return { ...rest, resources: { source: part(source.slice().buffer as ArrayBuffer) } };
+      }
       default:
         return op;
     }
@@ -195,12 +210,16 @@ function changeRequestOf(changes: readonly SentChange[]): {
   return { body, parts };
 }
 
-/** Whether a change carries bytes: a drawing, an attached file, a signature's artwork. */
+/**
+ * Whether a change carries bytes: a drawing, an attached file, a signature's
+ * artwork, a PDF whose pages come in.
+ */
 function carriesBytes(change: Change): boolean {
   if (isUndoChange(change)) return false;
   return change.ops.some(
     (op) =>
       op.type === 'forms.setSignatureAppearance' ||
+      op.type === 'pages.insert' ||
       ((op.type === 'annotations.create' || op.type === 'annotations.update') &&
         op.resources !== undefined &&
         Object.values(op.resources).some((resource) => resource !== undefined)),
@@ -214,6 +233,7 @@ function planesOf(result: ChangeResult): LayerScopePlane[] {
     if (isSkippedItem(item)) continue;
     if (item.type.startsWith('metadata.')) planes.add('metadata');
     else if (item.type.startsWith('outline.')) planes.add('outline');
+    else if (item.type.startsWith('pages.')) planes.add('layout');
     else if (item.type.startsWith('forms.')) planes.add('forms');
     else planes.add('annotations');
   }

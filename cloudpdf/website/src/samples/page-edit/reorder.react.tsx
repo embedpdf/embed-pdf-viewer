@@ -13,7 +13,7 @@ const plugins = [renderPlugin(), pageEditPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// Pick a page, then move it. Each button uses another placement.
+// Pick a page, then move it. Each button uses another position.
 function PageOrder() {
   const pageEdit = usePageEdit();
   const pages = usePageList();

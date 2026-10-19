@@ -10,7 +10,7 @@ import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angul
 import type { OpenInput, PageInfo, PageRef } from '@embedpdf/angular/runtime';
 import { EpdfPageView } from '@embedpdf/angular/page-view';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
-import { EpdfPageEdit, withPageEdit, type PagePlacement } from '@embedpdf/angular/page-edit';
+import { EpdfPageEdit, withPageEdit, type PagePosition } from '@embedpdf/angular/page-edit';
 import { localEngine } from '@embedpdf/engine';
 
 const ebook = async (): Promise<OpenInput> => {
@@ -18,7 +18,7 @@ const ebook = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// Pick a page, then move it. Each button uses another placement.
+// Pick a page, then move it. Each button uses another position.
 @Component({
   selector: 'demo-page-order',
   imports: [EpdfPageView, EpdfRenderLayer],
@@ -107,9 +107,9 @@ export class PageOrder {
     return (page && this.document.pages()[page.index + 1]) ?? null;
   });
 
-  protected moveTo(placement: PagePlacement) {
+  protected moveTo(position: PagePosition) {
     const page = this.page();
-    if (page) void this.pageEdit.reorder([page.ref], placement);
+    if (page) void this.pageEdit.reorder([page.ref], position);
   }
 
   protected moveBefore(other: PageInfo | null) {

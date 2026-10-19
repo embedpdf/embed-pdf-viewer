@@ -28,14 +28,13 @@
     const cover = pages.current[0];
     if (inserted || !cover) return;
     inserted = true;
-    void pageEdit.insertBlank({ placement: { after: cover.ref } }).then(show);
+    void pageEdit.insertBlank({ position: { after: cover.ref } }).then(show);
   });
 
   const positions = $derived(
     added
       .map(
-        (ref) =>
-          pages.current.findIndex((each) => each.ref.objectNumber === ref.objectNumber) + 1,
+        (ref) => pages.current.findIndex((each) => each.ref.objectNumber === ref.objectNumber) + 1,
       )
       .filter((position) => position > 0),
   );
@@ -44,7 +43,7 @@
     show(
       await pageEdit.insertFromBytes(await otherPdf(), {
         pageIndexes: [0, 2],
-        placement: { after },
+        position: { after },
       }),
     );
   }
@@ -56,7 +55,7 @@
       type="button"
       class="button"
       disabled={!canEdit}
-      onclick={() => pageEdit.insertBlank({ placement: { after: page.ref } }).then(show)}
+      onclick={() => pageEdit.insertBlank({ position: { after: page.ref } }).then(show)}
     >
       + Blank page after
     </button>

@@ -20,6 +20,7 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { InProcessRealtimeBus } from '../src/realtime/RealtimeBus';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { appliedResult, postChange } from './_helpers/changes';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'events-sse-secret';
@@ -137,17 +138,13 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const sse = new SseCollector();
     await sse.open(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/events`, token);
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-Engine-Session-Id': 'engine-session-A',
-      },
-      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
-    });
-    expect(res.status).toBe(200);
-    const responseBody = (await res.json()) as unknown;
+    const result = appliedResult(
+      await postChange(
+        { baseUrl: fx.baseUrl, docId, layerName, token },
+        [{ type: 'pages.rotate', pages: [1].map(toPageRef), rotation: 90 }],
+        { headers: { 'X-Engine-Session-Id': 'engine-session-A' } },
+      ),
+    );
 
     await sse.waitFor(1);
     const [event] = sse.events;
@@ -159,12 +156,12 @@ describe('GET /events — the SSE half of the document event stream', () => {
       payload: unknown;
       layerName: string;
     };
-    expect(row.kind).toBe('pages.rotate');
+    expect(row.kind).toBe('change');
     expect(row.layerName).toBe(layerName);
     expect(row.originSessionId).toBe('engine-session-A');
-    // The streamed payload is the mutating caller's response — the
+    // The streamed payload is the change's result as the caller got it — the
     // three-way identity (response = audit payload = event payload).
-    expect(row.payload).toEqual(responseBody);
+    expect(row.payload).toEqual(result);
     await sse.close();
   });
 
@@ -252,24 +249,17 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
     const token = docToken(tenantId, docId, layerName);
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+    const target = { baseUrl: fx.baseUrl, docId, layerName, token };
 
     // Two mutations before any subscriber exists.
-    const first = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
-    });
-    expect(first.status).toBe(200);
-    const second = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/reorder`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ pages: [3].map(toPageRef), position: 'start' }),
-    });
-    expect(second.status).toBe(200);
+    appliedResult(
+      await postChange(target, [{ type: 'pages.rotate', pages: [1].map(toPageRef), rotation: 90 }]),
+    );
+    appliedResult(
+      await postChange(target, [
+        { type: 'pages.reorder', pages: [3].map(toPageRef), position: 'start' },
+      ]),
+    );
 
     // Resume from cursor 1 → only the second mutation replays.
     const sse = new SseCollector();
@@ -277,7 +267,12 @@ describe('GET /events — the SSE half of the document event stream', () => {
     await sse.waitFor(1);
     expect(sse.events).toHaveLength(1);
     expect(sse.events[0].id).toBe(2);
-    expect((JSON.parse(sse.events[0].data) as { kind: string }).kind).toBe('pages.reorder');
+    const row = JSON.parse(sse.events[0].data) as {
+      kind: string;
+      payload: { items: Array<{ type: string }> };
+    };
+    expect(row.kind).toBe('change');
+    expect(row.payload.items.map((item) => item.type)).toEqual(['pages.reorder']);
     await sse.close();
   });
 
@@ -287,27 +282,20 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
     const token = docToken(tenantId, docId, layerName);
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+    const target = { baseUrl: fx.baseUrl, docId, layerName, token };
 
-    const old = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 180 }),
-    });
-    expect(old.status).toBe(200);
+    appliedResult(
+      await postChange(target, [
+        { type: 'pages.rotate', pages: [1].map(toPageRef), rotation: 180 },
+      ]),
+    );
 
     const sse = new SseCollector();
     await sse.open(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/events`, token);
 
-    const fresh = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ pages: [2].map(toPageRef), rotation: 90 }),
-    });
-    expect(fresh.status).toBe(200);
+    appliedResult(
+      await postChange(target, [{ type: 'pages.rotate', pages: [2].map(toPageRef), rotation: 90 }]),
+    );
 
     await sse.waitFor(1);
     expect(sse.events).toHaveLength(1); // the old rotate did not replay
@@ -361,12 +349,11 @@ describe('GET /events — the SSE half of the document event stream', () => {
     await fx.bus.publishRevocation('jti-someone-else', Date.now() + 60_000);
 
     // The stream must still deliver mutations afterwards.
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
-    });
-    expect(res.status).toBe(200);
+    appliedResult(
+      await postChange({ baseUrl: fx.baseUrl, docId, layerName, token }, [
+        { type: 'pages.rotate', pages: [1].map(toPageRef), rotation: 90 },
+      ]),
+    );
     await sse.waitFor(1);
     expect(sse.events[0].event).toBe('mutation');
     await sse.close();
@@ -386,12 +373,11 @@ describe('GET /events — the SSE half of the document event stream', () => {
     expect(before.status).toBe(200);
     expect(((await before.json()) as { auditHead: number }).auditHead).toBe(0);
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
-    });
-    expect(res.status).toBe(200);
+    appliedResult(
+      await postChange({ baseUrl: fx.baseUrl, docId, layerName, token }, [
+        { type: 'pages.rotate', pages: [1].map(toPageRef), rotation: 90 },
+      ]),
+    );
 
     const after = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=2`,

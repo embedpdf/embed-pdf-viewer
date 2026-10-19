@@ -57,6 +57,18 @@ import {
   revertOutlineItem,
   updateOutlineItem,
 } from './internal/outlineChanges';
+import {
+  changingPageTree,
+  deletePages,
+  insertBlankPages,
+  insertPages,
+  removePages,
+  reorderPages,
+  reorderPagesBack,
+  restorePages,
+  rotatePages,
+  rotatePagesBack,
+} from './internal/pageChanges';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -208,6 +220,16 @@ function runOp(
       return moveOutlineItems(ctx, op);
     case 'outline.delete':
       return deleteOutlineItem(ctx, op, at);
+    case 'pages.rotate':
+      return changingPageTree(ctx, () => rotatePages(ctx, op));
+    case 'pages.reorder':
+      return changingPageTree(ctx, () => reorderPages(ctx, op));
+    case 'pages.delete':
+      return changingPageTree(ctx, () => deletePages(ctx, op));
+    case 'pages.insertBlank':
+      return changingPageTree(ctx, () => insertBlankPages(ctx, op));
+    case 'pages.insert':
+      return changingPageTree(ctx, () => insertPages(ctx, op));
   }
 }
 
@@ -245,5 +267,13 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return restoreOutlineItem(ctx, step);
     case 'outline.move':
       return moveOutlineItemsBack(ctx, step);
+    case 'pages.rotate':
+      return changingPageTree(ctx, () => rotatePagesBack(ctx, step));
+    case 'pages.reorder':
+      return changingPageTree(ctx, () => reorderPagesBack(ctx, step));
+    case 'pages.restore':
+      return changingPageTree(ctx, () => restorePages(ctx, step));
+    case 'pages.remove':
+      return changingPageTree(ctx, () => removePages(ctx, step));
   }
 }

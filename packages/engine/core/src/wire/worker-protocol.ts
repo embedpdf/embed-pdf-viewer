@@ -31,7 +31,7 @@ import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldValue } from '../forms/value';
-import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
+import type { PdfRect } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { ObjectNumberRange } from '../identity/ObjectNumbers';
@@ -63,13 +63,9 @@ import type {
   FormWidgetDeleteResult,
 } from '../mutation/FormMutationResults';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
-import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
-import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { AnnotationPosition, FieldPosition, PagePosition } from '../mutation/ListPosition';
-import type { PageReorderResult } from '../mutation/PageReorderResult';
+import type { AnnotationPosition, FieldPosition } from '../mutation/ListPosition';
 import type { PageNameResult } from '../mutation/PageNameResult';
-import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
@@ -1104,39 +1100,6 @@ export interface AnnotationAppearancesEncodedResultWire<C extends Coordinates = 
   appearances: EncodedAppearanceWire<C>[];
 }
 
-export interface PagesReorderWorkerRequest extends WriteJobFields {
-  kind: 'pages.reorder';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  pages: PageRef[];
-  position: PagePosition;
-  artifactPath?: string;
-}
-
-export interface PagesRotateWorkerRequest extends WriteJobFields {
-  kind: 'pages.rotate';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  pages: PageRef[];
-  /** Absolute rotation in degrees clockwise — see `PageRotateInput`. */
-  rotation: PdfRotation;
-  artifactPath?: string;
-}
-
-export interface PagesDeleteWorkerRequest extends WriteJobFields {
-  kind: 'pages.delete';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  pages: PageRef[];
-  artifactPath?: string;
-}
-
 /** Register/rename a `/Names /Pages` entry — see `PageNameInput`. */
 export interface PagesSetNameWorkerRequest extends WriteJobFields {
   kind: 'pages.setName';
@@ -1269,38 +1232,6 @@ export interface AnnotationsReadFileWorkerRequest {
   path?: string;
   /** Decompression-bomb cap forwarded to the runtime. Absent/0 = unlimited. */
   maxDecodedBytes?: number;
-}
-
-/** Insert every page of a standalone PDF (transferable `bytes`) at
- *  `position` (omitted → `'end'`). A structural mutation: layer sessions
- *  persist an artifact like reorder/rotate/delete. */
-export interface PagesInsertWorkerRequest extends WriteJobFields {
-  kind: 'pages.insert';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  bytes: ArrayBuffer;
-  position?: PagePosition;
-  artifactPath?: string;
-}
-
-/** Create `count` (default 1) blank pages of `size` (PDF points) at
- *  `position` (omitted → `'end'`). A structural mutation exactly like
- *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
- *  layer sessions persist an artifact identically. */
-export interface PagesInsertBlankWorkerRequest extends WriteJobFields {
-  kind: 'pages.insertBlank';
-  effect: 'contentWrite';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  size: PdfSize;
-  count?: number;
-  position?: PagePosition;
-  /** The object numbers the new pages get, one per page; the next free ones when absent. */
-  objectNumbers?: number[];
-  artifactPath?: string;
 }
 
 /**
@@ -1623,9 +1554,6 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsReorderCalculationsWorkerRequest
   | FormsUpdateWidgetWorkerRequest<C>
   | PagesListWorkerRequest
-  | PagesReorderWorkerRequest
-  | PagesRotateWorkerRequest
-  | PagesDeleteWorkerRequest
   | AnnotationsFlattenWorkerRequest
   | AnnotationsExportAppearanceWorkerRequest
   | PagesSetNameWorkerRequest
@@ -1633,8 +1561,6 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | PagesFlattenWorkerRequest
   | RedactionApplyWorkerRequest
   | PagesExtractWorkerRequest
-  | PagesInsertWorkerRequest
-  | PagesInsertBlankWorkerRequest
   | AttachmentsListWorkerRequest
   | AttachmentsReadFileWorkerRequest
   | AttachmentsCreateWorkerRequest
@@ -1925,24 +1851,6 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | { tag: 'pages.list'; snapshot: PageListSnapshot<C> }
   | {
-      tag: 'pages.reorder';
-      result: PageReorderResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'pages.rotate';
-      result: PageRotateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'pages.delete';
-      result: PageDeleteResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
       tag: 'pages.setName';
       result: PageNameResult<C>;
       artifact?: LayerArtifactWorkerPayload;
@@ -1986,18 +1894,6 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'annotations.readFile'; content: AttachmentFileWorkerPayload }
-  | {
-      tag: 'pages.insert';
-      result: PageInsertResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'pages.insertBlank';
-      result: PageInsertResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
   | { tag: 'measure.viewports'; page: PageRef; viewports: PageMeasurementViewport<C>[] }
   | {
       tag: 'measure.setScale';

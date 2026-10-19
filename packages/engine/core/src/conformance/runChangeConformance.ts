@@ -342,6 +342,30 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
     ],
     ops: ([parent]) => [{ type: 'outline.delete', ref: toOutlineItemRef(parent!) }],
   },
+  'pages.rotate': {
+    ops: () => [{ type: 'pages.rotate', pages: [PAGE, EMPTY_PAGE], rotation: 90 }],
+  },
+  'pages.reorder': {
+    ops: () => [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],
+  },
+  'pages.delete': {
+    // The page goes with its annotations and the form's widget; the undo brings them back.
+    ops: () => [{ type: 'pages.delete', pages: [PAGE] }],
+  },
+  'pages.insertBlank': {
+    ops: ([page]) => [
+      {
+        type: 'pages.insertBlank',
+        spec: { size: { width: 300, height: 300 } },
+        position: { after: PAGE },
+        objectNumbers: [page!],
+      },
+    ],
+  },
+  'pages.insert': {
+    // The redo brings back the same pages, under the same refs.
+    ops: () => [{ type: 'pages.insert', source: SIGNATURE_ARTWORK_PDF, position: 'start' }],
+  },
 };
 
 /**
@@ -394,16 +418,17 @@ export function runChangeConformance(
 
     /** Everything a change can write, as the document reads it. */
     const factsOf = async (doc: DocumentHandle) => {
-      const [onPage, onEmptyPage, form, metadata, custom, outline] = await Promise.all([
-        doc.page(PAGE).annotations.list(),
-        doc.page(EMPTY_PAGE).annotations.list(),
+      const pages = await doc.pages.list();
+      const [annotations, form, metadata, custom, outline] = await Promise.all([
+        Promise.all(pages.pages.map((page) => doc.page(page.ref).annotations.list())),
         doc.forms.list(),
         doc.metadata.get(),
         doc.metadata.custom.get(),
         doc.outline.get(),
       ]);
       return {
-        annotations: [onPage.annotations, onEmptyPage.annotations],
+        pages,
+        annotations: annotations.map((list) => list.annotations),
         fields: form.fields,
         widgets: form.widgets,
         calculationOrder: form.calculationOrder,
@@ -796,6 +821,92 @@ export function runChangeConformance(
         });
         await doc.apply({ undoOf: deleted.meta.opId });
         expect(await colorOf(doc, FILE_SQUARE)).toBe('#e11d48');
+      });
+    });
+
+    const pageOrderOf = async (doc: DocumentHandle) =>
+      (await doc.pages.list()).pages.map((page) => page.ref);
+    const blankPage = (objectNumber: number): ChangeOp => ({
+      type: 'pages.insertBlank',
+      spec: { size: { width: 300, height: 300 } },
+      objectNumbers: [objectNumber],
+    });
+
+    test('the undo of a page insert is skipped when someone annotated the page since', async () => {
+      await withDocument(async (doc) => {
+        const [page, square] = await take(doc, 2);
+        const inserted = await doc.apply({ ops: [blankPage(page!)] });
+        const added = toPageRef(page!);
+        await doc.apply({
+          ops: [
+            {
+              type: 'annotations.create',
+              page: added,
+              data: { subtype: 'square', box: box(20) },
+              objectNumber: square,
+            },
+          ],
+        });
+        const undo = await doc.apply({ undoOf: inserted.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'pages.delete'))).toBe(true);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE, added]);
+      });
+    });
+
+    test('the undo of a page insert still applies after pages moved around it', async () => {
+      await withDocument(async (doc) => {
+        const [page] = await take(doc, 1);
+        const inserted = await doc.apply({ ops: [blankPage(page!)] });
+        await doc.apply({ ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'end' }] });
+        const undo = await doc.apply({ undoOf: inserted.meta.opId });
+        expect(appliedOfType(undo, 'pages.delete').pages).toEqual([toPageRef(page!)]);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE]);
+      });
+    });
+
+    test('the undo of a page move leaves a page someone moved since', async () => {
+      await withDocument(async (doc) => {
+        const moved = await doc.apply({
+          ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],
+        });
+        await doc.apply({ ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'end' }] });
+        const undo = await doc.apply({ undoOf: moved.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'pages.reorder'))).toBe(true);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE]);
+      });
+    });
+
+    test('the undo of a page rotate leaves a page someone turned since', async () => {
+      await withDocument(async (doc) => {
+        const turned = await doc.apply({
+          ops: [{ type: 'pages.rotate', pages: [PAGE, EMPTY_PAGE], rotation: 90 }],
+        });
+        await doc.apply({ ops: [{ type: 'pages.rotate', pages: [EMPTY_PAGE], rotation: 180 }] });
+        const undo = await doc.apply({ undoOf: turned.meta.opId });
+        expect(appliedOfType(undo, 'pages.rotate').pages).toEqual([PAGE]);
+        const { pages } = await doc.pages.list();
+        expect(pages.map((page) => page.rotation)).toEqual([0, 180]);
+      });
+    });
+
+    test('a deleted page comes back at its place, with its name', async () => {
+      await withDocument(async (doc) => {
+        await doc.pages.setName({ name: 'Appendix', page: EMPTY_PAGE });
+        await doc.apply({
+          ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],
+        });
+        const deleted = await doc.apply({ ops: [{ type: 'pages.delete', pages: [EMPTY_PAGE] }] });
+        expect((await doc.pages.list()).namedPages).toEqual([]);
+
+        const recorded = recordEvents(doc);
+        const undo = await doc.apply({ undoOf: deleted.meta.opId });
+        recorded.stop();
+        expect(appliedOfType(undo, 'pages.restore').pages).toEqual([EMPTY_PAGE]);
+        expect(await pageOrderOf(doc)).toEqual([EMPTY_PAGE, PAGE]);
+        expect((await doc.pages.list()).namedPages).toEqual([
+          { name: 'Appendix', target: { kind: 'page', page: EMPTY_PAGE } },
+        ]);
+        expect(recorded.events.map((event) => event.type)).toEqual(['pages.restored']);
       });
     });
 

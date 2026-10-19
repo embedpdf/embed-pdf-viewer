@@ -7,6 +7,7 @@ import {
   EventHub,
   SessionEventPublisher,
   outlineVerbs,
+  pageVerbs,
   subscribeToType,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -15,6 +16,7 @@ import {
   type DocumentEvent,
   type DocumentEventStream,
   type DocumentFormsService,
+  type DocumentPagesService,
   type DocumentHandle,
   type DocumentOutlineService,
   type DocumentRedactionService,
@@ -102,7 +104,9 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly signatures: DocumentSignaturesService;
   readonly forms: DocumentFormsService;
   readonly search: CloudDocumentSearchService;
-  readonly pages: CloudDocumentPagesService;
+  readonly pages: DocumentPagesService;
+  /** The page reads behind `pages`, the layout per page among them. */
+  private readonly pageReads: CloudDocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
   readonly render: DocumentRenderService;
@@ -324,7 +328,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
     );
-    this.pages = new CloudDocumentPagesService(
+    this.pageReads = new CloudDocumentPagesService(
       http,
       id,
       layerName,
@@ -333,6 +337,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
       this.writes,
     );
+    this.pages = pageVerbs(this.pageReads, (change, options) => this.apply(change, options));
     this.redaction = new CloudDocumentRedactionService(
       http,
       id,
@@ -354,7 +359,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
       this.publisher,
       this.writes,
-      (signal) => this.pages.pageLayout(ref, signal),
+      (signal) => this.pageReads.pageLayout(ref, signal),
       () => this.cloudSecurity.pageLayerRights(),
       () => this.cloudSecurity.pagePrintRights(),
     );
@@ -743,6 +748,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.absorbPageDelete(event.meta, event.pages);
         return;
       case 'pages.inserted':
+      case 'pages.restored':
         this.absorbPageInsert(event.meta);
         return;
       case 'metadata.updated':

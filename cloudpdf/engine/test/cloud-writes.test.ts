@@ -271,7 +271,7 @@ describe('the transport', () => {
     await http.postJson('/v1/docs/d1/layers/default/access', {}, parse, signal(), {
       session: true,
     });
-    await http.postJson('/v1/docs/d1/layers/default/pages/rotate', {}, parse, signal(), {
+    await http.postJson('/v1/docs/d1/layers/default/changes', {}, parse, signal(), {
       write: { opId: 'op-1' },
     });
     await http.stream('/v1/docs/d1/layers/default/events', {}, signal());

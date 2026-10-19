@@ -46,6 +46,7 @@ import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlatte
 import type { RedactionApplyResult } from '../mutation/RedactionApplyResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageReorderResult } from '../mutation/PageReorderResult';
+import type { PageRestoreResult } from '../mutation/PageRestoreResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { FormFieldRef } from '../identity/FormFieldRef';
@@ -178,6 +179,8 @@ export type DocumentEvent =
       origin: EventOrigin;
     } & PageDeleteResult)
   | ({ type: 'pages.inserted'; origin: EventOrigin } & PageInsertResult)
+  /** An undo brought deleted pages back, or a redo brought inserted pages back. */
+  | ({ type: 'pages.restored'; origin: EventOrigin } & PageRestoreResult)
   | ({
       type: 'pages.named';
       /** The decoded key that was registered, renamed, or removed. */

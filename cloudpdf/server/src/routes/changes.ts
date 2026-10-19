@@ -124,6 +124,10 @@ function opsOf(
           const { resources, ...rest } = op;
           return { ...rest, appearance: { pdf: new Uint8Array(bytesOf(resources.appearance)) } };
         }
+        case 'pages.insert': {
+          const { resources, ...rest } = op;
+          return { ...rest, source: new Uint8Array(bytesOf(resources.source)) };
+        }
         default:
           return op as ChangeOp<PageCoordinates, WireAnnotationResources>;
       }
@@ -131,13 +135,18 @@ function opsOf(
   };
 }
 
-/** A part an op takes as an attached file may hold any bytes; every other part is an image or a PDF. */
+/**
+ * A part an op takes as an attached file, or as the PDF whose pages it
+ * inserts (which the worker judges, refusing only that change), may hold any
+ * bytes; every other part is an image or a PDF.
+ */
 function changeBinaryPolicy(body: unknown, key: string): 'image-or-pdf' | 'any' {
   const changes = (body as { changes?: unknown } | null)?.changes;
   if (!Array.isArray(changes)) return 'image-or-pdf';
-  const asFile = changes.some(
-    (entry: { ops?: { resources?: { file?: unknown } }[] }) =>
-      Array.isArray(entry?.ops) && entry.ops.some((op) => op?.resources?.file === key),
+  const anyBytes = changes.some(
+    (entry: { ops?: { resources?: { file?: unknown; source?: unknown } }[] }) =>
+      Array.isArray(entry?.ops) &&
+      entry.ops.some((op) => op?.resources?.file === key || op?.resources?.source === key),
   );
-  return asFile ? 'any' : 'image-or-pdf';
+  return anyBytes ? 'any' : 'image-or-pdf';
 }

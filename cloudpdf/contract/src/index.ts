@@ -32,13 +32,8 @@ import {
   FormSetValueResultSchema,
   FormSnapshotSchema,
   IdentitySchema,
-  PageDeleteResultSchema,
   PageFlattenResultSchema,
-  PageInsertResultSchema,
-  PageReorderInputSchema,
-  PageReorderResultSchema,
   PageNameResultSchema,
-  PageRotateResultSchema,
   RedactionApplyResultSchema,
   RedactionApplyScopeSchema,
   PageTextSnapshotSchema,
@@ -1807,6 +1802,7 @@ export const docOperations = {
       'doc.forms.modify',
       'doc.metadata.modify',
       'doc.outline.modify',
+      'doc.pages.assemble',
     ],
     requestHeaders: [documentPasswordHeader],
     params: DocLayerParamsSchema,
@@ -1822,9 +1818,9 @@ export const docOperations = {
       'an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair ' +
       'or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own ' +
       'capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure ' +
-      "`doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`. Bytes (a stamp's drawing, an " +
-      "attached file, a signature's " +
-      "artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
+      '`doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`, pages `doc.pages.assemble`. ' +
+      "Bytes (a stamp's drawing, an attached file, a signature's artwork, a PDF whose pages come in) travel as " +
+      "multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
       'and each file as the part `resource:<key>`. ' +
       'At most 64 changes per request and 512 ops per change.',
     responses: {
@@ -2129,61 +2125,6 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
-  'doc.pages.reorder': {
-    operationId: 'doc.pages.reorder',
-    title: 'Reorder pages',
-    summary:
-      'Move pages together, in the order given, next to a neighbour page (`{ before }`, `{ after }`) or to the start or end. Returns the new layout.',
-    method: 'POST',
-    path: wireTemplates.layerPagesReorder,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: PageReorderInputSchema },
-    responses: {
-      200: { contentType: 'application/json', schema: PageReorderResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
-  'doc.pages.rotate': {
-    operationId: 'doc.pages.rotate',
-    title: 'Rotate pages',
-    summary: 'Set absolute rotation on pages.',
-    method: 'POST',
-    path: wireTemplates.layerPagesRotate,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson },
-    responses: {
-      200: { contentType: 'application/json', schema: PageRotateResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
-  'doc.pages.delete': {
-    operationId: 'doc.pages.delete',
-    title: 'Delete pages',
-    summary: 'Delete pages.',
-    method: 'POST',
-    path: wireTemplates.layerPagesDelete,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson },
-    responses: {
-      200: { contentType: 'application/json', schema: PageDeleteResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-  },
   'doc.pages.setName': {
     operationId: 'doc.pages.setName',
     title: 'Set page name',
@@ -2238,48 +2179,6 @@ export const docOperations = {
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
-  },
-  'doc.pages.insert': {
-    operationId: 'doc.pages.insert',
-    title: 'Insert pages from a PDF',
-    summary: 'Copy every page of an uploaded PDF into the document at an index.',
-    method: 'POST',
-    path: wireTemplates.layerPagesInsert,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: {
-      contentType: 'multipart/form-data',
-    },
-    responses: {
-      200: { contentType: 'application/json', schema: PageInsertResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-    notes:
-      'Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.',
-  },
-  'doc.pages.insertBlank': {
-    operationId: 'doc.pages.insertBlank',
-    title: 'Insert blank pages',
-    summary: 'Create blank pages of an explicit size at a position.',
-    method: 'POST',
-    path: wireTemplates.layerPagesInsertBlank,
-    credentials: docCredentials,
-    scope: [],
-    docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
-    params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: looseJson },
-    responses: {
-      200: { contentType: 'application/json', schema: PageInsertResultSchema },
-      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
-    },
-    notes:
-      'Body is `{"size": {"width", "height"}, "count"?, "position"?}` — size in PDF points, count in [1, 100], `position` a `PagePosition` (omitted → the end).',
   },
   'doc.pages.extract': {
     operationId: 'doc.pages.extract',

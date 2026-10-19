@@ -31,7 +31,13 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.OutlineUpdate
     | CloudPDF.ChangeItem.OutlineMove
     | CloudPDF.ChangeItem.OutlineDelete
-    | CloudPDF.ChangeItem.OutlineRestore;
+    | CloudPDF.ChangeItem.OutlineRestore
+    | CloudPDF.ChangeItem.PagesRotate
+    | CloudPDF.ChangeItem.PagesReorder
+    | CloudPDF.ChangeItem.PagesDelete
+    | CloudPDF.ChangeItem.PagesInsertBlank
+    | CloudPDF.ChangeItem.PagesInsert
+    | CloudPDF.ChangeItem.PagesRestore;
 
 export namespace ChangeItem {
     export interface Skipped {
@@ -66,10 +72,16 @@ export namespace ChangeItem {
             OutlineUpdate: "outline.update",
             OutlineMove: "outline.move",
             OutlineDelete: "outline.delete",
+            PagesRotate: "pages.rotate",
+            PagesReorder: "pages.reorder",
+            PagesDelete: "pages.delete",
+            PagesInsertBlank: "pages.insertBlank",
+            PagesInsert: "pages.insert",
             AnnotationsRestore: "annotations.restore",
             FormsRestore: "forms.restore",
             FormsRestoreWidget: "forms.restoreWidget",
             OutlineRestore: "outline.restore",
+            PagesRestore: "pages.restore",
         } as const;
         export type Op = (typeof Op)[keyof typeof Op];
     }
@@ -307,5 +319,672 @@ export namespace ChangeItem {
         items: CloudPDF.OutlineItem[];
         order: CloudPDF.OutlineOrder;
         meta: CloudPDF.OutlineMutationMeta;
+    }
+
+    export interface PagesRotate {
+        type: "pages.rotate";
+        pages: CloudPDF.PageRef[];
+        rotation: number;
+        layout: ChangeItemPagesRotate.Layout;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesRotate {
+        export interface Layout {
+            pageCount: number;
+            pages: Layout.Pages.Item[];
+            namedPages: Layout.NamedPages.Item[];
+        }
+
+        export namespace Layout {
+            export type Pages = Pages.Item[];
+
+            export namespace Pages {
+                export interface Item {
+                    index: number;
+                    ref: CloudPDF.PageRef;
+                    label: string | null;
+                    size: Item.Size;
+                    rotation: number;
+                    userUnit: number;
+                    tabOrder: Item.TabOrder | null;
+                    boxes: Item.Boxes;
+                    pdfCropBox: Item.PdfCropBox;
+                    actions?: CloudPDF.PdfPageActions | undefined;
+                }
+
+                export namespace Item {
+                    export interface Size {
+                        width: number;
+                        height: number;
+                    }
+
+                    export const TabOrder = {
+                        Rows: "rows",
+                        Columns: "columns",
+                        Structure: "structure",
+                        Annotations: "annotations",
+                        Widgets: "widgets",
+                    } as const;
+                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
+
+                    export interface Boxes {
+                        media: Boxes.Media;
+                        crop: Boxes.Crop;
+                        bleed: Boxes.Bleed;
+                        trim: Boxes.Trim;
+                        art: Boxes.Art;
+                    }
+
+                    export namespace Boxes {
+                        export interface Media {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Crop {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Bleed {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Trim {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Art {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+                    }
+
+                    export interface PdfCropBox {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+
+            export type NamedPages = NamedPages.Item[];
+
+            export namespace NamedPages {
+                export interface Item {
+                    name: string;
+                    target: CloudPDF.ChangeItemPagesRotateLayoutNamedPagesItemTarget;
+                }
+            }
+        }
+    }
+
+    export interface PagesReorder {
+        type: "pages.reorder";
+        pages: CloudPDF.PageRef[];
+        layout: ChangeItemPagesReorder.Layout;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesReorder {
+        export interface Layout {
+            pageCount: number;
+            pages: Layout.Pages.Item[];
+            namedPages: Layout.NamedPages.Item[];
+        }
+
+        export namespace Layout {
+            export type Pages = Pages.Item[];
+
+            export namespace Pages {
+                export interface Item {
+                    index: number;
+                    ref: CloudPDF.PageRef;
+                    label: string | null;
+                    size: Item.Size;
+                    rotation: number;
+                    userUnit: number;
+                    tabOrder: Item.TabOrder | null;
+                    boxes: Item.Boxes;
+                    pdfCropBox: Item.PdfCropBox;
+                    actions?: CloudPDF.PdfPageActions | undefined;
+                }
+
+                export namespace Item {
+                    export interface Size {
+                        width: number;
+                        height: number;
+                    }
+
+                    export const TabOrder = {
+                        Rows: "rows",
+                        Columns: "columns",
+                        Structure: "structure",
+                        Annotations: "annotations",
+                        Widgets: "widgets",
+                    } as const;
+                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
+
+                    export interface Boxes {
+                        media: Boxes.Media;
+                        crop: Boxes.Crop;
+                        bleed: Boxes.Bleed;
+                        trim: Boxes.Trim;
+                        art: Boxes.Art;
+                    }
+
+                    export namespace Boxes {
+                        export interface Media {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Crop {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Bleed {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Trim {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Art {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+                    }
+
+                    export interface PdfCropBox {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+
+            export type NamedPages = NamedPages.Item[];
+
+            export namespace NamedPages {
+                export interface Item {
+                    name: string;
+                    target: CloudPDF.ChangeItemPagesReorderLayoutNamedPagesItemTarget;
+                }
+            }
+        }
+    }
+
+    export interface PagesDelete {
+        type: "pages.delete";
+        pages: CloudPDF.PageRef[];
+        layout: ChangeItemPagesDelete.Layout;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesDelete {
+        export interface Layout {
+            pageCount: number;
+            pages: Layout.Pages.Item[];
+            namedPages: Layout.NamedPages.Item[];
+        }
+
+        export namespace Layout {
+            export type Pages = Pages.Item[];
+
+            export namespace Pages {
+                export interface Item {
+                    index: number;
+                    ref: CloudPDF.PageRef;
+                    label: string | null;
+                    size: Item.Size;
+                    rotation: number;
+                    userUnit: number;
+                    tabOrder: Item.TabOrder | null;
+                    boxes: Item.Boxes;
+                    pdfCropBox: Item.PdfCropBox;
+                    actions?: CloudPDF.PdfPageActions | undefined;
+                }
+
+                export namespace Item {
+                    export interface Size {
+                        width: number;
+                        height: number;
+                    }
+
+                    export const TabOrder = {
+                        Rows: "rows",
+                        Columns: "columns",
+                        Structure: "structure",
+                        Annotations: "annotations",
+                        Widgets: "widgets",
+                    } as const;
+                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
+
+                    export interface Boxes {
+                        media: Boxes.Media;
+                        crop: Boxes.Crop;
+                        bleed: Boxes.Bleed;
+                        trim: Boxes.Trim;
+                        art: Boxes.Art;
+                    }
+
+                    export namespace Boxes {
+                        export interface Media {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Crop {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Bleed {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Trim {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Art {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+                    }
+
+                    export interface PdfCropBox {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+
+            export type NamedPages = NamedPages.Item[];
+
+            export namespace NamedPages {
+                export interface Item {
+                    name: string;
+                    target: CloudPDF.ChangeItemPagesDeleteLayoutNamedPagesItemTarget;
+                }
+            }
+        }
+    }
+
+    export interface PagesInsertBlank {
+        type: "pages.insertBlank";
+        insertedPages: CloudPDF.PageRef[];
+        layout: ChangeItemPagesInsertBlank.Layout;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesInsertBlank {
+        export interface Layout {
+            pageCount: number;
+            pages: Layout.Pages.Item[];
+            namedPages: Layout.NamedPages.Item[];
+        }
+
+        export namespace Layout {
+            export type Pages = Pages.Item[];
+
+            export namespace Pages {
+                export interface Item {
+                    index: number;
+                    ref: CloudPDF.PageRef;
+                    label: string | null;
+                    size: Item.Size;
+                    rotation: number;
+                    userUnit: number;
+                    tabOrder: Item.TabOrder | null;
+                    boxes: Item.Boxes;
+                    pdfCropBox: Item.PdfCropBox;
+                    actions?: CloudPDF.PdfPageActions | undefined;
+                }
+
+                export namespace Item {
+                    export interface Size {
+                        width: number;
+                        height: number;
+                    }
+
+                    export const TabOrder = {
+                        Rows: "rows",
+                        Columns: "columns",
+                        Structure: "structure",
+                        Annotations: "annotations",
+                        Widgets: "widgets",
+                    } as const;
+                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
+
+                    export interface Boxes {
+                        media: Boxes.Media;
+                        crop: Boxes.Crop;
+                        bleed: Boxes.Bleed;
+                        trim: Boxes.Trim;
+                        art: Boxes.Art;
+                    }
+
+                    export namespace Boxes {
+                        export interface Media {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Crop {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Bleed {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Trim {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Art {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+                    }
+
+                    export interface PdfCropBox {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+
+            export type NamedPages = NamedPages.Item[];
+
+            export namespace NamedPages {
+                export interface Item {
+                    name: string;
+                    target: CloudPDF.ChangeItemPagesInsertBlankLayoutNamedPagesItemTarget;
+                }
+            }
+        }
+    }
+
+    export interface PagesInsert {
+        type: "pages.insert";
+        insertedPages: CloudPDF.PageRef[];
+        layout: ChangeItemPagesInsert.Layout;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesInsert {
+        export interface Layout {
+            pageCount: number;
+            pages: Layout.Pages.Item[];
+            namedPages: Layout.NamedPages.Item[];
+        }
+
+        export namespace Layout {
+            export type Pages = Pages.Item[];
+
+            export namespace Pages {
+                export interface Item {
+                    index: number;
+                    ref: CloudPDF.PageRef;
+                    label: string | null;
+                    size: Item.Size;
+                    rotation: number;
+                    userUnit: number;
+                    tabOrder: Item.TabOrder | null;
+                    boxes: Item.Boxes;
+                    pdfCropBox: Item.PdfCropBox;
+                    actions?: CloudPDF.PdfPageActions | undefined;
+                }
+
+                export namespace Item {
+                    export interface Size {
+                        width: number;
+                        height: number;
+                    }
+
+                    export const TabOrder = {
+                        Rows: "rows",
+                        Columns: "columns",
+                        Structure: "structure",
+                        Annotations: "annotations",
+                        Widgets: "widgets",
+                    } as const;
+                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
+
+                    export interface Boxes {
+                        media: Boxes.Media;
+                        crop: Boxes.Crop;
+                        bleed: Boxes.Bleed;
+                        trim: Boxes.Trim;
+                        art: Boxes.Art;
+                    }
+
+                    export namespace Boxes {
+                        export interface Media {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Crop {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Bleed {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Trim {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Art {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+                    }
+
+                    export interface PdfCropBox {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+
+            export type NamedPages = NamedPages.Item[];
+
+            export namespace NamedPages {
+                export interface Item {
+                    name: string;
+                    target: CloudPDF.ChangeItemPagesInsertLayoutNamedPagesItemTarget;
+                }
+            }
+        }
+    }
+
+    export interface PagesRestore {
+        type: "pages.restore";
+        pages: CloudPDF.PageRef[];
+        layout: ChangeItemPagesRestore.Layout;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesRestore {
+        export interface Layout {
+            pageCount: number;
+            pages: Layout.Pages.Item[];
+            namedPages: Layout.NamedPages.Item[];
+        }
+
+        export namespace Layout {
+            export type Pages = Pages.Item[];
+
+            export namespace Pages {
+                export interface Item {
+                    index: number;
+                    ref: CloudPDF.PageRef;
+                    label: string | null;
+                    size: Item.Size;
+                    rotation: number;
+                    userUnit: number;
+                    tabOrder: Item.TabOrder | null;
+                    boxes: Item.Boxes;
+                    pdfCropBox: Item.PdfCropBox;
+                    actions?: CloudPDF.PdfPageActions | undefined;
+                }
+
+                export namespace Item {
+                    export interface Size {
+                        width: number;
+                        height: number;
+                    }
+
+                    export const TabOrder = {
+                        Rows: "rows",
+                        Columns: "columns",
+                        Structure: "structure",
+                        Annotations: "annotations",
+                        Widgets: "widgets",
+                    } as const;
+                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
+
+                    export interface Boxes {
+                        media: Boxes.Media;
+                        crop: Boxes.Crop;
+                        bleed: Boxes.Bleed;
+                        trim: Boxes.Trim;
+                        art: Boxes.Art;
+                    }
+
+                    export namespace Boxes {
+                        export interface Media {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Crop {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Bleed {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Trim {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Art {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+                    }
+
+                    export interface PdfCropBox {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+
+            export type NamedPages = NamedPages.Item[];
+
+            export namespace NamedPages {
+                export interface Item {
+                    name: string;
+                    target: CloudPDF.ChangeItemPagesRestoreLayoutNamedPagesItemTarget;
+                }
+            }
+        }
     }
 }

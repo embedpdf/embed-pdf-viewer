@@ -10,7 +10,13 @@ import {
   useMetadata,
   useMetadataState,
 } from '../src/metadata';
-import { pageEditPlugin, usePageEdit } from '../src/page-edit';
+import {
+  pageEditPlugin,
+  pageEditState,
+  PageEditToken,
+  usePageEdit,
+  usePageEditState,
+} from '../src/page-edit';
 import {
   ACTIONS_DEFAULTS,
   actionsPlugin,
@@ -83,6 +89,32 @@ const plugins = [pageEditPlugin(), metadataPlugin(), actionsPlugin({ openSequenc
 const latest = <Value>(values: Value[]) => values[values.length - 1];
 
 enableAutoUnmount(afterEach);
+
+describe('usePageEditState', () => {
+  it("has exactly the page's State fields as refs, and follows the selection", async () => {
+    const states: unknown[] = [];
+    const Probe = probe(() => {
+      const { selected, canEdit, canExtract } = usePageEditState();
+      return () => {
+        states.push({
+          selected: selected.value,
+          canEdit: canEdit.value,
+          canExtract: canExtract.value,
+        });
+        return null;
+      };
+    });
+    const { kernel } = await viewerWith(plugins, () => h(Probe), engine);
+    expect(latest(states)).toEqual(pageEditState.empty);
+
+    await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
+    await settle();
+    expect(latest(states)).toEqual({ selected: [], canEdit: true, canExtract: true });
+    kernel.capability(PageEditToken).select([0]);
+    await settle();
+    expect(latest(states)).toEqual({ selected: [toPageRef(1)], canEdit: true, canExtract: true });
+  });
+});
 
 describe('useMetadataState', () => {
   it("has exactly the page's State fields as refs: empty with no document, the document's once it loads", async () => {
