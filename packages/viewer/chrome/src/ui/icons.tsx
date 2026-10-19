@@ -180,9 +180,21 @@ export const ICON_PATHS = {
   ],
   eye: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0'],
   file: ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'],
+  // Copy pages out into a new PDF.
+  fileExport: [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M11.5 21h-4.5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v5m-5 6h7m-3 -3l3 3l-3 3',
+  ],
   fileImport: [
     'M14 3v4a1 1 0 0 0 1 1h4',
     'M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l3 3l-3 3',
+  ],
+  // A new blank page.
+  filePlus: [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
+    'M12 11l0 6',
+    'M9 14l6 0',
   ],
   fitToPage: [
     'M12 20h-6a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h6',
@@ -342,6 +354,17 @@ export const ICON_PATHS = {
     'M8 9h8',
     'M8 13h6',
     'M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12',
+  ],
+  // Turning a page in the file: a page under the arrow, apart from the view's rotation.
+  pageRotateClockwise: [
+    'M5 9h7a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-7a1 1 0 0 1 -1 -1v-10a1 1 0 0 1 1 -1z',
+    'M9 4h5a5 5 0 0 1 5 5v4',
+    'M16 10l3 3l3 -3',
+  ],
+  pageRotateCounterClockwise: [
+    'M19 9h-7a1 1 0 0 0 -1 1v10a1 1 0 0 0 1 1h7a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1z',
+    'M15 4h-5a5 5 0 0 0 -5 5v4',
+    'M8 10l-3 3l-3 -3',
   ],
   palette: [
     'M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25',

@@ -78,13 +78,16 @@ right now (Copy needs a selection).
 | `signatures` | `.signing`, `.checking` | `.signing` only |
 | `redaction` | | yes |
 | `measurement` | | yes |
-| `pages` | Rotating, moving, inserting and deleting pages | yes |
+| `pages` | Rotating, moving, inserting and deleting pages in the thumbnails panel | yes |
 | `attachments` | `.adding` (the attachment tool) | `.adding` only |
 | `text` | `.selection`, `.copy` | no |
 | `search` | | no |
 | `thumbnails` | | no |
 | `outline` | `.editing` (adding, renaming, moving and deleting items) | `.editing` only, so people still follow it |
 | `documents` | `.open`, `.download`, `.print`, `.tabs` | no |
+
+Extracting pages into a new PDF is a download: it goes with `documents.download`, so `readOnly`
+keeps it for your code (`page:extract`).
 
 A mode tab disappears by itself when only its bar's
 [dependent groups](../customize/layout#build-a-bar), undo, redo and style, are left, so

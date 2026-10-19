@@ -18,7 +18,7 @@ one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
 
 | Panel | What's in it | Side | Opens with |
 | :-- | :-- | :-- | :-- |
-| `thumbnails` | A small picture of every page; pick one to go there | `start` | `panel:thumbnails` |
+| `thumbnails` | A small picture of every page; pick one to go there, or [organize the pages](#organize-pages) | `start` | `panel:thumbnails` |
 | `outline` | The document's table of contents (its bookmarks): follow, filter, and with the right to change the outline, add, rename, drag and delete items | `start` | `panel:outline` |
 | `attachments` | Files inside the PDF | `start` | `panel:attachments` |
 | `search` | Find text, and every match in context | `end` | `panel:search`, `search:find` (`Ctrl`/`Cmd`+`F`) |
@@ -115,6 +115,29 @@ takes the Stage's settings:
 
 From code, `viewer.get('thumbnails')` is that Stage:
 `viewer.get('thumbnails').updateSettings({ columns: 2 })`.
+
+### Organize pages
+
+Where the user may change the pages, the thumbnails panel is where they do it, as in most PDF
+apps:
+
+- **Select pages.** A click selects a page and goes to it; `Ctrl`/`Cmd`+click adds a page or
+  takes it out, `Shift`+click selects a range.
+- **The header** inserts a blank page, rotates and deletes the selected pages, and opens the menu
+  of the rest; undo and redo sit at its end.
+- **Each page has a menu**: its button, a right-click, or a long press. It rotates, inserts a
+  blank page or a PDF after the page, duplicates, extracts and deletes.
+- **Drag pages** to move them: a line shows where they land. Dragging a selected page moves the
+  whole selection. On a phone, hold the page first, so a swipe still scrolls.
+- **Drop a PDF** between two pages to insert its pages there, instead of opening it as a tab.
+- **The keyboard**: the arrows go through the pages, `Shift` extends the selection, `Space` adds a
+  page or takes it out, `Alt`+arrows move the selection one place, `Delete` deletes, and
+  `Ctrl`/`Cmd`+`A` selects every page.
+
+Every edit is one step of the history, so undo puts the pages back as they were, a deleted page
+with its annotations. The buttons are the `page:*` [commands](commands), so `disable` and
+`readOnly` turn editing off and leave a plain list of pages. A user without
+`doc.pages.assemble` in their scope sees the plain list too.
 
 ## Panels on the same side
 

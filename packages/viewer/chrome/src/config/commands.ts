@@ -39,11 +39,13 @@ import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
 import { SignatureToken } from '@embedpdf/react/signature';
 import { I18nToken } from '@embedpdf/react/i18n';
+import { saveFile } from '@embedpdf/web';
 
 import type { Feature } from '../features';
 import { openModeSurfaceOf } from './modes';
 import { openFileCommand } from './open-files';
 import { outlineCommands } from './outline';
+import { pageCommands } from './page-commands';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
@@ -443,6 +445,9 @@ export const defaultCommands: CommandDef[] = [
   // ── the outline ─────────────────────────────────────────────────────────
   ...outlineCommands,
 
+  // ── the pages: rotate, move, insert, delete, copy out ───────────────────
+  ...pageCommands,
+
   // ── document actions ────────────────────────────────────────────────────
   openFileCommand,
   {
@@ -461,15 +466,7 @@ export const defaultCommands: CommandDef[] = [
       // when the actions plugin is installed, so the WillSave changes are in the bytes.
       documents
         .download(id)
-        .then((bytes) => {
-          const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-          const url = URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.download = 'document.pdf';
-          anchor.click();
-          URL.revokeObjectURL(url);
-        })
+        .then((bytes) => saveFile(bytes, 'document.pdf', 'application/pdf'))
         .catch((error) => console.warn('[snippet-react] download failed', error));
     },
     enabled: (commandContext) => commandContext.documentId != null,
@@ -561,7 +558,6 @@ export const defaultCommands: CommandDef[] = [
   modeCommand('mode:form', 'commands.mode.form', { feature: 'forms.building' }),
   modeCommand('mode:redact', 'commands.mode.redact', { feature: 'redaction' }),
   modeCommand('mode:measure', 'commands.mode.measure', { feature: 'measurement' }),
-
   // ── annotate tools (real interaction tools) ─────────────────────────────
   tool('tool:highlight', 'highlight', 'commands.annotate.highlight', 'highlight', {
     feature: 'annotations.highlight',

@@ -295,6 +295,13 @@ describe('the built-in commands', () => {
         'panel:comments',
         'panel:stamps',
         'panel:redaction',
+        'page:rotate-clockwise',
+        'page:delete',
+        'page:duplicate',
+        'page:insert-blank',
+        'page:insert-file',
+        'page:extract',
+        'menu:page',
       ]),
     ).toEqual([]);
   });

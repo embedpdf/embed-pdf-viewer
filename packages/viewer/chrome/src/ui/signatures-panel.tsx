@@ -18,6 +18,7 @@ import { useInteractionState } from '@embedpdf/react/interaction';
 import { useSelector } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
 import { useSurface } from '@embedpdf/react/shell';
+import { saveFile } from '@embedpdf/web';
 import { useStamp, useStampAssetPreviewUrl, type StampAsset } from '@embedpdf/react/stamp';
 import {
   SignatureToken,
@@ -181,14 +182,7 @@ function SignerRowView({
 
   const exportPdf = async () => {
     const bytes = await stamp.exportLibrary(row.libraryId).catch(() => null);
-    if (!bytes) return;
-    const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${row.name || 'signature'}.pdf`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    if (bytes) saveFile(bytes, `${row.name || 'signature'}.pdf`, 'application/pdf');
   };
   const commitRename = () => {
     const name = renaming?.trim();

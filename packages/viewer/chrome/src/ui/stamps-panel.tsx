@@ -28,6 +28,7 @@ import {
 } from '@embedpdf/react/stamp';
 import { useSurface } from '@embedpdf/react/shell';
 import { useI18nState, useT } from '@embedpdf/react/i18n';
+import { saveFile } from '@embedpdf/web';
 import { useStampSettings } from '../config-context';
 import {
   DEFAULT_LIBRARY_ID,
@@ -119,14 +120,7 @@ export function StampsPanel() {
    *  or another viewer. */
   const exportPdf = async (libraryId: string, name: string) => {
     const bytes = await stamp.exportLibrary(libraryId).catch(() => null);
-    if (!bytes) return;
-    const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${name || 'stamps'}.pdf`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    if (bytes) saveFile(bytes, `${name || 'stamps'}.pdf`, 'application/pdf');
   };
 
   // A removed library falls back to "All"; the picker never names a ghost.
