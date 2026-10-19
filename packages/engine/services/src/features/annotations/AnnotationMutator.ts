@@ -32,7 +32,7 @@ import { blendModeFromCode } from './internal/blendMode';
 import { assertCaptionMetadataWritable } from './internal/mutations/captionMetadata';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
-import type { FontRegistrar } from '../fonts';
+import { fontWriteContext, type FontRegistrar } from '../fonts';
 import { annotationRefOf } from './internal/identity/annotationName';
 import { openAnnotAtRaw, resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { annotationMutationMeta } from './internal/mutations/annotationMutationMeta';
@@ -97,14 +97,8 @@ export class AnnotationMutator {
   /** Build the per-write context handed to subtype writers: font resolver
    *  (FreeText `/DA`), the document pointer and binary resources (stamp). */
   private writeContext(resources?: WireAnnotationResources): AnnotationWriteContext {
-    const fonts = this.fonts;
     return {
-      ...(fonts
-        ? {
-            resolveRegisteredFontId: (key: string) => fonts.idFor(key),
-            describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
-          }
-        : {}),
+      ...fontWriteContext(this.runtime, this.session, this.fonts),
       runtime: this.runtime,
       docPtr: this.session.requireDocPtr(),
       drawings: this.session.drawingIndex(),

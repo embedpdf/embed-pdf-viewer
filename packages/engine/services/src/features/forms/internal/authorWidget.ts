@@ -3,6 +3,7 @@ import { EngineError, EngineErrorCode, generateUuidV7 } from '@embedpdf/engine-c
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import { objectNumberUnavailable } from '../../../document-session/DocumentSession';
+import type { AnnotationWriteContext } from '../../annotations/internal/write/annotationWriteContext';
 import {
   setAnnotRect,
   writeAnnotString,
@@ -31,7 +32,8 @@ export function createUnattachedWidget(
   docPtr: Ptr,
   pageIndex: number,
   placement: PlacedWidget,
-  objectNumber?: number,
+  objectNumber: number | undefined,
+  ctx: AnnotationWriteContext,
 ): number {
   const { fn, mem } = runtime;
   const annotPtr = fn.EPDFPage_CreateAnnotRaw(
@@ -51,7 +53,7 @@ export function createUnattachedWidget(
     const { page: _page, rect, rotation, exportValue: _exportValue, actions, ...style } = placement;
     setAnnotRect(fn, mem, annotPtr, rect);
     if (rotation) setWidgetTurn(fn, annotPtr, rotation);
-    if (Object.keys(style).length > 0) applyWidgetStyle(fn, mem, annotPtr, style);
+    if (Object.keys(style).length > 0) applyWidgetStyle(fn, mem, annotPtr, style, ctx);
     if (actions) writeWidgetActions(runtime, docPtr, annotPtr, actions);
     const widgetObjectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
     if (widgetObjectNumber <= 0) {

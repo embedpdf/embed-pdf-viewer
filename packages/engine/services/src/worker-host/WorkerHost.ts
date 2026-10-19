@@ -60,6 +60,9 @@ import {
   type FontsClearWorkerRequest,
   type FontsAuthorizeEditingWorkerRequest,
   type DocumentSetFontSettingsWorkerRequest,
+  type DocumentFontsListWorkerRequest,
+  type DocumentFontsProgramWorkerRequest,
+  type DocumentFontsResolveWorkerRequest,
   type AnnotationsListWorkerRequest,
   type AnnotationsRenderAppearancesWorkerRequest,
   type AnnotationsReorderWorkerRequest,
@@ -165,7 +168,7 @@ import {
   type ChangeOutcome,
   type ChangeRecord,
 } from '../features/changes';
-import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
+import { DocumentFontReader, FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
@@ -505,6 +508,9 @@ export class WorkerHost {
       // candidate never changed.
       this.assertNoPendingSigning(msg);
       if (transacted && writesDocument(msg)) transacted.beginTransaction(msg.opId);
+      // What the write draws with no font for a character is read back at
+      // finishMutation; start from nothing.
+      this.writingSession(msg)?.clearMissingCharacters();
       // The write's own objects go at or above the floor its caller set.
       if (transacted && 'objectNumberFloor' in msg && msg.objectNumberFloor !== undefined) {
         transacted.raiseLastObjectNumber(msg.objectNumberFloor - 1);
@@ -743,6 +749,15 @@ export class WorkerHost {
         case 'document.setFontSettings':
           resultPack = this.handleDocumentSetFontSettings(msg);
           break;
+        case 'document.fonts.list':
+          resultPack = this.handleDocumentFontsList(msg);
+          break;
+        case 'document.fonts.resolve':
+          resultPack = this.handleDocumentFontsResolve(msg);
+          break;
+        case 'document.fonts.program':
+          resultPack = this.handleDocumentFontsProgram(msg);
+          break;
         case 'objectNumbers.reserve':
           resultPack = wirePack({
             tag: 'objectNumbers.reserve',
@@ -784,6 +799,14 @@ export class WorkerHost {
    * open, usable layer document. Anything else (no such session, a locked
    * one) gets its handler's own error.
    */
+  /** The open session a write job writes to; undefined for any other job. */
+  private writingSession(msg: FileSpaceJob): DocumentSession | undefined {
+    if (!writesDocument(msg) || !('docId' in msg)) return undefined;
+    const layerName = 'layerName' in msg ? msg.layerName : undefined;
+    const session = this.sessions.get(sessionKey(msg.docId, layerName));
+    return session?.isOpen() ? session : undefined;
+  }
+
   private transactedSession(msg: FileSpaceJob): DocumentSession | undefined {
     if (!writesDocument(msg)) return undefined;
     const layerName = 'layerName' in msg ? msg.layerName : undefined;
@@ -1669,6 +1692,46 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'pages.insertBlank', result }, req.artifactPath);
   }
 
+  private handleDocumentFontsList(
+    req: DocumentFontsListWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
+    return wirePack({ tag: 'document.fonts.list', facts: reader.facts() });
+  }
+
+  private handleDocumentFontsResolve(
+    req: DocumentFontsResolveWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
+    const facts = reader.facts();
+    const { runs, missingCharacters } = reader.resolve(req.annotation, req.runs, facts);
+    return wirePack({ tag: 'document.fonts.resolve', runs, missingCharacters, facts });
+  }
+
+  private handleDocumentFontsProgram(
+    req: DocumentFontsProgramWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
+    const program = reader.program(req.sha256, req.part === 'data');
+    // The bytes are a copy out of the runtime's memory: they transfer.
+    const bytes = program.bytes
+      ? (program.bytes.buffer.slice(
+          program.bytes.byteOffset,
+          program.bytes.byteOffset + program.bytes.byteLength,
+        ) as ArrayBuffer)
+      : null;
+    return wirePack(
+      {
+        tag: 'document.fonts.program',
+        covers: program.covers,
+        ascent: program.ascent,
+        descent: program.descent,
+        bytes,
+      },
+      bytes ? [bytes] : [],
+    );
+  }
+
   private handleAttachmentsList(
     req: AttachmentsListWorkerRequest,
     signal: AbortSignal,
@@ -2490,7 +2553,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
+    const mutator = new FormMutator(this.runtime, session, this.fonts);
     const result = mutator.repair(req.bakeAppearances ?? false, signal);
     return this.finishMutation(session, { tag: 'forms.repair', result }, req.artifactPath);
   }
@@ -2709,11 +2772,12 @@ export class WorkerHost {
       session.invalidateDerived();
     }
     if (payload.tag !== 'signatures.complete') session.noteEdit();
+    const reported = withMissingCharacters(payload, session.missingCharacters());
     if (session.kind !== 'layer' || !session.persistLayerArtifact) {
-      return wirePack(payload);
+      return wirePack(reported);
     }
     const saved = this.saveLayerArtifact(session, artifactPath);
-    return wirePack({ ...payload, ...saved.payload }, saved.transfer);
+    return wirePack({ ...reported, ...saved.payload }, saved.transfer);
   }
 
   private saveLayerArtifact(session: DocumentSession, artifactPath?: string): LayerArtifactSave {
@@ -2789,6 +2853,22 @@ function actorOf({ identity }: ChangeAuthority): AnnotationActor {
     ...(identity.groupId !== undefined ? { groupId: identity.groupId } : {}),
     ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
   };
+}
+
+/**
+ * A write's payload with the characters it drew with no font in its result's
+ * meta (`meta.missingCharacters`), when there are any and it has a meta.
+ */
+function withMissingCharacters<P extends WorkerResultPayload<PdfCoordinates>>(
+  payload: P,
+  missingCharacters: string[],
+): P {
+  if (missingCharacters.length === 0 || !('result' in payload)) return payload;
+  const result = payload.result as unknown;
+  if (typeof result !== 'object' || result === null || !('meta' in result)) return payload;
+  const { meta } = result as { meta: unknown };
+  if (typeof meta !== 'object' || meta === null) return payload;
+  return { ...payload, result: { ...result, meta: { ...meta, missingCharacters } } };
 }
 
 /**

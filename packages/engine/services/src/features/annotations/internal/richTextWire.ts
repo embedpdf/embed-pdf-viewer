@@ -1,5 +1,5 @@
 import {
-  faceForFreeTextFont,
+  faceForFontName,
   type FontIdentityInfo,
   type RichTextBody,
   type RichTextDocument,
@@ -27,7 +27,7 @@ function withEngineFace<T extends Partial<RichTextRunStyle>>(
   describe?: (fontKey: string) => FontIdentityInfo | undefined,
 ): T {
   if (style.family === undefined) return style;
-  const face = faceForFreeTextFont(style.family, describe);
+  const face = faceForFontName(style.family, describe);
   const out: T = { ...style, family: face.family };
   // A key or a standard name carries its weight and italic; an explicit
   // `weight`/`italic` in the style still wins.

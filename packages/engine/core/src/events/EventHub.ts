@@ -102,6 +102,24 @@ export class SessionEventPublisher {
   }
 
   /**
+   * Publish a fact no write of this session carries (the local engine's
+   * fonts changed, which changes every open document's list): stamped like
+   * a write's events, with no `tx`.
+   */
+  publishFact(event: DocumentEventInit): void {
+    this.hub.publish({
+      ...event,
+      origin: {
+        kind: 'local',
+        sessionId: this.sessionId,
+        sub: this.sub,
+        ts: Date.now(),
+        serverId: null,
+      },
+    } as DocumentEvent);
+  }
+
+  /**
    * Publish what one change committed: its events as {@link publishWrite}
    * does, and for an undo, the `opId` of the change it undid.
    */

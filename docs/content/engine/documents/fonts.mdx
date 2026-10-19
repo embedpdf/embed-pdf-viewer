@@ -1,17 +1,84 @@
 ---
 title: Fonts
-description: Give the engine your own fonts, for text in any script or your brand typeface, and fill in characters a document's fonts don't have.
-engines: [local]
+description: Write text in any font and any language, use the fonts a document already has, and show typed text in a browser exactly as the engine will draw it.
 ---
 
 import { Callout } from '@/components/docs/callout';
 
 # Fonts
 
-Text the engine draws (a free text annotation, a filled-in form field, a redaction label) needs a
-font that has its characters. The 14 standard PDF fonts only cover Latin text. To write Chinese,
-Cyrillic, Arabic or your brand typeface, register a font with the engine and use it by a key you
-choose:
+Text the engine draws (a free text annotation, a filled-in form field, a redaction label) is
+written in the font you name in `fontFamily`. Characters that font doesn't have come from
+fallback fonts, so text in any language shows, and the PDF looks the same in every PDF app:
+
+```ts
+await page.annotations.create({
+  subtype: 'free-text',
+  box: { x: 60, y: 132, width: 300, height: 60 },
+  contents: 'Order 66 שולם',
+  fontFamily: 'helvetica',
+});
+```
+
+"Order 66" is drawn in Helvetica, the Hebrew in a Hebrew fallback font, right to left.
+
+## The fonts you can use
+
+`doc.fonts.list()` returns every font you can name in a document:
+
+```ts
+const { fonts } = await doc.fonts.list();
+
+for (const font of fonts) {
+  console.log(font.name, font.source, font.canChoose);
+  // 'helvetica' 'standard' true
+  // 'noto-sc' 'engine' true
+  // 'MinionPro-Regular' 'document' false
+}
+```
+
+| `source`     | The fonts                                                                                     | Their `name`                       |
+| :----------- | :-------------------------------------------------------------------------------------------- | :--------------------------------- |
+| `'standard'` | The 14 standard PDF fonts. They only cover Latin text.                                        | `'helvetica'`, `'times-bold'`, …   |
+| `'engine'`   | The engine's fonts: the ones you [register](#register-a-font) locally, your server's on the cloud. | the `key` they were given          |
+| `'document'` | Fonts the PDF already has.                                                                    | the font's own name, such as `'MinionPro-Regular'` |
+
+Pass a font's `name` as `fontFamily` to write with it. A font with `canChoose: false` can't be
+named for new text; `restrictions` says why (see [What a font allows](#what-a-font-allows)). A
+name that isn't in the list fails with `InvalidArg`: the engine doesn't quietly swap in another
+font.
+
+| Field            | What it is                                                                                   |
+| :--------------- | :------------------------------------------------------------------------------------------- |
+| `name`           | What you pass as `fontFamily`.                                                               |
+| `source`         | `'standard'`, `'engine'` or `'document'`.                                                    |
+| `familyName`     | The family, such as `'Minion Pro'`.                                                          |
+| `weight`         | `100` to `900`.                                                                              |
+| `italic`         | Whether it's an italic.                                                                      |
+| `postScriptName` | The font's PostScript name, such as `'MinionPro-Regular'`; `null` when it has none.          |
+| `canChoose`      | Whether new text can be written in it.                                                       |
+| `restrictions`   | Why it can't be chosen, or why its program can't be downloaded; empty when neither applies.  |
+| `programs`       | The font files behind it; the first is the one new text uses. See [Programs](#programs).    |
+
+Next to `fonts`, the list has `fallbacks`, the names of the fonts that
+[fill in missing characters](#text-in-any-language) in the order they were added, and
+`lastResort`, the program that draws a box for a character no font has.
+
+The list changes when a write adds a font to the document, and, on the local engine, when you
+register fonts. Each change raises the document event `fonts.changed`:
+
+```ts
+doc.events.on('fonts.changed', async () => {
+  const { fonts } = await doc.fonts.list();
+});
+```
+
+<Engine local>
+
+## Register a font
+
+To write Chinese, Cyrillic, Greek or your brand typeface, register the font with the engine and
+use it by a key you choose:
 
 ```ts
 const response = await fetch('/fonts/NotoSansSC-Regular.otf');
@@ -21,12 +88,14 @@ await engine.fonts.register({
   familyName: 'Noto Sans SC',
   data: new Uint8Array(await response.arrayBuffer()),
 });
+
+await page.annotations.create({
+  subtype: 'free-text',
+  box: { x: 60, y: 132, width: 300, height: 60 },
+  contents: '请检查这一部分',
+  fontFamily: 'noto-sc',
+});
 ```
-
-Registered fonts belong to the engine, not to one document: every document opened on the engine
-can use them, until you clear them or destroy the engine.
-
-## Register a font
 
 `register()` takes the font file (TTF or OTF) and a `key`:
 
@@ -38,10 +107,10 @@ can use them, until you clear them or destroy the engine.
 | `weight`     | `100` to `900`.                                              | read from the file |
 | `italic`     | Whether it's the italic style.                               | read from the file |
 
-Registering a key a second time does nothing and returns the first font, so it's safe to call on
-every page load. A file the engine can't read fails with `InvalidArg`. The 14 standard names
-(`'helvetica'`, `'times-roman'`, `'courier'`, …) are taken: registering one of them fails with
-`InvalidArg`.
+Registered fonts belong to the engine, not to one document: every document opened on the engine
+can use them, until you clear them or destroy the engine. Registering a key a second time does
+nothing and returns the first font, so it's safe to call on every page load. A file the engine
+can't read fails with `InvalidArg`, and so does one of the 14 standard names as a key.
 
 To load fonts while the engine starts, before the first document opens, pass them to
 `localEngine()` with a `url` or with `data`:
@@ -53,58 +122,206 @@ const engine = localEngine({
 });
 ```
 
-`fonts` are only used when you name them; `fallbackFonts` also [fill in missing
-characters](#automatic-fallback-for-missing-characters).
+`fonts` are only used when you name them; `fallbackFonts` also
+[fill in missing characters](#text-in-any-language).
 
-## Use a font on free text
+```ts
+engine.fonts.list(); // the fonts you registered, in order (no await: it's in memory)
+await engine.fonts.clearFallbacks(); // empty the fallback list; the fonts stay registered
+await engine.fonts.clear(); // unregister every font and empty the fallback list
+```
 
-A free text annotation's `fontFamily` takes a standard font name or a key you registered:
+<Callout type="info">
+  The engine keeps every registered font in memory, and a CJK font is several megabytes. Register
+  the few fonts you use rather than a whole library.
+</Callout>
+
+</Engine>
+
+<Engine cloud>
+
+## Your server's fonts
+
+On the cloud the server decides which fonts exist, for every user and every document. They're
+in `doc.fonts.list()` with `source: 'engine'`, named by the key your server gives them:
 
 ```ts
 await page.annotations.create({
   subtype: 'free-text',
   box: { x: 60, y: 132, width: 300, height: 60 },
-  contents: '这是一个测试',
+  contents: '请检查这一部分',
   fontFamily: 'noto-sc',
 });
 ```
 
-A key you never registered fails with `InvalidArg`: the engine doesn't quietly swap in another
-font.
+See [Fonts](/docs/server/configuration/fonts) to give your server fonts, and to choose which of
+them it may send to browsers.
 
-When you save, the PDF carries only the characters the text uses, not the whole font. A CJK font
-of several megabytes adds only what those characters need, and the text shows the same in every
-PDF app.
+</Engine>
 
-In [rich text](/docs/engine/annotations/free-text), a run names its font by family, the way the PDF
-does: `{ text: '世界', style: { family: 'Noto Sans SC' } }`. The engine finds a registered font by
-its family or its key. A family it can't find anywhere is drawn in Helvetica, so the text still
-shows.
+## Text in any language
 
-When you read the annotation back, its `fontFamily` is your key if the font is registered on the
-engine that reads it, and the font's family name otherwise. So a document you saved comes back
-with the same key, as long as the font is registered.
+The engine picks a font for each character:
 
-## Show the font in the browser too
+- the font you named, when it has the character;
+- otherwise the first fallback font that has it. Fallback fonts closest in style (weight, then
+  italic) come first; among equals, the order they were added in.
 
-The engine puts the font into the PDF; the browser doesn't know it. The text editor and any
-annotation the browser draws itself use the CSS font family `epdf-` and the font's key, such as
-`epdf-noto-sc`, so give the browser the same file under that name. `mountWebFont()` names it for
-you, and the `epdf-` keeps a font of the same name on your page from standing in for it:
+It then lays the text out the way the language needs: Hebrew and Arabic right to left, mixed
+with numbers and Latin words in the right order; Arabic letters joined, Devanagari letters
+combined. The PDF holds the text in the order it was typed, so copying and searching it works.
+
+Hebrew and Arabic work with no setup: the engine has Noto Sans Hebrew and Noto Naskh Arabic as
+fallback fonts. For other languages, add a fallback font:
+
+<Engine local>
 
 ```ts
-import { mountWebFont } from '@embedpdf/web';
-
 await engine.fonts.register({ key: 'noto-sc', familyName: 'Noto Sans SC', data });
-const unmount = await mountWebFont('noto-sc', data);
+await engine.fonts.addFallback('noto-sc');
 
-// When you no longer need it:
-unmount();
+// "Hello " is drawn in Helvetica, "世界" in Noto Sans SC.
+await page.annotations.create({
+  subtype: 'free-text',
+  box: { x: 60, y: 192, width: 300, height: 60 },
+  contents: 'Hello 世界',
+});
 ```
 
-Mounting a key twice is fine: the font stays until the last `unmount()`. The viewer does both
-steps for you from its `engine.fonts` option; see
-[Fonts for text annotations](/docs/viewer/features/annotations#fonts).
+</Engine>
+
+<Engine cloud>
+
+Your server's fonts are fallback fonts unless your server says otherwise; see
+[Fonts](/docs/server/configuration/fonts).
+
+</Engine>
+
+A character no font has is drawn as a box, a small empty rectangle, so the text never silently
+loses a character. The write tells you which ones:
+
+```ts
+const { meta } = await page.annotations.create({
+  subtype: 'free-text',
+  box: { x: 60, y: 252, width: 300, height: 60 },
+  contents: 'Hello 世界',
+});
+
+meta.missingCharacters; // ['世', '界'] when no font has them
+```
+
+Every write that draws text says so in `meta.missingCharacters`: creating or changing a free text
+annotation, filling in or resetting a form field, applying a redaction with a label. It's left out
+when every character was drawn.
+
+## Fonts the document already has
+
+`doc.fonts.list()` includes every font the document uses, on its pages, in its annotations and in
+its form. Text in a document's font can be added when the document holds the whole font and its
+licence allows editing:
+
+```ts
+const { fonts } = await doc.fonts.list();
+const minion = fonts.find((font) => font.familyName === 'Minion Pro' && font.canChoose);
+
+if (minion) {
+  await doc.forms.updateWidget(widget.ref, { fontFamily: minion.name });
+}
+```
+
+Most PDFs carry only part of a font, the characters their text uses (a subset). Such a font can't
+be chosen for new text (`restrictions: ['subset']`): a character it lacks has nowhere to come
+from.
+
+A box that already uses a font keeps it, whatever the font is, as long as the font has the
+characters you type: filling in a form field whose font is a subset of Minion Pro writes Minion
+Pro. When you type a character the font lacks, the box moves to another font as a whole: the
+same family from the engine's fonts if it has it, then the whole font in the document, then the
+standard font closest to it. [`resolve()`](#show-typed-text-in-a-browser) tells you before the
+write.
+
+## Show typed text in a browser
+
+The viewer shows text being typed in the font the engine will write it in. If you build your own
+editor, ask the engine the same question the viewer does: which fonts will it draw this text in?
+
+```ts
+const { runs, missingCharacters } = await doc.fonts.resolve({
+  annotation: annotation.ref, // the box being edited; leave it out for a new one
+  runs: [{ text: 'Order 66 שולם', fontFamily: 'helvetica' }],
+});
+```
+
+Each run you send comes back with the font the engine will use for it:
+
+| Field         | What it is                                                                                         |
+| :------------ | :------------------------------------------------------------------------------------------------- |
+| `font`        | The font's `name`: the one you asked for, or the one the box moves to.                             |
+| `weight`      | Its weight.                                                                                        |
+| `italic`      | Whether it's an italic.                                                                            |
+| `substituted` | `true` when it isn't the font you asked for.                                                       |
+| `program`     | The font file the engine will use, by hash; `null` when a browser can't get one.                   |
+| `fallbacks`   | The fallback fonts' files, by hash, in the order the engine tries them for this run's style.      |
+
+`missingCharacters` lists the characters no font has, which the engine will draw as boxes.
+
+A run's text can also name its font by family, the way [rich text](/docs/engine/annotations/free-text#rich-text)
+does: `{ text: '世界', family: 'Noto Sans SC', weight: 400, italic: false }`.
+
+Then download each file, add it to the browser under a family of its own, and list the families
+in the same order, ending with the last-resort font that draws the boxes:
+
+```ts
+const { lastResort } = await doc.fonts.list();
+const [run] = runs;
+const hashes = [run.program, ...run.fallbacks, lastResort.displayHash].filter((hash) => hash !== null);
+
+for (const hash of hashes) {
+  const face = new FontFace(`font-${hash}`, await doc.fonts.downloadProgram(hash));
+  document.fonts.add(await face.load());
+}
+
+const input = document.querySelector('textarea')!; // your editor
+input.style.fontFamily = hashes.map((hash) => `"font-${hash}"`).join(', ');
+input.style.fontSynthesis = 'none'; // never fake a bold or italic the engine won't draw
+```
+
+Ask again when the text gets a character outside what its fonts cover; `doc.fonts.getProgram()`
+says what a file covers. After the write, the engine's own picture of the box is exact.
+
+### Programs
+
+A font's file is its program. `programs` on each font, and `getProgram(hash)`, describe them:
+
+| Field                 | What it is                                                                                                         |
+| :-------------------- | :----------------------------------------------------------------------------------------------------------------- |
+| `displayHash`         | SHA-256 of the file a browser loads. You download and name programs by it.                                         |
+| `sourceHash`          | SHA-256 of the file the engine lays text out with and puts in the PDF; `null` when the document doesn't hold one.  |
+| `embedded`            | `'whole'`, `'subset'`, or `'none'` when the PDF only names the font.                                               |
+| `format`              | `'truetype'`, `'opentype'`, `'cff'`, `'type1'` or `'type3'`; `null` when nothing is embedded.                      |
+| `embeddingPermission` | What the font's licence says: `'installable'`, `'editable'` or `'preview-and-print'`; `null` when it says nothing. |
+| `canDownload`         | Whether `downloadProgram()` hands out the file.                                                                    |
+
+`getProgram(hash)` adds what an editor needs to lay text out the way the engine does:
+
+| Field     | What it is                                                                            |
+| :-------- | :------------------------------------------------------------------------------------ |
+| `covers`  | The characters the engine can write with it, as ranges of code points: `{ start, count }`. |
+| `ascent`  | How far the font reaches above the baseline, in thousandths of the font size.         |
+| `descent` | How far below, as a negative number.                                                  |
+
+`downloadProgram(hash)` refuses a program with `canDownload: false` with `InvalidArg`, and a hash
+the document's fonts don't name with `NotFound`.
+
+<Engine cloud>
+
+Downloading a program needs a token that may write text in the document: one with
+`doc.annotate.modify`, `doc.forms.fill`, `doc.forms.modify` or `doc.redact`. Without one it fails
+with `Forbidden`, and `details.anyOf` lists them.
+
+</Engine>
+
+<Engine local>
 
 ## Document font settings
 
@@ -128,66 +345,79 @@ already in the document is never added again.
 Kerning and ligatures are off by default because Acrobat draws annotation text without them, and
 the engine matches what Acrobat draws.
 
-## Automatic fallback for missing characters
-
-A registered font is only used where you name it. Add it to the fallback list, and the engine
-also uses it for any character the chosen font doesn't have, in the text it draws and when it
-renders pages:
-
-```ts
-await engine.fonts.register({ key: 'noto-sc', familyName: 'Noto Sans SC', data });
-await engine.fonts.addFallback('noto-sc');
-
-// "Hello " is drawn in Helvetica (the default), "世界" in Noto Sans SC.
-await page.annotations.create({
-  subtype: 'free-text',
-  box: { x: 60, y: 192, width: 300, height: 60 },
-  contents: 'Hello 世界',
-});
-```
-
-Fallback fonts are tried in the order you add them; the first one that has the character wins.
-
-## Manage fonts
-
-```ts
-engine.fonts.list(); // every registered font, in the order you registered them (no await: it's in memory)
-await engine.fonts.clearFallbacks(); // empty the fallback list; the fonts stay registered
-await engine.fonts.clear(); // unregister every font and empty the fallback list
-```
-
-<Callout type="info">
-  The engine keeps every registered font in memory, and a CJK font is several megabytes. Register
-  the few fonts you use rather than a whole library.
-</Callout>
+</Engine>
 
 ## Good to know
 
-### Font licences
+### What a font allows
 
-A font file says how it may be embedded, and the engine follows it. `register()` returns what it
-found:
+Three questions, answered separately for every font:
 
-```ts
-const font = await engine.fonts.register({ key: 'brand-serif', data });
-font.embeddingPermission; // 'installable' | 'editable' | 'preview-and-print'
-font.editingAuthorized; // may new text be written with it?
-```
+- **What its licence says** (`embeddingPermission`). A font file says whether it may be embedded
+  for editing or only for showing.
+- **Whether new text can be written in it** (`canChoose`).
+- **Whether its program can go to a browser** (`canDownload`).
 
-A font whose licence forbids embedding is refused when you register it. A `'preview-and-print'`
-font shows text a document already has, but can't be used for new text: a free text annotation
-that names it fails, and the fallback list skips it. When your licence does allow editing, say so:
+| The font                                                           | `canChoose`        | `canDownload`      | `restrictions`                 |
+| :----------------------------------------------------------------- | :----------------- | :----------------- | :----------------------------- |
+| A standard font                                                    | yes                | yes                |                                |
+| An engine font                                                     | yes                | yes                |                                |
+| An engine font whose licence is preview-and-print                  | once you authorize it | yes             | `'preview-and-print'` until then |
+| A server font your server keeps to itself                          | yes                | no                 | `'not-served'`                 |
+| A whole TrueType or OpenType font in the document                  | yes                | yes                |                                |
+| The same, preview-and-print                                        | no                 | no                 | `'preview-and-print'`          |
+| A subset in the document                                           | no                 | yes                | `'subset'`                     |
+| A Type 1 or CFF font in the document                               | no                 | yes                | `'unsupported-format'`         |
+| A font whose characters can't be told apart (no Unicode mapping)   | no                 | no                 | `'no-unicode-map'`             |
+| A Type 3 font (its letters are drawings)                           | no                 | no                 | `'unsupported-format'`         |
+| A font the PDF only names                                          | no                 | no                 | `'not-embedded'`               |
+
+A font you can't choose is still kept by a box that has it (see
+[Fonts the document already has](#fonts-the-document-already-has)). A program with
+`canDownload: false` is shown while typing in a similar font, and the engine's picture follows
+the write.
+
+<Engine local>
+
+A font whose licence is preview-and-print can show text a document already has, but can't be
+used for new text until you say your licence allows it:
 
 ```ts
 await engine.fonts.authorizeEditing('brand-serif');
 ```
 
+A font whose licence forbids embedding is refused when you register it.
+
+</Engine>
+
+### The standard fonts look the same everywhere
+
+The engine draws the 14 standard fonts with its own built-in faces, on every computer and every
+server, whatever fonts are installed. Their programs come from the same faces, so a browser shows
+them exactly as the engine draws them.
+
+### Fonts a browser can't load
+
+PDFs, forms especially, often carry their fonts as Type 1 or CFF, which browsers can't load. For
+those the engine builds a program a browser can load, with the same letters, the same widths and
+the same characters, and `displayHash` names it. That's why a program has two hashes: they're the
+same for a TrueType or OpenType font and differ for these.
+
+### A hash is not a permission
+
+The same file in two documents has the same hash, but each document decides what may be done with
+it: a font allowed in one document isn't allowed in another because its hash matches.
+
+<Engine local>
+
 ### Variable fonts
 
 A variable font is fixed to one style when you register it: the `weight` you give, or the font's
-default. The PDF then carries an ordinary font of that style, and the font's `instanced` field is
-`true`.
+default. The PDF then carries an ordinary font of that style, the font's `instanced` field is
+`true`, and its program is that fixed font.
 
 ### Several fonts at once
 
 `registerAll([...])` registers a list of fonts in order and returns them in the same order.
+
+</Engine>

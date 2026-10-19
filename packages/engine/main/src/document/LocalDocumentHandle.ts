@@ -39,7 +39,7 @@ import { LocalDocumentActionsService } from './LocalDocumentActionsService';
 import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsService';
 import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsService';
 import { LocalDocumentChanges } from './LocalDocumentChanges';
-import { LocalDocumentFontSettings } from './LocalDocumentFontSettings';
+import { DocumentFontsWatch, LocalDocumentFontsService } from './LocalDocumentFontsService';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
 import { readLocalOutline } from './LocalDocumentOutlineService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
@@ -69,6 +69,8 @@ interface OpenDocument {
   readonly security: LocalDocumentSecurityService;
   readonly objectNumbers: LocalObjectNumberPool;
   readonly render: DocumentRenderService;
+  /** Says `fonts.changed` for this document (see {@link DocumentFontsWatch}). */
+  readonly fontsWatch: DocumentFontsWatch;
   readonly isClosed: () => boolean;
   close(): void;
   /** The handles `with()` made, by their facts, so asking twice gives the same one. */
@@ -84,7 +86,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly actions: DocumentActionsService;
   readonly outline: DocumentOutlineService;
   readonly forms: LocalDocumentFormsService;
-  readonly fonts: LocalDocumentFontSettings;
+  readonly fonts: LocalDocumentFontsService;
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
@@ -118,20 +120,25 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
     /** The numbers the open handed out; absent for a locked open, which gets them on unlock. */
     objectNumbers?: ObjectNumberRange,
+    /** The engine's open documents' font watches: this one joins while it is open. */
+    fontWatches?: Set<DocumentFontsWatch>,
   ): LocalDocumentHandle {
     let closed = false;
     const isClosed = () => closed;
     const hub = new EventHub();
     const pool = new LocalObjectNumberPool(id, queue, hub, objectNumbers);
+    // A single instance, so every event is `kind: 'local'` — the same
+    // interface as cloud with the collaborative fields at rest.
+    const publisher = new SessionEventPublisher(hub, sessionId);
+    const fontsWatch = new DocumentFontsWatch(hub, publisher, isClosed);
+    fontWatches?.add(fontsWatch);
     const doc: OpenDocument = {
       id,
       queue,
       imageEncoder,
       guard,
       renderPolicy,
-      // A single instance, so every event is `kind: 'local'` — the same
-      // interface as cloud with the collaborative fields at rest.
-      publisher: new SessionEventPublisher(hub, sessionId),
+      publisher,
       events: hub,
       security: new LocalDocumentSecurityService(
         initialSecurity,
@@ -143,9 +150,12 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       ),
       objectNumbers: pool,
       render: { getPolicy: () => AbortablePromise.resolveValue(renderPolicy) },
+      fontsWatch,
       isClosed,
       close: () => {
         closed = true;
+        fontsWatch.close();
+        fontWatches?.delete(fontsWatch);
       },
       withFacts: new Map(),
     };
@@ -176,7 +186,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       (change, options) => this.apply(change, options),
     );
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
-    this.fonts = new LocalDocumentFontSettings(id, queue, view, guard);
+    this.fonts = new LocalDocumentFontsService(id, queue, view, guard, doc.fontsWatch);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
     this.pages = new LocalDocumentPagesService(id, queue, view, guard, publisher);
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, publisher);

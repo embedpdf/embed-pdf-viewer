@@ -21,7 +21,11 @@ export { isLocalPage } from './engine/LocalPageHandle';
 export type { LocalPageHandle } from './engine/LocalPageHandle';
 export { LOCAL_ENGINE_BRAND } from './engine/localEngineBrand';
 export type { FontService } from './engine/FontService';
-export type { DocumentFontSettings, FontEmbeddingPolicy } from './engine/DocumentFontSettings';
+export type {
+  DocumentFontsService,
+  FontEmbeddingPolicy,
+  LocalDocumentFontsService,
+} from './engine/DocumentFontsService';
 export type { DocumentHandle } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
@@ -209,6 +213,9 @@ export type {
   FontsClearWorkerRequest,
   FontsAuthorizeEditingWorkerRequest,
   DocumentSetFontSettingsWorkerRequest,
+  DocumentFontsListWorkerRequest,
+  DocumentFontsResolveWorkerRequest,
+  DocumentFontsProgramWorkerRequest,
   CloseWorkerRequest,
   LayerCloseWorkerRequest,
   AbortWorkerRequest,
@@ -226,3 +233,18 @@ export type {
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,
 } from './wire/worker-protocol';
+export {
+  canChooseProgram,
+  documentFontNameOf,
+  documentProgramForName,
+  fontListOf,
+  fontResolutionOf,
+  restrictionsOfProgram,
+  standardFontOfBaseFont,
+  type BuiltInPrograms,
+  type DocumentFaceFacts,
+  type EngineFontFacts,
+  type FontListFacts,
+  type FontProgramFacts,
+  type ResolvedRunFacts,
+} from './fonts/fontList';

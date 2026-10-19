@@ -77,7 +77,7 @@ async function mountFace(
 
 /**
  * A font program to mount: its CSS family, its style, and its bytes. The
- * structural twin of `@embedpdf/core-fonts`' `FontProgram`, whose family is
+ * structural twin of `@embedpdf/core-fonts`' `MountableFontProgram`, whose family is
  * named by the program's hash, so it never shadows another font.
  */
 export interface MountableFontProgram {

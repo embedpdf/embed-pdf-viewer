@@ -12,6 +12,7 @@ import type {
 import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
 import type { CustomMetadata } from '../dto/CustomMetadata';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
+import type { CodePointRange, FontResolveRun } from '../dto/DocumentFonts';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { DocumentOutline } from '../dto/DocumentOutline';
 import type { FontIdentityInfo } from '../dto/FontSpec';
@@ -27,6 +28,7 @@ import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
+import type { FontListFacts, ResolvedRunFacts } from '../fonts/fontList';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
@@ -1507,6 +1509,45 @@ export interface DocumentSetFontSettingsWorkerRequest {
   typographicFeatures?: boolean;
 }
 
+/** The facts a document's font list is made from (a read). */
+export interface DocumentFontsListWorkerRequest {
+  kind: 'document.fonts.list';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/**
+ * The fonts a write would draw each run in: the write's own resolution, run
+ * without writing (a read).
+ */
+export interface DocumentFontsResolveWorkerRequest {
+  kind: 'document.fonts.resolve';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  /** The box being edited; absent for a new one. */
+  annotation?: AnnotationRef;
+  runs: FontResolveRun[];
+}
+
+/**
+ * A program the document's fonts name, by SHA-256: its coverage and metrics
+ * (`'info'`) or its bytes (`'data'`). The engine's own built-in programs (the
+ * standard faces, the last resort) never get here (a read).
+ */
+export interface DocumentFontsProgramWorkerRequest {
+  kind: 'document.fonts.program';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  sha256: string;
+  part: 'info' | 'data';
+}
+
 export interface CloseWorkerRequest {
   kind: 'close';
   effect: 'close';
@@ -1678,6 +1719,9 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FontsAuthorizeEditingWorkerRequest
   | ObjectNumbersReserveWorkerRequest
   | DocumentSetFontSettingsWorkerRequest
+  | DocumentFontsListWorkerRequest
+  | DocumentFontsResolveWorkerRequest
+  | DocumentFontsProgramWorkerRequest
   | CloseWorkerRequest
   | LayerCloseWorkerRequest
   | WorkerControlMessage;
@@ -2059,6 +2103,21 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'fonts.clear' }
   | { tag: 'fonts.authorizeEditing'; identity: FontIdentityInfo }
   | { tag: 'document.setFontSettings' }
+  | { tag: 'document.fonts.list'; facts: FontListFacts }
+  | {
+      tag: 'document.fonts.resolve';
+      runs: ResolvedRunFacts[];
+      missingCharacters: string[];
+      facts: FontListFacts;
+    }
+  | {
+      tag: 'document.fonts.program';
+      covers: CodePointRange[];
+      ascent: number;
+      descent: number;
+      /** The bytes, for `part: 'data'`; on the transfer list. */
+      bytes: ArrayBuffer | null;
+    }
   | { tag: 'close' }
   | { tag: 'shutdown' };
 

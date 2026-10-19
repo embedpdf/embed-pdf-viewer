@@ -145,7 +145,7 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
   // A reset fills in every field it puts back: each must be the caller's to fill.
   for (const target of targets) authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
   const pending = captureBefore(ctx.runtime, ctx.session, targets.flatMap(objectsOf));
-  const result = new FormMutator(ctx.runtime, ctx.session).reset(
+  const result = new FormMutator(ctx.runtime, ctx.session, ctx.fonts).reset(
     op.fields ? [...op.fields] : undefined,
     ctx.signal,
   );
@@ -182,7 +182,11 @@ export function createField(ctx: ChangeContext, op: Op<'forms.create'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
   if (draftWritesScripts(op.draft)) authorizeCapability(ctx.authority, 'doc.forms.script');
   const groupId = newFieldGroup(ctx, op.draft.groupId);
-  const { field, calculationOrder } = new FormMutator(ctx.runtime, ctx.session).createField(
+  const { field, calculationOrder } = new FormMutator(
+    ctx.runtime,
+    ctx.session,
+    ctx.fonts,
+  ).createField(
     { ...op.draft, ...(groupId !== undefined ? { groupId } : {}) },
     ctx.signal,
     ctx.authority.identity,
@@ -241,7 +245,7 @@ export function addWidget(ctx: ChangeContext, op: Op<'forms.addWidget'>): Done {
     ...objectsOf(before),
     ...[...pages].map((page) => ({ objectNumber: page, deep: [] })),
   ]);
-  const { field } = new FormMutator(ctx.runtime, ctx.session).addWidget(
+  const { field } = new FormMutator(ctx.runtime, ctx.session, ctx.fonts).addWidget(
     op.field,
     op.placement,
     ctx.signal,
@@ -281,7 +285,7 @@ export function removeWidget(ctx: ChangeContext, op: Op<'forms.removeWidget'>): 
     { objectNumber: before.objectNumber, deep: [] },
     { objectNumber: widget, deep: [] },
   ]);
-  const result = new FormMutator(ctx.runtime, ctx.session).detachWidget(
+  const result = new FormMutator(ctx.runtime, ctx.session, ctx.fonts).detachWidget(
     op.field,
     op.widget,
     ctx.signal,
@@ -406,11 +410,11 @@ export function updateWidget(
 /** `forms.reorderCalculations`; its reverse puts each field back beside its old neighbours. */
 export function reorderCalculations(ctx: ChangeContext, op: Op<'forms.reorderCalculations'>): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
-  const { before, after, moved } = new FormMutator(ctx.runtime, ctx.session).reorderCalculations(
-    op.fields,
-    op.position,
-    ctx.signal,
-  );
+  const { before, after, moved } = new FormMutator(
+    ctx.runtime,
+    ctx.session,
+    ctx.fonts,
+  ).reorderCalculations(op.fields, op.position, ctx.signal);
   return {
     item: calculationsItem(ctx, after, moved),
     reverse: [orderStep({ before, after })],
@@ -470,7 +474,7 @@ export function setSignatureAppearance(
   const before = readField(ctx, op.field);
   authorizeFieldWrite(ctx.authority, before.field.groupId, 'sign');
   return recordRevert(ctx, before, 'forms.setSignatureAppearance', () =>
-    new FormMutator(ctx.runtime, ctx.session).setSignatureAppearance(
+    new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setSignatureAppearance(
       op.field,
       op.appearance.pdf,
       ctx.signal,
@@ -825,7 +829,7 @@ function writeWidgetDelete(ctx: ChangeContext, widget: WidgetAnnotation<PdfCoord
       { objectNumber: owner.objectNumber, deep: [] },
       { objectNumber: widgetNumber, deep: [] },
     ]);
-    new FormMutator(ctx.runtime, ctx.session).detachWidget(
+    new FormMutator(ctx.runtime, ctx.session, ctx.fonts).detachWidget(
       { kind: 'objectNumber', objectNumber: owner.objectNumber },
       ref,
       ctx.signal,
@@ -866,7 +870,7 @@ function writeWidgetDelete(ctx: ChangeContext, widget: WidgetAnnotation<PdfCoord
 function writeValue(ctx: ChangeContext, before: ReadField, value: FormFieldValue): Done {
   const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: before.objectNumber };
   const pending = captureBefore(ctx.runtime, ctx.session, objectsOf(before));
-  const result = new FormMutator(ctx.runtime, ctx.session).setValue(
+  const result = new FormMutator(ctx.runtime, ctx.session, ctx.fonts).setValue(
     ref,
     value,
     ctx.signal,
@@ -910,7 +914,8 @@ function writeEffect(
 ): Done {
   let wrote = false;
   const done = recordRevert(ctx, before, type, () => {
-    wrote = write(new FormMutator(ctx.runtime, ctx.session)).meta.changedWidgets.length > 0;
+    wrote =
+      write(new FormMutator(ctx.runtime, ctx.session, ctx.fonts)).meta.changedWidgets.length > 0;
     return { field: readFieldByNumber(ctx, before.objectNumber).field };
   });
   // Widgets that already showed so were left as they were: nothing to undo.
@@ -929,7 +934,11 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
     before,
     'forms.update',
     () => {
-      const updated = new FormMutator(ctx.runtime, ctx.session).updateField(ref, patch, ctx.signal);
+      const updated = new FormMutator(ctx.runtime, ctx.session, ctx.fonts).updateField(
+        ref,
+        patch,
+        ctx.signal,
+      );
       order = updated.calculationOrder;
       return updated;
     },

@@ -1194,6 +1194,9 @@ importers:
 
   packages/engine/main:
     dependencies:
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../core

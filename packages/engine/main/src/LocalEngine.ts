@@ -16,6 +16,7 @@ import {
   type OpenOptions,
 } from '@embedpdf/engine-core/runtime';
 
+import type { DocumentFontsWatch } from './document/LocalDocumentFontsService';
 import { LocalDocumentHandle } from './document/LocalDocumentHandle';
 import { OBJECT_NUMBER_POOL_SIZE } from './document/LocalObjectNumberPool';
 import { LocalFontService } from './fonts/LocalFontService';
@@ -84,6 +85,8 @@ export class LocalEngine implements LocalEngineContract {
    * reach its internal surface without casting.
    */
   readonly fonts: LocalFontService;
+  /** The open documents' font watches: told when the engine's fonts change. */
+  private readonly fontWatches = new Set<DocumentFontsWatch>();
 
   private constructor(
     private readonly transport: Transport,
@@ -101,7 +104,10 @@ export class LocalEngine implements LocalEngineContract {
         ? new PortableImageEncoder()
         : new BrowserImageEncoder());
     this.renderPolicy = renderPolicy ?? CONTINUOUS_RENDER_POLICY;
-    this.fonts = new LocalFontService(this.queue);
+    // Registering a font changes the font list of every open document.
+    this.fonts = new LocalFontService(this.queue, () => {
+      for (const watch of this.fontWatches) watch.engineFontsChanged();
+    });
   }
 
   /**
@@ -310,6 +316,7 @@ export class LocalEngine implements LocalEngineContract {
         `local:${generateUuid()}`,
         this.renderPolicy,
         payload.objectNumbers,
+        this.fontWatches,
       );
       if (payload.passwordRejected) handle.security.markPasswordRejected();
       return handle;

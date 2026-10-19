@@ -27,6 +27,7 @@ import {
 import { PagePtrPool } from './pages/PagePtrPool';
 import type { PageRecord } from './pages/PageRecord';
 import type { PageResidency } from './pages/PageResidency';
+import { readUtf16String } from '../runtime/memory/strings';
 
 /**
  * Owns the lifecycle of a single open PDFium document and the
@@ -410,6 +411,27 @@ export class DocumentSession {
   /** Count one committed write. Called once per write, after its commit. */
   noteEdit(): void {
     this.editsSeqCounter++;
+  }
+
+  /** Forget the characters earlier appearances drew with no font: a write starts. */
+  clearMissingCharacters(): void {
+    if (this.docPtr) this.runtime.fn.EPDFDoc_ClearMissingCharacters(this.docPtr);
+  }
+
+  /** The characters (graphemes) appearances drew with no font since the last clear. */
+  missingCharacters(): string[] {
+    if (!this.docPtr) return [];
+    const { fn, mem } = this.runtime;
+    const docPtr = this.docPtr;
+    const characters: string[] = [];
+    const count = fn.EPDFDoc_CountMissingCharacters(docPtr);
+    for (let index = 0; index < count; index++) {
+      const character = readUtf16String(mem, (buf, cap) =>
+        fn.EPDFDoc_GetMissingCharacter(docPtr, index, buf, cap),
+      );
+      if (character) characters.push(character);
+    }
+    return characters;
   }
 
   // ── transactions ──────────────────────────────────────────────────────────

@@ -1,4 +1,8 @@
-import type { FontIdentityInfo, WireAnnotationResources } from '@embedpdf/engine-core/runtime';
+import type {
+  FontIdentityInfo,
+  FontRestriction,
+  WireAnnotationResources,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DrawingIndex } from '../../../../document-session/DrawingIndex';
@@ -27,6 +31,14 @@ export interface AnnotationWriteContext {
    * family; this is how a key is told apart.
    */
   describeRegisteredFont?: (fontKey: string) => FontIdentityInfo | undefined;
+  /**
+   * The document program a `fontFamily` names, when it names one of the
+   * document's fonts: its stream's object number, and whether new text may be
+   * written with it (and why not). Undefined for any other name.
+   */
+  resolveDocumentFont?: (
+    name: string,
+  ) => { objectNumber: number; choosable: boolean; restrictions: FontRestriction[] } | undefined;
   /** The runtime, for writers that marshal tables of pointers (a widget's actions). */
   runtime?: PdfRuntimeModule;
   /** Document pointer — required by writers that create page objects. */

@@ -74,8 +74,8 @@ To pick the runtime yourself, pass `runtime: { prefer: 'wasm' }` or `{ prefer: '
 ## Fonts
 
 Text the engine draws (a free text annotation, a filled form field) needs a font that has its
-characters. For languages the built-in fonts don't cover, give the engine a fallback font when you
-create it:
+characters. The engine covers Latin, Hebrew and Arabic text on its own. For other languages, give
+the engine a fallback font when you create it:
 
 ```ts
 const engine = localEngine({

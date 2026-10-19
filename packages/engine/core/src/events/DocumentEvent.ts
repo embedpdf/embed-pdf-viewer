@@ -193,6 +193,15 @@ export type DocumentEvent =
       /** What was deleted (see `deletedAttachmentOf`). */
       deleted: AttachmentRef | null;
     } & AttachmentDeleteResult)
+  | {
+      /**
+       * The fonts that can be named in the document changed: a write added or
+       * removed one, or (on the local engine) the engine's fonts changed. Read
+       * `doc.fonts.list()` again.
+       */
+      type: 'fonts.changed';
+      origin: EventOrigin;
+    }
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
   | ({ type: 'metadata.customUpdated'; origin: EventOrigin } & CustomMetadataUpdateResult)
   | ({ type: 'outline.created'; origin: EventOrigin } & OutlineCreateResult)

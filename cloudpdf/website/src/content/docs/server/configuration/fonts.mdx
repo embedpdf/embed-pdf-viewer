@@ -37,9 +37,22 @@ CLOUDPDF_FALLBACK_FONTS='[
 | `weight` | no | Style weight (100–900) for matching; inferred if omitted. |
 | `italic` | no | Italic flag for matching; inferred if omitted. |
 | `fallback` | no | Enroll for automatic missing-glyph fill. Defaults to `true`. |
+| `serve` | no | Send the font to browsers, so text being typed shows in it before the server draws it. Defaults to `false`. |
 
 Order matters: fonts are tried as fallbacks in the order listed, so put your preferred
-faces first.
+faces first. Noto Sans Hebrew and Noto Naskh Arabic come with the server and are tried after
+yours.
+
+## Sending fonts to browsers
+
+Every client can see your fonts (`doc.fonts.list()` lists them) and write with them by key. Their
+files stay on the server unless you set `serve: true`. Then the viewer loads the font while
+someone types in it, so the text shows exactly as the server will draw it; without it, the
+viewer shows a similar font until the server's picture arrives.
+
+Serving a font sends it to your users' browsers, which some font licences don't allow: check
+yours. A served font goes only to clients with a valid token, and browsers cache it privately,
+never on a shared CDN.
 
 <Callout type="info">
   Fonts are loaded <strong>by path and range-read on demand</strong> — the bytes are never

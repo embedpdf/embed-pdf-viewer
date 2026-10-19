@@ -145,7 +145,7 @@ fields you change later with `doc.forms.updateWidget()`:
 | `strokeWidth`   | Border width in points                                                                           |
 | `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field)          |
 | `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                               |
-| `fontFamily`    | A standard PDF font, such as `'helvetica'` or `'courier'`, or the `key` of a font you registered |
+| `fontFamily`    | The `name` of a font in `doc.fonts.list()`, such as `'helvetica'`; see [Fonts](/docs/engine/documents/fonts) |
 | `fontSize`      | Text size in points                                                                              |
 | `fontColor`     | Text color                                                                                       |
 | `textAlign`     | `'left'`, `'center'` or `'right'`                                                                |
@@ -167,9 +167,10 @@ widgets: [
 A mark is `'check'`, `'cross'`, `'star'`, `'circle'`, `'square'` or `'diamond'`. With
 `checkStyle: null`, a checkbox draws a check and a radio button a circle.
 
-A font the document already has, and that you didn't register, reads as its family name, such as
-`'Roboto'`. Changing a widget's color or size keeps its font; to change the font, name a standard
-font or a registered one.
+A font the document already has reads as its name in `doc.fonts.list()`, such as `'Roboto-Bold'`.
+Changing a widget's color or size keeps its font, whatever it is; to change the font, name one
+whose `canChoose` is `true`. Text in any language is filled in: characters the widget's font
+doesn't have come from fallback fonts (see [Text in any language](/docs/engine/documents/fonts#text-in-any-language)).
 
 To change the look later, update the widget with the same fields (see
 [Move and style widgets](#move-and-style-widgets)). An entry also takes what the widget does when

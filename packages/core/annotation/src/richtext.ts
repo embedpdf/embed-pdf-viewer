@@ -11,7 +11,7 @@
  * carries as a hard break and the `\r` that separates two paragraphs.
  */
 import {
-  faceForFreeTextFont,
+  faceForFontName,
   type Annotation,
   type FaceRequest,
   type FontHandle,
@@ -295,7 +295,7 @@ export type FontLookup = () => readonly FontHandle[];
 /** The face a DTO font names: a standard font's family, weight and italic, a
  *  registered key's identity, else the string itself as a family. */
 export const faceForFont = (font: string, fonts?: FontLookup): FaceRequest =>
-  faceForFreeTextFont(font, fonts && ((key) => fonts().find((handle) => handle.key === key)));
+  faceForFontName(font, fonts && ((key) => fonts().find((handle) => handle.key === key)));
 
 const hex = (css: string): string => css.trim().toUpperCase();
 

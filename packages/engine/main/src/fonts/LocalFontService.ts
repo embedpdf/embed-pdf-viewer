@@ -47,7 +47,11 @@ export class LocalFontService implements FontService {
   private readonly fonts = new Map<FontKey, RegisteredFont>();
   private readonly fallbacks: FontKey[] = [];
 
-  constructor(private readonly queue: WorkerQueue) {}
+  constructor(
+    private readonly queue: WorkerQueue,
+    /** Told after each change to the registered fonts or the fallback chain. */
+    private readonly onChange: () => void = () => {},
+  ) {}
 
   register(spec: FontSpec): AbortablePromise<FontHandle> {
     const key = spec.key;
@@ -101,6 +105,7 @@ export class LocalFontService implements FontService {
       // and the licence: the handle carries what the document will name.
       const handle: FontHandle = { key, ...payload.identity };
       this.fonts.set(key, { handle, italic, weight, familyName, bytes: replayCopy });
+      this.onChange();
       return handle;
     });
   }
@@ -183,6 +188,7 @@ export class LocalFontService implements FontService {
       forwardAbort(signal, submission);
       await submission;
       if (!this.fallbacks.includes(key)) this.fallbacks.push(key);
+      this.onChange();
     });
   }
 
@@ -204,6 +210,7 @@ export class LocalFontService implements FontService {
       forwardAbort(signal, submission);
       const payload = await submission;
       entry.handle = { key, ...payload.identity };
+      this.onChange();
       return entry.handle;
     });
   }
@@ -217,6 +224,7 @@ export class LocalFontService implements FontService {
       forwardAbort(signal, submission);
       await submission;
       this.fallbacks.length = 0;
+      this.onChange();
     });
   }
 
@@ -230,6 +238,7 @@ export class LocalFontService implements FontService {
       await submission;
       this.fonts.clear();
       this.fallbacks.length = 0;
+      this.onChange();
     });
   }
 

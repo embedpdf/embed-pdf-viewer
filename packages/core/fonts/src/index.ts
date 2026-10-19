@@ -3,8 +3,14 @@
  * font that a document doesn't embed with one of its own built-in faces, on
  * every platform; this package holds those faces as OpenType programs a
  * browser can load, and the numbers the engine lays text out with in them.
- * Generated from the fork's font data (scripts/generate-standard-fonts.mjs).
+ * Generated from the fork's font data (scripts/generate-standard-fonts.mjs),
+ * with the last-resort program that draws a box for a character no font has.
  */
 export { standardFontMetrics, type StandardFontMetrics } from './standard/metrics';
-export { fontProgramFamily, standardFontProgram, type FontProgram } from './standard/programs';
+export {
+  fontProgramFamily,
+  standardFontProgram,
+  type MountableFontProgram,
+} from './standard/programs';
+export { LAST_RESORT_HASH, lastResortFontProgram } from './last-resort';
 export { standardFontCss, type StandardFontCss } from './standard/css';

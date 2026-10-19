@@ -9,7 +9,7 @@ export { textEditorLayout, type TextEditorLayout } from './editor';
 export type { DrawOp, PathSegment, Rgb, TextRun, WidgetDrawing } from './drawing';
 export { layoutFontOf, type LayoutFont } from './font';
 export { widgetScene, type WidgetPlacement } from './scene';
-export type { FontProgram } from '@embedpdf/core-fonts';
+export type { MountableFontProgram } from '@embedpdf/core-fonts';
 export {
   layoutVariableText,
   type LaidLine,

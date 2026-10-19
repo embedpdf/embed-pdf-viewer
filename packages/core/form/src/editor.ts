@@ -5,7 +5,11 @@
  * widget's, one line's height and a comb's spacing. In points, in the
  * widget's upright frame.
  */
-import { standardFontCss, standardFontProgram, type FontProgram } from '@embedpdf/core-fonts';
+import {
+  standardFontCss,
+  standardFontProgram,
+  type MountableFontProgram,
+} from '@embedpdf/core-fonts';
 import type {
   Coordinates,
   FormFieldDTO,
@@ -18,7 +22,7 @@ import { textFieldLayout } from './drawing/text';
 
 export interface TextEditorLayout {
   /** The face the engine draws the text in: mounted, `fontFamily` reaches it. */
-  readonly program: FontProgram;
+  readonly program: MountableFontProgram;
   readonly fontFamily: string;
   readonly fontWeight: number;
   readonly fontStyle: 'normal' | 'italic';

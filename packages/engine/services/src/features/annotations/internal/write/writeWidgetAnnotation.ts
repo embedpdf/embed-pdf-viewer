@@ -10,7 +10,7 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
-  faceForFreeTextFont,
+  faceForFontName,
   familyKey,
   normalizePdfRect,
   pdfQuarterTurnBox,
@@ -34,6 +34,7 @@ import {
   readDefaultAppearance,
   readDefaultAppearanceFace,
 } from '../read/annotationReadPrimitives';
+import { boxFontName } from '../read/boxFontName';
 import { readWidgetTurn } from '../read/readWidgetAnnotation';
 import { widgetBorderStyleFromCode, widgetBorderStyleToCode } from '../shapeBorderStyle';
 import type { AnnotationWriteContext } from './annotationWriteContext';
@@ -164,7 +165,9 @@ function namesCurrentFace(
 ): boolean {
   const current = readDefaultAppearanceFace(fn, mem, annotPtr);
   if (!current) return false;
-  const named = faceForFreeTextFont(font, ctx?.describeRegisteredFont);
+  // The name a read gives the box's font (a document font's PostScript name).
+  if (boxFontName(fn, mem, annotPtr, current) === font) return true;
+  const named = faceForFontName(font, ctx?.describeRegisteredFont);
   return (
     familyKey(named.family) === familyKey(current.family) &&
     (named.weight === undefined || named.weight === current.weight) &&

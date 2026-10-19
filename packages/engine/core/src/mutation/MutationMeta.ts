@@ -76,4 +76,10 @@ export interface MutationMeta {
    * before it on the layer.
    */
   undoable: boolean;
+  /**
+   * Characters the write drew with no font that has them (each a grapheme,
+   * first seen first): the PDF shows them as boxes. Absent when every
+   * character was drawn.
+   */
+  missingCharacters?: string[];
 }

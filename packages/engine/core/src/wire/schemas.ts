@@ -1043,6 +1043,7 @@ export const MutationMetaSchema: z.ZodType<MutationMeta> = z.object({
   cacheDelta: CacheDeltaSchema.nullable(),
   opId: z.string(),
   undoable: z.boolean(),
+  missingCharacters: z.array(z.string()).optional(),
 });
 
 /**
@@ -1093,6 +1094,7 @@ export const AnnotationListMutationMetaSchema: z.ZodType<AnnotationListMutationM
   cacheDelta: CacheDeltaSchema.nullable(),
   opId: z.string(),
   undoable: z.boolean(),
+  missingCharacters: z.array(z.string()).optional(),
   changed: z.array(AnnotationRefSchema),
 });
 
@@ -1176,6 +1178,7 @@ export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
   cacheDelta: CacheDeltaSchema.nullable(),
   opId: z.string(),
   undoable: z.boolean(),
+  missingCharacters: z.array(z.string()).optional(),
   changedFields: z.array(FormFieldRefSchema),
   changedWidgets: z.array(FormWidgetSchema),
   redrawnWidgets: z.array(FormWidgetSchema),
@@ -1705,6 +1708,7 @@ export const AttachmentMutationMetaSchema: z.ZodType<AttachmentMutationMeta> = z
   cacheDelta: CacheDeltaSchema.nullable(),
   opId: z.string(),
   undoable: z.boolean(),
+  missingCharacters: z.array(z.string()).optional(),
   changed: z.array(AttachmentRefSchema),
 });
 
@@ -1742,6 +1746,7 @@ export const OutlineMutationMetaSchema: z.ZodType<OutlineMutationMeta> = z.objec
   cacheDelta: CacheDeltaSchema.nullable(),
   opId: z.string(),
   undoable: z.boolean(),
+  missingCharacters: z.array(z.string()).optional(),
   changed: z.array(OutlineItemRefSchema),
 });
 

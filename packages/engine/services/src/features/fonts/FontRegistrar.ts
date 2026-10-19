@@ -2,11 +2,20 @@ import {
   EngineError,
   EngineErrorCode,
   familyKey,
+  type CodePointRange,
+  type EngineFontFacts,
   type FontEmbeddingPermission,
+  type FontFormat,
   type FontIdentityInfo,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfFileAccessHandle, PdfRuntimeModule } from '@embedpdf/engine-runtime';
+import {
+  NULL_PTR,
+  type PdfFileAccessHandle,
+  type PdfRuntimeModule,
+} from '@embedpdf/engine-runtime';
 
+import { readRanges } from '../../runtime/memory/ranges';
+import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { readUtf8String } from '../../runtime/memory/strings';
 
 /** `EPDF_FONT_EMBEDDING_*` codes. Restricted (3) and bitmap-only (4) are
@@ -73,6 +82,15 @@ export class FontRegistrar {
   /** What the runtime resolved for each key: the identity a document names
    *  the face by, and the licence. */
   private readonly identities = new Map<string, FontIdentityInfo>();
+  /** Each key's program: its hash, format and PostScript name, and whether
+   *  its bytes may go to a browser (the app's own fonts may; the host's
+   *  startup fonts stay home). */
+  private readonly programs = new Map<
+    string,
+    { sha256: string; format: FontFormat; postScriptName: string | null; served: boolean }
+  >();
+  /** Keys in the fallback chain, in the order added. */
+  private fallbackOrder: string[] = [];
 
   constructor(
     private readonly runtime: PdfRuntimeModule,
@@ -111,6 +129,7 @@ export class FontRegistrar {
       }
       this.ids.set(fontKey, id);
       this.identities.set(fontKey, this.readIdentity(id, { familyName, weight, italic }));
+      this.programs.set(fontKey, { ...this.readProgram(id), served: true });
     } finally {
       mem.free(ptr);
     }
@@ -147,6 +166,7 @@ export class FontRegistrar {
     }
     this.ids.set(fontKey, id);
     this.identities.set(fontKey, this.readIdentity(id, { familyName, weight, italic }));
+    this.programs.set(fontKey, { ...this.readProgram(id), served: false });
     this.fileHandles.push(access);
   }
 
@@ -261,10 +281,103 @@ export class FontRegistrar {
     if (!this.runtime.fn.EPDFFont_AddFallbackFont(id)) {
       throw new EngineError(EngineErrorCode.InvalidArg, `addFallback failed: ${fontKey}`);
     }
+    if (!this.fallbackOrder.includes(fontKey)) this.fallbackOrder.push(fontKey);
   }
 
   clearFallbacks(): void {
     this.runtime.fn.EPDFFont_ClearFallbackFonts();
+    this.fallbackOrder = [];
+  }
+
+  /** Keys in the fallback chain, in the order added. */
+  fallbackKeys(): string[] {
+    return [...this.fallbackOrder];
+  }
+
+  /** The registered fonts, in registration order, as a font list takes them. */
+  engineFontFacts(): EngineFontFacts[] {
+    const facts: EngineFontFacts[] = [];
+    for (const [key, identity] of this.identities) {
+      const program = this.programs.get(key);
+      if (!program) continue;
+      facts.push({
+        key,
+        identity,
+        postScriptName: program.postScriptName,
+        format: program.format,
+        sha256: program.sha256,
+        served: program.served,
+      });
+    }
+    return facts;
+  }
+
+  /** The key of this thread's native font id, or undefined. */
+  keyForId(id: number): string | undefined {
+    for (const [key, candidate] of this.ids) {
+      if (candidate === id) return key;
+    }
+    return undefined;
+  }
+
+  /**
+   * A registered font's program, by its hash: its coverage and metrics, and
+   * its bytes. Undefined for a hash no registered font has.
+   */
+  programFor(sha256: string):
+    | {
+        info(): { covers: CodePointRange[]; ascent: number; descent: number };
+        bytes(): Uint8Array;
+      }
+    | undefined {
+    const key = [...this.programs].find(([, program]) => program.sha256 === sha256)?.[0];
+    if (key === undefined) return undefined;
+    const id = this.requireId(key);
+    const { fn, mem } = this.runtime;
+    return {
+      info: () => {
+        const covers = readRanges(this.runtime, (out, capacity) =>
+          fn.EPDFFont_GetCoverage(id, out, capacity),
+        );
+        const metrics = withScratchN(mem, [4, 4], ([ascent, descent]) =>
+          fn.EPDFFont_GetMetrics(id, ascent, descent)
+            ? { ascent: Number(mem.peek(ascent, 'f32')), descent: Number(mem.peek(descent, 'f32')) }
+            : { ascent: 0, descent: 0 },
+        );
+        return {
+          covers,
+          ascent: Math.round(metrics.ascent * 1000),
+          descent: -Math.round(metrics.descent * 1000),
+        };
+      },
+      bytes: () => {
+        const length = fn.EPDFFont_GetProgramData(id, NULL_PTR, 0);
+        return withScratch(mem, Math.max(1, length), (out) => {
+          fn.EPDFFont_GetProgramData(id, out, length);
+          return mem.readBytes(out, length);
+        });
+      },
+    };
+  }
+
+  /** A registered font's program facts: its hash, format and PostScript name. */
+  private readProgram(id: number): {
+    sha256: string;
+    format: FontFormat;
+    postScriptName: string | null;
+  } {
+    const { fn, mem } = this.runtime;
+    const sha256 = withScratch(mem, 32, (out) =>
+      fn.EPDFFont_GetProgramHash(id, out)
+        ? Array.from(mem.readBytes(out, 32), (byte) => byte.toString(16).padStart(2, '0')).join('')
+        : '',
+    );
+    return {
+      sha256,
+      format: fn.EPDFFont_GetProgramFormat(id) === 2 ? 'opentype' : 'truetype',
+      postScriptName:
+        readUtf8String(mem, (buf, cap) => fn.EPDFFont_GetPostScriptName(id, buf, cap)) || null,
+    };
   }
 
   /** Unregister every font and reset the fallback chain (clears the map too). */
@@ -272,6 +385,8 @@ export class FontRegistrar {
     this.runtime.fn.EPDFFont_ClearRegisteredFonts();
     this.ids.clear();
     this.identities.clear();
+    this.programs.clear();
+    this.fallbackOrder = [];
     // Native registry no longer reads through these — release the file handles.
     for (const access of this.fileHandles) {
       access.close();

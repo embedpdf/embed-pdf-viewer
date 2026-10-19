@@ -22,6 +22,11 @@
  * FreeType gives them for a bare CFF face: the font box's top and bottom
  * (`CPDF_Font::CheckFontMetrics`).
  *
+ * It also writes the last-resort program: one box glyph that every code
+ * point outside the surrogates maps to (a format 13 cmap, as Unicode's Last
+ * Resort and Adobe NotDef map them), so a character no font has shows as a
+ * box in a browser, as the engine draws it (src/last-resort.generated.ts).
+ *
  * Run it after the fork's font data changes:
  *   node packages/core/fonts/scripts/generate-standard-fonts.mjs
  * `--check` compares instead of writing (the test runs it).
@@ -504,6 +509,199 @@ function nameTable(records) {
   return Uint8Array.from([...writer.done(), ...strings.flat()]);
 }
 
+/** An sfnt from its tables: the table directory, each table padded, `head`'s checksum adjustment. */
+function sfnt(version, tables) {
+  const tags = Object.keys(tables).sort();
+  const searchRange = 2 ** Math.floor(Math.log2(tags.length)) * 16;
+  const directory = new Writer()
+    .u32(version)
+    .u16(tags.length)
+    .u16(searchRange)
+    .u16(Math.log2(searchRange / 16))
+    .u16(tags.length * 16 - searchRange);
+  let offset = 12 + tags.length * 16;
+  const body = [];
+  let headOffset = 0;
+  for (const tag of tags) {
+    const table = tables[tag];
+    if (tag === 'head') headOffset = offset;
+    directory.tag(tag).u32(checksum(table)).u32(offset).u32(table.length);
+    const padded = Uint8Array.from([...table, ...new Array((4 - (table.length % 4)) % 4).fill(0)]);
+    body.push(padded);
+    offset += padded.length;
+  }
+  const font = Uint8Array.from([...directory.done(), ...body.flatMap((part) => [...part])]);
+  const adjustment = (0xb1b0afba - checksum(font)) >>> 0;
+  font.set(
+    [adjustment >>> 24, (adjustment >>> 16) & 255, (adjustment >>> 8) & 255, adjustment & 255],
+    headOffset + 8,
+  );
+  return font;
+}
+
+/**
+ * The last-resort program: glyph 1 is a box (an outlined rectangle), and a
+ * format 13 cmap maps every code point from U+0020 up, surrogates left out,
+ * to it. TrueType outlines, so it has no CFF to parse; an OS/2 table, which
+ * browsers' font sanitizers require.
+ */
+function lastResortFont() {
+  const box = [
+    // outer contour, clockwise
+    [60, 0],
+    [60, 700],
+    [640, 700],
+    [640, 0],
+    // inner contour, counterclockwise: the hole
+    [580, 60],
+    [580, 640],
+    [120, 640],
+    [120, 60],
+  ];
+  const glyph = new Writer().i16(2).i16(60).i16(0).i16(640).i16(700).u16(3).u16(7).u16(0);
+  for (let index = 0; index < box.length; index += 1) glyph.u8(0x01); // on-curve, long deltas
+  let previous = [0, 0];
+  for (const [x] of box) {
+    glyph.i16(x - previous[0]);
+    previous = [x, previous[1]];
+  }
+  previous = [0, 0];
+  for (const [, y] of box) {
+    glyph.i16(y - previous[1]);
+    previous = [previous[0], y];
+  }
+  const glyf = glyph.done();
+  const loca = new Writer()
+    .u16(0)
+    .u16(0)
+    .u16(glyf.length / 2)
+    .done();
+  const head = new Writer()
+    .fixed(1)
+    .fixed(1)
+    .u32(0) // checkSumAdjustment, set by sfnt()
+    .u32(0x5f0f3cf5)
+    .u16(0x0003)
+    .u16(1000)
+    .zeros(16) // created, modified: none, so the bytes are the same every run
+    .i16(60)
+    .i16(0)
+    .i16(640)
+    .i16(700)
+    .u16(0)
+    .u16(8)
+    .i16(2)
+    .i16(0) // short loca offsets
+    .i16(0)
+    .done();
+  const hhea = new Writer()
+    .fixed(1)
+    .i16(800)
+    .i16(-200)
+    .i16(0)
+    .u16(700)
+    .i16(0)
+    .i16(0)
+    .i16(640)
+    .i16(1)
+    .i16(0)
+    .i16(0)
+    .zeros(8)
+    .i16(0)
+    .u16(2)
+    .done();
+  const hmtx = new Writer().u16(600).i16(0).u16(700).i16(60).done();
+  const maxp = new Writer()
+    .fixed(1)
+    .u16(2) // glyphs
+    .u16(8) // points
+    .u16(2) // contours
+    .u16(0)
+    .u16(0)
+    .u16(2) // zones
+    .zeros(16)
+    .done();
+  const os2 = new Writer()
+    .u16(4)
+    .i16(700)
+    .u16(400)
+    .u16(5)
+    .u16(0) // fsType: installable
+    .i16(650)
+    .i16(600)
+    .i16(0)
+    .i16(75)
+    .i16(650)
+    .i16(600)
+    .i16(0)
+    .i16(350)
+    .i16(50)
+    .i16(250)
+    .i16(0)
+    .zeros(10) // panose
+    .u32(0)
+    .u32(0)
+    .u32(0)
+    .u32(0)
+    .tag('EPDF')
+    .u16(0x40 | 0x80)
+    .u16(0x20)
+    .u16(0xffff)
+    .i16(800)
+    .i16(-200)
+    .i16(0)
+    .u16(800)
+    .u16(200)
+    .u32(0)
+    .u32(0)
+    .i16(500)
+    .i16(700)
+    .u16(0)
+    .u16(32)
+    .u16(1)
+    .done();
+  const groups = [
+    [0x20, 0xd7ff],
+    [0xe000, 0x10ffff],
+  ];
+  const cmap = new Writer()
+    .u16(0)
+    .u16(1)
+    .u16(3)
+    .u16(10)
+    .u32(12)
+    .u16(13)
+    .u16(0)
+    .u32(16 + groups.length * 12)
+    .u32(0)
+    .u32(groups.length);
+  for (const [start, end] of groups) cmap.u32(start).u32(end).u32(1);
+  const post = new Writer().fixed(3).fixed(0).i16(-100).i16(50).u32(0).zeros(16).done();
+  const name = nameTable([
+    [0, 'Copyright 2026 CloudPDF LTD'],
+    [1, 'EmbedPDF Last Resort'],
+    [2, 'Regular'],
+    [3, 'EmbedPDFLastResort-Regular'],
+    [4, 'EmbedPDF Last Resort'],
+    [5, 'Version 1.000'],
+    [6, 'EmbedPDFLastResort-Regular'],
+    [13, 'Licensed under the Apache License, Version 2.0'],
+    [14, 'https://www.apache.org/licenses/LICENSE-2.0'],
+  ]);
+  return sfnt(0x00010000, {
+    'OS/2': os2,
+    cmap: cmap.done(),
+    glyf,
+    head,
+    hhea,
+    hmtx,
+    loca,
+    maxp,
+    name,
+    post,
+  });
+}
+
 function openType(face, cffBytes, cff, characters, encodingOf) {
   const glyphCount = cff.glyphNames.length;
   const widths = cff.widths.map((width) => (face.fixed ? 600 : normalize(width, cff.unitsPerEm)));
@@ -627,31 +825,7 @@ function openType(face, cffBytes, cff, characters, encodingOf) {
     name,
     post,
   };
-  const tags = Object.keys(tables).sort();
-  const searchRange = 2 ** Math.floor(Math.log2(tags.length)) * 16;
-  const directory = new Writer()
-    .tag('OTTO')
-    .u16(tags.length)
-    .u16(searchRange)
-    .u16(Math.log2(searchRange / 16))
-    .u16(tags.length * 16 - searchRange);
-  let offset = 12 + tags.length * 16;
-  const body = [];
-  let headOffset = 0;
-  for (const tag of tags) {
-    const table = tables[tag];
-    if (tag === 'head') headOffset = offset;
-    directory.tag(tag).u32(checksum(table)).u32(offset).u32(table.length);
-    const padded = Uint8Array.from([...table, ...new Array((4 - (table.length % 4)) % 4).fill(0)]);
-    body.push(padded);
-    offset += padded.length;
-  }
-  const font = Uint8Array.from([...directory.done(), ...body.flatMap((part) => [...part])]);
-  const adjustment = (0xb1b0afba - checksum(font)) >>> 0;
-  font.set(
-    [adjustment >>> 24, (adjustment >>> 16) & 255, (adjustment >>> 8) & 255, adjustment & 255],
-    headOffset + 8,
-  );
+  const font = sfnt(0x4f54544f, tables); // 'OTTO'
   return { font, ascent, descent };
 }
 
@@ -714,6 +888,20 @@ function generate() {
       `  },`,
     ].join('\n');
   });
+  const lastResort = lastResortFont();
+  files.set(
+    '../last-resort.generated.ts',
+    [
+      `// Generated by packages/core/fonts/scripts/generate-standard-fonts.mjs. Don't edit.`,
+      ``,
+      `/** SHA-256 of the last-resort program. */`,
+      `export const LAST_RESORT_HASH = '${sha256(lastResort)}';`,
+      ``,
+      `/** The last-resort program, base64. */`,
+      `export const LAST_RESORT_PROGRAM = '${Buffer.from(lastResort).toString('base64')}';`,
+      ``,
+    ].join('\n'),
+  );
   files.set(
     'faces.generated.ts',
     [
