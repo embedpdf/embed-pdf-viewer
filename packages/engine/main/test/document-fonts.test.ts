@@ -175,6 +175,55 @@ describe('doc.fonts (local engine)', () => {
     expect(plain.meta.missingCharacters).toBeUndefined();
   });
 
+  test('a field and a redaction label report what no font has, as the resolve for the field says', async () => {
+    const page = (await doc.pages.list()).pages[0]!;
+    const { field } = await doc.forms.create({
+      family: 'text',
+      name: 'missing',
+      widgets: [
+        { page: page.ref, rect: { x: 40, y: 40, width: 200, height: 24 }, fontFamily: 'helvetica' },
+      ],
+    });
+    const widget = (await doc.forms.list()).widgets.find(
+      (candidate) =>
+        candidate.ref.kind === 'objectNumber' &&
+        candidate.ref.objectNumber === field.widgets[0]!.objectNumber,
+    )!;
+    const answer = await doc.fonts.resolve({
+      annotation: widget.ref,
+      runs: [{ text: 'A中B', fontFamily: 'helvetica' }],
+    });
+    expect(answer.missingCharacters).toEqual(['中']);
+    const { meta } = await doc.forms.setValue(field.ref, { value: 'A中B' });
+    expect(meta.missingCharacters).toEqual(answer.missingCharacters);
+
+    const label = await doc.page(page.ref).annotations.create({
+      subtype: 'redact',
+      rect: { x: 40, y: 100, width: 200, height: 40 },
+      overlayText: 'X中',
+      fontFamily: 'helvetica',
+    });
+    expect(label.meta.missingCharacters).toEqual(['中']);
+    // Applying stamps the label the mark drew: nothing is drawn again.
+    const applied = await doc.redaction.apply({ annotations: [label.annotation.ref] });
+    expect(applied.meta.missingCharacters).toBeUndefined();
+  });
+
+  test('a character no font has is drawn with the last resort, which the font list leaves out', async () => {
+    const page = (await doc.pages.list()).pages[0]!;
+    await doc.page(page.ref).annotations.create({
+      subtype: 'free-text',
+      box: { x: 20, y: 20, width: 200, height: 40 },
+      contents: 'Hello 中',
+    });
+    // It's in the file, whole, under its own name.
+    const saved = new TextDecoder('latin1').decode(await doc.download({ mode: 'rewrite' }));
+    expect(saved).toContain('/EmbedPDFLastResort-Regular');
+    const list = await doc.fonts.list();
+    expect(list.fonts.some((font) => font.familyName === 'EmbedPDF Last Resort')).toBe(false);
+    expect(list.lastResort.displayHash).toBe(LAST_RESORT_HASH);
+  });
+
   test('downloads the built-in programs, and refuses an unknown hash', async () => {
     const helvetica = await doc.fonts.downloadProgram(standardFontProgram('helvetica').hash);
     expect(sha256(helvetica)).toBe(standardFontProgram('helvetica').hash);

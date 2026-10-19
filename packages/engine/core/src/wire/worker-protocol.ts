@@ -28,7 +28,7 @@ import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
-import type { FontListFacts, ResolvedRunFacts } from '../fonts/fontList';
+import type { FallbackTier, FontListFacts, ResolvedRunFacts } from '../fonts/fontList';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
@@ -1456,6 +1456,8 @@ export interface FontsAddFallbackWorkerRequest {
   effect: 'runtimeWrite';
   jobId: WorkerJobId;
   fontKey: string;
+  /** Tried after every font of a lower tier (`FALLBACK_TIERS`). */
+  tier: FallbackTier;
 }
 
 export interface FontsClearFallbacksWorkerRequest {

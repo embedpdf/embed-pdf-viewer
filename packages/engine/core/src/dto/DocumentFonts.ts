@@ -19,7 +19,10 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 export interface FontList {
   /** The standard fonts, then the engine's in registration order, then the document's. */
   fonts: Font[];
-  /** The fonts that fill in missing characters, in the order they were added. */
+  /**
+   * The fonts that fill in missing characters: yours in the order you added
+   * them, then the ones the engine comes with.
+   */
   fallbacks: FontName[];
   /** The program that draws a box for a character no font has. */
   lastResort: FontProgram;

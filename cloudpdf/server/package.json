@@ -52,7 +52,9 @@
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@cloudpdf/contract": "workspace:*",
+    "@embedpdf/core-fonts": "workspace:*",
     "@embedpdf/core-signature": "workspace:*",
+    "@embedpdf/default-fallback-fonts": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/engine-runtime": "workspace:*",
     "@embedpdf/engine-services": "workspace:*",

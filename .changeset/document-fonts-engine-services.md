@@ -11,3 +11,5 @@ A write that draws characters no font has reports them in `meta.missingCharacter
 Fix `forms.create` and `forms.addWidget` refusing a widget whose `fontFamily` names a registered font.
 
 A document font that is Type 1, bare CFF or a TrueType without a Unicode cmap is served as its display program: `document.fonts.program` takes a display hash (`displayHash`) and returns what a browser loads.
+
+Every thread registers the last-resort font, and registers it again after `fonts.clear`, so a character no font has is drawn as a box, embedded with the appearance, and reported. Fallback fonts have tiers: `FontRegistrar.addFallback(key, tier)` and `StartupFontSpec.tier`; `fallbackKeys()` lists them by tier. Characters a form field or a redaction label drew with no font are reported in the write's `meta.missingCharacters`, and `document.fonts.resolve` for a widget answers what its write draws.

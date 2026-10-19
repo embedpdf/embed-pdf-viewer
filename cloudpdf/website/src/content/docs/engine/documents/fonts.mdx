@@ -166,8 +166,8 @@ them it may send to browsers.
 The engine picks a font for each character:
 
 - the font you named, when it has the character;
-- otherwise the first fallback font that has it. Fallback fonts closest in style (weight, then
-  italic) come first; among equals, the order they were added in.
+- otherwise the first fallback font that has it. Yours come before the ones the engine comes with;
+  among each, the closest in style (weight, then italic) first, then the order they were added in.
 
 It then lays the text out the way the language needs: Hebrew and Arabic right to left, mixed
 with numbers and Latin words in the right order; Arabic letters joined, Devanagari letters
@@ -189,6 +189,9 @@ await page.annotations.create({
   contents: 'Hello 世界',
 });
 ```
+
+`clearFallbacks()` removes the Hebrew and Arabic fonts along with yours, and
+`localEngine({ defaultFallbackFonts: false })` never loads them.
 
 </Engine>
 
@@ -213,8 +216,8 @@ meta.missingCharacters; // ['世', '界'] when no font has them
 ```
 
 Every write that draws text says so in `meta.missingCharacters`: creating or changing a free text
-annotation, filling in or resetting a form field, applying a redaction with a label. It's left out
-when every character was drawn.
+annotation or a redaction's label, filling in or resetting a form field, applying a redaction whose
+label wasn't drawn yet. It's left out when every character was drawn.
 
 ## Fonts the document already has
 

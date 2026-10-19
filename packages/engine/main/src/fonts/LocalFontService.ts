@@ -2,8 +2,10 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  FALLBACK_TIERS,
   STANDARD_FONTS,
   wirePack,
+  type FallbackTier,
   type FontHandle,
   type FontIdentityInfo,
   type FontKey,
@@ -45,7 +47,8 @@ interface RegisteredFont {
  */
 export class LocalFontService implements FontService {
   private readonly fonts = new Map<FontKey, RegisteredFont>();
-  private readonly fallbacks: FontKey[] = [];
+  /** The fallback chain with each font's tier, in the order added. */
+  private readonly fallbacks: { key: FontKey; tier: FallbackTier }[] = [];
 
   constructor(
     private readonly queue: WorkerQueue,
@@ -132,7 +135,10 @@ export class LocalFontService implements FontService {
    *
    * @internal — not part of the public FontService contract.
    */
-  seedRegistered(spec: FontSpec, opts: { fallback?: boolean } = {}): FontHandle {
+  seedRegistered(
+    spec: FontSpec,
+    opts: { fallback?: boolean; tier?: FallbackTier } = {},
+  ): FontHandle {
     const key = spec.key;
     let entry = this.fonts.get(key);
     if (!entry) {
@@ -155,9 +161,7 @@ export class LocalFontService implements FontService {
       };
       this.fonts.set(key, entry);
     }
-    if (opts.fallback && !this.fallbacks.includes(key)) {
-      this.fallbacks.push(key);
-    }
+    if (opts.fallback) this.noteFallback(key, opts.tier ?? FALLBACK_TIERS.own);
     return entry.handle;
   }
 
@@ -180,16 +184,30 @@ export class LocalFontService implements FontService {
         new EngineError(EngineErrorCode.InvalidArg, `font not registered: ${key}`),
       );
     }
+    const tier = FALLBACK_TIERS.own;
     return AbortablePromise.run<void>(async (signal) => {
       const submission = this.queue.enqueue({
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: key }),
+          wirePack({
+            kind: 'fonts.addFallback',
+            effect: 'runtimeWrite',
+            jobId,
+            fontKey: key,
+            tier,
+          }),
       });
       forwardAbort(signal, submission);
       await submission;
-      if (!this.fallbacks.includes(key)) this.fallbacks.push(key);
+      this.noteFallback(key, tier);
       this.onChange();
     });
+  }
+
+  /** Record a fallback as the worker has it: adding one again changes its tier only. */
+  private noteFallback(key: FontKey, tier: FallbackTier): void {
+    const existing = this.fallbacks.find((fallback) => fallback.key === key);
+    if (existing) existing.tier = tier;
+    else this.fallbacks.push({ key, tier });
   }
 
   authorizeEditing(font: FontHandle | FontKey): AbortablePromise<FontHandle> {
@@ -272,10 +290,16 @@ export class LocalFontService implements FontService {
           ),
       });
     }
-    for (const key of this.fallbacks) {
+    for (const { key, tier } of this.fallbacks) {
       await this.queue.enqueue({
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: key }),
+          wirePack({
+            kind: 'fonts.addFallback',
+            effect: 'runtimeWrite',
+            jobId,
+            fontKey: key,
+            tier,
+          }),
       });
     }
     for (const [key, font] of this.fonts) {

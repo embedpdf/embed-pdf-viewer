@@ -64,11 +64,21 @@ export interface EngineFontFacts {
   served: boolean;
 }
 
+/**
+ * The order fallback fonts are tried in, before their style is: the app's own
+ * (the server's on the cloud) first, then the ones the engine comes with.
+ */
+export const FALLBACK_TIERS = { own: 0, builtIn: 1 } as const;
+export type FallbackTier = (typeof FALLBACK_TIERS)[keyof typeof FALLBACK_TIERS];
+
 /** Everything a font list is made from. */
 export interface FontListFacts {
   faces: DocumentFaceFacts[];
   engineFonts: EngineFontFacts[];
-  /** Keys of the engine's fonts that fill in missing characters, in the order added. */
+  /**
+   * Keys of the engine's fonts that fill in missing characters, by tier
+   * (the app's, then the built-in ones), each in the order added.
+   */
   fallbacks: string[];
 }
 
@@ -262,8 +272,12 @@ function standardFontOf(name: StandardFont, builtIn: BuiltInPrograms): Font {
 
 /** The fonts that can be named in a document, from what the engine found. */
 export function fontListOf(facts: FontListFacts, builtIn: BuiltInPrograms): FontList {
+  // A document that drew a box for a missing character holds the last
+  // resort: it is the list's `lastResort`, not a font to write with.
+  const isLastResort = (face: DocumentFaceFacts) =>
+    face.programs.some((program) => program.sha256 === builtIn.lastResortDisplayHash);
   const documentFonts = facts.faces
-    .filter((face) => face.familyName !== '' && !isStandardStandIn(face))
+    .filter((face) => face.familyName !== '' && !isStandardStandIn(face) && !isLastResort(face))
     .map(documentFontOf);
   return {
     fonts: [

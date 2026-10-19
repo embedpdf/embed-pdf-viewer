@@ -72,6 +72,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@embedpdf/core-fonts": "workspace:*",
+    "@embedpdf/default-fallback-fonts": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/engine-services": "workspace:*",
     "@embedpdf/engine-runtime": "workspace:*",

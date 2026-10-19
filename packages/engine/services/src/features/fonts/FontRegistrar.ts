@@ -1,9 +1,12 @@
+import { lastResortFontBytes } from '@embedpdf/core-fonts';
 import {
   EngineError,
   EngineErrorCode,
+  FALLBACK_TIERS,
   familyKey,
   type CodePointRange,
   type EngineFontFacts,
+  type FallbackTier,
   type FontEmbeddingPermission,
   type FontFormat,
   type FontIdentityInfo,
@@ -51,6 +54,8 @@ export interface StartupFontSpec {
   italic?: boolean;
   /** Also add to the glyph-fallback chain (automatic missing-glyph fill). */
   fallback?: boolean;
+  /** Its fallback tier (`FALLBACK_TIERS`); the host's own fonts by default. */
+  tier?: FallbackTier;
 }
 
 /**
@@ -89,14 +94,40 @@ export class FontRegistrar {
     string,
     { sha256: string; format: FontFormat; postScriptName: string | null; served: boolean }
   >();
-  /** Keys in the fallback chain, in the order added. */
-  private fallbackOrder: string[] = [];
+  /** Keys in the fallback chain with their tiers, in the order added. */
+  private fallbacks: { key: string; tier: FallbackTier }[] = [];
 
   constructor(
     private readonly runtime: PdfRuntimeModule,
     /** Host-owned `fontKey → native FontId` map for this thread. */
     private readonly ids: Map<string, number>,
-  ) {}
+  ) {
+    this.registerLastResort();
+  }
+
+  /**
+   * The last resort draws a character no font has as a box, so the text
+   * keeps it: every thread has it, whatever fonts the app or the server add.
+   * It isn't one of the engine's fonts (a font list names it apart), so it
+   * has no key.
+   */
+  private registerLastResort(): void {
+    const bytes = lastResortFontBytes();
+    const { mem, fn } = this.runtime;
+    const ptr = mem.alloc(bytes.byteLength);
+    try {
+      mem.writeBytes(ptr, bytes);
+      const id = fn.EPDFFont_RegisterMemFont64('', 0, -1, ptr, bytes.byteLength);
+      if (id === 0 || !fn.EPDFFont_SetLastResortFont(id)) {
+        throw new EngineError(
+          EngineErrorCode.RuntimeUnavailable,
+          'the last-resort font did not register',
+        );
+      }
+    } finally {
+      mem.free(ptr);
+    }
+  }
 
   /**
    * Register a font from its bytes. Copies into the WASM heap, hands the
@@ -270,28 +301,35 @@ export class FontRegistrar {
         spec.path,
       );
       if (spec.fallback) {
-        this.addFallback(spec.key);
+        this.addFallback(spec.key, spec.tier);
       }
     }
   }
 
-  /** Append a registered font to the ordered glyph-fallback chain. */
-  addFallback(fontKey: string): void {
+  /**
+   * Add a registered font to the glyph-fallback chain, in `tier`: it is tried
+   * after every font of a lower tier. Adding it again changes its tier only.
+   */
+  addFallback(fontKey: string, tier: FallbackTier = FALLBACK_TIERS.own): void {
     const id = this.requireId(fontKey);
-    if (!this.runtime.fn.EPDFFont_AddFallbackFont(id, 0)) {
+    if (!this.runtime.fn.EPDFFont_AddFallbackFont(id, tier)) {
       throw new EngineError(EngineErrorCode.InvalidArg, `addFallback failed: ${fontKey}`);
     }
-    if (!this.fallbackOrder.includes(fontKey)) this.fallbackOrder.push(fontKey);
+    const existing = this.fallbacks.find((fallback) => fallback.key === fontKey);
+    if (existing) existing.tier = tier;
+    else this.fallbacks.push({ key: fontKey, tier });
   }
 
   clearFallbacks(): void {
     this.runtime.fn.EPDFFont_ClearFallbackFonts();
-    this.fallbackOrder = [];
+    this.fallbacks = [];
   }
 
-  /** Keys in the fallback chain, in the order added. */
+  /** Keys in the fallback chain by tier, each tier in the order added. */
   fallbackKeys(): string[] {
-    return [...this.fallbackOrder];
+    return [...this.fallbacks]
+      .sort((left, right) => left.tier - right.tier)
+      .map((fallback) => fallback.key);
   }
 
   /** The registered fonts, in registration order, as a font list takes them. */
@@ -380,13 +418,17 @@ export class FontRegistrar {
     };
   }
 
-  /** Unregister every font and reset the fallback chain (clears the map too). */
+  /**
+   * Unregister every font and reset the fallback chain (clears the map too).
+   * The last resort stays: it is registered again.
+   */
   clear(): void {
     this.runtime.fn.EPDFFont_ClearRegisteredFonts();
+    this.registerLastResort();
     this.ids.clear();
     this.identities.clear();
     this.programs.clear();
-    this.fallbackOrder = [];
+    this.fallbacks = [];
     // Native registry no longer reads through these — release the file handles.
     for (const access of this.fileHandles) {
       access.close();

@@ -84,6 +84,14 @@ const engine = localEngine({
 The font is loaded while the engine starts, so it's ready before the first document opens.
 [Fonts](/docs/engine/documents/fonts) covers registering fonts later and using them by name.
 
+Hebrew and Arabic come from Noto Sans Hebrew and Noto Naskh Arabic, which the engine loads while it
+starts too (about 320 KB, as chunks of your build), and tries after your fallback fonts. If your
+users don't write Hebrew or Arabic, leave them out:
+
+```ts
+const engine = localEngine({ defaultFallbackFonts: false });
+```
+
 ## With a viewer
 
 The viewer can use your engine or create its own:
@@ -104,6 +112,7 @@ The viewer can use your engine or create its own:
 | :--------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `fallbackFonts`        | Fonts used for characters the document's own fonts don't have.                                                                                   |
 | `fonts`                | Fonts you use by name only (a free text `fontFamily`), not as fallback.                                                                          |
+| `defaultFallbackFonts` | `false` leaves out the Hebrew and Arabic fonts the engine comes with.                                                                            |
 | `worker`               | Your own worker: a `Worker`, a function returning one, a URL, or `'inline'`.                                                                     |
 | `wasmUrl`              | Where to load the WebAssembly file from, when you host it yourself.                                                                              |
 | `renderPolicy`         | The render sizes documents answer with; see [Render policy](/docs/engine/documents/rendering#render-policy).                                     |

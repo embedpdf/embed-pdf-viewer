@@ -2343,7 +2343,7 @@ export class WorkerHost {
   private handleFontsAddFallback(
     req: FontsAddFallbackWorkerRequest,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    this.fonts.addFallback(req.fontKey);
+    this.fonts.addFallback(req.fontKey, req.tier);
     return wirePack({ tag: 'fonts.addFallback' });
   }
 

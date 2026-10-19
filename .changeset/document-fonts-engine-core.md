@@ -13,3 +13,5 @@ Add the `document.fonts.list`, `document.fonts.resolve` and `document.fonts.prog
 `DescribeFont` answers a font's face only (family, weight and italic).
 
 A document program with a display program can go to a browser: `FontProgramFacts.displaySha256` names it, and `displayHash` is it, so a form's Type 1 or CFF field font is `canDownload` while it still can't be chosen for new text. The `document.fonts.program` worker request names its program by `displayHash`.
+
+Fallback fonts have tiers (`FALLBACK_TIERS`): the app's own (the server's on the cloud) are tried before the ones the engine comes with, whatever their style, and `FontList.fallbacks` lists them in that order. The `fonts.addFallback` worker request takes a `tier`. A document that drew a character no font has holds the last-resort program, which `doc.fonts.list()` doesn't list as one of its fonts: it is the list's `lastResort`.

@@ -13,4 +13,5 @@ export {
   type MountableFontProgram,
 } from './standard/programs';
 export { LAST_RESORT_HASH, lastResortFontProgram } from './last-resort';
+export { lastResortFontBytes } from './last-resort-bytes';
 export { standardFontCss, standardFontStack, type StandardFontCss } from './standard/css';

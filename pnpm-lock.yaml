@@ -174,9 +174,15 @@ importers:
       '@cloudpdf/contract':
         specifier: workspace:*
         version: link:../contract
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../packages/core/fonts
       '@embedpdf/core-signature':
         specifier: workspace:*
         version: link:../../packages/core/signature
+      '@embedpdf/default-fallback-fonts':
+        specifier: workspace:*
+        version: link:../../packages/default-fallback-fonts
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../packages/engine/core
@@ -1161,6 +1167,12 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  packages/default-fallback-fonts:
+    devDependencies:
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+
   packages/default-signature-fonts:
     devDependencies:
       rimraf:
@@ -1197,6 +1209,9 @@ importers:
       '@embedpdf/core-fonts':
         specifier: workspace:*
         version: link:../../core/fonts
+      '@embedpdf/default-fallback-fonts':
+        specifier: workspace:*
+        version: link:../../default-fallback-fonts
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../core
@@ -1323,6 +1338,9 @@ importers:
 
   packages/engine/services:
     dependencies:
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../core

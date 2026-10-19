@@ -17,6 +17,7 @@ import {
   type WorkerImageEncoder,
 } from '@embedpdf/engine-services';
 
+import { defaultFallbackFontSpecs } from './defaultFallbackFonts';
 import { signingCandidatePathFactory } from './signing-paths';
 import type { WorkerBootstrapData } from './WorkerThreadPool';
 
@@ -40,7 +41,7 @@ function bootstrap(): WorkerBootstrapData | undefined {
 
 function bootstrapFontSpecs(): StartupFontSpec[] {
   const descriptors = bootstrap()?.fonts ?? [];
-  return descriptors.map((d) => ({
+  const own = descriptors.map((d) => ({
     key: d.key,
     path: d.path,
     familyName: d.familyName,
@@ -48,6 +49,8 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
     italic: d.italic,
     fallback: d.fallback ?? true,
   }));
+  // Then the fonts the engine comes with, tried after the deployment's own.
+  return [...own, ...defaultFallbackFontSpecs(new Set(own.map((spec) => spec.key)))];
 }
 
 (async () => {

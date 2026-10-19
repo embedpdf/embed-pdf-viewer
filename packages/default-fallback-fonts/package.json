@@ -1,0 +1,43 @@
+{
+  "name": "@embedpdf/default-fallback-fonts",
+  "version": "1.0.0-next.0",
+  "private": false,
+  "description": "The fonts the EmbedPDF engine fills in Hebrew and Arabic with: Noto Sans Hebrew and Noto Naskh Arabic, regular and bold (Apache License 2.0), as TrueType files and as lazy modules any bundler code-splits.",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "fonts",
+    "licenses",
+    "modules",
+    "library.js",
+    "library.d.ts",
+    "README.md"
+  ],
+  "exports": {
+    "./fonts/NotoSansHebrew-Regular.ttf": "./fonts/NotoSansHebrew-Regular.ttf",
+    "./fonts/NotoSansHebrew-Bold.ttf": "./fonts/NotoSansHebrew-Bold.ttf",
+    "./fonts/NotoNaskhArabic-Regular.ttf": "./fonts/NotoNaskhArabic-Regular.ttf",
+    "./fonts/NotoNaskhArabic-Bold.ttf": "./fonts/NotoNaskhArabic-Bold.ttf",
+    "./library": {
+      "types": "./library.d.ts",
+      "default": "./library.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/default-fallback-fonts"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "clean": "rimraf modules"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0"
+  }
+}
