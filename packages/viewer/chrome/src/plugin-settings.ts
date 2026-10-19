@@ -92,6 +92,7 @@ interface BuiltInSettings {
   readonly signature: ConfigOf<typeof signaturePlugin> & ViewerSignatureSettings;
   readonly pageEdit: never;
   readonly metadata: never;
+  readonly fonts: never;
   readonly outline: never;
   readonly actions: ConfigOf<typeof actionsPlugin>;
   readonly documents: never;
@@ -120,6 +121,7 @@ const WITHOUT_SETTINGS: ReadonlySet<string> = new Set<PluginName>([
   'link',
   'pageEdit',
   'metadata',
+  'fonts',
   'outline',
   'documents',
   'shell',

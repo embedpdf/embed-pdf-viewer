@@ -21,8 +21,8 @@ import { textLookOf } from './drawing';
 import { textFieldLayout } from './drawing/text';
 
 export interface TextEditorLayout {
-  /** The face the engine draws the text in: mounted, `fontFamily` reaches it. */
-  readonly program: MountableFontProgram;
+  /** The programs the engine draws the text in, the face's first: mounted, `fontFamily` reaches them. */
+  readonly programs: readonly MountableFontProgram[];
   readonly fontFamily: string;
   readonly fontWeight: number;
   readonly fontStyle: 'normal' | 'italic';
@@ -63,7 +63,7 @@ export function textEditorLayout<C extends Coordinates = PageCoordinates>(
   const { bbox, font } = look;
   const fontSize = layout.fontSize;
   const base = {
-    program: standardFontProgram(font.font),
+    programs: [standardFontProgram(font.font)],
     ...standardFontCss(font.font),
     fontSize,
     lineHeight: ((font.ascent - font.descent) * fontSize) / 1000,

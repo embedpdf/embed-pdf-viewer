@@ -32,6 +32,7 @@ import type {
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
+import { fontsPlugin } from '@embedpdf/react/fonts';
 import { metadataPlugin } from '@embedpdf/react/metadata';
 import { outlinePlugin } from '@embedpdf/react/outline';
 import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
@@ -446,6 +447,9 @@ export function FullViewer({
     // The document's title, author and your own fields, read the first time something asks
     // (`viewer.get('metadata').ensureLoaded()`, `useMetadataState()`), never as a document opens.
     metadataPlugin(),
+    // The document's fonts, read the first time text is typed in a font of its own: what
+    // the free text and form editors draw that text in, so it shows as the engine writes it.
+    fontsPlugin(),
     // The document's outline, read the first time its panel or its state asks for it.
     outlinePlugin(),
     interactionPlugin(settings.interaction),

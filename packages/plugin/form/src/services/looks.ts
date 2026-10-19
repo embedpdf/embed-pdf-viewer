@@ -19,7 +19,13 @@ import {
   widgetScene,
   type TextEditorLayout,
 } from '@embedpdf/core-form';
-import type { AnnotationRef, FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import {
+  isStandardFontName,
+  type AnnotationRef,
+  type FormFieldDTO,
+  type WidgetAnnotation,
+} from '@embedpdf/engine-core/runtime';
+import type { FontsCapability } from '@embedpdf/plugin-fonts/contract';
 
 import {
   fieldForWidget,
@@ -49,10 +55,13 @@ export function createWidgetLooks({
   fields,
   formatted,
   design,
+  fonts,
 }: {
   readonly fields: Mirror<FieldIndex>;
   readonly formatted: FormattedTexts;
   readonly design: FormDesign;
+  /** The fonts plugin, when installed: a field in a font of its own is edited in its program. */
+  readonly fonts: () => FontsCapability | null;
 }) {
   /** What the widget's picture depends on, as one string. */
   const lookKeyOf = (row: WidgetAnnotation, field: FormFieldDTO | null): string => {
@@ -143,6 +152,26 @@ export function createWidgetLooks({
     },
   );
 
+  /**
+   * The layout in the field's own font, when it isn't a standard one: its
+   * program, the fallbacks and the last resort, as the fonts plugin draws it.
+   * The first field that asks reads the document's fonts. The layout's
+   * numbers stay the standard face's until the painter knows the font's.
+   */
+  const inItsFont = (layout: TextEditorLayout, font: string | null): TextEditorLayout => {
+    const api = fonts();
+    if (!api || !font || isStandardFontName(font)) return layout;
+    if (api.getStatus() === 'idle') api.ensureLoaded().catch(() => {});
+    const css = api.getFontCss(font);
+    return {
+      ...layout,
+      programs: css.programs,
+      fontFamily: css.fontFamily,
+      fontWeight: css.fontWeight,
+      fontStyle: css.fontStyle,
+    };
+  };
+
   return {
     listShownWidgets: (pageObjectNumber: number) => shownOn(pageObjectNumber),
     getWidgetPainting: (ref: AnnotationRef) => sceneOf(numberOf(ref)),
@@ -164,7 +193,8 @@ export function createWidgetLooks({
       const number = numberOf(ref);
       const row = widgetRowOf(view, number);
       const field = row ? fieldForWidget(view, number) : null;
-      return row && field ? textEditorLayout(row, field, text) : null;
+      const layout = row && field ? textEditorLayout(row, field, text) : null;
+      return layout && row ? inItsFont(layout, row.fontFamily ?? null) : null;
     },
   };
 }

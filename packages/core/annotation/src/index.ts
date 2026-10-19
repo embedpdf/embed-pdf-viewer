@@ -72,6 +72,7 @@ export {
   splitRunsAt,
   styleAt,
   type FontLookup,
+  type NamedFont,
   type RichTextRange,
   type RichTextStyleDelta,
 } from './richtext';

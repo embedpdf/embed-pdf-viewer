@@ -49,7 +49,7 @@ const layout = computed(() =>
 const mounts = createFontMounts();
 onUnmounted(() => mounts.release());
 watchEffect(() => {
-  if (layout.value) mounts.mount([layout.value.program]);
+  if (layout.value) mounts.mount(layout.value.programs);
 });
 
 const editorStyle = computed(() =>

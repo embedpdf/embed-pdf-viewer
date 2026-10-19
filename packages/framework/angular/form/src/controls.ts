@@ -151,7 +151,7 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
       inject(DestroyRef).onDestroy(() => mounts.release());
       effect(() => {
         const layout = this.layout();
-        if (layout) mounts.mount([layout.program]);
+        if (layout) mounts.mount(layout.programs);
       });
     }
     effect((onCleanup) => {

@@ -40,7 +40,12 @@ import type { Stamps } from '../write/stamps';
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc' | 'tryGet'>,
-  { view: { pageModel }, lending }: Pick<AnnotationServices, 'view' | 'lending'>,
+  {
+    view: { pageModel },
+    lending,
+    fonts: fontLookup,
+    textFonts,
+  }: Pick<AnnotationServices, 'view' | 'lending' | 'fonts' | 'textFonts'>,
   ghost: Pick<Ghost, 'itemsOn'>,
   stamps: Pick<Stamps, 'lookOf'>,
 ) {
@@ -92,24 +97,33 @@ export function createRenderReads(
 
   const textsCache = new Map<
     number,
-    { model: Model; zoom: number | undefined; rotation: number | undefined; v: TextItem[] }
+    {
+      model: Model;
+      zoom: number | undefined;
+      rotation: number | undefined;
+      fonts: object;
+      v: TextItem[];
+    }
   >();
   const textItemsOf = (page: PageRef, view?: ViewEnv): TextItem[] => {
     const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
+    const fonts = textFonts.version();
     const cached = textsCache.get(pageObjectNumber);
     if (
       cached &&
       cached.model === model &&
       cached.zoom === view?.zoom &&
-      cached.rotation === view?.rotation
+      cached.rotation === view?.rotation &&
+      cached.fonts === fonts
     )
       return cached.v;
-    const items = buildTextItems(model, page, view);
+    const items = buildTextItems(model, page, view, { lookup: fontLookup, text: textFonts });
     textsCache.set(pageObjectNumber, {
       model: model,
       zoom: view?.zoom,
       rotation: view?.rotation,
+      fonts,
       v: items,
     });
     return items;

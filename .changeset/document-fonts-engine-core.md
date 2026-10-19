@@ -9,3 +9,5 @@ Add the `fonts.changed` document event, and `meta.missingCharacters` on a write 
 Rename `FreeTextFont` to `FontName`, `faceForFreeTextFont` to `faceForFontName`, and `freeTextFontForFace` to `fontNameForFace`. `LocalDocumentHandle.fonts` is a `LocalDocumentFontsService` (the reads above, plus `setEmbeddingPolicy` and `setTypographicFeatures`) in place of `DocumentFontSettings`.
 
 Add the `document.fonts.list`, `document.fonts.resolve` and `document.fonts.program` worker requests.
+
+`DescribeFont` answers a font's face only (family, weight and italic).

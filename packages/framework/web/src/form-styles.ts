@@ -103,6 +103,8 @@ export type TextFieldEditorStyle = TextFieldStyle & {
   padding: string;
   /** In pixels, with its unit: one line of the engine's layout. */
   lineHeight?: string;
+  /** `none` with the engine's layout: the browser never fakes a bold or an italic the face doesn't have. */
+  fontSynthesis?: 'none';
   resize: 'none';
   cursor: 'text';
   /** 1 while focused, 0 at rest, where the field's picture shows through. */
@@ -159,6 +161,7 @@ export function textFieldEditorStyleOf(
           fontFamily: layout.fontFamily,
           fontWeight: layout.fontWeight,
           fontStyle: layout.fontStyle,
+          fontSynthesis: 'none' as const,
           fontSize: pixels(layout.fontSize),
           lineHeight: pixels(layout.lineHeight),
           padding: [

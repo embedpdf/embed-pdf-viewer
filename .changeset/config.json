@@ -42,6 +42,7 @@
       "@embedpdf/plugin-actions",
       "@embedpdf/plugin-annotation",
       "@embedpdf/plugin-commands",
+      "@embedpdf/plugin-fonts",
       "@embedpdf/plugin-form",
       "@embedpdf/plugin-history",
       "@embedpdf/plugin-i18n",

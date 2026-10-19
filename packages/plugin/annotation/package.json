@@ -56,7 +56,8 @@
     "@embedpdf/plugin-render": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/plugin-actions": "workspace:*",
-    "@embedpdf/core-acrojs": "workspace:*"
+    "@embedpdf/core-acrojs": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

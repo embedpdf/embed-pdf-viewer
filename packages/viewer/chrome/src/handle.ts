@@ -17,6 +17,7 @@
 import { ActionsToken, type ActionsCapability } from '@embedpdf/react/actions';
 import { AnnotationToken, type AnnotationCapability } from '@embedpdf/react/annotation';
 import { CommandsToken, type CommandsCapability } from '@embedpdf/react/commands';
+import { FontsToken, type FontsCapability } from '@embedpdf/react/fonts';
 import { FormToken, type FormCapability } from '@embedpdf/react/form';
 import { I18nToken, type I18nCapability } from '@embedpdf/react/i18n';
 import { InteractionToken, type InteractionCapability } from '@embedpdf/react/interaction';
@@ -61,6 +62,8 @@ export interface ViewerPlugins {
   readonly pageEdit: PageEditCapability;
   /** The document's title, author and your own fields; `ensureLoaded()` reads them. */
   readonly metadata: MetadataCapability;
+  /** The document's fonts, and the CSS and programs its typed text is drawn in; reading its state reads them. */
+  readonly fonts: FontsCapability;
   /** The document's outline (its bookmarks); reading its state reads it. */
   readonly outline: OutlineCapability;
   readonly actions: ActionsCapability;
@@ -95,6 +98,7 @@ export const VIEWER_PLUGINS: {
   signature: SignatureToken,
   pageEdit: PageEditToken,
   metadata: MetadataToken,
+  fonts: FontsToken,
   outline: OutlineToken,
   actions: ActionsToken,
   documents: DocumentsToken,

@@ -105,6 +105,7 @@ export type {
   TextStyle,
 } from '@embedpdf/core-annotation';
 import { devWarn } from './dev';
+import { useFontMounts } from './font-mounts';
 import { usePaintsPagePart } from './page-layers';
 import { useAnnotationSettings } from './annotation-hooks';
 import { INERT } from './inert';
@@ -652,6 +653,8 @@ function useTextBoxEditor(
 /** A free text annotation: the same styled element for reading and typing. */
 function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   const { painted } = useChromePaint();
+  // The programs the engine draws the text in, so the box shows them.
+  useFontMounts(item.programs);
   // On the engine's text plate (the box inset by its padding), laid out at a legible size.
   const box = freeTextBoxOf(item, page.transform, painted.textOutline);
   const ref = useTextBoxEditor(item, box.scale);
@@ -672,6 +675,7 @@ export interface RichTextEditor {
 }
 
 const NO_STYLE: React.CSSProperties = {};
+const NO_PROGRAMS: TextItem['programs'] = [];
 
 /**
  * Make your own element the editor of a text box you draw yourself (a
@@ -698,6 +702,7 @@ export function useRichTextEditor(annotation: Annotation): RichTextEditor {
   const scale = textBoxEditorScaleOf(item, page.transform, React.useContext(LookScaleContext));
   const own = React.useMemo(() => (item ? ownTextBoxOf(item, scale) : null), [item, scale]);
   const ref = useTextBoxEditor(item, own?.scale ?? scale);
+  useFontMounts(item?.programs ?? NO_PROGRAMS);
   return { ref, style: own?.style ?? NO_STYLE, editing: item?.editing ?? false };
 }
 

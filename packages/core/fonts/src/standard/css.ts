@@ -20,10 +20,15 @@ export interface StandardFontCss {
   readonly fontStyle: 'normal' | 'italic';
 }
 
+/** The platform's look-alikes of a standard face, as a CSS family list. */
+export function standardFontStack(font: StandardFont): string {
+  return STACKS[STANDARD_FACES[font].family];
+}
+
 export function standardFontCss(font: StandardFont): StandardFontCss {
   const program = standardFontProgram(font);
   return {
-    fontFamily: `"${program.family}", ${STACKS[STANDARD_FACES[font].family]}`,
+    fontFamily: `"${program.family}", ${standardFontStack(font)}`,
     fontWeight: program.weight,
     fontStyle: program.style,
   };

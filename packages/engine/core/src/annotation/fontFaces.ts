@@ -20,8 +20,10 @@ interface StandardFace {
   italic: boolean;
 }
 
-/** Looks up a registered font by its key: what `engine.fonts` knows about it. */
-export type DescribeFont = (fontKey: string) => FontIdentityInfo | undefined;
+/** Looks up a font by the name a box gives it: its face. */
+export type DescribeFont = (
+  fontKey: string,
+) => Pick<FontIdentityInfo, 'familyName' | 'weight' | 'italic'> | undefined;
 
 export const STANDARD_FACES: Readonly<Record<StandardFont, StandardFace>> = {
   courier: { family: 'Courier', weight: 400, italic: false },

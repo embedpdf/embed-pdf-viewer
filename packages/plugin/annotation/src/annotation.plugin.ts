@@ -1,5 +1,6 @@
 import { definePlugin } from '@embedpdf/core';
 import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract/host';
@@ -14,7 +15,8 @@ import { initialAnnotationState } from './model';
  * optionally uses the selection plugin: shapes and ink work without it, text
  * markup lights up only when it is present. The engine's pictures of its
  * annotations come through the render plugin; without it, what draws live
- * still draws. `config` is the settings the app
+ * still draws. With the fonts plugin, text being typed shows in the font
+ * programs the engine writes with. `config` is the settings the app
  * registers, over {@link ANNOTATION_DEFAULTS}.
  */
 export const annotationPlugin = (config?: AnnotationConfig) =>
@@ -23,7 +25,7 @@ export const annotationPlugin = (config?: AnnotationConfig) =>
     token: AnnotationToken,
     scope: 'document',
     requires: [InteractionToken],
-    optional: [SelectionToken, PublicActionsToken, RenderToken],
+    optional: [SelectionToken, PublicActionsToken, RenderToken, FontsToken],
     state: initialAnnotationState,
     settings: { defaults: ANNOTATION_DEFAULTS, registered: config },
     create: createAnnotationController,

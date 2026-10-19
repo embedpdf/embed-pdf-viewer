@@ -149,7 +149,7 @@ DEFAULT_RICH_TEXT_BODY [VariableDeclaration] (from packages/engine/core/src/dto/
 DRAWN_RECT_KINDS [VariableDeclaration] (from packages/engine/core/src/annotation/shapeForRect.ts): DRAWN_RECT_KINDS: ReadonlySet<AnnotationSubtype> = new Set([ 'highlight', 'underline', 'squiggly', 'strikeout', 'square', 'circle', 'free-text', 'stamp', 'caret', 'widget', 'line', 'polyline', 'polygon', 'ink', ])
 DTOOfKind [TypeAliasDeclaration] (from packages/engine/core/src/annotation/registry.ts): export type DTOOfKind<K> = K extends AnnotationKindModule<infer _S, infer D, infer _Dr, infer _Pa> ? D : never;
 DateInput [TypeAliasDeclaration] (from packages/engine/core/src/dto/IsoDateTime.ts): export type DateInput = IsoDateTime | Date;
-DescribeFont [TypeAliasDeclaration] (from packages/engine/core/src/annotation/fontFaces.ts): export type DescribeFont = (fontKey: string) => FontIdentityInfo | undefined;
+DescribeFont [TypeAliasDeclaration] (from packages/engine/core/src/annotation/fontFaces.ts): export type DescribeFont = ( fontKey: string, ) => Pick<FontIdentityInfo, 'familyName' | 'weight' | 'italic'> | undefined;
 DestinationBox [TypeAliasDeclaration] (from packages/engine/core/src/pageSpace/destinations.ts): export type DestinationBox = PdfRect | VisibleBoxOf;
 DigestAlgorithm [TypeAliasDeclaration] (from packages/engine/core/src/signature/types.ts): export type DigestAlgorithm = 'sha1' | 'sha256' | 'sha384' | 'sha512';
 DimensionInput [InterfaceDeclaration] (from packages/engine/core/src/measure/derive.ts): export interface DimensionInput{ subtype: string; intent?: string | null; measure?: PdfMeasurement | null; linePoints?: LinePoints; vertices?: PdfPoint[]; contents?: string | null; }

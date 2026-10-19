@@ -47,7 +47,7 @@
   const mounts = createFontMounts();
   $effect(() => () => mounts.release());
   $effect(() => {
-    if (layout) mounts.mount([layout.program]);
+    if (layout) mounts.mount(layout.programs);
   });
 
   const editorStyle = $derived(

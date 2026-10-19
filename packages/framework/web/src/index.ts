@@ -106,6 +106,7 @@ export {
   offsetOfPosition,
   positionOfOffset,
   renderRichText,
+  restyleFaces,
   serializeRichText,
   styleDeltaOf,
 } from './rich-text-editor';
@@ -121,6 +122,7 @@ export type {
   RichTextEditorCommand,
   RichTextEditorDecoration,
   RichTextEditorDocument,
+  RichTextEditorFace,
   RichTextEditorHost,
   RichTextEditorParagraph,
   RichTextEditorProps,

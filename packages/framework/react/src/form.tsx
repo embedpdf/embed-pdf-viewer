@@ -37,6 +37,7 @@ import { annotationKey, type EventHook } from '@embedpdf/core';
 import { MITER_LIMIT } from '@embedpdf/core-annotation';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import {
   FormToken,
   formState,
@@ -246,8 +247,10 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
 
   const frame = rectInPixels(item.box, page.transform);
   // The text being typed, where the engine will draw it, in its face.
+  // A field in a font of its own draws again once the document's fonts are read.
+  useOptionalSelector(FontsToken, (fonts) => fonts.getFontList(), null);
   const layout = item.annotationRef ? form.getTextEditorLayout(item.annotationRef, draft) : null;
-  useFontMounts(layout ? [layout.program] : NO_PROGRAMS);
+  useFontMounts(layout ? layout.programs : NO_PROGRAMS);
   const editorProps = {
     value: draft,
     maxLength: item.maxLength ?? undefined,
