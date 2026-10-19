@@ -72,6 +72,7 @@ export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { MetadataService } from './engine/MetadataService';
 export type { DocumentOutlineService, OutlineCreateOptions } from './engine/DocumentOutlineService';
 export { outlineVerbs } from './engine/outlineVerbs';
+export { pageVerbs, type PageStructureVerb } from './engine/pageVerbs';
 export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';

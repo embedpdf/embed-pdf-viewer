@@ -160,6 +160,9 @@ export function foldRecords(
       return drop(records, keysOnPages(records, event.pages));
     case 'pages.inserted':
       return event.insertedPages.length ? reload({ pages: event.insertedPages }) : records;
+    // An undo brought deleted pages back, with their annotations.
+    case 'pages.restored':
+      return reload({ pages: event.pages });
     // These paint annotations into the page content and remove them.
     case 'redaction.applied':
     case 'pages.flattened': {

@@ -142,5 +142,26 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
       const { type: _type, ...result } = item;
       return [{ type: 'outline.restored', ...result }];
     }
+    case 'pages.rotate': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.rotated', ...result }];
+    }
+    case 'pages.reorder': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.reordered', ...result }];
+    }
+    case 'pages.delete': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.deleted', ...result }];
+    }
+    case 'pages.insertBlank':
+    case 'pages.insert': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.inserted', ...result }];
+    }
+    case 'pages.restore': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.restored', ...result }];
+    }
   }
 }

@@ -7,6 +7,7 @@ import {
   EventHub,
   SessionEventPublisher,
   outlineVerbs,
+  pageVerbs,
   wirePack,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -178,7 +179,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
     this.fonts = new LocalDocumentFontSettings(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
-    this.pages = new LocalDocumentPagesService(id, queue, view, guard, publisher);
+    this.pages = pageVerbs(
+      new LocalDocumentPagesService(id, queue, view, guard, publisher),
+      (change, options) => this.apply(change, options),
+    );
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, publisher);
     this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, publisher);
     this.changes = new LocalDocumentChanges(id, queue, view, guard, publisher);

@@ -57,6 +57,17 @@ import {
   revertOutlineItem,
   updateOutlineItem,
 } from './internal/outlineChanges';
+import {
+  deletePages,
+  insertBlankPages,
+  insertPages,
+  removePages,
+  reorderPages,
+  reorderPagesBack,
+  restorePages,
+  rotatePages,
+  rotatePagesBack,
+} from './internal/pageChanges';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -208,6 +219,16 @@ function runOp(
       return moveOutlineItems(ctx, op);
     case 'outline.delete':
       return deleteOutlineItem(ctx, op, at);
+    case 'pages.rotate':
+      return rotatePages(ctx, op);
+    case 'pages.reorder':
+      return reorderPages(ctx, op);
+    case 'pages.delete':
+      return deletePages(ctx, op);
+    case 'pages.insertBlank':
+      return insertBlankPages(ctx, op);
+    case 'pages.insert':
+      return insertPages(ctx, op);
   }
 }
 
@@ -245,5 +266,13 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return restoreOutlineItem(ctx, step);
     case 'outline.move':
       return moveOutlineItemsBack(ctx, step);
+    case 'pages.rotate':
+      return rotatePagesBack(ctx, step);
+    case 'pages.reorder':
+      return reorderPagesBack(ctx, step);
+    case 'pages.restore':
+      return restorePages(ctx, step);
+    case 'pages.remove':
+      return removePages(ctx, step);
   }
 }

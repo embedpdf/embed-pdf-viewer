@@ -15,6 +15,7 @@ import type {
   PageRef,
   PdfCoordinates,
   PdfDestination,
+  PdfRotation,
   WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -45,7 +46,11 @@ export type ReverseStep =
   | MetadataRevertStep
   | OutlineRemoveStep
   | OutlineRestoreStep
-  | OutlineMoveStep;
+  | OutlineMoveStep
+  | PageRotateStep
+  | PageReorderStep
+  | PageRestoreStep
+  | PageRemoveStep;
 
 /**
  * One dictionary a change wrote, as it was before (the capture, with the
@@ -291,6 +296,61 @@ export interface OutlineMoveStep {
   readonly left: readonly { readonly item: number; readonly parent: number }[];
 }
 
+/**
+ * Turns pages to `rotation`: its reverse, and, the other way round, its redo.
+ * Each page turns only while it still has the rotation the change left it
+ * with (`left`). A change that turned pages from several rotations has one
+ * step for each.
+ */
+export interface PageRotateStep {
+  readonly kind: 'pages.rotate';
+  /** The pages, by object number. */
+  readonly pages: readonly number[];
+  readonly rotation: PdfRotation;
+  readonly left: PdfRotation;
+}
+
+/**
+ * Puts pages back where they were before a move: its reverse, and, the other
+ * way round, its redo. Each page goes only while it still follows the page the
+ * move left it after, and the page it goes after is still there.
+ */
+export interface PageReorderStep {
+  readonly kind: 'pages.reorder';
+  /**
+   * Where each goes back to, by object number (after 0: first), in display
+   * order, so an anchor is placed before what follows it.
+   */
+  readonly placements: readonly { readonly page: number; readonly after: number }[];
+  /** The page each was left after (0: first). */
+  readonly left: readonly { readonly page: number; readonly after: number }[];
+}
+
+/**
+ * Brings back what a page delete removed: the same pages, at the same
+ * numbers, each after the page it followed while that is still there, else
+ * first (`EPDFPage_ImportRaw`), with their annotations and names. A page that
+ * is back already is left alone.
+ */
+export interface PageRestoreStep {
+  readonly kind: 'pages.restore';
+  /** Each page and its capture, in the display order they had. */
+  readonly pages: readonly { readonly page: number; readonly capture: Uint8Array }[];
+}
+
+/**
+ * Deletes pages an insert or a restore brought, each while it reads as the
+ * change left it: the page and what the layer holds of its annotations,
+ * contents and resources. Undoing an insert never deletes a page someone
+ * annotated, or turned, since. A step that would delete every page is left
+ * alone: a document keeps one.
+ */
+export interface PageRemoveStep {
+  readonly kind: 'pages.remove';
+  /** Each page, and the digest of how the change left it. */
+  readonly pages: readonly { readonly page: number; readonly left: string }[];
+}
+
 /** The bytes a record's captures hold. */
 export function recordBytes(record: ChangeRecord): number {
   let bytes = 0;
@@ -309,6 +369,9 @@ export function recordBytes(record: ChangeRecord): number {
       case 'field.restore':
       case 'outline.restore':
         bytes += step.capture.byteLength;
+        break;
+      case 'pages.restore':
+        for (const { capture } of step.pages) bytes += capture.byteLength;
         break;
       default:
         break;

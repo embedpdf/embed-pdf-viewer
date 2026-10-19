@@ -830,6 +830,7 @@ export type { PageRotateResult } from './mutation/PageRotateResult';
 export type { PageDeleteInput } from './mutation/PageDeleteInput';
 export type { PageDeleteResult } from './mutation/PageDeleteResult';
 export type { PageInsertResult } from './mutation/PageInsertResult';
+export type { PageRestoreResult } from './mutation/PageRestoreResult';
 export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
 export { opIdOf } from './mutation/WriteOptions';
 export {
