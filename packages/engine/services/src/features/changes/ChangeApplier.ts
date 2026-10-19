@@ -58,6 +58,7 @@ import {
   updateOutlineItem,
 } from './internal/outlineChanges';
 import {
+  changingPageTree,
   deletePages,
   insertBlankPages,
   insertPages,
@@ -220,15 +221,15 @@ function runOp(
     case 'outline.delete':
       return deleteOutlineItem(ctx, op, at);
     case 'pages.rotate':
-      return rotatePages(ctx, op);
+      return changingPageTree(ctx, () => rotatePages(ctx, op));
     case 'pages.reorder':
-      return reorderPages(ctx, op);
+      return changingPageTree(ctx, () => reorderPages(ctx, op));
     case 'pages.delete':
-      return deletePages(ctx, op);
+      return changingPageTree(ctx, () => deletePages(ctx, op));
     case 'pages.insertBlank':
-      return insertBlankPages(ctx, op);
+      return changingPageTree(ctx, () => insertBlankPages(ctx, op));
     case 'pages.insert':
-      return insertPages(ctx, op);
+      return changingPageTree(ctx, () => insertPages(ctx, op));
   }
 }
 
@@ -267,12 +268,12 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
     case 'outline.move':
       return moveOutlineItemsBack(ctx, step);
     case 'pages.rotate':
-      return rotatePagesBack(ctx, step);
+      return changingPageTree(ctx, () => rotatePagesBack(ctx, step));
     case 'pages.reorder':
-      return reorderPagesBack(ctx, step);
+      return changingPageTree(ctx, () => reorderPagesBack(ctx, step));
     case 'pages.restore':
-      return restorePages(ctx, step);
+      return changingPageTree(ctx, () => restorePages(ctx, step));
     case 'pages.remove':
-      return removePages(ctx, step);
+      return changingPageTree(ctx, () => removePages(ctx, step));
   }
 }

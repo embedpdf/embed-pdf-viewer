@@ -2,12 +2,12 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type DocPagesRotate200ResponseLayoutNamedPagesItemTarget =
-    | CloudPDF.DocPagesRotate200ResponseLayoutNamedPagesItemTarget.Page
-    | CloudPDF.DocPagesRotate200ResponseLayoutNamedPagesItemTarget.Template
-    | CloudPDF.DocPagesRotate200ResponseLayoutNamedPagesItemTarget.Dangling;
+export type ChangeItemPagesReorderLayoutNamedPagesItemTarget =
+    | CloudPDF.ChangeItemPagesReorderLayoutNamedPagesItemTarget.Page
+    | CloudPDF.ChangeItemPagesReorderLayoutNamedPagesItemTarget.Template
+    | CloudPDF.ChangeItemPagesReorderLayoutNamedPagesItemTarget.Dangling;
 
-export namespace DocPagesRotate200ResponseLayoutNamedPagesItemTarget {
+export namespace ChangeItemPagesReorderLayoutNamedPagesItemTarget {
     export interface Page {
         kind: "page";
         page: CloudPDF.PageRef;

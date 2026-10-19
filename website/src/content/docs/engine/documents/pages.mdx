@@ -271,7 +271,21 @@ showThumbnails(layout.pages);
 ```
 
 Other code that shows pages can listen for `pages.reordered`, `pages.rotated`, `pages.deleted`,
-`pages.inserted` and `pages.flattened` instead. See [Events](/docs/engine/concepts/events).
+`pages.inserted`, `pages.restored` and `pages.flattened` instead. See
+[Events](/docs/engine/concepts/events).
+
+### Undo
+
+`rotate()`, `reorder()`, `delete()`, `insert()` and `insertBlank()` are changes: each returns its
+`opId` in `meta`, and `doc.apply({ undoOf: opId })` undoes it. An undo of a delete brings the same
+pages back, under the same refs, with their annotations and names, and fires `pages.restored`. To
+make several page edits one step, apply them as one change. See
+[Changes & undo](/docs/engine/documents/changes).
+
+```ts
+const { meta } = await doc.pages.delete([ref]);
+await doc.apply({ undoOf: meta.opId }); // the page is back where it was
+```
 
 ### Inserting
 

@@ -2,12 +2,12 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type DocPagesInsert200ResponseLayoutNamedPagesItemTarget =
-    | CloudPDF.DocPagesInsert200ResponseLayoutNamedPagesItemTarget.Page
-    | CloudPDF.DocPagesInsert200ResponseLayoutNamedPagesItemTarget.Template
-    | CloudPDF.DocPagesInsert200ResponseLayoutNamedPagesItemTarget.Dangling;
+export type ChangeItemPagesRestoreLayoutNamedPagesItemTarget =
+    | CloudPDF.ChangeItemPagesRestoreLayoutNamedPagesItemTarget.Page
+    | CloudPDF.ChangeItemPagesRestoreLayoutNamedPagesItemTarget.Template
+    | CloudPDF.ChangeItemPagesRestoreLayoutNamedPagesItemTarget.Dangling;
 
-export namespace DocPagesInsert200ResponseLayoutNamedPagesItemTarget {
+export namespace ChangeItemPagesRestoreLayoutNamedPagesItemTarget {
     export interface Page {
         kind: "page";
         page: CloudPDF.PageRef;

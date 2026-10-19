@@ -2,12 +2,12 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type DocPagesDelete200ResponseLayoutNamedPagesItemTarget =
-    | CloudPDF.DocPagesDelete200ResponseLayoutNamedPagesItemTarget.Page
-    | CloudPDF.DocPagesDelete200ResponseLayoutNamedPagesItemTarget.Template
-    | CloudPDF.DocPagesDelete200ResponseLayoutNamedPagesItemTarget.Dangling;
+export type ChangeItemPagesRotateLayoutNamedPagesItemTarget =
+    | CloudPDF.ChangeItemPagesRotateLayoutNamedPagesItemTarget.Page
+    | CloudPDF.ChangeItemPagesRotateLayoutNamedPagesItemTarget.Template
+    | CloudPDF.ChangeItemPagesRotateLayoutNamedPagesItemTarget.Dangling;
 
-export namespace DocPagesDelete200ResponseLayoutNamedPagesItemTarget {
+export namespace ChangeItemPagesRotateLayoutNamedPagesItemTarget {
     export interface Page {
         kind: "page";
         page: CloudPDF.PageRef;

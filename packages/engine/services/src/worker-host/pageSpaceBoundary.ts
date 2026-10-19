@@ -68,13 +68,8 @@ export function resultInPageSpace(
   switch (payload.tag) {
     case 'pages.list':
       return { ...payload, snapshot: pageListOf(payload.snapshot) };
-    case 'pages.reorder':
-    case 'pages.rotate':
-    case 'pages.delete':
     case 'pages.setName':
     case 'pages.removeName':
-    case 'pages.insert':
-    case 'pages.insertBlank':
       return {
         ...payload,
         result: { ...payload.result, layout: pageListOf(payload.result.layout) },

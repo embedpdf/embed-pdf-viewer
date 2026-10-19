@@ -27,6 +27,21 @@ type Op<T extends ChangeOp['type']> = Extract<
 /** What a page's guard digests: the page, and what the layer holds of these. */
 const PAGE_DEEP_KEYS = ['Annots', 'Contents', 'Resources'];
 
+/**
+ * Runs a page op or step. It changes the page tree in place, so the
+ * document's idle parsed pages close before and after it, as a
+ * `contentWrite` job's do: no page that went, or came back, stays parsed.
+ */
+export function changingPageTree(ctx: ChangeContext, write: () => Done): Done {
+  const pool = ctx.session.pagePool();
+  pool.closeIdle();
+  try {
+    return write();
+  } finally {
+    pool.closeIdle();
+  }
+}
+
 const mutatorOf = (ctx: ChangeContext) => new PagesMutator(ctx.runtime, ctx.session);
 const inserterOf = (ctx: ChangeContext) => new PagesInserter(ctx.runtime, ctx.session);
 const authorize = (ctx: ChangeContext) => authorizeCapability(ctx.authority, 'doc.pages.assemble');

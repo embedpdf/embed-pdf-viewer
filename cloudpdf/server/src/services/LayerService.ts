@@ -73,21 +73,15 @@ import {
   type CustomMetadataUpdateResult,
   type CacheDelta,
   type MutationMeta,
-  type PageDeleteResult,
   type PageFlattenResult,
   type PageFlattenUsage,
-  type PageInsertResult,
-  type PdfSize,
   type RedactionApplyResult,
   type RedactionApplyScope,
   type PageListSnapshot,
-  type PagePosition,
   type PageReorderResult,
   type PageNameResult,
   type PageObjectNumber,
   type PageRef,
-  type PageRotateResult,
-  type PdfRotation,
   type WirePack,
   type WorkerJobId,
   type WorkerRequest,
@@ -127,6 +121,7 @@ import {
   withCacheDelta,
   wrote,
   type ChangeFacts,
+  type PageSetStep,
   type ChangePlan,
   type RequestedChange,
   type SingleOpAudit,
@@ -165,24 +160,6 @@ import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
 
 type LayerArtifactInput = { bytes: ArrayBuffer; size: number } | { path: string };
-
-/**
- * Page addresses arrive on the wire as `PageRef`s (one kind: the canonical
- * `objectNumber`); everything this service persists — `layer_pages` rows,
- * audit rows — is keyed by the number. Unwrap once at
- * the entry point; the worker request carries the refs as received.
- */
-function pageObjectNumbersOf(pages: readonly PageRef[]): PageObjectNumber[] {
-  return pages.map((page) => {
-    if (page.kind !== 'objectNumber') {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `unsupported page address kind '${String((page as { kind: unknown }).kind)}'`,
-      );
-    }
-    return page.objectNumber;
-  });
-}
 
 /**
  * The commit-time version CAS lost: `layers.current_version` moved between
@@ -579,48 +556,6 @@ export class LayerService {
     );
   }
 
-  async reorderPages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      pages: PageRef[];
-      position: PagePosition;
-    },
-    signal?: AbortSignal,
-  ): Promise<PageReorderResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.reorder' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            pages: input.pages,
-            position: input.position,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.reorder') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.reorder payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageLayout(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          pages: payload.result.pages,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
   /**
    * Register/rename a `/Names /Pages` entry. Named pages are layout, so this
    * persists exactly like a page move: a new layer artifact, doc_version +
@@ -807,188 +742,6 @@ export class LayerService {
         }
         if (!payload.wrote) return payload.result;
         return this.persistPageFlatten(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async rotatePages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      pages: PageRef[];
-      rotation: PdfRotation;
-    },
-    signal?: AbortSignal,
-  ): Promise<PageRotateResult> {
-    const opId = writeOpIdOf(ctx);
-    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.rotate' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            pages: input.pages,
-            rotation: input.rotation,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.rotate') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.rotate payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageRotate(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          affectedPages: pageObjectNumbers,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async deletePages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      pages: PageRef[];
-    },
-    signal?: AbortSignal,
-  ): Promise<PageDeleteResult> {
-    const opId = writeOpIdOf(ctx);
-    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.delete' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            pages: input.pages,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.delete') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.delete payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageDelete(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          deletedPages: pageObjectNumbers,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async insertPages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      /** The standalone source PDF whose pages are copied in. Never put on
-       *  a postMessage transfer list — the fence-conflict rebase re-runs
-       *  this op, and a transferred (detached) buffer would corrupt the
-       *  retry. Structured clone copies it, like annotation resources. */
-      bytes: ArrayBuffer;
-      position?: PagePosition;
-    },
-    signal?: AbortSignal,
-  ): Promise<PageInsertResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
-        estimate: OBJECT_NUMBER_ESTIMATES.insertedPages(input.bytes.byteLength),
-      });
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.insert' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            bytes: input.bytes,
-            ...(input.position !== undefined ? { position: input.position } : {}),
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.insert') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.insert payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageInsert(ctx, input.docId, input.layerName, layer, {
-          kind: 'pages.insert',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async insertBlankPages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      size: PdfSize;
-      count?: number;
-      position?: PagePosition;
-      /** The new pages' object numbers, one per page: ones the editing session holds. */
-      objectNumbers?: readonly number[];
-    },
-    signal?: AbortSignal,
-  ): Promise<PageInsertResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
-        estimate: OBJECT_NUMBER_ESTIMATES.blankPages(input.count ?? 1),
-        ...(input.objectNumbers ? { named: input.objectNumbers } : {}),
-      });
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.insertBlank' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            size: input.size,
-            ...(input.count !== undefined ? { count: input.count } : {}),
-            ...(input.position !== undefined ? { position: input.position } : {}),
-            ...(input.objectNumbers ? { objectNumbers: [...input.objectNumbers] } : {}),
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.insertBlank') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.insertBlank payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageInsert(ctx, input.docId, input.layerName, layer, {
-          kind: 'pages.insertBlank',
           result: payload.result,
           artifact: requireLayerArtifact(payload as unknown),
         });
@@ -2186,6 +1939,9 @@ export class LayerService {
           if (bumped.versions.outline_version !== undefined) {
             cacheDelta = { ...cacheDelta, outlineVersion: bumped.versions.outline_version };
           }
+          if (bumped.versions.layout_version !== undefined) {
+            cacheDelta = { ...cacheDelta, layoutVersion: bumped.versions.layout_version };
+          }
           const artifactFields = {
             layer,
             nextVersion,
@@ -2308,8 +2064,9 @@ export class LayerService {
    * The version bumps a commit's facts call for, read inside its transaction:
    * the document version always; each touched page's pin of the family that
    * changed on it (`annotation_version`, `widget_version`); the annotation
-   * list and the form when they changed; the metadata and the outline when
-   * they changed.
+   * list and the form when they changed; the metadata, the outline and the
+   * layout when they changed. The page set's changes are written here, in
+   * the order the changes made them, before the pins are read.
    */
   private async bumpChangeVersions(
     trx: Transaction<Schema>,
@@ -2324,6 +2081,7 @@ export class LayerService {
       forms_version?: number;
       metadata_version?: number;
       outline_version?: number;
+      layout_version?: number;
     };
     pages: DurablePageRow[];
   }> {
@@ -2335,14 +2093,19 @@ export class LayerService {
         'forms_version',
         'metadata_version',
         'outline_version',
+        'layout_version',
       ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
     if (!current) throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
+    const previousDocVersion = Number(current.doc_version);
+    const gone = await this.writePageSet(trx, layer, facts.pageSet, previousDocVersion + 1, now);
     const annotationPages = new Set(facts.annotationPages);
     const widgetPages = new Set(facts.widgetPages);
     const pages: DurablePageRow[] = [];
     for (const pageObjectNumber of new Set([...annotationPages, ...widgetPages])) {
+      // A page the same commit took has no pins left to move.
+      if (gone.has(pageObjectNumber)) continue;
       const page = await trx
         .selectFrom('layer_pages')
         .selectAll()
@@ -2364,7 +2127,6 @@ export class LayerService {
         updatedAt: now,
       });
     }
-    const previousDocVersion = Number(current.doc_version);
     return {
       previousDocVersion,
       versions: {
@@ -2375,9 +2137,55 @@ export class LayerService {
         ...(facts.form ? { forms_version: Number(current.forms_version ?? 1) + 1 } : {}),
         ...(facts.metadata ? { metadata_version: Number(current.metadata_version) + 1 } : {}),
         ...(facts.outline ? { outline_version: Number(current.outline_version ?? 1) + 1 } : {}),
+        ...(facts.layout ? { layout_version: Number(current.layout_version) + 1 } : {}),
       },
       pages,
     };
+  }
+
+  /**
+   * Replays a commit's page-set steps on `layer_pages`: a page that went
+   * loses its row; a page an insert made gets one at the first epoch; a page
+   * an undo brought back gets one at `epoch` (the commit's document version,
+   * above every pin the page had), so no picture cached before it went is
+   * served for it. Returns the pages left without a row.
+   */
+  private async writePageSet(
+    trx: Transaction<Schema>,
+    layer: LayerRow,
+    steps: readonly PageSetStep[],
+    epoch: number,
+    now: number,
+  ): Promise<Set<number>> {
+    const gone = new Set<number>();
+    for (const { kind, pages } of steps) {
+      if (pages.length === 0) continue;
+      await trx
+        .deleteFrom('layer_pages')
+        .where('layer_id', '=', layer.id)
+        .where('page_object_number', 'in', [...pages])
+        .execute();
+      if (kind === 'remove') {
+        for (const page of pages) gone.add(page);
+        continue;
+      }
+      const version = kind === 'insert' ? 1 : epoch;
+      await trx
+        .insertInto('layer_pages')
+        .values(
+          pages.map((page) => ({
+            layer_id: layer.id,
+            page_object_number: page,
+            content_version: version,
+            annotation_version: version,
+            widget_version: version,
+            updated_at: now,
+          })),
+        )
+        .execute();
+      for (const page of pages) gone.delete(page);
+    }
+    return gone;
   }
 
   /**
@@ -2688,44 +2496,6 @@ export class LayerService {
     return { ...committed.result, pages: input.pages };
   }
 
-  /**
-   * Rotate shares the reorder commit exactly (the corrected model: rotation is
-   * presentation metadata — `doc_version` + `layout_version` bump, no
-   * `layer_pages` touch, every per-page cache stays warm). Only the audit
-   * kind and the affected-page set differ.
-   */
-  private async persistPageRotate(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      result: PageRotateResult;
-      affectedPages: PageObjectNumber[];
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<PageRotateResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitPageStructure({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      kind: 'pages.rotate',
-      layout: input.result.layout,
-      stamp: input.result.meta,
-      affectedPages: input.affectedPages,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
   private async persistPageFlatten<T extends { meta: MutationMeta }>(
     ctx: LayerWriteContext,
     docId: string,
@@ -2773,69 +2543,6 @@ export class LayerService {
       layerName,
       layer,
       raw: input.result,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
-  private async persistPageDelete(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      result: PageDeleteResult;
-      deletedPages: PageObjectNumber[];
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<PageDeleteResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitPageDelete({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      layout: input.result.layout,
-      stamp: input.result.meta,
-      deletedPages: input.deletedPages,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
-  private async persistPageInsert(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      kind: 'pages.insert' | 'pages.insertBlank';
-      result: PageInsertResult;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<PageInsertResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitPageInsert({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      kind: input.kind,
-      layout: input.result.layout,
-      stamp: input.result.meta,
-      insertedPages: input.result.insertedPages.map((page) => page.objectNumber),
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -2895,18 +2602,18 @@ export class LayerService {
   }
 
   /**
-   * Shared commit for the page-structure ops that keep the page set intact
-   * (reorder + rotate). Both have the same shape: the layer's `doc_version` and
-   * `layout_version` advance, `layer_pages` rows are left entirely untouched
-   * (display order and rotation live in the artifact, read back via /layout),
-   * and every per-page content/annotation cache stays warm.
+   * The commit of a page-name write, which keeps the page set intact: the
+   * layer's `doc_version` and `layout_version` advance, `layer_pages` rows are
+   * left entirely untouched (the names live in the artifact, read back via
+   * /layout), and every per-page content/annotation cache stays warm. The
+   * page changes (`doc.changes`) commit through `bumpChangeVersions`.
    */
   private async commitPageStructure(input: {
     ctx: LayerWriteContext;
     docId: string;
     layerName: string;
     layer: LayerRow;
-    kind: 'pages.reorder' | 'pages.rotate';
+    kind: 'pages.reorder';
     /** A reorder's moved pages, in their new order: `result.pages`. */
     pages?: PageRef[];
     /** The worker's post-mutation layout — becomes `result.layout`. */
@@ -2988,256 +2695,6 @@ export class LayerService {
           trx,
           input,
           { doc_version: versions.docVersion, layout_version: versions.layoutVersion },
-          auditId,
-          now,
-        );
-
-        return { result, auditId };
-      });
-  }
-
-  /**
-   * Delete commit: the only page-structure op that mutates the page set. On
-   * top of the shared version bumps it removes the deleted pages'
-   * `layer_pages` rows. Surviving pages' rows are untouched, so their pins
-   * stay warm.
-   */
-  private async commitPageDelete(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    /** The worker's post-delete layout (survivors) — becomes `result.layout`. */
-    layout: PageListSnapshot;
-    /** The write's id and whether it can be undone, as the worker stamped them. */
-    stamp: WriteStamp;
-    deletedPages: PageObjectNumber[];
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-  }): Promise<{
-    result: { layout: PageListSnapshot; meta: MutationMeta };
-    auditId: number;
-  }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await this.readLayerForCommit(trx, input.layer);
-
-        const rows = await trx
-          .selectFrom('layer_pages')
-          .select('page_object_number')
-          .where('layer_id', '=', input.layer.id)
-          .execute();
-        const known = new Set(rows.map((row) => Number(row.page_object_number)));
-        const deleted = new Set(input.deletedPages);
-        const survivorOrder = input.layout.pages.map((page) => page.ref.objectNumber);
-        if (rows.length !== survivorOrder.length + input.deletedPages.length) {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `pages.delete returned ${survivorOrder.length} survivors for ${rows.length} layer page rows minus ${input.deletedPages.length} deleted`,
-          );
-        }
-        for (const pageObjectNumber of input.deletedPages) {
-          if (!known.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `pages.delete removed unknown page object number ${pageObjectNumber}`,
-            );
-          }
-        }
-        for (const pageObjectNumber of survivorOrder) {
-          if (!known.has(pageObjectNumber) || deleted.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `pages.delete returned unexpected surviving page object number ${pageObjectNumber}`,
-            );
-          }
-        }
-
-        await trx
-          .deleteFrom('layer_pages')
-          .where('layer_id', '=', input.layer.id)
-          .where('page_object_number', 'in', input.deletedPages)
-          .execute();
-
-        const previousDocVersion = Number(currentLayer.doc_version);
-        const versions: LayoutVersions = {
-          previousDocVersion,
-          docVersion: previousDocVersion + 1,
-          layoutVersion: Number(currentLayer.layout_version) + 1,
-        };
-
-        // The finalized result — audited and returned identically: what we
-        // tell the caller is what we tell history (and remote subscribers).
-        const result = { layout: input.layout, meta: planeMeta(input.stamp, versions) };
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: 'pages.delete',
-          pageObjectNumber: null,
-          affectedPages: input.deletedPages,
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          input,
-          {
-            doc_version: versions.docVersion,
-            layout_version: versions.layoutVersion,
-            // The page set shrank — the bulk annotation corpus changed.
-            // Clients re-pin via the 404-refresh rail (the layout delta
-            // carries no annotationsVersion).
-            annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
-          },
-          auditId,
-          now,
-        );
-
-        return { result, auditId };
-      });
-  }
-
-  /**
-   * Insert commit: the other page-structure op that mutates the page set —
-   * the mirror of {@link commitPageDelete}. On top of the shared version
-   * bumps it adds `layer_pages` rows for the fresh page object numbers at the initial
-   * epoch (`content_version` 1, `annotation_version` 1 — exactly what the
-   * base snapshot would have written had the pages always existed).
-   * Pre-existing rows are untouched, so their pins stay warm.
-   */
-  private async commitPageInsert(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    kind: 'pages.insert' | 'pages.insertBlank';
-    /** The worker's post-insert layout — becomes `result.layout`. */
-    layout: PageListSnapshot;
-    /** The write's id and whether it can be undone, as the worker stamped them. */
-    stamp: WriteStamp;
-    insertedPages: PageObjectNumber[];
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-  }): Promise<{
-    result: PageInsertResult;
-    auditId: number;
-  }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await this.readLayerForCommit(trx, input.layer);
-
-        const rows = await trx
-          .selectFrom('layer_pages')
-          .select('page_object_number')
-          .where('layer_id', '=', input.layer.id)
-          .execute();
-        const known = new Set(rows.map((row) => Number(row.page_object_number)));
-        const inserted = new Set(input.insertedPages);
-        const pageOrder = input.layout.pages.map((page) => page.ref.objectNumber);
-        if (inserted.size !== input.insertedPages.length) {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `${input.kind} returned duplicate inserted page object numbers`,
-          );
-        }
-        if (rows.length + input.insertedPages.length !== pageOrder.length) {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `${input.kind} returned ${pageOrder.length} pages for ${rows.length} layer page rows plus ${input.insertedPages.length} inserted`,
-          );
-        }
-        for (const pageObjectNumber of input.insertedPages) {
-          if (known.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `${input.kind} claims fresh page object number ${pageObjectNumber} but a row already exists`,
-            );
-          }
-        }
-        for (const pageObjectNumber of pageOrder) {
-          if (!known.has(pageObjectNumber) && !inserted.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `${input.kind} returned unknown page object number ${pageObjectNumber}`,
-            );
-          }
-        }
-
-        await trx
-          .insertInto('layer_pages')
-          .values(
-            input.insertedPages.map((pageObjectNumber) => ({
-              layer_id: input.layer.id,
-              page_object_number: pageObjectNumber,
-              content_version: 1,
-              annotation_version: 1,
-              widget_version: 1,
-              updated_at: now,
-            })),
-          )
-          .execute();
-
-        const previousDocVersion = Number(currentLayer.doc_version);
-        const versions: LayoutVersions = {
-          previousDocVersion,
-          docVersion: previousDocVersion + 1,
-          layoutVersion: Number(currentLayer.layout_version) + 1,
-        };
-
-        // The finalized result — audited and returned identically: what we
-        // tell the caller is what we tell history (and remote subscribers).
-        const result: PageInsertResult = {
-          insertedPages: input.insertedPages.map(toPageRef),
-          layout: input.layout,
-          meta: planeMeta(input.stamp, versions),
-        };
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: input.kind,
-          pageObjectNumber: null,
-          affectedPages: input.insertedPages,
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          input,
-          {
-            doc_version: versions.docVersion,
-            layout_version: versions.layoutVersion,
-            // The page set grew — the annotation list and the form changed.
-            // Clients re-pin via the 404-refresh rail (the layout delta
-            // carries neither pin).
-            annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
-            forms_version: Number(currentLayer.forms_version ?? 1) + 1,
-          },
           auditId,
           now,
         );

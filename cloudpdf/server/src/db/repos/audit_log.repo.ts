@@ -11,11 +11,8 @@ export type AuditMutationKind =
   | 'annot.reorder'
   /** A bundle's annotations, created as one change (`doc.annotations.import`). */
   | 'annot.import'
+  /** A page name set or removed (`doc.pages.setName`, `removeName`): no page moves. */
   | 'pages.reorder'
-  | 'pages.rotate'
-  | 'pages.delete'
-  | 'pages.insert'
-  | 'pages.insertBlank'
   | 'pages.flatten'
   | 'redaction.apply'
   | 'metadata.update'

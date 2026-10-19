@@ -149,6 +149,10 @@ const createSquare = (page: number, objectNumber: number | null, opts: CallOptio
     { ...opts, body: opts.body ?? square(20) },
   );
 
+/** One change of `ops` under `opId`, to `POST …/changes`. */
+const postChange = (opts: CallOptions & { opId: string; ops: unknown[] }) =>
+  call('POST', '/changes', { ...opts, body: { changes: [{ opId: opts.opId, ops: opts.ops }] } });
+
 const count = (ranges: readonly ObjectNumberRange[]) =>
   ranges.reduce((sum, range) => sum + range.count, 0);
 
@@ -245,13 +249,23 @@ describe('creates at numbers', () => {
     );
     const [page, field, left, right, widget, split] = handed;
 
-    const inserted = await call('POST', `/pages/insert-blank?objectNumbers=${page}`, {
+    const inserted = await postChange({
       layer,
       session,
-      body: { size: { width: 200, height: 200 } },
+      opId: 'insert-at-number',
+      ops: [
+        {
+          type: 'pages.insertBlank',
+          spec: { size: { width: 200, height: 200 } },
+          objectNumbers: [page],
+        },
+      ],
     });
     expect(inserted.status).toBe(200);
-    expect(inserted.body.insertedPages).toEqual([{ kind: 'objectNumber', objectNumber: page }]);
+    expect(inserted.body.changes[0].status).toBe('applied');
+    expect(inserted.body.changes[0].result.items[0].insertedPages).toEqual([
+      { kind: 'objectNumber', objectNumber: page },
+    ]);
 
     const created = await call(
       'POST',
@@ -332,12 +346,6 @@ describe('idempotent writes', () => {
     const created = await createSquare(SECOND_PAGE, null, { layer });
     const item = `/annotations/pages/obj:${SECOND_PAGE}/items/obj:${created.body.annotation.ref.objectNumber}`;
     const writes: Array<[string, string, unknown]> = [
-      ['POST', '/pages/insert-blank', { size: { width: 200, height: 200 } }],
-      [
-        'POST',
-        '/pages/rotate',
-        { pages: [{ kind: 'objectNumber', objectNumber: FIRST_PAGE }], rotation: 90 },
-      ],
       ['POST', '/metadata', { title: 'Once' }],
       [
         'POST',
@@ -371,6 +379,47 @@ describe('idempotent writes', () => {
     expect(rows.map((row) => row.idempotency_key).sort()).toEqual(
       writes.map((_, i) => `write-${i}`).sort(),
     );
+  });
+
+  test('a page change asked again under its opId gets what it committed, and spends no number twice', async () => {
+    const layer = 'idempotent-pages';
+    const session = 'cloud:idempotent-pages';
+    const [number] = objectNumbersIn((await access({ layer, session })).body.edit.objectNumbers);
+    const change = {
+      layer,
+      session,
+      opId: 'pages-once',
+      ops: [
+        {
+          type: 'pages.insertBlank',
+          spec: { size: { width: 200, height: 200 } },
+          objectNumbers: [number],
+        },
+        {
+          type: 'pages.rotate',
+          pages: [{ kind: 'objectNumber', objectNumber: FIRST_PAGE }],
+          rotation: 90,
+        },
+      ],
+    };
+
+    const first = await postChange(change);
+    expect(first.status).toBe(200);
+    expect(first.body.changes[0].status).toBe('applied');
+    expect(first.body.changes[0].result.items[0].insertedPages).toEqual([
+      { kind: 'objectNumber', objectNumber: number },
+    ]);
+    // The number is spent, and the retry is answered without asking for it.
+    const retry = await postChange(change);
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual(first.body);
+
+    const rows = await db
+      .selectFrom('audit_log')
+      .select('id')
+      .where('idempotency_key', '=', 'pages-once')
+      .execute();
+    expect(rows).toHaveLength(1);
   });
 
   test('a key a header cannot carry is refused', async () => {

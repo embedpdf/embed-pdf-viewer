@@ -161,7 +161,12 @@ describe('parsed pages kept across jobs (wasm engine)', () => {
   test('a write that changes the page closes it', async () => {
     const host = await openHost();
     await digest(host, FIRST);
-    await host.ok({ kind: 'pages.rotate', effect: 'contentWrite', pages: [FIRST], rotation: 90 });
+    await host.ok({
+      kind: 'document.apply',
+      effect: 'write',
+      change: { ops: [{ type: 'pages.rotate', pages: [FIRST], rotation: 90 }] },
+      authority: { identity: {}, grants: null, protection: null },
+    });
     expect(host.counts.closes).toBeGreaterThan(0);
     await digest(host, FIRST);
     expect(parses(host)).toBeGreaterThan(1);

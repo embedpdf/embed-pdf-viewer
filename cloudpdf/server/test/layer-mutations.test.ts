@@ -21,6 +21,7 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { appliedResult, postChange, type ChangeTarget } from './_helpers/changes';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'layer-mutations-secret';
@@ -44,6 +45,14 @@ describe('Phase 5 layer mutation pipeline', () => {
 
   afterEach(async () => {
     await tearDown(fx);
+  });
+
+  /** A layer of the fixture's app, where a test's change goes. */
+  const target = (tenantId: string, docId: string, layerName: string): ChangeTarget => ({
+    baseUrl: fx.baseUrl,
+    docId,
+    layerName,
+    token: docToken(tenantId, docId, layerName),
   });
 
   test('first annotation create lazily creates layer, saves artifact, and bumps annotation version', async () => {
@@ -326,42 +335,36 @@ describe('Phase 5 layer mutation pipeline', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/reorder`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ pages: [3].map(toPageRef), position: 'start' }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(res.headers.get('cache-control')).toBe(NO_STORE);
-    const body = (await res.json()) as {
+    const posted = await postChange(target(tenantId, docId, layerName), [
+      { type: 'pages.reorder', pages: [3].map(toPageRef), position: 'start' },
+    ]);
+    const result = appliedResult(posted);
+    expect(posted.res.headers.get('cache-control')).toBe(NO_STORE);
+    const item = result.items[0] as {
+      type: string;
+      pages: Array<{ objectNumber: number }>;
       layout: {
         pageCount: number;
         pages: Array<{ ref: { objectNumber: number }; index: number }>;
       };
-      meta: {
-        cacheDelta: {
-          previousDocVersion: number;
-          docVersion: number;
-          layoutVersion: number;
-        } | null;
-      };
+      meta: { cacheDelta: unknown };
     };
-    // A move returns the new geometry (order), not liveness.
-    expect(body.layout.pageCount).toBe(3);
-    expect(body.layout.pages.map((page) => page.ref.objectNumber)).toEqual([3, 1, 2]);
-    expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1, 2]);
+    // A move returns the pages that moved and the new geometry (order), not liveness.
+    expect(item.type).toBe('pages.reorder');
+    expect(item.pages).toEqual([3].map(toPageRef));
+    expect(item.layout.pageCount).toBe(3);
+    expect(item.layout.pages.map((page) => page.ref.objectNumber)).toEqual([3, 1, 2]);
+    expect(item.layout.pages.map((page) => page.index)).toEqual([0, 1, 2]);
     // Cloud coherence pins: docVersion + layoutVersion both advance by one,
     // no per-page pin changes.
-    expect(body.meta.cacheDelta).toEqual({
+    expect(item.meta.cacheDelta).toEqual({
       previousDocVersion: 1,
       docVersion: 2,
       layoutVersion: 2,
+      working: true,
       pages: [],
     });
+    expect(result.meta.cacheDelta).toEqual(item.meta.cacheDelta);
 
     const layer = await fx.db
       .selectFrom('layers')
@@ -395,53 +398,54 @@ describe('Phase 5 layer mutation pipeline', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ pages: [1, 2].map(toPageRef), rotation: 90 }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(res.headers.get('cache-control')).toBe(NO_STORE);
-    const body = (await res.json()) as {
+    const posted = await postChange(target(tenantId, docId, layerName), [
+      { type: 'pages.rotate', pages: [1, 2].map(toPageRef), rotation: 90 },
+    ]);
+    const result = appliedResult(posted);
+    expect(posted.res.headers.get('cache-control')).toBe(NO_STORE);
+    const item = result.items[0] as {
+      type: string;
+      pages: Array<{ objectNumber: number }>;
+      rotation: number;
       layout: {
         pageCount: number;
         pages: Array<{ ref: { objectNumber: number }; rotation: number }>;
       };
-      meta: {
-        cacheDelta: {
-          previousDocVersion: number;
-          docVersion: number;
-          layoutVersion: number;
-        } | null;
-      };
+      meta: { cacheDelta: unknown };
     };
     // Rotation is presentation metadata: same pages, same order, new values.
-    expect(body.layout.pageCount).toBe(3);
-    expect(body.layout.pages.map((page) => [page.ref.objectNumber, page.rotation])).toEqual([
+    expect(item).toMatchObject({
+      type: 'pages.rotate',
+      pages: [1, 2].map(toPageRef),
+      rotation: 90,
+    });
+    expect(item.layout.pageCount).toBe(3);
+    expect(item.layout.pages.map((page) => [page.ref.objectNumber, page.rotation])).toEqual([
       [1, 90],
       [2, 90],
       [3, 0],
     ]);
-    expect(body.meta.cacheDelta).toEqual({
+    expect(item.meta.cacheDelta).toEqual({
       previousDocVersion: 1,
       docVersion: 2,
       layoutVersion: 2,
+      working: true,
       pages: [],
     });
 
-    // The audit trail records the rotate against the affected pages only.
+    // The audit trail records the change, its item naming the rotated pages.
     const audit = await fx.db
       .selectFrom('audit_log')
-      .select(['kind', 'affected_pages_json'])
+      .select(['kind', 'payload_json'])
       .where('doc_id', '=', docId)
       .orderBy('id', 'desc')
       .executeTakeFirstOrThrow();
-    expect(audit.kind).toBe('pages.rotate');
-    expect(JSON.parse(String(audit.affected_pages_json))).toEqual([1, 2]);
+    expect(audit.kind).toBe('change');
+    expect(JSON.parse(String(audit.payload_json)).items[0]).toMatchObject({
+      type: 'pages.rotate',
+      pages: [1, 2].map(toPageRef),
+      rotation: 90,
+    });
 
     // `layer_pages` rows are untouched: renders are normalized, every
     // per-page cache stays warm across a rotate.
@@ -467,47 +471,47 @@ describe('Phase 5 layer mutation pipeline', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/delete`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ pages: [2].map(toPageRef) }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
+    const result = appliedResult(
+      await postChange(target(tenantId, docId, layerName), [
+        { type: 'pages.delete', pages: [2].map(toPageRef) },
+      ]),
+    );
+    const item = result.items[0] as {
+      type: string;
+      pages: Array<{ objectNumber: number }>;
       layout: {
         pageCount: number;
         pages: Array<{ ref: { objectNumber: number }; index: number }>;
       };
-      meta: {
-        cacheDelta: {
-          previousDocVersion: number;
-          docVersion: number;
-          layoutVersion: number;
-        } | null;
-      };
+      meta: { cacheDelta: unknown };
     };
-    expect(body.layout.pageCount).toBe(2);
-    expect(body.layout.pages.map((page) => page.ref.objectNumber)).toEqual([1, 3]);
-    expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1]);
-    expect(body.meta.cacheDelta).toEqual({
+    expect(item.type).toBe('pages.delete');
+    expect(item.pages).toEqual([2].map(toPageRef));
+    expect(item.layout.pageCount).toBe(2);
+    expect(item.layout.pages.map((page) => page.ref.objectNumber)).toEqual([1, 3]);
+    expect(item.layout.pages.map((page) => page.index)).toEqual([0, 1]);
+    // The page set changed: the annotation list and the form move with the layout.
+    expect(item.meta.cacheDelta).toEqual({
       previousDocVersion: 1,
       docVersion: 2,
       layoutVersion: 2,
+      annotationsVersion: 2,
+      formsVersion: 2,
+      working: true,
       pages: [],
     });
 
     const audit = await fx.db
       .selectFrom('audit_log')
-      .select(['kind', 'affected_pages_json'])
+      .select(['kind', 'payload_json'])
       .where('doc_id', '=', docId)
       .orderBy('id', 'desc')
       .executeTakeFirstOrThrow();
-    expect(audit.kind).toBe('pages.delete');
-    expect(JSON.parse(String(audit.affected_pages_json))).toEqual([2]);
+    expect(audit.kind).toBe('change');
+    expect(JSON.parse(String(audit.payload_json)).items[0]).toMatchObject({
+      type: 'pages.delete',
+      pages: [2].map(toPageRef),
+    });
 
     // The deleted page's row is gone; survivors keep their pins.
     const layer = await fx.db
@@ -534,51 +538,29 @@ describe('Phase 5 layer mutation pipeline', () => {
     const docId = 'doclayermut009';
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
-    const headers = {
-      Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-      'Content-Type': 'application/json',
-    };
+    const layer = target(tenantId, docId, layerName);
 
     const mutations: Array<{ kind: string; response: unknown }> = [];
 
     const created = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
-      { method: 'POST', headers, body: JSON.stringify(highlightDraft()) },
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${layer.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(highlightDraft()),
+      },
     );
     expect(created.status).toBe(200);
     mutations.push({ kind: 'annot.create', response: await created.json() });
 
-    const moved = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/reorder`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ pages: [3].map(toPageRef), position: 'start' }),
-    });
-    expect(moved.status).toBe(200);
-    mutations.push({ kind: 'pages.reorder', effect: 'contentWrite', response: await moved.json() });
-
-    const rotated = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ pages: [2].map(toPageRef), rotation: 90 }),
-    });
-    expect(rotated.status).toBe(200);
-    mutations.push({
-      kind: 'pages.rotate',
-      effect: 'contentWrite',
-      response: await rotated.json(),
-    });
-
-    const deleted = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/delete`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ pages: [2].map(toPageRef) }),
-    });
-    expect(deleted.status).toBe(200);
-    mutations.push({
-      kind: 'pages.delete',
-      effect: 'contentWrite',
-      response: await deleted.json(),
-    });
+    // A change's row holds the change's result, as its answer carried it.
+    for (const op of [
+      { type: 'pages.reorder', pages: [3].map(toPageRef), position: 'start' },
+      { type: 'pages.rotate', pages: [2].map(toPageRef), rotation: 90 },
+      { type: 'pages.delete', pages: [2].map(toPageRef) },
+    ]) {
+      mutations.push({ kind: 'change', response: appliedResult(await postChange(layer, [op])) });
+    }
 
     const auditRows = await fx.db
       .selectFrom('audit_log')
@@ -751,21 +733,17 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(res.status).toBe(400);
   });
 
-  test('deleting every page is rejected and commits nothing', async () => {
+  test('deleting every page is refused and commits nothing', async () => {
     const tenantId = 'tenant-layer-pages';
     const docId = 'doclayermut008';
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/delete`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ pages: [1, 2, 3].map(toPageRef) }),
-    });
-    expect(res.status).toBe(400);
+    const posted = await postChange(target(tenantId, docId, layerName), [
+      { type: 'pages.delete', pages: [1, 2, 3].map(toPageRef) },
+    ]);
+    expect(posted.res.status).toBe(200);
+    expect(posted.answer).toMatchObject({ status: 'refused', error: { code: 'InvalidArg' } });
 
     const layer = await fx.db
       .selectFrom('layers')
