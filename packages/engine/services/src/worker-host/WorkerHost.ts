@@ -1712,7 +1712,7 @@ export class WorkerHost {
     req: DocumentFontsProgramWorkerRequest,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
-    const program = reader.program(req.sha256, req.part === 'data');
+    const program = reader.program(req.displayHash, req.part === 'data');
     // The bytes are a copy out of the runtime's memory: they transfer.
     const bytes = program.bytes
       ? (program.bytes.buffer.slice(

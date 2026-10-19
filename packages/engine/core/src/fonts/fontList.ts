@@ -33,6 +33,12 @@ export interface FontProgramFacts {
   mapsUnicode: boolean;
   /** SHA-256 (hex) of the decoded program; `null` without one. */
   sha256: string | null;
+  /**
+   * SHA-256 (hex) of what a browser loads for it: the program itself, or for a
+   * Type 1, bare CFF or cmap-less program the display program the engine
+   * builds from it; `null` when a browser can't draw it.
+   */
+  displaySha256: string | null;
   /** Line metrics in thousandths of the font size, as the layout reads them; 0 when it doesn't load. */
   ascent: number;
   descent: number;
@@ -95,12 +101,16 @@ export function canChooseProgram(program: FontProgramFacts): boolean {
 }
 
 /**
- * Whether a browser can mount a document program as it is: an sfnt that maps
- * characters through a Unicode cmap, whose licence allows editing. A subset
- * qualifies: a box that keeps it shows its characters.
+ * Whether a browser can draw a document program: it has a display program
+ * (the program itself, or one the engine builds from it), and its licence,
+ * when it states one, allows editing. A subset qualifies: a box that keeps it
+ * shows its characters.
  */
 function isDisplayable(program: FontProgramFacts): boolean {
-  return isSfnt(program.format) && program.mapsUnicode && allowsEditing(program.permission);
+  return (
+    program.displaySha256 !== null &&
+    (program.permission === null || allowsEditing(program.permission))
+  );
 }
 
 /** Every reason a document program can't be chosen, or can't go to a browser. */
@@ -122,7 +132,7 @@ export function restrictionsOfProgram(program: FontProgramFacts): FontRestrictio
 function documentProgramOf(program: FontProgramFacts): FontProgram {
   const displayable = isDisplayable(program);
   return {
-    displayHash: displayable ? program.sha256 : null,
+    displayHash: displayable ? program.displaySha256 : null,
     sourceHash: program.embedded === 'none' ? null : program.sha256,
     embedded: program.embedded,
     format: program.embedded === 'none' ? null : program.format,
@@ -352,7 +362,7 @@ export function fontResolutionOf(
       return {
         ...base,
         font: documentFontNameOf(found.face),
-        program: isDisplayable(found.program) ? found.program.sha256 : null,
+        program: isDisplayable(found.program) ? found.program.displaySha256 : null,
       };
     }
     // The box's own font, which the PDF only names.

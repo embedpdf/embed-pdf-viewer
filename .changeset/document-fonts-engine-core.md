@@ -11,3 +11,5 @@ Rename `FreeTextFont` to `FontName`, `faceForFreeTextFont` to `faceForFontName`,
 Add the `document.fonts.list`, `document.fonts.resolve` and `document.fonts.program` worker requests.
 
 `DescribeFont` answers a font's face only (family, weight and italic).
+
+A document program with a display program can go to a browser: `FontProgramFacts.displaySha256` names it, and `displayHash` is it, so a form's Type 1 or CFF field font is `canDownload` while it still can't be chosen for new text. The `document.fonts.program` worker request names its program by `displayHash`.

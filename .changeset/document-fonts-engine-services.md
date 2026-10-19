@@ -9,3 +9,5 @@ A free text, a widget or a form field can name a font the document holds whole b
 A write that draws characters no font has reports them in `meta.missingCharacters`.
 
 Fix `forms.create` and `forms.addWidget` refusing a widget whose `fontFamily` names a registered font.
+
+A document font that is Type 1, bare CFF or a TrueType without a Unicode cmap is served as its display program: `document.fonts.program` takes a display hash (`displayHash`) and returns what a browser loads.

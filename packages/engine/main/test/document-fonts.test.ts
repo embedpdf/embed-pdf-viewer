@@ -185,6 +185,60 @@ describe('doc.fonts (local engine)', () => {
     );
   });
 
+  test('a form font a browser can’t load goes to it as a display program of the font the engine writes with', async () => {
+    const kept = await engine.open({
+      kind: 'bytes',
+      id: 'kept',
+      bytes: new Uint8Array(await readFile(resolve(here, 'fixtures', 'kept_fonts_form.pdf'))),
+    });
+    const list = await kept.fonts.list();
+    for (const [name, format] of [
+      ['FoxitFixed', 'cff'],
+      ['Roboto2-Regular', 'type1'],
+    ] as const) {
+      const font = fontNamed(list.fonts, name)!;
+      expect(font).toMatchObject({
+        source: 'document',
+        canChoose: false,
+        restrictions: ['unsupported-format'],
+      });
+      const program = font.programs[0]!;
+      expect(program).toMatchObject({ format, embedded: 'whole', canDownload: true });
+      expect(program.displayHash).not.toBe(program.sourceHash);
+      const bytes = await kept.fonts.downloadProgram(program.displayHash!);
+      expect(String.fromCharCode(...bytes.slice(0, 4))).toBe('OTTO');
+      expect(sha256(bytes)).toBe(program.displayHash);
+    }
+
+    // The Type 1 font holds the letters of "Hello world" (in capitals) and no
+    // space: the browser gets exactly the characters the engine writes with it.
+    const hello = fontNamed(list.fonts, 'Roboto2-Regular')!.programs[0]!;
+    const info = await kept.fonts.getProgram(hello.displayHash!);
+    const covers = (character: string) =>
+      info.covers.some(
+        (range) =>
+          range.start <= character.codePointAt(0)! &&
+          character.codePointAt(0)! < range.start + range.count,
+      );
+    expect(['H', 'E', 'L', 'O', 'W', 'R', 'D'].every(covers)).toBe(true);
+    expect(covers(' ')).toBe(false);
+    expect(covers('A')).toBe(false);
+
+    // A field keeps its font while it covers the text, drawn by that program.
+    const widget = (await kept.forms.list()).widgets.find(
+      (candidate) => candidate.fontFamily === 'Roboto2-Regular',
+    )!;
+    const answer = await kept.fonts.resolve({
+      annotation: widget.ref,
+      runs: [{ text: 'HELLO', fontFamily: widget.fontFamily! }],
+    });
+    expect(answer.runs[0]).toMatchObject({
+      font: 'Roboto2-Regular',
+      substituted: false,
+      program: hello.displayHash,
+    });
+  });
+
   test('a name that is no font fails, and a document subset can’t be chosen', async () => {
     const page = (await doc.pages.list()).pages[0]!;
     const unknown = await rejection(

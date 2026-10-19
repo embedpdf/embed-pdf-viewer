@@ -1534,9 +1534,10 @@ export interface DocumentFontsResolveWorkerRequest {
 }
 
 /**
- * A program the document's fonts name, by SHA-256: its coverage and metrics
- * (`'info'`) or its bytes (`'data'`). The engine's own built-in programs (the
- * standard faces, the last resort) never get here (a read).
+ * A program the document's fonts name, by its display hash: its coverage and
+ * metrics (`'info'`) or the bytes a browser loads (`'data'`). The engine's own
+ * built-in programs (the standard faces, the last resort) never get here (a
+ * read).
  */
 export interface DocumentFontsProgramWorkerRequest {
   kind: 'document.fonts.program';
@@ -1544,7 +1545,7 @@ export interface DocumentFontsProgramWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  sha256: string;
+  displayHash: string;
   part: 'info' | 'data';
 }
 

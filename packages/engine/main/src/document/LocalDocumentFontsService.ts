@@ -190,7 +190,7 @@ export class LocalDocumentFontsService implements LocalDocumentFontsServiceContr
       if (builtIn) return builtIn;
       const program = await this.programNamed(fonts, displayHash, signal);
       const info = await this.request(
-        { kind: 'document.fonts.program', sha256: displayHash, part: 'info' },
+        { kind: 'document.fonts.program', displayHash, part: 'info' },
         'document.fonts.program',
         signal,
       );
@@ -214,7 +214,7 @@ export class LocalDocumentFontsService implements LocalDocumentFontsServiceContr
         );
       }
       const payload = await this.request(
-        { kind: 'document.fonts.program', sha256: displayHash, part: 'data' },
+        { kind: 'document.fonts.program', displayHash, part: 'data' },
         'document.fonts.program',
         signal,
       );

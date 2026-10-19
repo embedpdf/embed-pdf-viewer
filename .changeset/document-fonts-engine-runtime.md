@@ -9,3 +9,5 @@ Write with a document's own fonts: `EPDFAnnot_SetDefaultAppearanceDocumentFont` 
 Read registered fonts: `EPDFFont_GetProgramData`, `EPDFFont_GetProgramFormat`, `EPDFFont_GetProgramHash`, `EPDFFont_GetCoverage`, `EPDFFont_GetMetrics`, `EPDFFont_GetPostScriptName`, and `EPDFFont_GetFallbackOrder`, the order fallbacks are tried in for a weight and style.
 
 Fix a default appearance naming a registered preview-and-print font that was not authorized for editing: new text no longer draws with it.
+
+Build a display program for a document font a browser can't load as it is (Type 1, bare CFF, a TrueType without a Unicode cmap): an OpenType font with the program's outlines, a Unicode cmap holding exactly the characters the engine writes with the font through the PDF's encoding, and the advances it lays them out with (`/Widths`). `EPDFFontFaces_GetProgramDisplayHash` names what a browser loads for a program (the program itself, or its display program), `EPDFDoc_GetFontDisplayProgramData` returns those bytes, the same bytes every time, and `EPDFDoc_GetFontProgramCoverage` reports the characters a browser draws with it.

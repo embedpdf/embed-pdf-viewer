@@ -222,22 +222,23 @@ export class DocumentFontReader {
   }
 
   /**
-   * A program the document's fonts name, by SHA-256: an engine font's or a
-   * document program's. Its coverage and metrics, and with `data`, its bytes.
-   * Rejects with `NotFound` for a hash neither names.
+   * A program the document's fonts name, by its display hash: an engine
+   * font's or a document program's. The coverage and metrics a browser draws
+   * it with, and with `data`, the bytes it loads. Rejects with `NotFound` for
+   * a hash neither names.
    */
   program(
-    sha256: string,
+    displayHash: string,
     data: boolean,
   ): { covers: CodePointRange[]; ascent: number; descent: number; bytes: Uint8Array | null } {
-    const engineFont = this.fonts.programFor(sha256);
+    const engineFont = this.fonts.programFor(displayHash);
     if (engineFont) return { ...engineFont.info(), bytes: data ? engineFont.bytes() : null };
 
     const program = this.faces()
       .flatMap((face) => face.programs)
-      .find((candidate) => candidate.sha256 === sha256 && candidate.objectNumber > 0);
+      .find((candidate) => candidate.displaySha256 === displayHash && candidate.objectNumber > 0);
     if (!program) {
-      throw new EngineError(EngineErrorCode.NotFound, `no font program ${sha256}`);
+      throw new EngineError(EngineErrorCode.NotFound, `no font program ${displayHash}`);
     }
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -246,9 +247,14 @@ export class DocumentFontReader {
     );
     let bytes: Uint8Array | null = null;
     if (data) {
-      const length = fn.EPDFDoc_GetFontProgramData(docPtr, program.objectNumber, NULL_PTR, 0);
+      const length = fn.EPDFDoc_GetFontDisplayProgramData(
+        docPtr,
+        program.objectNumber,
+        NULL_PTR,
+        0,
+      );
       bytes = withScratch(mem, Math.max(1, length), (out) => {
-        fn.EPDFDoc_GetFontProgramData(docPtr, program.objectNumber, out, length);
+        fn.EPDFDoc_GetFontDisplayProgramData(docPtr, program.objectNumber, out, length);
         return mem.readBytes(out, length);
       });
     }
@@ -297,8 +303,11 @@ function programFacts(
   program: number,
 ): FontProgramFacts {
   const { fn, mem } = runtime;
-  const sha256 = withScratch(mem, 32, (out) =>
-    fn.EPDFFontFaces_GetProgramHash(faces, face, program, out) ? hex(mem.readBytes(out, 32)) : null,
+  const hashOf = (read: (out: Ptr) => boolean): string | null =>
+    withScratch(mem, 32, (out) => (read(out) ? hex(mem.readBytes(out, 32)) : null));
+  const sha256 = hashOf((out) => fn.EPDFFontFaces_GetProgramHash(faces, face, program, out));
+  const displaySha256 = hashOf((out) =>
+    fn.EPDFFontFaces_GetProgramDisplayHash(faces, face, program, out),
   );
   const metrics = withScratchN(mem, [4, 4], ([ascent, descent]) =>
     fn.EPDFFontFaces_GetProgramMetrics(faces, face, program, ascent, descent)
@@ -317,6 +326,7 @@ function programFacts(
       PERMISSIONS[fn.EPDFFontFaces_GetProgramEmbeddingPermission(faces, face, program)] ?? null,
     mapsUnicode: fn.EPDFFontFaces_ProgramMapsUnicode(faces, face, program),
     sha256,
+    displaySha256,
     ascent: Math.round(metrics.ascent * 1000),
     descent: -Math.round(metrics.descent * 1000),
   };
