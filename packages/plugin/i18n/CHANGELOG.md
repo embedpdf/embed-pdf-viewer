@@ -1,5 +1,11 @@
 # @embedpdf/plugin-i18n
 
+## 3.0.0-next.16
+
+### Patch Changes
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – EmbedPDF's strings include `outline.untitled`, the title of a new outline item, in all eight languages.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

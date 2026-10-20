@@ -1,5 +1,19 @@
 # @embedpdf/engine-runtime
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Binds the fork's attachment captures: `EPDFAttachment_ExportRawToOwnedBuffer`, `EPDFAttachment_ImportRaw` and `EPDFAttachment_ExportCanonicalToOwnedBuffer`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The runtime's bindings name the outline editing functions (`EPDFOutline_*`), which address items by object number, keep `/Count` right and work inside layer transactions, and the outline capture functions used to undo a delete. The `EPDFBookmark_*` writers are gone.
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – The runtime's bindings name `EPDFDoc_ExportDictCanonicalToOwnedBuffer`: a dictionary and what the layer holds under it as bytes a guard compares, without the keys it is told to leave out and with each stream as it reads.
+
+### Patch Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – Bindings for the runtime's new functions, among them `EPDFDoc_ExportPagesFlattened`, which copies pages into a new document as they draw for display or print.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

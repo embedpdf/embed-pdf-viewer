@@ -1,5 +1,19 @@
 # @cloudpdf/server
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Attachments are changes: `POST …/changes` takes `attachments.create` (its file as a `resource:<key>` part) and `attachments.delete` under `doc.attachments.modify`, and undoes them by `opId`. The routes `POST …/attachments` and `DELETE …/attachments/{fileKey}` are removed, and file downloads no longer carry `X-EmbedPDF-File-Name` and `X-EmbedPDF-File-Type`: the listing has both. New current reads: `GET …/attachments`, `GET …/attachment-files/{fileKey}/data` and an annotation's `GET …/items/{annotKey}/resources/file`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The document's outline: `GET /v1/docs/:docId/outline@{token}` (shared and cacheable while a layer inherits the outline and the layout) and `GET /v1/docs/:docId/layers/:layerName/outline`, with outline edits through `POST …/changes`. Layers and published versions carry an outline version (migration `035_outline_version`), outline ops move it, and its plane decides when a layer reads the shared outline. A token that may change the outline (`doc.outline.modify`) is handed object numbers for new items, as one that may create annotations is.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – Page edits are changes: `POST …/changes` takes `pages.rotate`, `pages.reorder`, `pages.delete`, `pages.insertBlank` and `pages.insert` (its PDF as a `resource:<key>` part) under `doc.pages.assemble`, and undoes them by `opId`. An undo of a delete brings the same pages back with fresh page pins, so no picture cached before they went is served for them. The routes `POST …/pages/reorder`, `/pages/rotate`, `/pages/delete`, `/pages/insert` and `/pages/insert-blank` are removed.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `POST /v1/docs/:docId/layers/:layerName/pages/extract` takes `flatten` (`{ usage?: 'display' | 'print' }`), `includeAnnotations` and `includeFormFields`, and returns the pages as they draw for that usage. A flattened copy passes on `doc.download` or `doc.download.flattened` (a signed document refuses the latter), and paints only what the token may read; the include options are refused without `flatten`.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – Serve the print pictures at both tiers: each picture family printed at 150 DPI under `render/print/` (needs `doc.print`) and at 300 DPI under `render/print-high/` (needs `doc.print.high`), on top of the family's own rights. A print picture's token is its pins and its format; the server sizes it from the DPI and the paper. Print pictures are cached at their versioned URLs but never stored or refused by the render lattice.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

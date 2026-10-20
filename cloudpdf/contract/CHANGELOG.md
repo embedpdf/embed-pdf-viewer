@@ -1,5 +1,19 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – `doc.changes` takes the attachment ops under `doc.attachments.modify`. New operations: `doc.attachments.list`, `doc.attachments.download` and `doc.annotations.readFile`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The contract gains `doc.outline.get`, and `doc.changes` takes the outline ops under the `doc.outline.modify` capability. The outline's models are named once in the OpenAPI document.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – `doc.changes` takes the page ops under `doc.pages.assemble`, with a PDF to insert as a multipart part. The operations `doc.pages.reorder`, `doc.pages.rotate`, `doc.pages.delete`, `doc.pages.insert` and `doc.pages.insertBlank` are removed: page edits are changes.
+
+### Patch Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The `doc.pages.extract` operation describes its flatten options and their permissions.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

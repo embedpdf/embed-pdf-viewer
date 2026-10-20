@@ -1,5 +1,15 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – A new `doc.attachments` resource with `list` and `download`, and `doc.annotations.readFile` for a file attachment annotation's file. `doc.changes` ops include `attachments.create` and `attachments.delete`, each undone by its `opId`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `doc.outline.get()` reads a document's outline, and changes take the outline ops.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – `doc.pages` no longer has `reorder`, `rotate`, `delete`, `insert` and `insertBlank`: page edits go through `doc.changes`, whose ops now include `pages.rotate`, `pages.reorder`, `pages.delete`, `pages.insertBlank` and `pages.insert`, and each can be undone by its `opId`.
+
 ## 3.0.0-next.15
 
 ### Minor Changes
