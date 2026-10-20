@@ -1,6 +1,9 @@
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import type { PageBox } from '../geometry/pageSpace';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import type { PageRef } from '../identity/PageRef';
+import type { TextLayout } from '../text/layout';
 import { drawnTextOf, type DrawnText } from './drawnText';
 import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataConformance';
 import { EVERY_PERMISSION } from './fixtureScope';
@@ -68,15 +71,19 @@ const CASES: MixedScriptCase[] = [
   },
 ];
 
-/** A free text or a text field in Helvetica, holding `value`. */
+/** A free text or a text field in Helvetica, holding `value`, in `box` on `page`. */
 interface Writer {
   name: string;
   field: boolean;
+  box: PageBox;
   write(
     doc: DocumentHandle,
+    page: PageRef,
     value: string,
   ): Promise<{ ref: AnnotationRef; missing: string[] | undefined }>;
 }
+
+const PAGE_SIZE = { width: 300, height: 300 };
 
 let fields = 0;
 
@@ -84,11 +91,11 @@ const WRITERS: Writer[] = [
   {
     name: 'free text',
     field: false,
-    async write(doc, value) {
-      const page = (await doc.pages.list()).pages[0]!;
-      const { annotation, meta } = await doc.page(page.ref).annotations.create({
+    box: { x: 20, y: 20, width: 260, height: 40 },
+    async write(doc, page, value) {
+      const { annotation, meta } = await doc.page(page).annotations.create({
         subtype: 'free-text',
-        box: { x: 20, y: 20, width: 260, height: 40 },
+        box: this.box,
         fontFamily: 'helvetica',
         fontSize: 12,
         contents: value,
@@ -99,15 +106,15 @@ const WRITERS: Writer[] = [
   {
     name: 'text field',
     field: true,
-    async write(doc, value) {
-      const page = (await doc.pages.list()).pages[0]!;
+    box: { x: 20, y: 100, width: 260, height: 24 },
+    async write(doc, page, value) {
       const { field } = await doc.forms.create({
         family: 'text',
         name: `mixed-${++fields}`,
         widgets: [
           {
-            page: page.ref,
-            rect: { x: 20, y: 100, width: 260, height: 24 },
+            page,
+            rect: this.box,
             fontFamily: 'helvetica',
             fontSize: 12,
           },
@@ -186,9 +193,33 @@ function problemsOf(drawn: DrawnText): string[] {
 }
 
 /**
+ * The characters of `layout` whose box isn't inside `box`, with where each
+ * is. Characters with no box (a space can have none) are left out.
+ */
+function charactersOutside(layout: TextLayout, box: PageBox): string[] {
+  const outside: string[] = [];
+  const inside = ({ x, y }: { x: number; y: number }) =>
+    x >= box.x - 0.5 &&
+    x <= box.x + box.width + 0.5 &&
+    y >= box.y - 0.5 &&
+    y <= box.y + box.height + 0.5;
+  for (let index = 0; index < layout.charCount; index++) {
+    const quad = layout.charQuad(index);
+    if (!quad) continue;
+    const corners = [quad.upperLeft, quad.upperRight, quad.lowerLeft, quad.lowerRight];
+    if (!corners.every(inside)) {
+      const { x, y } = quad.upperLeft;
+      outside.push(`character ${index} at (${x.toFixed(1)}, ${y.toFixed(1)})`);
+    }
+  }
+  return outside;
+}
+
+/**
  * Mixed-script text as the shared text engine writes it, in a free text and
  * in a text field: read back from the appearance each exports, every run's
- * font, what it says, its direction and its place. Hebrew and Arabic come
+ * font, what it says, its direction and its place; flattened, every
+ * character's box inside the box it was written in. Hebrew and Arabic come
  * from the engine's default fallback fonts, a character none has from its
  * last resort. `opts.fixture` is a blank page.
  */
@@ -214,7 +245,9 @@ export function runMixedScriptConformance(
         test(`${writer.name}: ${scriptCase.name}`, async () => {
           const doc = await openFixture(engine, opts);
           try {
-            const { ref, missing } = await writer.write(doc, scriptCase.value);
+            // A page of its own: what earlier cases flattened stays on theirs.
+            const [page] = (await doc.pages.insertBlank({ size: PAGE_SIZE })).insertedPages;
+            const { ref, missing } = await writer.write(doc, page!, scriptCase.value);
             const pdf = await doc.page(ref.page).annotations.exportAppearance([ref]);
             const drawn = await drawnTextOf(pdf);
             expect(drawn).toHaveLength(1);
@@ -222,6 +255,12 @@ export function runMixedScriptConformance(
             expect(byFont(drawn[0]!)).toEqual(expected);
             expect(problemsOf(drawn[0]!)).toEqual([]);
             expect(missing).toEqual(scriptCase.missing);
+
+            // Flattened into the page, every character is boxed where it's drawn.
+            await doc.page(ref.page).annotations.flatten([ref]);
+            const layout = await doc.page(ref.page).text.layout();
+            expect(layout.charCount > 0).toBe(true);
+            expect(charactersOutside(layout, writer.box)).toEqual([]);
           } finally {
             await doc.close();
           }

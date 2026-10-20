@@ -16,4 +16,4 @@ A document program with a display program can go to a browser: `FontProgramFacts
 
 Fallback fonts have tiers (`FALLBACK_TIERS`): the app's own (the server's on the cloud) are tried before the ones the engine comes with, whatever their style, and `FontList.fallbacks` lists them in that order. The `fonts.addFallback` worker request takes a `tier`. A document that drew a character no font has holds the last-resort program, which `doc.fonts.list()` doesn't list as one of its fonts: it is the list's `lastResort`.
 
-Add `runMixedScriptConformance` to the conformance suites: mixed-script text in a free text and a text field, read back from the appearance each exports (each run's font, text, `/ActualText`, direction and place). `drawnTextOf(pdf)` is the reader it uses.
+Add `runMixedScriptConformance` to the conformance suites: mixed-script text in a free text and a text field, read back from the appearance each exports (each run's font, text, `/ActualText`, direction and place), and flattened, each character's box inside the box it was written in. `drawnTextOf(pdf)` is the reader it uses.
