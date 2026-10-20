@@ -115,6 +115,14 @@ describe('textEditorLayout', () => {
     ).toBeCloseTo(runs[0]!.x, 2);
   });
 
+  it('reads the line in the direction the engine draws it: its first strong character', () => {
+    const rtl = (text: string) => textEditorLayout(widget(), textField(), text)!.rtl;
+    expect(rtl('שלום test 123')).toBe(true);
+    expect(rtl('test 123 שלום')).toBe(false);
+    expect(rtl('123 שלום')).toBe(true);
+    expect(rtl('')).toBe(false);
+  });
+
   it('is only for text fields', () => {
     expect(textEditorLayout(widget(), { family: 'checkbox' } as FormFieldDTO, '')).toBeNull();
   });

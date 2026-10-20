@@ -41,6 +41,12 @@ export interface TextEditorLayout {
    */
   readonly letterSpacing: number;
   readonly comb: boolean;
+  /**
+   * The text reads right to left, as the engine draws it: its first strong
+   * character is (Hebrew, Arabic). An editor reads the line in the same
+   * direction, so a line of mixed scripts is ordered as the engine orders it.
+   */
+  readonly rtl: boolean;
 }
 
 /**
@@ -99,6 +105,7 @@ export function textEditorLayout<C extends Coordinates = PageCoordinates>(
     fontStyle: face.fontStyle,
     fontSize,
     lineHeight: ((face.ascent - face.descent) * fontSize) / 1000,
+    rtl: laid.rtl,
     padding: {
       top: bbox.top - plate.top,
       right: bbox.right - plate.right,

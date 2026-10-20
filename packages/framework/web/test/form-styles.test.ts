@@ -90,6 +90,7 @@ describe('textFieldEditorStyleOf', () => {
       padding: { top: 1, right: 2, bottom: 1, left: 2 },
       letterSpacing: 0,
       comb: false,
+      rtl: false,
     };
     expect(textFieldEditorStyleOf(field, frame, colors, true, layout)).toMatchObject({
       fontFamily: layout.fontFamily,
@@ -97,7 +98,12 @@ describe('textFieldEditorStyleOf', () => {
       lineHeight: '22.2px',
       padding: '2px 4px 2px 4px',
       textAlign: 'left',
+      direction: 'ltr',
     });
+    // A line that reads right to left in the engine reads so in the editor too, aligned as the field is.
+    expect(
+      textFieldEditorStyleOf(field, frame, colors, true, { ...layout, rtl: true }),
+    ).toMatchObject({ direction: 'rtl', textAlign: 'left' });
     // A comb starts at its first cell and spaces its characters by the cells.
     const comb = {
       ...field,
@@ -137,6 +143,7 @@ describe('textFieldEditorStyleOf', () => {
       padding: { top: 1, right: 2, bottom: 1, left: 2 },
       letterSpacing: 0,
       comb: false,
+      rtl: false,
     };
     expect(textFieldEditorStyleOf(small, frame, colors, true, layout)).toMatchObject({
       width: '200%',

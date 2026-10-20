@@ -197,13 +197,21 @@ describe('a field', () => {
   });
 
   test('a field whose first strong character is Hebrew reads right to left', () => {
-    expect(runsOf(layoutField('123 שלום', FONTS, FIELD))).toEqual([
+    const laid = layoutField('123 שלום', FONTS, FIELD);
+    expect(runsOf(laid)).toEqual([
       [
         ['hebrew', 'שלום', true],
         ['helvetica', ' ', true],
         ['helvetica', '123', false],
       ],
     ]);
+    // What an editor reads the line in, so it orders the line as the engine does.
+    expect(laid.rtl).toBe(true);
+    expect(layoutField('Hello שלום', FONTS, FIELD).rtl).toBe(false);
+    expect(layoutField('שלום test 123', FONTS, FIELD).rtl).toBe(true);
+    // Nothing that reads either way: left to right.
+    expect(layoutField('123', FONTS, FIELD).rtl).toBe(false);
+    expect(layoutField('', FONTS, FIELD).rtl).toBe(false);
   });
 
   test('a character no font has is drawn by the last resort, and reported', () => {

@@ -78,6 +78,11 @@ export interface FieldText<F extends TextFont = TextFont> {
   /** The height its lines take. */
   readonly contentHeight: number;
   readonly lines: readonly FieldLine<F>[];
+  /**
+   * The direction its lines read in: right to left when its first strong
+   * character is (Hebrew, Arabic), left to right otherwise.
+   */
+  readonly rtl: boolean;
   /** Characters no font has, drawn as boxes: each a grapheme, first seen first. */
   readonly missing: readonly string[];
 }
@@ -255,7 +260,7 @@ export function layoutField<F extends TextFont>(
       out.push({ baseline: f32(plate.top - baselineY), runs });
     }
   }
-  return { fontSize, contentHeight, lines: out, missing };
+  return { fontSize, contentHeight, lines: out, rtl, missing };
 
   function fieldRun(run: Run<F>, x: number): FieldRun<F> {
     const { font, text, rtl, plain, width } = run;
