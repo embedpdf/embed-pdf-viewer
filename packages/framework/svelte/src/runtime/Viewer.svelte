@@ -14,7 +14,7 @@
   import { untrack } from 'svelte';
   import { createKernel, isLocalEngine, viewerSettingsOf } from '@embedpdf/core';
   import type { Engine, EngineFactory, Kernel, ViewerSettings } from '@embedpdf/core';
-  import { browserClock, browserPrinter } from '@embedpdf/web';
+  import { browserClock, browserPrinter, browserTextMeasurer } from '@embedpdf/web';
   import { KernelBinding, setKernelHolder } from './binding.svelte';
   import { isDev } from './dev';
   import type { ViewerProps } from './props';
@@ -63,6 +63,7 @@
           settings,
           clock: browserClock(),
           printer: browserPrinter(),
+          measurer: browserTextMeasurer(),
         });
       } catch (error) {
         // A plugin graph that can't be built shows `error`, not an exception mid-render.

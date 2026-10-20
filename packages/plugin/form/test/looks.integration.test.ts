@@ -4,12 +4,13 @@
  * format script wrote it, then and after; a checkbox's state is never pending (its pictures of
  * both states are held).
  */
-import { createKernel, type DocumentHandle } from '@embedpdf/core';
+import { createKernel, type DocumentHandle, type HostTextMeasurer } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
-import { createLocalEngine } from '@embedpdf/engine';
+import { createLocalEngine, localEngine } from '@embedpdf/engine';
 import { CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
 import type { AnnotationRef, Engine, PageRef } from '@embedpdf/engine-core/runtime';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
+import { FontsToken, fontsPlugin } from '@embedpdf/plugin-fonts';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 import { describe, expect, it } from 'vitest';
 
@@ -28,6 +29,18 @@ async function bytesOf(engine: Engine): Promise<Uint8Array> {
     name: 'amount',
     widgets: [{ page, rect: { x: 20, y: 20, width: 120, height: 20 }, fontFamily: 'helvetica', fontSize: 10 }],
     actions: { format: { type: 'javascript', script: 'event.value = "$" + event.value;' } },
+  });
+  await doc.forms.create({
+    family: 'text',
+    name: 'greeting',
+    widgets: [
+      {
+        page,
+        rect: { x: 20, y: 100, width: 160, height: 20 },
+        fontFamily: 'helvetica',
+        fontSize: 10,
+      },
+    ],
   });
   await doc.forms.create({
     family: 'checkbox',
@@ -107,6 +120,99 @@ describe('a filled widget looks', () => {
           .then(next.resolve, next.reject);
       }
       await clicked;
+    } finally {
+      await kernel.destroy();
+    }
+  });
+
+  it("in a script its font lacks: the picture until the engine's fonts are found, then drawn in them", async () => {
+    // The recipe's engine: it has the default fallback fonts.
+    const real = localEngine({ runtime: { prefer: 'wasm' } });
+    const held: HeldChange[] = [];
+    let holding = false;
+    let inner: DocumentHandle | null = null;
+    // A host that has a program once its bytes load, and measures every character 600 wide.
+    const loaded = new Set<string>();
+    const listeners = new Set<() => void>();
+    const measurer: HostTextMeasurer = {
+      ready(program) {
+        if (loaded.has(program.family)) return true;
+        void program.load().then(() => {
+          loaded.add(program.family);
+          for (const listener of [...listeners]) listener();
+        });
+        return false;
+      },
+      width: (_program, text) => [...text].length * 600,
+      onReady(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+    const kernel = createKernel({
+      engine: gated(
+        real,
+        held,
+        (doc) => (inner = doc),
+        () => holding,
+      ),
+      plugins: [
+        interactionPlugin(),
+        actionsPlugin({ javascript: { enabled: true, sandboxFactory: createQuickJsSandbox } }),
+        fontsPlugin(),
+        formPlugin(),
+      ],
+      measurer,
+    });
+    try {
+      await kernel.documents.open({ kind: 'bytes', id: 'looks', bytes: await bytesOf(real) });
+      const form = kernel.capability(FormToken);
+      await form.refresh();
+      const field = form.get({ kind: 'fqn', name: 'greeting' })!;
+      const widget = field.widgets[0]!;
+      const ref: AnnotationRef = {
+        kind: 'objectNumber',
+        page: widget.page!,
+        objectNumber: widget.objectNumber,
+      };
+      const page = widget.page as PageRef;
+
+      holding = true;
+      const filled = form.setValue(field.ref, { value: 'Hello שלום' });
+      for (let tries = 0; tries < 200 && held.length === 0; tries += 1) await settle();
+      const pending = form.listShownWidgets(page);
+      expect(
+        pending.find(
+          (shown) =>
+            shown.ref.kind === 'objectNumber' && shown.ref.objectNumber === widget.objectNumber,
+        )!.pending,
+      ).toBe(true);
+      // Its fonts aren't found yet: no painting, so the layer keeps the engine's picture.
+      expect(form.getWidgetPainting(ref)).toBeNull();
+
+      for (let tries = 0; tries < 500 && !form.getWidgetPainting(ref); tries += 1) await settle();
+      const runs = form
+        .getWidgetPainting(ref)!
+        .scene.flatMap((node) => (node.kind === 'textRun' ? [node] : []));
+      expect(runs.map((run) => [run.text, run.rtl])).toEqual([
+        ['Hello ', false],
+        ['שלום', true],
+      ]);
+      // In the fallback the engine draws Hebrew in, and the page's widgets are listed anew.
+      const hebrew = kernel
+        .capability(FontsToken)
+        .getPaintFonts('helvetica', 'שלום')!
+        .fallbacks.find((font) => font.covers(0x05e9))!;
+      expect(runs[1]!.program).toBe(hebrew.program);
+      expect(form.listShownWidgets(page)).not.toBe(pending);
+
+      holding = false;
+      for (const next of held.splice(0)) {
+        await (inner as unknown as DocumentHandle)
+          .apply(next.change, next.options as never)
+          .then(next.resolve, next.reject);
+      }
+      await filled;
     } finally {
       await kernel.destroy();
     }

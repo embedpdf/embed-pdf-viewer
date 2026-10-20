@@ -30,6 +30,7 @@ import {
   standardFontForFace,
   styleOfProgram,
 } from './model';
+import { createPaintFonts } from './paint';
 
 /** The document's fonts service, on an engine that has one. */
 function documentFonts(doc: DocumentHandle): LocalDocumentFontsService {
@@ -63,6 +64,11 @@ export function createFontsController(ctx: PluginContext<void>) {
   const programs = new Map<string, MountableFontProgram>();
   const programInfos = new Map<string, Promise<FontProgramInfo>>();
   let css = new Map<string, FontCss>();
+  let paintFontsEpoch = 0;
+  const paintFontsChanged = () => {
+    paintFontsEpoch++;
+    ctx.notify();
+  };
 
   const list = ctx.mirror<FontList | null>({
     name: 'fonts',
@@ -70,8 +76,11 @@ export function createFontsController(ctx: PluginContext<void>) {
     initial: () => null,
     load: async (doc) => ({ value: await documentFonts(doc).list() }),
     fold: foldFontList,
-    changed: ({ next }) => {
+    changed: ({ previous, next }) => {
       css = new Map();
+      // A change can move the fallbacks; what the first read was asked for meanwhile still holds.
+      if (previous) paintFonts.reset();
+      paintFontsChanged();
       if (next) listChanged.emit({ fonts: next });
     },
   });
@@ -144,6 +153,39 @@ export function createFontsController(ctx: PluginContext<void>) {
     };
   };
 
+  /** A program's coverage and metrics, read once per hash (a failed read is tried again). */
+  const programInfoOf = (displayHash: string): Promise<FontProgramInfo> => {
+    let info = programInfos.get(displayHash);
+    if (!info) {
+      info = documentFonts(ctx.doc).getProgram(displayHash);
+      programInfos.set(displayHash, info);
+      info.catch(() => programInfos.delete(displayHash));
+    }
+    return info;
+  };
+
+  const paintFonts = createPaintFonts({
+    measurer: ctx.measurer,
+    canFind: () => isLocalDocument(ctx.doc),
+    loadList: () => list.ensureLoaded(),
+    resolve: (request) => documentFonts(ctx.doc).resolve(request),
+    getProgram: programInfoOf,
+    programOf: (hash, style) => programOf(hash, style ?? styleOfProgram(list.get(), hash)),
+    standardOf: (font) => {
+      const current = list.get();
+      const listed = current ? fontNamed(current, font) : undefined;
+      return listed
+        ? standardFontForFace({
+            family: listed.familyName,
+            weight: listed.weight,
+            italic: listed.italic,
+          })
+        : 'helvetica';
+    },
+    changed: paintFontsChanged,
+  });
+  ctx.measurer?.onReady(paintFontsChanged);
+
   const cached = (key: string, build: () => FontCss): FontCss => {
     let known = css.get(key);
     if (!known) {
@@ -199,19 +241,14 @@ export function createFontsController(ctx: PluginContext<void>) {
     refresh: () => list.refresh(),
     resolve: async (request, options) =>
       ctx.cancellable(options?.signal, documentFonts(ctx.doc).resolve(request)),
-    getProgram: async (displayHash, options) => {
-      let info = programInfos.get(displayHash);
-      if (!info) {
-        info = documentFonts(ctx.doc).getProgram(displayHash);
-        programInfos.set(displayHash, info);
-        info.catch(() => programInfos.delete(displayHash));
-      }
+    getProgram: async (displayHash, options) =>
       // Another caller may share the read: cancelling this one leaves it running.
-      return ctx.cancellable(
+      ctx.cancellable(
         options?.signal,
-        info.then((value) => value),
-      );
-    },
+        programInfoOf(displayHash).then((value) => value),
+      ),
+    getPaintFonts: (font, text) => paintFonts.get(font, text),
+    getPaintFontsEpoch: () => paintFontsEpoch,
     getFontCss: (font) =>
       cached(`font:${font}`, () => {
         if (isStandardFontName(font)) return standardCss(font);

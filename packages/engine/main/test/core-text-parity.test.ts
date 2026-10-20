@@ -40,18 +40,15 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import {
   layoutField,
+  programPaintFont,
+  standardPaintFont,
   standardTextFont,
+  type PaintFont,
+  type PaintFonts,
   type FieldTextOptions,
-  type TextFont,
   type TextFonts,
 } from '../../../core/text/src';
-import {
-  standardPaintFont,
-  widgetDrawing,
-  type DrawOp,
-  type PaintFont,
-  type WidgetFonts,
-} from '../../../core/form/src';
+import { widgetDrawing, type DrawOp } from '../../../core/form/src';
 import { localEngine } from '../src/index';
 
 const POSITION = 0.1;
@@ -72,16 +69,16 @@ function harfbuzzWidth(bytes: Uint8Array): (text: string, rtl: boolean) => numbe
   };
 }
 
-function programFont(hash: string, info: FontProgramInfo, bytes: Uint8Array): TextFont {
-  return {
-    key: hash,
-    ascent: info.ascent,
-    descent: info.descent,
-    standard: false,
-    covers: (codePoint) =>
-      info.covers.some(({ start, count }) => codePoint >= start && codePoint < start + count),
-    width: harfbuzzWidth(bytes),
+/** A program as the engine reads it, measured by HarfBuzz. */
+function programFont(hash: string, info: FontProgramInfo, bytes: Uint8Array): PaintFont {
+  const program = {
+    hash,
+    family: fontProgramFamily(hash),
+    weight: 400,
+    style: 'normal' as const,
+    load: async () => bytes,
   };
+  return programPaintFont(info, program, harfbuzzWidth(bytes));
 }
 
 interface Shape {
@@ -165,6 +162,7 @@ let engine: LocalEngine;
 let doc: LocalDocumentHandle;
 let page: PageRef;
 let fonts: TextFonts;
+let lastResort: PaintFont;
 /** A font's name in the written PDF, by the twin's key. */
 const names = new Map<string, string>();
 let fieldNumber = 0;
@@ -183,7 +181,7 @@ beforeAll(async () => {
   const loaded = async (hash: string) =>
     programFont(hash, await doc.fonts.getProgram(hash), await doc.fonts.downloadProgram(hash));
   const fallbacks = await Promise.all(resolution.runs[0]!.fallbacks.map(loaded));
-  const lastResort = await loaded(list.lastResort.displayHash!);
+  lastResort = await loaded(list.lastResort.displayHash!);
   fonts = { face: standardTextFont('helvetica'), fallbacks, lastResort };
 
   names.set('helvetica', 'Helvetica');
@@ -281,34 +279,15 @@ describe('core-text lays a field out as the engine writes it', () => {
   }
 });
 
-/** A program font as the painter draws it: its layout numbers, its program, its family. */
-const paintFontOf = (font: TextFont): PaintFont => ({
-  ...font,
-  fontFamily: `"${fontProgramFamily(font.key)}"`,
-  fontWeight: 400,
-  fontStyle: 'normal',
-  program: {
-    hash: font.key,
-    family: fontProgramFamily(font.key),
-    weight: 400,
-    style: 'normal',
-    load: async () => new Uint8Array(),
-  },
-});
-
 /** The painter's fonts for a widget in `face`: the fallbacks in the order the engine tries them for its style. */
-async function widgetFontsOf(face: StandardFont): Promise<WidgetFonts> {
+async function widgetFontsOf(face: StandardFont): Promise<PaintFonts> {
   const resolution = await doc.fonts.resolve({ runs: [{ text: 'a', fontFamily: face }] });
   const fallbacks = await Promise.all(
     resolution.runs[0]!.fallbacks.map(async (hash) =>
       programFont(hash, await doc.fonts.getProgram(hash), await doc.fonts.downloadProgram(hash)),
     ),
   );
-  return {
-    face: standardPaintFont(face),
-    fallbacks: fallbacks.map(paintFontOf),
-    lastResort: paintFontOf(fonts.lastResort!),
-  };
+  return { face: standardPaintFont(face), fallbacks, lastResort };
 }
 
 interface WidgetCase {

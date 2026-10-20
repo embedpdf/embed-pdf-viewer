@@ -3,19 +3,18 @@
  * drawing lands on the page. That it draws what the engine writes is the
  * engine's parity gate (`widget-painter-parity.test.ts`).
  */
-import { layoutField } from '@embedpdf/core-text';
+import {
+  defaultPaintFonts,
+  layoutField,
+  lastResortPaintFont,
+  standardPaintFont,
+  type PaintFont,
+  type PaintFonts,
+} from '@embedpdf/core-text';
 import type { FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import {
-  defaultWidgetFonts,
-  lastResortPaintFont,
-  standardPaintFont,
-  widgetDrawing,
-  widgetScene,
-  type PaintFont,
-  type WidgetFonts,
-} from '../src';
+import { widgetDrawing, widgetScene } from '../src';
 
 /** A Hebrew font: every letter 600 thousandths wide. */
 const HEBREW: PaintFont = {
@@ -36,7 +35,7 @@ const HEBREW: PaintFont = {
     load: async () => new Uint8Array(),
   },
 };
-const FONTS: WidgetFonts = {
+const FONTS: PaintFonts = {
   face: standardPaintFont('helvetica'),
   fallbacks: [HEBREW],
   lastResort: lastResortPaintFont(),
@@ -104,7 +103,7 @@ describe('the painter', () => {
 
   it('fits a size of 0 to the box, with the engine sizes', () => {
     const fitted = (height: number) =>
-      layoutField('Hello', defaultWidgetFonts('helvetica'), {
+      layoutField('Hello', defaultPaintFonts('helvetica'), {
         plate: { left: 0, bottom: 0, right: 200, top: height },
         fontSize: 0,
         alignment: 0,

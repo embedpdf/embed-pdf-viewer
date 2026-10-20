@@ -5,15 +5,8 @@
  * the engine by the parity gate (engine `widget-painter-parity.test.ts`).
  * Pure: no DOM, no engine.
  */
-export { paints, widgetDrawing, type ShownValue } from './drawing';
+export { paints, widgetDrawing, widgetText, type ShownValue } from './drawing';
 export { textEditorLayout, type TextEditorLayout } from './editor';
 export type { DrawOp, PathSegment, Rgb, TextRun, WidgetDrawing } from './drawing';
-export {
-  defaultWidgetFonts,
-  lastResortPaintFont,
-  standardPaintFont,
-  type PaintFont,
-  type WidgetFonts,
-} from './fonts';
 export { widgetScene, type WidgetPlacement } from './scene';
 export type { MountableFontProgram } from '@embedpdf/core-fonts';

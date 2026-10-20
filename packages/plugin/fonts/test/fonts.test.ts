@@ -1,7 +1,24 @@
-import { reload, type DocumentEvent, type DocumentHandle } from '@embedpdf/core';
+import {
+  reload,
+  type DocumentEvent,
+  type DocumentHandle,
+  type HostFontProgram,
+  type HostTextMeasurer,
+} from '@embedpdf/core';
 import { createTestContext, LOCAL_ENGINE_BRAND } from '@embedpdf/core/testing';
-import { LAST_RESORT_HASH, lastResortFontProgram, standardFontProgram } from '@embedpdf/core-fonts';
-import type { Font, FontList, FontProgram } from '@embedpdf/engine-core/runtime';
+import {
+  LAST_RESORT_HASH,
+  fontProgramFamily,
+  lastResortFontProgram,
+  standardFontProgram,
+} from '@embedpdf/core-fonts';
+import {
+  isStandardFontName,
+  type Font,
+  type FontList,
+  type FontProgram,
+  type FontResolveRequest,
+} from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createFontsController } from '../src/controller';
@@ -71,14 +88,37 @@ const LIST: FontList = {
 const origin = { kind: 'local' as const, sessionId: 's', sub: null, ts: 0, serverId: null };
 const fontsChanged = { type: 'fonts.changed', origin } as DocumentEvent;
 
-function harness(options: { local?: boolean; list?: FontList } = {}) {
+/** The Hebrew letters: what the fallback in the list covers. */
+const HEBREW_LETTERS = { start: 0x05d0, count: 27 };
+
+function harness(options: { local?: boolean; list?: FontList; measurer?: HostTextMeasurer } = {}) {
   let current = options.list ?? LIST;
   const fonts = {
     list: vi.fn(async () => current),
-    resolve: vi.fn(async () => ({ runs: [], missingCharacters: [] })),
+    // A box keeps the font it asks for, with the list's fallbacks.
+    resolve: vi.fn(async (request: FontResolveRequest) => ({
+      runs: request.runs.map((run) => {
+        const name = 'fontFamily' in run ? run.fontFamily : 'helvetica';
+        const listed = current.fonts.find((candidate) => candidate.name === name);
+        const own = listed?.programs[0];
+        return {
+          font: name,
+          weight: listed?.weight ?? 400,
+          italic: listed?.italic ?? false,
+          substituted: false,
+          program: isStandardFontName(name)
+            ? standardFontProgram(name).hash
+            : own?.canDownload
+              ? own.displayHash
+              : null,
+          fallbacks: fallbackHashes(current),
+        };
+      }),
+      missingCharacters: [],
+    })),
     getProgram: vi.fn(async (hash: string) => ({
       ...program(hash),
-      covers: [{ start: 32, count: 95 }],
+      covers: hash === hashOf('c') ? [HEBREW_LETTERS] : [{ start: 32, count: 95 }],
       ascent: 900,
       descent: -200,
     })),
@@ -86,6 +126,7 @@ function harness(options: { local?: boolean; list?: FontList } = {}) {
   };
   const ctx = createTestContext({
     id: 'fonts',
+    measurer: options.measurer,
     doc: (options.local === false
       ? {}
       : { [LOCAL_ENGINE_BRAND]: true, fonts }) as unknown as Partial<DocumentHandle>,
@@ -260,5 +301,132 @@ describe('the fonts controller', () => {
     await expect(api.ensureLoaded()).rejects.toMatchObject({ code: 'unsupported' });
     await expect(api.resolve({ runs: [] })).rejects.toMatchObject({ code: 'unsupported' });
     expect(api.getFontCss('times-roman').programs[0]).toBe(standardFontProgram('times-roman'));
+  });
+});
+
+/** A host whose programs are ready when `load()` says so, and whose letters are 600 wide. */
+function fakeMeasurer() {
+  const listeners = new Set<() => void>();
+  const loaded = new Set<string>();
+  const asked: string[] = [];
+  const measurer: HostTextMeasurer = {
+    ready: (program: HostFontProgram) => {
+      asked.push(program.family);
+      return loaded.has(program.family);
+    },
+    width: (_program, text) => [...text].length * 600,
+    onReady(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  return {
+    measurer,
+    asked,
+    load(family: string) {
+      loaded.add(family);
+      for (const listener of [...listeners]) listener();
+    },
+  };
+}
+
+const HEBREW_FAMILY = fontProgramFamily(hashOf('c'));
+
+describe("a box's paint fonts", () => {
+  it('draws text its standard font has whole in it at once, without asking the engine', () => {
+    const host = fakeMeasurer();
+    const { fonts, api } = harness({ measurer: host.measurer });
+    const plain = api.getPaintFonts('helvetica', 'Hello, “world”')!;
+    expect(plain.face.key).toBe('helvetica');
+    expect(plain.fallbacks).toEqual([]);
+    expect(plain.lastResort?.key).toBe(LAST_RESORT_HASH);
+    expect(api.getPaintFonts('helvetica', 'Bye')).toBe(plain);
+    expect(fonts.resolve).not.toHaveBeenCalled();
+  });
+
+  it("finds the fallbacks for the box's style, then waits for the programs its text needs", async () => {
+    const host = fakeMeasurer();
+    const { fonts, api } = harness({ measurer: host.measurer });
+    const epoch = api.getPaintFontsEpoch();
+    expect(api.getPaintFonts('helvetica-bold', 'Hello שלום')).toBeNull();
+    await settle();
+    expect(fonts.resolve).toHaveBeenCalledWith({
+      runs: [{ text: ' ', fontFamily: 'helvetica-bold' }],
+    });
+    expect(api.getPaintFontsEpoch()).toBeGreaterThan(epoch);
+    // Found; the Hebrew program is asked for and loads.
+    expect(api.getPaintFonts('helvetica-bold', 'Hello שלום')).toBeNull();
+    expect(host.asked).toEqual([HEBREW_FAMILY]);
+    const loading = api.getPaintFontsEpoch();
+    host.load(HEBREW_FAMILY);
+    expect(api.getPaintFontsEpoch()).toBeGreaterThan(loading);
+
+    const found = api.getPaintFonts('helvetica-bold', 'Hello שלום')!;
+    expect(found.face.key).toBe('helvetica-bold');
+    expect(found.fallbacks.map((font) => [font.key, font.program.family])).toEqual([
+      [hashOf('c'), HEBREW_FAMILY],
+    ]);
+    expect(found.fallbacks[0]!.covers(0x05e9)).toBe(true);
+    expect(found.fallbacks[0]!.covers(0x0041)).toBe(false);
+    expect(found.fallbacks[0]!.width('שלום', true)).toBe(2400);
+    expect(found.fallbacks[0]).toMatchObject({ ascent: 900, descent: -200 });
+    // The same fonts for any text in that box; text in Latin alone needs no program.
+    expect(api.getPaintFonts('helvetica-bold', 'שלום עולם')).toBe(found);
+    expect(fonts.resolve).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws in a font's own program, or, when a browser can't get it, its face's standard font", async () => {
+    const host = fakeMeasurer();
+    host.load(fontProgramFamily(hashOf('a')));
+    host.load(HEBREW_FAMILY);
+    const { api } = harness({ measurer: host.measurer });
+    api.getPaintFonts('Roboto-Regular', 'Hi שלום');
+    api.getPaintFonts('Minion', 'Hi שלום');
+    await settle();
+    const roboto = api.getPaintFonts('Roboto-Regular', 'Hi שלום')!;
+    expect(roboto.face).toMatchObject({
+      key: hashOf('a'),
+      standard: false,
+      fontFamily: `"${fontProgramFamily(hashOf('a'))}"`,
+      fontWeight: 400,
+    });
+    expect(roboto.face.width('Hi', false)).toBe(1200);
+    expect(api.getPaintFonts('Minion', 'Hi שלום')!.face.key).toBe('helvetica');
+  });
+
+  it("draws in the defaults where fonts can't be found or measured", async () => {
+    const withoutMeasurer = harness();
+    expect(withoutMeasurer.api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toEqual([]);
+    expect(withoutMeasurer.fonts.resolve).not.toHaveBeenCalled();
+
+    const host = fakeMeasurer();
+    const cloud = harness({ local: false, measurer: host.measurer });
+    expect(cloud.api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toEqual([]);
+
+    const failing = harness({ measurer: host.measurer });
+    failing.fonts.resolve.mockRejectedValueOnce(new Error('closed'));
+    expect(failing.api.getPaintFonts('helvetica', 'שלום')).toBeNull();
+    await settle();
+    expect(failing.api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toEqual([]);
+  });
+
+  it("finds them again once the document's fonts change", async () => {
+    const host = fakeMeasurer();
+    host.load(HEBREW_FAMILY);
+    const { ctx, fonts, api, setList } = harness({ measurer: host.measurer });
+    api.getPaintFonts('helvetica', 'שלום');
+    await settle();
+    expect(api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toHaveLength(1);
+
+    setList({ ...LIST, fallbacks: [] });
+    const epoch = api.getPaintFontsEpoch();
+    ctx.emitDocumentEvent(fontsChanged);
+    await settle();
+    expect(api.getPaintFontsEpoch()).toBeGreaterThan(epoch);
+    // What was found draws on while they're found again: nothing waits on the picture.
+    expect(api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toHaveLength(1);
+    await settle();
+    expect(api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toEqual([]);
+    expect(fonts.resolve).toHaveBeenCalledTimes(2);
   });
 });

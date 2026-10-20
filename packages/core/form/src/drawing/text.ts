@@ -7,9 +7,9 @@
  * in the same order.
  */
 import { layoutField, type FieldText, type FieldTextOptions } from '@embedpdf/core-text';
+import type { PaintFont, PaintFonts } from '@embedpdf/core-text';
 import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
-import type { PaintFont, WidgetFonts } from '../fonts';
 import { BLACK, borderOps, boxOps, deflate, rectPath, type BorderStyleInfo } from './border';
 import type { DrawOp, Rgb, TextRun } from './types';
 
@@ -26,7 +26,7 @@ export interface TextLook {
   readonly border: BorderStyleInfo;
   readonly background: Rgb | null;
   readonly borderColor: Rgb | null;
-  readonly fonts: WidgetFonts;
+  readonly fonts: PaintFonts;
   readonly fontSize: number;
   readonly textColor: Rgb | null;
   readonly alignment: 0 | 1 | 2;

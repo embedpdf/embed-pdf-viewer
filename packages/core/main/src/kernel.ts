@@ -1,6 +1,7 @@
 import { createBurstGate } from './bursts';
 import { createDocumentChanges } from './changes';
 import { timerClock, type HostClock } from './clock';
+import type { HostTextMeasurer } from './measurer';
 import { createStore } from './store';
 import {
   createPluginContext,
@@ -356,6 +357,11 @@ export function createKernel(config: {
    * `browserPrinter()` from `@embedpdf/web`. Without one, nothing prints (`canPrint()` is false).
    */
   printer?: HostPrinter;
+  /**
+   * The host's text measuring: what plugins' `ctx.measurer` measures with. A browser passes
+   * `browserTextMeasurer()` from `@embedpdf/web`. Without one, `ctx.measurer` is `null`.
+   */
+  measurer?: HostTextMeasurer;
 }): Kernel {
   const { engine, plugins } = config;
   const report = config.report ?? ((error: unknown) => console.error('[kernel]', error));
@@ -1108,6 +1114,7 @@ export function createKernel(config: {
     workspaceLeases,
     report,
     clock: config.clock ?? timerClock,
+    measurer: config.measurer ?? null,
     resolveCapability,
     tryResolveCapability: tryResolveInternal,
     documentHandle,

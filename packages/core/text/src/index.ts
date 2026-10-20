@@ -20,6 +20,14 @@ export {
   type TextFont,
   type TextFonts,
 } from './fonts';
+export {
+  defaultPaintFonts,
+  lastResortPaintFont,
+  programPaintFont,
+  standardPaintFont,
+  type PaintFont,
+  type PaintFonts,
+} from './paint';
 export { firstStrongIsRtl, lineLevels, mirrorOf, paragraphLevels, visualOrder } from './bidi';
 export { graphemeStarts, graphemesOf, isInvisibleGrapheme } from './graphemes';
 export { isSimpleScript, scriptOf } from './scripts';

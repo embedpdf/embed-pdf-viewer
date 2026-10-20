@@ -6,6 +6,7 @@ import {
   layoutField,
   matchGrapheme,
   paragraphLevels,
+  programPaintFont,
   scriptOf,
   standardTextFont,
   visualOrder,
@@ -116,6 +117,61 @@ describe('the font per grapheme', () => {
     expect(HELVETICA.covers(0x20ac)).toBe(true);
     expect(HELVETICA.covers(0x5d0)).toBe(false);
     expect(HELVETICA.width('Hi', false)).toBe(722 + 222);
+  });
+
+  test("a program covers the engine's ranges, has its metrics and measures as it is told", () => {
+    const program = {
+      hash: 'a'.repeat(64),
+      family: 'epdf-aaaaaaaaaaaaaaaa',
+      weight: 700,
+      style: 'italic' as const,
+      load: async () => new Uint8Array(),
+    };
+    const measured: [string, boolean][] = [];
+    const font = programPaintFont(
+      {
+        displayHash: program.hash,
+        sourceHash: program.hash,
+        embedded: 'whole',
+        format: 'truetype',
+        embeddingPermission: 'installable',
+        canDownload: true,
+        // Out of order: the engine's ranges are read as they come.
+        covers: [
+          { start: 0x05d0, count: 27 },
+          { start: 0x20, count: 95 },
+        ],
+        ascent: 950,
+        descent: -250,
+      },
+      program,
+      (text, rtl) => {
+        measured.push([text, rtl]);
+        return 600;
+      },
+    );
+    expect([0x1f, 0x20, 0x7e, 0x7f, 0x5cf, 0x5d0, 0x5ea, 0x5eb].map(font.covers)).toEqual([
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+    ]);
+    expect(font).toMatchObject({
+      key: program.hash,
+      ascent: 950,
+      descent: -250,
+      standard: false,
+      fontFamily: '"epdf-aaaaaaaaaaaaaaaa"',
+      fontWeight: 700,
+      fontStyle: 'italic',
+      program,
+    });
+    expect(font.width('שלום', true)).toBe(600);
+    expect(measured).toEqual([['שלום', true]]);
   });
 });
 

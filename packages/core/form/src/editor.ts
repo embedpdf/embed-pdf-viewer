@@ -6,6 +6,7 @@
  * widget's upright frame.
  */
 import { standardFontStack, type MountableFontProgram } from '@embedpdf/core-fonts';
+import type { FieldText, PaintFont, PaintFonts } from '@embedpdf/core-text';
 import {
   isStandardFontName,
   type Coordinates,
@@ -16,7 +17,6 @@ import {
 
 import { textLookOf } from './drawing';
 import { textFieldLayout } from './drawing/text';
-import type { WidgetFonts } from './fonts';
 
 export interface TextEditorLayout {
   /** The programs the engine draws the text in, the face's first: mounted, `fontFamily` reaches them. */
@@ -44,20 +44,27 @@ export interface TextEditorLayout {
 }
 
 /**
- * The CSS family list that draws text in `fonts`: each program, the face's
- * first and the last resort's last, then the face's own stack for before
- * they load.
+ * The CSS family list that draws text in `programs`, then the face's own
+ * stack for before they load.
  */
-function familyList(fonts: WidgetFonts): string {
-  const programs = programsOf(fonts).map((program) => `"${program.family}"`);
+function familyList(fonts: PaintFonts, programs: readonly MountableFontProgram[]): string {
   const { key } = fonts.face;
   const stack = isStandardFontName(key) ? standardFontStack(key) : 'sans-serif';
-  return [...programs, stack].join(', ');
+  return [...programs.map((program) => `"${program.family}"`), stack].join(', ');
 }
 
-/** The programs that draw text in `fonts`, each once, in the order they're tried. */
-function programsOf(fonts: WidgetFonts): MountableFontProgram[] {
-  const all = [fonts.face, ...fonts.fallbacks, ...(fonts.lastResort ? [fonts.lastResort] : [])];
+/**
+ * The programs that draw `laid`, each once, in the order they're tried: the
+ * face's first, then the fallbacks its text is drawn in (a browser loads no
+ * other), then the last resort's.
+ */
+function programsOf(fonts: PaintFonts, laid: FieldText<PaintFont>): MountableFontProgram[] {
+  const drawn = new Set(laid.lines.flatMap((line) => line.runs.map((run) => run.font)));
+  const all = [
+    fonts.face,
+    ...fonts.fallbacks.filter((font) => drawn.has(font)),
+    ...(fonts.lastResort ? [fonts.lastResort] : []),
+  ];
   return [...new Map(all.map((font) => [font.program.family, font.program])).values()];
 }
 
@@ -70,7 +77,7 @@ export function textEditorLayout<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
   field: FormFieldDTO<C>,
   text: string,
-  fonts?: WidgetFonts,
+  fonts?: PaintFonts,
 ): TextEditorLayout | null {
   if (field.family !== 'text') return null;
   const { look } = textLookOf(widget, fonts);
@@ -84,9 +91,10 @@ export function textEditorLayout<C extends Coordinates = PageCoordinates>(
   const { bbox } = look;
   const { face } = look.fonts;
   const fontSize = laid.fontSize;
+  const programs = programsOf(look.fonts, laid);
   const base = {
-    programs: programsOf(look.fonts),
-    fontFamily: familyList(look.fonts),
+    programs,
+    fontFamily: familyList(look.fonts, programs),
     fontWeight: face.fontWeight,
     fontStyle: face.fontStyle,
     fontSize,

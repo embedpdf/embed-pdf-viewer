@@ -1,10 +1,10 @@
 /**
- * The fonts the painter draws a widget's text with: each one as
- * `@embedpdf/core-text` lays text out in it, with the program and the CSS a
- * browser draws it with. A viewer that knows the document's fonts gives the
- * widget's face, the fallbacks in the order the engine tries them and the
- * last resort (`WidgetFonts`); without them a widget draws in its standard
- * font, or Helvetica, with only the last resort behind it.
+ * Fonts a browser draws laid-out text with: each one as the layout reads it
+ * (a `TextFont`), with the program and the CSS a browser draws it with. A
+ * viewer that knows the document's fonts gives a box's face, the fallbacks in
+ * the order the engine tries them for its style and the last resort
+ * (`PaintFonts`); without them a box draws in its standard font, or
+ * Helvetica, with only the last resort behind it (`defaultPaintFonts`).
  */
 import {
   LAST_RESORT_HASH,
@@ -15,10 +15,16 @@ import {
   standardFontProgram,
   type MountableFontProgram,
 } from '@embedpdf/core-fonts';
-import { standardTextFont, type TextFont, type TextFonts } from '@embedpdf/core-text';
-import { isStandardFontName, type StandardFont } from '@embedpdf/engine-core/runtime';
+import {
+  isStandardFontName,
+  type CodePointRange,
+  type FontProgramInfo,
+  type StandardFont,
+} from '@embedpdf/engine-core/runtime';
 
-/** A font the painter draws with. */
+import { standardTextFont, type TextFont, type TextFonts } from './fonts';
+
+/** A font a browser draws with. */
 export interface PaintFont extends TextFont {
   /** The CSS family list that draws it, its program's family first. */
   readonly fontFamily: string;
@@ -28,8 +34,8 @@ export interface PaintFont extends TextFont {
   readonly program: MountableFontProgram;
 }
 
-/** The fonts a widget's text is drawn with. */
-export type WidgetFonts = TextFonts<PaintFont>;
+/** The fonts a box's text is drawn with. */
+export type PaintFonts = TextFonts<PaintFont>;
 
 const standardFonts = new Map<StandardFont, PaintFont>();
 
@@ -44,6 +50,49 @@ export function standardPaintFont(font: StandardFont): PaintFont {
   };
   standardFonts.set(font, paintFont);
   return paintFont;
+}
+
+/**
+ * A font program the engine draws with, as a browser draws it: the characters
+ * it covers and its line metrics as the engine reads them
+ * (`doc.fonts.getProgram`), and its widths from `measure`, the browser's own
+ * shaping of the mounted program, in thousandths of the font size.
+ */
+export function programPaintFont(
+  info: FontProgramInfo,
+  program: MountableFontProgram,
+  measure: (text: string, rtl: boolean) => number,
+): PaintFont {
+  const covers = coverageOf(info.covers);
+  return {
+    key: program.hash,
+    ascent: info.ascent,
+    descent: info.descent,
+    standard: false,
+    covers,
+    width: measure,
+    fontFamily: `"${program.family}"`,
+    fontWeight: program.weight,
+    fontStyle: program.style,
+    program,
+  };
+}
+
+/** Whether a code point is in `ranges`: a binary search over them, in order. */
+function coverageOf(ranges: readonly CodePointRange[]): (codePoint: number) => boolean {
+  const sorted = [...ranges].sort((left, right) => left.start - right.start);
+  return (codePoint) => {
+    let low = 0;
+    let high = sorted.length - 1;
+    while (low <= high) {
+      const middle = (low + high) >> 1;
+      const { start, count } = sorted[middle]!;
+      if (codePoint < start) high = middle - 1;
+      else if (codePoint >= start + count) low = middle + 1;
+      else return true;
+    }
+    return false;
+  };
 }
 
 const ZERO_WIDTH_JOINER = 0x200d;
@@ -85,10 +134,10 @@ export function lastResortPaintFont(): PaintFont {
 }
 
 /**
- * The fonts a widget draws with when the viewer gives none: its standard font
+ * The fonts a box draws with when the viewer gives none: its standard font
  * (Helvetica for any other), no fallbacks, and the last resort.
  */
-export function defaultWidgetFonts(fontFamily: string | null | undefined): WidgetFonts {
+export function defaultPaintFonts(fontFamily: string | null | undefined): PaintFonts {
   const face = isStandardFontName(fontFamily ?? '') ? (fontFamily as StandardFont) : 'helvetica';
   return { face: standardPaintFont(face), fallbacks: [], lastResort: lastResortPaintFont() };
 }

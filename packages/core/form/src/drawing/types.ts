@@ -5,9 +5,8 @@
  * each thing the engine's appearance stream paints, so the parity gate can
  * compare them one by one, and the scene can draw them.
  */
+import type { PaintFont } from '@embedpdf/core-text';
 import type { PdfRect } from '@embedpdf/engine-core/runtime';
-
-import type { PaintFont } from '../fonts';
 
 /** A colour as the stream paints it: red, green and blue from 0 to 1. */
 export type Rgb = readonly [number, number, number];

@@ -246,9 +246,8 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
   useEffect(() => editor.setValue(item.value), [editor, item.value]);
 
   const frame = rectInPixels(item.box, page.transform);
-  // The text being typed, where the engine will draw it, in its face.
-  // A field in a font of its own draws again once the document's fonts are read.
-  useOptionalSelector(FontsToken, (fonts) => fonts.getFontList(), null);
+  // The text being typed, where the engine will draw it, in its fonts: again once they're found.
+  useOptionalSelector(FontsToken, (fonts) => fonts.getPaintFontsEpoch(), 0);
   const layout = item.annotationRef ? form.getTextEditorLayout(item.annotationRef, draft) : null;
   useFontMounts(layout ? layout.programs : NO_PROGRAMS);
   const editorProps = {

@@ -7,6 +7,7 @@ import { PluginError } from './errors';
 import { createEventHook, type EventHookSource } from './event-hook';
 import { guardHandle } from './guarded-handle';
 import { createLatestLane, type LatestLane } from './lanes';
+import { instanceMeasurer, type HostTextMeasurer } from './measurer';
 import { createMirror, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
 import type { Scope } from './scope';
@@ -85,6 +86,8 @@ export interface ContextServices {
   readonly report: (error: unknown) => void;
   /** The host's time, which each instance's `ctx.clock` schedules on. */
   readonly clock: HostClock;
+  /** The host's text measuring (`ctx.measurer`); `null` when it gives none. */
+  readonly measurer: HostTextMeasurer | null;
   resolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T;
   /** Total resolution (the kernel's internal rule: bring-up or ready) — what
    *  `ctx.tryGet` delegates to. Never exception-driven: a throwing capability
@@ -381,6 +384,7 @@ export function createPluginContext(
     },
     cleanup: (teardown) => scope.defer(teardown),
     clock: instanceClock(services.clock, lifetime),
+    measurer: services.measurer && instanceMeasurer(services.measurer, lifetime),
     onSettle(flush) {
       if (!session) {
         throw new Error(

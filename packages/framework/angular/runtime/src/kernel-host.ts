@@ -47,7 +47,7 @@ import type {
   SettingsDeclaration,
   ViewerSettings,
 } from '@embedpdf/core';
-import { browserClock, browserPrinter } from '@embedpdf/web';
+import { browserClock, browserPrinter, browserTextMeasurer } from '@embedpdf/web';
 import { Observable } from 'rxjs';
 import type { EmbedPdfConfig, EmbedPdfKernelConfig, EpdfViewerStatus } from './config';
 import { onServerError } from './errors';
@@ -359,6 +359,7 @@ export class EpdfKernelHost {
         settings: registeredViewerSettings(config),
         clock: browserClock(),
         printer: browserPrinter(),
+        measurer: browserTextMeasurer(),
       });
     } catch (error) {
       if (owned) void engine.destroy();

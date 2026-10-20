@@ -6,6 +6,7 @@
  * what its text is drawn in: the widget's font, the fallbacks and the last
  * resort, as the viewer knows them.
  */
+import { defaultPaintFonts, type PaintFonts } from '@embedpdf/core-text';
 import {
   isStandardFontName,
   type FormFieldDTO,
@@ -15,7 +16,6 @@ import {
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
-import { defaultWidgetFonts, type WidgetFonts } from '../fonts';
 import { borderStyleInfo, rgbOf } from './border';
 import { comboBoxOps, listBoxOps, pushButtonOps, textFieldOps, type TextLook } from './text';
 import { checkboxOps, radioOps } from './toggle';
@@ -41,7 +41,7 @@ const ALIGNMENT = { left: 0, center: 1, right: 2 } as const;
  */
 export function textLookOf<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
-  fonts?: WidgetFonts,
+  fonts?: PaintFonts,
 ): { readonly look: TextLook; readonly approximate: string | null } {
   const box = (widget.box ?? widget.rect) as unknown as { width: number; height: number };
   const family = widget.fontFamily ?? '';
@@ -52,7 +52,7 @@ export function textLookOf<C extends Coordinates = PageCoordinates>(
       border: borderStyleInfo(widget),
       background: widget.interiorColor ? rgbOf(widget.interiorColor) : null,
       borderColor: widget.color ? rgbOf(widget.color) : null,
-      fonts: fonts ?? defaultWidgetFonts(widget.fontFamily),
+      fonts: fonts ?? defaultPaintFonts(widget.fontFamily),
       fontSize: widget.fontSize ?? 0,
       textColor: widget.fontColor ? rgbOf(widget.fontColor) : null,
       alignment: ALIGNMENT[widget.textAlign ?? 'left'],
@@ -80,6 +80,32 @@ const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Every character the painter draws for a widget, as one string: what a
+ * viewer finds the widget's fonts for. A password's characters are drawn as
+ * `*`; a check box or a radio button draws none.
+ */
+export function widgetText<C extends Coordinates = PageCoordinates>(
+  widget: WidgetAnnotation<C>,
+  field: FormFieldDTO<C>,
+  shown: ShownValue = {},
+): string {
+  switch (field.family) {
+    case 'text': {
+      const value = shown.text ?? field.value;
+      return field.password && value ? '*' : value;
+    }
+    case 'combobox':
+      return shown.text ?? field.value;
+    case 'listbox':
+      return field.options.map((option) => option.label).join('\n');
+    case 'pushbutton':
+      return widget.caption ?? '';
+    default:
+      return '';
+  }
+}
+
+/**
  * The drawing, or `null` for a widget the painter doesn't draw (a signature,
  * a family the engine doesn't know).
  */
@@ -87,7 +113,7 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
   field: FormFieldDTO<C>,
   shown: ShownValue = {},
-  fonts?: WidgetFonts,
+  fonts?: PaintFonts,
 ): WidgetDrawing | null {
   if (!paints(field)) return null;
   const box = (widget.box ?? widget.rect) as unknown as { width: number; height: number };

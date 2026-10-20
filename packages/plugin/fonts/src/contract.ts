@@ -5,6 +5,7 @@
  */
 import type { EventHook, OperationOptions, ResourceStatus } from '@embedpdf/core';
 import type { MountableFontProgram } from '@embedpdf/core-fonts';
+import type { PaintFonts } from '@embedpdf/core-text';
 import type {
   FaceRequest,
   FontList,
@@ -17,6 +18,7 @@ import type {
 
 export { FontsToken } from './token';
 export type { MountableFontProgram } from '@embedpdf/core-fonts';
+export type { PaintFonts } from '@embedpdf/core-text';
 
 /**
  * How a browser draws text in a font: CSS whose families are the font
@@ -90,6 +92,22 @@ export interface FontsCapability {
   getFaceCss(face: FaceRequest): FontCss;
   /** How a browser draws a run as {@link resolve} answered it. */
   getRunCss(run: ResolvedFontRun): FontCss;
+  /**
+   * The fonts a box in `font` draws `text` with, as the engine picks one per
+   * character (the box's font, then the fallbacks in the order the engine
+   * tries them for its style, then the last resort), each measured as the
+   * browser shapes it (the kernel's `measurer`): what `@embedpdf/core-text`
+   * lays the text out with, so a viewer draws what the engine will write.
+   * `null` while they're found and the programs the text needs load: asking
+   * starts that, and {@link getPaintFontsEpoch} moves when it's done. Text a
+   * standard font draws whole needs neither. Where they can't be found or
+   * measured (an engine that doesn't find a document's fonts, a host without
+   * a measurer), the box's standard font, or Helvetica, with only the last
+   * resort behind it.
+   */
+  getPaintFonts(font: FontName, text: string): PaintFonts | null;
+  /** Moves each time {@link getPaintFonts} may answer differently: ask again when it does. */
+  getPaintFontsEpoch(): number;
   /**
    * The face a CSS family this plugin names stands for (a program's family),
    * to read back text a browser drew itself; `null` for any other family and

@@ -22,6 +22,8 @@ export { browserClock } from './clock';
 export type { WebClock } from './clock';
 export { browserPrinter } from './printer';
 export type { WebPrinter, WebPrintSheet, WebStagedPrint } from './printer';
+export { browserTextMeasurer } from './text-measurer';
+export type { WebTextMeasurer } from './text-measurer';
 export { cssText } from './css-text';
 export type { StyleRecord } from './css-text';
 export { copySelection, wireSelectionClipboard } from './clipboard';
