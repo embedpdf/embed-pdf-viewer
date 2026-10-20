@@ -256,6 +256,19 @@ describe('a stamp before the engine wrote it', () => {
   });
 });
 
+describe('a placed stamp', () => {
+  it('takes the stamp tool’s opacity', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    harness.seedToolDefaults();
+    harness.capability.tools.updateDefaults('stamp', { opacity: 0.4 });
+    await harness.capability.stamps.arm({ source: pngOf(200, 100) });
+    expect(harness.capability.placeArmedStamp(PAGE, { x: 300, y: 400 })).toBe(true);
+    await Promise.resolve();
+    expect(harness.create.mock.calls[0]![0]).toMatchObject({ subtype: 'stamp', opacity: 0.4 });
+  });
+});
+
 describe('an annotation an undo brings back', () => {
   it('shows the picture the engine drew of it at once, until the engine draws it again', async () => {
     const harness = annotationHarness();
