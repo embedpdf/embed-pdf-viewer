@@ -1,0 +1,173 @@
+---
+title: Attachments
+description: "List the files a PDF carries, save them, let people attach and remove files, and go to a file pinned to a page."
+---
+
+# Attachments
+
+A PDF can carry other files: a spreadsheet with the numbers behind a report, the original of a
+scanned contract. They sit in two places: the document's own attachments, and file attachment
+annotations, a file pinned to a spot on a page. Register `attachmentPlugin()` to list both as one
+list:
+
+<Snippet name="documents/attachment-list" />
+
+What `useAttachmentState()` gives you updates by itself: after your own changes, and on a shared
+document, after someone else's. Nothing is read when a document opens: the attachments load the
+first time something asks for them. The files on the pages come from the
+[annotation plugin](/docs/headless/annotations), when you've registered it.
+
+## Show the files
+
+`files` lists the document's attachments first, in the order the document keeps them (by name),
+then the files on its pages, in page order. Each file has its `name`, `mimeType`, `description`,
+`size`, `checksum`, `createdAt` and `modifiedAt` (`null` when the PDF doesn't say), an `id` for
+your list's keys, and its `home`:
+
+- `{ kind: 'document', ref }`: one of the document's attachments, `ref` its name in the document.
+- `{ kind: 'page', ref }`: a file attachment annotation; `ref.page` is its page.
+
+Show a name with `displayNameOf(file)`, and put it in a `<bdi>`. A name can hide characters that
+make it look like another (`invoice.pdf` that is really `invoice.exe`); `displayNameOf` takes them
+out, and the `<bdi>` keeps a name in another script from turning your row around.
+
+`status` says whether the attachments haven't been asked for yet (`'idle'`), are loading, are
+there (`'ready'`), or couldn't be read.
+
+## Save a file
+
+`download(file)` returns the file's bytes, its name ready to save under (`displayNameOf`'s) and
+its type. Hand them to `saveFile()` to save them as a browser download:
+
+```ts
+const { bytes, name, mimeType } = await attachment.download(file);
+saveFile(bytes, name, mimeType ?? undefined);
+```
+
+Save a file; never open it in a new tab or a frame of your page. A file opened there runs with your
+page's origin, so an HTML attachment could act as your page.
+
+Saving takes a file out of the document, so it needs `doc.download`: check `canDownload`. A file
+too large to unpack in the browser is refused (see [Large files](#large-files)).
+
+## Attach files
+
+`add(files)` attaches files as one change: one step to undo. A `File` the user picked brings its
+name and type; bytes need a `name`:
+
+```ts
+await attachment.add([{ data: picked }, { data: bytes, name: 'figures.csv' }]);
+```
+
+Names are unique in a document: a name it has already gets a number, `notes (2).txt`, so nothing
+is replaced. The files show at once, `isPending(file)` while the engine saves them, and `add()`
+resolves with them. Check `canAdd` first.
+
+## Remove a file
+
+`remove(file)` takes a file away, as one step to undo: an undo brings back the same file, with its
+bytes and dates. A file on a page goes with its annotation, through the annotation plugin.
+`canRemove(file)` says whether this one may go.
+
+<Example name="attachment/files" />
+
+## Go to a page's file
+
+`reveal(file)` selects a page's file attachment annotation and brings it into view, through the
+[stage](/docs/headless/viewing/stage) when you've registered it. It does nothing for one of the
+document's attachments, which isn't on a page.
+
+## Select files
+
+`select(files)` makes files the selection, and `selected` lists them. The selection is the
+reader's: show it, and act on it with your own buttons and menus.
+
+```ts
+attachment.select([file]);
+await attachment.remove(selected[0]);
+```
+
+## Methods
+
+Everything `useAttachment()` gives you.
+
+| Method                | What it does                                                                                      |
+| :-------------------- | :------------------------------------------------------------------------------------------------ |
+| `get(id)`             | One file by its `id`, or `null`.                                                                  |
+| `isPending(file)`     | Whether a change to it waits for the engine. [Attach files](#attach-files)                        |
+| `canRemove(file)`     | Whether this file may go. [Remove a file](#remove-a-file)                                         |
+| `select(files)`       | Makes these files the selection; `[]` clears it. [Select files](#select-files)                    |
+| `add(files)`          | Attaches files as one change. Resolves with the new files.                                        |
+| `remove(file)`        | Takes a file away, as one change.                                                                 |
+| `download(file)`      | Resolves `{ bytes, name, mimeType }`, ready to save. [Save a file](#save-a-file)                  |
+| `reveal(file)`        | Goes to a page's file and selects it. [Go to a page's file](#go-to-a-pages-file)                  |
+| `ensureLoaded()`      | Reads the attachments, unless they're loaded or loading. Resolves once they're there.             |
+| `refresh()`           | Reads the attachments again. Rarely needed: they stay up to date by themselves.                   |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useAttachmentState()" />
+
+| Field         | What it is                                                                                     | Read once         |
+| :------------ | :--------------------------------------------------------------------------------------------- | :---------------- |
+| `files`       | Every file, the document's then the pages', with your changes shown before the engine answers  | `list()`          |
+| `selected`    | The selected files, in the order they were selected                                            | `getSelected()`   |
+| `status`      | `'idle'` until something asks for them, then `'loading'`, `'ready'`, `'forbidden'` or `'error'` | `getStatus()`     |
+| `canAdd`      | Whether attaching and removing files is allowed                                                | `canAdd()`        |
+| `canDownload` | Whether saving files is allowed                                                                | `canDownload()`   |
+
+## Events
+
+<Snippet name="documents/attachment-changed" />
+
+| Event        | Fires when                                                                                         | Carries                   |
+| :----------- | :------------------------------------------------------------------------------------------------- | :------------------------ |
+| `onChanged`  | The document's attachments were added, removed or brought back by an undo, by you or by someone else | `type`, `files`, `origin` |
+| `onResynced` | The attachments were read from the file: the first time they're asked for, after `refresh()`, or to catch up after a lost connection | `files` |
+
+`type` is `'added'`, `'removed'` or `'restored'`; for a removal, `files` are the files as they
+were. A file on a page is an annotation: its changes are the annotation plugin's events.
+
+## Permissions
+
+| Permission               | What it allows                                       | Check                              |
+| :----------------------- | :--------------------------------------------------- | :--------------------------------- |
+| `doc.open`               | Listing the files                                    | none: it opened                    |
+| `doc.download`           | Saving a file: it leaves the document                | `attachment.canDownload()`         |
+| `doc.attachments.modify` | Attaching files and removing the document's own      | `attachment.canAdd()`              |
+
+Removing a file on a page is deleting its annotation, so the annotation's own permission decides:
+`canRemove(file)` asks it.
+
+## Good to know
+
+### Large files
+
+<Engine local>
+
+The browser holds a file it saves in memory, so the local engine refuses a file that unpacks to
+more than 256 MB. `download()` rejects with `invalid-input`, and the error's `details.limit` names
+the limit. A file's own size can't be trusted for this: a small compressed file can unpack to
+gigabytes.
+
+</Engine>
+
+<Engine cloud>
+
+The server unpacks the file and applies its own limit; `download()` rejects a larger one with
+`invalid-input`.
+
+</Engine>
+
+### Removed files and saving
+
+Removing a file takes it out of the document as it is now; an incremental save still contains the
+version you opened. When a file must really be gone, save with `mode: 'rewrite'`. See
+[Saving](/docs/headless/documents/saving).
+
+### The ready-made viewer
+
+The viewer's Attachments panel is built on this plugin. See
+[Panels](/docs/viewer/customize/panels).
