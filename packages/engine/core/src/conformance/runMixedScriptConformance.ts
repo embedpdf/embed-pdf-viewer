@@ -60,6 +60,11 @@ const CASES: MixedScriptCase[] = [
     ],
   },
   {
+    name: 'Arabic with harakat',
+    value: 'مَرْحَبًا',
+    runs: [[ARABIC, 'مَرْحَبًا']],
+  },
+  {
     name: 'a character no font has',
     value: 'A中B',
     runs: [
@@ -219,7 +224,8 @@ function charactersOutside(layout: TextLayout, box: PageBox): string[] {
  * Mixed-script text as the shared text engine writes it, in a free text and
  * in a text field: read back from the appearance each exports, every run's
  * font, what it says, its direction and its place; flattened, every
- * character's box inside the box it was written in. Hebrew and Arabic come
+ * character's box inside the box it was written in, and its right-to-left
+ * runs reading as written. Hebrew and Arabic come
  * from the engine's default fallback fonts, a character none has from its
  * last resort. `opts.fixture` is a blank page.
  */
@@ -256,11 +262,17 @@ export function runMixedScriptConformance(
             expect(problemsOf(drawn[0]!)).toEqual([]);
             expect(missing).toEqual(scriptCase.missing);
 
-            // Flattened into the page, every character is boxed where it's drawn.
+            // Flattened into the page, every character is boxed where it's
+            // drawn, and each right-to-left run reads as it was written.
             await doc.page(ref.page).annotations.flatten([ref]);
             const layout = await doc.page(ref.page).text.layout();
             expect(layout.charCount > 0).toBe(true);
             expect(charactersOutside(layout, writer.box)).toEqual([]);
+            const { text } = await doc.page(ref.page).text.get();
+            const misread = drawn[0]!.runs
+              .filter((run) => RIGHT_TO_LEFT.test(run.text) && !text.includes(run.text))
+              .map((run) => run.text);
+            expect(misread).toEqual([]);
           } finally {
             await doc.close();
           }
