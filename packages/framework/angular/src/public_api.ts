@@ -13,6 +13,7 @@ export * from '@embedpdf/angular/view-manager';
 export * from '@embedpdf/angular/page-edit';
 export * from '@embedpdf/angular/metadata';
 export * from '@embedpdf/angular/outline';
+export * from '@embedpdf/angular/attachment';
 export * from '@embedpdf/angular/history';
 export * from '@embedpdf/angular/page-view';
 export * from '@embedpdf/angular/commands';

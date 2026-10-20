@@ -35,6 +35,10 @@
       "types": "./dist/annotation/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-annotation.mjs"
     },
+    "./attachment": {
+      "types": "./dist/attachment/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-angular-attachment.mjs"
+    },
     "./interaction": {
       "types": "./dist/interaction/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-interaction.mjs"
@@ -137,6 +141,7 @@
     "@embedpdf/web": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
