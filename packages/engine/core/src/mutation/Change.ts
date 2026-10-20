@@ -438,7 +438,8 @@ export interface ChangeResult<C extends Coordinates = PageCoordinates> {
   items: ChangeItem<C>[];
   /**
    * Every page the change touched, the cloud's cache delta, the change's
-   * `opId` (what `{ undoOf }` names) and whether it can be undone.
+   * `opId` (what `{ undoOf }` names), whether it can be undone, and what
+   * its ops drew with no font (each item's `meta` says it for its op).
    */
   meta: MutationMeta;
 }

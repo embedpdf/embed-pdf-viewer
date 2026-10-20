@@ -6,7 +6,7 @@ Serve the `document.fonts.list`, `document.fonts.resolve` and `document.fonts.pr
 
 A free text, a widget or a form field can name a font the document holds whole by its name. The write uses the document's own program instead of embedding another; a font that can't be chosen (a subset, a font the document only names, a preview-and-print licence, a Type 1, CFF or Type 3 program, or one without a Unicode cmap) is refused with `InvalidArg` and `details.restrictions`. A widget's or a box's `fontFamily` reads back by that name.
 
-A write that draws characters no font has reports them in `meta.missingCharacters`.
+A write that draws characters no font has reports them in `meta.missingCharacters`. A change reports them per op, in each item's `meta`, and for the whole change in its own, so the cloud, whose writes are changes, reports them too.
 
 Fix `forms.create` and `forms.addWidget` refusing a widget whose `fontFamily` names a registered font.
 

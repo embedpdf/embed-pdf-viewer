@@ -4,7 +4,7 @@
 
 Add a document's fonts as one list: `DocumentFontsService`, with `list()` (a `FontList` of the standard fonts, the engine's and the document's own, the fallbacks in the order they are tried, and the last-resort program), `resolve(request)` (which font and program a write would draw each run in, its fallbacks, and the characters no font has), `getProgram(displayHash)` (the code points a program covers, its ascent and descent) and `downloadProgram(displayHash)`. A `Font` says whether it `canChoose` and, when not, its `restrictions` (`'subset'`, `'not-embedded'`, `'preview-and-print'`, `'unsupported-format'`, `'no-unicode-map'`, `'not-served'`). A document's font is named by its PostScript name without the subset tag, so `fontFamily` can name it in a free text or a widget like any other font.
 
-Add the `fonts.changed` document event, and `meta.missingCharacters` on a write that drew characters no font has.
+Add the `fonts.changed` document event, and `meta.missingCharacters` on a write that drew characters no font has. A change's items say it for their op, and its `meta` for the whole change.
 
 Rename `FreeTextFont` to `FontName`, `faceForFreeTextFont` to `faceForFontName`, and `freeTextFontForFace` to `fontNameForFace`. `LocalDocumentHandle.fonts` is a `LocalDocumentFontsService` (the reads above, plus `setEmbeddingPolicy` and `setTypographicFeatures`) in place of `DocumentFontSettings`.
 
@@ -15,3 +15,5 @@ Add the `document.fonts.list`, `document.fonts.resolve` and `document.fonts.prog
 A document program with a display program can go to a browser: `FontProgramFacts.displaySha256` names it, and `displayHash` is it, so a form's Type 1 or CFF field font is `canDownload` while it still can't be chosen for new text. The `document.fonts.program` worker request names its program by `displayHash`.
 
 Fallback fonts have tiers (`FALLBACK_TIERS`): the app's own (the server's on the cloud) are tried before the ones the engine comes with, whatever their style, and `FontList.fallbacks` lists them in that order. The `fonts.addFallback` worker request takes a `tier`. A document that drew a character no font has holds the last-resort program, which `doc.fonts.list()` doesn't list as one of its fonts: it is the list's `lastResort`.
+
+Add `runMixedScriptConformance` to the conformance suites: mixed-script text in a free text and a text field, read back from the appearance each exports (each run's font, text, `/ActualText`, direction and place). `drawnTextOf(pdf)` is the reader it uses.

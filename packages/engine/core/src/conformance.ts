@@ -216,3 +216,5 @@ export {
   type FieldGroupToken,
   type FieldGroupsConformanceOptions,
 } from './conformance/runFieldGroupsConformance';
+export { runMixedScriptConformance } from './conformance/runMixedScriptConformance';
+export { drawnTextOf, type DrawnRun, type DrawnText } from './conformance/drawnText';

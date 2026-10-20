@@ -2857,7 +2857,9 @@ function actorOf({ identity }: ChangeAuthority): AnnotationActor {
 
 /**
  * A write's payload with the characters it drew with no font in its result's
- * meta (`meta.missingCharacters`), when there are any and it has a meta.
+ * meta (`meta.missingCharacters`), when there are any, it has a meta, and
+ * that meta doesn't already say: a change's result says per op, and for the
+ * whole change.
  */
 function withMissingCharacters<P extends WorkerResultPayload<PdfCoordinates>>(
   payload: P,
@@ -2867,7 +2869,7 @@ function withMissingCharacters<P extends WorkerResultPayload<PdfCoordinates>>(
   const result = payload.result as unknown;
   if (typeof result !== 'object' || result === null || !('meta' in result)) return payload;
   const { meta } = result as { meta: unknown };
-  if (typeof meta !== 'object' || meta === null) return payload;
+  if (typeof meta !== 'object' || meta === null || 'missingCharacters' in meta) return payload;
   return { ...payload, result: { ...result, meta: { ...meta, missingCharacters } } };
 }
 
@@ -2881,9 +2883,18 @@ function resultOf(session: DocumentSession, applied: AppliedChange): ChangeResul
   const items = applied.items.map(
     (item) => ({ ...item, meta: { ...item.meta, undoable } }) as ChangeItem<PdfCoordinates>,
   );
+  // What any of its ops drew with no font, first seen first.
+  const missingCharacters = [
+    ...new Set(items.flatMap((item) => item.meta.missingCharacters ?? [])),
+  ];
   return {
     items,
-    meta: { affectedPages: pagesOf(items), cacheDelta: null, ...session.writeStamp() },
+    meta: {
+      affectedPages: pagesOf(items),
+      cacheDelta: null,
+      ...session.writeStamp(),
+      ...(missingCharacters.length > 0 ? { missingCharacters } : {}),
+    },
   };
 }
 

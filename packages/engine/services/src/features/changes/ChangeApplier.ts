@@ -93,6 +93,7 @@ export class ChangeApplier {
   ): AppliedChange {
     const ctx = this.context(authority, signal, (self) => opsFillOwnField(self, ops));
     return collect(
+      this.session,
       authority,
       ops.map((op, at) => () => runOp(ctx, op, at)),
       signal,
@@ -102,6 +103,7 @@ export class ChangeApplier {
   undo(record: ChangeRecord, authority: ChangeAuthority, signal: AbortSignal): AppliedChange {
     const ctx = this.context(authority, signal, (self) => stepsFillOwnField(self, record.steps));
     return collect(
+      this.session,
       authority,
       record.steps.map((step) => () => runStep(ctx, step)),
       signal,
@@ -128,8 +130,12 @@ export class ChangeApplier {
   }
 }
 
-/** Runs each in order; the record reverses them in the opposite order. */
+/**
+ * Runs each in order; the record reverses them in the opposite order. Each
+ * item says what its run drew with no font for a character.
+ */
 function collect(
+  session: DocumentSession,
   authority: ChangeAuthority,
   runs: readonly (() => Done)[],
   signal: AbortSignal,
@@ -138,8 +144,17 @@ function collect(
   const reverses: (readonly ReverseStep[])[] = [];
   for (const run of runs) {
     throwIfAborted(signal);
+    session.clearMissingCharacters();
     const done = run();
-    items.push(done.item);
+    const missingCharacters = session.missingCharacters();
+    items.push(
+      missingCharacters.length === 0
+        ? done.item
+        : ({
+            ...done.item,
+            meta: { ...done.item.meta, missingCharacters },
+          } as ChangeItem<PdfCoordinates>),
+    );
     reverses.push(done.reverse);
   }
   return {

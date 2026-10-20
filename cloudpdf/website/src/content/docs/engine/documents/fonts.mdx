@@ -217,7 +217,8 @@ meta.missingCharacters; // ['世', '界'] when no font has them
 
 Every write that draws text says so in `meta.missingCharacters`: creating or changing a free text
 annotation or a redaction's label, filling in or resetting a form field, applying a redaction whose
-label wasn't drawn yet. It's left out when every character was drawn.
+label wasn't drawn yet. It's left out when every character was drawn. In a change
+(`doc.apply`), each item's `meta` says what its op drew, and the change's `meta` what they all did.
 
 ## Fonts the document already has
 
