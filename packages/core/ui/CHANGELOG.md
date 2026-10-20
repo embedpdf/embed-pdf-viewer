@@ -1,5 +1,11 @@
 # @embedpdf/core-ui
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `treeKeyAction(rows, focused, key, options)` is the keyboard of a tree view, as the ARIA tree pattern has it: the arrows, Home and End, `*`, Enter, and F2 and Delete when the tree is editable. Pure: a view hands in its rows and the key, and does what comes back.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

@@ -1,5 +1,21 @@
 # @embedpdf/angular
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – New entry `@embedpdf/angular/attachment`: `withAttachment()` and the `EpdfAttachment` service, with the files, the selected files, the load state, `canAdd()` and `canDownload()` as signals, the calls that select, add, remove, save and go to files, and `changed$` and `resynced$`. Reading it reads the document's attachments.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `@embedpdf/angular/outline`: `withOutline()` and the `EpdfOutline` service for the document's outline (its bookmarks): its State table as signals (`rows()`, `current()`, `canEdit()`, …), its calls, and the streams `changed$` and `resynced$`. Reading the service reads the outline.
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – Tapping a form field or editing a free text box on iOS no longer zooms the page in: their editors lay their text out at 16 px or more and draw it back at the page's size. `[epdfRichTextEditor]` now also makes your element fill its parent at that legible size, so draw the box's fill, border and padding on the parent: anything on the element itself scales with its text.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – `EpdfPageEdit` has `selected()`, the selected pages as a signal, and `select(pages)`. Page-edit positions are `position` now, in place of `placement`.
+
+### Patch Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The runtime hands the kernel the browser's printer (`browserPrinter()` from `@embedpdf/web`), and the documents service has `preparePrint()`, `print()` and `getPrintQuality()`.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

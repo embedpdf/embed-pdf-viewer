@@ -1,5 +1,13 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.16
+
+### Patch Changes
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – The annotations of pages an undo brings back are read again.
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – When pages go, come or come back, the pages whose annotations link to them are read again, so a link to a deleted page that an undo brought back works again.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

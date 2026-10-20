@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-form",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.16",
   "private": false,
   "description": "The form widget painter: what a widget looks like for its facts, ported from the engine's appearance generator and checked against it. Pure TypeScript, DOM-free.",
   "type": "module",
