@@ -30,7 +30,10 @@ export interface DrawnRun {
   x: number;
   /** Where the pen ends after it: known when the font says its widths. */
   end?: number;
-  /** Its first string's baseline. */
+  /**
+   * The baseline most of its glyphs sit on: a glyph the engine moves up or
+   * down (a mark, a joined letter) is drawn on a line of its own.
+   */
   baseline: number;
 }
 
@@ -249,8 +252,8 @@ class Lexer {
 interface PdfObject {
   number: number;
   value: PdfValue | undefined;
-  /** Where its stream's bytes are in the file. */
-  stream?: { start: number; end: number };
+  /** Where its stream's bytes are in the file; `exact` when its /Length said so. */
+  stream?: { start: number; end: number; exact: boolean };
 }
 
 /** A PDF file's objects, by number. */
@@ -268,18 +271,25 @@ class PdfFile {
   private constructor(private readonly bytes: Uint8Array) {
     const text = binary(bytes);
     const header = /(\d+)\s+\d+\s+obj\b/g;
+    const marker = /\s*stream\r?\n/y;
+    const lexer = new Lexer(text);
     for (let match = header.exec(text); match; match = header.exec(text)) {
-      const start = match.index + match[0].length;
-      const endobj = text.indexOf('endobj', start);
-      const body = text.slice(start, endobj < 0 ? undefined : endobj);
-      const lexer = new Lexer(body);
-      const object: PdfObject = { number: Number(match[1]), value: lexer.next() };
-      const marker = /^\s*stream\r?\n/.exec(body.slice(lexer.at));
-      if (marker) {
-        object.stream = {
-          start: start + lexer.at + marker[0].length,
-          end: text.lastIndexOf('endstream', endobj < 0 ? undefined : endobj),
-        };
+      lexer.at = match.index + match[0].length;
+      const value = lexer.next();
+      const object: PdfObject = { number: Number(match[1]), value };
+      marker.lastIndex = lexer.at;
+      const stream = value instanceof Map ? marker.exec(text) : null;
+      if (stream && value instanceof Map) {
+        // Its /Length says where it ends; compressed bytes can hold anything.
+        const start = lexer.at + stream[0].length;
+        const length = value.get('Length');
+        object.stream =
+          typeof length === 'number'
+            ? { start, end: start + length, exact: true }
+            : { start, end: text.indexOf('endstream', start), exact: false };
+        header.lastIndex = object.stream.end;
+      } else {
+        header.lastIndex = lexer.at;
       }
       this.byNumber.set(object.number, object);
     }
@@ -314,6 +324,7 @@ class PdfFile {
     if (!object?.stream || !(object.value instanceof Map)) return new Uint8Array();
     let { end } = object.stream;
     while (
+      !object.stream.exact &&
       end > object.stream.start &&
       (this.bytes[end - 1] === 10 || this.bytes[end - 1] === 13)
     ) {
@@ -480,6 +491,14 @@ function runsOf(content: Uint8Array, fonts: Map<string, DrawnFont>): DrawnRun[] 
   let pen = 0;
   let current: DrawnRun | undefined;
   let currentSpan: string | null = null;
+  let currentY = 0;
+  // Per run, how many glyphs each baseline it was drawn on holds.
+  const glyphsAt = new Map<DrawnRun, Map<number, number>>();
+  const tally = (run: DrawnRun, glyphs: string) => {
+    const counts = glyphsAt.get(run) ?? new Map<number, number>();
+    counts.set(line.y, (counts.get(line.y) ?? 0) + [...glyphs].length);
+    glyphsAt.set(run, counts);
+  };
 
   /** Moves the pen over a string, or over a `TJ` array's strings and adjustments. */
   const draw = (items: PdfValue[]) => {
@@ -509,9 +528,10 @@ function runsOf(content: Uint8Array, fonts: Map<string, DrawnFont>): DrawnRun[] 
       current !== undefined &&
       current.font === font &&
       currentSpan === span &&
-      (span !== null || current.baseline === line.y);
+      (span !== null || currentY === line.y);
     const { glyphs, measured } = draw(items);
     if (continues && current) {
+      tally(current, glyphs);
       current.glyphs += glyphs;
       if (span === null) current.text += glyphs;
       if (measured && current.end !== undefined) {
@@ -531,6 +551,8 @@ function runsOf(content: Uint8Array, fonts: Map<string, DrawnFont>): DrawnRun[] 
       baseline: line.y,
     };
     currentSpan = span;
+    currentY = line.y;
+    tally(current, glyphs);
     runs.push(current);
   };
 
@@ -604,6 +626,15 @@ function runsOf(content: Uint8Array, fonts: Map<string, DrawnFont>): DrawnRun[] 
         break;
     }
     operands.length = 0;
+  }
+  for (const run of runs) {
+    let most = 0;
+    for (const [y, count] of glyphsAt.get(run) ?? []) {
+      if (count >= most) {
+        most = count;
+        run.baseline = y;
+      }
+    }
   }
   return runs;
 }

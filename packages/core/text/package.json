@@ -1,0 +1,59 @@
+{
+  "name": "@embedpdf/core-text",
+  "version": "3.0.0-next.15",
+  "private": false,
+  "description": "Text laid out as the engine lays it out: the font each character is drawn in, the Unicode bidirectional order, and a form field's lines, sizes and runs. Pure TypeScript, DOM-free.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core-fonts": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
+    "bidi-js": "1.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "epdf": {
+    "devExports": "development"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/core/text"
+  }
+}
