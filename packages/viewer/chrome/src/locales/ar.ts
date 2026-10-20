@@ -102,6 +102,7 @@ export const ar: Locale = {
         note: 'تعليق',
         link: 'ارتباط',
         gotoLink: 'الانتقال إلى الارتباط',
+        saveFile: 'حفظ الملف',
         removeLink: 'إزالة الارتباط',
         delete: 'حذف',
         group: 'تجميع',
@@ -159,6 +160,7 @@ export const ar: Locale = {
         'annotations-create': 'لا يُسمح بإضافة تعليقات توضيحية',
         'doc-annotate-modify': 'لا يُسمح بتغيير التعليقات التوضيحية',
         'doc-annotate-read': 'لا يُسمح بعرض التعليقات التوضيحية',
+        'doc-attachments-modify': 'لا يُسمح بإضافة ملفات',
         'doc-download': 'لا يُسمح بالتنزيل',
         'doc-forms-modify': 'لا يُسمح بتحرير حقول النماذج',
         'doc-outline-modify': 'لا يُسمح بتغيير المخطط',
@@ -166,6 +168,13 @@ export const ar: Locale = {
         'doc-print': 'لا يُسمح بالطباعة',
         'doc-text-copy': 'لا يُسمح بالنسخ',
         'doc-text-search': 'لا يُسمح بالبحث',
+      },
+      attachment: {
+        add: 'إضافة ملف',
+        save: 'حفظ',
+        goTo: 'الانتقال إلى الصفحة',
+        delete: 'حذف',
+        more: 'خيارات إضافية',
       },
       outline: {
         add: 'إضافة عنصر',
@@ -467,6 +476,17 @@ export const ar: Locale = {
       invisible: 'قديم: إخفاء الأنواع الفرعية غير المعروفة',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'جارٍ تحميل المرفقات…',
+      failed: 'تعذّرت قراءة المرفقات.',
+      empty: 'لا يحتوي هذا المستند على ملفات مرفقة',
+      drop: 'أفلت الملفات لإرفاقها',
+      dropHint: 'أو أفلت الملفات هنا',
+      adding: 'جارٍ الإضافة…',
+      onPage: 'الصفحة {page}',
+      count: '{count} ملف',
+      countPlural: '{count} ملفات',
+    },
     outline: {
       filter: 'تصفية المخطط',
       loading: 'جارٍ تحميل المخطط…',

@@ -11,12 +11,14 @@ import { AttachmentToken } from './contract';
 export const attachmentState = defineState(AttachmentToken, {
   read: (attachment) => ({
     files: attachment.list(),
+    selected: attachment.getSelected(),
     status: attachment.getStatus(),
     canAdd: attachment.canAdd(),
     canDownload: attachment.canDownload(),
   }),
   empty: {
     files: [],
+    selected: [],
     status: 'idle',
     canAdd: false,
     canDownload: false,

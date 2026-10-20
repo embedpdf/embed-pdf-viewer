@@ -42,6 +42,7 @@ import { I18nToken } from '@embedpdf/react/i18n';
 import { saveFile } from '@embedpdf/web';
 
 import type { Feature } from '../features';
+import { attachmentCommands } from './attachments';
 import { openModeSurfaceOf } from './modes';
 import { openFileCommand } from './open-files';
 import { outlineCommands } from './outline';
@@ -444,6 +445,9 @@ export const defaultCommands: CommandDef[] = [
 
   // ── the outline ─────────────────────────────────────────────────────────
   ...outlineCommands,
+
+  // ── the files the document carries ──────────────────────────────────────
+  ...attachmentCommands,
 
   // ── the pages: rotate, move, insert, delete, copy out ───────────────────
   ...pageCommands,

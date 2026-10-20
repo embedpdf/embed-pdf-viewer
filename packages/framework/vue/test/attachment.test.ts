@@ -67,10 +67,11 @@ describe('useAttachmentState', () => {
   it("has the page's State fields as refs: empty with no document, the document's once read", async () => {
     const states: unknown[] = [];
     const Probe = probe(() => {
-      const { files, status, canAdd, canDownload } = useAttachmentState();
+      const { files, selected, status, canAdd, canDownload } = useAttachmentState();
       return () => {
         states.push({
           files: files.value,
+          selected: selected.value,
           status: status.value,
           canAdd: canAdd.value,
           canDownload: canDownload.value,

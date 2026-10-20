@@ -102,6 +102,7 @@ export const he: Locale = {
         note: 'הערה',
         link: 'קישור',
         gotoLink: 'עבור לקישור',
+        saveFile: 'שמירת הקובץ',
         removeLink: 'הסר קישור',
         delete: 'מחק',
         group: 'קבץ',
@@ -159,6 +160,7 @@ export const he: Locale = {
         'annotations-create': 'הוספת ביאורים אינה מותרת',
         'doc-annotate-modify': 'שינוי ביאורים אינו מותר',
         'doc-annotate-read': 'צפייה בביאורים אינה מותרת',
+        'doc-attachments-modify': 'אסור להוסיף קבצים',
         'doc-download': 'הורדה אינה מותרת',
         'doc-forms-modify': 'עריכת שדות טופס אינה מותרת',
         'doc-outline-modify': 'אין הרשאה לשנות סימניות',
@@ -166,6 +168,13 @@ export const he: Locale = {
         'doc-print': 'הדפסה אינה מותרת',
         'doc-text-copy': 'העתקה אינה מותרת',
         'doc-text-search': 'חיפוש אינו מותר',
+      },
+      attachment: {
+        add: 'הוספת קובץ',
+        save: 'שמירה',
+        goTo: 'מעבר לעמוד',
+        delete: 'מחיקה',
+        more: 'אפשרויות נוספות',
       },
       outline: {
         add: 'הוספת סימניה',
@@ -467,6 +476,17 @@ export const he: Locale = {
       invisible: 'מדור קודם: הסתר תת־סוגים לא ידועים',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'טוען קבצים מצורפים…',
+      failed: 'לא ניתן היה לקרוא את הקבצים המצורפים.',
+      empty: 'למסמך זה אין קבצים מצורפים',
+      drop: 'שחררו קבצים כדי לצרף אותם',
+      dropHint: 'או שחררו קבצים כאן',
+      adding: 'מוסיף…',
+      onPage: 'עמוד {page}',
+      count: 'קובץ {count}',
+      countPlural: '{count} קבצים',
+    },
     outline: {
       filter: 'סינון סימניות',
       loading: 'טוען סימניות…',

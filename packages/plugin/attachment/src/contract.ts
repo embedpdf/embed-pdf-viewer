@@ -64,6 +64,13 @@ export interface AttachmentCapability {
   list(): readonly AttachedFile[];
   /** One file by its `id`, or `null`. */
   get(id: string): AttachedFile | null;
+  /**
+   * The selected files, in the order they were selected; files the list no
+   * longer has drop out. What a panel's commands act on.
+   */
+  getSelected(): readonly AttachedFile[];
+  /** Make these files the selection; `[]` clears it. */
+  select(files: readonly AttachedFile[]): void;
   /** Whether a change to it waits for the engine: an add of an attachment, or a write to its annotation. */
   isPending(file: AttachedFile): boolean;
   /** Load state of the attachments: `idle` until `ensureLoaded()` asks, then `loading` → `ready`, or `forbidden` / `error`. */

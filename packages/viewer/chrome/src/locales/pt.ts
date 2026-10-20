@@ -101,6 +101,7 @@ export const pt: Locale = {
         note: 'Comentário',
         link: 'Link',
         gotoLink: 'Ir para o link',
+        saveFile: 'Salvar arquivo',
         removeLink: 'Remover link',
         delete: 'Excluir',
         group: 'Agrupar',
@@ -158,6 +159,7 @@ export const pt: Locale = {
         'annotations-create': 'Não é permitido adicionar anotações',
         'doc-annotate-modify': 'Não é permitido alterar anotações',
         'doc-annotate-read': 'Não é permitido exibir anotações',
+        'doc-attachments-modify': 'Não é permitido adicionar arquivos',
         'doc-download': 'Não é permitido baixar',
         'doc-forms-modify': 'Não é permitido editar campos de formulário',
         'doc-outline-modify': 'Não é permitido alterar os marcadores',
@@ -165,6 +167,13 @@ export const pt: Locale = {
         'doc-print': 'Não é permitido imprimir',
         'doc-text-copy': 'Não é permitido copiar',
         'doc-text-search': 'Não é permitido pesquisar',
+      },
+      attachment: {
+        add: 'Adicionar arquivo',
+        save: 'Salvar',
+        goTo: 'Ir para a página',
+        delete: 'Excluir',
+        more: 'Mais opções',
       },
       outline: {
         add: 'Adicionar marcador',
@@ -467,6 +476,17 @@ export const pt: Locale = {
       invisible: 'Legado: ocultar subtipos desconhecidos',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'Carregando anexos…',
+      failed: 'Não foi possível ler os anexos.',
+      empty: 'Este documento não tem arquivos anexados',
+      drop: 'Solte arquivos para anexá-los',
+      dropHint: 'Ou solte arquivos aqui',
+      adding: 'Adicionando…',
+      onPage: 'Página {page}',
+      count: '{count} arquivo',
+      countPlural: '{count} arquivos',
+    },
     outline: {
       filter: 'Filtrar marcadores',
       loading: 'Carregando marcadores…',

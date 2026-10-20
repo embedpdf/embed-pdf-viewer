@@ -26,7 +26,14 @@ import type {
   AttachmentsChangedEvent,
   AttachmentsResyncedEvent,
 } from './contract';
-import { documentFileOf, freeName, pageFileOf, type DocumentFiles } from './model';
+import {
+  documentFileOf,
+  freeName,
+  pageFileOf,
+  selected,
+  type AttachmentState,
+  type DocumentFiles,
+} from './model';
 import { displayNameOf } from './names';
 import { foldFiles, predictFiles, undoOf } from './sync/files';
 
@@ -45,7 +52,7 @@ const NO_FILES: readonly AttachedFile[] = Object.freeze([]);
  * an attachment is one change on the document's queue: it shows at once, is
  * one step of the history, and undoing it shows the files as they were.
  */
-export function createAttachmentController(ctx: PluginContext<void>) {
+export function createAttachmentController(ctx: PluginContext<AttachmentState>) {
   const changed = ctx.events.source<AttachmentsChangedEvent>();
   const resynced = ctx.events.source<AttachmentsResyncedEvent>();
 
@@ -118,6 +125,18 @@ export function createAttachmentController(ctx: PluginContext<void>) {
     },
   );
   const get = (id: string): AttachedFile | null => list().find((file) => file.id === id) ?? null;
+  const getSelected = memo(
+    () => [list(), ctx.state.get().selected] as const,
+    (files, ids) => {
+      if (ids.length === 0) return NO_FILES;
+      const byId = new Map(files.map((file) => [file.id, file]));
+      const chosen = ids.flatMap((id) => {
+        const file = byId.get(id);
+        return file ? [file] : [];
+      });
+      return chosen.length > 0 ? chosen : NO_FILES;
+    },
+  );
 
   const isPending = (file: AttachedFile): boolean => {
     if (file.home.kind === 'page') return annotations()?.isPending(file.home.ref) ?? false;
@@ -262,6 +281,8 @@ export function createAttachmentController(ctx: PluginContext<void>) {
   const api: AttachmentCapability = {
     list,
     get,
+    getSelected,
+    select: (files) => ctx.state.update(selected, files.map((file) => file.id)),
     isPending,
     getStatus: files.getStatus,
     ensureLoaded: (options) => ctx.cancellable(options?.signal, files.ensureLoaded()),

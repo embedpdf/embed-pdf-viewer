@@ -4,6 +4,7 @@ import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { AttachmentToken } from './contract';
 import { createAttachmentController } from './controller';
+import { initialAttachmentState } from './model';
 
 /**
  * The files a document carries. Document-scoped; optionally uses the
@@ -16,5 +17,6 @@ export const attachmentPlugin = () =>
     token: AttachmentToken,
     scope: 'document',
     optional: [AnnotationToken, StageToken],
+    state: initialAttachmentState,
     create: createAttachmentController,
   });

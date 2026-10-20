@@ -101,6 +101,7 @@ export const it: Locale = {
         note: 'Commento',
         link: 'Collegamento',
         gotoLink: 'Vai al collegamento',
+        saveFile: 'Salva file',
         removeLink: 'Rimuovi collegamento',
         delete: 'Elimina',
         group: 'Raggruppa',
@@ -158,6 +159,7 @@ export const it: Locale = {
         'annotations-create': 'L’aggiunta di annotazioni non è consentita',
         'doc-annotate-modify': 'La modifica delle annotazioni non è consentita',
         'doc-annotate-read': 'La visualizzazione delle annotazioni non è consentita',
+        'doc-attachments-modify': 'L’aggiunta di file non è consentita',
         'doc-download': 'Il download non è consentito',
         'doc-forms-modify': 'La modifica dei campi modulo non è consentita',
         'doc-outline-modify': 'La modifica dei segnalibri non è consentita',
@@ -165,6 +167,13 @@ export const it: Locale = {
         'doc-print': 'La stampa non è consentita',
         'doc-text-copy': 'La copia non è consentita',
         'doc-text-search': 'La ricerca non è consentita',
+      },
+      attachment: {
+        add: 'Aggiungi file',
+        save: 'Salva',
+        goTo: 'Vai alla pagina',
+        delete: 'Elimina',
+        more: 'Altre opzioni',
       },
       outline: {
         add: 'Aggiungi segnalibro',
@@ -466,6 +475,17 @@ export const it: Locale = {
       invisible: 'Obsoleto: nascondi i sottotipi sconosciuti',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'Caricamento degli allegati…',
+      failed: 'Impossibile leggere gli allegati.',
+      empty: 'Questo documento non ha file allegati',
+      drop: 'Rilascia i file per allegarli',
+      dropHint: 'Oppure rilascia i file qui',
+      adding: 'Aggiunta in corso…',
+      onPage: 'Pagina {page}',
+      count: '{count} file',
+      countPlural: '{count} file',
+    },
     outline: {
       filter: 'Filtra segnalibri',
       loading: 'Caricamento dei segnalibri…',

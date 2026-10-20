@@ -102,6 +102,7 @@ export const fr: Locale = {
         note: 'Commentaire',
         link: 'Lien',
         gotoLink: 'Ouvrir le lien',
+        saveFile: 'Enregistrer le fichier',
         removeLink: 'Supprimer le lien',
         delete: 'Supprimer',
         group: 'Grouper',
@@ -159,6 +160,7 @@ export const fr: Locale = {
         'annotations-create': 'L’ajout d’annotations n’est pas autorisé',
         'doc-annotate-modify': 'La modification des annotations n’est pas autorisée',
         'doc-annotate-read': 'L’affichage des annotations n’est pas autorisé',
+        'doc-attachments-modify': 'L’ajout de fichiers n’est pas autorisé',
         'doc-download': 'Le téléchargement n’est pas autorisé',
         'doc-forms-modify': 'La modification des champs de formulaire n’est pas autorisée',
         'doc-outline-modify': 'La modification des signets n’est pas autorisée',
@@ -166,6 +168,13 @@ export const fr: Locale = {
         'doc-print': 'L’impression n’est pas autorisée',
         'doc-text-copy': 'La copie n’est pas autorisée',
         'doc-text-search': 'La recherche n’est pas autorisée',
+      },
+      attachment: {
+        add: 'Ajouter un fichier',
+        save: 'Enregistrer',
+        goTo: 'Aller à la page',
+        delete: 'Supprimer',
+        more: 'Plus d’options',
       },
       outline: {
         add: 'Ajouter un signet',
@@ -469,6 +478,17 @@ export const fr: Locale = {
       invisible: 'Hérité : masquer les sous-types inconnus',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'Chargement des pièces jointes…',
+      failed: 'Les pièces jointes n’ont pas pu être lues.',
+      empty: 'Ce document n’a aucun fichier joint',
+      drop: 'Déposez des fichiers pour les joindre',
+      dropHint: 'Ou déposez des fichiers ici',
+      adding: 'Ajout…',
+      onPage: 'Page {page}',
+      count: '{count} fichier',
+      countPlural: '{count} fichiers',
+    },
     outline: {
       filter: 'Filtrer les signets',
       loading: 'Chargement des signets…',

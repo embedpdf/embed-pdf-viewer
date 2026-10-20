@@ -172,8 +172,8 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panels', () => {
       filled: true,
     });
     expect(thumbnails!.left).toBe(0);
-    // The outline shows beside them, so the title switches between the two; the attachments
-    // have nothing to show.
+    // The outline and the attachments show beside them (the session may add to both), so the
+    // title switches between them.
     expect(thumbnails!.switcher).toBe(true);
     await tab.close();
   });

@@ -13,6 +13,21 @@ import {
 
 import type { AttachedFile } from './contract';
 
+/** The session's part: the selected files, by id, in the order they were selected. */
+export interface AttachmentState {
+  readonly selected: readonly string[];
+}
+
+export const initialAttachmentState = (): AttachmentState => ({ selected: [] });
+
+/** Make these files the selection; the same ids leave the state as it is. */
+export function selected(state: AttachmentState, ids: readonly string[]): AttachmentState {
+  const unique = ids.filter((id, i) => ids.indexOf(id) === i);
+  const same =
+    unique.length === state.selected.length && unique.every((id, i) => id === state.selected[i]);
+  return same ? state : { ...state, selected: unique };
+}
+
 /** The document's attachments, in the order its name tree keeps them; `null` before the first read lands. */
 export type DocumentFiles = readonly Attachment[] | null;
 

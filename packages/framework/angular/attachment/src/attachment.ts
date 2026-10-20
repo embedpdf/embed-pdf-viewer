@@ -13,9 +13,9 @@ import { attachmentPlugin, attachmentState, AttachmentToken } from '@embedpdf/pl
 
 /**
  * The files of the document in scope (`[epdfDocumentScope]`), else the active one: the State
- * table as signals (`files()`, `status()`, `canAdd()`, `canDownload()`), the reads that take a
- * file (`get()`, `isPending()`, `canRemove()`), the calls that add, remove, save and go to
- * files, and the streams `changed$` and `resynced$`. Reading it reads the attachments. With no
+ * table as signals (`files()`, `selected()`, `status()`, `canAdd()`, `canDownload()`), the
+ * reads that take a file (`get()`, `isPending()`, `canRemove()`), the calls that select, add,
+ * remove, save and go to files, and the streams `changed$` and `resynced$`. Reading it reads the attachments. With no
  * document the signals read empty, and every call refuses with `not-ready`.
  */
 @Injectable({ providedIn: 'root' })
@@ -26,6 +26,7 @@ export class EpdfAttachment extends pluginService({
   state: attachmentState,
   methods: [
     'get',
+    'select',
     'isPending',
     'canRemove',
     'ensureLoaded',

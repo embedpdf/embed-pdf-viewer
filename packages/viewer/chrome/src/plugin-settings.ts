@@ -93,6 +93,7 @@ interface BuiltInSettings {
   readonly pageEdit: never;
   readonly metadata: never;
   readonly outline: never;
+  readonly attachment: never;
   readonly actions: ConfigOf<typeof actionsPlugin>;
   readonly documents: never;
   readonly interaction: ConfigOf<typeof interactionPlugin>;
@@ -121,6 +122,7 @@ const WITHOUT_SETTINGS: ReadonlySet<string> = new Set<PluginName>([
   'pageEdit',
   'metadata',
   'outline',
+  'attachment',
   'documents',
   'shell',
 ]);

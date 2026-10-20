@@ -209,6 +209,20 @@ describe('adding and removing', () => {
   });
 });
 
+describe('selection', () => {
+  it('keeps the files selected in order, and drops a file the list no longer has', async () => {
+    const { kernel, attachment } = await boot();
+    const [one, pdf] = attachment.list();
+    attachment.select([pdf!, one!, pdf!]);
+    expect(attachment.getSelected().map((file) => file.name)).toEqual(['attached.pdf', '1.txt']);
+    await attachment.remove(one!);
+    expect(attachment.getSelected().map((file) => file.name)).toEqual(['attached.pdf']);
+    attachment.select([]);
+    expect(attachment.getSelected()).toEqual([]);
+    await kernel.destroy();
+  });
+});
+
 describe("a page's files", () => {
   it('lists a file attachment annotation after the attachments, and saves, shows and removes it', async () => {
     const { kernel, attachment } = await boot({ annotations: true });

@@ -101,6 +101,7 @@ export const ja: Locale = {
         note: 'コメント',
         link: 'リンク',
         gotoLink: 'リンク先へ移動',
+        saveFile: 'ファイルを保存',
         removeLink: 'リンクを削除',
         delete: '削除',
         group: 'グループ化',
@@ -158,6 +159,7 @@ export const ja: Locale = {
         'annotations-create': '注釈の追加は許可されていません',
         'doc-annotate-modify': '注釈の変更は許可されていません',
         'doc-annotate-read': '注釈の表示は許可されていません',
+        'doc-attachments-modify': 'ファイルの追加は許可されていません',
         'doc-download': 'ダウンロードは許可されていません',
         'doc-forms-modify': 'フォームフィールドの編集は許可されていません',
         'doc-outline-modify': 'しおりの変更は許可されていません',
@@ -165,6 +167,13 @@ export const ja: Locale = {
         'doc-print': '印刷は許可されていません',
         'doc-text-copy': 'コピーは許可されていません',
         'doc-text-search': '検索は許可されていません',
+      },
+      attachment: {
+        add: 'ファイルを追加',
+        save: '保存',
+        goTo: 'ページに移動',
+        delete: '削除',
+        more: 'その他のオプション',
       },
       outline: {
         add: 'しおりを追加',
@@ -466,6 +475,17 @@ export const ja: Locale = {
       invisible: '旧仕様：不明なサブタイプを非表示',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: '添付ファイルを読み込み中…',
+      failed: '添付ファイルを読み取れませんでした。',
+      empty: 'この文書には添付ファイルがありません',
+      drop: 'ファイルをドロップして添付',
+      dropHint: 'またはここにファイルをドロップ',
+      adding: '追加中…',
+      onPage: '{page} ページ',
+      count: '{count} 個のファイル',
+      countPlural: '{count} 個のファイル',
+    },
     outline: {
       filter: 'しおりを絞り込む',
       loading: 'しおりを読み込んでいます…',
