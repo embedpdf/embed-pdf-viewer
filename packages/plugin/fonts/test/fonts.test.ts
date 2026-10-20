@@ -304,28 +304,40 @@ describe('the fonts controller', () => {
   });
 });
 
-/** A host whose programs are ready when `load()` says so, and whose letters are 600 wide. */
+/**
+ * A host whose programs are ready when `load()` says so, or refused when
+ * `refuse()` does, and whose letters are 600 wide.
+ */
 function fakeMeasurer() {
   const listeners = new Set<() => void>();
   const loaded = new Set<string>();
+  const refusedFamilies = new Set<string>();
   const asked: string[] = [];
   const measurer: HostTextMeasurer = {
     ready: (program: HostFontProgram) => {
       asked.push(program.family);
       return loaded.has(program.family);
     },
+    refused: (program) => refusedFamilies.has(program.family),
     width: (_program, text) => [...text].length * 600,
-    onReady(listener) {
+    onChange(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+  };
+  const changed = () => {
+    for (const listener of [...listeners]) listener();
   };
   return {
     measurer,
     asked,
     load(family: string) {
       loaded.add(family);
-      for (const listener of [...listeners]) listener();
+      changed();
+    },
+    refuse(family: string) {
+      refusedFamilies.add(family);
+      changed();
     },
   };
 }
@@ -392,6 +404,33 @@ describe("a box's paint fonts", () => {
     });
     expect(roboto.face.width('Hi', false)).toBe(1200);
     expect(api.getPaintFonts('Minion', 'Hi שלום')!.face.key).toBe('helvetica');
+  });
+
+  it("draws a program the browser refuses as one it can't get: the face's look-alike, no such fallback", async () => {
+    const host = fakeMeasurer();
+    const robotoFamily = fontProgramFamily(hashOf('a'));
+    const { api } = harness({ measurer: host.measurer });
+    await api.ensureLoaded();
+    expect(api.getFontCss('Roboto-Regular').programs[0]!.family).toBe(robotoFamily);
+    api.getPaintFonts('Roboto-Regular', 'Hi');
+    await settle();
+    expect(api.getPaintFonts('Roboto-Regular', 'Hi')).toBeNull();
+    expect(host.asked).toContain(robotoFamily);
+
+    const epoch = api.getPaintFontsEpoch();
+    host.refuse(robotoFamily);
+    host.refuse(HEBREW_FAMILY);
+    expect(api.getPaintFontsEpoch()).toBeGreaterThan(epoch);
+    // The editor's CSS starts with the face's standard look-alike, never the refused programs.
+    const css = api.getFontCss('Roboto-Regular');
+    expect(css.programs.map((program) => program.hash)).toEqual([
+      standardFontProgram('helvetica').hash,
+      LAST_RESORT_HASH,
+    ]);
+    // The painter draws in the look-alike, without waiting for a program that never comes.
+    const fonts = api.getPaintFonts('Roboto-Regular', 'Hi שלום')!;
+    expect(fonts.face.key).toBe('helvetica');
+    expect(fonts.fallbacks).toEqual([]);
   });
 
   it("draws in the defaults where fonts can't be found or measured", async () => {

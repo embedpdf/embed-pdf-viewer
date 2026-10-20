@@ -45,6 +45,8 @@ export interface PaintFontSources {
   ) => MountableFontProgram;
   /** The standard font a font whose program a browser can't get is drawn in. */
   readonly standardOf: (font: FontName) => StandardFont;
+  /** Whether the host refused `program`: it's drawn as one a browser can't get. */
+  readonly refused: (program: MountableFontProgram) => boolean;
   /** Something {@link PaintFontsOf.get} answers from changed. */
   readonly changed: () => void;
 }
@@ -120,6 +122,22 @@ export function createPaintFonts(sources: PaintFontSources) {
     return entry;
   };
 
+  /**
+   * `fonts` without the programs the host refused: a refused face is drawn
+   * in its standard look-alike, as a program a browser can't get is, and a
+   * refused fallback is passed over.
+   */
+  const withoutRefused = (font: FontName, fonts: PaintFonts): PaintFonts => {
+    const faceRefused = !fonts.face.standard && sources.refused(fonts.face.program);
+    const fallbacks = fonts.fallbacks.filter((fallback) => !sources.refused(fallback.program));
+    if (!faceRefused && fallbacks.length === fonts.fallbacks.length) return fonts;
+    return {
+      face: faceRefused ? standardPaintFont(sources.standardOf(font)) : fonts.face,
+      fallbacks,
+      lastResort: fonts.lastResort,
+    };
+  };
+
   /** Whether a program `text` is drawn in is still loading (asking starts it loading). */
   const loading = (measure: HostTextMeasurer, fonts: PaintFonts, text: string): boolean => {
     const asked = new Set<PaintFont>();
@@ -148,7 +166,8 @@ export function createPaintFonts(sources: PaintFontSources) {
       const { value } = foundFor(measurer, font);
       if (value === null) return null;
       if (value === 'failed') return plain;
-      return loading(measurer, value, text) ? null : value;
+      const usable = withoutRefused(font, value);
+      return loading(measurer, usable, text) ? null : usable;
     },
     /** The document's fonts changed: find each font's again, the next time it's asked for. */
     reset(): void {

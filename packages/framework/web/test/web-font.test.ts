@@ -130,6 +130,26 @@ describe('mountWebFont', () => {
     expect(sans.load).toHaveBeenCalledTimes(2);
   });
 
+  it('rejects a program the browser refuses, and holds nothing of it', async () => {
+    class RefusedFontFace extends FakeFontFace {
+      override async load(): Promise<this> {
+        throw new DOMException('Invalid font data in ArrayBuffer.');
+      }
+    }
+    vi.stubGlobal('FontFace', RefusedFontFace);
+    const { doc, faces } = fakeDocument();
+    const program = {
+      family: 'epdf-0123456789abcdef',
+      weight: 400,
+      style: 'normal' as const,
+      load: async () => new Uint8Array([1]),
+    };
+    await expect(mountFontProgram(program, { document: doc })).rejects.toThrow('Invalid font data');
+    expect(faces.size).toBe(0);
+    // Asked again, it's tried again.
+    await expect(mountFontProgram(program, { document: doc })).rejects.toThrow();
+  });
+
   it('is a no-op without the FontFace API', async () => {
     const { doc, faces } = fakeDocument();
     const unmount = await mountWebFont('x', new Uint8Array([0]), { document: doc });

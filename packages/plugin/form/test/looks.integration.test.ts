@@ -143,8 +143,9 @@ describe('a filled widget looks', () => {
         });
         return false;
       },
+      refused: () => false,
       width: (_program, text) => [...text].length * 600,
-      onReady(listener) {
+      onChange(listener) {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },

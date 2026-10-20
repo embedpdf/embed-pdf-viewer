@@ -25,6 +25,8 @@ export function fontKeyOfWebFamily(family: string): string {
  * Returns the unmount. Idempotent per (document, key): a second mount of a
  * key already in the document's font set is a no-op that still returns an
  * unmount of its own (the face leaves when the last holder unmounts).
+ * Rejects when the browser refuses the font (its font sanitizer rejects a
+ * malformed program whole).
  */
 export async function mountWebFont(
   key: string,
@@ -67,9 +69,9 @@ async function mountFace(
   try {
     await face.load();
     fonts.add(face);
-  } catch {
+  } catch (error) {
     holders.delete(family);
-    return () => {};
+    throw error;
   }
   notifyFontChange(doc);
   return () => release(holders, family);
@@ -91,7 +93,8 @@ export interface MountableFontProgram {
  * Mount a program under its own family, as it is (already in the viewer's
  * namespace), in its own weight and style, so CSS asking for that style takes
  * it as it is and never fakes a bold or an italic. Refcounted per document
- * like {@link mountWebFont}; resolves with the unmount.
+ * like {@link mountWebFont}; resolves with the unmount, and rejects when the
+ * bytes don't load or the browser refuses them.
  */
 export async function mountFontProgram(
   program: MountableFontProgram,

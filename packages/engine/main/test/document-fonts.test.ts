@@ -13,6 +13,35 @@ import type { LocalDocumentHandle } from '../src/document/LocalDocumentHandle';
 const here = dirname(fileURLToPath(import.meta.url));
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
+/** An sfnt's tables as its directory names them: tag, offset, bytes. */
+function tablesOf(font: Uint8Array): { tag: string; offset: number; bytes: Uint8Array }[] {
+  const view = new DataView(font.buffer, font.byteOffset, font.byteLength);
+  return Array.from({ length: view.getUint16(4) }, (_, i) => {
+    const record = 12 + i * 16;
+    const offset = view.getUint32(record + 8);
+    const bytes = font.slice(offset, offset + view.getUint32(record + 12));
+    const tag = String.fromCharCode(...font.slice(record, record + 4));
+    // checkSumAdjustment covers the whole font: it moves with the layout.
+    if (tag === 'head') bytes.fill(0, 8, 12);
+    return { tag, offset, bytes };
+  });
+}
+
+/** `font` with every table one byte further on, as a font whose tables were written back to back is. */
+function withTablesOffByOne(font: Uint8Array): Uint8Array {
+  const count = new DataView(font.buffer, font.byteOffset).getUint16(4);
+  const start = 12 + count * 16;
+  const moved = new Uint8Array(font.length + 1);
+  moved.set(font.subarray(0, start));
+  moved.set(font.subarray(start), start + 1);
+  const view = new DataView(moved.buffer);
+  for (let i = 0; i < count; i++) {
+    const offsetAt = 12 + i * 16 + 8;
+    view.setUint32(offsetAt, view.getUint32(offsetAt) + 1);
+  }
+  return moved;
+}
+
 let roboto: Uint8Array;
 let helloWorld: Uint8Array;
 
@@ -102,6 +131,35 @@ describe('doc.fonts (local engine)', () => {
     await fieldIn('roboto', 'hello');
     await new Promise((settle) => setTimeout(settle, 50));
     expect(events.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('a program whose tables a browser would refuse is downloaded realigned', async () => {
+    const misaligned = withTablesOffByOne(roboto);
+    expect(tablesOf(misaligned).every((table) => table.offset % 4 === 0)).toBe(false);
+    await engine.fonts.register({ key: 'roboto', data: misaligned.slice() });
+    await fieldIn('roboto', 'hello');
+    await engine.fonts.clear();
+
+    const list = await doc.fonts.list();
+    const font = list.fonts.find(
+      (candidate) => candidate.source === 'document' && candidate.familyName === 'Roboto',
+    )!;
+    expect(font).toMatchObject({ canChoose: true, restrictions: [] });
+    const program = font.programs[0]!;
+    expect(program).toMatchObject({ sourceHash: sha256(misaligned), canDownload: true });
+    expect(program.displayHash).not.toBe(program.sourceHash);
+
+    const bytes = await doc.fonts.downloadProgram(program.displayHash!);
+    expect(sha256(bytes)).toBe(program.displayHash);
+    const tables = tablesOf(bytes);
+    expect(tables.every((table) => table.offset % 4 === 0)).toBe(true);
+    const byTag = (list: ReturnType<typeof tablesOf>) =>
+      Object.fromEntries(list.map((table) => [table.tag, [...table.bytes]]));
+    expect(byTag(tables)).toEqual(byTag(tablesOf(misaligned)));
+    const info = await doc.fonts.getProgram(program.displayHash!);
+    expect(info.covers.some((range) => range.start <= 65 && 65 < range.start + range.count)).toBe(
+      true,
+    );
   });
 
   test('a document’s whole program is listed, named, downloaded and written with', async () => {

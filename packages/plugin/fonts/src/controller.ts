@@ -15,6 +15,7 @@ import {
   type DocumentHandle,
   type Font,
   type FontList,
+  type FontName,
   type FontProgramInfo,
   type LocalDocumentFontsService,
   type StandardFont,
@@ -125,8 +126,36 @@ export function createFontsController(ctx: PluginContext<void>) {
   };
 
   /**
-   * The CSS for text drawn by `primary`: then the fallbacks, then the last
-   * resort, then `tail`, the system's families for before they're mounted.
+   * The standard font the engine falls back to for `font`'s face, in
+   * `style` when given (a run's own weight and italic); Helvetica for a font
+   * the list doesn't name.
+   */
+  const standardOfName = (
+    font: FontName,
+    style?: { weight: number; italic: boolean },
+  ): StandardFont => {
+    if (isStandardFontName(font)) return font;
+    const current = list.get();
+    const listed = current ? fontNamed(current, font) : undefined;
+    if (!listed) return 'helvetica';
+    return standardFontForFace({
+      family: listed.familyName,
+      weight: style?.weight ?? listed.weight,
+      italic: style?.italic ?? listed.italic,
+    });
+  };
+
+  /**
+   * Whether the host tried `program` and can't use it (a browser refuses a
+   * malformed font whole): it is drawn as a program a browser can't get is.
+   */
+  const refused = (program: MountableFontProgram): boolean =>
+    ctx.measurer?.refused(program) ?? false;
+
+  /**
+   * The CSS for text drawn by `primary`: then the fallbacks the host didn't
+   * refuse, then the last resort, then `tail`, the system's families for
+   * before they're mounted.
    */
   const cssOf = (
     primary: MountableFontProgram | null,
@@ -140,7 +169,10 @@ export function createFontsController(ctx: PluginContext<void>) {
       if (!named.some((known) => known.hash === program.hash)) named.push(program);
     };
     if (primary) add(primary);
-    for (const hash of fallbacks) add(programOf(hash, styleOfProgram(current, hash)));
+    for (const hash of fallbacks) {
+      const program = programOf(hash, styleOfProgram(current, hash));
+      if (!refused(program)) add(program);
+    }
     add(lastResortFontProgram());
     return {
       fontFamily: cssFamilyList(
@@ -171,20 +203,15 @@ export function createFontsController(ctx: PluginContext<void>) {
     resolve: (request) => documentFonts(ctx.doc).resolve(request),
     getProgram: programInfoOf,
     programOf: (hash, style) => programOf(hash, style ?? styleOfProgram(list.get(), hash)),
-    standardOf: (font) => {
-      const current = list.get();
-      const listed = current ? fontNamed(current, font) : undefined;
-      return listed
-        ? standardFontForFace({
-            family: listed.familyName,
-            weight: listed.weight,
-            italic: listed.italic,
-          })
-        : 'helvetica';
-    },
+    standardOf: (font) => standardOfName(font),
+    refused,
     changed: paintFontsChanged,
   });
-  ctx.measurer?.onReady(paintFontsChanged);
+  // A program loaded, so text in it is drawn; or refused, so the CSS leaves it out.
+  ctx.measurer?.onChange(() => {
+    css = new Map();
+    paintFontsChanged();
+  });
 
   const cached = (key: string, build: () => FontCss): FontCss => {
     let known = css.get(key);
@@ -216,22 +243,20 @@ export function createFontsController(ctx: PluginContext<void>) {
 
   /**
    * A listed font's CSS. A font whose program can't reach the browser (one
-   * the document only names, a subset without a display file) is drawn in
-   * the standard font the engine falls back to for its face.
+   * the document only names, a subset without a display file, one the
+   * browser refused) is drawn in the standard font the engine falls back to
+   * for its face.
    */
   const listedCss = (font: Font): FontCss => {
     const program = font.programs[0];
-    if (!program?.displayHash || !program.canDownload) {
+    const mountable =
+      program?.displayHash && program.canDownload ? programOf(program.displayHash, font) : null;
+    if (!mountable || refused(mountable)) {
       return standardCss(
         standardFontForFace({ family: font.familyName, weight: font.weight, italic: font.italic }),
       );
     }
-    return cssOf(
-      programOf(program.displayHash, font),
-      font,
-      fallbackHashes(list.get()),
-      tailOf(font, null),
-    );
+    return cssOf(mountable, font, fallbackHashes(list.get()), tailOf(font, null));
   };
 
   const api: FontsCapability = {
@@ -270,8 +295,11 @@ export function createFontsController(ctx: PluginContext<void>) {
         () => {
           const standard = isStandardFontName(run.font) ? run.font : null;
           const current = list.get();
+          const program = run.program ? programOf(run.program, run) : null;
           return cssOf(
-            run.program ? programOf(run.program, run) : null,
+            program && refused(program)
+              ? standardFontProgram(standardOfName(run.font, run))
+              : program,
             run,
             run.fallbacks,
             tailOf(current ? fontNamed(current, run.font) : undefined, standard),

@@ -25,29 +25,38 @@ export interface HostFontProgram {
 export interface HostTextMeasurer {
   /**
    * Whether `program` is loaded, so text in it can be measured; when it
-   * isn't, the host starts loading it and says so through `onReady`.
+   * isn't, the host starts loading it and says so through `onChange`.
    */
   ready(program: HostFontProgram): boolean;
+  /**
+   * Whether the host tried `program` and can't use it (a browser refuses a
+   * malformed font whole): it never becomes ready. Asking loads nothing.
+   */
+  refused(program: HostFontProgram): boolean;
   /**
    * How wide `text` is in a ready `program`, shaped as one run (right to left
    * when `rtl`), in thousandths of an em.
    */
   width(program: HostFontProgram, text: string, rtl: boolean): number;
-  /** Calls `listener` each time a program the host was loading is ready; returns the unsubscribe. */
-  onReady(listener: () => void): () => void;
+  /**
+   * Calls `listener` each time a program the host was loading is ready or
+   * refused; returns the unsubscribe.
+   */
+  onChange(listener: () => void): () => void;
 }
 
 /**
- * The host's measurer as one plugin instance sees it: its `onReady`
+ * The host's measurer as one plugin instance sees it: its `onChange`
  * listeners go when the instance closes (`lifetime` aborts).
  */
 export function instanceMeasurer(host: HostTextMeasurer, lifetime: AbortSignal): HostTextMeasurer {
   return {
     ready: (program) => host.ready(program),
+    refused: (program) => host.refused(program),
     width: (program, text, rtl) => host.width(program, text, rtl),
-    onReady(listener) {
+    onChange(listener) {
       if (lifetime.aborted) return () => {};
-      const stop = host.onReady(listener);
+      const stop = host.onChange(listener);
       const close = () => stop();
       lifetime.addEventListener('abort', close, { once: true });
       return () => {
