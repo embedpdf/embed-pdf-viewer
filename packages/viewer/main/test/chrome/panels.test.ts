@@ -5,6 +5,9 @@
  * every language the viewer ships.
  */
 import { createLayout } from '@embedpdf/core-ui';
+import { AttachmentToken } from '@embedpdf/plugin-attachment';
+import { CommandsToken, type CommandDef } from '@embedpdf/plugin-commands';
+import { OutlineToken } from '@embedpdf/plugin-outline';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_LAYOUT } from '../../../chrome/src/config/chrome';
@@ -171,5 +174,46 @@ describe('samePanels', () => {
     expect(samePanels(panels, { notes: { side: 'end', title: 'Notes' } })).toBe(true);
     expect(samePanels(panels, { notes: { side: 'start', title: 'Notes' } })).toBe(false);
     expect(samePanels(undefined, {})).toBe(true);
+  });
+});
+
+describe('the outline and attachments panels', () => {
+  type Context = Parameters<NonNullable<CommandDef['visible']>>[0];
+  const visibleOf = (id: string) =>
+    panelCommandsFor(DEFAULT_LAYOUT.panels, () => false).find(
+      (command) => command.id === `panel:${id}`,
+    )!.visible!;
+
+  /** A session whose lists hold `entries`, that may add when `mayAdd`, with `off` features off. */
+  const session = (entries: number, mayAdd: boolean, off: readonly string[] = []): Context => {
+    const list = () => Array.from({ length: entries }, (_, index) => ({ id: String(index) }));
+    const capabilities = new Map<unknown, unknown>([
+      [OutlineToken, { list, canEdit: () => mayAdd }],
+      [AttachmentToken, { list, canAdd: () => mayAdd }],
+      [CommandsToken, { isCategoryDisabled: (feature: string) => off.includes(feature) }],
+    ]);
+    const tryGet = (token: unknown) => capabilities.get(token) ?? null;
+    return { documentId: 'doc', tryGet, get: tryGet } as unknown as Context;
+  };
+
+  it('show while their lists hold entries, or the session may add some', () => {
+    for (const id of ['outline', 'attachments']) {
+      const visible = visibleOf(id);
+      expect(visible(session(2, false))).toBe(true);
+      expect(visible(session(0, true))).toBe(true);
+      expect(visible(session(0, false))).toBe(false);
+    }
+  });
+
+  it('hide when empty once the feature that adds is off, as read-only turns it off', () => {
+    expect(visibleOf('outline')(session(0, true, ['outline.editing']))).toBe(false);
+    expect(visibleOf('attachments')(session(0, true, ['attachments.adding']))).toBe(false);
+    expect(visibleOf('attachments')(session(1, true, ['attachments.adding']))).toBe(true);
+  });
+
+  it('hide without their plugin', () => {
+    const none = { documentId: 'doc', tryGet: () => null, get: () => null } as unknown as Context;
+    expect(visibleOf('outline')(none)).toBe(false);
+    expect(visibleOf('attachments')(none)).toBe(false);
   });
 });

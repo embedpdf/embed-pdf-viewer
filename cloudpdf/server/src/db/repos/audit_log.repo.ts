@@ -17,8 +17,6 @@ export type AuditMutationKind =
   | 'redaction.apply'
   | 'metadata.update'
   | 'metadata.updateCustom'
-  | 'attachment.create'
-  | 'attachment.delete'
   | 'form.setValue'
   | 'form.reset'
   /** A bundle's fields, copied in as one change (`doc.forms.import`). */

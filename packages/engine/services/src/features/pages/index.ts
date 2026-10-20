@@ -1,4 +1,4 @@
-export { PagesReader, visibleBoxReader } from './PagesReader';
+export { PagesReader, rotationAt, visibleBoxReader } from './PagesReader';
 export { PagesMutator } from './PagesMutator';
 export { PagesExtractor } from './PagesExtractor';
 export { PagesInserter } from './PagesInserter';

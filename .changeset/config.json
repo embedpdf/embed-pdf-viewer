@@ -41,6 +41,7 @@
       "@embedpdf/engine-services",
       "@embedpdf/plugin-actions",
       "@embedpdf/plugin-annotation",
+      "@embedpdf/plugin-attachment",
       "@embedpdf/plugin-commands",
       "@embedpdf/plugin-form",
       "@embedpdf/plugin-history",

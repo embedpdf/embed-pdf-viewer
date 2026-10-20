@@ -57,6 +57,7 @@ import { useRefusalNotice } from './ui/refusal-notice';
 import { RotationBadge } from './ui/rotation-badge';
 import { SelectionStrip } from './ui/selection-strip';
 import { ShortcutsSheet } from './ui/shortcuts-sheet';
+import { SidebarReads } from './ui/sidebar-reads';
 import { SignatureBridge } from './ui/signature-bridge';
 import { StampLibraryStore } from './ui/stamp-store';
 import { TabBar } from './ui/tab-bar';
@@ -278,6 +279,8 @@ export function Shell({ components }: { components?: PlacedComponents }) {
               <ShortcutsSheet />
               {/* signatures: plugin intents → surfaces; the dialogs they open */}
               <SignatureBridge />
+              {/* the outline and the attachments, read so their panels' buttons know */}
+              <SidebarReads />
               {/* once a document shows: the features' panels and dialogs, fetched while idle */}
               <FeaturePrefetch />
               <SignDialog />

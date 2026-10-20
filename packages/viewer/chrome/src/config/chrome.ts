@@ -216,6 +216,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
             'annotation:stamp-from-selection',
             'annotation:link',
             'annotation:goto-link',
+            'annotation:save-file',
             'annotation:remove-link',
             'annotation:group',
             'annotation:ungroup',
@@ -259,6 +260,8 @@ export const DEFAULT_LAYOUT: LayoutData = {
       ['outline:rename', 'outline:set-destination', 'outline:properties'],
       ['outline:delete'],
     ],
+    // A file of the attachments panel: its menu button and a right-click on it open this.
+    'attachment-item': [['attachment:save', 'attachment:go-to'], ['attachment:delete']],
     // A page of the thumbnails panel: its menu button, a right-click and a long-press open this.
     page: [
       ['page:rotate-clockwise', 'page:rotate-counterclockwise'],

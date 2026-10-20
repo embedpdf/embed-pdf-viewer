@@ -191,6 +191,13 @@ export function readBoxes(
   });
 }
 
+/** The turn of the page at `index` as it reads: its own `/Rotate`, or the one it inherits. */
+export function rotationAt(runtime: PdfRuntimeModule, docPtr: Ptr, index: number): PdfRotation {
+  return withScratch(runtime.mem, 4, (intPtr) =>
+    readRotation(runtime.fn, runtime.mem, docPtr, index, intPtr),
+  );
+}
+
 /** The page's turn: its `/Rotate` as written, read by the rules of `pageRotationOf`. */
 function readRotation(
   fn: PdfFunctions,

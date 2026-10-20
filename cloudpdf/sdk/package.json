@@ -96,6 +96,17 @@
             },
             "default": "./dist/cjs/api/resources/doc/resources/annotations/exports.js"
         },
+        "./doc/attachments": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/attachments/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/attachments/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/attachments/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/attachments/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/attachments/exports.js"
+        },
         "./doc/forms": {
             "import": {
                 "types": "./dist/esm/api/resources/doc/resources/forms/exports.d.mts",

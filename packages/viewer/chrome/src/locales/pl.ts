@@ -101,6 +101,7 @@ export const pl: Locale = {
         note: 'Komentarz',
         link: 'Łącze',
         gotoLink: 'Przejdź do łącza',
+        saveFile: 'Zapisz plik',
         removeLink: 'Usuń łącze',
         delete: 'Usuń',
         group: 'Grupuj',
@@ -158,6 +159,7 @@ export const pl: Locale = {
         'annotations-create': 'Dodawanie adnotacji jest niedozwolone',
         'doc-annotate-modify': 'Zmienianie adnotacji jest niedozwolone',
         'doc-annotate-read': 'Wyświetlanie adnotacji jest niedozwolone',
+        'doc-attachments-modify': 'Dodawanie plików jest niedozwolone',
         'doc-download': 'Pobieranie jest niedozwolone',
         'doc-forms-modify': 'Edytowanie pól formularza jest niedozwolone',
         'doc-outline-modify': 'Zmienianie zakładek jest niedozwolone',
@@ -165,6 +167,13 @@ export const pl: Locale = {
         'doc-print': 'Drukowanie jest niedozwolone',
         'doc-text-copy': 'Kopiowanie jest niedozwolone',
         'doc-text-search': 'Wyszukiwanie jest niedozwolone',
+      },
+      attachment: {
+        add: 'Dodaj plik',
+        save: 'Zapisz',
+        goTo: 'Przejdź do strony',
+        delete: 'Usuń',
+        more: 'Więcej opcji',
       },
       outline: {
         add: 'Dodaj zakładkę',
@@ -466,6 +475,17 @@ export const pl: Locale = {
       invisible: 'Przestarzała: ukrywa nieznane podtypy',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'Wczytywanie załączników…',
+      failed: 'Nie udało się odczytać załączników.',
+      empty: 'Ten dokument nie ma załączonych plików',
+      drop: 'Upuść pliki, aby je załączyć',
+      dropHint: 'Lub upuść pliki tutaj',
+      adding: 'Dodawanie…',
+      onPage: 'Strona {page}',
+      count: '{count} plik',
+      countPlural: 'Pliki: {count}',
+    },
     outline: {
       filter: 'Filtruj zakładki',
       loading: 'Wczytywanie zakładek…',

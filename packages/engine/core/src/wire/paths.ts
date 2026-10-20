@@ -316,14 +316,6 @@ export const wirePaths = {
   layerAttachments: (docId: string, layerName: string, attachmentsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
 
-  /** POST: create a document-level embedded file (multipart mutation envelope). */
-  layerAttachmentsCollection: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments`,
-
-  /** DELETE: remove a document-level embedded file by name-tree key. */
-  layerAttachmentItem: (docId: string, layerName: string, key: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments/${encodeTokenText(key)}`,
-
   /**
    * Immutable decoded bytes of one document-level embedded file. Lives
    * under its own `attachment-files` prefix — a stronger capability tier
@@ -783,6 +775,8 @@ export const wireTemplates = {
   layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
   layerCustomMetadata: '/v1/docs/:docId/layers/:layerName/metadata/custom',
   layerOutline: '/v1/docs/:docId/layers/:layerName/outline',
+  layerAttachments: '/v1/docs/:docId/layers/:layerName/attachments',
+  layerAttachmentFile: '/v1/docs/:docId/layers/:layerName/attachment-files/:fileKey/data',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',
   layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pageKey/data',
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
@@ -797,6 +791,8 @@ export const wireTemplates = {
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
   layerAnnotationItemAppearanceResource:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
+  layerAnnotationItemFileResource:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/file',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
   layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
   layerFormWidgetsReorder: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',

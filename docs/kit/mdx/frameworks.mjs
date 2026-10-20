@@ -63,6 +63,7 @@ export const FRAMEWORK_WORDS = {
 const PLUGINS = [
   'Actions',
   'Annotation',
+  'Attachment',
   'Commands',
   'Comments',
   'Documents',

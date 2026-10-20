@@ -101,6 +101,7 @@ export const ko: Locale = {
         note: '댓글',
         link: '링크',
         gotoLink: '링크로 이동',
+        saveFile: '파일 저장',
         removeLink: '링크 제거',
         delete: '삭제',
         group: '그룹화',
@@ -158,6 +159,7 @@ export const ko: Locale = {
         'annotations-create': '주석 추가는 허용되지 않습니다',
         'doc-annotate-modify': '주석 변경은 허용되지 않습니다',
         'doc-annotate-read': '주석 보기는 허용되지 않습니다',
+        'doc-attachments-modify': '파일을 추가할 수 없습니다',
         'doc-download': '다운로드는 허용되지 않습니다',
         'doc-forms-modify': '양식 필드 편집은 허용되지 않습니다',
         'doc-outline-modify': '책갈피 변경은 허용되지 않습니다',
@@ -165,6 +167,13 @@ export const ko: Locale = {
         'doc-print': '인쇄는 허용되지 않습니다',
         'doc-text-copy': '복사는 허용되지 않습니다',
         'doc-text-search': '검색은 허용되지 않습니다',
+      },
+      attachment: {
+        add: '파일 추가',
+        save: '저장',
+        goTo: '페이지로 이동',
+        delete: '삭제',
+        more: '추가 옵션',
       },
       outline: {
         add: '책갈피 추가',
@@ -466,6 +475,17 @@ export const ko: Locale = {
       invisible: '레거시: 알 수 없는 하위 유형 숨김',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: '첨부 파일 불러오는 중…',
+      failed: '첨부 파일을 읽을 수 없습니다.',
+      empty: '이 문서에는 첨부 파일이 없습니다',
+      drop: '파일을 놓아 첨부하세요',
+      dropHint: '또는 여기에 파일을 놓으세요',
+      adding: '추가 중…',
+      onPage: '{page}페이지',
+      count: '파일 {count}개',
+      countPlural: '파일 {count}개',
+    },
     outline: {
       filter: '책갈피 필터',
       loading: '책갈피를 불러오는 중…',

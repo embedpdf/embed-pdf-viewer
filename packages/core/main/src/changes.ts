@@ -26,6 +26,7 @@ import {
   objectNumbersNamedBy,
   objectNumbersReferencedBy,
   type Annotation,
+  type Attachment,
   type Change,
   type ChangeOp,
   type ChangeResult,
@@ -72,6 +73,11 @@ export type PredictedOp =
       readonly items: readonly OutlineItem[];
       /** The item's place among its parent's children. */
       readonly index: number;
+    }
+  | {
+      readonly type: 'attachments.restore';
+      /** The embedded file as it was, under the key it had. */
+      readonly attachment: Attachment;
     };
 
 /** One user action, as a plugin stages it. */

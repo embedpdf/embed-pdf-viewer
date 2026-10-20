@@ -20,6 +20,7 @@ export * from './view-manager';
 export * from './page-edit';
 export * from './metadata';
 export * from './outline';
+export * from './attachment';
 export * from './history';
 export * from './annotation';
 export * from './redaction';

@@ -31,7 +31,9 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.PagesReorder
     | CloudPDF.ChangeOp.PagesDelete
     | CloudPDF.ChangeOp.PagesInsertBlank
-    | CloudPDF.ChangeOp.PagesInsert;
+    | CloudPDF.ChangeOp.PagesInsert
+    | CloudPDF.ChangeOp.AttachmentsCreate
+    | CloudPDF.ChangeOp.AttachmentsDelete;
 
 export namespace ChangeOp {
     export interface AnnotationsCreate {
@@ -269,6 +271,37 @@ export namespace ChangeOp {
     export namespace ChangeOpPagesInsert {
         export interface Resources {
             source: string;
+        }
+    }
+
+    export interface AttachmentsCreate {
+        type: "attachments.create";
+        file: CloudPDF.AttachmentFileBase;
+        resources: ChangeOpAttachmentsCreate.Resources;
+    }
+
+    export namespace ChangeOpAttachmentsCreate {
+        export interface Resources {
+            file: string;
+        }
+    }
+
+    export interface AttachmentsDelete {
+        type: "attachments.delete";
+        ref: ChangeOpAttachmentsDelete.Ref;
+    }
+
+    export namespace ChangeOpAttachmentsDelete {
+        export interface Ref {
+            kind: Ref.Kind;
+            key: string;
+        }
+
+        export namespace Ref {
+            export const Kind = {
+                Key: "key",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
         }
     }
 }

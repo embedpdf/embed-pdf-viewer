@@ -60,6 +60,10 @@ export const REFERENCE = [
     pages: ['headless/documents/outline.mdx'],
   },
   {
+    capability: 'plugin/attachment/src/contract.ts#AttachmentCapability',
+    pages: ['headless/documents/attachments.mdx'],
+  },
+  {
     capability: 'plugin/actions/src/contract.ts#ActionsCapability',
     pages: ['headless/documents/actions.mdx'],
   },

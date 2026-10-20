@@ -1,6 +1,7 @@
 import type {
   ChangeAuthority,
   ChangeItem,
+  Coordinates,
   PdfCoordinates,
   RecordedOp,
   WireAnnotationResources,
@@ -19,6 +20,12 @@ import {
   revertAnnotation,
   updateAnnotation,
 } from './internal/annotationChanges';
+import {
+  createAttachment,
+  deleteAttachment,
+  removeAttachment,
+  restoreAttachment,
+} from './internal/attachmentChanges';
 import type { ChangeContext, Done } from './internal/changeContext';
 import {
   addWidget,
@@ -53,6 +60,7 @@ import {
   moveOutlineItems,
   moveOutlineItemsBack,
   removeOutlineItem,
+  reopenOutlineItem,
   restoreOutlineItem,
   revertOutlineItem,
   updateOutlineItem,
@@ -74,11 +82,34 @@ import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 
 /** What a change did: one item per op (or per step of an undo), and the record that undoes it. */
-export interface AppliedChange {
-  readonly items: ChangeItem<PdfCoordinates>[];
+export interface AppliedChange<C extends Coordinates = PdfCoordinates> {
+  readonly items: ChangeItem<C>[];
   /** Its steps are empty when nothing was written: there is nothing to undo. */
   readonly record: ChangeRecord;
 }
+
+/**
+ * Where a change's places are measured. Each op's places turn into the
+ * file's coordinates right before it runs, and each item's into the
+ * answer's space right after its op (or an undo's step) ran, against the
+ * document as it is then: an earlier op can add, remove or put back a page a
+ * later one names.
+ */
+export interface ChangeSpace<In extends Coordinates, Out extends Coordinates> {
+  opInFileSpace(
+    op: RecordedOp<In, WireAnnotationResources>,
+  ): RecordedOp<PdfCoordinates, WireAnnotationResources>;
+  itemOut(item: ChangeItem<PdfCoordinates>): ChangeItem<Out>;
+}
+
+/**
+ * The file's own coordinates, in and out: for a single verb's one-op change,
+ * whose job converts at the worker's boundary.
+ */
+export const FILE_SPACE: ChangeSpace<PdfCoordinates, PdfCoordinates> = {
+  opInFileSpace: (op) => op,
+  itemOut: (item) => item,
+};
 
 /**
  * Runs changes inside the job's layer transaction, which its caller opens and
@@ -98,24 +129,32 @@ export class ChangeApplier {
     private readonly fonts?: FontRegistrar,
   ) {}
 
-  apply(
-    ops: readonly RecordedOp<PdfCoordinates, WireAnnotationResources>[],
+  apply<In extends Coordinates, Out extends Coordinates>(
+    ops: readonly RecordedOp<In, WireAnnotationResources>[],
     authority: ChangeAuthority,
     signal: AbortSignal,
-  ): AppliedChange {
+    space: ChangeSpace<In, Out>,
+  ): AppliedChange<Out> {
     const ctx = this.context(authority, signal, (self) => opsFillOwnField(self, ops));
     return collect(
       authority,
-      ops.map((op, at) => () => runOp(ctx, op, at)),
+      ops.map((op, at) => () => runOp(ctx, space.opInFileSpace(op), at)),
+      space,
       signal,
     );
   }
 
-  undo(record: ChangeRecord, authority: ChangeAuthority, signal: AbortSignal): AppliedChange {
+  undo<Out extends Coordinates>(
+    record: ChangeRecord,
+    authority: ChangeAuthority,
+    signal: AbortSignal,
+    space: Pick<ChangeSpace<Coordinates, Out>, 'itemOut'>,
+  ): AppliedChange<Out> {
     const ctx = this.context(authority, signal, (self) => stepsFillOwnField(self, record.steps));
     return collect(
       authority,
       record.steps.map((step) => () => runStep(ctx, step)),
+      space,
       signal,
     );
   }
@@ -140,18 +179,22 @@ export class ChangeApplier {
   }
 }
 
-/** Runs each in order; the record reverses them in the opposite order. */
-function collect(
+/**
+ * Runs each in order, its item measured as soon as it ran; the record
+ * reverses them in the opposite order.
+ */
+function collect<Out extends Coordinates>(
   authority: ChangeAuthority,
   runs: readonly (() => Done)[],
+  space: Pick<ChangeSpace<Coordinates, Out>, 'itemOut'>,
   signal: AbortSignal,
-): AppliedChange {
-  const items: ChangeItem<PdfCoordinates>[] = [];
+): AppliedChange<Out> {
+  const items: ChangeItem<Out>[] = [];
   const reverses: (readonly ReverseStep[])[] = [];
   for (const run of runs) {
     throwIfAborted(signal);
     const done = run();
-    items.push(done.item);
+    items.push(space.itemOut(done.item));
     reverses.push(done.reverse);
   }
   return {
@@ -230,6 +273,10 @@ function runOp(
       return changingPageTree(ctx, () => insertBlankPages(ctx, op));
     case 'pages.insert':
       return changingPageTree(ctx, () => insertPages(ctx, op));
+    case 'attachments.create':
+      return createAttachment(ctx, op);
+    case 'attachments.delete':
+      return deleteAttachment(ctx, op);
   }
 }
 
@@ -267,6 +314,8 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return restoreOutlineItem(ctx, step);
     case 'outline.move':
       return moveOutlineItemsBack(ctx, step);
+    case 'outline.reopen':
+      return reopenOutlineItem(ctx, step);
     case 'pages.rotate':
       return changingPageTree(ctx, () => rotatePagesBack(ctx, step));
     case 'pages.reorder':
@@ -275,5 +324,9 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return changingPageTree(ctx, () => restorePages(ctx, step));
     case 'pages.remove':
       return changingPageTree(ctx, () => removePages(ctx, step));
+    case 'attachments.remove':
+      return removeAttachment(ctx, step);
+    case 'attachments.restore':
+      return restoreAttachment(ctx, step);
   }
 }

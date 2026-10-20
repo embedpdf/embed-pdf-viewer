@@ -13,6 +13,7 @@
     "./actions": "./src/actions.tsx",
     "./anchored": "./src/anchored.tsx",
     "./annotation": "./src/annotation.tsx",
+    "./attachment": "./src/attachment.ts",
     "./commands": "./src/commands.ts",
     "./form": "./src/form.tsx",
     "./history": "./src/history.ts",
@@ -57,6 +58,10 @@
       "./annotation": {
         "import": "./dist/annotation.js",
         "require": "./dist/annotation.cjs"
+      },
+      "./attachment": {
+        "import": "./dist/attachment.js",
+        "require": "./dist/attachment.cjs"
       },
       "./commands": {
         "import": "./dist/commands.js",
@@ -163,6 +168,7 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",

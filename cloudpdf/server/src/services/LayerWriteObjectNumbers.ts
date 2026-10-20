@@ -30,7 +30,7 @@ import type { Database as Schema } from '../db/schema';
 
 /** How many object numbers a write's own objects are expected to need, by kind of write. */
 export const OBJECT_NUMBER_ESTIMATES = {
-  /** Annotation writes, metadata, attachments, flattening, redaction, page structure. */
+  /** Annotation writes, metadata, flattening, redaction, page structure; an embedded file's tree. */
   default: 64,
   /** Form writes regenerate many widget appearances. */
   forms: 256,
@@ -38,6 +38,8 @@ export const OBJECT_NUMBER_ESTIMATES = {
   blankPages: (count: number) => 64 + 16 * count,
   /** Pages copied from another file: about one object per 512 bytes of it. */
   insertedPages: (byteLength: number) => 1_024 + Math.ceil(byteLength / 512),
+  /** Embedded files: a file specification and its stream each. */
+  embeddedFiles: (count: number) => 2 * count,
 } as const;
 
 /**

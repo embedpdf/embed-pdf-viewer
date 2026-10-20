@@ -213,7 +213,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
-        const rawResponseBody = { name: "EngineError", code: "Unknown", message: "message" };
+        const rawResponseBody = { key: "value" };
 
         server
             .mockEndpoint()

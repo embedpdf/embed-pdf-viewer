@@ -25,7 +25,7 @@ import {
   scratchPath,
 } from './internal/candidateStore';
 import { bakeWidgetAppearance } from './internal/appearance';
-import { assertSealedSignature, bytesEqual, type SealExpectation } from './internal/sealCheck';
+import { assertSealedSignature, type SealExpectation } from './internal/sealCheck';
 import { disposeSignatureModel } from './internal/signatureModelCache';
 import { DIGEST_CODE, SignatureReader } from './SignatureReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -37,6 +37,7 @@ import {
   type OpenedPdfDocument,
 } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { withScratch } from '../../runtime/memory/scratch';
+import { bytesEqual } from '../../shared/bytesEqual';
 import { formatPdfDate } from '../../shared/pdf-date';
 import { generateUuid } from '../../shared/uuid';
 import { groupLockFields, groupOfField } from '../forms/internal/fieldGroups';

@@ -98,6 +98,35 @@ const keysOnPages = (records: AnnotationRecords, pages: readonly PageRef[]): str
 };
 
 /**
+ * The other pages whose annotations go to `pages`: a target or an action
+ * that names one, or one that couldn't be read (the page it goes to wasn't
+ * there). A link is read against the pages there are, so when pages go, come
+ * or come back, these read differently.
+ */
+function pagesGoingTo(records: AnnotationRecords, pages: readonly PageRef[]): PageRef[] {
+  const named = new Set(pages.map((page) => page.objectNumber));
+  const found = new Map<number, PageRef>();
+  for (const key of records.order) {
+    const { dto } = records.byKey[key]!;
+    const { target, actions } = dto as { target?: unknown; actions?: unknown };
+    if (named.has(dto.page.objectNumber) || found.has(dto.page.objectNumber)) continue;
+    if (goesTo(target, named) || goesTo(actions, named)) found.set(dto.page.objectNumber, dto.page);
+  }
+  return [...found.values()];
+}
+
+/** Whether a target or an action tree names one of `pages`, or holds what couldn't be read. */
+function goesTo(value: unknown, pages: ReadonlySet<number>): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some((entry) => goesTo(entry, pages));
+  const node = value as Record<string, unknown>;
+  if (node['kind'] === 'unsupported') return true;
+  const page = (node['page'] as { objectNumber?: unknown } | undefined)?.objectNumber;
+  if (typeof page === 'number' && pages.has(page)) return true;
+  return Object.values(node).some((entry) => goesTo(entry, pages));
+}
+
+/**
  * A fresh read of the whole document. Every record's appearance version moves
  * past the one it had, so a reload after a desync re-fetches every raster
  * (the appearances may have changed while the event stream was not trusted).
@@ -156,13 +185,21 @@ export function foldRecords(
     // the event doesn't say where, so the page is read again.
     case 'annotations.restored':
       return reload({ pages: [event.page] });
-    case 'pages.deleted':
-      return drop(records, keysOnPages(records, event.pages));
+    // A page's annotations go with it; links elsewhere to it read again.
+    case 'pages.deleted': {
+      const going = pagesGoingTo(records, event.pages);
+      return going.length
+        ? reload({ pages: [...event.pages, ...going] })
+        : drop(records, keysOnPages(records, event.pages));
+    }
     case 'pages.inserted':
-      return event.insertedPages.length ? reload({ pages: event.insertedPages }) : records;
-    // An undo brought deleted pages back, with their annotations.
+      return event.insertedPages.length
+        ? reload({ pages: [...event.insertedPages, ...pagesGoingTo(records, event.insertedPages)] })
+        : records;
+    // An undo brought deleted pages back, with their annotations, and links
+    // elsewhere to them read again.
     case 'pages.restored':
-      return reload({ pages: event.pages });
+      return reload({ pages: [...event.pages, ...pagesGoingTo(records, event.pages)] });
     // These paint annotations into the page content and remove them.
     case 'redaction.applied':
     case 'pages.flattened': {
@@ -379,7 +416,7 @@ export function undoOf(records: AnnotationRecords, ops: readonly ChangeOp[]): Pr
  * `recordsChanged` event, where sync/confirmed.ts reacts to it.
  */
 export function createRecordsMirror(
-  ctx: Pick<AnnotationContext, 'mirror' | 'doc'>,
+  ctx: Pick<AnnotationContext, 'mirror' | 'doc' | 'document'>,
   events: Pick<AnnotationEvents, 'recordsChanged'>,
 ): Mirror<AnnotationRecords> {
   const records: Mirror<AnnotationRecords> = ctx.mirror<AnnotationRecords>({
@@ -398,7 +435,12 @@ export function createRecordsMirror(
     fold: foldRecords,
     predict: predictRecords,
     loadPages: async (doc, pages) => {
-      const { annotations } = await doc.annotations.list({ pages });
+      // A page a delete took has nothing to read: its records just go.
+      const present = new Set(ctx.document()?.pages.map((page) => page.ref.objectNumber));
+      const reading = pages.filter((page) => present.has(page.objectNumber));
+      const { annotations } = reading.length
+        ? await doc.annotations.list({ pages: reading })
+        : { annotations: [] };
       return (current) => withPages(current, pages, annotations);
     },
     changed: (change) => events.recordsChanged.emit(change),

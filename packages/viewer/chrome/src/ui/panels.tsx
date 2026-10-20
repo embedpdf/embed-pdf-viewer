@@ -46,6 +46,9 @@ const RedactionPanel = lazyComponent(() =>
   import('./redaction-panel').then((ui) => ui.RedactionPanel),
 );
 const OutlinePanel = lazyComponent(() => import('./outline-panel').then((ui) => ui.OutlinePanel));
+const AttachmentsPanel = lazyComponent(() =>
+  import('./attachments-panel').then((ui) => ui.AttachmentsPanel),
+);
 const FormDesignPanel = lazyComponent(() =>
   import('./form-design-panel').then((ui) => ui.FormDesignPanel),
 );
@@ -61,6 +64,11 @@ const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, Bu
   ['thumbnails', { draw: () => <ThumbnailList />, list: true }],
   // Each document's own outline, its filter and its rows.
   ['outline', { draw: (documentId) => <OutlinePanel key={documentId ?? 'none'} />, list: true }],
+  // Each document's files: its attachments and the files on its pages.
+  [
+    'attachments',
+    { draw: (documentId) => <AttachmentsPanel key={documentId ?? 'none'} />, list: true },
+  ],
   // These read the document as they mount, so each document gets its own.
   ['search', { draw: (documentId) => <SearchPanel key={documentId ?? 'none'} />, list: true }],
   ['comments', { draw: (documentId) => <CommentsPanel key={documentId ?? 'none'} /> }],

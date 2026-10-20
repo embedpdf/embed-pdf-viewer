@@ -613,14 +613,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       ],
       // Response headers cross-origin JS may read (nothing is safelisted
       // beyond the basics): the backpressure hint + the advisory
-      // dimension/file headers clients already consume.
+      // dimension headers clients already consume.
       exposedHeaders: [
         'retry-after',
         'x-embedpdf-image-width',
         'x-embedpdf-image-height',
         'x-embedpdf-appearance-count',
-        'x-embedpdf-file-name',
-        'x-embedpdf-file-type',
         // The object numbers a write handed the editing session.
         'embedpdf-object-numbers',
       ],
@@ -1387,10 +1385,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(opts.bundleLimits ? { bundleLimits: opts.bundleLimits } : {}),
       });
-      await registerAttachmentRoutes(app, {
-        documentService,
-        layerService,
-      });
+      await registerAttachmentRoutes(app, { documentService });
       await registerSearchRoutes(app, {
         documentService,
       });

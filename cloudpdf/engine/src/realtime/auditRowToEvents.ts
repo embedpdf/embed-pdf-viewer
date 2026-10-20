@@ -5,7 +5,6 @@ import {
   formValuesImportFacts,
   annotationImportFacts,
   deletedAnnotationsOf,
-  deletedAttachmentOf,
   deletedFieldOf,
   toPageRef,
   type AnnotationCreateResult,
@@ -13,8 +12,6 @@ import {
   type AnnotationDeleteResult,
   type AnnotationReorderResult,
   type AnnotationUpdateResult,
-  type AttachmentCreateResult,
-  type AttachmentDeleteResult,
   type ChangeResult,
   type DocumentEvent,
   type EventOrigin,
@@ -212,19 +209,6 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         type: 'metadata.customUpdated',
         origin,
         ...(row.payload as CustomMetadataUpdateResult),
-      };
-    case 'attachment.create':
-      return {
-        type: 'attachments.created',
-        origin,
-        ...(row.payload as AttachmentCreateResult),
-      };
-    case 'attachment.delete':
-      return {
-        type: 'attachments.deleted',
-        origin,
-        deleted: deletedAttachmentOf(row.payload as AttachmentDeleteResult),
-        ...(row.payload as AttachmentDeleteResult),
       };
     // A value write is one `forms.valueSet`; a reset and an import are one
     // per field they changed (above).

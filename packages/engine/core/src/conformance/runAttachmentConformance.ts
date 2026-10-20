@@ -16,17 +16,17 @@ import { EVERY_PERMISSION } from './fixtureScope';
  * Attachment conformance suite. Fixture requirement: a document whose
  * `/EmbeddedFiles` name tree contains at least one embedded file.
  *
- * Both attachment surfaces are optional on the contract (the
- * `downloadLayer?` pattern), probed independently and skipped cleanly:
- *   - `doc.attachments?` — document-level EmbeddedFiles (list/download)
- *   - `page.annotations.downloadResource(ref, 'file')` — annotation-level file bytes
+ * Both homes of a file: `doc.attachments` (the `/EmbeddedFiles` name tree)
+ * and a file-attachment annotation's `file` resource
+ * (`page.annotations.downloadResource(ref, 'file')`). Both downloads answer
+ * the bytes; the name and type are what the listing says.
  *
  * Invariants:
  *   1. `list()` reflects the name tree: positional indices, non-empty
  *      names, and repeated calls agree (a read).
- *   2. `download(index)` round-trips the listed metadata and returns
- *      exactly `size` decoded bytes when the fixture declares one.
- *   3. Unknown indices reject with an `EngineError`.
+ *   2. `download(ref)` returns exactly `size` decoded bytes when the
+ *      fixture declares one.
+ *   3. Unknown keys reject with an `EngineError`.
  *   4. A created file-attachment annotation round-trips its file:
  *      metadata inline on the DTO (never bytes), bytes byte-identical
  *      as its `file` resource.
@@ -40,18 +40,13 @@ export function runAttachmentConformance(
 
   describe(`attachment conformance: ${opts.label}`, () => {
     let engine: Engine;
-    let docSupported = false;
-    let annotSupported = false;
     let firstPageObjectNumber: PageObjectNumber;
 
     beforeAll(async () => {
       engine = await opts.makeEngine();
       const probe = await openFixture(engine, opts);
-      docSupported = probe.attachments !== undefined;
       const pages = await probe.pages.list();
       firstPageObjectNumber = pages.pages[0].ref.objectNumber;
-      annotSupported =
-        probe.page(toPageRef(firstPageObjectNumber)).annotations.downloadResource !== undefined;
       await probe.close();
     });
 
@@ -60,7 +55,6 @@ export function runAttachmentConformance(
     });
 
     test('attachments.list() reflects the /EmbeddedFiles name tree and is a stable read', async () => {
-      if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.attachments.list();
@@ -81,19 +75,15 @@ export function runAttachmentConformance(
       }
     });
 
-    test('attachments.download() round-trips the listed metadata and decoded size', async () => {
-      if (!docSupported) return;
+    test('attachments.download() returns the listed decoded size', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const { attachments } = await doc.attachments.list();
         for (const item of attachments) {
-          const content = await doc.attachments.download(item.ref);
-          expect(content.name).toBe(item.name);
-          if (item.mimeType !== null) {
-            expect(content.mimeType).toBe(item.mimeType);
-          }
+          const bytes = await doc.attachments.download(item.ref);
+          expect(bytes).toBeInstanceOf(Uint8Array);
           if (item.size !== null) {
-            expect(content.bytes.length).toBe(item.size);
+            expect(bytes.length).toBe(item.size);
           }
         }
       } finally {
@@ -102,7 +92,6 @@ export function runAttachmentConformance(
     });
 
     test('attachments.download() rejects an unknown key', async () => {
-      if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
         await expect(
@@ -114,7 +103,6 @@ export function runAttachmentConformance(
     });
 
     test('a File brings its name and type, and a file without a type has none', async () => {
-      if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
         const picked = new File([new Uint8Array([1, 2, 3])], '0-picked.csv', { type: 'text/csv' });
@@ -128,8 +116,9 @@ export function runAttachmentConformance(
           name: '0-untyped.bin',
         });
         expect(untyped.mimeType).toBe(null);
-        expect((await doc.attachments.download(untyped.ref)).mimeType).toBe(null);
-        expect((await doc.attachments.download(fromFile.ref)).mimeType).toBe('text/csv');
+        const listed = (await doc.attachments.list()).attachments;
+        expect(listed.find((item) => item.ref.key === '0-untyped.bin')?.mimeType).toBe(null);
+        expect(listed.find((item) => item.ref.key === '0-picked.csv')?.mimeType).toBe('text/csv');
 
         // Bare bytes need a name.
         await expect(doc.attachments.create({ data: new Uint8Array([7]) })).rejects.toMatchObject({
@@ -141,7 +130,6 @@ export function runAttachmentConformance(
     });
 
     test('create() and delete() round-trip the name tree; keys survive index shifts', async () => {
-      if (!docSupported) return;
       const doc = await openFixture(engine, opts);
       try {
         const { attachments: before } = await doc.attachments.list();
@@ -179,9 +167,9 @@ export function runAttachmentConformance(
         ).rejects.toBeInstanceOf(EngineError);
 
         // The created file round-trips byte-identically.
-        const content = await doc.attachments.download(created.ref);
-        expect(content.bytes.length).toBe(data.length);
-        expect(content.bytes.every((byte, i) => byte === data[i])).toBe(true);
+        const bytes = await doc.attachments.download(created.ref);
+        expect(bytes.length).toBe(data.length);
+        expect(bytes.every((byte, i) => byte === data[i])).toBe(true);
 
         // Delete by ref; the ref stops resolving and the rest are intact.
         const removed = await doc.attachments.delete(created.ref);
@@ -196,7 +184,6 @@ export function runAttachmentConformance(
     });
 
     test('a file-attachment annotation takes a File as it is, and never guesses a type', async () => {
-      if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
@@ -236,7 +223,6 @@ export function runAttachmentConformance(
     });
 
     test('a created file-attachment annotation round-trips its file as its file resource', async () => {
-      if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
@@ -301,7 +287,6 @@ export function runAttachmentConformance(
     });
 
     test('a created text annotation round-trips icon, color, and contents', async () => {
-      if (!annotSupported) return;
       const doc = await openFixture(engine, opts);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;

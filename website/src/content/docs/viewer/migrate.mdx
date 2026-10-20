@@ -149,6 +149,7 @@ The plugins have new names:
 | `render`, `tiling` | `render` |
 | `thumbnail` | `thumbnails` |
 | `bookmark` | `outline`, which also adds, renames, moves and deletes items |
+| `attachment` | `attachment`, which also lists the files pinned to pages, and attaches and removes files |
 | `document-manager`, `export` | `documents` |
 | `interaction-manager`, `pan` | `interaction`, whose `pan` tool is the hand |
 | `ui` | `shell` for what's open, and the config's `layout` for what goes where |
@@ -341,8 +342,6 @@ What 2.x had that 3.0 doesn't:
 - **Marquee zoom, and the screenshot tool** (the `capture` plugin).
 - **Protect.** 2.x's Protect dialog, `setDocumentEncryption()` and `removeEncryption()`: 3.0 can't
   add or remove a document's password.
-- **The attachments panel, for now.** No plugin lists a document's attached files yet, so this
-  panel doesn't show (2.x's `attachment` plugin).
 - **Swedish and Traditional Chinese.** They aren't built in: add them with
   [`strings`](customize/translations#a-language-of-your-own).
 - **Theme events:** `themechange`, `activeColorScheme` and `themePreference`.

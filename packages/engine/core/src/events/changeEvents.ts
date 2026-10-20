@@ -1,5 +1,6 @@
 import type { DocumentEventInit } from './DocumentEvent';
 import { deletedAnnotationsOf } from '../mutation/AnnotationMutationResults';
+import { deletedAttachmentOf } from '../mutation/AttachmentMutationResults';
 import { isSkippedItem, type ChangeItem, type ChangeResult } from '../mutation/Change';
 import { deletedFieldOf, formResetFacts } from '../mutation/FormMutationResults';
 import { deletedOutlineItemsOf } from '../mutation/OutlineMutationResults';
@@ -162,6 +163,18 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
     case 'pages.restore': {
       const { type: _type, ...result } = item;
       return [{ type: 'pages.restored', ...result }];
+    }
+    case 'attachments.create': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'attachments.created', ...result }];
+    }
+    case 'attachments.delete': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'attachments.deleted', deleted: deletedAttachmentOf(result), ...result }];
+    }
+    case 'attachments.restore': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'attachments.restored', ...result }];
     }
   }
 }

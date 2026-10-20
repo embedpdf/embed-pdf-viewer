@@ -17,7 +17,7 @@ for (const attachment of attachments) {
   console.log(attachment.name, attachment.size);
 }
 
-const { bytes, name } = await doc.attachments.download(attachments[0].ref);
+const bytes = await doc.attachments.download(attachments[0].ref);
 ```
 
 ## List
@@ -41,18 +41,22 @@ A field reads `null` when the PDF doesn't say.
 
 ## Download one
 
-`download(ref)` returns the file's bytes with its name and type, ready to hand to the user:
+`download(ref)` returns the file's bytes. Its name and type are the ones the list gave you, so
+handing it to the user takes both:
 
 ```ts
-const { bytes, name, mimeType } = await doc.attachments.download(attachment.ref);
+const bytes = await doc.attachments.download(attachment.ref);
 
-const url = URL.createObjectURL(new Blob([bytes], { type: mimeType ?? '' }));
+const url = URL.createObjectURL(new Blob([bytes], { type: attachment.mimeType ?? '' }));
 const link = document.createElement('a');
 link.href = url;
-link.download = name;
+link.download = attachment.name;
 link.click();
 URL.revokeObjectURL(url);
 ```
+
+A [file attachment annotation's](/docs/engine/annotations/file-attachments) file downloads the
+same way: `page.annotations.downloadResource(ref, 'file')` returns its bytes.
 
 ## Attach a file
 
@@ -90,6 +94,22 @@ await doc.attachments.delete(attachment.ref);
 
 The attachment disappears from the list. Its bytes stay in earlier versions of the file until you
 save with `mode: 'rewrite'`; see [Good to know](#deleted-files-and-saving).
+
+## Undo
+
+`create()` and `delete()` are changes: each returns its `opId` in `meta`, and
+`doc.apply({ undoOf: opId })` undoes it. An undo of a delete brings the same file back, with its
+bytes, description and dates, and fires `attachments.restored`. To add or remove several files as
+one step, apply their ops as one change. See [Changes & undo](/docs/engine/documents/changes).
+
+```ts
+const { meta } = await doc.attachments.delete(attachment.ref);
+await doc.apply({ undoOf: meta.opId }); // the file is back
+```
+
+An undo leaves alone what someone changed since: the undo of an attach doesn't delete a file
+someone else attached under that name since, even with the same bytes, and the undo of a delete
+doesn't bring a file back while another file has its name.
 
 ## Attachments or file-attachment annotations
 
@@ -130,7 +150,25 @@ another app attached may show a different `name` than the one in its ref; always
 Adding or deleting a file changes the `index` of the files after it in name order, never their
 refs.
 
+### Large files
+
+<Engine local>
+
+The browser holds a file it downloads in memory, so the local engine refuses a file that decodes
+to more than `ATTACHMENT_LIMITS.decodedBytes` (256 MB) with `PayloadTooLarge`. That goes for
+attachments and file attachment annotations alike; `details.limit` names the limit. A file's own size can't be trusted for this: a small compressed
+file can decode to gigabytes.
+
+</Engine>
+
+<Engine cloud>
+
+The server decodes the file and applies its own limit, refusing a larger file with
+`PayloadTooLarge`.
+
+</Engine>
+
 ### Events
 
-Other code can follow changes with the `attachments.created` and `attachments.deleted` events. See
-[Events](/docs/engine/concepts/events).
+Other code can follow changes with the `attachments.created`, `attachments.deleted` and
+`attachments.restored` events. See [Events](/docs/engine/concepts/events).

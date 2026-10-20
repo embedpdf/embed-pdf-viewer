@@ -7,6 +7,7 @@ export default {
   render: 'Render',
   text: 'Text',
   annotations: 'Annotations',
+  attachments: 'Attachments',
   forms: 'Forms',
   metadata: 'Metadata',
   outline: 'Outline',

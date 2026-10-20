@@ -49,9 +49,10 @@ export function numbersNamedBy(changes: readonly RequestedChange[]): number[] {
 
 /**
  * How many objects a request's changes may make for themselves (appearance
- * streams, fonts, the pages they insert), as the single verbs estimated
- * theirs: form writes regenerate many widget appearances, inserted pages need
- * their own objects, every other write few.
+ * streams, fonts, the pages they insert, the files they embed), as the single
+ * verbs estimated theirs: form writes regenerate many widget appearances,
+ * inserted pages and embedded files need their own objects, every other write
+ * few.
  */
 export function objectNumberEstimateOf(changes: readonly RequestedChange[]): number {
   const forms = changes.some(
@@ -60,6 +61,7 @@ export function objectNumberEstimateOf(changes: readonly RequestedChange[]): num
   // An undo may restore what a form write took: estimate it as one.
   const undo = changes.some(({ change }) => isUndoChange(change));
   let pages = 0;
+  let files = 0;
   for (const { change } of changes) {
     if (isUndoChange(change)) continue;
     for (const op of change.ops) {
@@ -67,10 +69,16 @@ export function objectNumberEstimateOf(changes: readonly RequestedChange[]): num
         pages += OBJECT_NUMBER_ESTIMATES.insertedPages(op.source.byteLength);
       } else if (op.type === 'pages.insertBlank') {
         pages += OBJECT_NUMBER_ESTIMATES.blankPages(op.spec.count ?? 1);
+      } else if (op.type === 'attachments.create') {
+        files += 1;
       }
     }
   }
-  return (forms || undo ? OBJECT_NUMBER_ESTIMATES.forms : OBJECT_NUMBER_ESTIMATES.default) + pages;
+  return (
+    (forms || undo ? OBJECT_NUMBER_ESTIMATES.forms : OBJECT_NUMBER_ESTIMATES.default) +
+    pages +
+    OBJECT_NUMBER_ESTIMATES.embeddedFiles(files)
+  );
 }
 
 /**
@@ -95,6 +103,8 @@ export interface ChangeFacts {
   readonly metadata: boolean;
   /** The document's outline (`outline_version`). */
   readonly outline: boolean;
+  /** The document's embedded files (`attachments_version`). */
+  readonly attachments: boolean;
   /** The page order, the pages' rotations, or the page set (`layout_version`). */
   readonly layout: boolean;
   /** How the page set changed, in the order the items did it: the commit replays it on `layer_pages`. */
@@ -121,6 +131,7 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
   let form = false;
   let metadata = false;
   let outline = false;
+  let attachments = false;
   let layout = false;
   const pageSetChanged = (
     kind: PageSetStep['kind'],
@@ -143,6 +154,8 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
       metadata = true;
     } else if (item.type.startsWith('outline.')) {
       outline = true;
+    } else if (item.type.startsWith('attachments.')) {
+      attachments = true;
     } else if (item.type.startsWith('pages.')) {
       layout = true;
       if (item.type === 'pages.delete') pageSetChanged('remove', item.pages);
@@ -158,6 +171,7 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
     form,
     metadata,
     outline,
+    attachments,
     layout,
     pageSet,
   };
@@ -230,7 +244,7 @@ export interface SingleOpAudit {
 export interface ChangePlan {
   readonly now: number;
   readonly slots: ChangeSlot[];
-  readonly run: ServerChange<PageCoordinates>[];
+  readonly run: ServerChange[];
 }
 
 export type ChangeSlot =
