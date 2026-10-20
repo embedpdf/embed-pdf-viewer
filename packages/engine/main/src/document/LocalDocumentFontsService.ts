@@ -363,8 +363,8 @@ function builtInProgramInfo(fonts: CoreFonts, displayHash: string): FontProgramI
       format: 'truetype',
       embeddingPermission: 'installable',
       covers: LAST_RESORT_COVERS,
-      ascent: 800,
-      descent: -200,
+      ascent: fonts.LAST_RESORT_METRICS.ascent,
+      descent: fonts.LAST_RESORT_METRICS.descent,
     };
   }
   return undefined;

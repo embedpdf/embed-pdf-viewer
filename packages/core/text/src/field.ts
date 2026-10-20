@@ -18,7 +18,7 @@ import { firstStrongIsRtl } from './bidi';
 import { isOpenPunctuation, isSpace, needsBreak } from './breaks';
 import type { TextFont, TextFonts } from './fonts';
 import { graphemeStarts } from './graphemes';
-import { graphemesWidth, itemize, runsOf, scaled, type Paragraph } from './items';
+import { graphemesWidth, itemize, runsOf, scaled, type Paragraph, type Run } from './items';
 
 const f32 = Math.fround;
 const isFloatZero = (value: number) => value < 0.0001 && value > -0.0001;
@@ -51,31 +51,33 @@ export interface FieldTextOptions {
 }
 
 /** Text one font draws, in one direction. */
-export interface FieldRun {
-  readonly font: TextFont;
+export interface FieldRun<F extends TextFont = TextFont> {
+  readonly font: F;
   /** Its characters, in the order typed. */
   readonly text: string;
   /** Drawn right to left: its first character on the right. */
   readonly rtl: boolean;
+  /** A simple script, or a standard font: drawn with kerning and ligatures off, as the engine draws it. */
+  readonly plain: boolean;
   /** Where its left edge is. */
   readonly x: number;
   /** In points. */
   readonly width: number;
 }
 
-export interface FieldLine {
+export interface FieldLine<F extends TextFont = TextFont> {
   /** The baseline's y. */
   readonly baseline: number;
   /** In the order drawn, left to right. */
-  readonly runs: readonly FieldRun[];
+  readonly runs: readonly FieldRun<F>[];
 }
 
-export interface FieldText {
+export interface FieldText<F extends TextFont = TextFont> {
   /** The size it is drawn at: the field's, or the fitted one. */
   readonly fontSize: number;
   /** The height its lines take. */
   readonly contentHeight: number;
-  readonly lines: readonly FieldLine[];
+  readonly lines: readonly FieldLine<F>[];
   /** Characters no font has, drawn as boxes: each a grapheme, first seen first. */
   readonly missing: readonly string[];
 }
@@ -100,12 +102,16 @@ interface Line {
   readonly descent: number;
 }
 
-interface Section {
-  readonly paragraph: Paragraph;
+interface Section<F extends TextFont> {
+  readonly paragraph: Paragraph<F>;
   readonly units: readonly Unit[];
 }
 
-export function layoutField(text: string, fonts: TextFonts, options: FieldTextOptions): FieldText {
+export function layoutField<F extends TextFont>(
+  text: string,
+  fonts: TextFonts<F>,
+  options: FieldTextOptions,
+): FieldText<F> {
   const { plate, alignment, multiline, cells } = options;
   const plateWidth = f32(plate.right - plate.left);
   const plateHeight = f32(plate.top - plate.bottom);
@@ -113,7 +119,7 @@ export function layoutField(text: string, fonts: TextFonts, options: FieldTextOp
   const texts = sectionsOf(text, options);
   const rtl = firstStrongIsRtl(texts.join('')) ?? false;
   const comb = cells > 0;
-  const sections: Section[] = texts.map((sectionText) => {
+  const sections: Section<F>[] = texts.map((sectionText) => {
     const paragraph = itemize(sectionText, rtl, fonts);
     const units = paragraph.graphemes.map((grapheme, index): Unit => {
       const { font } = paragraph.items[grapheme.item]!;
@@ -128,7 +134,7 @@ export function layoutField(text: string, fonts: TextFonts, options: FieldTextOp
   });
   const missing = [...new Set(sections.flatMap((section) => section.paragraph.missing))];
 
-  const unitWidth = (section: Section, unit: Unit, size: number) =>
+  const unitWidth = (section: Section<F>, unit: Unit, size: number) =>
     graphemesWidth(section.paragraph, unit.grapheme, unit.grapheme + 1, size);
   const faceAscent = (size: number) => scaled(fonts.face.ascent, size);
   const faceDescent = (size: number) => scaled(fonts.face.descent, size);
@@ -170,7 +176,7 @@ export function layoutField(text: string, fonts: TextFonts, options: FieldTextOp
 
   // ── Each section's lines, placed as CPVT places them, one section under the other ──
   const placed: {
-    section: Section;
+    section: Section<F>;
     lines: Line[];
     cellX: number[];
     left: number;
@@ -215,14 +221,14 @@ export function layoutField(text: string, fonts: TextFonts, options: FieldTextOp
   // A one-line field's text has its middle at the plate's middle.
   const offsetY = options.centered ? f32(f32(contentHeight - plateHeight) / 2) : 0;
 
-  const out: FieldLine[] = [];
+  const out: FieldLine<F>[] = [];
   for (const { section, lines, cellX, left, top } of placed) {
     let lineTop = 0;
     for (const line of lines) {
       lineTop = f32(lineTop + line.ascent);
       const baselineY = f32(f32(lineTop + top) - offsetY);
       lineTop = f32(lineTop - line.descent);
-      const runs: FieldRun[] = [];
+      const runs: FieldRun<F>[] = [];
       if (line.begin >= 0) {
         if (comb) {
           cellX.forEach((x, index) => {
@@ -251,14 +257,9 @@ export function layoutField(text: string, fonts: TextFonts, options: FieldTextOp
   }
   return { fontSize, contentHeight, lines: out, missing };
 
-  function fieldRun(run: { font: TextFont; text: string; rtl: boolean; width: number }, x: number) {
-    return {
-      font: run.font,
-      text: run.text,
-      rtl: run.rtl,
-      x: f32(plate.left + x),
-      width: run.width,
-    };
+  function fieldRun(run: Run<F>, x: number): FieldRun<F> {
+    const { font, text, rtl, plain, width } = run;
+    return { font, text, rtl, plain, x: f32(plate.left + x), width };
   }
 
   /**
@@ -268,7 +269,7 @@ export function layoutField(text: string, fonts: TextFonts, options: FieldTextOp
    * `lines` receives them; `null` only measures.
    */
   function splitLines(
-    section: Section,
+    section: Section<F>,
     size: number,
     lines: Line[] | null,
   ): { width: number; height: number } {

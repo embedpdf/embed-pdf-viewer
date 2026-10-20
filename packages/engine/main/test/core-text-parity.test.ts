@@ -15,18 +15,25 @@
  * off by part of a kern. In a joined script (Arabic) a letter's width
  * depends on the letter after it, so a comb's cells are checked for font,
  * text and order only.
+ *
+ * The painter (`@embedpdf/core-form`) draws those runs: text fields, combo
+ * boxes, list box rows and push button captions in mixed scripts, through
+ * `widgetDrawing` with the same fonts, against what the engine writes.
  */
 import {
   BARE_PAGE_FIXTURE_PDF,
   drawnTextOf,
   type DrawnRun,
 } from '@embedpdf/engine-core/conformance';
+import { fontProgramFamily } from '@embedpdf/core-fonts';
 import type {
   FontProgramInfo,
-  LocalDocumentHandle,
   FormFieldDraft,
+  FormFieldValue,
+  LocalDocumentHandle,
   LocalEngine,
   PageRef,
+  StandardFont,
 } from '@embedpdf/engine-core/runtime';
 import * as hb from 'harfbuzzjs';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -38,6 +45,13 @@ import {
   type TextFont,
   type TextFonts,
 } from '../../../core/text/src';
+import {
+  standardPaintFont,
+  widgetDrawing,
+  type DrawOp,
+  type PaintFont,
+  type WidgetFonts,
+} from '../../../core/form/src';
 import { localEngine } from '../src/index';
 
 const POSITION = 0.1;
@@ -173,6 +187,8 @@ beforeAll(async () => {
   fonts = { face: standardTextFont('helvetica'), fallbacks, lastResort };
 
   names.set('helvetica', 'Helvetica');
+  names.set('helvetica-bold', 'Helvetica-Bold');
+  names.set('times-roman', 'Times-Roman');
   names.set(list.lastResort.displayHash!, 'EmbedPDFLastResort-Regular');
   for (const font of list.fonts) {
     const hash = font.programs[0]?.displayHash;
@@ -263,4 +279,202 @@ describe('core-text lays a field out as the engine writes it', () => {
       });
     }
   }
+});
+
+/** A program font as the painter draws it: its layout numbers, its program, its family. */
+const paintFontOf = (font: TextFont): PaintFont => ({
+  ...font,
+  fontFamily: `"${fontProgramFamily(font.key)}"`,
+  fontWeight: 400,
+  fontStyle: 'normal',
+  program: {
+    hash: font.key,
+    family: fontProgramFamily(font.key),
+    weight: 400,
+    style: 'normal',
+    load: async () => new Uint8Array(),
+  },
+});
+
+/** The painter's fonts for a widget in `face`: the fallbacks in the order the engine tries them for its style. */
+async function widgetFontsOf(face: StandardFont): Promise<WidgetFonts> {
+  const resolution = await doc.fonts.resolve({ runs: [{ text: 'a', fontFamily: face }] });
+  const fallbacks = await Promise.all(
+    resolution.runs[0]!.fallbacks.map(async (hash) =>
+      programFont(hash, await doc.fonts.getProgram(hash), await doc.fonts.downloadProgram(hash)),
+    ),
+  );
+  return {
+    face: standardPaintFont(face),
+    fallbacks: fallbacks.map(paintFontOf),
+    lastResort: paintFontOf(fonts.lastResort!),
+  };
+}
+
+interface WidgetCase {
+  name: string;
+  face: StandardFont;
+  draft: (page: PageRef) => FormFieldDraft;
+  value?: FormFieldValue;
+}
+
+const widgetBox = (width: number, height: number) => ({ x: 20, y: 20, width, height });
+const LOOK = { borderStyle: 'solid', strokeWidth: 1 };
+
+const WIDGET_CASES: WidgetCase[] = [
+  ...['Hello שלום 123', '123 שלום', 'שָׁלוֹם', 'Hello مرحبا', 'A中B'].flatMap((value) =>
+    (['left', 'right'] as const).map(
+      (textAlign): WidgetCase => ({
+        name: `text field, ${textAlign}: ${value}`,
+        face: 'helvetica',
+        draft: (page) =>
+          ({
+            family: 'text',
+            name: `painted_${(fieldNumber += 1)}`,
+            widgets: [
+              {
+                page,
+                box: widgetBox(160, 24),
+                fontFamily: 'helvetica',
+                fontSize: 12,
+                textAlign,
+                ...LOOK,
+              },
+            ],
+          }) as FormFieldDraft,
+        value: { value },
+      }),
+    ),
+  ),
+  ...[0, 10].map(
+    (fontSize): WidgetCase => ({
+      name: `combo box, ${fontSize}`,
+      face: 'helvetica',
+      draft: (page) =>
+        ({
+          family: 'combobox',
+          name: `painted_${(fieldNumber += 1)}`,
+          options: [
+            { label: 'שלום עולם', value: 'a' },
+            { label: 'Hello مرحبا 42', value: 'b' },
+          ],
+          widgets: [{ page, box: widgetBox(160, 22), fontFamily: 'helvetica', fontSize, ...LOOK }],
+        }) as FormFieldDraft,
+      value: { value: 'b' },
+    }),
+  ),
+  {
+    name: 'list box',
+    face: 'times-roman',
+    draft: (page) =>
+      ({
+        family: 'listbox',
+        name: `painted_${(fieldNumber += 1)}`,
+        multiSelect: true,
+        options: ['שלום', 'Hello مرحبا', '123 עולם', 'A中B'].map((label, index) => ({
+          label,
+          value: String(index),
+        })),
+        widgets: [
+          { page, box: widgetBox(140, 70), fontFamily: 'times-roman', fontSize: 10, ...LOOK },
+        ],
+      }) as FormFieldDraft,
+    value: { selectedValues: ['1'] },
+  },
+  ...['שלח טופס', 'Go مرحبا'].map(
+    (caption): WidgetCase => ({
+      name: `push button: ${caption}`,
+      face: 'helvetica-bold',
+      draft: (page) =>
+        ({
+          family: 'pushbutton',
+          name: `painted_${(fieldNumber += 1)}`,
+          widgets: [
+            {
+              page,
+              box: widgetBox(110, 28),
+              fontFamily: 'helvetica-bold',
+              fontSize: 12,
+              caption,
+              ...LOOK,
+            },
+          ],
+        }) as FormFieldDraft,
+    }),
+  ),
+];
+
+/** The painter's text runs, merged as the reader merges. */
+function paintedRuns(ops: readonly DrawOp[]): Placed[] {
+  const placed: (Placed & { rtl: boolean })[] = [];
+  const walk = (each: readonly DrawOp[]) => {
+    for (const op of each) {
+      if (op.kind === 'clip') walk(op.ops);
+      if (op.kind !== 'text') continue;
+      for (const run of op.runs) {
+        const font = names.get(run.font.key) ?? run.font.key;
+        const last = placed[placed.length - 1];
+        if (
+          last &&
+          !last.rtl &&
+          !run.rtl &&
+          last.font === font &&
+          Math.abs(last.baseline - run.y) < 0.001
+        ) {
+          last.text += run.text;
+          continue;
+        }
+        placed.push({ font, text: run.text, x: run.x, baseline: run.y, rtl: run.rtl });
+      }
+    }
+  };
+  walk(ops);
+  return placed.map(({ rtl: _rtl, ...rest }) => rest);
+}
+
+describe('the painter draws mixed-script widget text as the engine writes it', () => {
+  test.each(WIDGET_CASES.map((widgetCase) => [widgetCase.name, widgetCase] as const))(
+    '%s',
+    async (_name, widgetCase) => {
+      const created = await doc.forms.create(widgetCase.draft(page));
+      if (widgetCase.value) await doc.forms.setValue(created.field.ref, widgetCase.value);
+      const form = await doc.forms.list();
+      const fieldRef = created.field.ref;
+      const field = form.fields.find(
+        (each) =>
+          each.ref.kind === 'objectNumber' &&
+          fieldRef.kind === 'objectNumber' &&
+          each.ref.objectNumber === fieldRef.objectNumber,
+      )!;
+      const ref = field.widgets[0]!.ref!;
+      const row = form.widgets.find(
+        (each) =>
+          each.ref.kind === 'objectNumber' &&
+          ref.kind === 'objectNumber' &&
+          each.ref.objectNumber === ref.objectNumber,
+      )!;
+      const drawing = widgetDrawing(row, field, {}, await widgetFontsOf(widgetCase.face))!;
+      expect(drawing.approximate).toBeNull();
+      const painted = paintedRuns(drawing.ops);
+
+      const drawn = await drawnTextOf(await doc.page(page).annotations.exportAppearance([ref]));
+      const written = (drawn[0]?.runs ?? []).map((run) => ({
+        font: run.font,
+        text: run.text,
+        x: run.x,
+        baseline: run.baseline,
+      }));
+      expect(painted.map(({ font, text }) => [font, text])).toEqual(
+        written.map(({ font, text }) => [font, text]),
+      );
+      painted.forEach((run, index) => {
+        const expected = written[index]!;
+        expect(Math.abs(run.x - expected.x), `${run.text}: x`).toBeLessThanOrEqual(POSITION);
+        expect(
+          Math.abs(run.baseline - expected.baseline),
+          `${run.text}: baseline`,
+        ).toBeLessThanOrEqual(POSITION);
+      });
+    },
+  );
 });

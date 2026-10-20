@@ -53,45 +53,36 @@ export class EpdfSvgAttributes {
     @for (shape of shapes(); track $index) {
       @switch (shape.tag) {
         @case ('rect') {
-          <svg:rect
-            [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
-          ></svg:rect>
+          <svg:rect [epdfSvgAttributes]="shape.attributes" [style]="shape.style ?? null"></svg:rect>
         }
         @case ('ellipse') {
           <svg:ellipse
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
           ></svg:ellipse>
         }
         @case ('line') {
-          <svg:line
-            [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
-          ></svg:line>
+          <svg:line [epdfSvgAttributes]="shape.attributes" [style]="shape.style ?? null"></svg:line>
         }
         @case ('path') {
-          <svg:path
-            [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
-          ></svg:path>
+          <svg:path [epdfSvgAttributes]="shape.attributes" [style]="shape.style ?? null"></svg:path>
         }
         @case ('polygon') {
           <svg:polygon
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
           ></svg:polygon>
         }
         @case ('polyline') {
           <svg:polyline
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
           ></svg:polyline>
         }
         @case ('text') {
           <svg:text
             [epdfSvgAttributes]="shape.attributes"
-            [style.mix-blend-mode]="shape.blend ?? null"
+            [style]="shape.style ?? null"
             [textContent]="shape.text ?? ''"
           ></svg:text>
         }

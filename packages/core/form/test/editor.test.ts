@@ -3,10 +3,16 @@
  * `lineHeight`, inside `padding`, centred for one line and from the top for several, gives the
  * painter's baselines, and a comb's even spacing gives a fixed-width face's cells.
  */
-import type { FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import type { FormFieldDTO, StandardFont, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { layoutFontOf, textEditorLayout, widgetDrawing, type DrawOp, type TextRun } from '../src';
+import {
+  standardPaintFont,
+  textEditorLayout,
+  widgetDrawing,
+  type DrawOp,
+  type TextRun,
+} from '../src';
 
 const widget = (patch: Partial<WidgetAnnotation> = {}): WidgetAnnotation =>
   ({
@@ -51,7 +57,8 @@ function paintedText(row: WidgetAnnotation, field: FormFieldDTO) {
 /** Where the CSS line box puts the first baseline, from the box's top. */
 function cssBaseline(row: WidgetAnnotation, field: FormFieldDTO, text: string): number {
   const layout = textEditorLayout(row, field, text)!;
-  const ascent = (layoutFontOf(row.fontFamily)!.ascent * layout.fontSize) / 1000;
+  const ascent =
+    (standardPaintFont(row.fontFamily as StandardFont).ascent * layout.fontSize) / 1000;
   const content = row.box!.height - layout.padding.top - layout.padding.bottom;
   const multiline = field.family === 'text' && field.multiline;
   const lineTop = layout.padding.top + (multiline ? 0 : (content - layout.lineHeight) / 2);

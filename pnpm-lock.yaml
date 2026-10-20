@@ -1041,6 +1041,9 @@ importers:
       '@embedpdf/core-fonts':
         specifier: workspace:*
         version: link:../fonts
+      '@embedpdf/core-text':
+        specifier: workspace:*
+        version: link:../text
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core

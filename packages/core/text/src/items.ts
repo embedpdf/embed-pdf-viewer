@@ -8,11 +8,11 @@ import { matchGrapheme, type TextFont, type TextFonts } from './fonts';
 import { codePointsOf, graphemesOf, isInvisibleGrapheme } from './graphemes';
 import { isCommonScript, isSimpleScript, scriptOf } from './scripts';
 
-export interface Item {
+export interface Item<F extends TextFont = TextFont> {
   /** Code units of the paragraph's text. */
   readonly begin: number;
   readonly end: number;
-  readonly font: TextFont;
+  readonly font: F;
   readonly level: number;
   readonly script: string;
 }
@@ -27,13 +27,13 @@ export interface Grapheme {
   readonly widths: readonly number[];
 }
 
-export interface Paragraph {
+export interface Paragraph<F extends TextFont = TextFont> {
   readonly text: string;
   /** 0 for a paragraph read left to right, 1 right to left. */
   readonly base: number;
   /** Per code unit. */
   readonly levels: readonly number[];
-  readonly items: readonly Item[];
+  readonly items: readonly Item<F>[];
   readonly graphemes: readonly Grapheme[];
   /** Graphemes no font has, first seen first. */
   readonly missing: readonly string[];
@@ -42,15 +42,18 @@ export interface Paragraph {
 const SPACE = /^\s+$/u;
 
 /** The items of `text` as a paragraph read right to left when `rtl`, in `fonts`. */
-export function itemize(text: string, rtl: boolean, fonts: TextFonts): Paragraph {
+export function itemize<F extends TextFont>(
+  text: string,
+  rtl: boolean,
+  fonts: TextFonts<F>,
+): Paragraph<F> {
   const levels = paragraphLevels(text, rtl);
   const cuts = graphemesOf(text);
   const missing: string[] = [];
 
   // Per grapheme: script, level, font. Characters of no script of their own
   // follow the one before them; leading ones, the one after.
-  const pieces: { begin: number; end: number; script: string; level: number; font: TextFont }[] =
-    [];
+  const pieces: { begin: number; end: number; script: string; level: number; font: F }[] = [];
   let lastScript = 'Common';
   for (const [begin, end] of cuts) {
     const grapheme = text.slice(begin, end);
@@ -69,7 +72,7 @@ export function itemize(text: string, rtl: boolean, fonts: TextFonts): Paragraph
     }
   }
 
-  const items: Item[] = [];
+  const items: Item<F>[] = [];
   for (const piece of pieces) {
     const last = items[items.length - 1];
     if (
@@ -105,7 +108,7 @@ export function itemize(text: string, rtl: boolean, fonts: TextFonts): Paragraph
  * a word's graphemes take what each adds to its prefixes. Inside a word that
  * is approximate: a joined letter's width depends on the letter after it.
  */
-function widthsOf(text: string, item: Item, cuts: [number, number][]): number[][] {
+function widthsOf(text: string, item: Item<TextFont>, cuts: [number, number][]): number[][] {
   const rtl = item.level % 2 === 1;
   const { font } = item;
   if (font.standard) {
@@ -149,7 +152,7 @@ export const scaled = (thousandths: number, size: number): number =>
 
 /** How wide the graphemes `[from, to)` of `paragraph` are at `size` points. */
 export function graphemesWidth(
-  paragraph: Paragraph,
+  paragraph: Paragraph<TextFont>,
   from: number,
   to: number,
   size: number,
@@ -163,12 +166,14 @@ export function graphemesWidth(
 }
 
 /** A run of a line: one item's characters at one level. */
-export interface Run {
-  readonly font: TextFont;
+export interface Run<F extends TextFont = TextFont> {
+  readonly font: F;
   /** Its characters, in the order typed. */
   readonly text: string;
   /** Drawn right to left. */
   readonly rtl: boolean;
+  /** A simple script, or a standard font: drawn with kerning and ligatures off, as the engine draws it. */
+  readonly plain: boolean;
   /** In points. */
   readonly width: number;
   /** Code units of the paragraph's text. */
@@ -181,13 +186,18 @@ export interface Run {
  * left to right (`RunsFor`): each item's part of the line, cut where the
  * line's levels change, ordered by rule L2.
  */
-export function runsOf(paragraph: Paragraph, from: number, to: number, size: number): Run[] {
+export function runsOf<F extends TextFont>(
+  paragraph: Paragraph<F>,
+  from: number,
+  to: number,
+  size: number,
+): Run<F>[] {
   if (from >= to) return [];
   const { text, graphemes, items } = paragraph;
   const begin = graphemes[from]!.begin;
   const end = graphemes[to - 1]!.end;
   const levels = lineLevels(text, paragraph.levels, begin, end, paragraph.base);
-  const runs: Run[] = [];
+  const runs: Run<F>[] = [];
   const runLevels: number[] = [];
   let index = from;
   while (index < to) {
@@ -207,6 +217,7 @@ export function runsOf(paragraph: Paragraph, from: number, to: number, size: num
       font: item.font,
       text: text.slice(grapheme.begin, runEnd),
       rtl: item.level % 2 === 1,
+      plain: item.font.standard || isSimpleScript(item.script),
       width: graphemesWidth(paragraph, index, next, size),
       begin: grapheme.begin,
       end: runEnd,

@@ -6,7 +6,6 @@
 -->
 <script setup lang="ts">
 import { onUnmounted, watchEffect } from 'vue';
-import type { CSSProperties } from 'vue';
 import { createFontMounts, type SvgShape } from '@embedpdf/web';
 
 const props = defineProps<{ shapes: readonly SvgShape[] }>();
@@ -17,10 +16,6 @@ onUnmounted(() => mounts.release());
 watchEffect(() =>
   mounts.mount(props.shapes.flatMap((shape) => (shape.program ? [shape.program] : []))),
 );
-
-/** A shape's blend is CSS, never an attribute. */
-const blendOf = (blend: string | undefined): CSSProperties | undefined =>
-  blend ? { mixBlendMode: blend as CSSProperties['mixBlendMode'] } : undefined;
 </script>
 
 <template>
@@ -29,7 +24,7 @@ const blendOf = (blend: string | undefined): CSSProperties | undefined =>
     v-for="(shape, index) in shapes"
     :key="index"
     v-bind="shape.attributes"
-    :style="blendOf(shape.blend)"
+    :style="shape.style"
   >
     <SvgShapes v-if="shape.children" :shapes="shape.children" />
     <template v-else>{{ shape.text }}</template>

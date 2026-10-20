@@ -7,3 +7,5 @@ Add the last-resort font: `lastResortFontProgram()` and `LAST_RESORT_HASH`, a ti
 The package now resolves to its built files outside the repository's development condition.
 
 `lastResortFontBytes()` returns the last-resort program's bytes from a module that reaches nothing else, for an engine to register.
+
+`LAST_RESORT_METRICS` gives the numbers the engine lays the last-resort box out with: its advance, ascent and descent.

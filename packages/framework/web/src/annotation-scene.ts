@@ -55,10 +55,11 @@ export type SceneShapeNode = (
       paint: ScenePaint;
     }
   | {
-      kind: 'glyphs';
+      kind: 'textRun';
       at: ScenePoint;
       text: string;
-      offsets: number[];
+      rtl: boolean;
+      plain: boolean;
       fontSize: number;
       fontFamily: string;
       fontWeight?: number;
@@ -87,18 +88,27 @@ export type SvgShapeTag =
 /**
  * One SVG element: its tag, its attributes under their SVG names
  * (`stroke-width`, `fill-rule`; an attribute left out is not set), the text
- * inside it, and its blend mode, which is CSS (`mix-blend-mode` in its
- * `style`), never an attribute.
+ * inside it, and the CSS that has no attribute (`mix-blend-mode`,
+ * `white-space`, `font-kerning`), under its CSS names, for the element's
+ * `style`.
  */
 export interface SvgShape {
   tag: SvgShapeTag;
   attributes: Readonly<Record<string, string | number>>;
   text?: string;
-  blend?: string;
+  style?: Readonly<Record<string, string>>;
   /** What a clipping `svg` holds, in drawing order. */
   children?: SvgShape[];
   /** The face a `text` draws in: the renderer mounts it (`fontProgramsOf`). */
   program?: MountableFontProgram;
+}
+
+/** A shape's `style` as CSS text, for a renderer that sets it as one attribute. */
+export function styleText(style: Readonly<Record<string, string>> | undefined): string | undefined {
+  if (!style) return undefined;
+  return Object.entries(style)
+    .map(([name, value]) => `${name}: ${value}`)
+    .join('; ');
 }
 
 /** The faces shapes draw their text in, each once: a renderer mounts them while it shows the shapes. */
@@ -175,7 +185,8 @@ export function svgShapesOf(
 
 function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
   const painted = paintAttributes(node.paint, options.miterLimit);
-  const blend = node.paint.blend ? { blend: node.paint.blend } : {};
+  const blendStyle = node.paint.blend ? { 'mix-blend-mode': node.paint.blend } : undefined;
+  const styled = blendStyle ? { style: blendStyle } : {};
   switch (node.kind) {
     case 'rect':
       return {
@@ -187,7 +198,7 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
           height: node.rect.height,
           ...painted,
         },
-        ...blend,
+        ...styled,
       };
     case 'ellipse':
       return {
@@ -199,16 +210,16 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
           ry: node.rect.height / 2,
           ...painted,
         },
-        ...blend,
+        ...styled,
       };
     case 'line':
       return {
         tag: 'line',
         attributes: { x1: node.a.x, y1: node.a.y, x2: node.b.x, y2: node.b.y, ...painted },
-        ...blend,
+        ...styled,
       };
     case 'path':
-      return { tag: 'path', attributes: { d: node.d, ...painted }, ...blend };
+      return { tag: 'path', attributes: { d: node.d, ...painted }, ...styled };
     case 'text':
       return {
         tag: 'text',
@@ -223,7 +234,7 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
           ...painted,
         },
         text: node.text,
-        ...blend,
+        ...styled,
       };
     case 'poly':
       return {
@@ -232,20 +243,17 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
           points: node.points.map((point) => `${point.x},${point.y}`).join(' '),
           ...painted,
         },
-        ...blend,
+        ...styled,
       };
-    case 'glyphs': {
-      // One x per character: each glyph starts where the PDF starts it. A space draws nothing and
-      // SVG would collapse it (and an x with it), so it's left out.
-      const drawn = node.text
-        .split('')
-        .flatMap((character, index) =>
-          /\s/.test(character) ? [] : [{ character, x: node.at.x + (node.offsets[index] ?? 0) }],
-        );
+    case 'textRun':
+      // One element per run, at its left edge: the browser shapes the run in
+      // its direction and orders nothing (bidi-override); a right-to-left run
+      // ends at its left edge (text-anchor: end). Spaces at either end keep
+      // their room only with white-space: pre.
       return {
         tag: 'text',
         attributes: {
-          x: drawn.map((glyph) => glyph.x).join(' '),
+          x: node.at.x,
           y: node.at.y,
           ...(node.rotation
             ? { transform: `rotate(${node.rotation} ${node.at.x} ${node.at.y})` }
@@ -254,13 +262,19 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
           'font-family': node.fontFamily,
           ...(node.fontWeight !== undefined ? { 'font-weight': node.fontWeight } : {}),
           ...(node.fontStyle !== undefined ? { 'font-style': node.fontStyle } : {}),
+          direction: node.rtl ? 'rtl' : 'ltr',
+          'unicode-bidi': 'bidi-override',
+          'text-anchor': node.rtl ? 'end' : 'start',
           ...painted,
         },
-        text: drawn.map((glyph) => glyph.character).join(''),
+        text: node.text,
+        style: {
+          'white-space': 'pre',
+          ...(node.plain ? { 'font-kerning': 'none', 'font-variant-ligatures': 'none' } : {}),
+          ...blendStyle,
+        },
         ...(node.program ? { program: node.program } : {}),
-        ...blend,
       };
-    }
   }
 }
 

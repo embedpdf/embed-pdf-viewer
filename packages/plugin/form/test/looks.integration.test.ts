@@ -71,7 +71,7 @@ describe('a filled widget looks', () => {
         )!;
       const paintedText = (name: string) =>
         (form.getWidgetPainting(widgetOf(name))?.scene ?? [])
-          .flatMap((node) => (node.kind === 'glyphs' ? [node.text] : []))
+          .flatMap((node) => (node.kind === 'textRun' ? [node.text] : []))
           .join(' ');
       expect(shownOf('amount').pending).toBe(false);
 

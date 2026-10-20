@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { fontProgramsOf, ghostOpacity, sceneViewBox, svgShapesOf } from '../src/annotation-scene';
+import {
+  fontProgramsOf,
+  ghostOpacity,
+  sceneViewBox,
+  styleText,
+  svgShapesOf,
+} from '../src/annotation-scene';
 
 const options = { miterLimit: 10 };
 
@@ -60,7 +66,7 @@ describe('svgShapesOf', () => {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    expect(shape.blend).toBe('multiply');
+    expect(shape.style).toEqual({ 'mix-blend-mode': 'multiply' });
   });
 
   it('draws an ellipse from its box, a line, open and closed polylines, and turned text', () => {
@@ -120,7 +126,7 @@ describe('svgShapesOf', () => {
     });
   });
 
-  it('places painted glyphs one by one, leaves spaces out, and clips a node to its box', () => {
+  it('draws a run as one text element at its left edge, and clips a node to its box', () => {
     const program = {
       family: 'epdf-0123456789abcdef',
       weight: 700,
@@ -130,17 +136,18 @@ describe('svgShapesOf', () => {
     const [clipped] = svgShapesOf(
       [
         {
-          kind: 'glyphs',
+          kind: 'textRun',
           at: { x: 10, y: 20 },
-          text: 'H i',
-          offsets: [0, 7.22, 10],
+          text: ' Hi ',
+          rtl: false,
+          plain: true,
           fontSize: 10,
           fontFamily: '"epdf-0123456789abcdef", Helvetica, Arial, sans-serif',
           fontWeight: 700,
           fontStyle: 'italic',
           rotation: 90,
           program,
-          paint: { fill: '#ff0000' },
+          paint: { fill: '#ff0000', blend: 'multiply' },
           clip: { x: 5, y: 6, width: 90, height: 18 },
         },
       ],
@@ -153,22 +160,68 @@ describe('svgShapesOf', () => {
     expect(clipped!.children).toEqual([
       {
         tag: 'text',
-        text: 'Hi',
+        // Its spaces too: white-space: pre keeps their room.
+        text: ' Hi ',
         attributes: expect.objectContaining({
-          x: '10 20',
+          x: 10,
           y: 20,
           transform: 'rotate(90 10 20)',
           'font-size': 10,
           'font-family': '"epdf-0123456789abcdef", Helvetica, Arial, sans-serif',
           'font-weight': 700,
           'font-style': 'italic',
+          direction: 'ltr',
+          'unicode-bidi': 'bidi-override',
+          'text-anchor': 'start',
           fill: '#ff0000',
         }),
+        style: {
+          'white-space': 'pre',
+          'font-kerning': 'none',
+          'font-variant-ligatures': 'none',
+          'mix-blend-mode': 'multiply',
+        },
         program,
       },
     ]);
     // The face the text draws in, for the renderer to mount.
     expect(fontProgramsOf([clipped!, clipped!])).toEqual([program]);
+  });
+
+  it('draws a right-to-left run right to left, ending at its left edge, shaped with its features', () => {
+    const [shape] = svgShapesOf(
+      [
+        {
+          kind: 'textRun',
+          at: { x: 40, y: 20 },
+          text: 'שלום',
+          rtl: true,
+          plain: false,
+          fontSize: 12,
+          fontFamily: '"epdf-hebrew"',
+          paint: { fill: '#000000' },
+        },
+      ],
+      options,
+    );
+    expect(shape).toMatchObject({
+      tag: 'text',
+      text: 'שלום',
+      attributes: {
+        x: 40,
+        direction: 'rtl',
+        'unicode-bidi': 'bidi-override',
+        'text-anchor': 'end',
+      },
+      style: { 'white-space': 'pre' },
+    });
+  });
+
+  it('writes a style as CSS text', () => {
+    expect(styleText({ 'white-space': 'pre', 'mix-blend-mode': 'multiply' })).toBe(
+      'white-space: pre; mix-blend-mode: multiply',
+    );
+    expect(styleText(undefined)).toBeUndefined();
   });
 });
 

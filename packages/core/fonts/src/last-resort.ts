@@ -25,3 +25,9 @@ export function lastResortFontProgram(): MountableFontProgram {
 }
 
 export { LAST_RESORT_HASH };
+
+/**
+ * What the engine lays text out with in the last-resort program, in
+ * thousandths of an em: its box's advance, and its ascent and descent.
+ */
+export const LAST_RESORT_METRICS = { advance: 700, ascent: 800, descent: -200 } as const;

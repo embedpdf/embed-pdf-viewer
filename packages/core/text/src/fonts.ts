@@ -33,18 +33,18 @@ export interface TextFont {
   readonly standard: boolean;
 }
 
-/** The fonts a box draws with. */
-export interface TextFonts {
+/** The fonts a box draws with: `F` is the caller's own font type, which runs carry back. */
+export interface TextFonts<F extends TextFont = TextFont> {
   /** The box's own font. */
-  readonly face: TextFont;
+  readonly face: F;
   /** The fallbacks, in the order the engine tries them for the box's style. */
-  readonly fallbacks: readonly TextFont[];
+  readonly fallbacks: readonly F[];
   /** The font that draws a box for a character no font has; `null` when there is none. */
-  readonly lastResort: TextFont | null;
+  readonly lastResort: F | null;
 }
 
-export interface GraphemeMatch {
-  readonly font: TextFont;
+export interface GraphemeMatch<F extends TextFont = TextFont> {
+  readonly font: F;
   /** `false` when no font has the grapheme: it is drawn as a box, or not at all. */
   readonly covered: boolean;
 }
@@ -54,7 +54,10 @@ export const coversGrapheme = (font: TextFont, grapheme: string): boolean =>
   codePointsOf(grapheme).every((codePoint) => !needsGlyph(codePoint) || font.covers(codePoint));
 
 /** The font that draws `grapheme`. */
-export function matchGrapheme(grapheme: string, fonts: TextFonts): GraphemeMatch {
+export function matchGrapheme<F extends TextFont>(
+  grapheme: string,
+  fonts: TextFonts<F>,
+): GraphemeMatch<F> {
   if (coversGrapheme(fonts.face, grapheme)) return { font: fonts.face, covered: true };
   const fallback = fonts.fallbacks.find((font) => coversGrapheme(font, grapheme));
   if (fallback) return { font: fallback, covered: true };

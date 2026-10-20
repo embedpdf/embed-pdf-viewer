@@ -6,7 +6,7 @@
 <svelte:options namespace="svg" />
 
 <script lang="ts">
-  import { createFontMounts, type SvgShape } from '@embedpdf/web';
+  import { createFontMounts, styleText, type SvgShape } from '@embedpdf/web';
   import SvgShapes from './SvgShapes.svelte';
 
   let { shapes }: { shapes: readonly SvgShape[] } = $props();
@@ -20,7 +20,7 @@
 </script>
 
 {#each shapes as shape, index (index)}
-  <svelte:element this={shape.tag} {...shape.attributes} style:mix-blend-mode={shape.blend}>
+  <svelte:element this={shape.tag} {...shape.attributes} style={styleText(shape.style)}>
     {#if shape.children}
       <SvgShapes shapes={shape.children} />
     {:else if shape.text !== undefined}

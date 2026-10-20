@@ -13,7 +13,13 @@ import { fileURLToPath } from 'node:url';
 import { STANDARD_FONTS } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { standardFontCss, standardFontMetrics, standardFontProgram } from '../src';
+import {
+  LAST_RESORT_METRICS,
+  lastResortFontBytes,
+  standardFontCss,
+  standardFontMetrics,
+  standardFontProgram,
+} from '../src';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FONT_DATA = resolve(HERE, '../../../engine/runtime/runtime-src/core/fxge/fontdata');
@@ -148,5 +154,14 @@ describe('the standard faces', () => {
       `"epdf-${standardFontProgram('times-bold-italic').hash.slice(0, 16)}", "Times New Roman", Times, serif`,
     );
     expect([css.fontWeight, css.fontStyle]).toEqual([700, 'italic']);
+  });
+});
+
+describe('the last-resort program', () => {
+  it('has the numbers the engine lays its boxes out with', () => {
+    const font = readOpenType(lastResortFontBytes());
+    expect(font.advanceOf(1)).toBe(LAST_RESORT_METRICS.advance);
+    expect(font.ascender).toBe(LAST_RESORT_METRICS.ascent);
+    expect(font.descender).toBe(LAST_RESORT_METRICS.descent);
   });
 });

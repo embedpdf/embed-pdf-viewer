@@ -5,20 +5,18 @@
  * widget's, one line's height and a comb's spacing. In points, in the
  * widget's upright frame.
  */
+import { standardFontStack, type MountableFontProgram } from '@embedpdf/core-fonts';
 import {
-  standardFontCss,
-  standardFontProgram,
-  type MountableFontProgram,
-} from '@embedpdf/core-fonts';
-import type {
-  Coordinates,
-  FormFieldDTO,
-  PageCoordinates,
-  WidgetAnnotation,
+  isStandardFontName,
+  type Coordinates,
+  type FormFieldDTO,
+  type PageCoordinates,
+  type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 import { textLookOf } from './drawing';
 import { textFieldLayout } from './drawing/text';
+import type { WidgetFonts } from './fonts';
 
 export interface TextEditorLayout {
   /** The programs the engine draws the text in, the face's first: mounted, `fontFamily` reaches them. */
@@ -45,28 +43,54 @@ export interface TextEditorLayout {
   readonly comb: boolean;
 }
 
-/** The layout of `text` in the widget's field; `null` for a widget that isn't a text field's. */
+/**
+ * The CSS family list that draws text in `fonts`: each program, the face's
+ * first and the last resort's last, then the face's own stack for before
+ * they load.
+ */
+function familyList(fonts: WidgetFonts): string {
+  const programs = programsOf(fonts).map((program) => `"${program.family}"`);
+  const { key } = fonts.face;
+  const stack = isStandardFontName(key) ? standardFontStack(key) : 'sans-serif';
+  return [...programs, stack].join(', ');
+}
+
+/** The programs that draw text in `fonts`, each once, in the order they're tried. */
+function programsOf(fonts: WidgetFonts): MountableFontProgram[] {
+  const all = [fonts.face, ...fonts.fallbacks, ...(fonts.lastResort ? [fonts.lastResort] : [])];
+  return [...new Map(all.map((font) => [font.program.family, font.program])).values()];
+}
+
+/**
+ * The layout of `text` in the widget's field, in `fonts` (the widget's
+ * standard font when none are given); `null` for a widget that isn't a text
+ * field's.
+ */
 export function textEditorLayout<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
   field: FormFieldDTO<C>,
   text: string,
+  fonts?: WidgetFonts,
 ): TextEditorLayout | null {
   if (field.family !== 'text') return null;
-  const { look } = textLookOf(widget);
+  const { look } = textLookOf(widget, fonts);
   const facts = {
     multiline: field.multiline,
     password: field.password,
     comb: field.comb,
     maxLength: field.maxLength,
   };
-  const { plate, layout } = textFieldLayout(look, { ...facts, value: text });
-  const { bbox, font } = look;
-  const fontSize = layout.fontSize;
+  const { plate, laid } = textFieldLayout(look, { ...facts, value: text });
+  const { bbox } = look;
+  const { face } = look.fonts;
+  const fontSize = laid.fontSize;
   const base = {
-    programs: [standardFontProgram(font.font)],
-    ...standardFontCss(font.font),
+    programs: programsOf(look.fonts),
+    fontFamily: familyList(look.fonts),
+    fontWeight: face.fontWeight,
+    fontStyle: face.fontStyle,
     fontSize,
-    lineHeight: ((font.ascent - font.descent) * fontSize) / 1000,
+    lineHeight: ((face.ascent - face.descent) * fontSize) / 1000,
     padding: {
       top: bbox.top - plate.top,
       right: bbox.right - plate.right,
@@ -80,14 +104,13 @@ export function textEditorLayout<C extends Coordinates = PageCoordinates>(
   // A comb centres each character in its cell: CSS can only space them evenly, so the room is
   // the cell less the characters' mean width (exact for a fixed-width face). An empty comb
   // places a stand-in, for where the first character will go.
-  const placed = text ? layout : textFieldLayout(look, { ...facts, value: '0' }).layout;
-  const words = placed.lines.flatMap((line) => line.words);
-  const advances = words.map((word) => ((font.width(word.code) ?? 0) * placed.fontSize) / 1000);
-  const mean = advances.reduce((sum, advance) => sum + advance, 0) / Math.max(1, advances.length);
+  const placed = text ? laid : textFieldLayout(look, { ...facts, value: '0' }).laid;
+  const runs = placed.lines.flatMap((line) => line.runs);
+  const mean = runs.reduce((sum, run) => sum + run.width, 0) / Math.max(1, runs.length);
   const cell = (plate.right - plate.left) / cells;
   return {
     ...base,
-    padding: { ...base.padding, left: (words[0]?.x ?? plate.left) - bbox.left },
+    padding: { ...base.padding, left: (runs[0]?.x ?? plate.left) - bbox.left },
     letterSpacing: cell - mean,
     comb: true,
   };

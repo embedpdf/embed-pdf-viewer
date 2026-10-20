@@ -6,11 +6,12 @@
  * (`GeneratePushButtonFormAP`). Each draws what its generator function writes,
  * in the same order.
  */
-import type { LayoutFont } from '../font';
+import { layoutField, type FieldText, type FieldTextOptions } from '@embedpdf/core-text';
+import type { PdfRect } from '@embedpdf/engine-core/runtime';
+
+import type { PaintFont, WidgetFonts } from '../fonts';
 import { BLACK, borderOps, boxOps, deflate, rectPath, type BorderStyleInfo } from './border';
 import type { DrawOp, Rgb, TextRun } from './types';
-import { textRuns } from '../layout/edit';
-import { layoutVariableText, type PdfRect, type TextLayout } from '../layout/variable-text';
 
 const f32 = Math.fround;
 const isFloatZero = (value: number) => value < 0.0001 && value > -0.0001;
@@ -25,7 +26,7 @@ export interface TextLook {
   readonly border: BorderStyleInfo;
   readonly background: Rgb | null;
   readonly borderColor: Rgb | null;
-  readonly font: LayoutFont;
+  readonly fonts: WidgetFonts;
   readonly fontSize: number;
   readonly textColor: Rgb | null;
   readonly alignment: 0 | 1 | 2;
@@ -33,20 +34,42 @@ export interface TextLook {
 
 export interface Drawn {
   readonly ops: DrawOp[];
-  /** A character the font can't write. */
-  readonly approximate: boolean;
+  /** Characters no font the painter has: drawn as boxes. */
+  readonly missing: readonly string[];
 }
 
-const contentHeight = (layout: TextLayout) => f32(layout.content.top - layout.content.bottom);
-const plateHeight = (plate: PdfRect) => f32(plate.top - plate.bottom);
+type Laid = FieldText<PaintFont>;
 
-const textOp = (look: TextLook, layout: TextLayout, runs: TextRun[], color: Rgb): DrawOp => ({
+/** `text` laid out in the look's fonts, at its size unless `options` say. */
+const laidOut = (
+  look: TextLook,
+  text: string,
+  options: Omit<FieldTextOptions, 'fontSize'> & { readonly fontSize?: number },
+): Laid => layoutField(text, look.fonts, { fontSize: look.fontSize, ...options });
+
+/** Every run of the laid-out text, line by line, left to right. */
+const runsOf = (laid: Laid): TextRun[] =>
+  laid.lines.flatMap((line) =>
+    line.runs.map(({ x, text, font, rtl, plain, width }) => ({
+      x,
+      y: line.baseline,
+      text,
+      font,
+      rtl,
+      plain,
+      width,
+    })),
+  );
+
+const textOp = (laid: Laid, color: Rgb): DrawOp => ({
   kind: 'text',
-  font: look.font.font,
-  size: layout.fontSize,
+  size: laid.fontSize,
   color,
-  runs,
+  runs: runsOf(laid),
 });
+
+/** One line, as a combo box, a list box row and a caption draw it. */
+const ONE_LINE = { multiline: false, password: false, limit: 0, cells: 0 } as const;
 
 /** What a text field's text depends on, besides its look. */
 export interface TextFieldText {
@@ -61,20 +84,21 @@ export interface TextFieldText {
 export function textFieldLayout(
   look: TextLook,
   field: TextFieldText,
-): { readonly plate: PdfRect; readonly layout: TextLayout } {
+): { readonly plate: PdfRect; readonly laid: Laid } {
   const width = look.border.width;
   const plate = deflate(look.bbox, f32(2 * width), width);
   const maxLength = field.maxLength ?? 0;
-  const layout = layoutVariableText(field.value, look.font, {
+  const laid = laidOut(look, field.value, {
     plate,
-    fontSize: look.fontSize,
     alignment: look.alignment,
     multiline: field.multiline,
-    ...(field.password ? { substitute: '*' } : {}),
+    password: field.password,
     limit: field.comb ? 0 : maxLength,
     cells: field.comb ? maxLength : 0,
+    // A one-line field's text has its middle at the plate's.
+    centered: !field.multiline,
   });
-  return { plate, layout };
+  return { plate, laid };
 }
 
 export function textFieldOps(look: TextLook, field: TextFieldText): Drawn {
@@ -97,18 +121,17 @@ export function textFieldOps(look: TextLook, field: TextFieldText): Drawn {
   } else {
     ops.push(...borderOps(bbox, border, look.borderColor));
   }
-  const { plate: body, layout } = textFieldLayout(look, field);
-  const offset = field.multiline
-    ? { x: 0, y: 0 }
-    : { x: 0, y: f32(f32(contentHeight(layout) - plateHeight(body)) / 2) };
-  const runs = textRuns(layout, offset, !field.comb);
+  const { laid } = textFieldLayout(look, field);
+  const text = textOp(laid, look.textColor ?? BLACK);
   ops.push({
     kind: 'clip',
     rect: deflate(bbox, width),
-    ops: runs.length ? [textOp(look, layout, runs, look.textColor ?? BLACK)] : [],
+    ops: hasRuns(text) ? [text] : [],
   });
-  return { ops, approximate: layout.approximate };
+  return { ops, missing: laid.missing };
 }
+
+const hasRuns = (op: DrawOp) => op.kind === 'text' && op.runs.length > 0;
 
 export function comboBoxOps(look: TextLook, field: { readonly value: string }): Drawn {
   const { bbox, border } = look;
@@ -120,23 +143,14 @@ export function comboBoxOps(look: TextLook, field: { readonly value: string }): 
   const body = deflate(bbox, border.width, border.width);
   const button = normalized({ ...body, left: f32(body.right - 13) });
   const edit = deflate(normalized({ ...body, right: button.left }), 4, 0);
-  const layout = layoutVariableText(field.value, look.font, {
+  const laid = laidOut(look, field.value, {
+    ...ONE_LINE,
     plate: edit,
-    fontSize: look.fontSize,
     alignment: 0,
-    multiline: false,
-    limit: 0,
-    cells: 0,
+    centered: true,
   });
-  const offset = { x: 0, y: f32(f32(contentHeight(layout) - plateHeight(edit)) / 2) };
-  const runs = textRuns(layout, offset, true);
-  if (runs.length) {
-    ops.push({
-      kind: 'clip',
-      rect: edit,
-      ops: [textOp(look, layout, runs, look.textColor ?? BLACK)],
-    });
-  }
+  const text = textOp(laid, look.textColor ?? BLACK);
+  if (hasRuns(text)) ops.push({ kind: 'clip', rect: edit, ops: [text] });
   if (!isEmpty(button)) {
     const centerX = f32(f32(button.left + button.right) / 2);
     const centerY = f32(f32(button.top + button.bottom) / 2);
@@ -156,7 +170,7 @@ export function comboBoxOps(look: TextLook, field: { readonly value: string }): 
       });
     }
   }
-  return { ops, approximate: layout.approximate };
+  return { ops, missing: laid.missing };
 }
 
 /** The list box's selected rows: PDFium's form highlight. */
@@ -178,7 +192,7 @@ export function listBoxOps(
   ops.push(...borderOps(bbox, border, look.borderColor));
   const body = deflate(bbox, border.width, border.width);
   const rows: DrawOp[] = [];
-  let approximate = false;
+  const missing = new Set<string>();
   let y = body.top;
   // Text without a colour of its own paints in the colour the last row left.
   let fill: Rgb = BLACK;
@@ -187,17 +201,16 @@ export function listBoxOps(
   for (let index = start; index < field.options.length; index += 1) {
     if (isFloatSmaller(y, body.bottom)) break;
     const option = field.options[index]!;
-    const layout = layoutVariableText(option.label, look.font, {
-      plate: { left: body.left, bottom: 0, right: body.right, top: 0 },
+    // A row is one line, from the top of what is left.
+    const laid = laidOut(look, option.label, {
+      ...ONE_LINE,
+      plate: { left: body.left, bottom: y, right: body.right, top: y },
       fontSize: look.fontSize === 0 || isFloatZero(look.fontSize) ? 12 : look.fontSize,
       alignment: 0,
-      multiline: false,
-      limit: 0,
-      cells: 0,
+      centered: false,
     });
-    approximate ||= layout.approximate;
-    const height = contentHeight(layout);
-    const runs = textRuns(layout, { x: 0, y }, true);
+    for (const character of laid.missing) missing.add(character);
+    const height = laid.contentHeight;
     if (option.selected) {
       rows.push({
         kind: 'fill',
@@ -205,41 +218,27 @@ export function listBoxOps(
         color: SELECTED_ROW,
         evenOdd: false,
       });
-      rows.push(textOp(look, layout, runs, WHITE));
+      rows.push(textOp(laid, WHITE));
       fill = WHITE;
     } else {
       fill = look.textColor ?? fill;
-      rows.push(textOp(look, layout, runs, fill));
+      rows.push(textOp(laid, fill));
     }
     y = f32(y - height);
   }
   if (rows.length) ops.push({ kind: 'clip', rect: body, ops: rows });
-  return { ops, approximate };
+  return { ops, missing: [...missing] };
 }
 
 export function pushButtonOps(look: TextLook, caption: string | null): Drawn {
   const { bbox, border } = look;
   const ops = boxOps(bbox, border, look.background, look.borderColor);
-  if (!caption) return { ops, approximate: false };
+  if (!caption) return { ops, missing: [] };
   const body = deflate(bbox, f32(2 * border.width), border.width);
-  const layout = layoutVariableText(caption, look.font, {
-    plate: body,
-    fontSize: look.fontSize,
-    alignment: 1,
-    multiline: false,
-    limit: 0,
-    cells: 0,
-  });
-  const offset = { x: 0, y: f32(f32(contentHeight(layout) - plateHeight(body)) / 2) };
-  const runs = textRuns(layout, offset, true);
-  if (runs.length) {
-    ops.push({
-      kind: 'clip',
-      rect: deflate(bbox, border.width),
-      ops: [textOp(look, layout, runs, look.textColor ?? BLACK)],
-    });
-  }
-  return { ops, approximate: layout.approximate };
+  const laid = laidOut(look, caption, { ...ONE_LINE, plate: body, alignment: 1, centered: true });
+  const text = textOp(laid, look.textColor ?? BLACK);
+  if (hasRuns(text)) ops.push({ kind: 'clip', rect: deflate(bbox, border.width), ops: [text] });
+  return { ops, missing: laid.missing };
 }
 
 function normalized(rect: PdfRect): PdfRect {

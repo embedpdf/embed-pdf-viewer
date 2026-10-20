@@ -1,20 +1,19 @@
 /**
  * The form widget painter: what a widget looks like for its facts, ported
- * from the engine's appearance generator (`cpdf_generateap.cpp`) and its text
- * layout (`CPVT`), and checked against the engine by the parity gate
- * (engine `widget-painter-parity.test.ts`). Pure: no DOM, no engine.
+ * from the engine's appearance generator, its text laid out as the engine's
+ * shared text engine lays it out (`@embedpdf/core-text`), and checked against
+ * the engine by the parity gate (engine `widget-painter-parity.test.ts`).
+ * Pure: no DOM, no engine.
  */
 export { paints, widgetDrawing, type ShownValue } from './drawing';
 export { textEditorLayout, type TextEditorLayout } from './editor';
 export type { DrawOp, PathSegment, Rgb, TextRun, WidgetDrawing } from './drawing';
-export { layoutFontOf, type LayoutFont } from './font';
+export {
+  defaultWidgetFonts,
+  lastResortPaintFont,
+  standardPaintFont,
+  type PaintFont,
+  type WidgetFonts,
+} from './fonts';
 export { widgetScene, type WidgetPlacement } from './scene';
 export type { MountableFontProgram } from '@embedpdf/core-fonts';
-export {
-  layoutVariableText,
-  type LaidLine,
-  type LaidWord,
-  type PdfRect,
-  type TextLayout,
-  type VariableTextOptions,
-} from './layout/variable-text';

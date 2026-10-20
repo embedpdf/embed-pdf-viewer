@@ -956,16 +956,20 @@ export type SceneNode = (
       rotation?: number;
       paint: Paint;
     }
-  /** Painted text placed character by character: `offsets[i]` is how far
-   *  along the baseline from `at` character `i` starts, so each glyph lands
-   *  where the PDF puts it (a form widget's painted text). `rotation` turns
-   *  the run about `at`, degrees clockwise. `program` is the face it draws
-   *  in, for whatever draws it to mount (`fontFamily` names it first). */
+  /** A run of painted text in one font and one direction, as a layout
+   *  placed it (a form widget's text): `at` is where its left edge meets the
+   *  baseline, `text` its characters in typing order. A right-to-left run is
+   *  drawn right to left from its right end, so it ends at `at`; the browser
+   *  shapes the run and orders nothing. `plain` turns kerning and ligatures
+   *  off, as the engine draws simple scripts. `rotation` turns the run about
+   *  `at`, degrees clockwise. `program` is the face it draws in, for whatever
+   *  draws it to mount (`fontFamily` names it first). */
   | {
-      kind: 'glyphs';
+      kind: 'textRun';
       at: Point;
       text: string;
-      offsets: number[];
+      rtl: boolean;
+      plain: boolean;
       fontSize: number;
       fontFamily: string;
       fontWeight?: number;
