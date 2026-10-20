@@ -44,6 +44,7 @@ import {
   SignatureCompleteResultSchema,
   SignaturePreparedWireSchema,
   SignatureSnapshotSchema,
+  AttachmentListSchema,
   wireTemplates,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
@@ -1349,6 +1350,14 @@ export const DocAnnotationParamsSchema = DocPageParamsSchema.extend({
 export const DocFieldParamsSchema = DocLayerParamsSchema.extend({
   fieldKey: z.string().min(1),
 });
+export const DocAttachmentParamsSchema = DocLayerParamsSchema.extend({
+  fileKey: z
+    .string()
+    .min(1)
+    .describe(
+      "The embedded file's name-tree key (its `ref.key`), token-text encoded, as `fieldKey` is.",
+    ),
+});
 
 /**
  * Attached to every doc-plane operation: per-request password supply for
@@ -1486,6 +1495,45 @@ export const docOperations = {
       200: { contentType: 'application/json', schema: DocumentOutlineSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
+  },
+  'doc.attachments.list': {
+    operationId: 'doc.attachments.list',
+    title: 'List attachments',
+    summary:
+      "The files embedded in the document (its /EmbeddedFiles) for a layer, in key order: each with its name, type, description, size, checksum and dates, never its bytes. Add and remove them with the attachment ops of a change.",
+    method: 'GET',
+    path: wireTemplates.layerAttachments,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: AttachmentListSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      "A file-attachment annotation's file is listed with the annotation; read its bytes with `doc.annotations.readFile`.",
+  },
+  'doc.attachments.download': {
+    operationId: 'doc.attachments.download',
+    title: 'Download an attachment',
+    summary:
+      "One embedded file's bytes, decoded. Its name and type are what the listing says; `Content-Type` is its type, or `application/octet-stream` when it has none.",
+    method: 'GET',
+    path: wireTemplates.layerAttachmentFile,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocAttachmentParamsSchema,
+    responses: {
+      200: { contentType: 'application/octet-stream' },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      413: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes: "A file that decodes past the server's limit is refused (PayloadTooLarge).",
   },
   'doc.signatures.list': {
     operationId: 'doc.signatures.list',
@@ -1798,6 +1846,7 @@ export const docOperations = {
     scope: [],
     docCapabilities: [
       'doc.annotate.modify',
+      'doc.attachments.modify',
       'doc.forms.fill',
       'doc.forms.modify',
       'doc.metadata.modify',
@@ -1818,7 +1867,8 @@ export const docOperations = {
       'an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair ' +
       'or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own ' +
       'capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure ' +
-      '`doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`, pages `doc.pages.assemble`. ' +
+      '`doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`, pages `doc.pages.assemble`, ' +
+      'embedded files `doc.attachments.modify`. ' +
       "Bytes (a stamp's drawing, an attached file, a signature's artwork, a PDF whose pages come in) travel as " +
       "multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
       'and each file as the part `resource:<key>`. ' +
@@ -1960,6 +2010,26 @@ export const docOperations = {
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
+  },
+  'doc.annotations.readFile': {
+    operationId: 'doc.annotations.readFile',
+    title: 'Read an attached file',
+    summary:
+      "A file-attachment annotation's file, decoded: its `file` resource. Its name and type are what the annotation's `file` says. A read; the source is untouched.",
+    method: 'GET',
+    path: wireTemplates.layerAnnotationItemFileResource,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocAnnotationParamsSchema,
+    responses: {
+      200: { contentType: 'application/octet-stream' },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      413: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes: "A file that decodes past the server's limit is refused (PayloadTooLarge).",
   },
   'doc.forms.list': {
     operationId: 'doc.forms.list',
@@ -2261,6 +2331,7 @@ export const docsGroups = {
   shares: { title: 'Shares' },
   doc: { title: 'Document operations', slug: 'document-operations' },
   'doc.annotations': { title: 'Annotations' },
+  'doc.attachments': { title: 'Attachments' },
   'doc.forms': { title: 'Forms' },
   'doc.metadata': { title: 'Metadata' },
   'doc.metadata.custom': { title: 'Custom keys' },

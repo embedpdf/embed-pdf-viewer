@@ -441,6 +441,7 @@ export {
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
   AttachmentRestoreResultSchema,
+  AttachmentWireComponents,
 } from './wire/schemas';
 export type { SignaturePreparedWire, SignatureCompleteBody } from './wire/schemas';
 export type {

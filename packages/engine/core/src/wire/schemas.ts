@@ -22,7 +22,12 @@ import {
   type AnnotationAppearancesQuery,
   type WidgetAppearancesQuery,
 } from '../dto/AnnotationRender';
-import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema';
+import {
+  AttachmentFileBaseSchema,
+  AttachmentFileInfoSchema,
+  AttachmentRefSchema,
+  AttachmentSchema,
+} from '../dto/Attachment.schema';
 import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
 import {
   PAGE_PRINT_FAMILIES,
@@ -1687,6 +1692,16 @@ export const AttachmentDeleteResultSchema: z.ZodType<AttachmentDeleteResult> = z
 export const AttachmentListSchema: z.ZodType<AttachmentList> = z.object({
   attachments: z.array(AttachmentSchema),
 });
+
+/** Embedded files (`doc.attachments`): the models the OpenAPI projection names. */
+export const AttachmentWireComponents = {
+  AttachmentRef: AttachmentRefSchema,
+  AttachmentFileInfo: AttachmentFileInfoSchema,
+  Attachment: AttachmentSchema,
+  AttachmentList: AttachmentListSchema,
+  AttachmentFileBase: AttachmentFileBaseSchema,
+  AttachmentMutationMeta: AttachmentMutationMetaSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 /**
  * Metadata write result: the re-read `metadata`. On the cloud,

@@ -128,6 +128,8 @@ function opsOf(
           const { resources, ...rest } = op;
           return { ...rest, source: new Uint8Array(bytesOf(resources.source)) };
         }
+        case 'attachments.create':
+          return { ...op, resources: { file: bytesOf(op.resources.file) } };
         default:
           return op as ChangeOp<PageCoordinates, WireAnnotationResources>;
       }

@@ -772,6 +772,130 @@
         }
       }
     },
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}/resources/file": {
+      "get": {
+        "operationId": "doc.annotations.readFile",
+        "x-fern-sdk-group-name": ["doc", "annotations"],
+        "x-fern-sdk-method-name": "readFile",
+        "x-docs-title": "Read an attached file",
+        "summary": "A file-attachment annotation's file, decoded: its `file` resource. Its name and type are what the annotation's `file` says. A read; the source is untouched.",
+        "description": "A file that decodes past the server's limit is refused (PayloadTooLarge).",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.download"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "pageKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+            }
+          },
+          {
+            "name": "annotKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$",
+              "description": "The annotation's address on the page: `obj:N`, its indirect object number, or `base:N` for an annotation the uploaded file stored inline (without an object number of its own), the position it was born at in the page's /Annots. The name the annotation's `ref` carries for life."
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnnotationsReadFile400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnnotationsReadFile404Response"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnnotationsReadFile413Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/appearance": {
       "post": {
         "operationId": "doc.annotations.exportAppearance",
@@ -1124,6 +1248,199 @@
         }
       }
     },
+    "/v1/docs/{docId}/layers/{layerName}/attachment-files/{fileKey}/data": {
+      "get": {
+        "operationId": "doc.attachments.download",
+        "x-fern-sdk-group-name": ["doc", "attachments"],
+        "x-fern-sdk-method-name": "download",
+        "x-docs-title": "Download an attachment",
+        "summary": "One embedded file's bytes, decoded. Its name and type are what the listing says; `Content-Type` is its type, or `application/octet-stream` when it has none.",
+        "description": "A file that decodes past the server's limit is refused (PayloadTooLarge).",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.download"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "fileKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The embedded file's name-tree key (its `ref.key`), token-text encoded, as `fieldKey` is."
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAttachmentsDownload400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAttachmentsDownload404Response"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAttachmentsDownload413Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/attachments": {
+      "get": {
+        "operationId": "doc.attachments.list",
+        "x-fern-sdk-group-name": ["doc", "attachments"],
+        "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List attachments",
+        "summary": "The files embedded in the document (its /EmbeddedFiles) for a layer, in key order: each with its name, type, description, size, checksum and dates, never its bytes. Add and remove them with the attachment ops of a change.",
+        "description": "A file-attachment annotation's file is listed with the annotation; read its bytes with `doc.annotations.readFile`.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.open"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAttachmentsList200Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAttachmentsList404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/layers/{layerName}/changes": {
       "post": {
         "operationId": "doc.changes",
@@ -1131,7 +1448,7 @@
         "x-fern-sdk-method-name": "changes",
         "x-docs-title": "Apply changes",
         "summary": "Apply user actions to a layer, each a change whose ops apply in order, all or none, or the undo of an earlier change.",
-        "description": "Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`, pages `doc.pages.assemble`. Bytes (a stamp's drawing, an attached file, a signature's artwork, a PDF whose pages come in) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.",
+        "description": "Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`, outline `doc.outline.modify`, pages `doc.pages.assemble`, embedded files `doc.attachments.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork, a PDF whose pages come in) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, and each file as the part `resource:<key>`. At most 64 changes per request and 512 ops per change.",
         "security": [
           {
             "apiToken": []
@@ -1143,6 +1460,7 @@
         "x-required-scope": [],
         "x-required-capability": [
           "doc.annotate.modify",
+          "doc.attachments.modify",
           "doc.forms.fill",
           "doc.forms.modify",
           "doc.metadata.modify",
@@ -6422,6 +6740,9 @@
     },
     "doc.annotations": {
       "title": "Annotations"
+    },
+    "doc.attachments": {
+      "title": "Attachments"
     },
     "doc.forms": {
       "title": "Forms"
@@ -11724,55 +12045,11 @@
                 "enum": ["push-pin", "paperclip", "graph", "tag"]
               },
               "file": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "mimeType": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "description": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "size": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "nullable": true
-                  },
-                  "checksum": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "createdAt": {
-                    "allOf": [
-                      {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
-                      }
-                    ],
-                    "nullable": true
-                  },
-                  "modifiedAt": {
-                    "allOf": [
-                      {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
-                      }
-                    ],
-                    "nullable": true
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AttachmentFileInfo"
                   }
-                },
-                "required": [
-                  "name",
-                  "mimeType",
-                  "description",
-                  "size",
-                  "checksum",
-                  "createdAt",
-                  "modifiedAt"
                 ],
-                "additionalProperties": false,
                 "nullable": true
               }
             },
@@ -20661,6 +20938,200 @@
         "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changed"],
         "additionalProperties": false
       },
+      "AttachmentRef": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["key"]
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["kind", "key"],
+        "additionalProperties": false
+      },
+      "AttachmentFileInfo": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "checksum": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "modifiedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttachmentFileInfo/properties/createdAt"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "mimeType",
+          "description",
+          "size",
+          "checksum",
+          "createdAt",
+          "modifiedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["key"]
+              },
+              "key": {
+                "type": "string"
+              }
+            },
+            "required": ["kind", "key"],
+            "additionalProperties": false
+          },
+          "name": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "checksum": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "modifiedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Attachment/properties/createdAt"
+              }
+            ],
+            "nullable": true
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "ref",
+          "name",
+          "mimeType",
+          "description",
+          "size",
+          "checksum",
+          "createdAt",
+          "modifiedAt",
+          "index"
+        ],
+        "additionalProperties": false
+      },
+      "AttachmentList": {
+        "type": "object",
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          }
+        },
+        "required": ["attachments"],
+        "additionalProperties": false
+      },
+      "AttachmentFileBase": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "AttachmentMutationMeta": {
+        "type": "object",
+        "properties": {
+          "affectedPages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageRef"
+            }
+          },
+          "cacheDelta": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CacheDelta"
+              }
+            ],
+            "nullable": true
+          },
+          "opId": {
+            "type": "string"
+          },
+          "undoable": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentRef"
+            }
+          }
+        },
+        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changed"],
+        "additionalProperties": false
+      },
       "ChangeOp": {
         "anyOf": [
           {
@@ -21330,6 +21801,44 @@
             },
             "required": ["type", "resources"],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["attachments.create"]
+              },
+              "file": {
+                "$ref": "#/components/schemas/AttachmentFileBase"
+              },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/ChangeOp/anyOf/0/properties/resources/properties/appearance"
+                  }
+                },
+                "required": ["file"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "file", "resources"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["attachments.delete"]
+              },
+              "ref": {
+                "$ref": "#/components/schemas/AttachmentRef"
+              }
+            },
+            "required": ["type", "ref"],
+            "additionalProperties": false
           }
         ]
       },
@@ -21374,11 +21883,14 @@
                   "pages.delete",
                   "pages.insertBlank",
                   "pages.insert",
+                  "attachments.create",
+                  "attachments.delete",
                   "annotations.restore",
                   "forms.restore",
                   "forms.restoreWidget",
                   "outline.restore",
-                  "pages.restore"
+                  "pages.restore",
+                  "attachments.restore"
                 ]
               },
               "meta": {
@@ -22381,6 +22893,54 @@
               }
             },
             "required": ["type", "pages", "layout", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["attachments.create"]
+              },
+              "attachment": {
+                "$ref": "#/components/schemas/Attachment"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/AttachmentMutationMeta"
+              }
+            },
+            "required": ["type", "attachment", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["attachments.delete"]
+              },
+              "meta": {
+                "$ref": "#/components/schemas/AttachmentMutationMeta"
+              }
+            },
+            "required": ["type", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["attachments.restore"]
+              },
+              "attachment": {
+                "$ref": "#/components/schemas/Attachment"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/AttachmentMutationMeta"
+              }
+            },
+            "required": ["type", "attachment", "meta"],
             "additionalProperties": false
           }
         ]
@@ -24466,6 +25026,21 @@
       "DocOutlineGet404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
+      "DocAttachmentsList200Response": {
+        "$ref": "#/components/schemas/AttachmentList"
+      },
+      "DocAttachmentsList404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocAttachmentsDownload400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocAttachmentsDownload404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocAttachmentsDownload413Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
       "DocSignaturesList200Response": {
         "type": "object",
         "properties": {
@@ -26448,6 +27023,15 @@
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocAnnotationsReadAppearance404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocAnnotationsReadFile400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocAnnotationsReadFile404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocAnnotationsReadFile413Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocFormsList200Response": {

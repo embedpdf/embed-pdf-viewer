@@ -6,6 +6,7 @@ import {
   EngineErrorCode,
   EventHub,
   SessionEventPublisher,
+  attachmentVerbs,
   outlineVerbs,
   pageVerbs,
   subscribeToType,
@@ -293,14 +294,15 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => readCloudOutline(http, id, layerName, () => this.closed, this.manifestAccessor),
       (change, options) => this.apply(change, options),
     );
-    this.attachments = new CloudDocumentAttachmentsService(
-      http,
-      id,
-      layerName,
-      () => this.closed,
-      this.manifestAccessor,
-      this.publisher,
-      this.writes,
+    this.attachments = attachmentVerbs(
+      new CloudDocumentAttachmentsService(
+        http,
+        id,
+        layerName,
+        () => this.closed,
+        this.manifestAccessor,
+      ),
+      (change, options) => this.apply(change, options),
     );
     this.signatures = new CloudDocumentSignaturesService(
       http,
@@ -767,6 +769,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         return;
       case 'attachments.created':
       case 'attachments.deleted':
+      case 'attachments.restored':
         this.absorbMutation(event.meta, ['attachments']);
         return;
       case 'forms.valueSet':
