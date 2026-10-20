@@ -1,7 +1,7 @@
 import { EngineError } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
-import { exportDict, importDict } from './captures';
+import { canonicalDict, exportDict, importDict } from './captures';
 import type { DocumentSession } from '../../../document-session/DocumentSession';
 import type { CapturedObject } from '../ChangeRecord';
 
@@ -30,7 +30,10 @@ export function captureBefore(
   return [...captured.values()];
 }
 
-/** Completes captures once the op has written: each dictionary as the op left it, the guard. */
+/**
+ * Completes captures once the op has written: each dictionary as the op left
+ * it, the guard, in canonical bytes (`canonicalDict`).
+ */
 export function captureAfter(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
@@ -38,7 +41,7 @@ export function captureAfter(
 ): CapturedObject[] {
   return pending.map((object) => ({
     ...object,
-    after: exportDict(runtime, session.requireDocPtr(), object.objectNumber, []),
+    after: canonicalDict(runtime, session.requireDocPtr(), object.objectNumber, []),
   }));
 }
 
@@ -49,7 +52,7 @@ export function unchangedSince(
   objects: readonly CapturedObject[],
 ): boolean {
   return objects.every((object) => {
-    const now = tryExportDict(runtime, session, object.objectNumber, []);
+    const now = tryCanonicalDict(runtime, session, object.objectNumber);
     return now !== null && sameBytes(now, object.after);
   });
 }
@@ -71,6 +74,20 @@ export function revertObjects(
   }
   session.invalidateDerived();
   return captureAfter(runtime, session, redo);
+}
+
+/** A dictionary's canonical bytes, or null when there is none at that number. */
+function tryCanonicalDict(
+  runtime: PdfRuntimeModule,
+  session: DocumentSession,
+  objectNumber: number,
+): Uint8Array | null {
+  try {
+    return canonicalDict(runtime, session.requireDocPtr(), objectNumber, []);
+  } catch (error) {
+    if (EngineError.is(error)) return null;
+    throw error;
+  }
 }
 
 /** The capture of a dictionary, or null when there is none at that number. */

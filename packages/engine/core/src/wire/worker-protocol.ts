@@ -507,17 +507,20 @@ export interface AnnotationsUpdateWorkerRequest<
  * One change (`doc.apply`): its ops in order, as one transaction, or the
  * reverse of an earlier write (`{ undoOf }`). Each op is checked as its
  * single verb's job checks it, inside the write.
+ *
+ * A change stays in page space across the worker, both ways: each op's places
+ * turn into the file's coordinates right before it runs, and its answer's
+ * back right after, against the document as it is then. An earlier op of the
+ * same change can add, remove or put back a page a later one names.
  */
-export interface DocumentApplyWorkerRequest<
-  C extends Coordinates = PageCoordinates,
-> extends WriteJobFields {
+export interface DocumentApplyWorkerRequest extends WriteJobFields {
   kind: 'document.apply';
   effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   /** The ops, with their bytes by role on the transfer list, as the single verbs send them. */
-  change: Change<C, WireAnnotationResources>;
+  change: Change<PageCoordinates, WireAnnotationResources>;
   /**
    * Who the change acts for, what they may do and what the document's
    * signatures forbid, checked inside the write against each op (the ops of
@@ -541,10 +544,10 @@ export interface ChangeRecordPayload {
 }
 
 /** One change of a server request (see `DocumentApplyChangesWorkerRequest`). */
-export interface ServerChange<C extends Coordinates = PageCoordinates> {
+export interface ServerChange {
   opId: string;
   /** Its ops (a single-verb route's one op, an import's among them), or an undo. */
-  change: RecordedChange<C, WireAnnotationResources>;
+  change: RecordedChange<PageCoordinates, WireAnnotationResources>;
   /** Who the change acts for (see `DocumentApplyWorkerRequest.authority`). */
   authority: ChangeAuthority;
   /**
@@ -561,26 +564,27 @@ export interface ServerChange<C extends Coordinates = PageCoordinates> {
  * A server request's changes, as one job: each runs in its own layer
  * transaction, committed or rolled back on its own, in order. A refusal is
  * that change's answer; anything else fails the job. The job saves one
- * artifact for the changes that applied.
+ * artifact for the changes that applied. Page space both ways, each op
+ * converted as it runs (see `DocumentApplyWorkerRequest`).
  */
-export interface DocumentApplyChangesWorkerRequest<C extends Coordinates = PageCoordinates> {
+export interface DocumentApplyChangesWorkerRequest {
   kind: 'document.applyChanges';
   effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  changes: ServerChange<C>[];
+  changes: ServerChange[];
   /** See `WriteJobFields.objectNumberFloor`. */
   objectNumberFloor?: number;
   artifactPath?: string;
 }
 
 /** What one change of a server request answered. */
-export type ServerChangeOutcome<C extends Coordinates = PageCoordinates> =
+export type ServerChangeOutcome =
   | {
       opId: string;
       status: 'applied';
-      result: ChangeResult<C>;
+      result: ChangeResult;
       /** What undoes it, for the caller to keep; null when nothing can. */
       record: ChangeRecordPayload | null;
     }
@@ -1534,8 +1538,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | AnnotationsUpdateWorkerRequest<C>
   | AnnotationsDeleteWorkerRequest
   | AnnotationsReorderWorkerRequest
-  | DocumentApplyWorkerRequest<C>
-  | DocumentApplyChangesWorkerRequest<C>
+  | DocumentApplyWorkerRequest
+  | DocumentApplyChangesWorkerRequest
   | FormsListWorkerRequest
   | FormsSetValueWorkerRequest
   | FormsResetWorkerRequest
@@ -1741,14 +1745,14 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'document.applyChanges';
       /** One per change, in order. */
-      outcomes: ServerChangeOutcome<C>[];
+      outcomes: ServerChangeOutcome[];
       /** The artifact, when at least one change applied. */
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
       tag: 'document.apply';
-      result: ChangeResult<C>;
+      result: ChangeResult;
       /**
        * True when this answers an `opId` that already had one: nothing ran
        * again, so nothing is published again.

@@ -9,7 +9,6 @@ import type {
   FormFieldPatch,
   FormFieldValue,
   MetadataPatch,
-  OutlineItem,
   OutlineItemPatch,
   OutlineItemRef,
   PageRef,
@@ -47,6 +46,7 @@ export type ReverseStep =
   | OutlineRemoveStep
   | OutlineRestoreStep
   | OutlineMoveStep
+  | OutlineReopenStep
   | PageRotateStep
   | PageReorderStep
   | PageRestoreStep
@@ -251,15 +251,29 @@ export interface MetadataRevertStep {
 
 /**
  * Deletes outline items a create or a restore brought back, when nobody
- * changed them since: the item and the items under it read exactly as the
- * change left them. Undoing a create never deletes an item someone gave a
- * child, or renamed, since.
+ * changed them since: the item and the items under it are the same ones, and
+ * their dictionaries read exactly as the change left them. Undoing a create
+ * never deletes an item someone gave a child, or renamed, since; a page its
+ * target goes to going away changes nothing of it.
  */
 export interface OutlineRemoveStep {
   readonly kind: 'outline.remove';
   readonly ref: OutlineItemRef;
-  /** The item and the items under it, depth first, as the change left them. */
-  readonly left: readonly OutlineItem<PdfDestination>[];
+  /** The item and the items under it, depth first, each as the change left it (the guard). */
+  readonly left: readonly CapturedObject[];
+}
+
+/**
+ * Opens again a parent that the op this step follows emptied, as it was open
+ * before: a parent without children has no open state, so it comes back
+ * closed with its first child. Only while its children are just the ones the
+ * undo put back: a parent someone filled since keeps what they left.
+ */
+export interface OutlineReopenStep {
+  readonly kind: 'outline.reopen';
+  readonly ref: OutlineItemRef;
+  /** The children it has once the undo put them back. */
+  readonly children: readonly number[];
 }
 
 /**
@@ -369,6 +383,9 @@ export function recordBytes(record: ChangeRecord): number {
       case 'field.restore':
       case 'outline.restore':
         bytes += step.capture.byteLength;
+        break;
+      case 'outline.remove':
+        objects(step.left);
         break;
       case 'pages.restore':
         for (const { capture } of step.pages) bytes += capture.byteLength;

@@ -727,7 +727,9 @@ export class CloudDocumentHandle implements DocumentHandle {
 
   /** Patch the cached manifest from a remote event's coherence pins — the
    *  same absorb rails local mutations use, so reads stay warm no matter
-   *  whose hand caused the change. */
+   *  whose hand caused the change. Every event kind is named below, so a new
+   *  one can't be forgotten: a missed one leaves this client reading the
+   *  old version from an immutable, cached URL. */
   private absorbRemoteEvent(event: DocumentEvent): void {
     switch (event.type) {
       case 'pages.scaleSet':
@@ -736,8 +738,16 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'annotations.created':
       case 'annotations.updated':
       case 'annotations.deleted':
+      case 'annotations.restored':
       case 'annotations.reordered':
         this.absorbMutation(event.meta, ['annotations']);
+        return;
+      case 'outline.created':
+      case 'outline.updated':
+      case 'outline.moved':
+      case 'outline.deleted':
+      case 'outline.restored':
+        this.absorbMutation(event.meta, ['outline']);
         return;
       case 'pages.reordered':
       case 'pages.rotated':
@@ -794,6 +804,17 @@ export class CloudDocumentHandle implements DocumentHandle {
         // so a remote apply must stop this client's base reads immediately.
         this.absorbMutation(event.meta, ['content', 'annotations', 'forms']);
         return;
+      case 'signatures.completed':
+        // Arrives with `document.versioned`, which drops the manifest.
+        return;
+      case 'signatures.cancelled':
+        // Moves no pin a read uses, as an own cancel absorbs nothing.
+        return;
+      case 'stream.desynced':
+        // The stream's own handler dropped the manifest already.
+        return;
+      default:
+        event satisfies never;
     }
   }
 }

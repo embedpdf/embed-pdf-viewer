@@ -68,6 +68,31 @@ export function exportDict(
   );
 }
 
+/**
+ * The dictionary `objectNumber` as bytes a guard compares: without
+ * `skipKeys`, and under `deepKeys` the objects the layer holds, each stream
+ * as it reads. They stay the same while it reads the same, also after a save
+ * encoded its streams again or the layer learned its file's hash; never
+ * imported.
+ */
+export function canonicalDict(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  objectNumber: number,
+  deepKeys: readonly string[],
+  skipKeys: readonly string[] = [],
+): Uint8Array {
+  return takeOwned(runtime, `object ${objectNumber}`, (sizePtr) =>
+    runtime.fn.EPDFDoc_ExportDictCanonicalToOwnedBuffer(
+      docPtr,
+      objectNumber,
+      deepKeys.join(' '),
+      skipKeys.join(' '),
+      sizePtr,
+    ),
+  );
+}
+
 /** Puts the dictionary of `capture` back as it was: exactly its keys. */
 export function importDict(runtime: PdfRuntimeModule, docPtr: Ptr, capture: Uint8Array): void {
   withBytes(runtime, capture, (ptr) => {

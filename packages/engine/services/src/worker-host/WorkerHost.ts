@@ -112,6 +112,8 @@ import {
   type WorkerRequest,
   type WorkerResponse,
   type WorkerResultPayload,
+  type Coordinates,
+  type PageCoordinates,
   type PdfCoordinates,
   type ChangeItem,
   type ChangeResult,
@@ -131,6 +133,8 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import {
+  itemInPageSpace,
+  opInFileSpace,
   renderOptionsInFileSpace,
   requestInFileSpace,
   resultInPageSpace,
@@ -155,10 +159,13 @@ import {
 import { AttachmentMutator, AttachmentReader } from '../features/attachments';
 import {
   ChangeApplier,
+  FILE_SPACE,
   changeLedgerOf,
   type AppliedChange,
   type ChangeOutcome,
   type ChangeRecord,
+  type ChangeSpace,
+  type KeptResult,
 } from '../features/changes';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../features/forms';
@@ -1350,7 +1357,7 @@ export class WorkerHost {
    * since.
    */
   private handleDocumentApply(
-    req: DocumentApplyWorkerRequest<PdfCoordinates>,
+    req: DocumentApplyWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
@@ -1358,7 +1365,7 @@ export class WorkerHost {
     const fingerprint = changeFingerprint(req.change);
     const prior = changeLedgerOf(session).outcome(req.opId);
     if (prior) {
-      const result = this.replayed(prior, fingerprint, req.opId);
+      const result = this.replayed<PageCoordinates>(prior, fingerprint, req.opId);
       return wirePack({ tag: 'document.apply', result, replayed: true });
     }
     const result = this.recorded(session, req.opId, fingerprint, () =>
@@ -1392,7 +1399,12 @@ export class WorkerHost {
       result = this.replayed(prior, fingerprint, opId);
     } else {
       result = this.recorded(session, opId, fingerprint, () =>
-        new ChangeApplier(this.runtime, session, this.fonts).apply(change.ops, authority, signal),
+        new ChangeApplier(this.runtime, session, this.fonts).apply(
+          change.ops,
+          authority,
+          signal,
+          FILE_SPACE,
+        ),
       );
     }
     const item = result.items[0];
@@ -1402,12 +1414,15 @@ export class WorkerHost {
     return item as Extract<ChangeItem<PdfCoordinates>, { type: Op['type'] }>;
   }
 
-  /** A change's answer the first time, kept under its `opId`; a retry's checks. */
-  private replayed(
+  /**
+   * A change's answer the first time, kept under its `opId`; a retry's
+   * checks. The answer is in the space its job answered in (`ChangeOutcome`).
+   */
+  private replayed<C extends Coordinates = PdfCoordinates>(
     prior: ChangeOutcome,
     fingerprint: string,
     opId: string,
-  ): ChangeResult<PdfCoordinates> {
+  ): ChangeResult<C> {
     if (prior.fingerprint !== fingerprint) {
       throw new EngineError(
         EngineErrorCode.IdempotencyKeyReused,
@@ -1415,24 +1430,30 @@ export class WorkerHost {
       );
     }
     if (prior.kind === 'refused') throw deserializeError(prior.error);
-    return prior.result;
+    return prior.result as ChangeResult<C>;
   }
 
   /**
    * Runs a change and keeps its answer under `opId`: the result and the record
    * that undoes it, or a refusal the change keeps (see `isKeptRefusal`).
    */
-  private recorded(
+  private recorded<C extends PdfCoordinates | PageCoordinates>(
     session: DocumentSession,
     opId: string,
     fingerprint: string,
-    run: () => AppliedChange,
-  ): ChangeResult<PdfCoordinates> {
+    run: () => AppliedChange<C>,
+  ): ChangeResult<C> {
     const ledger = changeLedgerOf(session);
     try {
       const applied = run();
       const result = resultOf(session, applied);
-      ledger.keepApplied(opId, fingerprint, result, result.meta.undoable ? applied.record : null);
+      // Kept in the space it answers in (KeptResult).
+      ledger.keepApplied(
+        opId,
+        fingerprint,
+        result as KeptResult,
+        result.meta.undoable ? applied.record : null,
+      );
       return result;
     } catch (err) {
       if (EngineError.is(err) && isKeptRefusal(err.code)) {
@@ -1449,7 +1470,7 @@ export class WorkerHost {
    * runs the record this job kept for it. One artifact for all that applied.
    */
   private handleDocumentApplyChanges(
-    req: DocumentApplyChangesWorkerRequest<PdfCoordinates>,
+    req: DocumentApplyChangesWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
@@ -1459,12 +1480,13 @@ export class WorkerHost {
       session.raiseLastObjectNumber(req.objectNumberFloor - 1);
     }
     const applier = new ChangeApplier(this.runtime, session, this.fonts);
+    const space = this.pageSpaceOf(session);
     const records = new Map<string, ChangeRecord | null>();
-    const outcomes: ServerChangeOutcome<PdfCoordinates>[] = [];
+    const outcomes: ServerChangeOutcome[] = [];
     for (const entry of req.changes) {
       session.beginTransaction(entry.opId);
       try {
-        const applied = runServerChange(applier, entry, records, signal);
+        const applied = runServerChange(applier, entry, records, signal, space);
         const result = resultOf(session, applied);
         session.commitTransaction();
         const record = result.meta.undoable ? applied.record : null;
@@ -1486,15 +1508,30 @@ export class WorkerHost {
     return this.finishMutation(session, payload, req.artifactPath);
   }
 
+  /**
+   * Page space for a change, measured as each op runs: the page boxes are read
+   * anew each time, as an op can add, remove or put back the page a later
+   * one names.
+   */
+  private pageSpaceOf(session: DocumentSession): ChangeSpace<PageCoordinates, PageCoordinates> {
+    return {
+      opInFileSpace: (op) => opInFileSpace(op, visibleBoxReader(this.runtime, session)),
+      itemOut: (item) => itemInPageSpace(item, visibleBoxReader(this.runtime, session)),
+    };
+  }
+
   /** A change's ops, or the steps of the record an undo names. */
   private runChange(
     session: DocumentSession,
-    req: DocumentApplyWorkerRequest<PdfCoordinates>,
+    req: DocumentApplyWorkerRequest,
     signal: AbortSignal,
-  ): AppliedChange {
+  ): AppliedChange<PageCoordinates> {
     const applier = new ChangeApplier(this.runtime, session, this.fonts);
+    const space = this.pageSpaceOf(session);
     const userId = req.authority.identity.userId ?? null;
-    if (!isUndoChange(req.change)) return applier.apply(req.change.ops, req.authority, signal);
+    if (!isUndoChange(req.change)) {
+      return applier.apply(req.change.ops, req.authority, signal, space);
+    }
     const kept = changeLedgerOf(session).record(req.change.undoOf);
     if (!kept || 'unavailable' in kept) {
       throw new EngineError(
@@ -1509,7 +1546,7 @@ export class WorkerHost {
     if (kept.record.userId !== null && kept.record.userId !== userId) {
       throw new PermissionDenied('changes:undo', 'target');
     }
-    return applier.undo(kept.record, req.authority, signal);
+    return applier.undo(kept.record, req.authority, signal, space);
   }
 
   private handlePagesList(
@@ -2719,11 +2756,14 @@ function actorOf({ identity }: ChangeAuthority): AnnotationActor {
  * A change's result once it ran: its items, which were read back before the
  * change knew whether it could be undone, carry that now, as its meta does.
  */
-function resultOf(session: DocumentSession, applied: AppliedChange): ChangeResult<PdfCoordinates> {
+function resultOf<C extends Coordinates>(
+  session: DocumentSession,
+  applied: AppliedChange<C>,
+): ChangeResult<C> {
   const undoable = applied.record.steps.length > 0;
   if (undoable) session.markUndoable();
   const items = applied.items.map(
-    (item) => ({ ...item, meta: { ...item.meta, undoable } }) as ChangeItem<PdfCoordinates>,
+    (item) => ({ ...item, meta: { ...item.meta, undoable } }) as ChangeItem<C>,
   );
   return {
     items,
@@ -2738,12 +2778,13 @@ function resultOf(session: DocumentSession, applied: AppliedChange): ChangeResul
  */
 function runServerChange(
   applier: ChangeApplier,
-  entry: ServerChange<PdfCoordinates>,
+  entry: ServerChange,
   records: ReadonlyMap<string, ChangeRecord | null>,
   signal: AbortSignal,
-): AppliedChange {
+  space: ChangeSpace<PageCoordinates, PageCoordinates>,
+): AppliedChange<PageCoordinates> {
   const { change, authority } = entry;
-  if (!isUndoChange(change)) return applier.apply(change.ops, authority, signal);
+  if (!isUndoChange(change)) return applier.apply(change.ops, authority, signal, space);
   const userId = authority.identity.userId ?? null;
   const record = records.has(change.undoOf)
     ? records.get(change.undoOf)!
@@ -2756,11 +2797,11 @@ function runServerChange(
     );
   }
   if (!record) return { items: [], record: { userId, steps: [] } };
-  return applier.undo(record, authority, signal);
+  return applier.undo(record, authority, signal, space);
 }
 
 /** Every page a change's items touched, once each, in order. */
-function pagesOf(items: readonly ChangeItem<PdfCoordinates>[]): PageRef[] {
+function pagesOf<C extends Coordinates>(items: readonly ChangeItem<C>[]): PageRef[] {
   const pages = new Map<number, PageRef>();
   for (const item of items) {
     for (const page of item.meta.affectedPages) pages.set(page.objectNumber, page);
@@ -2845,7 +2886,7 @@ function passwordRequiredProbe() {
  * `doc.apply` takes no import: an import runs through its own verb, which
  * alone may write restored attribution.
  */
-function assertNoImport(change: Change<PdfCoordinates, WireAnnotationResources>): void {
+function assertNoImport(change: Change<PageCoordinates, WireAnnotationResources>): void {
   if (isUndoChange(change)) return;
   const verbs: Record<string, string> = {
     'annotations.import': 'doc.annotations.import',

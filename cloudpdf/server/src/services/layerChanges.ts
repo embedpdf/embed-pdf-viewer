@@ -230,7 +230,7 @@ export interface SingleOpAudit {
 export interface ChangePlan {
   readonly now: number;
   readonly slots: ChangeSlot[];
-  readonly run: ServerChange<PageCoordinates>[];
+  readonly run: ServerChange[];
 }
 
 export type ChangeSlot =

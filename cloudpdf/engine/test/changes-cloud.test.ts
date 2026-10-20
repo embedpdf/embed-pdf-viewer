@@ -126,6 +126,69 @@ describe('changes on the cloud engine', () => {
     }
   });
 
+  test('changes sent together meet the pages as the ones before them left them', async () => {
+    const recording = recordingFetch();
+    const doc = await openFresh(recording.fetchFn);
+    try {
+      const { page, square } = await landmarks(doc);
+      // A change on the page, then the page's delete, in one request.
+      const [updated, deleted] = await Promise.all([
+        doc.apply(
+          { ops: [{ type: 'annotations.update', ref: square.ref, patch: { color: '#e11d48' } }] },
+          { opId: 'update-1' },
+        ),
+        doc.apply({ ops: [{ type: 'pages.delete', pages: [page] }] }, { opId: 'delete-1' }),
+      ]);
+      expect(recording.requests).toEqual([['update-1', 'delete-1']]);
+      expect(updated.items.map((item) => item.type)).toEqual(['annotations.update']);
+      expect(deleted.items.map((item) => item.type)).toEqual(['pages.delete']);
+
+      // The page's return, then a change on it, in one request.
+      const [restored, recolored] = await Promise.all([
+        doc.apply({ undoOf: 'delete-1' }, { opId: 'undo-1' }),
+        doc.apply(
+          { ops: [{ type: 'annotations.update', ref: square.ref, patch: { color: '#0000ff' } }] },
+          { opId: 'update-2' },
+        ),
+      ]);
+      expect(recording.requests[1]).toEqual(['undo-1', 'update-2']);
+      expect(restored.items.map((item) => item.type)).toEqual(['pages.restore']);
+      expect(recolored.items.map((item) => item.type)).toEqual(['annotations.update']);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('another session reads an outline change without asking for the old one', async () => {
+    const docA = await openFresh();
+    const answers: { url: string; status: number }[] = [];
+    const watching: typeof fetch = async (input, init) => {
+      const response = await fetch(input, init);
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      answers.push({ url, status: response.status });
+      return response;
+    };
+    const docB = await openAgain(docA.id, watching);
+    try {
+      expect((await docB.outline.get()).items).toEqual([]);
+      const eventsB: DocumentEvent[] = [];
+      docB.events.subscribe((event) => eventsB.push(event));
+      // Give B's lazy stream a beat to connect before A writes.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await docA.apply({ ops: [{ type: 'outline.create', parent: null, data: { title: 'From A' } }] });
+      await waitFor(() => eventsB.some((event) => event.type === 'outline.created'), 'the event');
+      answers.length = 0;
+      const { items } = await docB.outline.get();
+      expect(items.map((item) => item.title)).toEqual(['From A']);
+      // B's manifest took the event's pins: no stale read that a CDN could have answered.
+      expect(answers.filter(({ url }) => url.includes('/outline'))).toHaveLength(1);
+      expect(answers.every(({ status }) => status === 200)).toBe(true);
+    } finally {
+      await docB.close();
+      await docA.close();
+    }
+  });
+
   test('another session sees a change’s events, and an undo’s name what it undid', async () => {
     const docA = await openFresh();
     const docB = await openAgain(docA.id);
