@@ -23,10 +23,7 @@ import {
   type WidgetAppearancesQuery,
 } from '../dto/AnnotationRender';
 import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema';
-import {
-  AppearanceResourceKeysSchema,
-  ImageResourceKeysSchema,
-} from './resourceKeys';
+import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
@@ -96,6 +93,7 @@ import type {
 import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
+  AttachmentRestoreResult,
   AttachmentMutationMeta,
 } from '../mutation/AttachmentMutationResults';
 import type { AttachmentList } from '../dto/Attachment';
@@ -1672,6 +1670,11 @@ export const AttachmentMutationMetaSchema: z.ZodType<AttachmentMutationMeta> = z
 });
 
 export const AttachmentCreateResultSchema: z.ZodType<AttachmentCreateResult> = z.object({
+  attachment: AttachmentSchema,
+  meta: AttachmentMutationMetaSchema,
+});
+
+export const AttachmentRestoreResultSchema: z.ZodType<AttachmentRestoreResult> = z.object({
   attachment: AttachmentSchema,
   meta: AttachmentMutationMetaSchema,
 });

@@ -429,6 +429,7 @@ export {
 export { WidgetDTOSchema, WidgetPatchSchema } from './annotation/kinds/widget';
 export { DateInputSchema, IsoDateTimeSchema } from './dto/IsoDateTime.schema';
 export {
+  AttachmentFileBaseSchema,
   AttachmentFileInfoSchema,
   WireAttachmentFileSchema,
   AttachmentSchema,
@@ -439,6 +440,7 @@ export {
   AttachmentMutationMetaSchema,
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
+  AttachmentRestoreResultSchema,
 } from './wire/schemas';
 export type { SignaturePreparedWire, SignatureCompleteBody } from './wire/schemas';
 export type {

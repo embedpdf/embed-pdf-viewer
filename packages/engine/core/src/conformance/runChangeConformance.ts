@@ -1,5 +1,6 @@
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import { toAttachmentRef } from '../dto/Attachment';
 import { OUTLINE_READ_LIMITS } from '../dto/DocumentOutline';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
@@ -79,6 +80,17 @@ const outlineItem = (
   parent: parent === undefined ? null : toOutlineItemRef(parent),
   data: { title, target: { kind: 'goto', destination: { kind: 'fit', page: PAGE } } },
   ...(objectNumber === undefined ? {} : { objectNumber }),
+});
+
+/** The bytes of a file to embed. */
+const NOTES = new TextEncoder().encode('Notes for the change conformance.');
+const NOTES_REF = toAttachmentRef('notes.txt');
+
+/** `notes.txt` embedded in the document, with `bytes`. */
+const embedNotes = (bytes: Uint8Array = NOTES): ChangeOp => ({
+  type: 'attachments.create',
+  file: { name: 'notes.txt', mimeType: 'text/plain', description: 'Meeting notes' },
+  resources: { file: bytes },
 });
 
 /** A saved PDF as text, one character per byte. */
@@ -381,6 +393,14 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
     // The redo brings back the same pages, under the same refs.
     ops: () => [{ type: 'pages.insert', source: SIGNATURE_ARTWORK_PDF, position: 'start' }],
   },
+  'attachments.create': {
+    // The redo brings back the same file, with its dates.
+    ops: () => [embedNotes()],
+  },
+  'attachments.delete': {
+    setup: () => [embedNotes()],
+    ops: () => [{ type: 'attachments.delete', ref: NOTES_REF }],
+  },
 };
 
 /**
@@ -434,12 +454,13 @@ export function runChangeConformance(
     /** Everything a change can write, as the document reads it. */
     const factsOf = async (doc: DocumentHandle) => {
       const pages = await doc.pages.list();
-      const [annotations, form, metadata, custom, outline] = await Promise.all([
+      const [annotations, form, metadata, custom, outline, attachments] = await Promise.all([
         Promise.all(pages.pages.map((page) => doc.page(page.ref).annotations.list())),
         doc.forms.list(),
         doc.metadata.get(),
         doc.metadata.custom.get(),
         doc.outline.get(),
+        doc.attachments.list(),
       ]);
       return {
         pages,
@@ -450,6 +471,7 @@ export function runChangeConformance(
         metadata: { title: metadata.title, subject: metadata.subject },
         custom,
         outline,
+        attachments: attachments.attachments,
       };
     };
 
@@ -1133,6 +1155,67 @@ export function runChangeConformance(
       });
     });
 
+    test('a deleted file comes back with its bytes, its description and its dates', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({ ops: [embedNotes()] });
+        const [embedded] = (await doc.attachments.list()).attachments;
+        const deleted = await doc.apply({
+          ops: [{ type: 'attachments.delete', ref: NOTES_REF }],
+        });
+        expect((await doc.attachments.list()).attachments).toEqual([]);
+
+        const recorded = recordEvents(doc);
+        const undo = await doc.apply({ undoOf: deleted.meta.opId });
+        recorded.stop();
+        expect(appliedOfType(undo, 'attachments.restore').attachment).toEqual(embedded);
+        expect((await doc.attachments.list()).attachments).toEqual([embedded]);
+        expect(await doc.attachments.download(NOTES_REF)).toEqual(NOTES);
+        expect(recorded.events.map((event) => event.type)).toEqual(['attachments.restored']);
+      });
+    });
+
+    test('the undo of a file added is skipped when someone added another under its name', async () => {
+      await withDocument(async (doc) => {
+        const added = await doc.apply({ ops: [embedNotes()] });
+        const other = new TextEncoder().encode('Other notes.');
+        await doc.apply({ ops: [{ type: 'attachments.delete', ref: NOTES_REF }] });
+        await doc.apply({ ops: [embedNotes(other)] });
+
+        const undo = await doc.apply({ undoOf: added.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'attachments.delete'))).toBe(true);
+        expect(await doc.attachments.download(NOTES_REF)).toEqual(other);
+      });
+    });
+
+    test('the undo of a file removed is skipped when another file has its name', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({ ops: [embedNotes()] });
+        const deleted = await doc.apply({
+          ops: [{ type: 'attachments.delete', ref: NOTES_REF }],
+        });
+        const other = new TextEncoder().encode('Other notes.');
+        await doc.apply({ ops: [embedNotes(other)] });
+
+        const undo = await doc.apply({ undoOf: deleted.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'attachments.restore'))).toBe(true);
+        expect((await doc.attachments.list()).attachments).toHaveLength(1);
+        expect(await doc.attachments.download(NOTES_REF)).toEqual(other);
+      });
+    });
+
+    test('a file whose name another file has is refused, and the change writes nothing', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({ ops: [embedNotes()] });
+        const before = await factsOf(doc);
+        await expect(
+          doc.apply({
+            ops: [{ type: 'metadata.update', patch: { title: 'Changed' } }, embedNotes()],
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(await factsOf(doc)).toEqual(before);
+      });
+    });
+
     test('undoing a change twice is harmless', async () => {
       await withDocument(async (doc) => {
         const before = await factsOf(doc);
@@ -1248,6 +1331,25 @@ export function runChangeConformance(
         const updated = await doc.page(PAGE).annotations.update(FILE_SQUARE, { color: '#e11d48' });
         expect(updated.meta.undoable).toBe(true);
         await doc.apply({ undoOf: updated.meta.opId });
+        expect(await factsOf(doc)).toEqual(before);
+      });
+    });
+
+    test('adding and removing a file are one-op changes: their opIds undo them', async () => {
+      await withDocument(async (doc) => {
+        const before = await factsOf(doc);
+        const picked = new File([NOTES], 'notes.txt', { type: 'text/plain' });
+        const created = await doc.attachments.create({ data: picked });
+        expect(created.attachment.ref).toEqual(NOTES_REF);
+        expect(created.meta.undoable).toBe(true);
+        const withFile = await factsOf(doc);
+
+        const deleted = await doc.attachments.delete(NOTES_REF);
+        expect(deleted.meta.undoable).toBe(true);
+        await doc.apply({ undoOf: deleted.meta.opId });
+        expect(await factsOf(doc)).toEqual(withFile);
+
+        await doc.apply({ undoOf: created.meta.opId });
         expect(await factsOf(doc)).toEqual(before);
       });
     });

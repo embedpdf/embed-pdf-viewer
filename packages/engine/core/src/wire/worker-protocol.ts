@@ -9,7 +9,7 @@ import type {
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
-import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
+import type { Attachment, AttachmentRef } from '../dto/Attachment';
 import type { CustomMetadata } from '../dto/CustomMetadata';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
@@ -44,10 +44,6 @@ import type {
   AnnotationReorderResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
-import type {
-  AttachmentCreateResult,
-  AttachmentDeleteResult,
-} from '../mutation/AttachmentMutationResults';
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type {
   FormFieldCreateResult,
@@ -69,7 +65,6 @@ import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
-import type { WireResourceMap } from '../resource/BinarySource';
 import type { WorkingSetPage } from '../scheduling/facts';
 import type { SearchRequest, SearchSlice } from '../search/types';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
@@ -1193,36 +1188,6 @@ export interface AttachmentsReadFileWorkerRequest {
   maxDecodedBytes?: number;
 }
 
-/**
- * Create a document-level embedded file (a mutation — layer sessions
- * persist an artifact). `file` is the same post-normalization wire shape
- * the file-attachment annotation draft uses: metadata in JSON, bytes
- * out-of-band under the referenced resource key. `file.name` becomes the
- * name-tree key.
- */
-export interface AttachmentsCreateWorkerRequest extends WriteJobFields {
-  kind: 'attachments.create';
-  effect: 'write';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  file: WireAttachmentFile;
-  /** Binary payload referenced by `file.resources.file` — transfer-list bytes. */
-  resources?: WireResourceMap;
-  artifactPath?: string;
-}
-
-/** Delete a document-level embedded file by key (a mutation). */
-export interface AttachmentsDeleteWorkerRequest extends WriteJobFields {
-  kind: 'attachments.delete';
-  effect: 'write';
-  jobId: WorkerJobId;
-  docId: string;
-  layerName?: string;
-  ref: AttachmentRef;
-  artifactPath?: string;
-}
-
 /** Decode the file embedded in a FileAttachment annotation's `/FS`.
  *  Same read semantics and delivery modes as `attachments.readFile`. */
 export interface AnnotationsReadFileWorkerRequest {
@@ -1567,8 +1532,6 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | PagesExtractWorkerRequest
   | AttachmentsListWorkerRequest
   | AttachmentsReadFileWorkerRequest
-  | AttachmentsCreateWorkerRequest
-  | AttachmentsDeleteWorkerRequest
   | AnnotationsReadFileWorkerRequest
   | AnnotationsReadAppearanceWorkerRequest
   | AnnotationsExportWorkerRequest
@@ -1885,18 +1848,6 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'pages.extract'; bytes: ArrayBuffer; size: number }
   | { tag: 'attachments.list'; attachments: Attachment[] }
   | { tag: 'attachments.readFile'; content: AttachmentFileWorkerPayload }
-  | {
-      tag: 'attachments.create';
-      result: AttachmentCreateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
-      tag: 'attachments.delete';
-      result: AttachmentDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
   | { tag: 'annotations.readFile'; content: AttachmentFileWorkerPayload }
   | { tag: 'measure.viewports'; page: PageRef; viewports: PageMeasurementViewport<C>[] }
   | {

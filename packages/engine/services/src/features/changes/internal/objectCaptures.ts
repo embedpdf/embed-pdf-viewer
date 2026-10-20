@@ -3,6 +3,7 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { canonicalDict, exportDict, importDict } from './captures';
 import type { DocumentSession } from '../../../document-session/DocumentSession';
+import { bytesEqual } from '../../../shared/bytesEqual';
 import type { CapturedObject } from '../ChangeRecord';
 
 /** A dictionary an op is about to write, captured as it is (null: it doesn't exist yet). */
@@ -53,7 +54,7 @@ export function unchangedSince(
 ): boolean {
   return objects.every((object) => {
     const now = tryCanonicalDict(runtime, session, object.objectNumber);
-    return now !== null && sameBytes(now, object.after);
+    return now !== null && bytesEqual(now, object.after);
   });
 }
 
@@ -103,10 +104,4 @@ function tryExportDict(
     if (EngineError.is(error)) return null;
     throw error;
   }
-}
-
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.byteLength !== b.byteLength) return false;
-  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
-  return true;
 }

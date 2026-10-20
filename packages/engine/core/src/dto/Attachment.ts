@@ -86,6 +86,14 @@ export interface AttachmentFileInfo {
  */
 export type AttachmentRef = { kind: 'key'; key: string };
 
+/**
+ * How much of a file the local engine decodes: a download of a larger file,
+ * from either home, is refused with `PayloadTooLarge`, before a small stream
+ * that inflates to gigabytes takes the tab down. A file's declared size
+ * can't be trusted. The cloud engine has its server's limit.
+ */
+export const ATTACHMENT_LIMITS = { decodedBytes: 256 * 1024 * 1024 } as const;
+
 /** The ref of an attachment whose name-tree key you already hold. */
 export function toAttachmentRef(key: string): AttachmentRef {
   return { kind: 'key', key };

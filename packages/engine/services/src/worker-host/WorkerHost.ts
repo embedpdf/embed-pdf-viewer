@@ -82,8 +82,6 @@ import {
   type PagesExtractWorkerRequest,
   type AttachmentsListWorkerRequest,
   type AttachmentsReadFileWorkerRequest,
-  type AttachmentsCreateWorkerRequest,
-  type AttachmentsDeleteWorkerRequest,
   type AnnotationsReadFileWorkerRequest,
   type AnnotationsReadAppearanceWorkerRequest,
   type AnnotationsExportWorkerRequest,
@@ -156,7 +154,7 @@ import {
   AnnotationFlattener,
   RawAnnotationReader,
 } from '../features/annotations';
-import { AttachmentMutator, AttachmentReader } from '../features/attachments';
+import { AttachmentReader } from '../features/attachments';
 import {
   ChangeApplier,
   FILE_SPACE,
@@ -674,12 +672,6 @@ export class WorkerHost {
           break;
         case 'attachments.readFile':
           resultPack = this.handleAttachmentsReadFile(msg, ctrl.signal);
-          break;
-        case 'attachments.create':
-          resultPack = this.handleAttachmentsCreate(msg, ctrl.signal);
-          break;
-        case 'attachments.delete':
-          resultPack = this.handleAttachmentsDelete(msg, ctrl.signal);
           break;
         case 'measure.setScale':
           resultPack = this.handleMeasureSetScale(msg, ctrl.signal);
@@ -1656,26 +1648,6 @@ export class WorkerHost {
       { tag: 'attachments.readFile', content },
       content.bytes !== undefined ? [content.bytes] : [],
     );
-  }
-
-  private handleAttachmentsCreate(
-    req: AttachmentsCreateWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    const session = this.requireSession(req);
-    const mutator = new AttachmentMutator(this.runtime, session);
-    const result = mutator.create(req.file, req.resources, signal);
-    return this.finishMutation(session, { tag: 'attachments.create', result }, req.artifactPath);
-  }
-
-  private handleAttachmentsDelete(
-    req: AttachmentsDeleteWorkerRequest,
-    signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    const session = this.requireSession(req);
-    const mutator = new AttachmentMutator(this.runtime, session);
-    const result = mutator.delete(req.ref, signal);
-    return this.finishMutation(session, { tag: 'attachments.delete', result }, req.artifactPath);
   }
 
   private async handleAnnotationsReadFile(

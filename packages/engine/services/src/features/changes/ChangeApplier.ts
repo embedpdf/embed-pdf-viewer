@@ -20,6 +20,12 @@ import {
   revertAnnotation,
   updateAnnotation,
 } from './internal/annotationChanges';
+import {
+  createAttachment,
+  deleteAttachment,
+  removeAttachment,
+  restoreAttachment,
+} from './internal/attachmentChanges';
 import type { ChangeContext, Done } from './internal/changeContext';
 import {
   addWidget,
@@ -267,6 +273,10 @@ function runOp(
       return changingPageTree(ctx, () => insertBlankPages(ctx, op));
     case 'pages.insert':
       return changingPageTree(ctx, () => insertPages(ctx, op));
+    case 'attachments.create':
+      return createAttachment(ctx, op);
+    case 'attachments.delete':
+      return deleteAttachment(ctx, op);
   }
 }
 
@@ -314,5 +324,9 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
       return changingPageTree(ctx, () => restorePages(ctx, step));
     case 'pages.remove':
       return changingPageTree(ctx, () => removePages(ctx, step));
+    case 'attachments.remove':
+      return removeAttachment(ctx, step);
+    case 'attachments.restore':
+      return restoreAttachment(ctx, step);
   }
 }

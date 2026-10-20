@@ -2,6 +2,7 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratch } from '../../../runtime/memory/scratch';
+import { withUtf16String } from '../../../runtime/memory/strings';
 import { U64_BYTES, pokeU64 } from '../../../runtime/memory/u64';
 
 /**
@@ -162,6 +163,50 @@ export function importPage(runtime: PdfRuntimeModule, docPtr: Ptr, capture: Uint
   withBytes(runtime, capture, (ptr) => {
     if (!runtime.fn.EPDFPage_ImportRaw(docPtr, ptr, capture.byteLength)) {
       throw new EngineError(EngineErrorCode.Unknown, 'EPDFPage_ImportRaw refused a capture');
+    }
+  });
+}
+
+/** The embedded file under `key` as its delete removes it: its key, its file specification, its streams. */
+export function exportAttachment(runtime: PdfRuntimeModule, docPtr: Ptr, key: string): Uint8Array {
+  return takeOwned(runtime, `attachment '${key}'`, (sizePtr) =>
+    withUtf16String(runtime.mem, key, (keyPtr) =>
+      runtime.fn.EPDFAttachment_ExportRawToOwnedBuffer(docPtr, keyPtr, sizePtr),
+    ),
+  );
+}
+
+/**
+ * The embedded file under `key` as bytes a guard compares: the same while it
+ * is the same file, as it was (its number included); null when no file has
+ * the key. Never imported.
+ */
+export function canonicalAttachment(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  key: string,
+): Uint8Array | null {
+  try {
+    return takeOwned(runtime, `attachment '${key}'`, (sizePtr) =>
+      withUtf16String(runtime.mem, key, (keyPtr) =>
+        runtime.fn.EPDFAttachment_ExportCanonicalToOwnedBuffer(docPtr, keyPtr, sizePtr),
+      ),
+    );
+  } catch (error) {
+    if (EngineError.is(error)) return null;
+    throw error;
+  }
+}
+
+/** Puts the embedded file of `capture` back under its key. */
+export function importAttachment(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  capture: Uint8Array,
+): void {
+  withBytes(runtime, capture, (ptr) => {
+    if (!runtime.fn.EPDFAttachment_ImportRaw(docPtr, ptr, capture.byteLength)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFAttachment_ImportRaw refused a capture');
     }
   });
 }

@@ -3,6 +3,7 @@ import type {
   AnnotationFamily,
   AnnotationPatch,
   AnnotationRef,
+  AttachmentRef,
   ChangeItemType,
   CustomMetadataPatch,
   FormFieldDTO,
@@ -50,7 +51,9 @@ export type ReverseStep =
   | PageRotateStep
   | PageReorderStep
   | PageRestoreStep
-  | PageRemoveStep;
+  | PageRemoveStep
+  | AttachmentRemoveStep
+  | AttachmentRestoreStep;
 
 /**
  * One dictionary a change wrote, as it was before (the capture, with the
@@ -365,6 +368,29 @@ export interface PageRemoveStep {
   readonly pages: readonly { readonly page: number; readonly left: string }[];
 }
 
+/**
+ * Deletes the embedded file a create or a restore brought, while it is still
+ * that file, as the change left it: undoing an upload never deletes a file
+ * someone put under its name since, even one with the same bytes.
+ */
+export interface AttachmentRemoveStep {
+  readonly kind: 'attachments.remove';
+  readonly ref: AttachmentRef;
+  /** The file as the change left it, in canonical bytes (the guard). */
+  readonly left: Uint8Array;
+}
+
+/**
+ * Brings back the file a delete removed, under its key, with its file
+ * specification and bytes as they were (`EPDFAttachment_ImportRaw`). Left
+ * alone when another file has the key now.
+ */
+export interface AttachmentRestoreStep {
+  readonly kind: 'attachments.restore';
+  readonly ref: AttachmentRef;
+  readonly capture: Uint8Array;
+}
+
 /** The bytes a record's captures hold. */
 export function recordBytes(record: ChangeRecord): number {
   let bytes = 0;
@@ -389,6 +415,12 @@ export function recordBytes(record: ChangeRecord): number {
         break;
       case 'pages.restore':
         for (const { capture } of step.pages) bytes += capture.byteLength;
+        break;
+      case 'attachments.remove':
+        bytes += step.left.byteLength;
+        break;
+      case 'attachments.restore':
+        bytes += step.capture.byteLength;
         break;
       default:
         break;

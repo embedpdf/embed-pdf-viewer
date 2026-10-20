@@ -12,6 +12,7 @@ import type {
 import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
+  AttachmentRestoreResult,
 } from '../mutation/AttachmentMutationResults';
 import type {
   FormFieldCreateResult,
@@ -196,6 +197,8 @@ export type DocumentEvent =
       /** What was deleted (see `deletedAttachmentOf`). */
       deleted: AttachmentRef | null;
     } & AttachmentDeleteResult)
+  /** An undo brought a deleted file back, under the key it had. */
+  | ({ type: 'attachments.restored'; origin: EventOrigin } & AttachmentRestoreResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
   | ({ type: 'metadata.customUpdated'; origin: EventOrigin } & CustomMetadataUpdateResult)
   | ({ type: 'outline.created'; origin: EventOrigin } & OutlineCreateResult)

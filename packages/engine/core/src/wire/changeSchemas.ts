@@ -7,6 +7,9 @@ import {
   AnnotationPositionSchema,
   AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
+  AttachmentCreateResultSchema,
+  AttachmentDeleteResultSchema,
+  AttachmentRestoreResultSchema,
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
   EngineErrorPayloadSchema,
@@ -47,6 +50,7 @@ import {
   AnnotationSchema,
 } from '../annotation/kinds';
 import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
+import { AttachmentFileBaseSchema, AttachmentRefSchema } from '../dto/Attachment.schema';
 import { OutlineItemDraftSchema, OutlineItemPatchSchema } from '../dto/DocumentOutline.schema';
 import {
   FormFieldDraftSchema,
@@ -63,6 +67,7 @@ import type { ChangeItemType } from '../mutation/Change';
 import {
   AnnotationResourceKeysSchema,
   AppearanceResourceKeysSchema,
+  FileResourceKeysSchema,
   SourceResourceKeysSchema,
 } from './resourceKeys';
 
@@ -242,6 +247,16 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     resources: SourceResourceKeysSchema,
     position: PagePositionSchema.optional(),
   }),
+  z.object({
+    type: z.literal('attachments.create'),
+    file: AttachmentFileBaseSchema,
+    /** The file's bytes, as the key of their multipart part. */
+    resources: FileResourceKeysSchema,
+  }),
+  z.object({
+    type: z.literal('attachments.delete'),
+    ref: AttachmentRefSchema,
+  }),
 ]);
 
 /**
@@ -281,6 +296,7 @@ const ChangeItemTypeSchema = z.enum([
   'forms.restoreWidget',
   'outline.restore',
   'pages.restore',
+  'attachments.restore',
 ] as unknown as [ChangeItemType, ...ChangeItemType[]]);
 
 /** What an undo left alone, by name. */
@@ -358,6 +374,9 @@ export const ChangeItemSchema = z.union([
   itemOf('pages.insertBlank', PageInsertResultSchema),
   itemOf('pages.insert', PageInsertResultSchema),
   itemOf('pages.restore', PageRestoreResultSchema),
+  itemOf('attachments.create', AttachmentCreateResultSchema),
+  itemOf('attachments.delete', AttachmentDeleteResultSchema),
+  itemOf('attachments.restore', AttachmentRestoreResultSchema),
 ]);
 
 /** What a change did: one item per op (per step of an undo), and its meta. */
