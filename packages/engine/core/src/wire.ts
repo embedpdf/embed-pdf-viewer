@@ -118,7 +118,6 @@ export {
   PageLayoutSchema,
   PageBoxesSchema,
   PagePositionSchema,
-  PageReorderInputSchema,
   PageReorderResultSchema,
   AnnotationFlattenInputSchema,
   AnnotationFlattenResultSchema,
@@ -132,12 +131,8 @@ export {
   PageNameInputSchema,
   PageNameResultSchema,
   PageRemoveNameInputSchema,
-  PageRotateInputSchema,
   PageRotateResultSchema,
-  PageDeleteInputSchema,
   PageDeleteResultSchema,
-  PageInsertInputSchema,
-  PageInsertBlankInputSchema,
   PageInsertBlankSpecSchema,
   PageExtractInputSchema,
   PageInsertResultSchema,
@@ -434,6 +429,7 @@ export {
 export { WidgetDTOSchema, WidgetPatchSchema } from './annotation/kinds/widget';
 export { DateInputSchema, IsoDateTimeSchema } from './dto/IsoDateTime.schema';
 export {
+  AttachmentFileBaseSchema,
   AttachmentFileInfoSchema,
   WireAttachmentFileSchema,
   AttachmentSchema,
@@ -444,6 +440,8 @@ export {
   AttachmentMutationMetaSchema,
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
+  AttachmentRestoreResultSchema,
+  AttachmentWireComponents,
 } from './wire/schemas';
 export type { SignaturePreparedWire, SignatureCompleteBody } from './wire/schemas';
 export type {

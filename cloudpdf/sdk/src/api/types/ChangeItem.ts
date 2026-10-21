@@ -37,7 +37,10 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.PagesDelete
     | CloudPDF.ChangeItem.PagesInsertBlank
     | CloudPDF.ChangeItem.PagesInsert
-    | CloudPDF.ChangeItem.PagesRestore;
+    | CloudPDF.ChangeItem.PagesRestore
+    | CloudPDF.ChangeItem.AttachmentsCreate
+    | CloudPDF.ChangeItem.AttachmentsDelete
+    | CloudPDF.ChangeItem.AttachmentsRestore;
 
 export namespace ChangeItem {
     export interface Skipped {
@@ -77,11 +80,14 @@ export namespace ChangeItem {
             PagesDelete: "pages.delete",
             PagesInsertBlank: "pages.insertBlank",
             PagesInsert: "pages.insert",
+            AttachmentsCreate: "attachments.create",
+            AttachmentsDelete: "attachments.delete",
             AnnotationsRestore: "annotations.restore",
             FormsRestore: "forms.restore",
             FormsRestoreWidget: "forms.restoreWidget",
             OutlineRestore: "outline.restore",
             PagesRestore: "pages.restore",
+            AttachmentsRestore: "attachments.restore",
         } as const;
         export type Op = (typeof Op)[keyof typeof Op];
     }
@@ -986,5 +992,22 @@ export namespace ChangeItem {
                 }
             }
         }
+    }
+
+    export interface AttachmentsCreate {
+        type: "attachments.create";
+        attachment: CloudPDF.Attachment;
+        meta: CloudPDF.AttachmentMutationMeta;
+    }
+
+    export interface AttachmentsDelete {
+        type: "attachments.delete";
+        meta: CloudPDF.AttachmentMutationMeta;
+    }
+
+    export interface AttachmentsRestore {
+        type: "attachments.restore";
+        attachment: CloudPDF.Attachment;
+        meta: CloudPDF.AttachmentMutationMeta;
     }
 }

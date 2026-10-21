@@ -6,5 +6,6 @@ export default {
   pages: 'Organizing pages',
   metadata: 'Metadata',
   outline: 'Outline',
+  attachments: 'Attachments',
   actions: 'Actions & scripts',
 };

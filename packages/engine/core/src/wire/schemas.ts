@@ -1,6 +1,5 @@
 import type { Identity } from '../auth/scope/types';
 import { PageRefSchema } from '../identity/PageRef.schema';
-import type { PageRef } from '../identity/PageRef';
 import { z } from 'zod';
 
 import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
@@ -23,12 +22,13 @@ import {
   type AnnotationAppearancesQuery,
   type WidgetAppearancesQuery,
 } from '../dto/AnnotationRender';
-import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema';
 import {
-  AppearanceResourceKeysSchema,
-  ImageResourceKeysSchema,
-  SourceResourceKeysSchema,
-} from './resourceKeys';
+  AttachmentFileBaseSchema,
+  AttachmentFileInfoSchema,
+  AttachmentRefSchema,
+  AttachmentSchema,
+} from '../dto/Attachment.schema';
+import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
@@ -98,6 +98,7 @@ import type {
 import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
+  AttachmentRestoreResult,
   AttachmentMutationMeta,
 } from '../mutation/AttachmentMutationResults';
 import type { AttachmentList } from '../dto/Attachment';
@@ -119,7 +120,6 @@ import type {
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
-import type { PageDeleteInput } from '../mutation/PageDeleteInput';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
@@ -135,7 +135,6 @@ import {
 import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { ListPosition } from '../mutation/ListPosition';
-import type { PageReorderInput } from '../mutation/PageReorderInput';
 import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type {
   AnnotationAppearanceExportInput,
@@ -153,7 +152,6 @@ import type {
 } from '../mutation/OutlineMutationResults';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
-import type { PageRotateInput } from '../mutation/PageRotateInput';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type {
   AnnotationImportBody,
@@ -1586,14 +1584,6 @@ export const PageRemoveNameInputSchema: z.ZodType<PageRemoveNameInput> = z.objec
   name: z.string().min(1),
 });
 
-/** Page reorder input: the pages, in their new order, and where they go. */
-export const PageReorderInputSchema: z.ZodType<PageReorderInput> = z
-  .object({
-    pages: z.array(PageRefSchema).min(1),
-    position: PagePositionSchema,
-  })
-  .strict();
-
 /**
  * Page reorder result. No per-page revision is bumped (they survive a page
  * reorder). The whole new order is returned so callers swap their snapshot.
@@ -1611,15 +1601,6 @@ export const PageNameResultSchema: z.ZodType<PageNameResult> = z.object({
 });
 
 /**
- * Page rotate input. Absolute rotation (idempotent — see `PageRotateInput`),
- * one value applied to every listed page.
- */
-export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
-  pages: z.array(PageRefSchema),
-  rotation: PdfRotationSchema,
-});
-
-/**
  * Page rotate result. Rotation is presentation metadata over normalized
  * content: nothing per-page invalidates; the new `layout` carries the
  * rotation values (see `PageRotateResult`).
@@ -1627,11 +1608,6 @@ export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
 export const PageRotateResultSchema: z.ZodType<PageRotateResult> = z.object({
   layout: PageListSnapshotSchema,
   meta: MutationMetaSchema,
-});
-
-/** Page delete input. Deleting every page is rejected server/worker-side. */
-export const PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({
-  pages: z.array(PageRefSchema),
 });
 
 /**
@@ -1642,18 +1618,6 @@ export const PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({
   layout: PageListSnapshotSchema,
   meta: MutationMetaSchema,
 });
-
-/**
- * Page insert (bytes) input — the `body` part of the multipart envelope;
- * the PDF rides the part `resources.source` names. `position` omitted →
- * `'end'`.
- */
-export const PageInsertInputSchema: z.ZodType<{
-  position?: ListPosition<PageRef>;
-  resources: { source: string };
-}> = z
-  .object({ position: PagePositionSchema.optional(), resources: SourceResourceKeysSchema })
-  .strict();
 
 /**
  * What blank pages to make (`PageInsertBlankSpec`). `size` is in PDF points
@@ -1667,13 +1631,6 @@ export const PageInsertBlankSpecSchema = z.object({
   }),
   count: z.number().int().min(1).max(PAGE_INSERT_BLANK_MAX_COUNT).optional(),
 });
-
-/** Blank-page insert input — plain JSON, pages.insert minus the bytes. */
-export const PageInsertBlankInputSchema: z.ZodType<{
-  size: { width: number; height: number };
-  count?: number;
-  position?: ListPosition<PageRef>;
-}> = PageInsertBlankSpecSchema.extend({ position: PagePositionSchema.optional() });
 
 /**
  * Page extract input: the pages to export, in the order they should appear,
@@ -1722,6 +1679,11 @@ export const AttachmentCreateResultSchema: z.ZodType<AttachmentCreateResult> = z
   meta: AttachmentMutationMetaSchema,
 });
 
+export const AttachmentRestoreResultSchema: z.ZodType<AttachmentRestoreResult> = z.object({
+  attachment: AttachmentSchema,
+  meta: AttachmentMutationMetaSchema,
+});
+
 export const AttachmentDeleteResultSchema: z.ZodType<AttachmentDeleteResult> = z.object({
   meta: AttachmentMutationMetaSchema,
 });
@@ -1730,6 +1692,16 @@ export const AttachmentDeleteResultSchema: z.ZodType<AttachmentDeleteResult> = z
 export const AttachmentListSchema: z.ZodType<AttachmentList> = z.object({
   attachments: z.array(AttachmentSchema),
 });
+
+/** Embedded files (`doc.attachments`): the models the OpenAPI projection names. */
+export const AttachmentWireComponents = {
+  AttachmentRef: AttachmentRefSchema,
+  AttachmentFileInfo: AttachmentFileInfoSchema,
+  Attachment: AttachmentSchema,
+  AttachmentList: AttachmentListSchema,
+  AttachmentFileBase: AttachmentFileBaseSchema,
+  AttachmentMutationMeta: AttachmentMutationMetaSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 /**
  * Metadata write result: the re-read `metadata`. On the cloud,

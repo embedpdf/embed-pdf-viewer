@@ -21,6 +21,15 @@ export interface AttachmentCreateResult {
   meta: AttachmentMutationMeta;
 }
 
+/**
+ * An undo of a delete: the file it brought back, under the key it had, read
+ * back after the write.
+ */
+export interface AttachmentRestoreResult {
+  attachment: Attachment;
+  meta: AttachmentMutationMeta;
+}
+
 /** A delete: nothing exists after it, so only `meta`. */
 export interface AttachmentDeleteResult {
   meta: AttachmentMutationMeta;

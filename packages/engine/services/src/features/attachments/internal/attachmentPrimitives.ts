@@ -165,7 +165,7 @@ export function extractAttachmentToBuffer(
       statusPtr,
     );
     if (!ok) {
-      throw extractStatusError(Number(mem.peek(statusPtr, 'i32')));
+      throw extractStatusError(Number(mem.peek(statusPtr, 'i32')), maxDecodedBytes);
     }
     const size = Number(mem.peek(sizePtr, 'i32')) >>> 0;
     dataPtr = mem.peek(bufPtrSlot, 'ptr') as Ptr;
@@ -212,7 +212,7 @@ export function extractAttachmentToFile(
       statusPtr,
     );
     if (!ok) {
-      throw extractStatusError(Number(mem.peek(statusPtr, 'i32')));
+      throw extractStatusError(Number(mem.peek(statusPtr, 'i32')), maxDecodedBytes);
     }
     return { size: Number(mem.peek(sizePtr, 'i32')) >>> 0 };
   } finally {
@@ -223,7 +223,7 @@ export function extractAttachmentToFile(
 }
 
 /** `EPDFAttachmentExtractStatus` (public/fpdf_attachment.h) → EngineError. */
-function extractStatusError(status: number): EngineError {
+function extractStatusError(status: number, maxDecodedBytes: number | undefined): EngineError {
   switch (status) {
     case 1: // kNoFileStream
       return new EngineError(
@@ -235,7 +235,8 @@ function extractStatusError(status: number): EngineError {
     case 3: // kSizeLimitExceeded
       return new EngineError(
         EngineErrorCode.PayloadTooLarge,
-        'embedded file exceeds the configured decoded-size limit',
+        `the embedded file decodes to more than ${maxDecodedBytes} bytes, the limit`,
+        { details: { limit: maxDecodedBytes } },
       );
     case 4: // kWriteFailed
       return new EngineError(EngineErrorCode.Unknown, 'writing the extracted attachment failed');

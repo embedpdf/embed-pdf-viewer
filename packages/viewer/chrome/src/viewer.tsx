@@ -34,6 +34,7 @@ import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
 import { metadataPlugin } from '@embedpdf/react/metadata';
 import { outlinePlugin } from '@embedpdf/react/outline';
+import { attachmentPlugin } from '@embedpdf/react/attachment';
 import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
 import { selectionPlugin } from '@embedpdf/react/selection';
 import { AnnotationToken, annotationPlugin } from '@embedpdf/react/annotation';
@@ -448,6 +449,9 @@ export function FullViewer({
     metadataPlugin(),
     // The document's outline, read the first time its panel or its state asks for it.
     outlinePlugin(),
+    // The files the document carries, read once a document shows, so the attachments panel
+    // knows whether it has any; the pages' files come from the annotations.
+    attachmentPlugin(),
     interactionPlugin(settings.interaction),
     // Platform haptics, default-on: the Vibration API where it exists
     // (Android), a safe silent no-op elsewhere — iOS Safari included, until

@@ -101,6 +101,7 @@ export const nl: Locale = {
         note: 'Opmerking',
         link: 'Koppeling',
         gotoLink: 'Koppeling openen',
+        saveFile: 'Bestand opslaan',
         removeLink: 'Koppeling verwijderen',
         delete: 'Verwijderen',
         group: 'Groeperen',
@@ -158,6 +159,7 @@ export const nl: Locale = {
         'annotations-create': 'Annotaties toevoegen is niet toegestaan',
         'doc-annotate-modify': 'Annotaties wijzigen is niet toegestaan',
         'doc-annotate-read': 'Annotaties bekijken is niet toegestaan',
+        'doc-attachments-modify': 'Bestanden toevoegen is niet toegestaan',
         'doc-download': 'Downloaden is niet toegestaan',
         'doc-forms-modify': 'Formuliervelden bewerken is niet toegestaan',
         'doc-outline-modify': 'Bladwijzers wijzigen is niet toegestaan',
@@ -165,6 +167,13 @@ export const nl: Locale = {
         'doc-print': 'Afdrukken is niet toegestaan',
         'doc-text-copy': 'Kopiëren is niet toegestaan',
         'doc-text-search': 'Zoeken is niet toegestaan',
+      },
+      attachment: {
+        add: 'Bestand toevoegen',
+        save: 'Opslaan',
+        goTo: 'Ga naar pagina',
+        delete: 'Verwijderen',
+        more: 'Meer opties',
       },
       outline: {
         add: 'Bladwijzer toevoegen',
@@ -467,6 +476,17 @@ export const nl: Locale = {
       invisible: 'Verouderd: onbekende subtypen verbergen',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'Bijlagen laden…',
+      failed: 'De bijlagen konden niet worden gelezen.',
+      empty: 'Dit document heeft geen bijgevoegde bestanden',
+      drop: 'Zet bestanden neer om ze bij te voegen',
+      dropHint: 'Of zet bestanden hier neer',
+      adding: 'Toevoegen…',
+      onPage: 'Pagina {page}',
+      count: '{count} bestand',
+      countPlural: '{count} bestanden',
+    },
     outline: {
       filter: 'Bladwijzers filteren',
       loading: 'Bladwijzers laden…',

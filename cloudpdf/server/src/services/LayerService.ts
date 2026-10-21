@@ -41,7 +41,6 @@ import {
   type AnnotationPatch,
   type WireAnnotationBundle,
   type WireAnnotationResources,
-  type WireResourceMap,
   type AnnotationRef,
   type AnnotationUpdateResult,
   type FormFieldCreateResult,
@@ -86,10 +85,6 @@ import {
   type WorkerJobId,
   type WorkerRequest,
   type WorkerResultPayload,
-  type WireAttachmentFile,
-  type AttachmentRef,
-  type AttachmentCreateResult,
-  type AttachmentDeleteResult,
   type DocumentVersionRef,
   type SignatureCancelResult,
   type SignatureCompleteResult,
@@ -874,98 +869,6 @@ export class LayerService {
       'metadata.updateCustom',
       signal,
     );
-  }
-
-  // ── Attachments ──────────────────────────────────────────────────────
-  //
-  // Document-scoped like metadata: the /EmbeddedFiles name tree lives on
-  // the catalog, so mutations touch no page rows — they advance the layer
-  // doc version plus the dedicated `attachments_version` pin that keys
-  // the immutable /attachments@… and /attachment-files/…@… leaves.
-  // Identity is the name-tree key (unique by construction).
-
-  /** Create a document-level embedded file (multipart mutation envelope). */
-  async createAttachment(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      file: WireAttachmentFile;
-      resources: WireResourceMap;
-    },
-    signal?: AbortSignal,
-  ): Promise<AttachmentCreateResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'attachments.create' as const,
-            effect: 'write' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            file: input.file,
-            resources: input.resources,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'attachments.create') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected attachments.create payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAttachmentMutation(ctx, input.docId, input.layerName, layer, {
-          kind: 'attachment.create',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  /** Delete a document-level embedded file by name-tree key. */
-  async deleteAttachment(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      ref: AttachmentRef;
-    },
-    signal?: AbortSignal,
-  ): Promise<AttachmentDeleteResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'attachments.delete' as const,
-            effect: 'write' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'attachments.delete') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected attachments.delete payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAttachmentMutation(ctx, input.docId, input.layerName, layer, {
-          kind: 'attachment.delete',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
   }
 
   // ── Forms ────────────────────────────────────────────────────────────
@@ -1939,6 +1842,9 @@ export class LayerService {
           if (bumped.versions.outline_version !== undefined) {
             cacheDelta = { ...cacheDelta, outlineVersion: bumped.versions.outline_version };
           }
+          if (bumped.versions.attachments_version !== undefined) {
+            cacheDelta = { ...cacheDelta, attachmentsVersion: bumped.versions.attachments_version };
+          }
           if (bumped.versions.layout_version !== undefined) {
             cacheDelta = { ...cacheDelta, layoutVersion: bumped.versions.layout_version };
           }
@@ -2064,8 +1970,8 @@ export class LayerService {
    * The version bumps a commit's facts call for, read inside its transaction:
    * the document version always; each touched page's pin of the family that
    * changed on it (`annotation_version`, `widget_version`); the annotation
-   * list and the form when they changed; the metadata, the outline and the
-   * layout when they changed. The page set's changes are written here, in
+   * list and the form when they changed; the metadata, the outline, the
+   * embedded files and the layout when they changed. The page set's changes are written here, in
    * the order the changes made them, before the pins are read.
    */
   private async bumpChangeVersions(
@@ -2081,6 +1987,7 @@ export class LayerService {
       forms_version?: number;
       metadata_version?: number;
       outline_version?: number;
+      attachments_version?: number;
       layout_version?: number;
     };
     pages: DurablePageRow[];
@@ -2093,6 +2000,7 @@ export class LayerService {
         'forms_version',
         'metadata_version',
         'outline_version',
+        'attachments_version',
         'layout_version',
       ])
       .where('id', '=', layer.id)
@@ -2137,6 +2045,9 @@ export class LayerService {
         ...(facts.form ? { forms_version: Number(current.forms_version ?? 1) + 1 } : {}),
         ...(facts.metadata ? { metadata_version: Number(current.metadata_version) + 1 } : {}),
         ...(facts.outline ? { outline_version: Number(current.outline_version ?? 1) + 1 } : {}),
+        ...(facts.attachments
+          ? { attachments_version: Number(current.attachments_version) + 1 }
+          : {}),
         ...(facts.layout ? { layout_version: Number(current.layout_version) + 1 } : {}),
       },
       pages,
@@ -4021,91 +3932,6 @@ export class LayerService {
     pending.add(key);
     this.pendingAttemptKeys.set(writeKey, pending);
     return key;
-  }
-
-  private async persistAttachmentMutation<
-    R extends AttachmentCreateResult | AttachmentDeleteResult,
-  >(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      kind: 'attachment.create' | 'attachment.delete';
-      result: R;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<R> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await trx
-          .selectFrom('layers')
-          .select(['current_version', 'doc_version', 'attachments_version'])
-          .where('id', '=', layer.id)
-          .executeTakeFirst();
-        if (!currentLayer) {
-          throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
-        }
-        // No SELECT-check here — the fence is writeLayerAdvance's guarded
-        // UPDATE (atomic with the write; see guardedVersionBump).
-
-        // Attachment writes touch only the catalog's name tree — no page
-        // rows, no per-page versions. Advance the layer doc version plus
-        // the dedicated attachments pin (the metadata_version design).
-        const previousDocVersion = Number(currentLayer.doc_version);
-        const docVersion = previousDocVersion + 1;
-        const attachmentsVersion = Number(currentLayer.attachments_version) + 1;
-
-        // The finalized result — audited and returned identically: what we
-        // tell the caller is what we tell history (and remote subscribers).
-        const result = {
-          ...input.result,
-          meta: {
-            ...input.result.meta,
-            ...planeMeta(input.result.meta, { previousDocVersion, docVersion, attachmentsVersion }),
-          },
-        } as R;
-
-        const auditEvent = makeAuditEvent({
-          ctx,
-          docId,
-          layer,
-          layerName,
-          kind: input.kind,
-          pageObjectNumber: null,
-          affectedPages: [],
-          artifactVersion: nextVersion,
-          artifactKey,
-          artifactSha: uploaded.sha256,
-          artifactSize: uploaded.size,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          {
-            layer,
-            nextVersion,
-            artifactKey,
-            artifactSha: uploaded.sha256,
-            artifactSize: uploaded.size,
-          },
-          { doc_version: docVersion, attachments_version: attachmentsVersion },
-          auditId,
-          now,
-        );
-
-        return { result, auditId };
-      });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
   }
 
   private enqueueLayerWrite<T>(

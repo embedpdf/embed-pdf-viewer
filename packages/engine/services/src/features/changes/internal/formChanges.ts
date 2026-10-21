@@ -18,6 +18,7 @@ import {
   type FieldScriptEvent,
   type ChangeItemType,
   type ChangeOp,
+  type Coordinates,
   type FormImportOp,
   isSkippedItem,
   type FormFieldDTO,
@@ -650,9 +651,9 @@ function isCalculated(ctx: ChangeContext, target: ReadField): boolean {
 }
 
 /** Whether `ops` fill in a field the caller may fill: its value, or its displayed text. */
-export function opsFillOwnField(
+export function opsFillOwnField<C extends Coordinates>(
   ctx: ChangeContext,
-  ops: readonly RecordedOp<PdfCoordinates, WireAnnotationResources>[],
+  ops: readonly RecordedOp<C, WireAnnotationResources>[],
 ): boolean {
   return ops.some((op) => {
     if (op.type !== 'forms.setValue' && op.type !== 'forms.setAppearanceText') return false;

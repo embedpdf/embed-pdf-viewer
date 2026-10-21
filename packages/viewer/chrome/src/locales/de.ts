@@ -101,6 +101,7 @@ export const de: Locale = {
         note: 'Kommentar',
         link: 'Link',
         gotoLink: 'Link öffnen',
+        saveFile: 'Datei speichern',
         removeLink: 'Link entfernen',
         delete: 'Löschen',
         group: 'Gruppieren',
@@ -158,6 +159,7 @@ export const de: Locale = {
         'annotations-create': 'Hinzufügen von Anmerkungen ist nicht zulässig',
         'doc-annotate-modify': 'Ändern von Anmerkungen ist nicht zulässig',
         'doc-annotate-read': 'Anzeigen von Anmerkungen ist nicht zulässig',
+        'doc-attachments-modify': 'Das Hinzufügen von Dateien ist nicht erlaubt',
         'doc-download': 'Herunterladen ist nicht zulässig',
         'doc-forms-modify': 'Bearbeiten von Formularfeldern ist nicht zulässig',
         'doc-outline-modify': 'Das Ändern der Lesezeichen ist nicht erlaubt',
@@ -165,6 +167,13 @@ export const de: Locale = {
         'doc-print': 'Drucken ist nicht zulässig',
         'doc-text-copy': 'Kopieren ist nicht zulässig',
         'doc-text-search': 'Suchen ist nicht zulässig',
+      },
+      attachment: {
+        add: 'Datei hinzufügen',
+        save: 'Speichern',
+        goTo: 'Gehe zu Seite',
+        delete: 'Löschen',
+        more: 'Weitere Optionen',
       },
       outline: {
         add: 'Lesezeichen hinzufügen',
@@ -467,6 +476,17 @@ export const de: Locale = {
       invisible: 'Veraltet: unbekannte Untertypen ausblenden',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'Anhänge werden geladen…',
+      failed: 'Die Anhänge konnten nicht gelesen werden.',
+      empty: 'Dieses Dokument hat keine angehängten Dateien',
+      drop: 'Dateien zum Anhängen hier ablegen',
+      dropHint: 'Oder Dateien hier ablegen',
+      adding: 'Wird hinzugefügt…',
+      onPage: 'Seite {page}',
+      count: '{count} Datei',
+      countPlural: '{count} Dateien',
+    },
     outline: {
       filter: 'Lesezeichen filtern',
       loading: 'Lesezeichen werden geladen…',

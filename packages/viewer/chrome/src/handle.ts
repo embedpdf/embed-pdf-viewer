@@ -16,6 +16,7 @@
  */
 import { ActionsToken, type ActionsCapability } from '@embedpdf/react/actions';
 import { AnnotationToken, type AnnotationCapability } from '@embedpdf/react/annotation';
+import { AttachmentToken, type AttachmentCapability } from '@embedpdf/react/attachment';
 import { CommandsToken, type CommandsCapability } from '@embedpdf/react/commands';
 import { FormToken, type FormCapability } from '@embedpdf/react/form';
 import { I18nToken, type I18nCapability } from '@embedpdf/react/i18n';
@@ -63,6 +64,8 @@ export interface ViewerPlugins {
   readonly metadata: MetadataCapability;
   /** The document's outline (its bookmarks); reading its state reads it. */
   readonly outline: OutlineCapability;
+  /** The files the document carries, attached and on its pages; reading its state reads them. */
+  readonly attachment: AttachmentCapability;
   readonly actions: ActionsCapability;
   readonly documents: DocumentsCapability;
   readonly interaction: InteractionCapability;
@@ -96,6 +99,7 @@ export const VIEWER_PLUGINS: {
   pageEdit: PageEditToken,
   metadata: MetadataToken,
   outline: OutlineToken,
+  attachment: AttachmentToken,
   actions: ActionsToken,
   documents: DocumentsToken,
   interaction: InteractionToken,

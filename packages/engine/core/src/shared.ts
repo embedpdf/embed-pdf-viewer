@@ -389,11 +389,12 @@ export type {
   AttachmentContent,
   WireAttachmentFile,
 } from './dto/Attachment';
-export { toAttachmentRef } from './dto/Attachment';
+export { ATTACHMENT_LIMITS, toAttachmentRef } from './dto/Attachment';
 export type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
   AttachmentMutationMeta,
+  AttachmentRestoreResult,
 } from './mutation/AttachmentMutationResults';
 export { deletedAttachmentOf } from './mutation/AttachmentMutationResults';
 

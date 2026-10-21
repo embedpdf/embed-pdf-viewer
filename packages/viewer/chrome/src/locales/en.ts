@@ -94,6 +94,7 @@ export const en: Locale = {
         note: 'Comment',
         link: 'Link',
         gotoLink: 'Go to link',
+        saveFile: 'Save file',
         removeLink: 'Remove link',
         delete: 'Delete',
         group: 'Group',
@@ -153,6 +154,7 @@ export const en: Locale = {
         'annotations-create': "Adding annotations isn't allowed",
         'doc-annotate-modify': "Changing annotations isn't allowed",
         'doc-annotate-read': "Viewing annotations isn't allowed",
+        'doc-attachments-modify': 'Adding files isn’t allowed',
         'doc-download': "Downloading isn't allowed",
         'doc-forms-modify': "Editing form fields isn't allowed",
         'doc-outline-modify': 'Changing the outline isn’t allowed',
@@ -160,6 +162,13 @@ export const en: Locale = {
         'doc-print': "Printing isn't allowed",
         'doc-text-copy': "Copying isn't allowed",
         'doc-text-search': "Searching isn't allowed",
+      },
+      attachment: {
+        add: 'Add file',
+        save: 'Save',
+        goTo: 'Go to page',
+        delete: 'Delete',
+        more: 'More options',
       },
       outline: {
         add: 'Add item',
@@ -471,6 +480,17 @@ export const en: Locale = {
       invisible: 'Legacy: hide unknown subtypes',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: 'Loading attachments…',
+      failed: 'The attachments couldn’t be read.',
+      empty: 'This document has no attached files',
+      drop: 'Drop files to attach them',
+      dropHint: 'Or drop files here',
+      adding: 'Adding…',
+      onPage: 'Page {page}',
+      count: '{count} file',
+      countPlural: '{count} files',
+    },
     outline: {
       filter: 'Filter outline',
       loading: 'Loading outline…',

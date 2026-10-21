@@ -5,6 +5,7 @@ import { FileResourceKeysSchema } from '../wire/resourceKeys';
 
 import type {
   Attachment,
+  AttachmentFileBase,
   AttachmentFileInfo,
   AttachmentRef,
   WireAttachmentFile,
@@ -18,6 +19,13 @@ import type {
 
 export const WireAttachmentFileSchema: z.ZodType<WireAttachmentFile> = z.object({
   resources: FileResourceKeysSchema,
+  name: z.string().min(1),
+  mimeType: z.string().optional(),
+  description: z.string().optional(),
+});
+
+/** What a write takes of a file: its name (its key), type and description. */
+export const AttachmentFileBaseSchema: z.ZodType<AttachmentFileBase> = z.object({
   name: z.string().min(1),
   mimeType: z.string().optional(),
   description: z.string().optional(),

@@ -1,5 +1,10 @@
 import type { AnnotationListMutationMeta } from './AnnotationListMutationMeta';
 import type {
+  AttachmentCreateResult,
+  AttachmentDeleteResult,
+  AttachmentRestoreResult,
+} from './AttachmentMutationResults';
+import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
   AnnotationReorderResult,
@@ -52,6 +57,7 @@ import {
   type AnnotationResources,
   type WireAnnotationResources,
 } from '../annotation/resources';
+import type { AttachmentFileBase, AttachmentRef } from '../dto/Attachment';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { OutlineItemDraft, OutlineItemPatch } from '../dto/DocumentOutline';
 import type { MetadataPatch } from '../dto/MetadataPatch';
@@ -289,7 +295,18 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly type: 'pages.insert';
       readonly source: Uint8Array;
       readonly position?: PagePosition;
-    };
+    }
+  | {
+      /**
+       * A file embedded in the document (`/EmbeddedFiles`), under its name:
+       * the name is its key, and a name another file has is refused.
+       */
+      readonly type: 'attachments.create';
+      readonly file: AttachmentFileBase;
+      /** Its bytes, as the `file` resource. */
+      readonly resources: R;
+    }
+  | { readonly type: 'attachments.delete'; readonly ref: AttachmentRef };
 
 /**
  * An import, as the one op of its change: `doc.annotations.import` runs it,
@@ -356,7 +373,8 @@ export type ChangeItemType =
   | 'forms.restore'
   | 'forms.restoreWidget'
   | 'outline.restore'
-  | 'pages.restore';
+  | 'pages.restore'
+  | 'attachments.restore';
 
 /**
  * An op an undo left alone entirely: the document no longer showed what the
@@ -467,6 +485,10 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
   | ({ type: 'pages.insert' } & PageInsertResult<C>)
   /** An undo of a delete, or a redo of an insert: the pages it brought back. */
   | ({ type: 'pages.restore' } & PageRestoreResult<C>)
+  | ({ type: 'attachments.create' } & AttachmentCreateResult)
+  | ({ type: 'attachments.delete' } & AttachmentDeleteResult)
+  /** An undo of a delete, or a redo of a create: the file it brought back. */
+  | ({ type: 'attachments.restore' } & AttachmentRestoreResult)
   | SkippedChangeItem;
 
 /** Whether an item is an op an undo left alone entirely. */
@@ -627,6 +649,12 @@ export async function resolveChangeResources(change: Change): Promise<{
         const source = op.source.slice();
         buffers.push(source.buffer);
         ops.push({ ...op, source });
+        break;
+      }
+      case 'attachments.create': {
+        const wire = await resolveAnnotationResources(op.resources);
+        buffers.push(...annotationResourceBuffers(wire));
+        ops.push({ ...op, resources: wire });
         break;
       }
       default:

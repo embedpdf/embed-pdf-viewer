@@ -101,6 +101,7 @@ export const zhCN: Locale = {
         note: '注释',
         link: '链接',
         gotoLink: '转到链接',
+        saveFile: '保存文件',
         removeLink: '删除链接',
         delete: '删除',
         group: '分组',
@@ -158,6 +159,7 @@ export const zhCN: Locale = {
         'annotations-create': '不允许添加注释',
         'doc-annotate-modify': '不允许更改注释',
         'doc-annotate-read': '不允许查看注释',
+        'doc-attachments-modify': '不允许添加文件',
         'doc-download': '不允许下载',
         'doc-forms-modify': '不允许编辑表单字段',
         'doc-outline-modify': '不允许更改书签',
@@ -165,6 +167,13 @@ export const zhCN: Locale = {
         'doc-print': '不允许打印',
         'doc-text-copy': '不允许复制',
         'doc-text-search': '不允许搜索',
+      },
+      attachment: {
+        add: '添加文件',
+        save: '保存',
+        goTo: '转到页面',
+        delete: '删除',
+        more: '更多选项',
       },
       outline: {
         add: '添加书签',
@@ -466,6 +475,17 @@ export const zhCN: Locale = {
       invisible: '旧版：隐藏未知的子类型',
     },
     // The link editor over a selected annotation.
+    attachments: {
+      loading: '正在加载附件…',
+      failed: '无法读取附件。',
+      empty: '此文档没有附加文件',
+      drop: '拖放文件以附加',
+      dropHint: '或将文件拖放到此处',
+      adding: '正在添加…',
+      onPage: '第 {page} 页',
+      count: '{count} 个文件',
+      countPlural: '{count} 个文件',
+    },
     outline: {
       filter: '筛选书签',
       loading: '正在加载书签…',

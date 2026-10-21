@@ -104,11 +104,7 @@ export interface RequestOptions {
   readonly session?: boolean;
 }
 
-/**
- * A raw-bytes response plus its headers. The attachment-file leaves carry
- * their metadata as headers (`Content-Type`, `X-EmbedPDF-File-Name`), so
- * unlike `getBytes` the caller needs the `Headers` object back.
- */
+/** A raw-bytes response plus its headers. */
 export interface HttpFileResponse {
   bytes: Uint8Array;
   headers: Headers;

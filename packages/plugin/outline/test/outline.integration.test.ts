@@ -6,6 +6,7 @@
  * `doc.outline.modify` reads but can't write.
  */
 import { createKernel, isPluginError, type Engine } from '@embedpdf/core';
+import { gate } from '@embedpdf/core/testing';
 import { createLocalEngine } from '@embedpdf/engine';
 import { OUTLINE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
 import { toOutlineItemRef, toPageRef } from '@embedpdf/engine-core/runtime';
@@ -14,7 +15,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { OutlineToken, type OutlineCapability, type OutlineChangedEvent } from '../src/contract';
 import { outlinePlugin } from '../src/outline.plugin';
-import { gate } from './helpers/gate';
 
 let engine: Engine;
 beforeAll(async () => {

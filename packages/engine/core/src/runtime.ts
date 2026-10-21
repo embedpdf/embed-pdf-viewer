@@ -71,6 +71,7 @@ export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { MetadataService } from './engine/MetadataService';
 export type { DocumentOutlineService, OutlineCreateOptions } from './engine/DocumentOutlineService';
+export { attachmentVerbs, type AttachmentWriteVerb } from './engine/attachmentVerbs';
 export { outlineVerbs } from './engine/outlineVerbs';
 export { pageVerbs, type PageStructureVerb } from './engine/pageVerbs';
 export type { CustomMetadataService } from './engine/CustomMetadataService';
@@ -212,8 +213,6 @@ export type {
   ShutdownWorkerRequest,
   AttachmentsListWorkerRequest,
   AttachmentsReadFileWorkerRequest,
-  AttachmentsCreateWorkerRequest,
-  AttachmentsDeleteWorkerRequest,
   AnnotationsReadFileWorkerRequest,
   AnnotationsReadAppearanceWorkerRequest,
   AnnotationsExportWorkerRequest,

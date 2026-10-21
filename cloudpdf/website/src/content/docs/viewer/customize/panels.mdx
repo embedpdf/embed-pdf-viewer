@@ -22,7 +22,7 @@ one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
 | :-- | :-- | :-- | :-- |
 | `thumbnails` | A small picture of every page; pick one to go there, or [organize the pages](#organize-pages) | `start` | `panel:thumbnails` |
 | `outline` | The document's table of contents (its bookmarks): follow, filter, and with the right to change the outline, add, rename, drag and delete items | `start` | `panel:outline` |
-| `attachments` | Files inside the PDF | `start` | `panel:attachments` |
+| `attachments` | The files inside the PDF, its own and those pinned to its pages: save them, go to a page's file, and with the right to, attach and remove files | `start` | `panel:attachments` |
 | `search` | Find text, and every match in context | `end` | `panel:search`, `search:find` (`Ctrl`/`Cmd`+`F`) |
 | `comments` | Every comment and its replies | `end` | `panel:comments` |
 | `style` | Color, width and font of the selected annotation, or of the tool | `end` | `panel:style` |
@@ -32,7 +32,10 @@ one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
 | `measurement` | The scale, and every measurement on the page | `end` | `panel:measurement` |
 | `form-design` | The form's fields, and the selected one's settings and buttons; in the Form mode only | `end` | `form:design`, `panel:form-design` |
 
-A panel whose feature you [turn off](../features/turning-off) is gone, with its button.
+A panel whose feature you [turn off](../features/turning-off) is gone, with its button. The
+outline and attachments panels show while they have a job: the document has items or files to
+list, or the user may add some. A read-only viewer on a document without an outline shows no
+outline button; the same for attachments.
 
 ## How a panel opens
 
@@ -140,6 +143,25 @@ Every edit is one step of the history, so undo puts the pages back as they were,
 with its annotations. The buttons are the `page:*` [commands](commands), so `disable` and
 `readOnly` turn editing off and leave a plain list of pages. A user without
 `doc.pages.assemble` in their scope sees the plain list too.
+
+## The attachments
+
+The attachments panel lists the files the PDF carries: its own first, then the files pinned to
+its pages, each with its name, size and description, and its page for a page's file. A name never
+shows the characters that can make one file look like another.
+
+- **Click a file** to save it; click a page's file to go to it on its page.
+- **Each file has a menu**: its button or a right-click. It saves the file, goes to a page's file,
+  and deletes the file.
+- **Attach files** with the header's button, or drop them on the panel; a file dropped there is
+  attached, not opened as a tab. A name the document has already gets a number,
+  `notes (2).txt`.
+- **A selected file attachment** on the page has Save file in its bar.
+
+Saving a file is a download: it goes with `documents.download` and needs `doc.download` in the
+user's scope. Attaching and deleting are `attachments.adding`, which `readOnly` turns off, and need
+`doc.attachments.modify`; each is one step of the history. From code, `viewer.get('attachment')`
+is the [attachment plugin](/docs/headless/documents/attachments).
 
 ## Panels on the same side
 

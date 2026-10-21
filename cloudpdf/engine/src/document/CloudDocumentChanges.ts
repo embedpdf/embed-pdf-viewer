@@ -198,6 +198,11 @@ function changeRequestOf(changes: readonly SentChange[]): {
         const { source, ...rest } = op;
         return { ...rest, resources: { source: part(source.slice().buffer as ArrayBuffer) } };
       }
+      case 'attachments.create': {
+        // Without its bytes, the request's schema refuses the change.
+        const { file } = op.resources;
+        return { ...op, resources: file ? { file: part(file) } : {} };
+      }
       default:
         return op;
     }
@@ -220,6 +225,7 @@ function carriesBytes(change: Change): boolean {
     (op) =>
       op.type === 'forms.setSignatureAppearance' ||
       op.type === 'pages.insert' ||
+      op.type === 'attachments.create' ||
       ((op.type === 'annotations.create' || op.type === 'annotations.update') &&
         op.resources !== undefined &&
         Object.values(op.resources).some((resource) => resource !== undefined)),
@@ -235,6 +241,7 @@ function planesOf(result: ChangeResult): LayerScopePlane[] {
     else if (item.type.startsWith('outline.')) planes.add('outline');
     else if (item.type.startsWith('pages.')) planes.add('layout');
     else if (item.type.startsWith('forms.')) planes.add('forms');
+    else if (item.type.startsWith('attachments.')) planes.add('attachments');
     else planes.add('annotations');
   }
   return [...planes];

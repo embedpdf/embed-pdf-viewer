@@ -8,10 +8,10 @@ import {
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 
-import { exportDict, exportPage, importPage } from './captures';
+import { canonicalDict, exportPage, importPage } from './captures';
 import { leftAlone, type ChangeContext, type Done } from './changeContext';
 import { sha256HexOf } from '../../../runtime/digest';
-import { PagesInserter, PagesMutator, PagesReader } from '../../pages';
+import { PagesInserter, PagesMutator, PagesReader, rotationAt } from '../../pages';
 import type {
   PageRemoveStep,
   PageReorderStep,
@@ -26,6 +26,13 @@ type Op<T extends ChangeOp['type']> = Extract<
 
 /** What a page's guard digests: the page, and what the layer holds of these. */
 const PAGE_DEEP_KEYS = ['Annots', 'Contents', 'Resources'];
+
+/**
+ * What it leaves out of the page's bytes: its place (/Parent), so moving
+ * pages around it changes nothing, and its /Rotate, which counts by value
+ * instead: turning a page and turning it back reads the same.
+ */
+const PAGE_SKIPPED_KEYS = ['Parent', 'Rotate'];
 
 /**
  * Runs a page op or step. It changes the page tree in place, so the
@@ -219,13 +226,21 @@ function removeStepOf(ctx: ChangeContext, pages: readonly number[]): PageRemoveS
 
 /**
  * How a page reads now: the digest of its dictionary and of what the layer
- * holds of its annotations, contents and resources. Its place isn't in it, so
- * moving pages around it changes nothing.
+ * holds of its annotations, contents and resources, as they read (canonical
+ * bytes: a save that only encodes a stream again changes nothing), without
+ * its place, and with its turn as a value.
  */
 function digestOf(ctx: ChangeContext, page: number): string {
   const { fn, mem } = ctx.runtime;
-  const capture = exportDict(ctx.runtime, ctx.session.requireDocPtr(), page, PAGE_DEEP_KEYS);
-  return sha256HexOf(fn, mem, capture);
+  const docPtr = ctx.session.requireDocPtr();
+  const bytes = canonicalDict(ctx.runtime, docPtr, page, PAGE_DEEP_KEYS, PAGE_SKIPPED_KEYS);
+  const index = ctx.session.allRecords().find((record) => record.pageObjectNumber === page);
+  const turn = index ? rotationAt(ctx.runtime, docPtr, index.pageIndex) : 0;
+  const turned = new TextEncoder().encode(`\nturn ${turn}`);
+  const digested = new Uint8Array(bytes.byteLength + turned.byteLength);
+  digested.set(bytes);
+  digested.set(turned, bytes.byteLength);
+  return sha256HexOf(fn, mem, digested);
 }
 
 /** The steps that turn each page back, one for each rotation the pages had. */

@@ -7,8 +7,4 @@
  * Keyed by the page under `viewer/` (`customize/layout`). Remove an entry when the viewer does what
  * the page says; the publish gate fails on a page that doesn't exist or an entry with no reason.
  */
-export const VIEWER_PENDING = {
-  'customize/panels': {
-    N4: 'the attachments panel: no plugin lists the attached files',
-  },
-};
+export const VIEWER_PENDING = {};

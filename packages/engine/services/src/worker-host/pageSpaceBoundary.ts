@@ -23,12 +23,8 @@ import {
   pdfRenderTargetOf,
   type Annotation,
   type AnnotationPatch,
-  type Change,
   type ChangeItem,
-  type ChangeOp,
-  type RecordedChange,
   type RecordedOp,
-  type ChangeResult,
   type PageRef,
   type WireAnnotationResources,
   type PageRenderOptions,
@@ -108,16 +104,10 @@ export function resultInPageSpace(
         result: { ...payload.result, annotation: annotation(payload.result.annotation) },
       };
     case 'document.apply':
-      return { ...payload, result: changeResultInPageSpace(payload.result, boxOf) };
     case 'document.applyChanges':
-      return {
-        ...payload,
-        outcomes: payload.outcomes.map((outcome) =>
-          outcome.status === 'applied'
-            ? { ...outcome, result: changeResultInPageSpace(outcome.result, boxOf) }
-            : outcome,
-        ),
-      };
+      // In page space already: the change applier converts each item as its
+      // op runs (ChangeSpace).
+      return payload;
     case 'annotations.import':
       return {
         ...payload,
@@ -212,15 +202,11 @@ export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): File
     case 'forms.createField':
       return { ...job, draft: pdfFormFieldDraftOf(job.draft, boxOf) };
     case 'document.apply':
-      return { ...job, change: changeInFileSpace(job.change, boxOf) };
     case 'document.applyChanges':
-      return {
-        ...job,
-        changes: job.changes.map((entry) => ({
-          ...entry,
-          change: changeInFileSpace(entry.change, boxOf),
-        })),
-      };
+      // Each op converts right before it runs, against the document as the
+      // ops before it left it (ChangeSpace): one before it may add, remove
+      // or put back the page it names.
+      return job;
     case 'forms.addWidget':
       return { ...job, placement: pdfWidgetPlacementOf(job.placement, boxOf) };
     case 'measure.setScale':
@@ -260,24 +246,8 @@ export function renderOptionsInFileSpace(
   };
 }
 
-/** A change's ops, each place measured in the file's coordinates, as its single verb's job is. */
-function changeInFileSpace(
-  change: Change<PageCoordinates, WireAnnotationResources>,
-  boxOf: VisibleBoxOf,
-): Change<PdfCoordinates, WireAnnotationResources>;
-function changeInFileSpace(
-  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
-  boxOf: VisibleBoxOf,
-): RecordedChange<PdfCoordinates, WireAnnotationResources>;
-function changeInFileSpace(
-  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
-  boxOf: VisibleBoxOf,
-): RecordedChange<PdfCoordinates, WireAnnotationResources> {
-  if ('undoOf' in change) return change;
-  return { ops: change.ops.map((op) => opInFileSpace(op, boxOf)) };
-}
-
-function opInFileSpace(
+/** An op's places in the file's coordinates, as its single verb's job's are. */
+export function opInFileSpace(
   op: RecordedOp<PageCoordinates, WireAnnotationResources>,
   boxOf: VisibleBoxOf,
 ): RecordedOp<PdfCoordinates, WireAnnotationResources> {
@@ -343,15 +313,8 @@ function opInFileSpace(
   }
 }
 
-/** What a change did, each place in page space, as its single verbs' results are. */
-function changeResultInPageSpace(
-  result: ChangeResult<PdfCoordinates>,
-  boxOf: VisibleBoxOf,
-): ChangeResult {
-  return { ...result, items: result.items.map((item) => itemInPageSpace(item, boxOf)) };
-}
-
-function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf): ChangeItem {
+/** What an op did, each place in page space, as its single verb's result is. */
+export function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf): ChangeItem {
   // An op an undo left alone holds no places.
   if (isSkippedItem(item)) return item;
   const annotation = (read: Annotation<PdfCoordinates>) =>

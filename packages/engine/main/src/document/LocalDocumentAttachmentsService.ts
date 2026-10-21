@@ -1,20 +1,13 @@
 import {
+  ATTACHMENT_LIMITS,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
-  deletedAttachmentOf,
-  normalizeAttachmentFileSource,
-  opIdOf,
   wirePack,
-  type AttachmentContent,
-  type AttachmentCreateResult,
-  type AttachmentDeleteResult,
-  type AttachmentFileSource,
   type AttachmentList,
   type AttachmentRef,
+  type AttachmentWriteVerb,
   type DocumentAttachmentsService,
-  type SessionEventPublisher,
-  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
@@ -26,25 +19,24 @@ interface DocClosedView {
 }
 
 /**
- * Document-level attachments (the catalog's `/EmbeddedFiles` name tree)
- * for the local engine. `list()`/`download()` are pure reads over the
- * worker session; `create()`/`delete()` are mutations.
+ * The reads of document-level attachments (the catalog's `/EmbeddedFiles`
+ * name tree) on the local engine, pure reads over the worker session;
+ * `create` and `delete` are changes (`attachmentVerbs`).
  *
  * Gating mirrors the metadata/bytes tier split the cloud routes use:
  * `list()` (metadata only) rides the base `doc.open` read; `download()`
  * egresses content bytes, so it gates on `doc.download` — the same rule
- * as `pages.extract` and the whole-document download. `create`/`delete`
- * are mutations gated on `doc.attachments.modify` and publish
- * `attachments.created`/`attachments.deleted` events after the worker
- * confirms — ground truth, never optimistic.
+ * as `pages.extract` and the whole-document download.
  */
-export class LocalDocumentAttachmentsService implements DocumentAttachmentsService {
+export class LocalDocumentAttachmentsService implements Omit<
+  DocumentAttachmentsService,
+  AttachmentWriteVerb
+> {
   constructor(
     private readonly docId: string,
     private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
-    private readonly publisher: SessionEventPublisher,
   ) {}
 
   list(): AbortablePromise<AttachmentList> {
@@ -75,7 +67,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
     });
   }
 
-  download(ref: AttachmentRef): AbortablePromise<AttachmentContent> {
+  download(ref: AttachmentRef): AbortablePromise<Uint8Array> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -89,9 +81,16 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'attachments.readFile', effect: 'read', jobId, docId, ref }),
+        wirePack({
+          kind: 'attachments.readFile',
+          effect: 'read',
+          jobId,
+          docId,
+          ref,
+          maxDecodedBytes: ATTACHMENT_LIMITS.decodedBytes,
+        }),
     });
-    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+    return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -106,98 +105,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
           'attachments.readFile returned no bytes (path mode is server-only)',
         );
       }
-      return {
-        bytes: new Uint8Array(content.bytes),
-        name: content.name,
-        mimeType: content.mimeType ?? null,
-      };
-    });
-  }
-
-  create(
-    file: AttachmentFileSource,
-    options?: WriteOptions,
-  ): AbortablePromise<AttachmentCreateResult> {
-    if (this.view.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
-      );
-    }
-    let opId: string;
-    try {
-      opId = opIdOf(options);
-      this.guard.assertCapability('doc.attachments.modify');
-    } catch (err) {
-      return AbortablePromise.rejectReason(err);
-    }
-    const docId = this.docId;
-    // Queued now, so it keeps its place among this document's calls while
-    // its bytes are read.
-    const submission = this.queue.enqueue<WorkerResultPayload>({
-      line: { effect: 'write', docId },
-      buildPack: async (jobId: JobId) => {
-        // Same splitter the file-attachment annotation draft uses: metadata
-        // into the JSON body, bytes onto the transfer list.
-        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'file');
-        return wirePack(
-          {
-            kind: 'attachments.create',
-            effect: 'write',
-            jobId,
-            opId,
-            docId,
-            file: wireFile,
-            resources: { file: resource },
-          },
-          [resource.bytes],
-        );
-      },
-    });
-    return AbortablePromise.run<AttachmentCreateResult>(async (signal) => {
-      const onAbort = () => submission.abort(signal.reason);
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-      const payload = await submission;
-      if (payload.tag !== 'attachments.create') {
-        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
-      }
-      this.publisher.publishWrite(opId, { type: 'attachments.created', ...payload.result });
-      return payload.result;
-    });
-  }
-
-  delete(ref: AttachmentRef, options?: WriteOptions): AbortablePromise<AttachmentDeleteResult> {
-    if (this.view.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
-      );
-    }
-    let opId: string;
-    try {
-      opId = opIdOf(options);
-      this.guard.assertCapability('doc.attachments.modify');
-    } catch (err) {
-      return AbortablePromise.rejectReason(err);
-    }
-    const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'attachments.delete', effect: 'write', jobId, opId, docId, ref }),
-    });
-    return AbortablePromise.run<AttachmentDeleteResult>(async (signal) => {
-      const onAbort = () => submission.abort(signal.reason);
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-      const payload = await submission;
-      if (payload.tag !== 'attachments.delete') {
-        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
-      }
-      this.publisher.publishWrite(opId, {
-        type: 'attachments.deleted',
-        deleted: deletedAttachmentOf(payload.result),
-        ...payload.result,
-      });
-      return payload.result;
+      return new Uint8Array(content.bytes);
     });
   }
 }

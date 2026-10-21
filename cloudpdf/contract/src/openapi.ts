@@ -11,6 +11,7 @@
 
 import {
   AnnotationWireComponents,
+  AttachmentWireComponents,
   ChangeWireComponents,
   DocumentWireComponents,
   EngineErrorPayloadSchema,
@@ -64,6 +65,7 @@ const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   AnnotationWireComponents,
   FormWireComponents,
   OutlineWireComponents,
+  AttachmentWireComponents,
   ChangeWireComponents,
 ]);
 
