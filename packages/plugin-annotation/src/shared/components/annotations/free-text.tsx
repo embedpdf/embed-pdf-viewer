@@ -40,6 +40,14 @@ export function FreeText({
     isEditing,
   );
 
+  // Let the browser own the editable subtree. Reconciling a text child after
+  // Enter or paste can leave browser-created nodes behind and duplicate text.
+  useEffect(() => {
+    if (!editingRef.current && editorRef.current) {
+      editorRef.current.textContent = annotation.object.contents ?? '';
+    }
+  }, [annotation.object.contents, isEditing]);
+
   useEffect(() => {
     if (isEditing && editorRef.current) {
       editingRef.current = true;
@@ -108,6 +116,7 @@ export function FreeText({
           width: '100%',
           height: '100%',
           lineHeight: '1.18',
+          whiteSpace: 'pre-wrap',
           overflow: 'hidden',
           cursor: isEditing ? 'text' : onClick ? 'pointer' : 'default',
           outline: 'none',
@@ -115,9 +124,7 @@ export function FreeText({
         }}
         contentEditable={isEditing}
         {...suppressContentEditableWarningProps}
-      >
-        {annotation.object.contents}
-      </span>
+      />
     </div>
   );
 }
