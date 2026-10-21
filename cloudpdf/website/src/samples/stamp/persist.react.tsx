@@ -32,7 +32,7 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Where the libraries live between visits: this browser's IndexedDB.
 const store = indexedDbByteStore('embedpdf-stamp-example');
@@ -126,7 +126,7 @@ function Libraries() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Libraries />
         <Stage className="stage">

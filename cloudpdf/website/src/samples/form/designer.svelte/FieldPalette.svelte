@@ -23,7 +23,7 @@
   // The pointer fills the form in; every other tool here designs it.
   const filling = $derived(interactionState.activeToolId === 'pointer');
 
-  // Start on the ebook's last page, which has room for a form, with the text tool picked.
+  // Start on the form's last page, which is empty, with the text tool picked.
   let started = false;
   $effect(() => {
     const page = pages.current.at(-1)?.ref;
@@ -69,9 +69,7 @@
       </button>
     {/each}
     <output class="readout">
-      {formState.fields.length === 0
-        ? 'Click the page to place a field'
-        : `${formState.fields.length} fields`}
+      {formState.fields.length} fields: click the page to place another
     </output>
   </div>
 {/if}

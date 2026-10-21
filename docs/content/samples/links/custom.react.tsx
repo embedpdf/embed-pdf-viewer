@@ -1,73 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useState } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import { annotationPlugin, useAnnotation } from '@embedpdf/react/annotation';
+import { actionsPlugin, useActionsUiAdapter } from '@embedpdf/react/actions';
 import { LinkLayer, linkPlugin } from '@embedpdf/react/link';
 import { localEngine } from '@embedpdf/engine';
 
 import './custom.css';
 
 const engine = localEngine();
-// The annotation plugin is only here to make the links below.
-const plugins = [
-  stagePlugin(),
-  renderPlugin(),
-  interactionPlugin(),
-  annotationPlugin(),
-  linkPlugin(),
-];
+// The actions plugin runs a link that names a viewer command, such as the cover's "Next page".
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), actionsPlugin(), linkPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source links]
+const links = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-links.pdf');
+  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// Where the two links go on the first page, in page coordinates.
-const TO_PAGE_3 = { x: 72, y: 24, width: 160, height: 28 };
-const TO_WEBSITE = { x: 250, y: 24, width: 190, height: 28 };
-
-// Made on load, since the document has none: a label the page shows, and a link over it.
-function AddLinks() {
-  const annotation = useAnnotation();
-  const pages = usePageList();
-  const added = useRef(false);
-
-  useEffect(() => {
-    const [first, , third] = pages;
-    if (!first || !third || added.current) return;
-    added.current = true;
-    const label = (text: string, box: typeof TO_PAGE_3) =>
-      annotation.create(first.ref, {
-        subtype: 'free-text',
-        box,
-        contents: text,
-        fontSize: 13,
-        fontColor: '#054fb3',
-        interiorColor: '#e8f1ff',
-        color: '#7db6ff',
-        strokeWidth: 1,
-      });
-    void (async () => {
-      await label('Go to page 3 →', TO_PAGE_3);
-      await label('Open embedpdf.com ↗', TO_WEBSITE);
-      await annotation.create(first.ref, {
-        subtype: 'link',
-        rect: TO_PAGE_3,
-        target: { kind: 'goto', destination: { kind: 'fit', page: third.ref } },
-      });
-      await annotation.create(first.ref, {
-        subtype: 'link',
-        rect: TO_WEBSITE,
-        target: { kind: 'uri', uri: 'https://www.embedpdf.com' },
-      });
-    })();
-  }, [annotation, pages]);
-
+// The browser's way to open a website, once for the viewer.
+function BrowserActions() {
+  useActionsUiAdapter();
   return null;
 }
 
@@ -75,9 +31,9 @@ export default function App() {
   const [shown, setShown] = useState(true);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddLinks />
+        <BrowserActions />
         <div className="toolbar">
           <div className="segmented" role="group" aria-label="Link areas">
             <button type="button" aria-pressed={shown} onClick={() => setShown(true)}>

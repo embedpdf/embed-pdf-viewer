@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -12,9 +11,7 @@ import {
   AnnotationLayer,
   annotationKey,
   annotationPlugin,
-  useAnnotation,
   useAnnotationList,
-  useAnnotationState,
 } from '@embedpdf/react/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
@@ -23,28 +20,7 @@ import './identity.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
-
-// On load: a sticky note on the cover. It's Dana's, like everything drawn here.
-function AddNote() {
-  const annotation = useAnnotation();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
-
-  useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'text',
-      rect: { x: 470, y: 232, width: 20, height: 20 },
-      contents: 'Can we shorten the title?',
-      color: '#facc15',
-    });
-  }, [annotation, ready, cover]);
-
-  return null;
-}
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -102,10 +78,9 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: ebook }]}
+      initialDocuments={[{ source: review }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddNote />
         <Toolbar />
         <div className="viewer">
           <Stage className="stage">

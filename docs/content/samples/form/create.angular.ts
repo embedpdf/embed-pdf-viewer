@@ -4,6 +4,7 @@ import {
   computed,
   effect,
   inject,
+  signal,
   untracked,
   viewChild,
   ViewEncapsulation,
@@ -14,17 +15,18 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
+import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source forms]
+const forms = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 // How the new fields look: part of the PDF, like the rest of the page.
-const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
+const look = { color: '#94a3b8', interiorColor: '#ffffff', strokeWidth: 1, fontSize: 11 };
 
 /** A dropdown, the next row down the page. */
 function addDropdown(form: EpdfForm, page: PageRef, row: number) {
@@ -35,19 +37,19 @@ function addDropdown(form: EpdfForm, page: PageRef, row: number) {
       { label: 'Netherlands', value: 'NL' },
       { label: 'Belgium', value: 'BE' },
     ],
-    widgets: [{ page, rect: { x: 72, y: 520 + row * 36, width: 160, height: 24 }, ...look }],
+    widgets: [{ page, rect: { x: 96, y: 270 + row * 36, width: 160, height: 24 }, ...look }],
   });
 }
 
 /** A radio group: one field with a widget per button, each with the value it stands for. */
 function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
-  const y = 524 + row * 36;
+  const y = 274 + row * 36;
   return form.create({
     family: 'radio',
     name: `plan_${row + 1}`,
     widgets: [
-      { page, rect: { x: 72, y, width: 16, height: 16 }, exportValue: 'monthly', ...look },
-      { page, rect: { x: 112, y, width: 16, height: 16 }, exportValue: 'yearly', ...look },
+      { page, rect: { x: 96, y, width: 16, height: 16 }, exportValue: 'monthly', ...look },
+      { page, rect: { x: 136, y, width: 16, height: 16 }, exportValue: 'yearly', ...look },
     ],
   });
 }
@@ -57,7 +59,7 @@ function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfFormLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: forms }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -89,7 +91,7 @@ function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
         <button type="button" class="button" [disabled]="!last()" (click)="removeLast()">
           Remove the last
         </button>
-        <output class="readout">{{ names() || 'No fields' }}</output>
+        <output class="readout">{{ names() || 'No fields on this page yet' }}</output>
       </div>
       <epdf-stage class="stage">
         <ng-template epdfPage>
@@ -106,42 +108,44 @@ export class App {
   private readonly form = inject(EpdfForm);
   private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
-  private added = false;
+  private started = false;
 
   protected readonly addDropdown = addDropdown;
   protected readonly addRadioGroup = addRadioGroup;
-  /** The last page, which has room for a form. */
+  /** The form's last page is empty: room for new fields. */
   protected readonly page = computed(() => this.document.pages().at(-1)?.ref);
-  protected readonly last = computed(() => this.form.fields().at(-1));
-  protected readonly full = computed(() => this.form.fields().length >= 5);
+  private readonly added = signal<FormFieldDTO[]>([]);
+  protected readonly last = computed(() => this.added().at(-1));
+  protected readonly full = computed(() => this.added().length >= 5);
   protected readonly names = computed(() =>
-    this.form
-      .fields()
+    this.added()
       .map((field) => field.name)
       .join(', '),
   );
 
   constructor() {
-    // The ebook has no form: start with a dropdown on its last page.
     effect(() => {
       const page = this.page();
-      if (this.form.status() !== 'ready' || !page || !this.stage() || this.added) return;
-      this.added = true;
-      untracked(() => this.add(addDropdown));
+      const stage = this.stage();
+      if (!page || !stage || this.started) return;
+      this.started = true;
+      untracked(() => stage.goToPage(page));
     });
   }
 
   /** Each new field goes a row further down the page: bring it into view. */
-  protected add(addField: typeof addDropdown) {
+  protected async add(addField: typeof addDropdown) {
     const page = this.page();
     if (!page) return;
-    void addField(this.form, page, this.form.fields().length).then(({ field }) =>
-      this.stage()?.reveal(page, { rect: this.form.getWidget(field.widgets[0])!.rect }),
-    );
+    const { field } = await addField(this.form, page, this.added().length);
+    this.added.update((fields) => [...fields, field]);
+    this.stage()?.reveal(page, { rect: this.form.getWidget(field.widgets[0])!.rect });
   }
 
-  protected removeLast() {
+  protected async removeLast() {
     const last = this.last();
-    if (last) void this.form.delete(last.ref);
+    if (!last) return;
+    await this.form.delete(last.ref);
+    this.added.update((fields) => fields.slice(0, -1));
   }
 }

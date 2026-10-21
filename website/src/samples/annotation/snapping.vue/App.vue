@@ -6,7 +6,7 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddRectangles from './AddRectangles.vue';
+import SelectCircle from './SelectCircle.vue';
 import SnapControls from './SnapControls.vue';
 
 import '../snapping.css';
@@ -14,17 +14,17 @@ import '../snapping.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddRectangles />
+      <SelectCircle />
       <SnapControls />
       <Stage class="stage">
         <template #page>

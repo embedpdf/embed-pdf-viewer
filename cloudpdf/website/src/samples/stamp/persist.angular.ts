@@ -28,7 +28,7 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Where the libraries live between visits: this browser's IndexedDB.
 const store = indexedDbByteStore('embedpdf-stamp-example');
@@ -149,7 +149,7 @@ export class Libraries {
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),

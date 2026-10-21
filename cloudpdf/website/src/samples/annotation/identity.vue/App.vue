@@ -6,7 +6,6 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
-import AddNote from './AddNote.vue';
 import Authors from './Authors.vue';
 import Toolbar from './Toolbar.vue';
 
@@ -15,7 +14,7 @@ import '../identity.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
@@ -23,11 +22,10 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: ebook }]"
+    :initial-documents="[{ source: review }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddNote />
       <Toolbar />
       <div class="viewer">
         <Stage class="stage">

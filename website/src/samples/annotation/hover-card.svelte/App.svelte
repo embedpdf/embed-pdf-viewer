@@ -5,7 +5,6 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { localEngine } from '@embedpdf/engine';
-  import AddAnnotations from './AddAnnotations.svelte';
   import HoverCard from './HoverCard.svelte';
 
   import '../hover-card.css';
@@ -13,9 +12,9 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const review = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-review.pdf');
+    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
@@ -23,13 +22,12 @@
   {engine}
   {plugins}
   identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  initialDocuments={[{ source: ebook }]}
+  initialDocuments={[{ source: review }]}
 >
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddAnnotations />
     <p class="hint">Point at a note or the green rectangle</p>
     <Stage class="stage">
       <RenderLayer />

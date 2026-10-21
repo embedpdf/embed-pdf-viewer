@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -24,13 +24,14 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// On the cover: the characters of the title's first line.
-const FIRST_LINE = { start: 10, count: 17 };
+// On page 2: the characters of the sentence in its “Your turn” box, and where it is.
+const SENTENCE = { start: 605, count: 44 };
+const SENTENCE_BOX = { x: 68, y: 446, width: 256, height: 16 };
 
 const MARKUP = [
   { tool: 'highlight', label: 'Highlight' },
@@ -44,13 +45,16 @@ function MarkupToolbar() {
   const annotation = useAnnotation();
   const selection = useSelection();
   const { hasSelection } = useSelectionState();
-  const cover = usePageList()[0]?.ref;
+  const stage = useStage();
+  const page = usePageList()[1]?.ref;
   const [status, setStatus] = useState('');
 
-  // On load: the title's first line is selected, ready to mark.
+  // On load: the sentence is selected, ready to mark, and in view.
   useEffect(() => {
-    if (cover) selection.select({ page: cover, ...FIRST_LINE });
-  }, [selection, cover]);
+    if (!page) return;
+    selection.select({ page, ...SENTENCE });
+    stage.reveal(page, { rect: SENTENCE_BOX });
+  }, [selection, stage, page]);
 
   const mark = async (tool: string, label: string) => {
     const { annotations } = await annotation.createFromSelection(tool);
@@ -80,7 +84,7 @@ function MarkupToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <MarkupToolbar />
         <Stage className="stage">

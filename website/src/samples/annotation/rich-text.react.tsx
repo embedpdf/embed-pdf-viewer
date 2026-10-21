@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -18,46 +18,26 @@ import './rich-text.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// On load: a text box born with formatting, selected. Runs change the body only where they differ.
-function AddTextBox() {
+// On load: the document's rich text box, selected.
+function SelectRichText() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(
-      cover,
-      {
-        subtype: 'free-text',
-        box: { x: 106, y: 570, width: 380, height: 60 },
-        interiorColor: '#fffbe6',
-        richText: {
-          body: { family: 'Helvetica', size: 16, color: '#1a2748' },
-          paragraphs: [
-            {
-              runs: [
-                { text: 'Double-click me, select a word, then make it ' },
-                { text: 'bold', style: { weight: 700 } },
-                { text: ' or ' },
-                { text: 'red', style: { color: '#c00000' } },
-                { text: '.' },
-              ],
-            },
-          ],
-        },
-      },
-      undefined,
-      { select: true },
-    );
-  }, [annotation, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const richText = annotation.list().find((each) => each.nm === 'rich-text');
+    if (!richText) return;
+    annotation.selection.set([richText.ref]);
+    stage.reveal(richText.page, { rect: richText.rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
@@ -109,9 +89,9 @@ function RichTextToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddTextBox />
+        <SelectRichText />
         <RichTextToolbar />
         <Stage className="stage">
           {() => (

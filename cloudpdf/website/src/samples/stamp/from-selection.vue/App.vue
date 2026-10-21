@@ -8,8 +8,8 @@ import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { stampPlugin } from '@embedpdf/vue/stamp';
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
-import DrawSeal from './DrawSeal.vue';
 import MakeStamp from './MakeStamp.vue';
+import SelectSeal from './SelectSeal.vue';
 
 import '../from-selection.css';
 
@@ -23,14 +23,14 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <DrawSeal />
+      <SelectSeal />
       <MakeStamp />
       <Stage class="stage">
         <template #page>

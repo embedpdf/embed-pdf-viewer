@@ -20,7 +20,7 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A signature as a pen would draw it: two strokes, in points.
 const loop = Array.from({ length: 48 }, (_, i) => ({
@@ -136,7 +136,7 @@ export class Marks {
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),

@@ -22,11 +22,9 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const MY_STAMPS = 'my-stamps';
-// An empty corner of the cover, in page coordinates.
-const CORNER = { x: 70, y: 600, width: 190, height: 64 };
 
 @Component({
   selector: 'button[demoMyStamp]',
@@ -122,7 +120,7 @@ export class MakeStamp {
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -150,42 +148,22 @@ export class MakeStamp {
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
   private readonly stage = viewChild(EpdfStage);
-  private drawn = false;
+  private done = false;
 
   constructor() {
-    // On load: a framed text stamp in the cover's empty corner, both parts selected, scrolled
-    // into view.
+    // On load: the document's frame and word, both selected, scrolled into view.
     effect(() => {
       const stage = this.stage();
-      if (!stage || this.annotation.status() !== 'ready' || this.drawn) return;
-      this.drawn = true;
-      untracked(() => this.drawSeal(stage));
-    });
-  }
-
-  private drawSeal(stage: EpdfStage) {
-    void Promise.all([
-      this.annotation.create(0, {
-        subtype: 'square',
-        box: CORNER,
-        color: '#c4262e',
-        strokeWidth: 4,
-      }),
-      this.annotation.create(0, {
-        subtype: 'free-text',
-        intent: 'free-text',
-        box: CORNER,
-        contents: 'CHECKED',
-        fontFamily: 'helvetica-bold',
-        fontSize: 30,
-        textAlign: 'center',
-        verticalAlign: 'middle',
-        fontColor: '#c4262e',
-        strokeWidth: 0,
-      }),
-    ]).then((created) => {
-      this.annotation.selection.set(created.map((made) => made.annotation.ref));
-      stage.reveal(0, { rect: CORNER });
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
+      untracked(() => {
+        const found = this.annotation
+          .list()
+          .filter((each) => each.nm === 'checked-frame' || each.nm === 'checked-text');
+        if (found.length === 0) return;
+        this.annotation.selection.set(found.map((each) => each.ref));
+        stage.reveal(found[0].page, { rect: found[0].rect });
+      });
     });
   }
 }

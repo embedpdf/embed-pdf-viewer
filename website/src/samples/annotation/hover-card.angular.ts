@@ -1,12 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, inject, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -15,9 +8,9 @@ import { EpdfAnchored } from '@embedpdf/angular/anchored';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A card next to the annotation under the pointer: who wrote it, and what.
@@ -60,7 +53,7 @@ export class HoverCard {
       {
         engine: () => localEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: ebook }],
+        initialDocuments: [{ source: review }],
       },
       withStage(),
       withRender(),
@@ -86,38 +79,4 @@ export class HoverCard {
     <ng-template #loading><p class="loading">Loading…</p></ng-template>
   `,
 })
-export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
-
-  constructor() {
-    // On load: two notes and a rectangle on the cover, each with a comment.
-    effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      untracked(() => {
-        void this.annotation.create(cover, {
-          subtype: 'text',
-          rect: { x: 470, y: 232, width: 20, height: 20 },
-          contents: 'Can we shorten the title?',
-          color: '#facc15',
-        });
-        void this.annotation.create(cover, {
-          subtype: 'text',
-          rect: { x: 280, y: 520, width: 20, height: 20 },
-          contents: 'Add the co-author',
-          color: '#facc15',
-        });
-        void this.annotation.create(cover, {
-          subtype: 'square',
-          box: { x: 96, y: 376, width: 360, height: 118 },
-          contents: 'This subtitle reads well',
-          color: '#30a46c',
-          strokeWidth: 3,
-        });
-      });
-    });
-  }
-}
+export class App {}

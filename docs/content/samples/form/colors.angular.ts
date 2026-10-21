@@ -8,17 +8,17 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
-import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
+import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source forms]
+const forms = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -33,7 +33,7 @@ const COLORS = [
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfFormLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: forms }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -90,24 +90,16 @@ export class App {
   protected readonly colors = COLORS;
   private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
-  private added = false;
+  private started = false;
 
   constructor() {
-    // The ebook has no form, so this adds one to its last page: fields with no border of their own.
+    // Start on the sign-up page, the form's first fields.
     effect(() => {
-      const page = this.document.pages().at(-1)?.ref;
+      const page = this.document.pages()[1]?.ref;
       const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.added) return;
-      this.added = true;
-      untracked(() => void this.addSignUpForm(page, stage));
+      if (!page || !stage || this.started) return;
+      this.started = true;
+      untracked(() => stage.goToPage(page));
     });
-  }
-
-  private async addSignUpForm(page: PageRef, stage: EpdfStage) {
-    const at = (y: number, width = 240, height = 24) => ({ page, rect: { x: 72, y, width, height } });
-    await this.form.create({ family: 'text', name: 'name', widgets: [{ ...at(540), fontSize: 11 }] });
-    await this.form.create({ family: 'text', name: 'email', widgets: [{ ...at(576), fontSize: 11 }] });
-    await this.form.create({ family: 'checkbox', name: 'updates', widgets: [at(614, 16, 16)] });
-    stage.goToPage(page);
   }
 }

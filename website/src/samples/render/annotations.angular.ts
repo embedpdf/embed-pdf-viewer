@@ -1,27 +1,15 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  signal,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, signal, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-} from '@embedpdf/angular/annotation';
+import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 type Painter = 'picture' | 'layer';
@@ -31,7 +19,7 @@ type Painter = 'picture' | 'layer';
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfAnnotationLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -84,28 +72,5 @@ type Painter = 'picture' | 'layer';
   `,
 })
 export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
   protected readonly painter = signal<Painter>('picture');
-
-  constructor() {
-    // A rectangle on the first page, made on load so there's an annotation to show.
-    effect(() => {
-      const firstPage = this.document.pages()[0]?.ref;
-      if (!firstPage || this.added) return;
-      this.added = true;
-      untracked(
-        () =>
-          void this.annotation.create(firstPage, {
-            subtype: 'square',
-            box: { x: 72, y: 96, width: 300, height: 140 },
-            color: '#e11d48',
-            interiorColor: '#ffe4e6',
-            opacity: 0.7,
-            strokeWidth: 3,
-          }),
-      );
-    });
-  }
 }

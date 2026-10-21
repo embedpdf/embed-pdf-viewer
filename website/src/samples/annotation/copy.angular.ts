@@ -11,16 +11,16 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
-import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
+import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 /**
@@ -87,7 +87,7 @@ export class CopyButton {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -113,43 +113,21 @@ export class CopyButton {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly pages = inject(EpdfDocument).pages;
   private readonly stage = viewChild(EpdfStage);
-  private added = false;
+  private done = false;
 
   constructor() {
-    // On load: a rectangle and a text box on the cover, the rectangle selected and in view.
+    // On load: the document's square, selected, ready to copy.
     effect(() => {
       const stage = this.stage();
-      const cover = this.pages()[0]?.ref;
-      if (!stage || !cover || this.annotation.status() !== 'ready' || this.added) return;
-      this.added = true;
-      untracked(() => this.addAnnotations(stage, cover));
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
+      untracked(() => {
+        const square = this.annotation.list().find((each) => each.nm === 'square');
+        if (!square) return;
+        this.annotation.selection.set([square.ref]);
+        stage.reveal(square.page, { rect: square.rect });
+      });
     });
-  }
-
-  private addAnnotations(stage: EpdfStage, cover: PageRef) {
-    void this.annotation.create(cover, {
-      subtype: 'free-text',
-      box: { x: 300, y: 512, width: 230, height: 40 },
-      contents: 'Copy me too',
-      fontSize: 16,
-      fontColor: '#1a2748',
-      interiorColor: '#fffbe6',
-    });
-    void this.annotation
-      .create(
-        cover,
-        {
-          subtype: 'square',
-          box: { x: 96, y: 506, width: 178, height: 54 },
-          color: '#e5484d',
-          interiorColor: '#ffe4e1',
-          strokeWidth: 3,
-        },
-        undefined,
-        { select: true },
-      )
-      .then(({ annotation: made }) => stage.reveal(cover, { rect: made.rect }));
   }
 }

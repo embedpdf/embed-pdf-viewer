@@ -8,7 +8,6 @@ import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import type { AnnotationRenderer } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddNotes from './AddNotes.vue';
 import CommentBubble from './CommentBubble.vue';
 import TurnButton from './TurnButton.vue';
 
@@ -17,9 +16,9 @@ import '../renderers.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Defined once, here: the layer registers each entry.
@@ -36,11 +35,10 @@ const mine = ref(true);
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: ebook }]"
+    :initial-documents="[{ source: review }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddNotes />
       <div class="toolbar">
         <div class="segmented" role="group" aria-label="Look">
           <button type="button" :aria-pressed="mine" @click="mine = true">Your look</button>

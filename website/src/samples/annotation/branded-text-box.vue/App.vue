@@ -7,18 +7,18 @@ import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import type { AnnotationRenderer } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddTextBox from './AddTextBox.vue';
 import BrandedTextBox from './BrandedTextBox.vue';
 import FormatButtons from './FormatButtons.vue';
+import SelectTextBox from './SelectTextBox.vue';
 
 import '../branded-text-box.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const RENDERERS: AnnotationRenderer[] = [
@@ -27,10 +27,10 @@ const RENDERERS: AnnotationRenderer[] = [
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddTextBox />
+      <SelectTextBox />
       <FormatButtons />
       <Stage class="stage">
         <template #page>

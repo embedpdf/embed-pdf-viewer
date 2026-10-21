@@ -19,46 +19,31 @@ import './data.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source forms]
+const forms = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// How the new fields look: part of the PDF, like the rest of the page.
-const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
-
-/** The ebook has no form, so this adds one to its last page, fills it in, and goes there. */
-function useSignUpForm() {
+/** Start on the sign-up page, filled in. */
+function useStartOnSignUp() {
   const form = useForm();
   const stage = useStage();
   const status = useFormState((state) => state.status);
-  const page = usePageList().at(-1)?.ref;
-  const added = useRef(false);
+  const page = usePageList()[1]?.ref;
+  const started = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || added.current) return;
-    added.current = true;
-    const at = (y: number, width = 240, height = 24) => ({ page, rect: { x: 72, y, width, height } });
-    void (async () => {
-      await form.create({ family: 'text', name: 'name', widgets: [{ ...at(540), ...look }] });
-      await form.create({ family: 'text', name: 'email', widgets: [{ ...at(576), ...look }] });
-      await form.create({
-        family: 'combobox',
-        name: 'framework',
-        options: ['React', 'Vue', 'Svelte', 'Angular'].map((label) => ({ label, value: label })),
-        widgets: [{ ...at(612, 160), ...look }],
-      });
-      await form.create({ family: 'checkbox', name: 'updates', widgets: [{ ...at(650, 16, 16), ...look }] });
-      await form.importValues({ name: 'Ada Lovelace', email: 'ada@example.com', framework: 'Svelte' });
-      stage.goToPage(page);
-    })();
+    if (status !== 'ready' || !page || started.current) return;
+    started.current = true;
+    stage.goToPage(page);
+    void form.importValues({ name: 'Ada Lovelace', email: 'ada@example.com', framework: 'Svelte' });
   }, [form, stage, status, page]);
 }
 
 function DataToolbar() {
-  useSignUpForm();
+  useStartOnSignUp();
   const form = useForm();
   const [bundle, setBundle] = useState<FormBundle | null>(null);
   const [result, setResult] = useState('');
@@ -116,7 +101,7 @@ function Values() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <DataToolbar />
         <div className="viewer">

@@ -1,19 +1,10 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  signal,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, signal, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
-  EpdfAnnotation,
   EpdfAnnotationLayer,
   EpdfAnnotationTemplate,
   withAnnotation,
@@ -21,10 +12,10 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source review]
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -43,7 +34,7 @@ const ebook = async (): Promise<OpenInput> => {
       {
         engine: () => localEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: ebook }],
+        initialDocuments: [{ source: review }],
       },
       withStage(),
       withRender(),
@@ -89,10 +80,6 @@ const ebook = async (): Promise<OpenInput> => {
   `,
 })
 export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
-
   protected readonly mine = signal(true);
   // Kept in a field, the same function on every page: the layer registers each look once.
   protected readonly isNote = (annotation: Annotation) => annotation.subtype === 'text';
@@ -102,28 +89,5 @@ export class App {
       .split(' ')
       .map((word) => word[0])
       .join('');
-  }
-
-  constructor() {
-    // On load: two notes on the cover, 24 points square: 32 pixels at 100%.
-    effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      untracked(() => {
-        void this.annotation.create(cover, {
-          subtype: 'text',
-          rect: { x: 470, y: 228, width: 24, height: 24 },
-          contents: 'Can we shorten the title?',
-          color: '#facc15',
-        });
-        void this.annotation.create(cover, {
-          subtype: 'text',
-          rect: { x: 280, y: 516, width: 24, height: 24 },
-          contents: 'Add the co-author',
-          color: '#facc15',
-        });
-      });
-    });
   }
 }

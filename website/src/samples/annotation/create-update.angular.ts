@@ -2,8 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
+  input,
   signal,
   ViewEncapsulation,
 } from '@angular/core';
@@ -20,12 +20,15 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// Create a rectangle, then change, move and delete it, all from code.
+/**
+ * Create a rectangle, then change, move and delete it, all from code. Next to
+ * `<epdf-stage #stage="epdfStage">`: `<demo-square-controls [stage]="stage" />`.
+ */
 @Component({
   selector: 'demo-square-controls',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,6 +55,8 @@ const ebook = async (): Promise<OpenInput> => {
   `,
 })
 export class SquareControls {
+  readonly stage = input.required<EpdfStage>();
+
   private readonly annotation = inject(EpdfAnnotation);
   private readonly document = inject(EpdfDocument);
   private readonly squareRef = signal<AnnotationRef | null>(null);
@@ -76,27 +81,18 @@ export class SquareControls {
     if (!square) return 'No rectangle';
     return this.annotation.isPending(square.ref) ? 'Saving…' : 'Saved';
   });
-  private started = false;
-
-  constructor() {
-    // On load: one rectangle, to change.
-    effect(() => {
-      if (this.annotation.status() !== 'ready' || this.started) return;
-      this.started = true;
-      void this.add();
-    });
-  }
 
   protected async add() {
-    const cover = this.document.pages()[0]?.ref;
-    if (!cover) return;
-    const { annotation: square } = await this.annotation.create(cover, {
+    const page = this.document.pages()[4]?.ref; // the document's empty last page
+    if (!page) return;
+    const { annotation: square } = await this.annotation.create(page, {
       subtype: 'square',
       box: { x: 72, y: 592, width: 200, height: 100 },
       color: '#0078ff',
       strokeWidth: 3,
     });
     this.squareRef.set(square.ref);
+    this.stage().reveal(page, { rect: square.rect });
   }
 
   protected makeRed() {
@@ -136,7 +132,7 @@ export class SquareControls {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -148,8 +144,8 @@ export class SquareControls {
   encapsulation: ViewEncapsulation.None,
   template: `
     <ng-container *epdfDocumentGate="let document; fallback: loading">
-      <demo-square-controls />
-      <epdf-stage class="stage">
+      <demo-square-controls [stage]="stage" />
+      <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
           <epdf-annotation-layer />

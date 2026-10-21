@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -20,48 +20,26 @@ import './style-panel.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// On load: a rectangle (selected), an arrow and a text box on the cover.
-function AddAnnotations() {
+// On load: the document's square, selected, so the panel shows its style.
+function SelectSquare() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'line',
-      linePoints: { start: { x: 520, y: 120 }, end: { x: 470, y: 230 } },
-      lineEndings: { start: 'none', end: 'closed-arrow' },
-      color: '#1a2748',
-      strokeWidth: 3,
-    });
-    void annotation.create(cover, {
-      subtype: 'free-text',
-      box: { x: 300, y: 512, width: 230, height: 40 },
-      contents: 'Ready for review',
-      fontSize: 16,
-      fontColor: '#1a2748',
-    });
-    void annotation.create(
-      cover,
-      {
-        subtype: 'square',
-        box: { x: 96, y: 506, width: 178, height: 54 },
-        color: '#e5484d',
-        interiorColor: '#ffe4e1',
-        strokeWidth: 3,
-      },
-      undefined,
-      { select: true },
-    );
-  }, [annotation, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const square = annotation.list().find((each) => each.nm === 'square');
+    if (!square) return;
+    annotation.selection.set([square.ref]);
+    stage.reveal(square.page, { rect: square.rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
@@ -245,9 +223,9 @@ function StylePanel() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddAnnotations />
+        <SelectSquare />
         <div className="viewer">
           <Stage className="stage">
             {() => (

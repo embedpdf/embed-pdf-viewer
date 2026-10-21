@@ -34,45 +34,30 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source review]
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 const MY_STAMPS = 'my-stamps';
-// An empty corner of the cover, in page coordinates.
-const CORNER = { x: 70, y: 600, width: 190, height: 64 };
-
-// On load: a framed text stamp in the cover's empty corner, both parts selected, scrolled into view.
-function DrawSeal() {
+// On load: the document's frame and word, both selected, scrolled into view.
+function SelectSeal() {
   const annotation = useAnnotation();
   const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const drawn = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || drawn.current) return;
-    drawn.current = true;
-    void Promise.all([
-      annotation.create(0, { subtype: 'square', box: CORNER, color: '#c4262e', strokeWidth: 4 }),
-      annotation.create(0, {
-        subtype: 'free-text',
-        intent: 'free-text',
-        box: CORNER,
-        contents: 'CHECKED',
-        fontFamily: 'helvetica-bold',
-        fontSize: 30,
-        textAlign: 'center',
-        verticalAlign: 'middle',
-        fontColor: '#c4262e',
-        strokeWidth: 0,
-      }),
-    ]).then((created) => {
-      annotation.selection.set(created.map((made) => made.annotation.ref));
-      stage.reveal(0, { rect: CORNER });
-    });
+    if (!ready || done.current) return;
+    done.current = true;
+    const found = annotation
+      .list()
+      .filter((each) => each.nm === 'checked-frame' || each.nm === 'checked-text');
+    if (found.length === 0) return;
+    annotation.selection.set(found.map((each) => each.ref));
+    stage.reveal(found[0].page, { rect: found[0].rect });
   }, [annotation, stage, ready]);
 
   return null;
@@ -138,9 +123,9 @@ function MakeStamp() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <DrawSeal />
+        <SelectSeal />
         <MakeStamp />
         <Stage className="stage">
           {() => (

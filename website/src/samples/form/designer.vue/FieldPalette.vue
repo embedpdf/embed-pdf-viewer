@@ -14,7 +14,7 @@ const FIELD_TOOLS = [
   ['form-signature', 'Signature'],
 ] as const;
 
-/** Start on the ebook's last page, which has room for a form, with the text tool picked. */
+/** Start on the form's last page, which is empty, with the text tool picked. */
 function useStartDesigning() {
   const interaction = useInteraction();
   const stage = useStage();
@@ -74,8 +74,6 @@ const filling = computed(() => activeToolId.value === 'pointer');
     >
       {{ label }}
     </button>
-    <output class="readout">
-      {{ fields.length === 0 ? 'Click the page to place a field' : `${fields.length} fields` }}
-    </output>
+    <output class="readout">{{ fields.length }} fields: click the page to place another</output>
   </div>
 </template>

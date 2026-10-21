@@ -6,7 +6,6 @@
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { localEngine } from '@embedpdf/engine';
   import ActivityLog from './ActivityLog.svelte';
-  import AddRectangle from './AddRectangle.svelte';
   import Toolbar from './Toolbar.svelte';
 
   import '../events.css';
@@ -14,10 +13,10 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source review]
+  const review = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-review.pdf');
+    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
@@ -26,13 +25,12 @@
   {engine}
   {plugins}
   identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  initialDocuments={[{ source: ebook }]}
+  initialDocuments={[{ source: review }]}
 >
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddRectangle />
     <Toolbar />
     <div class="viewer">
       <Stage class="stage">

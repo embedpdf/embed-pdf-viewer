@@ -1,12 +1,4 @@
-import { useEffect, useRef } from 'react';
-import {
-  Viewer,
-  DocumentGate,
-  saveFile,
-  useDocument,
-  useDocuments,
-  usePageList,
-} from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate, saveFile, useDocument, useDocuments } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -15,12 +7,7 @@ import {
   useInteraction,
   useInteractionState,
 } from '@embedpdf/react/interaction';
-import {
-  AnnotationLayer,
-  annotationPlugin,
-  useAnnotation,
-  useAnnotationState,
-} from '@embedpdf/react/annotation';
+import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
 
 import './download.css';
@@ -28,31 +15,10 @@ import './download.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
-
-// On load: a rectangle on the cover, so there's a change to save.
-function AddRectangle() {
-  const annotation = useAnnotation();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
-
-  useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'square',
-      box: { x: 96, y: 506, width: 178, height: 54 },
-      color: '#e5484d',
-      strokeWidth: 3,
-    });
-  }, [annotation, ready, cover]);
-
-  return null;
-}
 
 // The annotations are part of the document: the downloaded PDF has every one.
 function SaveBar() {
@@ -74,7 +40,7 @@ function SaveBar() {
       <button
         type="button"
         className="button"
-        onClick={async () => saveFile(await documents.download(), 'ebook-annotated.pdf')}
+        onClick={async () => saveFile(await documents.download(), 'annotated.pdf')}
       >
         Download the PDF
       </button>
@@ -86,9 +52,8 @@ function SaveBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddRectangle />
         <SaveBar />
         <Stage className="stage">
           {() => (

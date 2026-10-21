@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -24,7 +24,7 @@ const plugins = [
   signaturePlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const APPROVAL = toFieldRef('approval');
 
@@ -34,7 +34,6 @@ function FillBar() {
   const stage = useStage();
   const signature = useSignature();
   const status = useFormState((state) => state.status);
-  const page = usePageList().at(-1)?.ref;
   const [assetId, setAssetId] = useState<string | null>(null);
   const [drawn, setDrawn] = useState(false);
   const done = useRef(false);
@@ -42,17 +41,14 @@ function FillBar() {
   useSignatureEvent((plugin) => plugin.onFilled, () => setDrawn(true));
   useSignatureEvent((plugin) => plugin.onCleared, () => setDrawn(false));
 
-  // On load: a signature field on the last page, a typed signature, drawn into the field.
+  // On load: the invoice, with a typed signature drawn into its signature field.
   useEffect(() => {
-    if (status !== 'ready' || !page || done.current) return;
+    if (status !== 'ready' || done.current) return;
     done.current = true;
     void (async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-      });
-      stage.goToPage(page);
+      // Bring the form's signature field into view, on the invoice.
+      const [widget] = form.getWidgets(APPROVAL);
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       const { asset } = await stamp.createAsset({
         libraryId: library.id,
@@ -63,7 +59,7 @@ function FillBar() {
       setAssetId(asset.id);
       await signature.fillField(APPROVAL, { assetId: asset.id });
     })();
-  }, [form, stamp, stage, signature, status, page]);
+  }, [form, stamp, stage, signature, status]);
 
   return (
     <div className="toolbar">
@@ -92,7 +88,7 @@ function FillBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <FillBar />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

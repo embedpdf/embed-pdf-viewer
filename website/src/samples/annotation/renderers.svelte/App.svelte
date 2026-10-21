@@ -9,7 +9,6 @@
     type AnnotationRenderer,
   } from '@embedpdf/svelte/annotation';
   import { localEngine } from '@embedpdf/engine';
-  import AddNotes from './AddNotes.svelte';
   import CommentBubble from './CommentBubble.svelte';
   import TurnButton from './TurnButton.svelte';
 
@@ -18,9 +17,9 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const review = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-review.pdf');
+    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 
   // Defined once, in the module: the layer registers each entry.
@@ -38,13 +37,12 @@
   {engine}
   {plugins}
   identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  initialDocuments={[{ source: ebook }]}
+  initialDocuments={[{ source: review }]}
 >
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddNotes />
     <div class="toolbar">
       <div class="segmented" role="group" aria-label="Look">
         <button type="button" aria-pressed={mine} onclick={() => (mine = true)}>Your look</button>

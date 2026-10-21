@@ -22,16 +22,15 @@ const engine = localEngine();
 const assetEngine = engine; // stamp libraries are PDFs; they open here too
 // [!/asset-engine]
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source review]
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// The middle of a Letter page, and the cover's empty corner, in page coordinates.
+// The middle of a Letter page, in page coordinates.
 const MIDDLE = { x: 306, y: 396 };
-const CORNER = { x: 60, y: 590, width: 220, height: 180 };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<demo-place-stamps [stage]="stage" />`. */
 @Component({
@@ -63,29 +62,14 @@ export class PlaceStamps {
   );
   protected readonly draft = computed(() => this.assets().find((asset) => asset.name === 'Draft'));
   protected readonly stamps = this.annotation.watch({ subtype: 'stamp' });
-  private started = false;
+  private loaded = false;
 
   constructor() {
-    // On load: the standard stamps, and "Approved" in the cover's empty corner, scrolled into view.
+    // On load: the standard stamps, ready to place.
     effect(() => {
-      if (this.annotation.status() !== 'ready' || this.started) return;
-      this.started = true;
-      const stage = this.stage();
-      void loadDefaultLibrary('en')
-        .then((bytes) => this.stamp.importLibrary(bytes))
-        .then(({ library }) => {
-          const asset = this.stamp
-            .listAssets({ libraryId: library.id })
-            .find((candidate) => candidate.name === 'Approved');
-          if (!asset) return;
-          return this.stamp.placeAsset(asset.id, {
-            page: 0,
-            center: { x: 170, y: 680 },
-            targetWidth: 180,
-            rotation: -8,
-          });
-        })
-        .then(() => stage.reveal(0, { rect: CORNER }));
+      if (this.annotation.status() !== 'ready' || this.loaded) return;
+      this.loaded = true;
+      void loadDefaultLibrary('en').then((bytes) => this.stamp.importLibrary(bytes));
     });
   }
 
@@ -119,7 +103,7 @@ export class PlaceStamps {
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),

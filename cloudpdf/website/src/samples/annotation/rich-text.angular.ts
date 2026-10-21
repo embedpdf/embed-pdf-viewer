@@ -5,9 +5,10 @@ import {
   effect,
   inject,
   untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -15,7 +16,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 type Format = 'bold' | 'italic' | 'underline';
 const FORMATS: readonly Format[] = ['bold', 'italic', 'underline'];
@@ -85,7 +86,7 @@ export class RichTextToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -111,40 +112,20 @@ export class RichTextToolbar {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   constructor() {
-    // On load: a text box born with formatting, selected. Runs change the body only where they differ.
+    // On load: the document's rich text box, selected.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
       untracked(() => {
-        void this.annotation.create(
-          cover,
-          {
-            subtype: 'free-text',
-            box: { x: 106, y: 570, width: 380, height: 60 },
-            interiorColor: '#fffbe6',
-            richText: {
-              body: { family: 'Helvetica', size: 16, color: '#1a2748' },
-              paragraphs: [
-                {
-                  runs: [
-                    { text: 'Double-click me, select a word, then make it ' },
-                    { text: 'bold', style: { weight: 700 } },
-                    { text: ' or ' },
-                    { text: 'red', style: { color: '#c00000' } },
-                    { text: '.' },
-                  ],
-                },
-              ],
-            },
-          },
-          undefined,
-          { select: true },
-        );
+        const richText = this.annotation.list().find((each) => each.nm === 'rich-text');
+        if (!richText) return;
+        this.annotation.selection.set([richText.ref]);
+        stage.reveal(richText.page, { rect: richText.rect });
       });
     });
   }

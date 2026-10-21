@@ -1,25 +1,13 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, inject, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-  withFilePicker,
-} from '@embedpdf/angular/annotation';
+import { EpdfAnnotationLayer, withAnnotation, withFilePicker } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -56,6 +44,11 @@ const TOOLS = [
 export class Toolbar {
   protected readonly interaction = inject(EpdfInteraction);
   protected readonly tools = TOOLS;
+
+  constructor() {
+    // On load: the stamp tool is active.
+    this.interaction.activateTool('stamp');
+  }
 }
 
 @Component({
@@ -70,7 +63,7 @@ export class Toolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -96,29 +89,4 @@ export class Toolbar {
     <ng-template #loading><p class="loading">Loading…</p></ng-template>
   `,
 })
-export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly interaction = inject(EpdfInteraction);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
-
-  constructor() {
-    // On load: a text file pinned to the cover, and the stamp tool active.
-    effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      untracked(() => {
-        const notes = new File(['Questions for the next review.'], 'notes.txt', {
-          type: 'text/plain',
-        });
-        void this.annotation.create(
-          cover,
-          { subtype: 'file-attachment', rect: { x: 470, y: 232, width: 20, height: 20 } },
-          { file: notes },
-        );
-        this.interaction.activateTool('stamp');
-      });
-    });
-  }
-}
+export class App {}

@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forms, an EmbedPDF demo document</title>
+<link rel="stylesheet" href="../shared/document.css">
+</head>
+<body>
+<section class="page" id="page-1" style="display:flex; flex-direction:column; padding:56px 64px 52px; background:#FFFFFF; position:relative; overflow:hidden;">
+  <div style="flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:24px;">
+    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF" style="height:40px; display:block;">
+    <div style="font:700 13px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-fg-muted); text-align:right; padding-top:6px;">Open source<br>PDF solutions</div>
+  </div>
+  <div style="position:absolute; top:196px; right:64px; width:95px; height:95px; background-image:radial-gradient(circle, #ABC9FD 2.5px, transparent 2.7px); background-size:25px 25px; background-position:-10px -10px;"></div>
+
+  <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-mist-blue); border-radius:999px; padding:9px 18px 9px 14px; margin-top:56px;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h1a3 3 0 0 1 3 3 3 3 0 0 1 3-3h1"></path><path d="M13 20h-1a3 3 0 0 1-3-3 3 3 0 0 1-3 3H5"></path><path d="M5 16H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h1"></path><path d="M13 8h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-7"></path><path d="M9 7v10"></path></svg>
+    <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-brand-blue);">Forms demo</div>
+  </div>
+  <h1 style="font:800 64px/1.08 var(--font-display); letter-spacing:-0.028em; color:var(--color-deep-navy); margin:20px 0 0;">Fill it in,<span style="display:block; color:var(--color-brand-blue);">right on the page.</span></h1>
+  <div style="flex:none; width:114px; height:10px; border-radius:5px; background:var(--color-blue-600); margin-top:22px;"></div>
+  <p style="font:400 20px/1.45 var(--font-body); color:var(--color-fg-muted); margin:22px 0 0; max-width:560px; text-wrap:pretty;">A demo form for EmbedPDF. Every box in it is a field: type in it, tick it, or pick from it. What you enter is saved into the PDF.</p>
+
+  <div style="flex:none; font:700 13px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-brand-blue); margin-top:40px;">Every kind of field</div>
+  <div style="flex:none; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; margin-top:14px;">
+    <a href="#page-2" style="display:flex; flex-direction:column; gap:14px; background:#FFFFFF; border:1px solid var(--color-brand-blue); border-radius:18px; padding:18px; color:var(--color-deep-navy); box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 16px rgba(10,26,77,0.06);">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="width:38px; height:38px; border-radius:11px; background:var(--color-mist-blue); display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h1a3 3 0 0 1 3 3 3 3 0 0 1 3-3h1"></path><path d="M13 20h-1a3 3 0 0 1-3-3 3 3 0 0 1-3 3H5"></path><path d="M5 16H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h1"></path><path d="M13 8h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-7"></path><path d="M9 7v10"></path></svg>
+        </div>
+        <div style="font:500 12px/1 var(--font-mono); color:var(--color-brand-blue);">text</div>
+      </div>
+      <div>
+        <div style="font:700 15px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-brand-blue);">Type<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+        <div style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:4px;">Text boxes for a name, an email, a company.</div>
+      </div>
+    </a>
+    <a href="#page-3" style="display:flex; flex-direction:column; gap:14px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:18px; padding:18px; color:var(--color-deep-navy); box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 16px rgba(10,26,77,0.06);">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="width:38px; height:38px; border-radius:11px; background:var(--color-mist-blue); display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="m9 12 2 2 4-4"></path></svg>
+        </div>
+        <div style="font:500 12px/1 var(--font-mono); color:var(--color-brand-blue);">radio · listbox</div>
+      </div>
+      <div>
+        <div style="font:700 15px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-brand-blue);">Pick<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+        <div style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:4px;">One plan from two, or any topics from a list.</div>
+      </div>
+    </a>
+    <a href="#page-4" style="display:flex; flex-direction:column; gap:14px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:18px; padding:18px; color:var(--color-deep-navy); box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 16px rgba(10,26,77,0.06);">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="width:38px; height:38px; border-radius:11px; background:var(--color-mist-blue); display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284"></path><path d="M3 21h18"></path></svg>
+        </div>
+        <div style="font:500 12px/1 var(--font-mono); color:var(--color-brand-blue);">signature</div>
+      </div>
+      <div>
+        <div style="font:700 15px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-brand-blue);">Sign<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+        <div style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:4px;">An invoice that adds itself up, then a signature.</div>
+      </div>
+    </a>
+  </div>
+
+  <div style="flex:none; font:700 13px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-brand-blue); margin-top:40px;">Contents</div>
+  <div style="flex:none; display:flex; flex-direction:column; margin-top:10px; border-top:1px solid var(--color-border);">
+    <a href="#page-2" style="display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:baseline; gap:12px; padding:14px 0; border-bottom:1px solid var(--color-border-soft); color:var(--color-deep-navy);">
+      <span style="font:800 15px/1.2 var(--font-display); color:var(--color-sky-blue);">02</span>
+      <span><span style="font:700 17px/1.3 var(--font-display); letter-spacing:-0.01em; color:var(--color-deep-navy);">Sign up</span><span style="font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">&nbsp;&nbsp;Text boxes, a dropdown, checkboxes.</span></span>
+      <span style="font:600 14px/1.2 var(--font-display); color:var(--color-brand-blue);">Page 2<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+    </a>
+    <a href="#page-3" style="display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:baseline; gap:12px; padding:14px 0; border-bottom:1px solid var(--color-border-soft); color:var(--color-deep-navy);">
+      <span style="font:800 15px/1.2 var(--font-display); color:var(--color-sky-blue);">03</span>
+      <span><span style="font:700 17px/1.3 var(--font-display); letter-spacing:-0.01em; color:var(--color-deep-navy);">Your plan</span><span style="font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">&nbsp;&nbsp;Radio buttons and a list.</span></span>
+      <span style="font:600 14px/1.2 var(--font-display); color:var(--color-brand-blue);">Page 3<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+    </a>
+    <a href="#page-4" style="display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:baseline; gap:12px; padding:14px 0; border-bottom:1px solid var(--color-border-soft); color:var(--color-deep-navy);">
+      <span style="font:800 15px/1.2 var(--font-display); color:var(--color-sky-blue);">04</span>
+      <span><span style="font:700 17px/1.3 var(--font-display); letter-spacing:-0.01em; color:var(--color-deep-navy);">Invoice</span><span style="font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">&nbsp;&nbsp;A total that adds up, and a signature.</span></span>
+      <span style="font:600 14px/1.2 var(--font-display); color:var(--color-brand-blue);">Page 4<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+    </a>
+    <a href="#page-5" style="display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:baseline; gap:12px; padding:14px 0; border-bottom:1px solid var(--color-border-soft); color:var(--color-deep-navy);">
+      <span style="font:800 15px/1.2 var(--font-display); color:var(--color-sky-blue);">05</span>
+      <span><span style="font:700 17px/1.3 var(--font-display); letter-spacing:-0.01em; color:var(--color-deep-navy);">Your turn</span><span style="font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">&nbsp;&nbsp;An empty page for the fields you add.</span></span>
+      <span style="font:600 14px/1.2 var(--font-display); color:var(--color-brand-blue);">Page 5<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+    </a>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:auto; padding-top:14px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+    <span>Built to be filled in with <span style="color:var(--color-brand-blue);">EmbedPDF</span></span>
+    <span style="font:800 15px/1.2 var(--font-display); color:var(--color-deep-navy);">01</span>
+  </div>
+</section>
+
+<section class="page" id="page-2" style="display:flex; flex-direction:column; padding:52px 64px; background:#FFFFFF; position:relative;">
+  <div style="position:absolute; top:104px; right:104px; width:95px; height:95px; background-image:radial-gradient(circle, #ABC9FD 2.5px, transparent 2.7px); background-size:25px 25px; background-position:-10px -10px;"></div>
+
+  <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-mist-blue); border-radius:999px; padding:9px 18px 9px 14px;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-brand-blue);">Step 1 of 3</div>
+  </div>
+  <h2 style="font:800 48px/1.04 var(--font-display); letter-spacing:-0.028em; color:var(--color-deep-navy); margin:18px 0 0;">Sign up<br><span style="color:var(--color-brand-blue);">for updates.</span></h2>
+  <div style="flex:none; width:68px; height:8px; border-radius:4px; background:var(--color-blue-600); margin-top:12px;"></div>
+  <p style="font:400 19px/1.5 var(--font-body); color:var(--color-fg-muted); margin:16px 0 0; max-width:520px; text-wrap:pretty;">Click a box and start typing. Fields marked <span style="color:var(--color-brand-blue); font-weight:600;">*</span> are required.</p>
+
+  <div style="flex:none; display:flex; flex-direction:column; gap:24px; margin-top:30px; padding:28px; border:1px solid var(--color-border-soft); border-radius:20px; background:var(--color-bg-soft);">
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+        <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Full name <span style="color:var(--color-brand-blue);">*</span></span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">name · text</span>
+      </div>
+      <div data-pdf="name" style="height:40px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+    </div>
+    <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px;">
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+          <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Email <span style="color:var(--color-brand-blue);">*</span></span>
+          <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">email · text</span>
+        </div>
+        <div data-pdf="email" style="height:40px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+          <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Company</span>
+          <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">company · text</span>
+        </div>
+        <div data-pdf="company" style="height:40px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+        <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Framework</span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">framework · combobox</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div data-pdf="framework" style="flex:none; width:240px; height:40px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+        <span style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted);">React, Vue, Svelte or Angular.</span>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px; padding-top:20px; border-top:1px solid var(--color-border-soft);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div data-pdf="updates" style="flex:none; width:20px; height:20px; box-sizing:border-box; border:1px solid var(--color-border); border-radius:4px; background:#FFFFFF;"></div>
+        <span style="flex:1; font:400 15px/1.4 var(--font-body); color:var(--color-fg);">Send me product updates, about once a month.</span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">updates · checkbox</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div data-pdf="terms" style="flex:none; width:20px; height:20px; box-sizing:border-box; border:1px solid var(--color-border); border-radius:4px; background:#FFFFFF;"></div>
+        <span style="flex:1; font:400 15px/1.4 var(--font-body); color:var(--color-fg);">I agree to the terms. <span style="color:var(--color-brand-blue); font-weight:600;">*</span></span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">terms · checkbox</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:none; position:relative; display:flex; align-items:center; gap:18px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:20px; padding:16px 24px; margin-top:24px; overflow:hidden;">
+    <div style="flex:none; width:44px; height:44px; border-radius:50%; background:var(--color-mist-blue); display:flex; align-items:center; justify-content:center;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 8h.01"></path><path d="M12 12h.01"></path><path d="M14 8h.01"></path><path d="M16 12h.01"></path><path d="M18 8h.01"></path><path d="M6 8h.01"></path><path d="M7 16h10"></path><path d="M8 12h.01"></path><rect width="20" height="16" x="2" y="4" rx="2"></rect></svg>
+    </div>
+    <div style="max-width:470px;">
+      <div style="font:700 16px/1.3 var(--font-display); color:var(--color-brand-blue);">Tab to the next field.</div>
+      <div style="font:400 14px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Enter confirms a text box. Escape puts back what it had.</div>
+    </div>
+    <div style="position:absolute; right:24px; top:50%; transform:translateY(-50%); width:48px; height:35px; background-image:radial-gradient(circle, #ABC9FD 2px, transparent 2.2px); background-size:13px 13px; background-position:-4.5px -4.5px;"></div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:auto; padding-top:14px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+    <a href="#page-1" style="font:400 14px/1.4 var(--font-body);"><svg class="arrow before" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>Contents</a>
+    <a href="#page-3" style="font:600 14px/1.4 var(--font-display);">Next: your plan<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+    <span style="font:800 15px/1.2 var(--font-display); color:var(--color-deep-navy);">02</span>
+  </div>
+</section>
+
+<section class="page" id="page-3" style="display:flex; flex-direction:column; padding:52px 64px; background:#FFFFFF; position:relative;">
+  <div style="position:absolute; top:104px; right:104px; width:95px; height:95px; background-image:radial-gradient(circle, #ABC9FD 2.5px, transparent 2.7px); background-size:25px 25px; background-position:-10px -10px;"></div>
+
+  <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-mist-blue); border-radius:999px; padding:9px 18px 9px 14px;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 2 2 4-4"></path><path d="m3 7 2 2 4-4"></path><path d="M13 6h8"></path><path d="M13 12h8"></path><path d="M13 18h8"></path></svg>
+    <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-brand-blue);">Step 2 of 3</div>
+  </div>
+  <h2 style="font:800 48px/1.04 var(--font-display); letter-spacing:-0.028em; color:var(--color-deep-navy); margin:18px 0 0;">Pick<br><span style="color:var(--color-brand-blue);">your plan.</span></h2>
+  <div style="flex:none; width:68px; height:8px; border-radius:4px; background:var(--color-blue-600); margin-top:12px;"></div>
+  <p style="font:400 19px/1.5 var(--font-body); color:var(--color-fg-muted); margin:16px 0 0; max-width:520px; text-wrap:pretty;">Radio buttons take one answer. A list can take several.</p>
+
+  <div style="flex:none; display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-top:30px;">
+    <span style="font:700 13px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-brand-blue);">Billing</span>
+    <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">plan · radio</span>
+  </div>
+  <div style="flex:none; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; margin-top:12px;">
+    <div style="display:flex; align-items:flex-start; gap:14px; padding:20px; border:1px solid var(--color-border-soft); border-radius:18px; background:#FFFFFF; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 16px rgba(10,26,77,0.06);">
+      <div data-pdf="plan" data-pdf-value="monthly" style="flex:none; width:20px; height:20px; box-sizing:border-box; border:1px solid var(--color-border); border-radius:50%; background:#FFFFFF; margin-top:2px;"></div>
+      <div style="flex:1; min-width:0;">
+        <div style="font:700 18px/1.3 var(--font-display); letter-spacing:-0.01em; color:var(--color-deep-navy);">Monthly</div>
+        <div style="font:400 14px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:4px;">Pay as you go. Stop any time.</div>
+        <div style="font:500 12px/1 var(--font-mono); color:var(--color-brand-blue); margin-top:14px;">'monthly'</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:14px; padding:20px; border:1px solid var(--color-border-soft); border-radius:18px; background:#FFFFFF; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 16px rgba(10,26,77,0.06);">
+      <div data-pdf="plan" data-pdf-value="yearly" style="flex:none; width:20px; height:20px; box-sizing:border-box; border:1px solid var(--color-border); border-radius:50%; background:#FFFFFF; margin-top:2px;"></div>
+      <div style="flex:1; min-width:0;">
+        <div style="font:700 18px/1.3 var(--font-display); letter-spacing:-0.01em; color:var(--color-deep-navy);">Yearly</div>
+        <div style="font:400 14px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:4px;">One payment, two months free.</div>
+        <div style="font:500 12px/1 var(--font-mono); color:var(--color-brand-blue); margin-top:14px;">'yearly'</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:none; display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-top:30px;">
+    <span style="font:700 13px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-brand-blue);">Topics you care about</span>
+    <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">topics · listbox</span>
+  </div>
+  <div style="flex:none; display:grid; grid-template-columns:240px minmax(0,1fr); gap:24px; align-items:start; margin-top:12px;">
+    <div data-pdf="topics" style="height:96px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding-top:4px;">
+      <div style="font:400 15px/1.5 var(--font-body); color:var(--color-fg); text-wrap:pretty;">Forms, Annotations and Signatures. Pick as many as you like.</div>
+      <div style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted);">Hold Ctrl, or Cmd on a Mac, to pick more than one.</div>
+    </div>
+  </div>
+
+  <div style="flex:none; margin-top:30px; border:1px solid var(--color-border-soft); border-radius:20px; overflow:hidden;">
+    <div style="display:flex; align-items:center; gap:10px; padding:12px 20px; background:var(--color-bg-soft); border-bottom:1px solid var(--color-border-soft);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"></path><path d="m8 6-6 6 6 6"></path></svg>
+      <span style="font:700 12px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-fg-muted);">Or fill it in from code</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:6px; padding:16px 20px; font:500 13px/1.6 var(--font-mono); color:var(--color-deep-navy);">
+      <div>form.setValue(plan, { value: <span style="color:var(--color-brand-blue);">'yearly'</span> })</div>
+      <div>form.setValue(topics, { selectedValues: [<span style="color:var(--color-brand-blue);">'Forms'</span>, <span style="color:var(--color-brand-blue);">'Signatures'</span>] })</div>
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:auto; padding-top:14px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+    <a href="#page-1" style="font:400 14px/1.4 var(--font-body);"><svg class="arrow before" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>Contents</a>
+    <a href="#page-4" style="font:600 14px/1.4 var(--font-display);">Next: invoice<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+    <span style="font:800 15px/1.2 var(--font-display); color:var(--color-deep-navy);">03</span>
+  </div>
+</section>
+
+<section class="page" id="page-4" style="display:flex; flex-direction:column; padding:52px 64px; background:#FFFFFF; position:relative;">
+  <div style="position:absolute; top:104px; right:104px; width:95px; height:95px; background-image:radial-gradient(circle, #ABC9FD 2.5px, transparent 2.7px); background-size:25px 25px; background-position:-10px -10px;"></div>
+
+  <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-mist-blue); border-radius:999px; padding:9px 18px 9px 14px;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>
+    <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-brand-blue);">Step 3 of 3</div>
+  </div>
+  <h2 style="font:800 48px/1.04 var(--font-display); letter-spacing:-0.028em; color:var(--color-deep-navy); margin:18px 0 0;">An invoice<br><span style="color:var(--color-brand-blue);">that adds up.</span></h2>
+  <div style="flex:none; width:68px; height:8px; border-radius:4px; background:var(--color-blue-600); margin-top:12px;"></div>
+  <p style="font:400 19px/1.5 var(--font-body); color:var(--color-fg-muted); margin:16px 0 0; max-width:540px; text-wrap:pretty;">Change a quantity and the amounts and total update as you type. Then sign.</p>
+
+  <div style="flex:none; display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:20px; margin-top:28px;">
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+        <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Bill to <span style="color:var(--color-brand-blue);">*</span></span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">billing.name</span>
+      </div>
+      <div data-pdf="billing.name" style="height:40px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+        <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Country</span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">billing.country</span>
+      </div>
+      <div data-pdf="billing.country" style="height:40px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+    </div>
+  </div>
+
+  <div style="flex:none; margin-top:24px; border:1px solid var(--color-border-soft); border-radius:20px; overflow:hidden;">
+    <div style="display:grid; grid-template-columns:minmax(0,1fr) 88px 96px 120px; gap:16px; padding:12px 20px; background:var(--color-bg-soft); border-bottom:1px solid var(--color-border-soft); font:700 12px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-fg-muted);">
+      <span>Item</span><span>Qty</span><span style="text-align:right;">Price</span><span style="text-align:right;">Amount</span>
+    </div>
+    <div style="display:grid; grid-template-columns:minmax(0,1fr) 88px 96px 120px; gap:16px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--color-border-soft);">
+      <span style="font:600 15px/1.3 var(--font-display); color:var(--color-deep-navy);">Pro license</span>
+      <div data-pdf="invoice.license.qty" style="height:34px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+      <span style="font:400 15px/1.3 var(--font-body); color:var(--color-fg); text-align:right; font-variant-numeric:tabular-nums;">$290.00</span>
+      <div data-pdf="invoice.license.amount" style="height:34px; border:1px solid var(--color-border-soft); border-radius:6px; background:var(--color-bg-soft);"></div>
+    </div>
+    <div style="display:grid; grid-template-columns:minmax(0,1fr) 88px 96px 120px; gap:16px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--color-border-soft);">
+      <span style="font:600 15px/1.3 var(--font-display); color:var(--color-deep-navy);">Priority support</span>
+      <div data-pdf="invoice.support.qty" style="height:34px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+      <span style="font:400 15px/1.3 var(--font-body); color:var(--color-fg); text-align:right; font-variant-numeric:tabular-nums;">$120.00</span>
+      <div data-pdf="invoice.support.amount" style="height:34px; border:1px solid var(--color-border-soft); border-radius:6px; background:var(--color-bg-soft);"></div>
+    </div>
+    <div style="display:grid; grid-template-columns:minmax(0,1fr) 88px 96px 120px; gap:16px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--color-border-soft);">
+      <span style="font:600 15px/1.3 var(--font-display); color:var(--color-deep-navy);">Onboarding session</span>
+      <div data-pdf="invoice.onboarding.qty" style="height:34px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+      <span style="font:400 15px/1.3 var(--font-body); color:var(--color-fg); text-align:right; font-variant-numeric:tabular-nums;">$80.00</span>
+      <div data-pdf="invoice.onboarding.amount" style="height:34px; border:1px solid var(--color-border-soft); border-radius:6px; background:var(--color-bg-soft);"></div>
+    </div>
+    <div style="display:grid; grid-template-columns:minmax(0,1fr) 120px; gap:16px; align-items:center; padding:14px 20px; background:var(--color-mist-blue);">
+      <span style="display:flex; align-items:baseline; gap:12px;"><span style="font:800 17px/1.3 var(--font-display); color:var(--color-deep-navy);">Total</span><span style="font:500 11.5px/1 var(--font-mono); color:var(--color-brand-blue);">invoice.total</span></span>
+      <div data-pdf="invoice.total" style="height:38px; border:1px solid var(--color-sky-blue); border-radius:6px; background:#FFFFFF;"></div>
+    </div>
+  </div>
+
+  <div style="flex:none; display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:20px; margin-top:24px;">
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+        <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Signature <span style="color:var(--color-brand-blue);">*</span></span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">approval · signature</span>
+      </div>
+      <div data-pdf="approval" style="height:72px; border:1px dashed var(--color-border); border-radius:6px; background:var(--color-bg-soft);"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+        <span style="font:700 14px/1.2 var(--font-display); color:var(--color-deep-navy);">Date</span>
+        <span style="font:500 11.5px/1 var(--font-mono); color:var(--color-fg-muted);">date · text</span>
+      </div>
+      <div data-pdf="date" style="height:40px; border:1px solid var(--color-border); border-radius:6px; background:#FFFFFF;"></div>
+      <span style="font:400 12.5px/1.45 var(--font-body); color:var(--color-fg-muted);">DD/MM/YYYY. Any other format is refused.</span>
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:auto; padding-top:14px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+    <a href="#page-1" style="font:400 14px/1.4 var(--font-body);"><svg class="arrow before" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>Contents</a>
+    <a href="#page-5" style="font:600 14px/1.4 var(--font-display);">Next: your turn<svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+    <span style="font:800 15px/1.2 var(--font-display); color:var(--color-deep-navy);">04</span>
+  </div>
+</section>
+
+<section class="page" id="page-5" style="display:flex; flex-direction:column; padding:52px 64px; background:#FFFFFF; position:relative;">
+  <div style="position:absolute; top:104px; right:104px; width:95px; height:95px; background-image:radial-gradient(circle, #ABC9FD 2.5px, transparent 2.7px); background-size:25px 25px; background-position:-10px -10px;"></div>
+
+  <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-mist-blue); border-radius:999px; padding:9px 18px 9px 14px;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M8 12h8"></path><path d="M12 8v8"></path></svg>
+    <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-brand-blue);">Your turn</div>
+  </div>
+  <h2 style="font:800 48px/1.04 var(--font-display); letter-spacing:-0.028em; color:var(--color-deep-navy); margin:18px 0 0;">Build<br><span style="color:var(--color-brand-blue);">your own form.</span></h2>
+  <div style="flex:none; width:68px; height:8px; border-radius:4px; background:var(--color-blue-600); margin-top:12px;"></div>
+  <p style="font:400 19px/1.5 var(--font-body); color:var(--color-fg-muted); margin:16px 0 0; max-width:520px; text-wrap:pretty;">This page is empty on purpose. Add text boxes, checkboxes, lists and signature fields to it.</p>
+
+  <div style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; margin-top:30px; border:1px dashed var(--color-border); border-radius:20px; background:var(--color-bg-soft);">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center;">
+      <div style="width:44px; height:44px; border-radius:50%; background:var(--color-mist-blue); display:flex; align-items:center; justify-content:center;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8"></path><path d="M12 8v8"></path></svg>
+      </div>
+      <div style="font:700 16px/1.3 var(--font-display); color:var(--color-brand-blue);">Room for your fields.</div>
+      <div style="font:400 14px/1.5 var(--font-body); color:var(--color-fg-muted);">Pick a kind of field, then draw its box anywhere here.</div>
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:28px; padding-top:14px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+    <a href="#page-1" style="font:400 14px/1.4 var(--font-body);"><svg class="arrow before" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>Contents</a>
+    <span style="font:800 15px/1.2 var(--font-display); color:var(--color-deep-navy);">05</span>
+  </div>
+</section>
+</body>
+</html>

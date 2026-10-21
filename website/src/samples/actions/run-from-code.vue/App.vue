@@ -12,14 +12,14 @@ import '../run-from-code.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), actionsPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const links = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-links.pdf');
+  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: links }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <NamedActions />

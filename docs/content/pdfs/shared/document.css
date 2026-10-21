@@ -1,0 +1,135 @@
+/*
+ * The demo documents' look: the EmbedPDF palette, its fonts, and US Letter pages.
+ *
+ * The fonts are fixed weights, never a variable font: Chrome prints a variable font's text as Type3
+ * glyph drawings, which select and search worse than the TrueType text a fixed weight prints as.
+ * They hold the Latin characters only, so draw arrows and other symbols as SVG.
+ */
+
+@font-face {
+  font-family: 'Inter';
+  font-weight: 400;
+  src: url('fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 500;
+  src: url('fonts/inter-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 600;
+  src: url('fonts/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 700;
+  src: url('fonts/inter-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-weight: 400;
+  src: url('fonts/manrope-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-weight: 500;
+  src: url('fonts/manrope-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-weight: 600;
+  src: url('fonts/manrope-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-weight: 700;
+  src: url('fonts/manrope-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-weight: 800;
+  src: url('fonts/manrope-latin-800-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 400;
+  src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 500;
+  src: url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+}
+
+:root {
+  --color-deep-navy: #0a1a4d;
+  --color-brand-blue: #1677ff;
+  --color-sky-blue: #7db6ff;
+  --color-mist-blue: #e6f0ff;
+  --color-bg-soft: #fafbff;
+  --color-fg: #031e50;
+  --color-fg-muted: #515b7e;
+  --color-border: #cfd5e1;
+  --color-border-soft: #e4edfd;
+  --color-blue-600: #006ffd;
+  --color-blue-700: #147fe5;
+
+  --font-display: 'Manrope', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@page {
+  size: letter;
+  margin: 0;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+/* One sheet per page: its content is laid out to fill the page exactly. */
+.page {
+  box-sizing: border-box;
+  width: 8.5in;
+  height: 11in;
+  overflow: hidden;
+  background: #ffffff;
+  break-after: page;
+}
+
+a {
+  color: var(--color-brand-blue);
+  text-decoration: none;
+}
+
+/* On screen, the pages stack like a PDF app shows them. */
+@media screen {
+  body {
+    padding: 32px 0;
+    background: #eef1f6;
+  }
+  .page {
+    margin: 0 auto 32px;
+    box-shadow: 0 1px 3px rgba(10, 26, 77, 0.12);
+  }
+}
+
+/* An arrow after a label, or before one: the fonts have no arrow characters. */
+.arrow {
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.25em;
+  vertical-align: -0.1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.arrow.before {
+  margin-left: 0;
+  margin-right: 0.3em;
+}

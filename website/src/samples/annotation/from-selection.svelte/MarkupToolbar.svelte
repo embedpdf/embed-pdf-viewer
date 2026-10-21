@@ -2,11 +2,13 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { usePageList } from '@embedpdf/svelte/runtime';
+  import { useStage } from '@embedpdf/svelte/stage';
   import { useSelection, useSelectionState } from '@embedpdf/svelte/selection';
   import { useAnnotation } from '@embedpdf/svelte/annotation';
 
-  // On the cover: the characters of the title's first line.
-  const FIRST_LINE = { start: 10, count: 17 };
+  // On page 2: the characters of the sentence in its “Your turn” box, and where it is.
+  const SENTENCE = { start: 605, count: 44 };
+  const SENTENCE_BOX = { x: 68, y: 446, width: 256, height: 16 };
 
   const MARKUP = [
     { tool: 'highlight', label: 'Highlight' },
@@ -18,13 +20,18 @@
   const annotation = useAnnotation();
   const selection = useSelection();
   const hasSelection = useSelectionState((state) => state.hasSelection);
+  const stage = useStage();
   const pages = usePageList();
   let status = $state('');
 
-  // On load: the title's first line is selected, ready to mark.
+  // On load: the sentence is selected, ready to mark, and in view.
   $effect(() => {
-    const cover = pages.current[0]?.ref;
-    if (cover) untrack(() => selection.select({ page: cover, ...FIRST_LINE }));
+    const page = pages.current[1]?.ref;
+    if (!page) return;
+    untrack(() => {
+      selection.select({ page, ...SENTENCE });
+      stage.reveal(page, { rect: SENTENCE_BOX });
+    });
   });
 
   async function mark(tool: string, label: string) {

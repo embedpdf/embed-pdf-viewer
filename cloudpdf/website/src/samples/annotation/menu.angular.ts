@@ -5,9 +5,10 @@ import {
   effect,
   inject,
   untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -20,7 +21,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // What's in the menu depends on what's selected: text boxes get Bold and Edit.
 @Component({
@@ -65,7 +66,7 @@ export class SelectionActions {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -93,35 +94,20 @@ export class SelectionActions {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   constructor() {
-    // On load: a rectangle and a text box on the cover, the text box selected so the menu shows.
+    // On load: the document's text box, selected, so its menu shows.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
       untracked(() => {
-        void this.annotation.create(cover, {
-          subtype: 'square',
-          box: { x: 96, y: 506, width: 178, height: 54 },
-          color: '#1e90ff',
-          strokeWidth: 3,
-        });
-        void this.annotation.create(
-          cover,
-          {
-            subtype: 'free-text',
-            box: { x: 300, y: 512, width: 230, height: 40 },
-            contents: 'Ready for review',
-            fontSize: 16,
-            fontColor: '#1a2748',
-            interiorColor: '#fffbe6',
-          },
-          undefined,
-          { select: true },
-        );
+        const textBox = this.annotation.list().find((each) => each.nm === 'text-box');
+        if (!textBox) return;
+        this.annotation.selection.set([textBox.ref]);
+        stage.reveal(textBox.page, { rect: textBox.rect });
       });
     });
   }

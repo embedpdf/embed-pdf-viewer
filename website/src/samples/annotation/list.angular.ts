@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  effect,
   inject,
   input,
   signal,
@@ -22,18 +21,10 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
-
-// A line of text, as the four corners a highlight takes.
-const quad = (x: number, y: number, width: number, height: number) => ({
-  upperLeft: { x, y },
-  upperRight: { x: x + width, y },
-  lowerLeft: { x, y: y + height },
-  lowerRight: { x: x + width, y: y + height },
-});
 
 interface Kind {
   label: string;
@@ -113,7 +104,7 @@ export class AnnotationList {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -139,42 +130,4 @@ export class AnnotationList {
     <ng-template #loading><p class="loading">Loading…</p></ng-template>
   `,
 })
-export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly pages = inject(EpdfDocument).pages;
-  private added = false;
-
-  constructor() {
-    // On load: highlights, notes and a rectangle on the first two pages.
-    effect(() => {
-      const [cover, second] = this.pages();
-      if (this.annotation.status() !== 'ready' || !cover || !second || this.added) return;
-      this.added = true;
-      void this.annotation.create(cover.ref, {
-        subtype: 'highlight',
-        quadPoints: [quad(106, 218, 352, 49)],
-        color: '#ffcd45',
-        contents: 'The title',
-      });
-      void this.annotation.create(cover.ref, {
-        subtype: 'text',
-        rect: { x: 470, y: 232, width: 20, height: 20 },
-        contents: 'Can we shorten it?',
-        color: '#facc15',
-      });
-      void this.annotation.create(second.ref, {
-        subtype: 'highlight',
-        quadPoints: [quad(57, 57, 242, 36), quad(57, 93, 265, 36)],
-        color: '#ffcd45',
-        contents: 'The opening line',
-      });
-      void this.annotation.create(second.ref, {
-        subtype: 'square',
-        box: { x: 52, y: 580, width: 470, height: 64 },
-        color: '#e5484d',
-        strokeWidth: 2,
-        contents: 'Rewrite this paragraph',
-      });
-    });
-  }
-}
+export class App {}

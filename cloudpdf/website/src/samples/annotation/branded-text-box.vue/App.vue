@@ -7,16 +7,16 @@ import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import type { AnnotationRenderer } from '@embedpdf/vue/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
-import AddTextBox from './AddTextBox.vue';
 import BrandedTextBox from './BrandedTextBox.vue';
 import FormatButtons from './FormatButtons.vue';
+import SelectTextBox from './SelectTextBox.vue';
 
 import '../branded-text-box.css';
 
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const RENDERERS: AnnotationRenderer[] = [
   { for: (annotation) => annotation.subtype === 'free-text', component: BrandedTextBox },
@@ -24,10 +24,10 @@ const RENDERERS: AnnotationRenderer[] = [
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddTextBox />
+      <SelectTextBox />
       <FormatButtons />
       <Stage class="stage">
         <template #page>

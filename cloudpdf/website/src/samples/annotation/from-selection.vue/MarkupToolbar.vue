@@ -2,11 +2,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
+import { useStage } from '@embedpdf/vue/stage';
 import { useSelection, useSelectionState } from '@embedpdf/vue/selection';
 import { useAnnotation } from '@embedpdf/vue/annotation';
 
-// On the cover: the characters of the title's first line.
-const FIRST_LINE = { start: 10, count: 17 };
+// On page 2: the characters of the sentence in its “Your turn” box, and where it is.
+const SENTENCE = { start: 605, count: 44 };
+const SENTENCE_BOX = { x: 68, y: 446, width: 256, height: 16 };
 
 const MARKUP = [
   { tool: 'highlight', label: 'Highlight' },
@@ -18,15 +20,18 @@ const MARKUP = [
 const annotation = useAnnotation();
 const selection = useSelection();
 const { hasSelection } = useSelectionState();
+const stage = useStage();
 const pages = usePageList();
-const cover = computed(() => pages.value[0]?.ref);
+const page = computed(() => pages.value[1]?.ref);
 const status = ref('');
 
-// On load: the title's first line is selected, ready to mark.
+// On load: the sentence is selected, ready to mark, and in view.
 watch(
-  cover,
-  (page) => {
-    if (page) selection.select({ page, ...FIRST_LINE });
+  page,
+  (current) => {
+    if (!current) return;
+    selection.select({ page: current, ...SENTENCE });
+    stage.reveal(current, { rect: SENTENCE_BOX });
   },
   { immediate: true },
 );

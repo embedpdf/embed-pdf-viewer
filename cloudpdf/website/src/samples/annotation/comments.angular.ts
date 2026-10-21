@@ -2,13 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   input,
   signal,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -23,7 +22,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // One thread: the first comment, its replies, a reply box, and a button that shows it.
 @Component({
@@ -124,7 +123,7 @@ export class Comments {
       {
         engine: () => cloudEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: ebook }],
+        initialDocuments: [{ source: review }],
       },
       withStage(),
       withRender(),
@@ -151,42 +150,4 @@ export class Comments {
     <ng-template #loading><p class="loading">Loading…</p></ng-template>
   `,
 })
-export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly comments = inject(EpdfComments);
-  private readonly pages = inject(EpdfDocument).pages;
-  private added = false;
-
-  constructor() {
-    // On load: a note with two replies on the cover, and a highlight with a comment on page 2.
-    effect(() => {
-      const [cover, second] = this.pages();
-      if (this.annotation.status() !== 'ready' || !cover || !second || this.added) return;
-      this.added = true;
-      void this.annotation
-        .create(cover.ref, {
-          subtype: 'text',
-          rect: { x: 470, y: 232, width: 20, height: 20 },
-          contents: 'Can we shorten the title?',
-          color: '#facc15',
-        })
-        .then(async ({ annotation: note }) => {
-          await this.comments.reply(note.ref, 'Maybe drop "(But they Don’t Have to Be)".');
-          await this.comments.reply(note.ref, 'I like it long. It’s a promise.');
-        });
-      void this.annotation.create(second.ref, {
-        subtype: 'highlight',
-        quadPoints: [
-          {
-            upperLeft: { x: 57, y: 57 },
-            upperRight: { x: 322, y: 57 },
-            lowerLeft: { x: 57, y: 129 },
-            lowerRight: { x: 322, y: 129 },
-          },
-        ],
-        color: '#ffcd45',
-        contents: 'A strong opening.',
-      });
-    });
-  }
-}
+export class App {}

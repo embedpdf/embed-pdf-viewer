@@ -1,17 +1,13 @@
 <!-- Create a rectangle, then change, move and delete it, all from code. -->
 <script lang="ts">
-  import { untrack } from 'svelte';
   import { usePageList } from '@embedpdf/svelte/runtime';
-  import {
-    useAnnotation,
-    useAnnotationState,
-    type AnnotationRef,
-  } from '@embedpdf/svelte/annotation';
+  import { useStage } from '@embedpdf/svelte/stage';
+  import { useAnnotation, type AnnotationRef } from '@embedpdf/svelte/annotation';
 
   const annotation = useAnnotation();
-  const ready = useAnnotationState((state) => state.status === 'ready');
+  const stage = useStage();
   const pages = usePageList();
-  const cover = $derived(pages.current[0]?.ref);
+  const page = $derived(pages.current[4]?.ref); // the document's empty last page
   let ref = $state.raw<AnnotationRef | null>(null);
 
   // Reads named get…, can… and is… follow the annotations as they change.
@@ -24,23 +20,16 @@
   });
 
   async function add() {
-    if (!cover) return;
-    const { annotation: made } = await annotation.create(cover, {
+    if (!page) return;
+    const { annotation: made } = await annotation.create(page, {
       subtype: 'square',
       box: { x: 72, y: 592, width: 200, height: 100 },
       color: '#0078ff',
       strokeWidth: 3,
     });
     ref = made.ref;
+    stage.reveal(page, { rect: made.rect });
   }
-
-  // On load: one rectangle, to change.
-  let started = false;
-  $effect(() => {
-    if (!ready.current || started) return;
-    started = true;
-    untrack(() => void add());
-  });
 
   function makeRed() {
     if (square) void annotation.update(square.ref, { color: '#dc143c' });

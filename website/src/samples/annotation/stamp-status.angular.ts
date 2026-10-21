@@ -8,9 +8,10 @@ import {
   output,
   signal,
   untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -24,9 +25,9 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // One stamp's status, pinned to it: a check on its corner once it's signed off,
@@ -112,7 +113,7 @@ export class Approvals {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -139,55 +140,22 @@ export class Approvals {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   constructor() {
-    // On load: two approval stamps on the cover, one signed off. The second sits
-    // at the bottom, so its status hangs over the next page.
+    // On load: the page with the document's two approval stamps, the budget one already signed off.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
       untracked(() => {
-        void approvedPicture().then(async (appearance) => {
-          await this.annotation.create(
-            cover,
-            {
-              subtype: 'stamp',
-              box: { x: 330, y: 470, width: 180, height: 60 },
-              name: 'approval-budget',
-            },
-            { appearance },
-          );
-          await this.annotation.create(
-            cover,
-            {
-              subtype: 'stamp',
-              box: { x: 96, y: 712, width: 180, height: 60 },
-              name: 'approval-contract',
-            },
-            { appearance },
-          );
-        });
+        const found = this.annotation
+          .list()
+          .filter((each) => each.nm === 'approval-budget' || each.nm === 'approval-contract');
+        if (found.length === 0) return;
+        stage.reveal(found[0].page, { rect: found[0].rect });
       });
     });
   }
-}
-
-// The stamp's picture, drawn on a canvas so the example needs no image file.
-function approvedPicture(): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  canvas.width = 360;
-  canvas.height = 120;
-  const context = canvas.getContext('2d')!;
-  context.strokeStyle = '#30a46c';
-  context.lineWidth = 10;
-  context.strokeRect(5, 5, 350, 110);
-  context.fillStyle = '#30a46c';
-  context.font = 'bold 54px sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText('APPROVED', 180, 64);
-  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/png'));
 }

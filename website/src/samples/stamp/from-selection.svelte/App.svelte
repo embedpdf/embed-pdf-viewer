@@ -6,7 +6,7 @@
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { stampPlugin } from '@embedpdf/svelte/stamp';
   import { localEngine } from '@embedpdf/engine';
-  import DrawSeal from './DrawSeal.svelte';
+  import SelectSeal from './SelectSeal.svelte';
   import MakeStamp from './MakeStamp.svelte';
 
   import '../from-selection.css';
@@ -21,18 +21,18 @@
     stampPlugin({ assetEngine }),
   ];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const review = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-review.pdf');
+    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <DrawSeal />
+    <SelectSeal />
     <MakeStamp />
     <Stage class="stage">
       <RenderLayer />

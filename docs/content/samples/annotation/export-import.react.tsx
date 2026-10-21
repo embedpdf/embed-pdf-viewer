@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -19,10 +19,10 @@ import './export-import.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source review]
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -30,7 +30,6 @@ const ebook = async (): Promise<OpenInput> => {
 function Transfer() {
   const annotation = useAnnotation();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
   const count = useAnnotationList().length;
   const [text, setText] = useState('');
   const [status, setStatus] = useState('');
@@ -58,26 +57,13 @@ function Transfer() {
     }
   };
 
-  // On load: a note and a rectangle on the cover, exported at once.
+  // On load: everything in the document, exported at once.
   useEffect(() => {
-    if (!ready || !cover || started.current) return;
+    if (!ready || started.current) return;
     started.current = true;
-    void Promise.all([
-      annotation.create(cover, {
-        subtype: 'text',
-        rect: { x: 470, y: 232, width: 20, height: 20 },
-        contents: 'Can we shorten the title?',
-        color: '#facc15',
-      }),
-      annotation.create(cover, {
-        subtype: 'square',
-        box: { x: 96, y: 506, width: 178, height: 54 },
-        color: '#e5484d',
-        strokeWidth: 3,
-      }),
-    ]).then(exportAll);
+    void exportAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, cover]);
+  }, [ready]);
 
   return (
     <div className="panel transfer">
@@ -116,7 +102,7 @@ function Transfer() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="viewer">
           <Stage className="stage">

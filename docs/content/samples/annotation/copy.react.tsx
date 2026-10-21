@@ -17,47 +17,28 @@ import './copy.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source review]
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// On load: a rectangle and a text box on the cover, the rectangle selected and in view.
-function AddAnnotations() {
+// On load: the document's square, selected, ready to copy.
+function SelectSquare() {
   const annotation = useAnnotation();
   const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'free-text',
-      box: { x: 300, y: 512, width: 230, height: 40 },
-      contents: 'Copy me too',
-      fontSize: 16,
-      fontColor: '#1a2748',
-      interiorColor: '#fffbe6',
-    });
-    void annotation
-      .create(
-        cover,
-        {
-          subtype: 'square',
-          box: { x: 96, y: 506, width: 178, height: 54 },
-          color: '#e5484d',
-          interiorColor: '#ffe4e1',
-          strokeWidth: 3,
-        },
-        undefined,
-        { select: true },
-      )
-      .then(({ annotation: made }) => stage.reveal(cover, { rect: made.rect }));
-  }, [annotation, stage, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const square = annotation.list().find((each) => each.nm === 'square');
+    if (!square) return;
+    annotation.selection.set([square.ref]);
+    stage.reveal(square.page, { rect: square.rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
@@ -105,9 +86,9 @@ function CopyButton() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddAnnotations />
+        <SelectSquare />
         <CopyButton />
         <Stage className="stage">
           {() => (

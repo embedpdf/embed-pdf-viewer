@@ -5,7 +5,7 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { cloudEngine } from '@cloudpdf/engine';
-  import AddRectangles from './AddRectangles.svelte';
+  import SelectMiddle from './SelectMiddle.svelte';
   import OrderControls from './OrderControls.svelte';
 
   import '../order.css';
@@ -13,15 +13,15 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddRectangles />
+    <SelectMiddle />
     <OrderControls />
     <Stage class="stage">
       <RenderLayer />

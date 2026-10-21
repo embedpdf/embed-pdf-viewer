@@ -6,7 +6,7 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, AnnotationMenu, annotationPlugin } from '@embedpdf/vue/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
-import AddAnnotations from './AddAnnotations.vue';
+import SelectTextBox from './SelectTextBox.vue';
 import SelectionActions from './SelectionActions.vue';
 
 import '../menu.css';
@@ -14,14 +14,14 @@ import '../menu.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddAnnotations />
+      <SelectTextBox />
       <Stage class="stage">
         <template #page>
           <RenderLayer />

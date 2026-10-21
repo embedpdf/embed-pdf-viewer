@@ -7,7 +7,7 @@
   import { stampPlugin } from '@embedpdf/svelte/stamp';
   import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
-  import DrawSeal from './DrawSeal.svelte';
+  import SelectSeal from './SelectSeal.svelte';
   import MakeStamp from './MakeStamp.svelte';
 
   import '../from-selection.css';
@@ -22,15 +22,15 @@ import { localEngine } from '@embedpdf/engine';
     stampPlugin({ assetEngine }),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <DrawSeal />
+    <SelectSeal />
     <MakeStamp />
     <Stage class="stage">
       <RenderLayer />

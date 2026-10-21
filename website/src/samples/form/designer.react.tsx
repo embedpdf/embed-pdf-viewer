@@ -20,9 +20,9 @@ const plugins = [
   formPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const forms = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const FIELD_TOOLS = [
@@ -34,7 +34,7 @@ const FIELD_TOOLS = [
   ['form-signature', 'Signature'],
 ] as const;
 
-/** Start on the ebook's last page, which has room for a form, with the text tool picked. */
+/** Start on the form's last page, which is empty, with the text tool picked. */
 function useStartDesigning() {
   const interaction = useInteraction();
   const stage = useStage();
@@ -92,7 +92,7 @@ function FieldPalette() {
         </button>
       ))}
       <output className="readout">
-        {fields.length === 0 ? 'Click the page to place a field' : `${fields.length} fields`}
+        {fields.length} fields: click the page to place another
       </output>
     </div>
   );
@@ -100,7 +100,7 @@ function FieldPalette() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <FieldPalette />
         <Stage className="stage">

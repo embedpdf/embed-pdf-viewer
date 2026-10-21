@@ -30,7 +30,7 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function StampButton({ asset, armed }: { asset: StampAsset; armed: boolean }) {
   const stamp = useStamp();
@@ -95,7 +95,7 @@ function LanguagePicker() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <LanguagePicker />
         <Stage className="stage">

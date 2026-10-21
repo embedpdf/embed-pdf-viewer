@@ -1,8 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
-  import { useForm, useFormState } from '@embedpdf/svelte/form';
+  import { toFieldRef, useForm, useFormState } from '@embedpdf/svelte/form';
   import { useStamp, useStampState } from '@embedpdf/svelte/stamp';
   import { useSignatureState, useSignerRows } from '@embedpdf/svelte/signature';
 
@@ -13,22 +12,17 @@
   const signatureState = useSignatureState();
   const rows = useSignerRows();
   const status = useFormState((formState) => formState.status);
-  const pages = usePageList();
   const mark = $derived(rows.current[0]?.signatures[0]);
 
-  // On load: a signature field on the last page, and a person's signature, armed.
+  // On load: the invoice, where the form's signature field is, and a person's signature, armed.
   let done = false;
   $effect(() => {
-    const page = pages.current.at(-1)?.ref;
-    if (status.current !== 'ready' || !page || done) return;
+    if (status.current !== 'ready' || done) return;
     done = true;
     untrack(async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-      });
-      stage.goToPage(page);
+      // Bring the form's signature field into view, on the invoice.
+      const [widget] = form.getWidgets(toFieldRef('approval'));
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       const { asset } = await stamp.createAsset({
         libraryId: library.id,

@@ -16,9 +16,9 @@ import './run-from-code.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), actionsPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const links = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-links.pdf');
+  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const VERBS: ReadonlyArray<[PdfNamedAction, string]> = [
@@ -70,7 +70,7 @@ function NamedActions() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <NamedActions />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

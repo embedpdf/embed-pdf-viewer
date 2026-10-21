@@ -29,7 +29,7 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A signature as a pen would draw it: two strokes, in points.
 const loop = Array.from({ length: 48 }, (_, i) => ({
@@ -123,7 +123,7 @@ function Marks() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Marks />
         <Stage className="stage">

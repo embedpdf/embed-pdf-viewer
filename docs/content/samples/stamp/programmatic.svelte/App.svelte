@@ -22,15 +22,15 @@
     stampPlugin({ assetEngine }),
   ];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source review]
+  const review = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-review.pdf');
+    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

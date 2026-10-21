@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useState } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -7,8 +7,6 @@ import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
   annotationPlugin,
-  useAnnotation,
-  useAnnotationState,
   type AnnotationRenderer,
   type AnnotationRendererProps,
 } from '@embedpdf/react/annotation';
@@ -19,10 +17,10 @@ import './renderers.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source review]
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -44,33 +42,6 @@ const RENDERERS: AnnotationRenderer[] = [
 ];
 const NONE: AnnotationRenderer[] = [];
 
-// On load: two notes on the cover, 24 points square: 32 pixels at 100%.
-function AddNotes() {
-  const annotation = useAnnotation();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
-
-  useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'text',
-      rect: { x: 470, y: 228, width: 24, height: 24 },
-      contents: 'Can we shorten the title?',
-      color: '#facc15',
-    });
-    void annotation.create(cover, {
-      subtype: 'text',
-      rect: { x: 280, y: 516, width: 24, height: 24 },
-      contents: 'Add the co-author',
-      color: '#facc15',
-    });
-  }, [annotation, ready, cover]);
-
-  return null;
-}
-
 // A note keeps its size on screen and stays upright: turn the view to see it.
 function TurnButton() {
   const stage = useStage();
@@ -89,10 +60,9 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: ebook }]}
+      initialDocuments={[{ source: review }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddNotes />
         <div className="toolbar">
           <div className="segmented" role="group" aria-label="Look">
             <button type="button" aria-pressed={mine} onClick={() => setMine(true)}>

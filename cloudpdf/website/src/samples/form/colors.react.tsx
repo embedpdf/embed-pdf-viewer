@@ -4,13 +4,7 @@ import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import {
-  FormLayer,
-  formPlugin,
-  useForm,
-  useFormSettings,
-  useFormState,
-} from '@embedpdf/react/form';
+import { FormLayer, formPlugin, useForm, useFormSettings } from '@embedpdf/react/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
 import './colors.css';
@@ -24,7 +18,7 @@ const plugins = [
   formPlugin({ fields: { border: '#ea580c' } }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const COLORS = [
   ['Accent', null],
@@ -32,29 +26,21 @@ const COLORS = [
   ['Green', '#16a34a'],
 ] as const;
 
-/** The ebook has no form, so this adds one to its last page: fields with no border of their own. */
-function useSignUpForm() {
-  const form = useForm();
+/** Start on the sign-up page, the form's first fields. */
+function useStartOnSignUp() {
   const stage = useStage();
-  const status = useFormState((state) => state.status);
-  const page = usePageList().at(-1)?.ref;
-  const added = useRef(false);
+  const page = usePageList()[1]?.ref;
+  const started = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || added.current) return;
-    added.current = true;
-    const at = (y: number, width = 240, height = 24) => ({ page, rect: { x: 72, y, width, height } });
-    void (async () => {
-      await form.create({ family: 'text', name: 'name', widgets: [{ ...at(540), fontSize: 11 }] });
-      await form.create({ family: 'text', name: 'email', widgets: [{ ...at(576), fontSize: 11 }] });
-      await form.create({ family: 'checkbox', name: 'updates', widgets: [at(614, 16, 16)] });
-      stage.goToPage(page);
-    })();
-  }, [form, stage, status, page]);
+    if (!page || started.current) return;
+    started.current = true;
+    stage.goToPage(page);
+  }, [stage, page]);
 }
 
 function ColorToolbar() {
-  useSignUpForm();
+  useStartOnSignUp();
   const form = useForm();
   const settings = useFormSettings();
 
@@ -94,7 +80,7 @@ function ColorToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ColorToolbar />
         <Stage className="stage">

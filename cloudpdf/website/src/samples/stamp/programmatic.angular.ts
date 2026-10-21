@@ -21,11 +21,10 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// The middle of a Letter page, and the cover's empty corner, in page coordinates.
+// The middle of a Letter page, in page coordinates.
 const MIDDLE = { x: 306, y: 396 };
-const CORNER = { x: 60, y: 590, width: 220, height: 180 };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<demo-place-stamps [stage]="stage" />`. */
 @Component({
@@ -57,29 +56,14 @@ export class PlaceStamps {
   );
   protected readonly draft = computed(() => this.assets().find((asset) => asset.name === 'Draft'));
   protected readonly stamps = this.annotation.watch({ subtype: 'stamp' });
-  private started = false;
+  private loaded = false;
 
   constructor() {
-    // On load: the standard stamps, and "Approved" in the cover's empty corner, scrolled into view.
+    // On load: the standard stamps, ready to place.
     effect(() => {
-      if (this.annotation.status() !== 'ready' || this.started) return;
-      this.started = true;
-      const stage = this.stage();
-      void loadDefaultLibrary('en')
-        .then((bytes) => this.stamp.importLibrary(bytes))
-        .then(({ library }) => {
-          const asset = this.stamp
-            .listAssets({ libraryId: library.id })
-            .find((candidate) => candidate.name === 'Approved');
-          if (!asset) return;
-          return this.stamp.placeAsset(asset.id, {
-            page: 0,
-            center: { x: 170, y: 680 },
-            targetWidth: 180,
-            rotation: -8,
-          });
-        })
-        .then(() => stage.reveal(0, { rect: CORNER }));
+      if (this.annotation.status() !== 'ready' || this.loaded) return;
+      this.loaded = true;
+      void loadDefaultLibrary('en').then((bytes) => this.stamp.importLibrary(bytes));
     });
   }
 
@@ -113,7 +97,7 @@ export class PlaceStamps {
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: review }] },
       withStage(),
       withRender(),
       withInteraction(),

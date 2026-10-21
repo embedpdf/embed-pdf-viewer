@@ -1,0 +1,84 @@
+import { useEffect, useRef, useState } from 'react';
+import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import type { OpenInput } from '@embedpdf/react/runtime';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { interactionPlugin } from '@embedpdf/react/interaction';
+import { actionsPlugin } from '@embedpdf/react/actions';
+import {
+  FormLayer,
+  formPlugin,
+  toFieldRef,
+  useFormEvent,
+  useFormValue,
+} from '@embedpdf/react/form';
+import { localEngine } from '@embedpdf/engine';
+
+import './scripts.css';
+
+const engine = localEngine();
+// The form's scripts run with JavaScript on in the actions plugin.
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  formPlugin(),
+  actionsPlugin({ javascript: { enabled: true } }),
+];
+
+const forms = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+
+/** Start on the invoice: its amounts and its total are calculated by scripts. */
+function useStartOnInvoice() {
+  const stage = useStage();
+  const page = usePageList()[3]?.ref;
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (!page || started.current) return;
+    started.current = true;
+    stage.goToPage(page);
+  }, [stage, page]);
+}
+
+function InvoiceBar() {
+  useStartOnInvoice();
+  const total = useFormValue(toFieldRef('invoice.total'));
+  const [refused, setRefused] = useState<string | null>(null);
+
+  // A script refused a value, such as a date that isn't day/month/year.
+  useFormEvent(
+    (form) => form.onValidationRejected,
+    ({ field, issues }) => setRefused(`${field.name}: ${issues[0]?.message ?? 'refused'}`),
+  );
+
+  return (
+    <div className="toolbar">
+      <output className="readout">
+        Total: {total && 'value' in total && total.value ? total.value : 'type a quantity'}
+      </output>
+      {refused && <output className="refused">{refused}</output>}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <InvoiceBar />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer />
+              <FormLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
+    </Viewer>
+  );
+}

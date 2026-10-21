@@ -17,9 +17,9 @@ import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotatio
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const forms = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const FIELD_TOOLS = [
@@ -43,7 +43,7 @@ const FIELD_TOOLS = [
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: forms }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -90,11 +90,7 @@ const FIELD_TOOLS = [
             </button>
           }
           <output class="readout">
-            @if (form.fields().length === 0) {
-              Click the page to place a field
-            } @else {
-              {{ form.fields().length }} fields
-            }
+            {{ form.fields().length }} fields: click the page to place another
           </output>
         </div>
       }
@@ -122,7 +118,7 @@ export class App {
   protected readonly filling = computed(() => this.interaction.activeToolId() === 'pointer');
 
   constructor() {
-    // Start on the ebook's last page, which has room for a form, with the text tool picked.
+    // Start on the form's last page, which is empty, with the text tool picked.
     effect(() => {
       const page = this.document.pages().at(-1)?.ref;
       const stage = this.stage();

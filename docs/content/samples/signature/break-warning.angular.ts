@@ -10,8 +10,8 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
-import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
@@ -31,10 +31,10 @@ const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they o
 // [!/asset-engine]
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source forms]
+const forms = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -43,7 +43,7 @@ const ebook = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfAnnotationLayer],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: forms }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -87,12 +87,14 @@ export class App {
   private readonly stamp = inject(EpdfStamp);
   private readonly annotation = inject(EpdfAnnotation);
   private readonly signature = inject(EpdfSignature);
-  private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
   private done = false;
 
-  /** The last page, which has room for the field. */
-  protected readonly page = computed(() => this.document.pages().at(-1)?.ref);
+  /** The page of the form's signature field: the box goes next to the signature. */
+  protected readonly page = computed(() => {
+    const first = this.form.get(toFieldRef('approval'))?.widgets[0];
+    return first ? this.form.getWidget(first)?.page : undefined;
+  });
   protected readonly signed = computed(() => this.signature.signatures()[0]);
   protected readonly status = computed(() => {
     const signed = this.signed();
@@ -109,13 +111,12 @@ export class App {
       this.warning.set(`This change will break the signature in "${name}" when saved.`);
     });
 
-    // On load: a signature field on the last page, signed by Ada with a typed signature.
+    // On load: the invoice, with its signature field signed by Ada with a typed signature.
     effect(() => {
-      const page = this.page();
       const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.done) return;
+      if (this.form.status() !== 'ready' || !stage || this.done) return;
       this.done = true;
-      untracked(() => void this.signDocument(page, stage));
+      untracked(() => void this.signDocument(stage));
     });
   }
 
@@ -130,13 +131,11 @@ export class App {
     });
   }
 
-  private async signDocument(page: PageRef, stage: EpdfStage) {
-    await this.form.create({
-      family: 'signature',
-      name: 'approval',
-      widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 } }],
-    });
-    stage.goToPage(page);
+  private async signDocument(stage: EpdfStage) {
+    // Bring the form's signature field into view, on the invoice.
+    const first = this.form.get(toFieldRef('approval'))?.widgets[0];
+    const widget = first ? this.form.getWidget(first) : null;
+    if (widget) stage.reveal(widget.page, { rect: widget.rect });
     const { library } = await this.stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
     const { asset } = await this.stamp.createAsset({
       libraryId: library.id,

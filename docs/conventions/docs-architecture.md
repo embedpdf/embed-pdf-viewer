@@ -207,6 +207,15 @@ the Angular pass compiles in the browser (JIT), so it first applies Angular's JI
 without which `input()`, `output()`, `model()` and `viewChild()` do nothing
 (`src/lib/angular-demo-samples.ts`).
 
+### The document an example opens
+
+An example opens one of the demo documents in `docs/content/documents.mjs`, through a
+`// [!doc-source <key>]` block. It picks the document that already has what it shows (links,
+form fields, annotations), so it reads them instead of making them on load: an example changes
+its document only when the reader does something. On the cloud site every reader opens the same
+stored document, and a change made on load would pile up with each visit. The documents are built
+from HTML by `docs/content/pdfs/` (see its README).
+
 ### A viewer example
 
 ```

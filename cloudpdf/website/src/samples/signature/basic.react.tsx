@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import { FormLayer, formPlugin, useForm, useFormState } from '@embedpdf/react/form';
+import { FormLayer, formPlugin, toFieldRef, useForm, useFormState } from '@embedpdf/react/form';
 import { stampPlugin, useStamp, useStampAssetPreviewUrl } from '@embedpdf/react/stamp';
 import {
   createTestSigner,
@@ -36,30 +36,26 @@ const plugins = [
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 /**
- * The ebook has no signature field, and the browser holds no signatures yet:
- * add a field to the last page, and one person with a typed signature.
+ * Start on the invoice, where the form's signature field is. The browser holds no signatures
+ * yet: add one person with a typed signature.
  */
 function useSetUp() {
   const form = useForm();
   const stamp = useStamp();
   const stage = useStage();
   const status = useFormState((state) => state.status);
-  const page = usePageList().at(-1)?.ref;
   const done = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || done.current) return;
+    if (status !== 'ready' || done.current) return;
     done.current = true;
     void (async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-      });
-      stage.goToPage(page);
+      // Bring the form's signature field into view, on the invoice.
+      const [widget] = form.getWidgets(toFieldRef('approval'));
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       await stamp.createAsset({
         libraryId: library.id,
@@ -68,7 +64,7 @@ function useSetUp() {
         mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
       });
     })();
-  }, [form, stamp, stage, status, page]);
+  }, [form, stamp, stage, status]);
 }
 
 function MarkButton({ assetId, label, onPick }: { assetId: string; label: string; onPick: () => void }) {
@@ -118,7 +114,7 @@ function SignBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SignBar />
         <Stage className="stage">

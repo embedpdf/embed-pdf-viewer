@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useEffect } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -11,8 +11,6 @@ import {
 import {
   AnnotationLayer,
   annotationPlugin,
-  useAnnotation,
-  useAnnotationState,
   useFilePickerProvider,
 } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
@@ -22,10 +20,10 @@ import './file-picker.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source review]
+const review = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-review.pdf');
+  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -63,34 +61,22 @@ function Toolbar() {
   );
 }
 
-// On load: a text file pinned to the cover, and the stamp tool active.
-function StartWithAFile() {
-  const annotation = useAnnotation();
+// On load: the stamp tool is active.
+function StartWithTheStamp() {
   const interaction = useInteraction();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    const notes = new File(['Questions for the next review.'], 'notes.txt', { type: 'text/plain' });
-    void annotation.create(
-      cover,
-      { subtype: 'file-attachment', rect: { x: 470, y: 232, width: 20, height: 20 } },
-      { file: notes },
-    );
     interaction.activateTool('stamp');
-  }, [annotation, interaction, ready, cover]);
+  }, [interaction]);
 
   return null;
 }
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <StartWithAFile />
+        <StartWithTheStamp />
         <Toolbar />
         <Stage className="stage">
           {() => (
