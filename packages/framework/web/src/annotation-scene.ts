@@ -11,6 +11,13 @@
 import { paint } from './theme';
 import type { MountableFontProgram } from './web-font';
 
+/** U+200D: next to a letter drawn alone, it gives the letter its form joined on that side. */
+const ZERO_WIDTH_JOINER = '\u200d';
+
+/** A run's text with a joiner on each side where it joins a letter drawn elsewhere. */
+const joinedRunText = (run: { text: string; joinsPrevious?: boolean; joinsNext?: boolean }) =>
+  `${run.joinsPrevious ? ZERO_WIDTH_JOINER : ''}${run.text}${run.joinsNext ? ZERO_WIDTH_JOINER : ''}`;
+
 /** How a scene node paints: the structural twin of core-annotation's `Paint`. */
 export interface ScenePaint {
   fill?: string;
@@ -60,6 +67,9 @@ export type SceneShapeNode = (
       text: string;
       rtl: boolean;
       plain: boolean;
+      /** A letter joined to the one before or after it in the text, drawn alone (a comb's cell). */
+      joinsPrevious?: boolean;
+      joinsNext?: boolean;
       fontSize: number;
       fontFamily: string;
       fontWeight?: number;
@@ -249,7 +259,11 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
       // One element per run, at its left edge: the browser shapes the run in
       // its direction and orders nothing (bidi-override); a right-to-left run
       // ends at its left edge (text-anchor: end). Spaces at either end keep
-      // their room only with white-space: pre.
+      // their room only with white-space: pre. A letter joined to a neighbour
+      // drawn elsewhere (a comb's cell) gets a joiner on that side, so it
+      // takes its joined form; Firefox ignores a joiner at a run's edge under
+      // bidi-override, and a lone letter needs no override, so such a run is
+      // embedded instead.
       return {
         tag: 'text',
         attributes: {
@@ -263,11 +277,11 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
           ...(node.fontWeight !== undefined ? { 'font-weight': node.fontWeight } : {}),
           ...(node.fontStyle !== undefined ? { 'font-style': node.fontStyle } : {}),
           direction: node.rtl ? 'rtl' : 'ltr',
-          'unicode-bidi': 'bidi-override',
+          'unicode-bidi': node.joinsPrevious || node.joinsNext ? 'embed' : 'bidi-override',
           'text-anchor': node.rtl ? 'end' : 'start',
           ...painted,
         },
-        text: node.text,
+        text: joinedRunText(node),
         style: {
           'white-space': 'pre',
           ...(node.plain ? { 'font-kerning': 'none', 'font-variant-ligatures': 'none' } : {}),

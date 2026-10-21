@@ -961,15 +961,20 @@ export type SceneNode = (
    *  baseline, `text` its characters in typing order. A right-to-left run is
    *  drawn right to left from its right end, so it ends at `at`; the browser
    *  shapes the run and orders nothing. `plain` turns kerning and ligatures
-   *  off, as the engine draws simple scripts. `rotation` turns the run about
-   *  `at`, degrees clockwise. `program` is the face it draws in, for whatever
-   *  draws it to mount (`fontFamily` names it first). */
+   *  off, as the engine draws simple scripts. `joinsPrevious` and `joinsNext`
+   *  say a letter drawn alone (a comb's cell) is joined to the letter before
+   *  or after it in the text: it takes that joined form, drawn with a joiner
+   *  (U+200D) on that side. `rotation` turns the run about `at`, degrees
+   *  clockwise. `program` is the face it draws in, for whatever draws it to
+   *  mount (`fontFamily` names it first). */
   | {
       kind: 'textRun';
       at: Point;
       text: string;
       rtl: boolean;
       plain: boolean;
+      joinsPrevious?: boolean;
+      joinsNext?: boolean;
       fontSize: number;
       fontFamily: string;
       fontWeight?: number;

@@ -6,7 +6,9 @@
  * each section into lines where CPVT breaks them, and each line into runs in
  * the order they are drawn. A font size of 0 is fitted: the biggest of CPVT's
  * sizes the text fits in. A comb puts one character in the middle of each
- * cell. A field reads right to left when its first strong character does.
+ * cell, a letter of a cursive script in the form the whole text gives it
+ * (joined to the letters around it). A field reads right to left when its
+ * first strong character does.
  *
  * Positions are PDF points, y up, as the field's appearance stream has them.
  * The arithmetic is single precision, as the engine's, so a line breaks where
@@ -19,6 +21,7 @@ import { isOpenPunctuation, isSpace, needsBreak } from './breaks';
 import type { TextFont, TextFonts } from './fonts';
 import { graphemeStarts } from './graphemes';
 import { graphemesWidth, itemize, runsOf, scaled, type Paragraph, type Run } from './items';
+import { joinedText, joinsOf, type Joins } from './joining';
 
 const f32 = Math.fround;
 const isFloatZero = (value: number) => value < 0.0001 && value > -0.0001;
@@ -63,6 +66,14 @@ export interface FieldRun<F extends TextFont = TextFont> {
   readonly x: number;
   /** In points. */
   readonly width: number;
+  /**
+   * A comb cell's letter, joined to the letter in the cell before it (in
+   * typing order), as the engine shapes the whole text: drawn alone, it takes
+   * that joined form only with a joiner (U+200D) on that side.
+   */
+  readonly joinsPrevious: boolean;
+  /** The same, to the letter in the cell after it. */
+  readonly joinsNext: boolean;
 }
 
 export interface FieldLine<F extends TextFont = TextFont> {
@@ -141,6 +152,23 @@ export function layoutField<F extends TextFont>(
 
   const unitWidth = (section: Section<F>, unit: Unit, size: number) =>
     graphemesWidth(section.paragraph, unit.grapheme, unit.grapheme + 1, size);
+  /** Where each of a comb's characters joins the ones in the cells around it: shaped as one text. */
+  const cellJoins = ({ paragraph, units }: Section<F>): Joins[] => {
+    const graphemeOf = (unit: Unit) => paragraph.graphemes[unit.grapheme]!;
+    return joinsOf(
+      units.map((unit) => paragraph.text.slice(graphemeOf(unit).begin, graphemeOf(unit).end)),
+      (a, b) => graphemeOf(units[a]!).item === graphemeOf(units[b]!).item,
+    );
+  };
+  /** A comb character's width: its joined form's, where it joins a neighbour. */
+  const cellWidth = (section: Section<F>, unit: Unit, joins: Joins, size: number) => {
+    if (!joins.previous && !joins.next) return unitWidth(section, unit, size);
+    const { paragraph } = section;
+    const grapheme = paragraph.graphemes[unit.grapheme]!;
+    const item = paragraph.items[grapheme.item]!;
+    const text = joinedText(paragraph.text.slice(grapheme.begin, grapheme.end), joins);
+    return scaled(item.font.width(text, item.level % 2 === 1), size);
+  };
   const faceAscent = (size: number) => scaled(fonts.face.ascent, size);
   const faceDescent = (size: number) => scaled(fonts.face.descent, size);
 
@@ -184,6 +212,7 @@ export function layoutField<F extends TextFont>(
     section: Section<F>;
     lines: Line[];
     cellX: number[];
+    cellJoins: Joins[];
     left: number;
     top: number;
   }[] = [];
@@ -192,6 +221,7 @@ export function layoutField<F extends TextFont>(
   for (const section of sections) {
     let lines: Line[];
     const cellX: number[] = [];
+    let joins: Joins[] = [];
     let left = 0;
     let height: number;
     if (comb) {
@@ -202,9 +232,10 @@ export function layoutField<F extends TextFont>(
       else if (alignment === 2) start = cells - units;
       const ascent = faceAscent(fontSize);
       let lineDescent = faceDescent(fontSize);
+      joins = cellJoins(section);
       for (let index = 0; index < units && index < cells; index += 1) {
         const unit = section.units[index]!;
-        const width = unitWidth(section, unit, fontSize);
+        const width = cellWidth(section, unit, joins[index]!, fontSize);
         cellX.push(f32(nodeWidth * (index + start + 0.5) - f32(width * 0.5)));
         lineDescent = Math.min(lineDescent, scaled(unit.descent, fontSize));
       }
@@ -218,7 +249,7 @@ export function layoutField<F extends TextFont>(
       left = alignmentOffset(alignment, typesetWidth, extent.width);
       height = extent.height;
     }
-    placed.push({ section, lines, cellX, left, top: positionY });
+    placed.push({ section, lines, cellX, cellJoins: joins, left, top: positionY });
     positionY = f32(positionY + height);
     contentHeight = f32(contentHeight + height);
   }
@@ -227,7 +258,7 @@ export function layoutField<F extends TextFont>(
   const offsetY = options.centered ? f32(f32(contentHeight - plateHeight) / 2) : 0;
 
   const out: FieldLine<F>[] = [];
-  for (const { section, lines, cellX, left, top } of placed) {
+  for (const { section, lines, cellX, cellJoins: joins, left, top } of placed) {
     let lineTop = 0;
     for (const line of lines) {
       lineTop = f32(lineTop + line.ascent);
@@ -238,13 +269,19 @@ export function layoutField<F extends TextFont>(
         if (comb) {
           cellX.forEach((x, index) => {
             const unit = section.units[index]!;
+            const cell = joins[index]!;
             for (const run of runsOf(
               section.paragraph,
               unit.grapheme,
               unit.grapheme + 1,
               fontSize,
             )) {
-              runs.push(fieldRun(run, x));
+              runs.push({
+                ...fieldRun(run, x),
+                width: cellWidth(section, unit, cell, fontSize),
+                joinsPrevious: cell.previous,
+                joinsNext: cell.next,
+              });
             }
           });
         } else {
@@ -264,7 +301,16 @@ export function layoutField<F extends TextFont>(
 
   function fieldRun(run: Run<F>, x: number): FieldRun<F> {
     const { font, text, rtl, plain, width } = run;
-    return { font, text, rtl, plain, x: f32(plate.left + x), width };
+    return {
+      font,
+      text,
+      rtl,
+      plain,
+      x: f32(plate.left + x),
+      width,
+      joinsPrevious: false,
+      joinsNext: false,
+    };
   }
 
   /**

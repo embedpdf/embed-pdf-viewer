@@ -23,3 +23,5 @@ Form fields and redaction labels are written by the same text engine as free tex
 Fix the boxes and origins of `/ActualText` characters inside a form XObject: they were in the form's own space, so text in a form drawn anywhere but the page's origin, such as a flattened form field, was selected and highlighted in the wrong place. They are in page space now, like every other character.
 
 Fix reading back `/ActualText` that holds marks or spaces between its words: a line cut the span at them and gave its pieces in visual order, so pointed Hebrew and Arabic with harakat came out scrambled, and a right-to-left span of two words had them swapped. Inside a span, a mark takes the direction of the character before it and the characters between two of the same direction take theirs (UAX #9), so the span reads as written.
+
+A form field's new appearance stream is a form XObject that says so (`/Type /XObject /Subtype /Form`), as readers and the PDF specification expect: it had neither.

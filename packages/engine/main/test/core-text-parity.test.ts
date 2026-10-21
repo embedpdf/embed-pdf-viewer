@@ -12,9 +12,9 @@
  * credits a kern to the glyph it follows; the twin measures the run whole and
  * shares its width between the characters by measuring prefixes. A run's
  * width agrees; one character's, which a comb centres in its cell, can be
- * off by part of a kern. In a joined script (Arabic) a letter's width
- * depends on the letter after it, so a comb's cells are checked for font,
- * text and order only.
+ * off by part of a kern. A comb's letter of a joined script (Arabic) is
+ * measured in the form the whole text gives it: with a joiner on each side
+ * where it joins its neighbours.
  *
  * The painter (`@embedpdf/core-form`) draws those runs: text fields, combo
  * boxes, list box rows and push button captions in mixed scripts, through
@@ -52,7 +52,6 @@ import { widgetDrawing, type DrawOp } from '../../../core/form/src';
 import { localEngine } from '../src/index';
 
 const POSITION = 0.1;
-const JOINED = /[\p{Script=Arabic}\p{Script=Syriac}\p{Script=Nko}\p{Script=Mongolian}]/u;
 
 /** How wide text is in a program, shaped by HarfBuzz, in thousandths of the font size. */
 function harfbuzzWidth(bytes: Uint8Array): (text: string, rtl: boolean) => number {
@@ -156,6 +155,13 @@ interface Placed {
   text: string;
   x: number;
   baseline: number;
+  /** Where the pen ends after it, when known. */
+  end?: number;
+  /**
+   * Drawn mark first (a pointed letter alone, in a comb's cell): its first
+   * glyph is the mark, at its own offset, so the run is placed by its end.
+   */
+  markFirst?: boolean;
 }
 
 let engine: LocalEngine;
@@ -223,6 +229,8 @@ async function written(shape: Shape, value: string): Promise<Placed[]> {
     text: run.text,
     x: run.x,
     baseline: run.baseline,
+    ...(run.end !== undefined ? { end: run.end } : {}),
+    markFirst: /^\p{M}/u.test(run.glyphs),
   }));
 }
 
@@ -246,9 +254,17 @@ function laidOut(shape: Shape, value: string): Placed[] {
         Math.abs(last.baseline - line.baseline) < 0.001
       ) {
         last.text += run.text;
+        last.end = run.x + run.width;
         continue;
       }
-      placed.push({ font, text: run.text, x: run.x, baseline: line.baseline, rtl: run.rtl });
+      placed.push({
+        font,
+        text: run.text,
+        x: run.x,
+        baseline: line.baseline,
+        end: run.x + run.width,
+        rtl: run.rtl,
+      });
     }
   }
   return placed.map(({ rtl: _rtl, ...rest }) => rest);
@@ -263,10 +279,13 @@ describe('core-text lays a field out as the engine writes it', () => {
         expect(twinRuns.map(({ font, text }) => [font, text])).toEqual(
           engineRuns.map(({ font, text }) => [font, text]),
         );
-        const cellsOfJoinedScript = shape.options.cells > 0 && JOINED.test(value);
         twinRuns.forEach((run, index) => {
           const expected = engineRuns[index]!;
-          if (!cellsOfJoinedScript) {
+          if (expected.markFirst) {
+            expect(Math.abs(run.end! - expected.end!), `${run.text}: end`).toBeLessThanOrEqual(
+              POSITION,
+            );
+          } else {
             expect(Math.abs(run.x - expected.x), `${run.text}: x`).toBeLessThanOrEqual(POSITION);
           }
           expect(

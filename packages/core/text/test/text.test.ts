@@ -3,6 +3,8 @@ import { describe, expect, test } from 'vitest';
 import {
   firstStrongIsRtl,
   graphemesOf,
+  joiningTypeOf,
+  joinsOf,
   layoutField,
   matchGrapheme,
   paragraphLevels,
@@ -270,5 +272,69 @@ describe('a field', () => {
     expect(runsOf(layoutField('שלום', FONTS, { ...FIELD, password: true }))).toEqual([
       [['helvetica', '****', false]],
     ]);
+  });
+  test('a comb sets a cursive letter in the form the whole text gives it, measured so', () => {
+    // Joined forms 100 narrower on each joined side, as a joiner (U+200D) asks for them.
+    const arabic: TextFont = {
+      ...fakeFont('arabic', [[0x0600, 0x06ff]]),
+      width: (text) =>
+        [...text].filter((c) => !/[\p{M}\u200d]/u.test(c)).length * 600 -
+        [...text].filter((c) => c === '\u200d').length * 100,
+    };
+    const fonts: TextFonts = { face: HELVETICA, fallbacks: [arabic], lastResort: LAST_RESORT };
+    const laid = layoutField('مرحبا', fonts, { ...FIELD, cells: 5 });
+    const runs = laid.lines[0]!.runs;
+    expect(runs.map((run) => [run.text, run.joinsPrevious, run.joinsNext])).toEqual([
+      ['م', false, true],
+      ['ر', true, false],
+      ['ح', false, true],
+      ['ب', true, true],
+      ['ا', true, false],
+    ]);
+    // Each in the middle of its cell, by its joined width.
+    const cell = (PLATE.right - PLATE.left) / 5;
+    const widths = [500, 500, 500, 400, 500].map((thousandths) => (thousandths * 12) / 1000);
+    runs.forEach((run, index) => {
+      expect(run.width).toBeCloseTo(widths[index]!, 3);
+      expect(run.x).toBeCloseTo(PLATE.left + cell * (index + 0.5) - widths[index]! / 2, 3);
+    });
+    // Outside a comb nothing is drawn alone: no run joins.
+    expect(
+      layoutField('مرحبا', fonts, FIELD).lines[0]!.runs.every(
+        (run) => !run.joinsPrevious && !run.joinsNext,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('joining', () => {
+  test("letters join as the engine's shaper reads Unicode's joining types", () => {
+    const type = (c: string) => joiningTypeOf(c.codePointAt(0)!);
+    expect(['ب', 'ا', 'ر', 'ـ', 'ء', '\u064e', '\u200d', '\u200c', 'ܐ', 'A'].map(type)).toEqual([
+      'D',
+      'R',
+      'R',
+      'C',
+      'U',
+      'T',
+      'C',
+      'U',
+      'R',
+      'U',
+    ]);
+  });
+
+  test('a pair joins where the first joins what follows and the second what precedes it', () => {
+    const joins = (word: string) =>
+      joinsOf(graphemesOf(word).map(([begin, end]) => word.slice(begin, end))).map(
+        (join) => `${join.previous ? '<' : ''}${join.next ? '>' : ''}`,
+      );
+    expect(joins('مرحبا')).toEqual(['>', '<', '>', '<>', '<']);
+    // Marks ride with their letter.
+    expect(joins('م\u064eر\u0652ح\u064eب\u064bا')).toEqual(['>', '<', '>', '<>', '<']);
+    // A space, Latin, a non-joiner: nothing joins across them.
+    expect(joins('بب ب')).toEqual(['>', '<', '', '']);
+    expect(joins('ب\u200cب')).toEqual(['', '', '']);
+    expect(joins('ab')).toEqual(['', '']);
   });
 });

@@ -217,6 +217,35 @@ describe('svgShapesOf', () => {
     });
   });
 
+  it('draws a letter joined to letters drawn elsewhere with a joiner on each joined side', () => {
+    const shape = (joins: { joinsPrevious?: boolean; joinsNext?: boolean }) =>
+      svgShapesOf(
+        [
+          {
+            kind: 'textRun',
+            at: { x: 40, y: 20 },
+            text: 'ب',
+            rtl: true,
+            plain: false,
+            ...joins,
+            fontSize: 12,
+            fontFamily: '"epdf-arabic"',
+            paint: { fill: '#000000' },
+          },
+        ],
+        options,
+      )[0]!;
+    const run = (joins: { joinsPrevious?: boolean; joinsNext?: boolean }) => shape(joins).text;
+    // A comb's cells, each drawn alone, in the forms the whole word gives them.
+    expect(run({ joinsPrevious: true, joinsNext: true })).toBe('\u200dب\u200d');
+    expect(run({ joinsPrevious: true })).toBe('\u200dب');
+    expect(run({ joinsNext: true })).toBe('ب\u200d');
+    expect(run({})).toBe('ب');
+    // Embedded, not overridden: Firefox drops a joiner at the edge of an overridden run.
+    expect(shape({ joinsNext: true }).attributes['unicode-bidi']).toBe('embed');
+    expect(shape({}).attributes['unicode-bidi']).toBe('bidi-override');
+  });
+
   it('writes a style as CSS text', () => {
     expect(styleText({ 'white-space': 'pre', 'mix-blend-mode': 'multiply' })).toBe(
       'white-space: pre; mix-blend-mode: multiply',

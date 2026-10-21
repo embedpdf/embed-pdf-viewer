@@ -46,6 +46,13 @@ export interface TextRun {
   readonly plain: boolean;
   /** In points. */
   readonly width: number;
+  /**
+   * A comb cell's letter joined to the one before it, or after it (in typing
+   * order), as the engine shapes the whole text: drawn alone, it takes that
+   * joined form with a joiner (U+200D) on that side.
+   */
+  readonly joinsPrevious: boolean;
+  readonly joinsNext: boolean;
 }
 
 export type DrawOp =

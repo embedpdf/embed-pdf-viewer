@@ -33,6 +33,7 @@
   "scripts": {
     "build": "epdf-build",
     "clean": "rimraf dist",
+    "generate": "node scripts/generate-joining-types.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

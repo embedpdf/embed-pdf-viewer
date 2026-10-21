@@ -9,3 +9,5 @@ Add `browserTextMeasurer()`, the browser's text measuring for the kernel (`creat
 `svgShapesOf` draws a `textRun` scene node as one `<text>` at its left edge, shaped by the browser in its direction (`unicode-bidi: bidi-override`; a right-to-left run anchored by its end), with its spaces kept (`white-space: pre`) and kerning and ligatures off for a plain run. `SvgShape.style` replaces `blend`: the CSS a shape needs that has no attribute, `mix-blend-mode` among it; `styleText(style)` writes it as one attribute.
 
 A text field's editor reads its line in the engine's direction (`direction` from the layout's `rtl`): text that starts in Hebrew or Arabic is ordered right to left as the engine orders it, and typing at the end of a right-to-left word continues it. The field's alignment is unchanged.
+
+`svgShapesOf` draws a `textRun` that joins its neighbours (`joinsPrevious`, `joinsNext`) with a joiner (U+200D) on each side it joins, embedded rather than overridden (`unicode-bidi: embed`; Firefox ignores a joiner at the edge of an overridden run), so an Arabic letter in a comb's cell takes its joined form, as the engine draws it.

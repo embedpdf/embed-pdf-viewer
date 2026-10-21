@@ -122,6 +122,8 @@ export function widgetScene(drawing: WidgetDrawing, placement: WidgetPlacement):
               text: run.text,
               rtl: run.rtl,
               plain: run.plain,
+              ...(run.joinsPrevious ? { joinsPrevious: true } : {}),
+              ...(run.joinsNext ? { joinsNext: true } : {}),
               fontSize: op.size,
               fontFamily: run.font.fontFamily,
               fontWeight: run.font.fontWeight,

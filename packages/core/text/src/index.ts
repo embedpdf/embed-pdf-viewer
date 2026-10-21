@@ -30,4 +30,12 @@ export {
 } from './paint';
 export { firstStrongIsRtl, lineLevels, mirrorOf, paragraphLevels, visualOrder } from './bidi';
 export { graphemeStarts, graphemesOf, isInvisibleGrapheme } from './graphemes';
+export {
+  graphemeJoiningType,
+  joinedText,
+  joiningTypeOf,
+  joinsOf,
+  type JoiningType,
+  type Joins,
+} from './joining';
 export { isSimpleScript, scriptOf } from './scripts';

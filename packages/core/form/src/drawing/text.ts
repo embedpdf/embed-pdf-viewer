@@ -50,7 +50,7 @@ const laidOut = (
 /** Every run of the laid-out text, line by line, left to right. */
 const runsOf = (laid: Laid): TextRun[] =>
   laid.lines.flatMap((line) =>
-    line.runs.map(({ x, text, font, rtl, plain, width }) => ({
+    line.runs.map(({ x, text, font, rtl, plain, width, joinsPrevious, joinsNext }) => ({
       x,
       y: line.baseline,
       text,
@@ -58,6 +58,8 @@ const runsOf = (laid: Laid): TextRun[] =>
       rtl,
       plain,
       width,
+      joinsPrevious,
+      joinsNext,
     })),
   );
 

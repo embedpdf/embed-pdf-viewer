@@ -164,4 +164,30 @@ describe('the painter', () => {
     );
     expect(hebrew).toMatchObject({ plain: false, program: HEBREW.program });
   });
+
+  it("draws a comb's Arabic letters in the forms the whole word gives them", () => {
+    const arabic: PaintFont = {
+      ...HEBREW,
+      key: 'arabic-hash',
+      covers: (codePoint) => codePoint >= 0x0600 && codePoint <= 0x06ff,
+      fontFamily: '"epdf-arabic"',
+      program: { ...HEBREW.program, hash: 'arabic-hash', family: 'epdf-arabic' },
+    };
+    const comb = { ...textField('مرحبا'), comb: true, maxLength: 5 } as FormFieldDTO;
+    const scene = widgetScene(
+      widgetDrawing(widget(), comb, {}, { ...FONTS, fallbacks: [arabic] })!,
+      { box: { x: 10, y: 20, width: 100, height: 20 } },
+    );
+    expect(
+      scene.flatMap((node) =>
+        node.kind === 'textRun' ? [[node.text, !!node.joinsPrevious, !!node.joinsNext]] : [],
+      ),
+    ).toEqual([
+      ['م', false, true],
+      ['ر', true, false],
+      ['ح', false, true],
+      ['ب', true, true],
+      ['ا', true, false],
+    ]);
+  });
 });
