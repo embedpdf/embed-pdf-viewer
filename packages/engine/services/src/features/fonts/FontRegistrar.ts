@@ -56,6 +56,8 @@ export interface StartupFontSpec {
   fallback?: boolean;
   /** Its fallback tier (`FALLBACK_TIERS`); the host's own fonts by default. */
   tier?: FallbackTier;
+  /** Whether its bytes may go to a browser (the server's `serve`); false by default. */
+  serve?: boolean;
 }
 
 /**
@@ -170,6 +172,7 @@ export class FontRegistrar {
    * Register a font from a local file via `EPDFFont_RegisterFont`. The runtime
    * range-reads the file on demand (it is not loaded into the JS heap), and the
    * file-access handle is retained until {@link clear}. Native/node only.
+   * `served` says whether its bytes may go to a browser (the server's `serve`).
    *
    * Throws `InvalidArg` when the runtime rejects the font (corrupt, no glyphs).
    */
@@ -179,6 +182,7 @@ export class FontRegistrar {
     weight: number,
     italic: number,
     path: string,
+    served = false,
   ): void {
     const access = this.runtime.fileAccess.fromNodeFile(path);
     let id = 0;
@@ -197,7 +201,7 @@ export class FontRegistrar {
     }
     this.ids.set(fontKey, id);
     this.identities.set(fontKey, this.readIdentity(id, { familyName, weight, italic }));
-    this.programs.set(fontKey, { ...this.readProgram(id), served: false });
+    this.programs.set(fontKey, { ...this.readProgram(id), served });
     this.fileHandles.push(access);
   }
 
@@ -299,6 +303,7 @@ export class FontRegistrar {
         spec.weight ?? 0,
         italic,
         spec.path,
+        spec.serve ?? false,
       );
       if (spec.fallback) {
         this.addFallback(spec.key, spec.tier);

@@ -25,3 +25,5 @@ Fix the boxes and origins of `/ActualText` characters inside a form XObject: the
 Fix reading back `/ActualText` that holds marks or spaces between its words: a line cut the span at them and gave its pieces in visual order, so pointed Hebrew and Arabic with harakat came out scrambled, and a right-to-left span of two words had them swapped. Inside a span, a mark takes the direction of the character before it and the characters between two of the same direction take theirs (UAX #9), so the span reads as written.
 
 A form field's new appearance stream is a form XObject that says so (`/Type /XObject /Subtype /Form`), as readers and the PDF specification expect: it had neither.
+
+A document's font index walks a layer incrementally: what each place (the AcroForm, each page) reaches is kept, and a transaction's commit or abort forgets only the places that read what it touched, so a list after an edit walks the pages the edit changed. `EPDFDoc_GetFontsFingerprint` returns a SHA-256 of every fact `EPDFFontFaces_Load` lists: read it before and after a write to learn whether the write changed the document's fonts.

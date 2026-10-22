@@ -19,6 +19,7 @@
 
 import type { DocCapability, PdfBits } from '../auth/scope';
 import { checkAnyCapability, checkCapability } from '../auth/scope';
+import { TEXT_WRITING_CAPABILITIES } from '../fonts/fontList';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
@@ -142,6 +143,14 @@ export type DocResourceId =
   | 'layer-attachments'
   | 'layer-attachment-files'
   | 'layer-outline'
+  // The fonts: the list (pinned by `fontsVersion` and the server's fonts),
+  // a program's facts (content-addressed by its hash) and its bytes, each
+  // under its own prefix: the bytes go only to a token that may write text,
+  // and never through a shared CDN.
+  | 'fonts'
+  | 'layer-fonts'
+  | 'layer-font-programs'
+  | 'layer-font-program-files'
   | 'download-current'
   | 'download-versioned';
 
@@ -518,6 +527,54 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
+  },
+  fonts: {
+    id: 'fonts',
+    pathPattern: '/v1/docs/{docId}/fonts@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/fonts@*`,
+    pathPrefix: '/v1/docs/{docId}/fonts@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/fonts@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-fonts': {
+    id: 'layer-fonts',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/fonts@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/fonts@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/fonts@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/fonts@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-font-programs': {
+    id: 'layer-font-programs',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/font-programs/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-programs/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/font-programs/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-programs/`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-font-program-files': {
+    id: 'layer-font-program-files',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/font-program-files/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-program-files/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/font-program-files/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/font-program-files/`,
+    requirement: { kind: 'any', capabilities: TEXT_WRITING_CAPABILITIES },
+    // A font's licence may allow sending it to the document's users, not
+    // hosting it on the web: browsers keep it privately.
+    routeKind: 'origin',
+    cdnCacheable: false,
   },
   'layer-attachment-files': {
     id: 'layer-attachment-files',

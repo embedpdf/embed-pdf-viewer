@@ -8,6 +8,7 @@
  */
 import { STANDARD_FACES, fontNameForFace, standardFamilyOf } from '../annotation/fontFaces';
 import { STANDARD_FONTS, type FontName, type StandardFont } from '../annotation/primitives';
+import type { DocCapability } from '../auth/scope/types';
 import type {
   Font,
   FontFormat,
@@ -18,6 +19,8 @@ import type {
   ResolvedFontRun,
 } from '../dto/DocumentFonts';
 import type { FontEmbeddingPermission, FontIdentityInfo } from '../dto/FontSpec';
+import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 
 /** A font program as the engine found it, before what it allows is decided. */
 export interface FontProgramFacts {
@@ -295,6 +298,46 @@ export function fontListOf(facts: FontListFacts, builtIn: BuiltInPrograms): Font
       canDownload: true,
     },
   };
+}
+
+/** Who may have a program's bytes: a session that may write text in the document. */
+export const TEXT_WRITING_CAPABILITIES = [
+  'doc.annotate.modify',
+  'doc.forms.fill',
+  'doc.forms.modify',
+  'doc.redact',
+] as const satisfies readonly DocCapability[];
+
+/** The program `list` names by its display hash: `NotFound` when none does. */
+export function listedProgram(list: FontList, displayHash: string): FontProgram {
+  const program = [...list.fonts.flatMap((font) => font.programs), list.lastResort].find(
+    (candidate) => candidate.displayHash === displayHash,
+  );
+  if (!program) {
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `no font in this document has the program ${displayHash}`,
+    );
+  }
+  return program;
+}
+
+/**
+ * The program `downloadProgram(displayHash)` hands out: as {@link listedProgram},
+ * and `InvalidArg` when it can't be downloaded.
+ */
+export function downloadableProgram(list: FontList, displayHash: string): FontProgram {
+  const program = listedProgram(list, displayHash);
+  if (!program.canDownload) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `the program ${displayHash} can't be downloaded`,
+      {
+        details: { field: 'displayHash' },
+      },
+    );
+  }
+  return program;
 }
 
 /**

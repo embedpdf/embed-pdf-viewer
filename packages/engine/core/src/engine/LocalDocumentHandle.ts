@@ -15,7 +15,7 @@ import type { BaseVersionInfo } from '../signature/types';
  * document checks with {@link isLocalDocument}.
  */
 export interface LocalDocumentHandle extends DocumentHandle {
-  /** The document's fonts, and its session's font settings. See {@link LocalDocumentFontsService}. */
+  /** As {@link DocumentHandle.fonts}, with the session's font settings. */
   readonly fonts: LocalDocumentFontsService;
   /**
    * Catalog-level `/PieceInfo` private application data (ISO 32000 §14.5),

@@ -1,4 +1,4 @@
-import { PluginError, type PluginContext } from '@embedpdf/core';
+import type { PluginContext } from '@embedpdf/core';
 import {
   fontProgramFamily,
   LAST_RESORT_HASH,
@@ -8,16 +8,13 @@ import {
   type MountableFontProgram,
 } from '@embedpdf/core-fonts';
 import {
-  isLocalDocument,
   isStandardFontName,
   STANDARD_FACES,
   STANDARD_FONTS,
-  type DocumentHandle,
   type Font,
   type FontList,
   type FontName,
   type FontProgramInfo,
-  type LocalDocumentFontsService,
   type StandardFont,
 } from '@embedpdf/engine-core/runtime';
 
@@ -32,12 +29,6 @@ import {
   styleOfProgram,
 } from './model';
 import { createPaintFonts } from './paint';
-
-/** The document's fonts service, on an engine that has one. */
-function documentFonts(doc: DocumentHandle): LocalDocumentFontsService {
-  if (isLocalDocument(doc)) return doc.fonts;
-  throw new PluginError('unsupported', 'fonts', "this document's engine doesn't list its fonts");
-}
 
 /** The hash prefix a program's CSS family names (`fontProgramFamily`), or undefined for another family. */
 function programPrefixOf(cssFamily: string): string | undefined {
@@ -75,7 +66,7 @@ export function createFontsController(ctx: PluginContext<void>) {
     name: 'fonts',
     onDemand: true,
     initial: () => null,
-    load: async (doc) => ({ value: await documentFonts(doc).list() }),
+    load: async (doc) => ({ value: await doc.fonts.list() }),
     fold: foldFontList,
     changed: ({ previous, next }) => {
       css = new Map();
@@ -109,7 +100,7 @@ export function createFontsController(ctx: PluginContext<void>) {
         load: () => {
           if (!bytes) {
             const loading = Promise.resolve().then(() =>
-              documentFonts(ctx.doc).downloadProgram(displayHash),
+              ctx.doc.fonts.downloadProgram(displayHash),
             );
             // A load that failed is tried again next time.
             loading.catch(() => {
@@ -189,7 +180,7 @@ export function createFontsController(ctx: PluginContext<void>) {
   const programInfoOf = (displayHash: string): Promise<FontProgramInfo> => {
     let info = programInfos.get(displayHash);
     if (!info) {
-      info = documentFonts(ctx.doc).getProgram(displayHash);
+      info = ctx.doc.fonts.getProgram(displayHash);
       programInfos.set(displayHash, info);
       info.catch(() => programInfos.delete(displayHash));
     }
@@ -198,9 +189,8 @@ export function createFontsController(ctx: PluginContext<void>) {
 
   const paintFonts = createPaintFonts({
     measurer: ctx.measurer,
-    canFind: () => isLocalDocument(ctx.doc),
     loadList: () => list.ensureLoaded(),
-    resolve: (request) => documentFonts(ctx.doc).resolve(request),
+    resolve: (request) => ctx.doc.fonts.resolve(request),
     getProgram: programInfoOf,
     programOf: (hash, style) => programOf(hash, style ?? styleOfProgram(list.get(), hash)),
     standardOf: (font) => standardOfName(font),
@@ -265,7 +255,7 @@ export function createFontsController(ctx: PluginContext<void>) {
     ensureLoaded: () => list.ensureLoaded(),
     refresh: () => list.refresh(),
     resolve: async (request, options) =>
-      ctx.cancellable(options?.signal, documentFonts(ctx.doc).resolve(request)),
+      ctx.cancellable(options?.signal, ctx.doc.fonts.resolve(request)),
     getProgram: async (displayHash, options) =>
       // Another caller may share the read: cancelling this one leaves it running.
       ctx.cancellable(

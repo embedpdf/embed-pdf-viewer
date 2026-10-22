@@ -1160,6 +1160,30 @@ parentPort.on('message', (msg) => {
       });
       return;
     }
+    case 'fonts.list': {
+      // The server's fonts, for its fingerprint: a stub registers none.
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: { tag: 'fonts.list', engineFonts: [], fallbacks: [] },
+      });
+      return;
+    }
+    case 'document.fonts.list': {
+      if (!openDocs.get(sessionKey(msg))) {
+        rejectNotOpen(msg);
+        return;
+      }
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: {
+          tag: 'document.fonts.list',
+          facts: { faces: [], engineFonts: [], fallbacks: [] },
+        },
+      });
+      return;
+    }
     case 'layer.close':
       // The reload seam: close exactly ONE layer session, leaving the
       // base session, sibling layers, and the pool binding intact.

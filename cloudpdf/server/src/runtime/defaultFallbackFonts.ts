@@ -1,7 +1,8 @@
 /**
  * The fonts the engine comes with (Noto Sans Hebrew, Noto Naskh Arabic) as
  * startup fonts: their files in `@embedpdf/default-fallback-fonts`, read by
- * path like the deployment's own, and tried after them.
+ * path like the deployment's own, and tried after them. Their licences let
+ * them go to browsers, so they are served, as the local engine's are.
  */
 import { createRequire } from 'node:module';
 
@@ -19,6 +20,7 @@ export function defaultFallbackFontSpecs(taken: ReadonlySet<string>): StartupFon
     weight: font.weight,
     italic: font.italic,
     fallback: true,
+    serve: true,
     tier: FALLBACK_TIERS.builtIn,
   }));
 }

@@ -28,7 +28,12 @@ import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
-import type { FallbackTier, FontListFacts, ResolvedRunFacts } from '../fonts/fontList';
+import type {
+  EngineFontFacts,
+  FallbackTier,
+  FontListFacts,
+  ResolvedRunFacts,
+} from '../fonts/fontList';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
@@ -1488,6 +1493,27 @@ export interface FontsClearWorkerRequest {
   jobId: WorkerJobId;
 }
 
+/**
+ * The engine's fonts as a document's font list names them, and its fallbacks
+ * in the order they're tried: what the server's fonts' fingerprint is made of.
+ */
+export interface FontsListWorkerRequest {
+  kind: 'fonts.list';
+  effect: 'read';
+  jobId: WorkerJobId;
+}
+
+/**
+ * A served engine font's bytes, by the SHA-256 of its program: the server's
+ * one URL for it, whatever the document. `NotFound` for a font not served.
+ */
+export interface FontsProgramWorkerRequest {
+  kind: 'fonts.program';
+  effect: 'read';
+  jobId: WorkerJobId;
+  sha256: string;
+}
+
 /** The application asserts a licence permitting editing with a font. */
 export interface FontsAuthorizeEditingWorkerRequest {
   kind: 'fonts.authorizeEditing';
@@ -1598,6 +1624,18 @@ export interface PagesWorkingSetWorkerRequest {
 export interface ShutdownWorkerRequest {
   kind: 'shutdown';
   jobId: WorkerJobId;
+}
+
+/**
+ * What a write's payload says beside its result: the layer it saved (a
+ * session that persists its layer, the server's), and whether the write
+ * changed the fonts that can be named in the document (a session that tracks
+ * them: on the server from its first write, locally once they were listed).
+ */
+export interface WritePayloadFacts {
+  artifact?: LayerArtifactWorkerPayload;
+  artifactFile?: LayerArtifactFileWorkerPayload;
+  fontsChanged?: true;
 }
 
 export interface LayerArtifactWorkerPayload {
@@ -1720,6 +1758,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FontsClearFallbacksWorkerRequest
   | FontsClearWorkerRequest
   | FontsAuthorizeEditingWorkerRequest
+  | FontsListWorkerRequest
+  | FontsProgramWorkerRequest
   | ObjectNumbersReserveWorkerRequest
   | DocumentSetFontSettingsWorkerRequest
   | DocumentFontsListWorkerRequest
@@ -1772,12 +1812,10 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.version'; version: BaseVersionInfo }
   | { tag: 'signatures.prepare'; result: SignaturePrepared }
-  | {
+  | ({
       tag: 'signatures.complete';
       result: SignatureCompleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'signatures.cancel'; result: SignatureCancelResult }
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
@@ -1797,19 +1835,15 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot<C['destination']> }
   | { tag: 'outline.read'; outline: DocumentOutline<C['destination']> }
-  | {
+  | ({
       tag: 'metadata.update';
       result: MetadataUpdateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'metadata.readCustom'; custom: CustomMetadata }
-  | {
+  | ({
       tag: 'metadata.updateCustom';
       result: CustomMetadataUpdateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'annotations.list'; list: AnnotationList<C> }
   | { tag: 'annotations.renderAppearances'; page: PageRef; result: AnnotationAppearancesResult<C> }
   | {
@@ -1817,57 +1851,43 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       page: PageRef;
       result: AnnotationAppearancesEncodedResultWire<C>;
     }
-  | {
+  | ({
       tag: 'annotations.create';
       result: AnnotationCreateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.update';
       result: AnnotationUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.delete';
       result: AnnotationDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.flatten';
       result: AnnotationFlattenResult;
       /** False when nothing was applied: no artifact, event, or version bump. */
       wrote: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
   /** A bundle is page space on both sides: the exporter measures what leaves. */
   | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
-  | {
+  | ({
       tag: 'annotations.import';
       result: AnnotationImportResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'annotations.reorder';
       result: AnnotationReorderResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'document.applyChanges';
       /** One per change, in order. */
       outcomes: ServerChangeOutcome<C>[];
       /** The artifact, when at least one change applied. */
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'document.apply';
       result: ChangeResult<C>;
       /**
@@ -1875,197 +1895,137 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
        * again, so nothing is published again.
        */
       replayed: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'forms.list'; snapshot: FormSnapshot<C> }
-  | {
+  | ({
       tag: 'forms.setValue';
       result: FormSetValueResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.reset';
       result: FormResetResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'forms.export'; bundle: WireFormBundle }
-  | {
+  | ({
       tag: 'forms.import';
       result: FormImportResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.importValues';
       result: FormValuesImportResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.repair';
       result: FormRepairResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.createField';
       result: FormFieldCreateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.updateField';
       result: FormFieldUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.setSignatureAppearance';
       result: FormFieldUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.deleteField';
       result: FormFieldDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.addWidget';
       result: FormWidgetLinkResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.detachWidget';
       result: FormWidgetLinkResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.reorderWidgets';
       result: FormWidgetsReorderResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.reorderCalculations';
       result: FormCalculationsReorderResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.updateWidget';
       result: FormWidgetUpdateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'forms.deleteWidget';
       result: FormWidgetDeleteResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pages.list'; snapshot: PageListSnapshot<C> }
-  | {
+  | ({
       tag: 'pages.reorder';
       result: PageReorderResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.rotate';
       result: PageRotateResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.delete';
       result: PageDeleteResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.setName';
       result: PageNameResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.removeName';
       result: PageNameResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.flatten';
       result: PageFlattenResult;
       /** False when nothing was applied: no artifact, event, or version bump. */
       wrote: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'redaction.apply';
       result: RedactionApplyResult;
       /** False when nothing was applied: no artifact, event, or version bump. */
       wrote: boolean;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pages.extract'; bytes: ArrayBuffer; size: number }
   | { tag: 'attachments.list'; attachments: Attachment[] }
   | { tag: 'attachments.readFile'; content: AttachmentFileWorkerPayload }
-  | {
+  | ({
       tag: 'attachments.create';
       result: AttachmentCreateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'attachments.delete';
       result: AttachmentDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'annotations.readFile'; content: AttachmentFileWorkerPayload }
-  | {
+  | ({
       tag: 'pages.insert';
       result: PageInsertResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
-  | {
+    } & WritePayloadFacts)
+  | ({
       tag: 'pages.insertBlank';
       result: PageInsertResult<C>;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'measure.viewports'; page: PageRef; viewports: PageMeasurementViewport<C>[] }
-  | {
+  | ({
       tag: 'measure.setScale';
       result: PageScaleResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pieceInfo.read'; snapshot: PieceInfoSnapshot | null }
-  | {
+  | ({
       tag: 'pieceInfo.update';
       result: PieceInfoUpdateResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pieceInfo.applications'; applications: string[] }
-  | {
+  | ({
       tag: 'pieceInfo.delete';
       result: PieceInfoDeleteResult;
-      artifact?: LayerArtifactWorkerPayload;
-      artifactFile?: LayerArtifactFileWorkerPayload;
-    }
+    } & WritePayloadFacts)
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
   | { tag: 'pages.geometry'; page: PageRef; snapshot: PageGeometrySnapshot<C> }
   | {
@@ -2105,6 +2065,8 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'fonts.clearFallbacks' }
   | { tag: 'fonts.clear' }
   | { tag: 'fonts.authorizeEditing'; identity: FontIdentityInfo }
+  | { tag: 'fonts.list'; engineFonts: EngineFontFacts[]; fallbacks: string[] }
+  | { tag: 'fonts.program'; bytes: ArrayBuffer }
   | { tag: 'document.setFontSettings' }
   | { tag: 'document.fonts.list'; facts: FontListFacts }
   | {

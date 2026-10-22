@@ -48,6 +48,27 @@ export function setNoStore(reply: { header(name: 'Cache-Control', value: string)
   reply.header('Cache-Control', NO_STORE);
 }
 
+/**
+ * A picture pinned to other server fonts than this server's (`serverFonts`)
+ * is a 404: this server would draw it differently, since fallback fonts draw
+ * page text. The client reads the manifest again. A request that pins
+ * nothing carries none.
+ */
+export async function assertServerFonts(
+  service: { readonly serverFonts: { fingerprint(): Promise<string> } },
+  requested: string | undefined,
+  reply: { header(name: 'Cache-Control', value: string): unknown },
+): Promise<void> {
+  if (requested === undefined) return;
+  const own = await service.serverFonts.fingerprint();
+  if (requested === own) return;
+  setNoStore(reply);
+  throw new EngineError(
+    EngineErrorCode.NotFound,
+    `drawn with server fonts ${requested}; this server's are ${own}`,
+  );
+}
+
 /** `429` with `Retry-After`: the caller is over a request budget for `retryAfterMs` more. */
 export function tooManyRequests(reply: FastifyReply, retryAfterMs: number): FastifyReply {
   return reply

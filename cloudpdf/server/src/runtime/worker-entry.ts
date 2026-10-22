@@ -48,6 +48,7 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
     weight: d.weight,
     italic: d.italic,
     fallback: d.fallback ?? true,
+    serve: d.serve ?? false,
   }));
   // Then the fonts the engine comes with, tried after the deployment's own.
   return [...own, ...defaultFallbackFontSpecs(new Set(own.map((spec) => spec.key)))];
@@ -95,6 +96,9 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
     },
     {
       imageEncoder,
+      // Every write says whether it changed the document's fonts: the font
+      // list's URL is versioned by each change.
+      reportEveryFontChange: true,
       // File-backed sessions sign through a candidate file under the
       // signing root the API process shares, keyed by signing id, so the
       // tail can be streamed to object storage right after prepare without

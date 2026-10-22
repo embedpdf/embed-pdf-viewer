@@ -20,6 +20,10 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import type { CdnSigner, SignInput } from '../src/cdn/CdnSigner';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { serverFontsFingerprint } from '../src/services/ServerFonts';
+
+/** The stub worker's server fonts: it registers none. */
+const SERVER_FONTS = serverFontsFingerprint([], []);
 
 /**
  * Plane-scoped view sharing. The rule under test: a layer is a set of
@@ -35,14 +39,11 @@ const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'view-sharing-secret';
 
 /** Canonical lattice token: durable read-through → countable single render. */
-const W320_TOKEN =
-  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
+const W320_TOKEN = `background=white,contentVersion=1,format=webp,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320`;
 /** The picture with annotations: its own path (`/render/annotations/…`), its own pins. */
-const W320_ANNOTATIONS_TOKEN =
-  'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
+const W320_ANNOTATIONS_TOKEN = `annotationVersion=1,background=white,contentVersion=1,format=webp,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320`;
 /** The picture with form fields (`/render/fields/…`). */
-const W320_FIELDS_TOKEN =
-  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320,widgetVersion=1';
+const W320_FIELDS_TOKEN = `background=white,contentVersion=1,format=webp,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320,widgetVersion=1`;
 
 const ALL_BASE = {
   content: 'base',

@@ -56,25 +56,20 @@ export interface FontsCapability {
   getFontList(): FontList | null;
   /** Load state of the list. */
   getStatus(): ResourceStatus;
-  /**
-   * Load the list unless it's loaded or loading. Rejects with `unsupported`
-   * on an engine that doesn't list a document's fonts, and when the load
-   * fails.
-   */
+  /** Load the list unless it's loaded or loading. Rejects when the load fails. */
   ensureLoaded(): Promise<void>;
   /** Read the list from the engine again. Rejects as {@link ensureLoaded} does. */
   refresh(): Promise<void>;
   /**
    * The fonts a write would draw each run in, found the way the write finds
    * them, without writing: what an editor shows while someone types. Rejects
-   * with `unsupported` on an engine that doesn't resolve fonts,
-   * `operation-cancelled` and `instance-closed`.
+   * with `operation-cancelled` and `instance-closed`.
    */
   resolve(request: FontResolveRequest, options?: OperationOptions): Promise<FontResolution>;
   /**
    * A program the document's fonts name, by its display hash, with the
    * characters it covers and its line metrics. Kept per hash once read.
-   * Rejects with `not-found` for a hash the list doesn't name, `unsupported`,
+   * Rejects with `not-found` for a hash the list doesn't name,
    * `operation-cancelled` and `instance-closed`.
    */
   getProgram(displayHash: string, options?: OperationOptions): Promise<FontProgramInfo>;

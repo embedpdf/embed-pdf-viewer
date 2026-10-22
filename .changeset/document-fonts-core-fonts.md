@@ -9,3 +9,5 @@ The package now resolves to its built files outside the repository's development
 `lastResortFontBytes()` returns the last-resort program's bytes from a module that reaches nothing else, for an engine to register.
 
 `LAST_RESORT_METRICS` gives the numbers the engine lays the last-resort box out with: its advance, ascent and descent.
+
+`BUILT_IN_PROGRAMS`, `builtInProgramInfo(displayHash)` and `loadBuiltInProgram(displayHash)`: the standard faces' and the last resort's programs as a document's font list names them, which every engine answers for without reading the document.

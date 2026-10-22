@@ -1,93 +1,104 @@
 ---
-title: Fallback fonts
-description: Configure server-side fallback fonts so rendering and annotation appearances cover glyphs a document's own fonts are missing.
+title: Fonts
+description: Give the server fonts to write text in, to fill in characters a document's fonts lack, and to send to browsers while someone types.
 ---
 
 import { Callout } from '@/components/docs/callout';
 
-# Fallback fonts
+# Fonts
 
-When a PDF references a font it doesn't embed, or a FreeText annotation needs a glyph its
-chosen font lacks, the server falls back to its own fonts to draw the missing characters.
-Out of the box that's the standard Latin set — to cover CJK, Cyrillic, Arabic, or any
-other script, configure **fallback fonts** on the server.
+The server decides which fonts exist, for every user and every document. Its fonts do three
+things:
 
-This is a **server-side** decision on purpose. Cloud clients can't register fonts (the
-client `engine.fonts` API is local-engine only); the deployment owns the font policy and
-applies it uniformly to every render and every saved annotation appearance. The local
-engine, which runs in the browser, registers its fonts there instead.
+- **Text can be written in them.** A free text box or a form field names one by its key, and
+  `doc.fonts.list()` lists them with `source: 'engine'`.
+- **They fill in missing characters.** When a document's fonts lack a character, in a page's text
+  or in a box being written, the server draws it with its fallback fonts.
+- **They can go to browsers.** With `serve: true`, the viewer loads a font while someone types in
+  it, so the text shows exactly as the server will draw it.
 
-## Configure with `CLOUDPDF_FALLBACK_FONTS`
+This is a **server-side** decision on purpose. Cloud clients can't register fonts (the client
+`engine.fonts` API is local-engine only); the deployment owns the font policy and applies it
+uniformly to every render and every saved appearance. The local engine, which runs in the
+browser, registers its fonts there instead.
 
-Set a JSON array of font descriptors. Each needs a stable `key` and a `path` to a TTF/OTF
-file readable by the server process:
+## Configure with `CLOUDPDF_FONTS`
+
+Set a JSON array of font descriptors. Each needs a stable `key` and a `path` to a TTF/OTF file
+readable by the server process:
 
 ```sh
-CLOUDPDF_FALLBACK_FONTS='[
+CLOUDPDF_FONTS='[
   { "key": "noto-sc", "path": "/srv/fonts/NotoSansSC-Regular.otf", "familyName": "Noto Sans SC" },
-  { "key": "noto-arabic", "path": "/srv/fonts/NotoNaskhArabic-Regular.ttf" }
+  { "key": "brand-sans", "path": "/srv/fonts/BrandSans-Regular.ttf", "fallback": false, "serve": true }
 ]'
 ```
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `key` | yes | Stable id for the font. |
+| `key` | yes | Stable id for the font: what `fontFamily` names it by. |
 | `path` | yes | Absolute path to a TTF/OTF file the server can read. |
 | `familyName` | no | Base font name; inferred from the file if omitted. |
 | `weight` | no | Style weight (100–900) for matching; inferred if omitted. |
 | `italic` | no | Italic flag for matching; inferred if omitted. |
-| `fallback` | no | Enroll for automatic missing-glyph fill. Defaults to `true`. |
+| `fallback` | no | Fill in characters other fonts lack. Defaults to `true`. |
 | `serve` | no | Send the font to browsers, so text being typed shows in it before the server draws it. Defaults to `false`. |
 
-Order matters: fonts are tried as fallbacks in the order listed, so put your preferred
-faces first. Noto Sans Hebrew and Noto Naskh Arabic come with the server and are tried after
-yours.
+Order matters: fonts are tried as fallbacks in the order listed, so put your preferred faces
+first. Noto Sans Hebrew and Noto Naskh Arabic come with the server and are tried after yours; a
+font of yours with the same key replaces them.
 
 ## Sending fonts to browsers
 
 Every client can see your fonts (`doc.fonts.list()` lists them) and write with them by key. Their
 files stay on the server unless you set `serve: true`. Then the viewer loads the font while
-someone types in it, so the text shows exactly as the server will draw it; without it, the
-viewer shows a similar font until the server's picture arrives.
+someone types in it, so the text shows exactly as the server will draw it. A font kept on the
+server is listed with the restriction `'not-served'`, and the viewer shows a similar font until
+the server's picture arrives.
 
 Serving a font sends it to your users' browsers, which some font licences don't allow: check
-yours. A served font goes only to clients with a valid token, and browsers cache it privately,
-never on a shared CDN.
+yours. A served font goes only to a token that may write text in a document, and browsers keep it
+privately, never on a shared CDN. Noto Sans Hebrew and Noto Naskh Arabic are served: their
+licences allow it.
 
 <Callout type="info">
-  Fonts are loaded <strong>by path and range-read on demand</strong> — the bytes are never
-  held resident in memory. You can configure several large CJK families and each costs a
-  file handle, not RAM per font. Make sure the paths are present in your container image or
-  mounted volume and readable by the server user.
+  Fonts are loaded <strong>by path and range-read on demand</strong>: the bytes are never held
+  resident in memory. You can configure several large CJK families and each costs a file handle,
+  not RAM per font. Make sure the paths are present in your container image or mounted volume and
+  readable by the server user.
 </Callout>
 
 <Callout type="warn">
-  A font that can't be read or parsed <strong>fails worker startup</strong> — a bad font
-  config is a boot error, not a silent degrade. Check the path and the file on a startup
-  failure.
+  A font that can't be read or parsed <strong>fails worker startup</strong>: a bad font config is
+  a boot error, not a silent degrade. Check the path and the file on a startup failure.
 </Callout>
 
 ## How it applies
 
-Each PDFium worker thread registers the fallback fonts on startup, before it serves any
-request (the runtime is [thread-confined](/docs/server/getting-started/how-it-works), so
-every worker holds its own copy). From then on, any glyph a document's fonts can't draw —
-during page rendering or when generating an annotation's appearance on save — is filled
-from the first fallback font that covers it.
+Each PDFium worker thread registers the fonts on startup, before it serves any request (the
+runtime is [thread-confined](/docs/server/getting-started/how-it-works), so every worker holds its
+own copy). From then on, any character a document's fonts can't draw, in a page's text or in an
+appearance the server writes, is filled from the first fallback font that has it.
+
+Pictures depend on the fallback fonts, so every picture's URL and the font list's carry a
+fingerprint of the server's fonts. When you change them, every page is drawn again once and the
+font list is read again; a restart that changes nothing keeps every cached picture. During a
+rolling deploy, a replica answers only URLs with its own fonts, and clients that reach another
+read the document again.
 
 ## Embedding via `buildApp`
 
-If you embed the server with `buildApp` instead of running the CLI, pass the same
-descriptors programmatically:
+If you embed the server with `buildApp` instead of running the CLI, pass the same descriptors
+programmatically:
 
 ```ts
-import { buildApp, loadFallbackFontsFromEnv } from '@cloudpdf/server';
+import { buildApp, loadServerFontsFromEnv } from '@cloudpdf/server';
 
 const { app } = await buildApp({
   workerEntry,
-  fallbackFonts: [
+  fonts: [
     { key: 'noto-sc', path: '/srv/fonts/NotoSansSC-Regular.otf', familyName: 'Noto Sans SC' },
   ],
-  // …or reuse the env convention: fallbackFonts: loadFallbackFontsFromEnv(),
+  // …or reuse the env convention: fonts: loadServerFontsFromEnv(),
 });
 ```

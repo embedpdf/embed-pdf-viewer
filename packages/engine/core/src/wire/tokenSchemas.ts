@@ -63,6 +63,14 @@ export const OutlineTokenSchema = {
 } as const satisfies TokenSchema;
 
 /**
+ * The font list: its own pin and the server's fonts' fingerprint, which lists
+ * the server's fonts beside the document's.
+ */
+export const FontsTokenSchema = {
+  fields: ['fontsVersion', 'serverFonts'],
+} as const satisfies TokenSchema;
+
+/**
  * Layer signature analysis: the working copy judged against the base,
  * pinned by `docVersion`; `since.signature` XOR `since.revision`; `level`
  * only in exploratory mode.
@@ -102,6 +110,7 @@ export const RenderTokenSchema = {
     'format',
     'quality',
     'rotation',
+    'serverFonts',
     'target.kind',
     'target.rect.height',
     'target.rect.width',
@@ -159,6 +168,7 @@ export const AnnotationAppearancesRenderTokenSchema = {
     'modes',
     'quality',
     'rotation',
+    'serverFonts',
     'viewport.kind',
     'viewport.scale',
     'viewport.width',
@@ -177,6 +187,7 @@ export const WidgetAppearancesRenderTokenSchema = {
     'modes',
     'quality',
     'rotation',
+    'serverFonts',
     'viewport.kind',
     'viewport.scale',
     'viewport.width',

@@ -66,6 +66,7 @@ import { registerAttachmentRoutes } from '../routes/attachments';
 import { registerChangeRoutes } from '../routes/changes';
 import { registerDocsRoutes } from '../routes/docs';
 import { registerEventsRoutes } from '../routes/events';
+import { registerFontRoutes } from '../routes/fonts';
 import { registerFormRoutes } from '../routes/forms';
 import { registerMetadataRoutes } from '../routes/metadata';
 import { registerObjectNumberRoutes } from '../routes/object-numbers';
@@ -88,7 +89,7 @@ import {
 import { ShardedEnginePool } from '../runtime/ShardedEnginePool';
 import { defaultSigningRoot } from '../runtime/signing-paths';
 import { resolvePoolSize } from '../runtime/WorkerThreadPool';
-import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
+import { WorkerThreadPool, type ServerFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CrashJournal, DocumentQuarantinedError } from '../services/CrashJournal';
 import { DerivedRenderService } from '../services/DerivedRenderService';
@@ -102,6 +103,7 @@ import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
 import { ObjectNumberService } from '../services/ObjectNumberService';
 import { LayerStateService } from '../services/LayerStateService';
+import { ServerFonts } from '../services/ServerFonts';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -144,14 +146,15 @@ export interface BuildAppOptions {
   enableJwksPersistence?: boolean;
   poolSize?: number;
   /**
-   * Deployment fallback fonts, registered on every worker thread at startup.
+   * The deployment's fonts, registered on every worker thread at startup.
    * Server-owned font policy: cloud clients cannot configure fonts, so the
-   * server decides which fallback fonts cover missing glyphs (page render +
-   * annotation appearance generation). Each is a file path that PDFium
-   * range-reads on demand — large CJK fallback fonts cost a file handle, not
-   * resident RAM. A font that fails to load fails worker startup.
+   * server decides which fonts text can be written in and which fallback
+   * fonts cover missing glyphs (page render + annotation appearance
+   * generation), and which go to browsers (`serve`). Each is a file path that
+   * PDFium range-reads on demand — large CJK fallback fonts cost a file
+   * handle, not resident RAM. A font that fails to load fails worker startup.
    */
-  fallbackFonts?: ReadonlyArray<FallbackFontDescriptor>;
+  fonts?: ReadonlyArray<ServerFontDescriptor>;
   /**
    * URL of the worker_thread entry script. The package's main entry exports
    * `defaultWorkerEntryUrl` which works in both dev (tsx -> src/) and after
@@ -792,7 +795,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
             workerEntry: String(opts.workerEntry),
             ...(opts.poolSize !== undefined ? { poolSize: opts.poolSize } : {}),
             ...(opts.maxDocsPerSlot !== undefined ? { maxDocsPerSlot: opts.maxDocsPerSlot } : {}),
-            fonts: opts.fallbackFonts ?? [],
+            fonts: opts.fonts ?? [],
             signingRoot,
           },
           onEvict: evictForward,
@@ -832,7 +835,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
                 ...(opts.maxDocsPerSlot !== undefined
                   ? { maxDocsPerSlot: opts.maxDocsPerSlot }
                   : {}),
-                fonts: opts.fallbackFonts ?? [],
+                fonts: opts.fonts ?? [],
                 signingRoot,
               },
               onEvict: hooks.onEvict,
@@ -869,7 +872,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         workerEntry: opts.workerEntry,
         maxDocsPerSlot: opts.maxDocsPerSlot,
         onEvict: evictForward,
-        fonts: opts.fallbackFonts,
+        fonts: opts.fonts,
         signingRoot,
       });
     }
@@ -1030,6 +1033,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   let importWorker: ImportWorker | undefined;
   let layerService: LayerService | undefined;
   let derivedRenders: DerivedRenderService | undefined;
+  let serverFonts: ServerFonts | undefined;
   let sweeperTimer: NodeJS.Timeout | undefined;
   let baseFileCache: BaseFileCache | undefined;
   if (opts.db && opts.objectStore) {
@@ -1056,6 +1060,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     // The derived-artifact plane for renders.
     // Needs a worker + the base-file cache — admin-only deploys skip it.
     if (baseFileCache && pool) {
+      serverFonts ??= new ServerFonts(pool);
       derivedRenders = new DerivedRenderService({
         storage: opts.objectStore,
         ...(opts.renderLattice?.widths ? { widths: opts.renderLattice.widths } : {}),
@@ -1073,6 +1078,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         encoder: new SharpImageEncoder(),
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         documents: new DocumentsRepo(opts.db),
+        serverFonts,
         onWarmError: (err, ctx) =>
           app.log.warn({ err, ...ctx }, 'thumbnail warm failed; thumbnailState=failed'),
       });
@@ -1292,6 +1298,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         pool,
         layerState: layerStateService,
         cdnAccessRequired,
+        serverFonts: (serverFonts ??= new ServerFonts(pool)),
         passwordVerifications: new PdfPasswordVerificationsRepo(opts.db, {
           // The proof rows are HMACs over real document passwords: on a
           // production license a strong secret is mandatory, or a leaked DB
@@ -1354,6 +1361,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
       await registerOutlineRoutes(app, { service: documentService });
+      await registerFontRoutes(app, { service: documentService });
       await registerSignatureRoutes(app, { service: documentService, layerService });
       await registerPageRoutes(app, {
         documentService,

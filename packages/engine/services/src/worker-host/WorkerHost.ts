@@ -58,6 +58,7 @@ import {
   type FontsAddFallbackWorkerRequest,
   type FontsClearFallbacksWorkerRequest,
   type FontsClearWorkerRequest,
+  type FontsProgramWorkerRequest,
   type FontsAuthorizeEditingWorkerRequest,
   type DocumentSetFontSettingsWorkerRequest,
   type DocumentFontsListWorkerRequest,
@@ -168,7 +169,13 @@ import {
   type ChangeOutcome,
   type ChangeRecord,
 } from '../features/changes';
-import { DocumentFontReader, FontRegistrar, type StartupFontSpec } from '../features/fonts';
+import {
+  DocumentFontReader,
+  FontRegistrar,
+  fontsChangedSince,
+  trackFontChanges,
+  type StartupFontSpec,
+} from '../features/fonts';
 import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
@@ -249,6 +256,14 @@ export interface WorkerHostOptions {
    * so an abort stops it about this soon. Defaults to {@link DEFAULT_SLICE_MS}.
    */
   sliceMs?: number;
+  /**
+   * Every write says whether it changed the fonts the document's list shows
+   * (`fontsChanged`), from a session's first write on. Without it a session
+   * says so only once its fonts were listed: the local engine's, which tells
+   * whoever listed them. The server sets it: it versions the list by every
+   * change.
+   */
+  reportEveryFontChange?: boolean;
 }
 
 /** See {@link WorkerHostOptions.sliceMs}. */
@@ -507,6 +522,11 @@ export class WorkerHost {
       // completes or is cancelled. Reads keep seeing the live document, which the
       // candidate never changed.
       this.assertNoPendingSigning(msg);
+      // The fonts before the first write are what the next one compares to.
+      if (this.options.reportEveryFontChange) {
+        const written = this.sessionWrittenBy(msg);
+        if (written) trackFontChanges(this.runtime, written);
+      }
       if (transacted && writesDocument(msg)) transacted.beginTransaction(msg.opId);
       // What the write draws with no font for a character is read back at
       // finishMutation; start from nothing.
@@ -746,6 +766,16 @@ export class WorkerHost {
         case 'fonts.authorizeEditing':
           resultPack = this.handleFontsAuthorizeEditing(msg);
           break;
+        case 'fonts.list':
+          resultPack = wirePack({
+            tag: 'fonts.list',
+            engineFonts: this.fonts.engineFontFacts(),
+            fallbacks: this.fonts.fallbackKeys(),
+          });
+          break;
+        case 'fonts.program':
+          resultPack = this.handleFontsProgram(msg);
+          break;
         case 'document.setFontSettings':
           resultPack = this.handleDocumentSetFontSettings(msg);
           break;
@@ -802,6 +832,19 @@ export class WorkerHost {
   /** The open session a write job writes to; undefined for any other job. */
   private writingSession(msg: FileSpaceJob): DocumentSession | undefined {
     if (!writesDocument(msg) || !('docId' in msg)) return undefined;
+    const layerName = 'layerName' in msg ? msg.layerName : undefined;
+    const session = this.sessions.get(sessionKey(msg.docId, layerName));
+    return session?.isOpen() ? session : undefined;
+  }
+
+  /**
+   * The open session a job may change: every write, those that run their own
+   * transactions (a server request's changes, a completed signing) included.
+   */
+  private sessionWrittenBy(msg: FileSpaceJob): DocumentSession | undefined {
+    if (!('docId' in msg) || (msg.effect !== 'write' && msg.effect !== 'contentWrite')) {
+      return undefined;
+    }
     const layerName = 'layerName' in msg ? msg.layerName : undefined;
     const session = this.sessions.get(sessionKey(msg.docId, layerName));
     return session?.isOpen() ? session : undefined;
@@ -1695,7 +1738,10 @@ export class WorkerHost {
   private handleDocumentFontsList(
     req: DocumentFontsListWorkerRequest,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
+    const session = this.requireSession(req);
+    // Whoever listed them hears of every change from now on.
+    trackFontChanges(this.runtime, session);
+    const reader = new DocumentFontReader(this.runtime, session, this.fonts);
     return wirePack({ tag: 'document.fonts.list', facts: reader.facts() });
   }
 
@@ -2354,6 +2400,27 @@ export class WorkerHost {
     return wirePack({ tag: 'fonts.clearFallbacks' });
   }
 
+  private handleFontsProgram(
+    req: FontsProgramWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const served = this.fonts
+      .engineFontFacts()
+      .some((font) => font.sha256 === req.sha256 && font.served);
+    const program = served ? this.fonts.programFor(req.sha256) : undefined;
+    if (!program) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `no served font has the program ${req.sha256}`,
+      );
+    }
+    const bytes = program.bytes();
+    const buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    return wirePack({ tag: 'fonts.program', bytes: buffer }, [buffer]);
+  }
+
   private handleFontsClear(
     _req: FontsClearWorkerRequest,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
@@ -2772,7 +2839,10 @@ export class WorkerHost {
       session.invalidateDerived();
     }
     if (payload.tag !== 'signatures.complete') session.noteEdit();
-    const reported = withMissingCharacters(payload, session.missingCharacters());
+    const written = withMissingCharacters(payload, session.missingCharacters());
+    const reported = fontsChangedSince(this.runtime, session)
+      ? { ...written, fontsChanged: true as const }
+      : written;
     if (session.kind !== 'layer' || !session.persistLayerArtifact) {
       return wirePack(reported);
     }

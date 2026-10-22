@@ -12,6 +12,7 @@ import {
   FormExportTokenSchema,
   AttachmentsTokenSchema,
   OutlineTokenSchema,
+  FontsTokenSchema,
   ContentTokenSchema,
   DocTokenSchema,
   DownloadTokenSchema,
@@ -296,6 +297,29 @@ export const decodeOutlineToken = (raw: string): OutlineToken => {
   return {
     outlineVersion: decodePositiveInteger(query.outlineVersion, 'outlineVersion'),
     layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
+  };
+};
+
+/** What a font list is: the document's fonts' pin and the server's fonts' fingerprint. */
+export interface FontsToken {
+  fontsVersion: number;
+  serverFonts: string;
+}
+
+export const encodeFontsToken = (token: FontsToken): string =>
+  encodeToken(FontsTokenSchema, {
+    fontsVersion: token.fontsVersion,
+    serverFonts: token.serverFonts,
+  });
+export const decodeFontsToken = (raw: string): FontsToken => {
+  const query = decodeToken(FontsTokenSchema, raw);
+  const serverFonts = query.serverFonts;
+  if (serverFonts === undefined || !/^[0-9a-f]{1,64}$/.test(serverFonts)) {
+    throw new Error('token field "serverFonts" must be a hex fingerprint');
+  }
+  return {
+    fontsVersion: decodePositiveInteger(query.fontsVersion, 'fontsVersion'),
+    serverFonts,
   };
 };
 

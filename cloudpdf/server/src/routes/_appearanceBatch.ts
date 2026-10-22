@@ -22,7 +22,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { FastifyReply } from 'fastify';
 
-import { parseOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import { assertServerFonts, parseOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
 import { buildMultipart, type MultipartPart } from './_multipart';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
@@ -72,14 +72,17 @@ export async function renderAppearanceBatch(input: {
   // The family's pin: the token's, against the page's in the manifest.
   let imageOptions: AnnotationAppearanceImageOptions;
   let requestedPin: number | undefined;
+  let requestedServerFonts: string | undefined;
   if (widgets) {
     const parsed = parseOrInvalidArg(WidgetAppearancesQuerySchema, unflatten(flatInput), label);
     imageOptions = parsed.options;
     requestedPin = parsed.widgetVersion;
+    requestedServerFonts = parsed.serverFonts;
   } else {
     const parsed = parseOrInvalidArg(AnnotationAppearancesQuerySchema, unflatten(flatInput), label);
     imageOptions = parsed.options;
     requestedPin = parsed.annotationVersion;
+    requestedServerFonts = parsed.serverFonts;
   }
   const pinName = widgets ? 'widgetVersion' : 'annotationVersion';
   const currentPin = widgets ? page.cache.widgetVersion : page.cache.annotationVersion;
@@ -98,6 +101,8 @@ export async function renderAppearanceBatch(input: {
       `appearance ${pinName} ${requestedPin} no longer current (current=${currentPin}) for page ${input.pageObjectNumber}`,
     );
   }
+  // An appearance drawn here may fill in characters with fallback fonts.
+  await assertServerFonts(input.documentService, requestedServerFonts, input.reply);
 
   // Appearance-scale enforcement: the appearance lattice
   // bounds scale — appearances are sized by `rect × scale`, so a page-sized

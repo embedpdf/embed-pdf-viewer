@@ -86,11 +86,22 @@ export class EventHub implements DocumentEventStream {
  * mutation services — they publish results, never build origins.
  */
 export class SessionEventPublisher {
+  /** Writes that changed the document's fonts, by `opId`, until their events are published. */
+  private readonly fontsChangedBy = new Set<string>();
+
   constructor(
     private readonly hub: EventHub,
     private readonly sessionId: string,
     private readonly sub: string | null = null,
   ) {}
+
+  /**
+   * The write `opId` changed the fonts that can be named in the document (the
+   * engine said so): its events end with `fonts.changed` when published.
+   */
+  noteFontsChanged(opId: string): void {
+    this.fontsChangedBy.add(opId);
+  }
 
   /**
    * Publish what one write of this session just committed: one
@@ -125,7 +136,10 @@ export class SessionEventPublisher {
    */
   publishChange(opId: string, events: readonly DocumentEventInit[], undoOf?: string): void {
     const ts = Date.now();
-    events.forEach((event, index) => {
+    const all: readonly DocumentEventInit[] = this.fontsChangedBy.delete(opId)
+      ? [...events, { type: 'fonts.changed' }]
+      : events;
+    all.forEach((event, index) => {
       this.hub.publish({
         ...event,
         origin: {
@@ -134,7 +148,7 @@ export class SessionEventPublisher {
           sub: this.sub,
           ts,
           serverId: null,
-          tx: { id: opId, index, count: events.length },
+          tx: { id: opId, index, count: all.length },
           ...(undoOf !== undefined ? { undoOf } : {}),
         },
       } as DocumentEvent);

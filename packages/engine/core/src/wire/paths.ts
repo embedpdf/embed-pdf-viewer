@@ -10,6 +10,7 @@ import {
 import type {
   AnalysisToken,
   AnnotationsExportToken,
+  FontsToken,
   FormExportToken,
   OutlineToken,
 } from './tokens';
@@ -87,6 +88,7 @@ import {
   encodeLayoutToken,
   encodeMetadataToken,
   encodeOutlineToken,
+  encodeFontsToken,
   encodeRenderToken,
   encodeTokenText,
   encodeWidgetAppearancesRenderToken,
@@ -301,6 +303,44 @@ export const wirePaths = {
   /** POST: set and remove the Info dict's custom keys for the layer. */
   layerCustomMetadataUpdate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom`,
+
+  /**
+   * GET: the fonts that can be named in the layer (`doc.fonts.list()`), at
+   * its `fontsVersion` and the server's fonts' fingerprint. Content-addressed:
+   * a stale pin, or another server's fonts, 404s and the client refreshes its
+   * manifest.
+   */
+  layerFonts: (docId: string, layerName: string, token: FontsToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/fonts@${encodeFontsToken(token)}`,
+
+  layerFontsCurrent: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/fonts`,
+
+  /** Immutable base font list: the shared-URL twin a layer resolves at while it draws what the base does. */
+  docFonts: (docId: string, token: FontsToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/fonts@${encodeFontsToken(token)}`,
+
+  /** POST: the fonts a write would draw each run in (`doc.fonts.resolve()`), a read with a body. */
+  layerFontsResolve: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/fonts/resolve`,
+
+  /** GET: a program's facts (`doc.fonts.getProgram()`), content-addressed by its display hash. */
+  layerFontProgram: (docId: string, layerName: string, displayHash: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-programs/${encodeURIComponent(displayHash)}`,
+
+  /**
+   * GET: a program's bytes (`doc.fonts.downloadProgram()`), for a token that
+   * may write text in the document. Private: never cached on a shared CDN.
+   */
+  layerFontProgramFile: (docId: string, layerName: string, displayHash: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-program-files/${encodeURIComponent(displayHash)}`,
+
+  /**
+   * GET: a served server font's bytes, one URL for every document, so a
+   * browser keeps one copy. Any valid token; private.
+   */
+  fontProgramFile: (displayHash: string) =>
+    `/v1/font-program-files/${encodeURIComponent(displayHash)}`,
 
   /**
    * Immutable base /EmbeddedFiles listing: the shared-URL variant an

@@ -48,6 +48,10 @@ export {
   OutlineDeleteResultSchema,
   OutlineRestoreResultSchema,
   OutlineWireComponents,
+  FontListSchema,
+  FontProgramInfoSchema,
+  FontResolveRequestSchema,
+  FontResolutionSchema,
   AccessRequestSchema,
   AccessResponseSchema,
   EditSessionAccessSchema,
@@ -290,6 +294,8 @@ export {
   encodeAttachmentsToken,
   encodeOutlineToken,
   decodeOutlineToken,
+  encodeFontsToken,
+  decodeFontsToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
@@ -453,7 +459,12 @@ export type {
   DocumentVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
-export type { AnnotationsExportToken, FormExportToken, OutlineToken } from './wire/tokens';
+export type {
+  AnnotationsExportToken,
+  FontsToken,
+  FormExportToken,
+  OutlineToken,
+} from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';

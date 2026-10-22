@@ -1,8 +1,10 @@
+import { BUILT_IN_PROGRAMS } from '@embedpdf/core-fonts';
 import {
   EngineError,
   EngineErrorCode,
   STANDARD_FACES,
   faceForFontName,
+  fontListOf,
   isStandardFontName,
   type AnnotationRef,
   type CodePointRange,
@@ -330,6 +332,64 @@ function programFacts(
     ascent: Math.round(metrics.ascent * 1000),
     descent: -Math.round(metrics.descent * 1000),
   };
+}
+
+interface FontsSeen {
+  /** The fork's fingerprint of the document's faces. */
+  fingerprint: string;
+  /** The document fonts a list shows, as JSON. */
+  documentFonts: string;
+}
+
+/**
+ * What each tracked session's fonts were when last read. A session is
+ * tracked once something needs to know of every change to its fonts.
+ */
+const fontsSeen = new WeakMap<DocumentSession, FontsSeen>();
+
+function fontsFingerprintOf(runtime: PdfRuntimeModule, session: DocumentSession): string {
+  const { fn, mem } = runtime;
+  return withScratch(mem, 32, (out) => {
+    if (!fn.EPDFDoc_GetFontsFingerprint(session.requireDocPtr(), out)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFDoc_GetFontsFingerprint failed');
+    }
+    return hex(mem.readBytes(out, 32));
+  });
+}
+
+/** The document fonts a list shows, as JSON: the engine's fonts don't change with a write. */
+function documentFontsOf(runtime: PdfRuntimeModule, session: DocumentSession): string {
+  const list = fontListOf(
+    { faces: readDocumentFaces(runtime, session), engineFonts: [], fallbacks: [] },
+    BUILT_IN_PROGRAMS,
+  );
+  return JSON.stringify(list.fonts.filter((font) => font.source === 'document'));
+}
+
+/** From now on, {@link fontsChangedSince} tells of every change to `session`'s fonts. */
+export function trackFontChanges(runtime: PdfRuntimeModule, session: DocumentSession): void {
+  if (fontsSeen.has(session)) return;
+  fontsSeen.set(session, {
+    fingerprint: fontsFingerprintOf(runtime, session),
+    documentFonts: documentFontsOf(runtime, session),
+  });
+}
+
+/**
+ * Whether the fonts `session`'s list shows changed since this was last asked
+ * (or since tracking began); false for a session not tracked. The fork's
+ * fingerprint says whether anything about the faces moved, which on a layer
+ * walks only what writes touched; only then is the list compared, since a
+ * face the list doesn't show (a standard font's stand-in) moves it too.
+ */
+export function fontsChangedSince(runtime: PdfRuntimeModule, session: DocumentSession): boolean {
+  const before = fontsSeen.get(session);
+  if (!before) return false;
+  const fingerprint = fontsFingerprintOf(runtime, session);
+  if (fingerprint === before.fingerprint) return false;
+  const documentFonts = documentFontsOf(runtime, session);
+  fontsSeen.set(session, { fingerprint, documentFonts });
+  return documentFonts !== before.documentFonts;
 }
 
 /**

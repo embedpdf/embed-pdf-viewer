@@ -32,8 +32,6 @@ import {
 export interface PaintFontSources {
   /** The host's measurer; `null` on a host that gives none. */
   readonly measurer: HostTextMeasurer | null;
-  /** Whether the document's engine finds fonts (`resolve`, `getProgram`). */
-  readonly canFind: () => boolean;
   /** Load the document's font list, which {@link programOf} and {@link standardOf} read. */
   readonly loadList: () => Promise<void>;
   readonly resolve: (request: FontResolveRequest) => Promise<FontResolution>;
@@ -162,7 +160,7 @@ export function createPaintFonts(sources: PaintFontSources) {
     get(font: FontName, text: string): PaintFonts | null {
       const plain = defaultsOf(font);
       if (isStandardFontName(font) && coversGrapheme(plain.face, text)) return plain;
-      if (!measurer || !sources.canFind()) return plain;
+      if (!measurer) return plain;
       const { value } = foundFor(measurer, font);
       if (value === null) return null;
       if (value === 'failed') return plain;

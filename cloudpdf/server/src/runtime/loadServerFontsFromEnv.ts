@@ -1,28 +1,30 @@
 /**
- * Build the deployment fallback-font list from environment variables.
+ * Build the deployment's font list from environment variables.
  *
  * Convention:
- *   CLOUDPDF_FALLBACK_FONTS  JSON array of font descriptors (default: none)
+ *   CLOUDPDF_FONTS  JSON array of font descriptors (default: none)
  *
- * Each entry is `{ key, path, familyName?, weight?, italic?, fallback? }`:
+ * Each entry is `{ key, path, familyName?, weight?, italic?, fallback?, serve? }`:
  *
- *   CLOUDPDF_FALLBACK_FONTS='[
+ *   CLOUDPDF_FONTS='[
  *     { "key": "noto-sc", "path": "/srv/fonts/NotoSansSC-Regular.otf",
  *       "familyName": "Noto Sans SC" }
  *   ]'
  *
- * `fallback` defaults to `true` (the server use case is filling missing glyphs).
- * Paths are read by each worker on demand — they must be readable by the server
- * process. A malformed value throws so a bad font config fails fast at boot.
+ * `fallback` defaults to `true` (the server use case is filling missing glyphs)
+ * and `serve` to `false` (a font's file stays on the server unless its licence
+ * lets it go to browsers). Paths are read by each worker on demand: they must
+ * be readable by the server process. A malformed value throws so a bad font
+ * config fails fast at boot.
  */
 
-import type { FallbackFontDescriptor } from './WorkerThreadPool';
+import type { ServerFontDescriptor } from './WorkerThreadPool';
 
-const ENV_KEY = 'CLOUDPDF_FALLBACK_FONTS';
+const ENV_KEY = 'CLOUDPDF_FONTS';
 
-export function loadFallbackFontsFromEnv(
+export function loadServerFontsFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-): FallbackFontDescriptor[] {
+): ServerFontDescriptor[] {
   const raw = env[ENV_KEY]?.trim();
   if (!raw) {
     return [];
@@ -41,7 +43,7 @@ export function loadFallbackFontsFromEnv(
   return parsed.map((entry, index) => normalizeDescriptor(entry, index));
 }
 
-function normalizeDescriptor(entry: unknown, index: number): FallbackFontDescriptor {
+function normalizeDescriptor(entry: unknown, index: number): ServerFontDescriptor {
   if (typeof entry !== 'object' || entry === null) {
     throw new Error(`${ENV_KEY}[${index}] must be an object`);
   }
@@ -55,11 +57,12 @@ function normalizeDescriptor(entry: unknown, index: number): FallbackFontDescrip
     throw new Error(`${ENV_KEY}[${index}].path is required and must be a non-empty string`);
   }
 
-  const descriptor: FallbackFontDescriptor = { key, path };
+  const descriptor: ServerFontDescriptor = { key, path };
   if (typeof e['familyName'] === 'string') descriptor.familyName = e['familyName'];
   if (typeof e['weight'] === 'number') descriptor.weight = e['weight'];
   if (typeof e['italic'] === 'boolean') descriptor.italic = e['italic'];
   // Default to true: a server-configured font is for filling missing glyphs.
   descriptor.fallback = typeof e['fallback'] === 'boolean' ? e['fallback'] : true;
+  descriptor.serve = typeof e['serve'] === 'boolean' ? e['serve'] : false;
   return descriptor;
 }

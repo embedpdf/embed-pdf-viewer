@@ -146,6 +146,11 @@ export interface LayersTable {
    * (migration 035): bumps only on outline writes.
    */
   outline_version: number;
+  /**
+   * Font list pointer epoch for `/fonts@{fontsVersion, serverFonts}`
+   * (migration 036): bumps on a write that changes the fonts the list shows.
+   */
+  fonts_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */
@@ -511,6 +516,7 @@ export interface BaseVersionsTable {
   annotations_version: number;
   forms_version: number;
   outline_version: number;
+  fonts_version: number;
   created_at: number;
 }
 

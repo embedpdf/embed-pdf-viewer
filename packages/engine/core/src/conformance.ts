@@ -217,4 +217,8 @@ export {
   type FieldGroupsConformanceOptions,
 } from './conformance/runFieldGroupsConformance';
 export { runMixedScriptConformance } from './conformance/runMixedScriptConformance';
+export {
+  runDocumentFontsConformance,
+  type DocumentFontsConformanceOptions,
+} from './conformance/runDocumentFontsConformance';
 export { drawnTextOf, type DrawnRun, type DrawnText } from './conformance/drawnText';

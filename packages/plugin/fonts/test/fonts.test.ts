@@ -128,7 +128,7 @@ function harness(options: { local?: boolean; list?: FontList; measurer?: HostTex
     id: 'fonts',
     measurer: options.measurer,
     doc: (options.local === false
-      ? {}
+      ? { fonts }
       : { [LOCAL_ENGINE_BRAND]: true, fonts }) as unknown as Partial<DocumentHandle>,
   });
   const api = ctx.connect(createFontsController(ctx));
@@ -296,10 +296,12 @@ describe('the fonts controller', () => {
     expect(fonts.getProgram).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses to list a document whose engine doesn't, and still draws the standard fonts", async () => {
-    const { api } = harness({ local: false });
-    await expect(api.ensureLoaded()).rejects.toMatchObject({ code: 'unsupported' });
-    await expect(api.resolve({ runs: [] })).rejects.toMatchObject({ code: 'unsupported' });
+  it('lists the fonts of a document on any engine, the cloud’s too', async () => {
+    const { api, fonts } = harness({ local: false });
+    await api.ensureLoaded();
+    expect(fonts.list).toHaveBeenCalledTimes(1);
+    await api.resolve({ runs: [] });
+    expect(fonts.resolve).toHaveBeenCalledTimes(1);
     expect(api.getFontCss('times-roman').programs[0]).toBe(standardFontProgram('times-roman'));
   });
 });
@@ -433,15 +435,12 @@ describe("a box's paint fonts", () => {
     expect(fonts.fallbacks).toEqual([]);
   });
 
-  it("draws in the defaults where fonts can't be found or measured", async () => {
+  it("draws in the defaults where fonts can't be measured or found", async () => {
     const withoutMeasurer = harness();
     expect(withoutMeasurer.api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toEqual([]);
     expect(withoutMeasurer.fonts.resolve).not.toHaveBeenCalled();
 
     const host = fakeMeasurer();
-    const cloud = harness({ local: false, measurer: host.measurer });
-    expect(cloud.api.getPaintFonts('helvetica', 'שלום')!.fallbacks).toEqual([]);
-
     const failing = harness({ measurer: host.measurer });
     failing.fonts.resolve.mockRejectedValueOnce(new Error('closed'));
     expect(failing.api.getPaintFonts('helvetica', 'שלום')).toBeNull();

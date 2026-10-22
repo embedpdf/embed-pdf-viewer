@@ -15,3 +15,4 @@ export {
 export { LAST_RESORT_HASH, LAST_RESORT_METRICS, lastResortFontProgram } from './last-resort';
 export { lastResortFontBytes } from './last-resort-bytes';
 export { standardFontCss, standardFontStack, type StandardFontCss } from './standard/css';
+export { BUILT_IN_PROGRAMS, builtInProgramInfo, loadBuiltInProgram } from './built-in';

@@ -257,6 +257,7 @@ describe('cdnCoverageForScope', () => {
       'attachments',
       'attachment-files',
       'outline',
+      'fonts',
     ] as const) {
       expect(shared.has(id)).toBe(true);
     }
@@ -284,6 +285,19 @@ describe('cdnCoverageForScope', () => {
     expect(contentOwned.has('page-annotations')).toBe(true);
     expect(contentOwned.has('attachments')).toBe(true);
     expect(contentOwned.has('layout')).toBe(true);
+    // The fonts are wherever the drawings are: content, annotations, forms.
+    expect(contentOwned.has('fonts')).toBe(false);
+    for (const plane of ['annotations', 'forms'] as const) {
+      const owned = ids(
+        cdnCoverageForScope(['*'], NO_BITS, {
+          docId: 'doc_1',
+          layerName: 'L1',
+          scopes: { ...ALL_BASE, [plane]: 'layer' },
+        }),
+      );
+      expect(owned.has('fonts')).toBe(false);
+      expect(owned.has('layer-fonts')).toBe(true);
+    }
     // Layer-scoped variants are never plane-gated — a diverged layer still
     // reads its own view.
     expect(contentOwned.has('layer-page-render')).toBe(true);
@@ -588,6 +602,11 @@ describe('cdnCoverageForScope', () => {
         'layer-attachments',
         'outline',
         'layer-outline',
+        // ...and the fonts: their list and each program's facts; a program's
+        // bytes never go through the CDN.
+        'fonts',
+        'layer-fonts',
+        'layer-font-programs',
         // doc.forms.read (bit 6) covers the signature reads: the layer's
         // snapshot and analysis, and the version-scoped families that need
         // no download right (contents/digests, history).

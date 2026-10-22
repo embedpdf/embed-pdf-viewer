@@ -39,6 +39,12 @@ import {
 } from './renderFamilies';
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
+import type {
+  FontList,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+} from '../dto/DocumentFonts';
 import type { LayerScopes } from '../dto/LayerScopes';
 import type { CustomMetadata } from '../dto/CustomMetadata';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
@@ -585,6 +591,8 @@ export const DocumentManifestSchema = z.object({
   annotationsVersion: z.number().int().positive().default(1),
   formsVersion: z.number().int().positive().default(1),
   outlineVersion: z.number().int().positive().default(1),
+  fontsVersion: z.number().int().positive().default(1),
+  serverFonts: z.string(),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   // Signing fences (absent on pre-signature servers: unwritten, unknown length).
@@ -793,6 +801,9 @@ const RenderQualitySchema = z.coerce.number().min(0).max(1);
 
 const AppearanceModeSchema = z.enum(['normal', 'rollover', 'down']);
 
+/** `DocumentManifest.serverFonts` in a picture's token: the fingerprint, in hex. */
+const ServerFontsSchema = z.string().regex(/^[0-9a-f]{1,64}$/);
+
 /**
  * A token's `modes`: the modes it asks for, in the engine's mode order,
  * joined by `-` (`normal-down`). Anything else is refused, so one set of
@@ -852,6 +863,7 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
   return z
     .object({
       ...pinFields,
+      serverFonts: ServerFontsSchema.optional(),
       format: PageNetworkRenderFormatSchema.optional(),
       quality: RenderQualitySchema.optional(),
       ...screenFields,
@@ -875,6 +887,13 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
           code: z.ZodIssueCode.custom,
           path: ['format'],
           message: 'versioned render requires format',
+        });
+      }
+      if (v.serverFonts === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['serverFonts'],
+          message: 'versioned render requires serverFonts',
         });
       }
       for (const pin of pins) {
@@ -901,7 +920,10 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
           ? { usage: 'print' as const, viewport: { kind: 'dpi' as const, dpi: print.dpi } }
           : {}),
       };
-      const query: PageRenderQuery = { options };
+      const query: PageRenderQuery = {
+        options,
+        ...(v.serverFonts !== undefined ? { serverFonts: v.serverFonts } : {}),
+      };
       for (const pin of pins) {
         if (pinned[pin] !== undefined) query[pin] = pinned[pin];
       }
@@ -957,6 +979,7 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
   return z
     .object({
       [pin]: z.coerce.number().int().positive().optional(),
+      serverFonts: ServerFontsSchema.optional(),
       format: PageNetworkRenderFormatSchema.optional(),
       modes: AppearanceModesSchema.optional(),
       rotation: RenderRotationSchema.optional(),
@@ -974,6 +997,13 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
           message: 'versioned appearance render requires format',
         });
       }
+      if (v[pin] !== undefined && v.serverFonts === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['serverFonts'],
+          message: 'versioned appearance render requires serverFonts',
+        });
+      }
     })
     .transform((v) => {
       const options: AnnotationAppearanceImageOptions = {
@@ -983,7 +1013,11 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
         ...(v.format !== undefined ? { format: v.format } : {}),
         ...(v.modes !== undefined ? { modes: v.modes } : {}),
       };
-      return { options, ...(v[pin] !== undefined ? { [pin]: v[pin] } : {}) };
+      return {
+        options,
+        ...(v[pin] !== undefined ? { [pin]: v[pin] } : {}),
+        ...(v.serverFonts !== undefined ? { serverFonts: v.serverFonts } : {}),
+      };
     });
 }
 
@@ -1028,6 +1062,7 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   metadataVersion: z.number().int().positive().optional(),
   attachmentsVersion: z.number().int().positive().optional(),
   outlineVersion: z.number().int().positive().optional(),
+  fontsVersion: z.number().int().positive().optional(),
   layerVersion: z.number().int().nonnegative().optional(),
   working: z.boolean().optional(),
   pages: z.array(
@@ -1797,6 +1832,92 @@ export const OutlineWireComponents = {
   OutlineOrder: OutlineOrderSchema,
   OutlineMutationMeta: OutlineMutationMetaSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
+
+// ---------------------------------------------------------------------------
+// Fonts: a document's font list, a program's facts, and a resolve.
+
+const FontProgramSchema = z.object({
+  displayHash: z.string().nullable(),
+  sourceHash: z.string().nullable(),
+  embedded: z.enum(['whole', 'subset', 'none']),
+  format: z.enum(['truetype', 'opentype', 'cff', 'type1', 'type3']).nullable(),
+  embeddingPermission: z.enum(['installable', 'editable', 'preview-and-print']).nullable(),
+  canDownload: z.boolean(),
+});
+
+/** `GET …/fonts@{fontsVersion,serverFonts}`: `doc.fonts.list()`. */
+export const FontListSchema: z.ZodType<FontList> = z.object({
+  fonts: z.array(
+    z.object({
+      name: z.string(),
+      source: z.enum(['standard', 'engine', 'document']),
+      familyName: z.string(),
+      weight: z.number().int(),
+      italic: z.boolean(),
+      postScriptName: z.string().nullable(),
+      canChoose: z.boolean(),
+      restrictions: z.array(
+        z.enum([
+          'subset',
+          'not-embedded',
+          'preview-and-print',
+          'unsupported-format',
+          'no-unicode-map',
+          'not-served',
+        ]),
+      ),
+      programs: z.array(FontProgramSchema),
+    }),
+  ),
+  fallbacks: z.array(z.string()),
+  lastResort: FontProgramSchema,
+});
+
+/** `GET …/font-programs/{displayHash}`: `doc.fonts.getProgram()`. */
+export const FontProgramInfoSchema: z.ZodType<FontProgramInfo> = FontProgramSchema.extend({
+  covers: z.array(
+    z.object({ start: z.number().int().nonnegative(), count: z.number().int().positive() }),
+  ),
+  ascent: z.number(),
+  descent: z.number(),
+});
+
+/** The body of `POST …/fonts/resolve`. */
+export const FontResolveRequestSchema: z.ZodType<FontResolveRequest> = z
+  .object({
+    annotation: AnnotationRefSchema.optional(),
+    runs: z
+      .array(
+        z.union([
+          z.object({ text: z.string().max(65_536), fontFamily: z.string() }).strict(),
+          z
+            .object({
+              text: z.string().max(65_536),
+              family: z.string(),
+              weight: z.number(),
+              italic: z.boolean(),
+            })
+            .strict(),
+        ]),
+      )
+      .max(1_000),
+  })
+  .strict();
+
+/** `POST …/fonts/resolve`: `doc.fonts.resolve()`. */
+export const FontResolutionSchema: z.ZodType<FontResolution> = z.object({
+  runs: z.array(
+    z.object({
+      font: z.string(),
+      weight: z.number(),
+      italic: z.boolean(),
+      substituted: z.boolean(),
+      program: z.string().nullable(),
+      fallbacks: z.array(z.string()),
+    }),
+  ),
+  missingCharacters: z.array(z.string()),
+});
 
 // ---------------------------------------------------------------------------
 // Digital signatures: the JSON forms of the two-phase signing DTOs.
