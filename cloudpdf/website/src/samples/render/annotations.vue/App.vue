@@ -13,7 +13,7 @@ import '../annotations.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const report: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 type Painter = 'picture' | 'layer';
 
@@ -21,7 +21,7 @@ const painter = ref<Painter>('picture');
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: report }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <div class="toolbar">

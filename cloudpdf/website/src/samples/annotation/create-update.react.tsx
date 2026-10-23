@@ -3,6 +3,7 @@ import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -16,15 +17,21 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './create-update.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const report: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Create a rectangle, then change, move and delete it, all from code.
 function SquareControls() {
   const annotation = useAnnotation();
   const stage = useStage();
-  const page = usePageList()[4]?.ref; // the document's empty last page
+  const page = usePageList()[1]?.ref; // page 2, which has room at the bottom
   const [ref, setRef] = useState<AnnotationRef | null>(null);
   useAnnotationList(); // re-render as the annotations change, for the reads below
 
@@ -100,13 +107,14 @@ function SquareControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: report }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SquareControls />
         <Stage className="stage">
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}

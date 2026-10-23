@@ -13,9 +13,9 @@ import '../annotations.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const report = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-report.pdf');
+  return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 type Painter = 'picture' | 'layer';
@@ -24,7 +24,7 @@ const painter = ref<Painter>('picture');
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: report }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <div class="toolbar">

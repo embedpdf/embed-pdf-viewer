@@ -9,7 +9,7 @@ import type { AnnotationRef } from '@embedpdf/vue/annotation';
 const annotation = useAnnotation();
 const stage = useStage();
 const pages = usePageList();
-const page = computed(() => pages.value[4]?.ref); // the document's empty last page
+const page = computed(() => pages.value[1]?.ref); // page 2, which has room at the bottom
 const squareRef = shallowRef<AnnotationRef | null>(null);
 const annotations = useAnnotationList(); // follows the annotations as they change, for the reads below
 

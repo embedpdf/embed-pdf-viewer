@@ -3,6 +3,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   EpdfAnnotationLayer,
@@ -12,7 +13,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-root',
@@ -21,6 +22,7 @@ const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPr
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     EpdfAnnotationTemplate,
   ],
@@ -29,11 +31,12 @@ const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPr
       {
         engine: () => cloudEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: review }],
+        initialDocuments: [{ source: proposal }],
       },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -57,13 +60,21 @@ const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPr
       <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer>
             @if (mine()) {
-              <!-- A note drawn as your app's comment bubble, the author's initials in it. It
-                   fills its frame, so the selection outline and the click area match it, and
-                   it turns with the annotation: a note stays upright on a turned page. -->
+              <!-- A note drawn as your app's comment bubble, the author's initials in it and
+                   its text in the tooltip. It fills its frame, so the selection outline and
+                   the click area match it, and it turns with the annotation: a note stays
+                   upright on a turned page. -->
               <ng-template [epdfAnnotation]="isNote" let-annotation let-hovered="hovered">
-                <div class="bubble" [class.bubble--hover]="hovered">{{ initials(annotation) }}</div>
+                <div
+                  class="bubble"
+                  [class.bubble--hover]="hovered"
+                  [title]="annotation.contents ?? ''"
+                >
+                  {{ initials(annotation) }}
+                </div>
               </ng-template>
             }
           </epdf-annotation-layer>

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   input,
   signal,
@@ -10,6 +11,7 @@ import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angul
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   annotationKey,
@@ -21,7 +23,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 interface Kind {
   label: string;
@@ -73,10 +75,14 @@ export class AnnotationList {
   private readonly pages = inject(EpdfDocument).pages;
   protected readonly kinds = KINDS;
   protected readonly kind = signal(KINDS[0]!);
-  protected readonly annotations = this.annotation.watch(() => {
+  private readonly ofKind = this.annotation.watch(() => {
     const subtype = this.kind().subtype;
     return subtype ? { subtype } : undefined;
   });
+  // Replies and review states belong to their comment's thread: the list leaves them out.
+  protected readonly annotations = computed(() =>
+    this.ofKind().filter((each) => each.reply?.type !== 'reply'),
+  );
   protected readonly key = annotationKey;
 
   protected pageNumberOf(objectNumber: number) {
@@ -96,15 +102,17 @@ export class AnnotationList {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     AnnotationList,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: proposal }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -117,6 +125,7 @@ export class AnnotationList {
         <epdf-stage #stage="epdfStage" class="stage">
           <ng-template epdfPage>
             <epdf-render-layer />
+            <epdf-selection-layer />
             <epdf-annotation-layer />
           </ng-template>
         </epdf-stage>

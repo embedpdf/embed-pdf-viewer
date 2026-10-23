@@ -3,6 +3,7 @@ import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -15,20 +16,34 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './renderers.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// A note drawn as your app's comment bubble, the author's initials in it. It
-// fills its frame, so the selection outline and the click area match it, and
-// it turns with the annotation: a note stays upright on a turned page.
+// A note drawn as your app's comment bubble, the author's initials in it and its
+// text in the tooltip. It fills its frame, so the selection outline and the click
+// area match it, and it turns with the annotation: a note stays upright on a turned
+// page.
 function CommentBubble({ annotation, hovered }: AnnotationRendererProps) {
   const initials = (annotation.author ?? '?')
     .split(' ')
     .map((word) => word[0])
     .join('');
 
-  return <div className={hovered ? 'bubble bubble--hover' : 'bubble'}>{initials}</div>;
+  return (
+    <div
+      className={hovered ? 'bubble bubble--hover' : 'bubble'}
+      title={annotation.contents ?? undefined}
+    >
+      {initials}
+    </div>
+  );
 }
 
 // Defined once, outside the component: the layer registers each entry.
@@ -55,7 +70,7 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: review }]}
+      initialDocuments={[{ source: proposal }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="toolbar">
@@ -73,6 +88,7 @@ export default function App() {
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer renderers={mine ? RENDERERS : NONE} />
             </>
           )}

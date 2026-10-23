@@ -216,6 +216,10 @@ its document only when the reader does something. On the cloud site every reader
 stored document, and a change made on load would pile up with each visit. The documents are built
 from HTML by `docs/content/pdfs/` (see its README).
 
+A document never instructs, everything it shows works in every example that opens it, and the
+example's hint says what to try (the README has the three rules). So an example that shows text
+turns on text selection, and comments go only in a document whose examples can show them.
+
 ### A viewer example
 
 ```

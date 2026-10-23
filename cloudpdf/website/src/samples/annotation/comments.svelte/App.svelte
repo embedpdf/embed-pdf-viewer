@@ -2,6 +2,7 @@
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { cloudEngine } from '@cloudpdf/engine';
@@ -10,16 +11,22 @@
   import '../comments.css';
 
   const engine = cloudEngine();
-  const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+  const plugins = [
+    stagePlugin(),
+    renderPlugin(),
+    interactionPlugin(),
+    selectionPlugin(),
+    annotationPlugin(),
+  ];
 
-  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <Viewer
   {engine}
   {plugins}
   identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  initialDocuments={[{ source: review }]}
+  initialDocuments={[{ source: proposal }]}
 >
   <DocumentGate>
     {#snippet fallback()}
@@ -28,6 +35,7 @@
     <div class="viewer">
       <Stage class="stage">
         <RenderLayer />
+        <SelectionLayer />
         <AnnotationLayer />
       </Stage>
       <Comments />

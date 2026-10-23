@@ -2,6 +2,7 @@ import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -16,11 +17,17 @@ import { localEngine } from '@embedpdf/engine';
 import './review.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const proposal = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-proposal.pdf');
+  return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A thread's verdict, its check mark, and the buttons the user may use.
@@ -97,7 +104,7 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: review }]}
+      initialDocuments={[{ source: proposal }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="viewer">
@@ -105,6 +112,7 @@ export default function App() {
             {() => (
               <>
                 <RenderLayer />
+                <SelectionLayer />
                 <AnnotationLayer />
               </>
             )}

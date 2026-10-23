@@ -11,7 +11,7 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const report: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
   type Painter = 'picture' | 'layer';
 </script>
@@ -20,7 +20,7 @@
   let painter = $state<Painter>('picture');
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: report }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

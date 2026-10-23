@@ -2,6 +2,7 @@
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { localEngine } from '@embedpdf/engine';
@@ -11,12 +12,18 @@
   import '../events.css';
 
   const engine = localEngine();
-  const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+  const plugins = [
+    stagePlugin(),
+    renderPlugin(),
+    interactionPlugin(),
+    selectionPlugin(),
+    annotationPlugin(),
+  ];
 
-  // [!doc-source review]
-  const review = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-review.pdf');
-    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source report]
+  const report = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-report.pdf');
+    return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
@@ -25,7 +32,7 @@
   {engine}
   {plugins}
   identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  initialDocuments={[{ source: review }]}
+  initialDocuments={[{ source: report }]}
 >
   <DocumentGate>
     {#snippet fallback()}
@@ -35,6 +42,7 @@
     <div class="viewer">
       <Stage class="stage">
         <RenderLayer />
+        <SelectionLayer />
         <AnnotationLayer />
       </Stage>
       <ActivityLog />

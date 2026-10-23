@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   input,
   signal,
@@ -10,6 +11,7 @@ import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angul
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   annotationKey,
@@ -21,9 +23,9 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const proposal = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-proposal.pdf');
+  return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 interface Kind {
@@ -76,10 +78,14 @@ export class AnnotationList {
   private readonly pages = inject(EpdfDocument).pages;
   protected readonly kinds = KINDS;
   protected readonly kind = signal(KINDS[0]!);
-  protected readonly annotations = this.annotation.watch(() => {
+  private readonly ofKind = this.annotation.watch(() => {
     const subtype = this.kind().subtype;
     return subtype ? { subtype } : undefined;
   });
+  // Replies and review states belong to their comment's thread: the list leaves them out.
+  protected readonly annotations = computed(() =>
+    this.ofKind().filter((each) => each.reply?.type !== 'reply'),
+  );
   protected readonly key = annotationKey;
 
   protected pageNumberOf(objectNumber: number) {
@@ -99,15 +105,17 @@ export class AnnotationList {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     AnnotationList,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: proposal }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -120,6 +128,7 @@ export class AnnotationList {
         <epdf-stage #stage="epdfStage" class="stage">
           <ng-template epdfPage>
             <epdf-render-layer />
+            <epdf-selection-layer />
             <epdf-annotation-layer />
           </ng-template>
         </epdf-stage>

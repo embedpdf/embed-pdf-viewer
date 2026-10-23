@@ -4,6 +4,7 @@ import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import type { AnnotationRenderer } from '@embedpdf/vue/annotation';
@@ -14,9 +15,15 @@ import TurnButton from './TurnButton.vue';
 import '../renderers.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Defined once, here: the layer registers each entry.
 const RENDERERS: AnnotationRenderer[] = [
@@ -32,7 +39,7 @@ const mine = ref(true);
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: review }]"
+    :initial-documents="[{ source: proposal }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
@@ -46,6 +53,7 @@ const mine = ref(true);
       <Stage class="stage">
         <template #page>
           <RenderLayer />
+          <SelectionLayer />
           <AnnotationLayer :renderers="mine ? RENDERERS : NONE" />
         </template>
       </Stage>

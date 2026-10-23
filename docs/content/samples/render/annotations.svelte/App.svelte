@@ -11,10 +11,10 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  // [!doc-source review]
-  const review = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-review.pdf');
-    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source report]
+  const report = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-report.pdf');
+    return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 
@@ -25,7 +25,7 @@
   let painter = $state<Painter>('picture');
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: report }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

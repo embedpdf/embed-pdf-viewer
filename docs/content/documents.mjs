@@ -36,4 +36,6 @@ export const DEMO_DOCUMENTS = {
   links: { cloudSource: ebookCloudSource },
   forms: { cloudSource: ebookCloudSource },
   review: { cloudSource: ebookCloudSource },
+  report: { cloudSource: ebookCloudSource },
+  proposal: { cloudSource: ebookCloudSource },
 };

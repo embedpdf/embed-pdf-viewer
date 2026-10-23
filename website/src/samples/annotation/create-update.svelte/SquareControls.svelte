@@ -7,7 +7,7 @@
   const annotation = useAnnotation();
   const stage = useStage();
   const pages = usePageList();
-  const page = $derived(pages.current[4]?.ref); // the document's empty last page
+  const page = $derived(pages.current[1]?.ref); // page 2, which has room at the bottom
   let ref = $state.raw<AnnotationRef | null>(null);
 
   // Reads named get…, can… and is… follow the annotations as they change.

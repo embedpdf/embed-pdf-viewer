@@ -2,6 +2,7 @@ import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -16,9 +17,15 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './review.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A thread's verdict, its check mark, and the buttons the user may use.
 function Review({ thread }: { thread: CommentThreadView }) {
@@ -94,7 +101,7 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: review }]}
+      initialDocuments={[{ source: proposal }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="viewer">
@@ -102,6 +109,7 @@ export default function App() {
             {() => (
               <>
                 <RenderLayer />
+                <SelectionLayer />
                 <AnnotationLayer />
               </>
             )}

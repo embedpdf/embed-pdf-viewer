@@ -133,3 +133,125 @@ a {
   margin-left: 0;
   margin-right: 0.3em;
 }
+
+/* ── Ordinary documents ──────────────────────────────────────────────────── */
+
+/* A page of an ordinary document (a report, a proposal, a letter): the letterhead, the body, and
+   a footer at the bottom. Documents read like the ones your users open: they never mention the
+   viewer. */
+.page.sheet {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding: 56px 80px 48px;
+  font: 400 13.5px/1.65 var(--font-body);
+  color: var(--color-fg);
+}
+
+.letterhead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.letterhead img {
+  display: block;
+  height: 26px;
+}
+.letterhead .kind {
+  font: 700 11.5px/1.2 var(--font-display);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+.sheet .title {
+  margin: 40px 0 0;
+  font: 800 32px/1.15 var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--color-deep-navy);
+  text-wrap: balance;
+}
+.sheet .meta {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--color-fg-muted);
+}
+.sheet .status {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font: 700 10.5px/1 var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a4b00;
+  background: #fff1d6;
+  vertical-align: 1px;
+}
+.sheet .lead {
+  margin: 24px 0 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+.sheet h2 {
+  margin: 28px 0 0;
+  font: 700 16px/1.3 var(--font-display);
+  color: var(--color-deep-navy);
+}
+.sheet p {
+  margin: 10px 0 0;
+}
+
+/* A table of figures: numbers line up on the right. */
+.sheet table {
+  width: 100%;
+  margin: 14px 0 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sheet th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font: 700 11px/1.2 var(--font-display);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--color-fg-muted);
+}
+.sheet td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+.sheet th.number,
+.sheet td.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A paragraph with room for a note in the right margin. */
+.with-note {
+  position: relative;
+}
+.note-slot {
+  position: absolute;
+  top: 2px;
+  right: -50px;
+  width: 27px;
+  height: 27px;
+}
+
+.page-footer {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  font-size: 11.5px;
+  color: var(--color-fg-muted);
+}

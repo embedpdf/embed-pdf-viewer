@@ -3,6 +3,7 @@ import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -17,9 +18,15 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './list.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const KINDS: { label: string; subtype?: AnnotationSubtype }[] = [
   { label: 'All' },
@@ -31,7 +38,10 @@ const KINDS: { label: string; subtype?: AnnotationSubtype }[] = [
 // The annotations of one kind, in drawing order. A click shows one on its page.
 function AnnotationList() {
   const [kind, setKind] = useState(KINDS[0]!);
-  const annotations = useAnnotationList(kind.subtype ? { subtype: kind.subtype } : undefined);
+  // Replies and review states belong to their comment's thread: the list leaves them out.
+  const annotations = useAnnotationList(
+    kind.subtype ? { subtype: kind.subtype } : undefined,
+  ).filter((each) => each.reply?.type !== 'reply');
   const pages = usePageList();
   const stage = useStage();
   const annotation = useAnnotation();
@@ -79,13 +89,14 @@ function AnnotationList() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: proposal }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="viewer">
           <Stage className="stage">
             {() => (
               <>
                 <RenderLayer />
+                <SelectionLayer />
                 <AnnotationLayer />
               </>
             )}

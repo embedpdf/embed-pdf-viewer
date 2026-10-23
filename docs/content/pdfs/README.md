@@ -12,6 +12,21 @@ pnpm --filter @embedpdf/docs-content pdfs forms    # one
 The PDFs land in `website/public/pdfs/embedpdf-<folder>.pdf`, which embedpdf.com serves at
 `/pdfs/…`. The build needs Google Chrome installed (`CHROME_PATH` names another).
 
+## What a document is
+
+One document serves one family of examples: the ones that turn on the same things. Three rules
+keep it honest, since a reader judges the product by what the example shows:
+
+- **It never instructs.** No "click", "your turn" or "try each one": it reads like a document
+  your users would open, such as a manual, an invoice or a proposal. Nothing on it is about the
+  viewer.
+- **What it shows works.** Everything on its pages works in every example that opens it. A note
+  nobody can read, a link nobody can follow, a box nobody can type in: none of them belong. Notes
+  and replies go only in a document whose examples show comments.
+- **The example's hint says what to try.** Only the example knows what it turned on, so its hint
+  and the page's **Try it** carry the instruction, and name what's on the document (the note next
+  to the title, the box around the downloads row).
+
 ## A document
 
 A folder with two files:
@@ -40,6 +55,12 @@ its field. Text markup needs no marker: the bake finds the phrase with `doc.sear
 marks the lines it covers. Give each annotation an `nm`, so the samples can find it by name. The
 build fails when a marked box has no use in `bake.mjs`, and when a page prints text in a font
 other than the shared ones.
+
+Most documents are ordinary ones (a report, a proposal), so `document.css` has their pieces: a
+`<section class="page sheet">` with a `.letterhead`, a `.title` and `.meta` line, a `.lead`,
+headings, tables and a `.page-footer`, and a `.note-slot` in the margin of a `.with-note` block
+for a note's icon. `shared/annotations.mjs` has the reviewers (`DANA`, `ADA`) and helpers that
+write annotations the way the viewer does: `markText()`, `addNote()`, `reply()`, `setStatus()`.
 
 ## From a design tool
 
