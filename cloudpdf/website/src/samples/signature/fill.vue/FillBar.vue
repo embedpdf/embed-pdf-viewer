@@ -24,7 +24,7 @@ useSignatureEvent(
   () => (drawn.value = false),
 );
 
-// On load: the invoice, with a typed signature drawn into its signature field.
+// On load: the agreement, with a typed signature drawn into its signature field.
 let done = false;
 watch(
   status,
@@ -32,7 +32,7 @@ watch(
     if (current !== 'ready' || done) return;
     done = true;
     void (async () => {
-      // Bring the form's signature field into view, on the invoice.
+      // Bring the agreement's signature field into view.
       const [widget] = form.getWidgets(APPROVAL);
       if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });

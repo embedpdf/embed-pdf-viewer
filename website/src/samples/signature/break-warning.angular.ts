@@ -29,9 +29,9 @@ const engine = localEngine();
 const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+const agreement = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 @Component({
@@ -39,7 +39,7 @@ const forms = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfAnnotationLayer],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: forms }] },
+      { engine, initialDocuments: [{ source: agreement }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -107,7 +107,7 @@ export class App {
       this.warning.set(`This change will break the signature in "${name}" when saved.`);
     });
 
-    // On load: the invoice, with its signature field signed by Ada with a typed signature.
+    // On load: the agreement, with its signature field signed by Ada with a typed signature.
     effect(() => {
       const stage = this.stage();
       if (this.form.status() !== 'ready' || !stage || this.done) return;
@@ -128,7 +128,7 @@ export class App {
   }
 
   private async signDocument(stage: EpdfStage) {
-    // Bring the form's signature field into view, on the invoice.
+    // Bring the agreement's signature field into view.
     const first = this.form.get(toFieldRef('approval'))?.widgets[0];
     const widget = first ? this.form.getWidget(first) : null;
     if (widget) stage.reveal(widget.page, { rect: widget.rect });

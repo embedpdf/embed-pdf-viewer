@@ -24,10 +24,10 @@ const engine = localEngine();
 const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
 // [!/asset-engine]
 
-// [!doc-source forms]
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source agreement]
+const agreement = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -38,7 +38,7 @@ const APPROVAL = toFieldRef('approval');
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: forms }] },
+      { engine, initialDocuments: [{ source: agreement }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -87,7 +87,7 @@ export class App {
     this.signature.filled$.pipe(takeUntilDestroyed()).subscribe(() => this.drawn.set(true));
     this.signature.cleared$.pipe(takeUntilDestroyed()).subscribe(() => this.drawn.set(false));
 
-    // On load: the invoice, with a typed signature drawn into its signature field.
+    // On load: the agreement, with a typed signature drawn into its signature field.
     effect(() => {
       const stage = this.stage();
       if (this.form.status() !== 'ready' || !stage || this.done) return;
@@ -106,7 +106,7 @@ export class App {
   }
 
   private async setUp(stage: EpdfStage) {
-    // Bring the form's signature field into view, on the invoice.
+    // Bring the agreement's signature field into view.
     const first = this.form.get(APPROVAL)?.widgets[0];
     const widget = first ? this.form.getWidget(first) : null;
     if (widget) stage.reveal(widget.page, { rect: widget.rect });

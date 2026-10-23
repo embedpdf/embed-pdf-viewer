@@ -20,10 +20,10 @@
     formPlugin(),
   ];
 
-  const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const registration: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: forms }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: registration }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

@@ -2,10 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   signal,
-  untracked,
   viewChild,
   ViewEncapsulation,
 } from '@angular/core';
@@ -18,15 +16,19 @@ import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
 import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+const registration = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-registration.pdf');
+  return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// How the new fields look: part of the PDF, like the rest of the page.
-const look = { color: '#94a3b8', interiorColor: '#ffffff', strokeWidth: 1, fontSize: 11 };
+// The printed boxes are the fields' look: a new field only sets its text size.
+const look = { fontSize: 11 };
 
-/** A dropdown, the next row down the page. */
+// The printed table of group tickets: a row every 36 points from the top at 470, with a country
+// box at x 96 and a circle for each ticket at x 330 and 430.
+const rowTop = (row: number) => 470 + row * 36;
+
+/** A dropdown in a row's country box. */
 function addDropdown(form: EpdfForm, page: PageRef, row: number) {
   return form.create({
     family: 'combobox',
@@ -34,20 +36,21 @@ function addDropdown(form: EpdfForm, page: PageRef, row: number) {
     options: [
       { label: 'Netherlands', value: 'NL' },
       { label: 'Belgium', value: 'BE' },
+      { label: 'Germany', value: 'DE' },
     ],
-    widgets: [{ page, rect: { x: 96, y: 270 + row * 36, width: 160, height: 24 }, ...look }],
+    widgets: [{ page, rect: { x: 96, y: rowTop(row), width: 160, height: 24 }, ...look }],
   });
 }
 
-/** A radio group: one field with a widget per button, each with the value it stands for. */
+/** A radio group in a row's two circles: one field, a widget per circle, each with its value. */
 function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
-  const y = 274 + row * 36;
+  const y = rowTop(row) + 4;
   return form.create({
     family: 'radio',
-    name: `plan_${row + 1}`,
+    name: `ticket_${row + 1}`,
     widgets: [
-      { page, rect: { x: 96, y, width: 16, height: 16 }, exportValue: 'monthly', ...look },
-      { page, rect: { x: 136, y, width: 16, height: 16 }, exportValue: 'yearly', ...look },
+      { page, rect: { x: 330, y, width: 16, height: 16 }, exportValue: 'one-day', ...look },
+      { page, rect: { x: 430, y, width: 16, height: 16 }, exportValue: 'both-days', ...look },
     ],
   });
 }
@@ -57,7 +60,7 @@ function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfFormLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: forms }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: registration }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -73,23 +76,23 @@ function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
         <button
           type="button"
           class="button"
-          [disabled]="!page() || full()"
-          (click)="add(addDropdown)"
+          [disabled]="!page() || rowFor('combobox') >= 5"
+          (click)="add(addDropdown, 'combobox')"
         >
           Add a dropdown
         </button>
         <button
           type="button"
           class="button"
-          [disabled]="!page() || full()"
-          (click)="add(addRadioGroup)"
+          [disabled]="!page() || rowFor('radio') >= 5"
+          (click)="add(addRadioGroup, 'radio')"
         >
           Add a radio group
         </button>
         <button type="button" class="button" [disabled]="!last()" (click)="removeLast()">
           Remove the last
         </button>
-        <output class="readout">{{ names() || 'No fields on this page yet' }}</output>
+        <output class="readout">{{ names() || 'No fields in the table yet' }}</output>
       </div>
       <epdf-stage class="stage">
         <ng-template epdfPage>
@@ -106,36 +109,27 @@ export class App {
   private readonly form = inject(EpdfForm);
   private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
-  private started = false;
 
   protected readonly addDropdown = addDropdown;
   protected readonly addRadioGroup = addRadioGroup;
-  /** The form's last page is empty: room for new fields. */
-  protected readonly page = computed(() => this.document.pages().at(-1)?.ref);
+  protected readonly page = computed(() => this.document.pages()[0]?.ref); // the printed form
   private readonly added = signal<FormFieldDTO[]>([]);
   protected readonly last = computed(() => this.added().at(-1));
-  protected readonly full = computed(() => this.added().length >= 5);
   protected readonly names = computed(() =>
     this.added()
       .map((field) => field.name)
       .join(', '),
   );
 
-  constructor() {
-    effect(() => {
-      const page = this.page();
-      const stage = this.stage();
-      if (!page || !stage || this.started) return;
-      this.started = true;
-      untracked(() => stage.goToPage(page));
-    });
+  /** Each kind of field fills its column from the top: the next row that hasn't got one. */
+  protected rowFor(family: FormFieldDTO['family']) {
+    return this.added().filter((field) => field.family === family).length;
   }
 
-  /** Each new field goes a row further down the page: bring it into view. */
-  protected async add(addField: typeof addDropdown) {
+  protected async add(addField: typeof addDropdown, family: FormFieldDTO['family']) {
     const page = this.page();
     if (!page) return;
-    const { field } = await addField(this.form, page, this.added().length);
+    const { field } = await addField(this.form, page, this.rowFor(family));
     this.added.update((fields) => [...fields, field]);
     this.stage()?.reveal(page, { rect: this.form.getWidget(field.widgets[0])!.rect });
   }

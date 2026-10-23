@@ -31,15 +31,15 @@
     }),
   ];
 
-  // [!doc-source forms]
-  const forms = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-forms.pdf');
-    return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source agreement]
+  const agreement = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+    return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: forms }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: agreement }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

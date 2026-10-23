@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useState } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { FormLayer, formPlugin, toFieldRef, useForm } from '@embedpdf/react/form';
@@ -24,21 +24,7 @@ async function fillIn(form: FormCapability) {
   return form.setValue(toFieldRef('topics'), { selectedValues: ['Forms', 'Signatures'] }); // list
 }
 
-/** Start on the sign-up page, the form's first fields. */
-function useStartOnSignUp() {
-  const stage = useStage();
-  const page = usePageList()[1]?.ref;
-  const started = useRef(false);
-
-  useEffect(() => {
-    if (!page || started.current) return;
-    started.current = true;
-    stage.goToPage(page);
-  }, [stage, page]);
-}
-
 function FillToolbar() {
-  useStartOnSignUp();
   const form = useForm();
   const [result, setResult] = useState('');
 

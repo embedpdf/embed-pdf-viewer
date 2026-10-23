@@ -2,15 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   signal,
-  untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -19,10 +16,10 @@ import { withActions } from '@embedpdf/angular/actions';
 import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source forms]
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source invoice]
+const invoice = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-invoice.pdf');
+  return { kind: 'bytes', id: 'invoice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -31,7 +28,7 @@ const forms = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfFormLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: forms }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: invoice }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -45,6 +42,7 @@ const forms = async (): Promise<OpenInput> => {
   encapsulation: ViewEncapsulation.None,
   template: `
     <ng-container *epdfDocumentGate="let document; fallback: loading">
+      <!-- The amounts and the total are calculated by the form's scripts. -->
       <div class="toolbar">
         <output class="readout">Total: {{ totalText() }}</output>
         @if (refused(); as refused) {
@@ -64,9 +62,6 @@ const forms = async (): Promise<OpenInput> => {
 })
 export class App {
   private readonly form = inject(EpdfForm);
-  private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
-  private started = false;
 
   private readonly total = this.form.valueOf(toFieldRef('invoice.total'));
   protected readonly totalText = computed(() => {
@@ -82,14 +77,5 @@ export class App {
       .subscribe(({ field, issues }) =>
         this.refused.set(`${field.name}: ${issues[0]?.message ?? 'refused'}`),
       );
-
-    // Start on the invoice: its amounts and its total are calculated by scripts.
-    effect(() => {
-      const page = this.document.pages()[3]?.ref;
-      const stage = this.stage();
-      if (!page || !stage || this.started) return;
-      this.started = true;
-      untracked(() => stage.goToPage(page));
-    });
   }
 }

@@ -43,4 +43,7 @@ export const DEMO_DOCUMENTS = {
   approvals: { cloudSource: ebookCloudSource },
   article: { cloudSource: ebookCloudSource },
   sketch: { cloudSource: ebookCloudSource },
+  invoice: { cloudSource: ebookCloudSource },
+  registration: { cloudSource: ebookCloudSource },
+  agreement: { cloudSource: ebookCloudSource },
 };

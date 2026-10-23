@@ -37,15 +37,15 @@ const plugins = [
   }),
 ];
 
-// [!doc-source forms]
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source agreement]
+const agreement = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 /**
- * Start on the invoice, where the form's signature field is. The browser holds no signatures
+ * Start at the agreement's signature field. The browser holds no signatures
  * yet: add one person with a typed signature.
  */
 function useSetUp() {
@@ -59,7 +59,7 @@ function useSetUp() {
     if (status !== 'ready' || done.current) return;
     done.current = true;
     void (async () => {
-      // Bring the form's signature field into view, on the invoice.
+      // Bring the agreement's signature field into view.
       const [widget] = form.getWidgets(toFieldRef('approval'));
       if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
@@ -120,7 +120,7 @@ function SignBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: agreement }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SignBar />
         <Stage className="stage">

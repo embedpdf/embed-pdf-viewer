@@ -6,11 +6,10 @@ import {
   inject,
   signal,
   untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -91,8 +90,6 @@ function valueText(field: FormFieldDTO): string {
 })
 export class App {
   protected readonly form = inject(EpdfForm);
-  private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
   private started = false;
 
   protected readonly valueText = valueText;
@@ -110,14 +107,11 @@ export class App {
       .pipe(takeUntilDestroyed())
       .subscribe(({ field }) => this.changed.set(field.name));
 
-    // Start on the sign-up page, with a name filled in.
+    // On load: a name filled in.
     effect(() => {
-      const page = this.document.pages()[1]?.ref;
-      const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.started) return;
+      if (this.form.status() !== 'ready' || this.started) return;
       this.started = true;
       untracked(() => {
-        stage.goToPage(page);
         void this.form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' });
       });
     });

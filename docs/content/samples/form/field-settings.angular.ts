@@ -4,10 +4,9 @@ import {
   effect,
   inject,
   untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -112,19 +111,14 @@ export class App {
   protected readonly form = inject(EpdfForm);
   private readonly annotation = inject(EpdfAnnotation);
   private readonly interaction = inject(EpdfInteraction);
-  private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
   private started = false;
 
   constructor() {
-    // Start on the sign-up page in design mode, with the name field selected.
+    // On load: design mode, with the name field selected.
     effect(() => {
-      const page = this.document.pages()[1]?.ref;
-      const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.started) return;
+      if (this.form.status() !== 'ready' || this.started) return;
       this.started = true;
       untracked(() => {
-        stage.goToPage(page);
         this.interaction.activateTool('form-edit');
         const widget = this.form.get(toFieldRef('name'))?.widgets[0]?.ref;
         if (widget) this.annotation.selection.set([widget]);

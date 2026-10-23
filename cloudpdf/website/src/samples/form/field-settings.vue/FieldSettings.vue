@@ -1,30 +1,24 @@
 <!-- What a settings panel shows for the selected field, and changes with `update()`. -->
 <script setup lang="ts">
-import { computed, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
-import { useStage } from '@embedpdf/vue/stage';
+import { watch } from 'vue';
 import { useInteraction } from '@embedpdf/vue/interaction';
 import { useAnnotation } from '@embedpdf/vue/annotation';
 import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import type { FormFieldDTO } from '@embedpdf/vue/form';
 
-/** Start on the sign-up page in design mode, with the name field selected. */
+/** On load: design mode, with the name field selected. */
 function useDesignForm() {
   const form = useForm();
   const annotation = useAnnotation();
   const interaction = useInteraction();
-  const stage = useStage();
   const status = useFormState((state) => state.status);
-  const pages = usePageList();
-  const signUp = computed(() => pages.value[1]?.ref);
   let started = false;
 
   watch(
-    [status, signUp],
-    ([current, page]) => {
-      if (current !== 'ready' || !page || started) return;
+    status,
+    (current) => {
+      if (current !== 'ready' || started) return;
       started = true;
-      stage.goToPage(page);
       interaction.activateTool('form-edit');
       const widget = form.get(toFieldRef('name'))?.widgets[0]?.ref;
       if (widget) annotation.selection.set([widget]);

@@ -14,13 +14,13 @@
   const status = useFormState((formState) => formState.status);
   const mark = $derived(rows.current[0]?.signatures[0]);
 
-  // On load: the invoice, where the form's signature field is, and a person's signature, armed.
+  // On load: the agreement, where the form's signature field is, and a person's signature, armed.
   let done = false;
   $effect(() => {
     if (status.current !== 'ready' || done) return;
     done = true;
     untrack(async () => {
-      // Bring the form's signature field into view, on the invoice.
+      // Bring the agreement's signature field into view.
       const [widget] = form.getWidgets(toFieldRef('approval'));
       if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });

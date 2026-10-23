@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
-import { useStage } from '@embedpdf/vue/stage';
+import { computed, onMounted } from 'vue';
 import { useInteraction, useInteractionState } from '@embedpdf/vue/interaction';
 import { useForm, useFormState } from '@embedpdf/vue/form';
 
@@ -14,24 +12,10 @@ const FIELD_TOOLS = [
   ['form-signature', 'Signature'],
 ] as const;
 
-/** Start on the form's last page, which is empty, with the text tool picked. */
+/** Start with the text tool picked: the printed form has boxes, but no fields yet. */
 function useStartDesigning() {
   const interaction = useInteraction();
-  const stage = useStage();
-  const pages = usePageList();
-  const lastPage = computed(() => pages.value.at(-1)?.ref);
-  let started = false;
-
-  watch(
-    lastPage,
-    (page) => {
-      if (!page || started) return;
-      started = true;
-      stage.goToPage(page);
-      interaction.activateTool('form-text');
-    },
-    { immediate: true },
-  );
+  onMounted(() => interaction.activateTool('form-text'));
 }
 
 useStartDesigning();

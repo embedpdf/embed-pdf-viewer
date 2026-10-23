@@ -32,14 +32,14 @@ const plugins = [
   signaturePlugin({ key: () => signer }),
 ];
 
-// [!doc-source forms]
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source agreement]
+const agreement = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-/** On load: the invoice, where the form's signature field is, and a person's signature, armed. */
+/** On load: the agreement, where the form's signature field is, and a person's signature, armed. */
 function useSetUp() {
   const form = useForm();
   const stamp = useStamp();
@@ -51,7 +51,7 @@ function useSetUp() {
     if (status !== 'ready' || done.current) return;
     done.current = true;
     void (async () => {
-      // Bring the form's signature field into view, on the invoice.
+      // Bring the agreement's signature field into view.
       const [widget] = form.getWidgets(toFieldRef('approval'));
       if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
@@ -97,7 +97,7 @@ function ArmBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: agreement }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ArmBar />
         <Stage className="stage">

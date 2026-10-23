@@ -1,13 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  untracked,
-  viewChild,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, inject, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -88,18 +80,4 @@ const COLORS = [
 export class App {
   protected readonly form = inject(EpdfForm);
   protected readonly colors = COLORS;
-  private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
-  private started = false;
-
-  constructor() {
-    // Start on the sign-up page, the form's first fields.
-    effect(() => {
-      const page = this.document.pages()[1]?.ref;
-      const stage = this.stage();
-      if (!page || !stage || this.started) return;
-      this.started = true;
-      untracked(() => stage.goToPage(page));
-    });
-  }
 }

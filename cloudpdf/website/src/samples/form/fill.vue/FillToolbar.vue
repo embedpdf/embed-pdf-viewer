@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
-import { useStage } from '@embedpdf/vue/stage';
+import { ref } from 'vue';
 import { toFieldRef, useForm } from '@embedpdf/vue/form';
 import type { FormCapability } from '@embedpdf/vue/form';
 
@@ -14,25 +12,6 @@ async function fillIn(form: FormCapability) {
   return form.setValue(toFieldRef('topics'), { selectedValues: ['Forms', 'Signatures'] }); // list
 }
 
-/** Start on the sign-up page, the form's first fields. */
-function useStartOnSignUp() {
-  const stage = useStage();
-  const pages = usePageList();
-  const signUp = computed(() => pages.value[1]?.ref);
-  let started = false;
-
-  watch(
-    signUp,
-    (page) => {
-      if (!page || started) return;
-      started = true;
-      stage.goToPage(page);
-    },
-    { immediate: true },
-  );
-}
-
-useStartOnSignUp();
 const form = useForm();
 const result = ref('');
 

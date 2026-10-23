@@ -1,14 +1,11 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  effect,
   inject,
   signal,
-  untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -67,21 +64,7 @@ async function fillIn(form: EpdfForm) {
 })
 export class App {
   private readonly form = inject(EpdfForm);
-  private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
-  private started = false;
   protected readonly result = signal('');
-
-  constructor() {
-    // Start on the sign-up page, the form's first fields.
-    effect(() => {
-      const page = this.document.pages()[1]?.ref;
-      const stage = this.stage();
-      if (!page || !stage || this.started) return;
-      this.started = true;
-      untracked(() => stage.goToPage(page));
-    });
-  }
 
   protected async fillIn() {
     const { status } = await fillIn(this.form);

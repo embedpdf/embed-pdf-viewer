@@ -21,11 +21,11 @@ const plugins = [
   actionsPlugin({ javascript: { enabled: true } }),
 ];
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const invoice: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: forms }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: invoice }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <InvoiceBar />

@@ -30,14 +30,14 @@ const engine = cloudEngine();
 const assetEngine = localEngine();
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfAnnotationLayer],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: forms }] },
+      { engine, initialDocuments: [{ source: agreement }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -105,7 +105,7 @@ export class App {
       this.warning.set(`This change will break the signature in "${name}" when saved.`);
     });
 
-    // On load: the invoice, with its signature field signed by Ada with a typed signature.
+    // On load: the agreement, with its signature field signed by Ada with a typed signature.
     effect(() => {
       const stage = this.stage();
       if (this.form.status() !== 'ready' || !stage || this.done) return;
@@ -126,7 +126,7 @@ export class App {
   }
 
   private async signDocument(stage: EpdfStage) {
-    // Bring the form's signature field into view, on the invoice.
+    // Bring the agreement's signature field into view.
     const first = this.form.get(toFieldRef('approval'))?.widgets[0];
     const widget = first ? this.form.getWidget(first) : null;
     if (widget) stage.reveal(widget.page, { rect: widget.rect });

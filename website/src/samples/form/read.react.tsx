@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -26,20 +26,17 @@ const forms = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-/** Start on the sign-up page, with a name filled in. */
-function useStartOnSignUp() {
+/** On load: a name filled in. */
+function useFilledInName() {
   const form = useForm();
-  const stage = useStage();
   const status = useFormState((state) => state.status);
-  const page = usePageList()[1]?.ref;
   const started = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || started.current) return;
+    if (status !== 'ready' || started.current) return;
     started.current = true;
-    stage.goToPage(page);
     void form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' });
-  }, [form, stage, status, page]);
+  }, [form, status]);
 }
 
 /** A field's value as text, whatever its family. */
@@ -60,7 +57,7 @@ function valueText(field: FormFieldDTO): string {
 }
 
 function Greeting() {
-  useStartOnSignUp();
+  useFilledInName();
   const name = useFormValue(toFieldRef('name'));
   const [changed, setChanged] = useState<string | null>(null);
 

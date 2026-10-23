@@ -12,13 +12,13 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
-  const forms = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-forms.pdf');
-    return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const registration = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-registration.pdf');
+    return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: forms }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: registration }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

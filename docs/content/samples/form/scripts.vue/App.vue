@@ -21,16 +21,16 @@ const plugins = [
   actionsPlugin({ javascript: { enabled: true } }),
 ];
 
-// [!doc-source forms]
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source invoice]
+const invoice = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-invoice.pdf');
+  return { kind: 'bytes', id: 'invoice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: forms }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: invoice }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <InvoiceBar />

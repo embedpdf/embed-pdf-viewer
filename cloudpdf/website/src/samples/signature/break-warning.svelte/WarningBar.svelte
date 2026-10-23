@@ -20,13 +20,13 @@
   const signed = $derived(signatureState.signatures[0]);
   let warning = $state<string | null>(null);
 
-  // On load: the invoice, with its signature field signed by Ada with a typed signature.
+  // On load: the agreement, with its signature field signed by Ada with a typed signature.
   let done = false;
   $effect(() => {
     if (status.current !== 'ready' || done) return;
     done = true;
     untrack(async () => {
-      // Bring the form's signature field into view, on the invoice.
+      // Bring the agreement's signature field into view.
       const [widget] = form.getWidgets(toFieldRef('approval'));
       if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });

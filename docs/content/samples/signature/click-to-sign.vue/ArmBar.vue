@@ -5,7 +5,7 @@ import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import { useStamp, useStampState } from '@embedpdf/vue/stamp';
 import { useSignatureState, useSignerRows } from '@embedpdf/vue/signature';
 
-/** On load: the invoice, where the form's signature field is, and a person's signature, armed. */
+/** On load: the agreement, where the form's signature field is, and a person's signature, armed. */
 function useSetUp() {
   const form = useForm();
   const stamp = useStamp();
@@ -19,7 +19,7 @@ function useSetUp() {
       if (current !== 'ready' || done) return;
       done = true;
       void (async () => {
-        // Bring the form's signature field into view, on the invoice.
+        // Bring the agreement's signature field into view.
         const [widget] = form.getWidgets(toFieldRef('approval'));
         if (widget) stage.reveal(widget.page, { rect: widget.rect });
         const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });

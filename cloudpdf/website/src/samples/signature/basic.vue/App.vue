@@ -31,11 +31,11 @@ const plugins = [
   }),
 ];
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: forms }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: agreement }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <SignBar />

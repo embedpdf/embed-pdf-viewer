@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -26,24 +26,21 @@ const forms = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-/** Start on the sign-up page, filled in. */
-function useStartOnSignUp() {
+/** On load: the form filled in. */
+function useFilledIn() {
   const form = useForm();
-  const stage = useStage();
   const status = useFormState((state) => state.status);
-  const page = usePageList()[1]?.ref;
   const started = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || started.current) return;
+    if (status !== 'ready' || started.current) return;
     started.current = true;
-    stage.goToPage(page);
     void form.importValues({ name: 'Ada Lovelace', email: 'ada@example.com', framework: 'Svelte' });
-  }, [form, stage, status, page]);
+  }, [form, status]);
 }
 
 function DataToolbar() {
-  useStartOnSignUp();
+  useFilledIn();
   const form = useForm();
   const [bundle, setBundle] = useState<FormBundle | null>(null);
   const [result, setResult] = useState('');

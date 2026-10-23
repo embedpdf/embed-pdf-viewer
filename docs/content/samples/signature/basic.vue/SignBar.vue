@@ -7,7 +7,7 @@ import { useSignature, useSignatureState, useSignerRows } from '@embedpdf/vue/si
 import MarkButton from './MarkButton.vue';
 
 /**
- * Start on the invoice, where the form's signature field is. The browser holds no signatures
+ * Start at the agreement's signature field. The browser holds no signatures
  * yet: add one person with a typed signature.
  */
 function useSetUp() {
@@ -23,7 +23,7 @@ function useSetUp() {
       if (current !== 'ready' || done) return;
       done = true;
       void (async () => {
-        // Bring the form's signature field into view, on the invoice.
+        // Bring the agreement's signature field into view.
         const [widget] = form.getWidgets(toFieldRef('approval'));
         if (widget) stage.reveal(widget.page, { rect: widget.rect });
         const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });

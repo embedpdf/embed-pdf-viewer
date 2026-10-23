@@ -28,7 +28,7 @@ const assetEngine = localEngine();
 // service with `remoteSigner`, or a person's own with `personalSigner`.
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A mark's button: its picture once there is one, its label until then.
 @Component({
@@ -62,7 +62,7 @@ export class MarkButton {
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: forms }] },
+      { engine, initialDocuments: [{ source: agreement }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -123,7 +123,7 @@ export class App {
   });
 
   constructor() {
-    // Start on the invoice, where the form's signature field is. The browser holds no signatures
+    // Start at the agreement's signature field. The browser holds no signatures
     // yet: add one person with a typed signature.
     effect(() => {
       const stage = this.stage();
@@ -144,7 +144,7 @@ export class App {
   }
 
   private async setUp(stage: EpdfStage) {
-    // Bring the form's signature field into view, on the invoice.
+    // Bring the agreement's signature field into view.
     const first = this.form.get(toFieldRef('approval'))?.widgets[0];
     const widget = first ? this.form.getWidget(first) : null;
     if (widget) stage.reveal(widget.page, { rect: widget.rect });

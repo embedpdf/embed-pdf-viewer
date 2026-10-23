@@ -1,24 +1,18 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
-  import { useStage } from '@embedpdf/svelte/stage';
   import { FormTransfer, useForm, useFormState, type FormBundle } from '@embedpdf/svelte/form';
 
   const form = useForm();
-  const stage = useStage();
   const status = useFormState((formState) => formState.status);
-  const pages = usePageList();
   let bundle = $state.raw<FormBundle | null>(null);
   let result = $state('');
 
-  // Start on the sign-up page, filled in.
+  // On load: the form filled in.
   let started = false;
   $effect(() => {
-    const page = pages.current[1]?.ref;
-    if (status.current !== 'ready' || !page || started) return;
+    if (status.current !== 'ready' || started) return;
     started = true;
     untrack(() => {
-      stage.goToPage(page);
       void form.importValues({
         name: 'Ada Lovelace',
         email: 'ada@example.com',

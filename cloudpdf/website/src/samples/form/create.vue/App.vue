@@ -13,11 +13,11 @@ import '../create.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const registration: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: forms }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: registration }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <BuildToolbar />

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin, useInteraction, useInteractionState } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
@@ -20,10 +20,10 @@ const plugins = [
   formPlugin(),
 ];
 
-// [!doc-source forms]
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source registration]
+const registration = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-registration.pdf');
+  return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -36,19 +36,16 @@ const FIELD_TOOLS = [
   ['form-signature', 'Signature'],
 ] as const;
 
-/** Start on the form's last page, which is empty, with the text tool picked. */
+/** Start with the text tool picked: the printed form has boxes, but no fields yet. */
 function useStartDesigning() {
   const interaction = useInteraction();
-  const stage = useStage();
-  const page = usePageList().at(-1)?.ref;
   const started = useRef(false);
 
   useEffect(() => {
-    if (!page || started.current) return;
+    if (started.current) return;
     started.current = true;
-    stage.goToPage(page);
     interaction.activateTool('form-text');
-  }, [interaction, stage, page]);
+  }, [interaction]);
 }
 
 function FieldPalette() {
@@ -102,7 +99,7 @@ function FieldPalette() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: registration }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <FieldPalette />
         <Stage className="stage">

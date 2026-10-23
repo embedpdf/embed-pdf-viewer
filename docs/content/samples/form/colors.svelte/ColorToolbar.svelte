@@ -1,7 +1,4 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
-  import { useStage } from '@embedpdf/svelte/stage';
   import { useForm, useFormSettings } from '@embedpdf/svelte/form';
 
   const COLORS = [
@@ -11,18 +8,7 @@
   ] as const;
 
   const form = useForm();
-  const stage = useStage();
   const settings = useFormSettings();
-  const pages = usePageList();
-
-  // Start on the sign-up page, the form's first fields.
-  let started = false;
-  $effect(() => {
-    const page = pages.current[1]?.ref;
-    if (!page || started) return;
-    started = true;
-    untrack(() => stage.goToPage(page));
-  });
 </script>
 
 <div class="toolbar">

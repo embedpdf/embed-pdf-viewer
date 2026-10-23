@@ -6,10 +6,9 @@ import {
   inject,
   signal,
   untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -66,8 +65,6 @@ const forms = async (): Promise<OpenInput> => {
 })
 export class App {
   private readonly form = inject(EpdfForm);
-  private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
   private started = false;
   protected readonly bundle = signal<FormBundle | null>(null);
   protected readonly result = signal('');
@@ -80,14 +77,11 @@ export class App {
   });
 
   constructor() {
-    // Start on the sign-up page, filled in.
+    // On load: the form filled in.
     effect(() => {
-      const page = this.document.pages()[1]?.ref;
-      const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.started) return;
+      if (this.form.status() !== 'ready' || this.started) return;
       this.started = true;
       untracked(() => {
-        stage.goToPage(page);
         void this.form.importValues({
           name: 'Ada Lovelace',
           email: 'ada@example.com',

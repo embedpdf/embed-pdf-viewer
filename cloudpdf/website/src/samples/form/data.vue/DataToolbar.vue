@@ -1,24 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
-import { useStage } from '@embedpdf/vue/stage';
+import { ref, shallowRef, watch } from 'vue';
 import { FormTransfer, useForm, useFormState, type FormBundle } from '@embedpdf/vue/form';
 
-/** Start on the sign-up page, filled in. */
-function useStartOnSignUp() {
+/** On load: the form filled in. */
+function useFilledIn() {
   const form = useForm();
-  const stage = useStage();
   const status = useFormState((state) => state.status);
-  const pages = usePageList();
-  const signUp = computed(() => pages.value[1]?.ref);
   let started = false;
 
   watch(
-    [status, signUp],
-    ([current, page]) => {
-      if (current !== 'ready' || !page || started) return;
+    status,
+    (current) => {
+      if (current !== 'ready' || started) return;
       started = true;
-      stage.goToPage(page);
       void form.importValues({
         name: 'Ada Lovelace',
         email: 'ada@example.com',
@@ -29,7 +23,7 @@ function useStartOnSignUp() {
   );
 }
 
-useStartOnSignUp();
+useFilledIn();
 const form = useForm();
 const bundle = shallowRef<FormBundle | null>(null);
 const result = ref('');

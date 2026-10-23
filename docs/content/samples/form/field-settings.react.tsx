@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin, useInteraction } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin, useAnnotation } from '@embedpdf/react/annotation';
@@ -26,24 +26,21 @@ const forms = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-/** Start on the sign-up page in design mode, with the name field selected. */
+/** On load: design mode, with the name field selected. */
 function useDesignForm() {
   const form = useForm();
   const annotation = useAnnotation();
   const interaction = useInteraction();
-  const stage = useStage();
   const status = useFormState((state) => state.status);
-  const page = usePageList()[1]?.ref;
   const started = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || started.current) return;
+    if (status !== 'ready' || started.current) return;
     started.current = true;
-    stage.goToPage(page);
     interaction.activateTool('form-edit');
     const widget = form.get(toFieldRef('name'))?.widgets[0]?.ref;
     if (widget) annotation.selection.set([widget]);
-  }, [form, annotation, interaction, stage, status, page]);
+  }, [form, annotation, interaction, status]);
 }
 
 /** What a settings panel shows for the selected field, and changes with `update()`. */

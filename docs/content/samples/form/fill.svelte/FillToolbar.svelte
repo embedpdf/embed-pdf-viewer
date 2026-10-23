@@ -1,7 +1,4 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
-  import { useStage } from '@embedpdf/svelte/stage';
   import { toFieldRef, useForm, type FormCapability } from '@embedpdf/svelte/form';
 
   /** One field of each family, with `setValue()` in the shape each one takes. */
@@ -14,18 +11,7 @@
   }
 
   const form = useForm();
-  const stage = useStage();
-  const pages = usePageList();
   let result = $state('');
-
-  // Start on the sign-up page, the form's first fields.
-  let started = false;
-  $effect(() => {
-    const page = pages.current[1]?.ref;
-    if (!page || started) return;
-    started = true;
-    untrack(() => stage.goToPage(page));
-  });
 
   async function fill() {
     const { status } = await fillIn(form);

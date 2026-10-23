@@ -20,10 +20,10 @@
     actionsPlugin({ javascript: { enabled: true } }),
   ];
 
-  const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const invoice: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: forms }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: invoice }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

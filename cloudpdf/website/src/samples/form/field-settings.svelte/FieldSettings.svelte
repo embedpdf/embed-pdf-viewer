@@ -1,8 +1,6 @@
 <!-- What a settings panel shows for the selected field, and changes with `update()`. -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
-  import { useStage } from '@embedpdf/svelte/stage';
   import { useInteraction } from '@embedpdf/svelte/interaction';
   import { useAnnotation } from '@embedpdf/svelte/annotation';
   import { toFieldRef, useForm, useFormState } from '@embedpdf/svelte/form';
@@ -10,18 +8,14 @@
   const form = useForm();
   const annotation = useAnnotation();
   const interaction = useInteraction();
-  const stage = useStage();
   const formState = useFormState();
-  const pages = usePageList();
 
-  // Start on the sign-up page in design mode, with the name field selected.
+  // On load: design mode, with the name field selected.
   let started = false;
   $effect(() => {
-    const page = pages.current[1]?.ref;
-    if (formState.status !== 'ready' || !page || started) return;
+    if (formState.status !== 'ready' || started) return;
     started = true;
     untrack(() => {
-      stage.goToPage(page);
       interaction.activateTool('form-edit');
       const widget = form.get(toFieldRef('name'))?.widgets[0]?.ref;
       if (widget) annotation.selection.set([widget]);

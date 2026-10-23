@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useState } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { actionsPlugin } from '@embedpdf/react/actions';
@@ -26,26 +26,13 @@ const plugins = [
   actionsPlugin({ javascript: { enabled: true } }),
 ];
 
-const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
-  return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
+const invoice = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-invoice.pdf');
+  return { kind: 'bytes', id: 'invoice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-/** Start on the invoice: its amounts and its total are calculated by scripts. */
-function useStartOnInvoice() {
-  const stage = useStage();
-  const page = usePageList()[3]?.ref;
-  const started = useRef(false);
-
-  useEffect(() => {
-    if (!page || started.current) return;
-    started.current = true;
-    stage.goToPage(page);
-  }, [stage, page]);
-}
-
+// The amounts and the total are calculated by the form's scripts.
 function InvoiceBar() {
-  useStartOnInvoice();
   const total = useFormValue(toFieldRef('invoice.total'));
   const [refused, setRefused] = useState<string | null>(null);
 
@@ -67,7 +54,7 @@ function InvoiceBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: forms }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: invoice }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <InvoiceBar />
         <Stage className="stage">
