@@ -16,9 +16,9 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// The top half of a page, where the box selects: on the shapes page, its first row.
+// The top half of a page, where the box selects: on the home page, the image and the button.
 const TOP_HALF = { x: 0, y: 0, width: 612, height: 396 };
 
 @Component({
@@ -49,7 +49,7 @@ export class SelectionToolbar {
   protected readonly annotation = inject(EpdfAnnotation);
   private readonly document = inject(EpdfDocument);
   protected readonly selected = this.annotation.selected; // the selected annotations
-  protected readonly page = computed(() => this.document.pages()[2]?.ref); // the shapes page
+  protected readonly page = computed(() => this.document.pages()[0]?.ref); // the home page wireframe
 
   protected selectAll() {
     const page = this.page();
@@ -74,7 +74,7 @@ export class SelectionToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -105,9 +105,9 @@ export class App {
   private done = false;
 
   constructor() {
-    // On load: the shapes page, with everything on it selected.
+    // On load: the home page wireframe, with everything on it selected.
     effect(() => {
-      const page = this.document.pages()[2]?.ref;
+      const page = this.document.pages()[0]?.ref;
       const stage = this.stage();
       if (this.annotation.status() !== 'ready' || !page || !stage || this.done) return;
       this.done = true;

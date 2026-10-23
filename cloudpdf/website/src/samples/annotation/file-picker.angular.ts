@@ -3,11 +3,12 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotationLayer, withAnnotation, withFilePicker } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -58,15 +59,17 @@ export class Toolbar {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     Toolbar,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: approvals }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
       // The browser's file dialog, for the stamp and attachment tools of every document.
       withFilePicker(),
@@ -81,6 +84,7 @@ export class Toolbar {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

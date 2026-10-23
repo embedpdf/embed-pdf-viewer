@@ -14,7 +14,7 @@ import '../identity.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
@@ -22,7 +22,7 @@ const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPr
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: review }]"
+    :initial-documents="[{ source: sketch }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>

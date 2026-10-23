@@ -2,6 +2,7 @@
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { localEngine } from '@embedpdf/engine';
@@ -11,17 +12,23 @@
   import '../stamp-status.css';
 
   const engine = localEngine();
-  const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+  const plugins = [
+    stagePlugin(),
+    renderPlugin(),
+    interactionPlugin(),
+    selectionPlugin(),
+    annotationPlugin(),
+  ];
 
-  // [!doc-source review]
-  const review = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-review.pdf');
-    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source approvals]
+  const approvals = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+    return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: approvals }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
@@ -30,6 +37,7 @@
     <p class="hint">Sign a stamp off, then move it: its status goes with it.</p>
     <Stage class="stage">
       <RenderLayer />
+      <SelectionLayer />
       <AnnotationLayer />
       {#snippet overlay()}
         <Approvals />

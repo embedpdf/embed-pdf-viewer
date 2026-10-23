@@ -19,10 +19,10 @@
     annotationPlugin(),
   ];
 
-  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: article }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

@@ -3,6 +3,7 @@ import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -18,9 +19,15 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './branded-text-box.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const notice: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Your own text box, in your app's look: it fills its frame, which the layer
 // places and turns like the text box. The element inside is the editor and
@@ -84,7 +91,7 @@ function FormatButtons() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: notice }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectTextBox />
         <FormatButtons />
@@ -92,6 +99,7 @@ export default function App() {
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer renderers={RENDERERS} />
             </>
           )}

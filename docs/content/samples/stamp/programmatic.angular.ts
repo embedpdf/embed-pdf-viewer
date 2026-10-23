@@ -11,6 +11,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfStamp, withStamp } from '@embedpdf/angular/stamp';
@@ -22,10 +23,10 @@ const engine = localEngine();
 const assetEngine = engine; // stamp libraries are PDFs; they open here too
 // [!/asset-engine]
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source approvals]
+const approvals = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+  return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -98,15 +99,17 @@ export class PlaceStamps {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     PlaceStamps,
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: review }] },
+      { engine, initialDocuments: [{ source: approvals }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
       withStamp({ assetEngine }),
     ),
@@ -120,6 +123,7 @@ export class PlaceStamps {
       <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

@@ -24,7 +24,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -67,7 +67,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: article }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />
         <Stage className="stage">

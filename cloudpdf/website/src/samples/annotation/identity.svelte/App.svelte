@@ -13,14 +13,14 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <Viewer
   {engine}
   {plugins}
   identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  initialDocuments={[{ source: review }]}
+  initialDocuments={[{ source: sketch }]}
 >
   <DocumentGate>
     {#snippet fallback()}

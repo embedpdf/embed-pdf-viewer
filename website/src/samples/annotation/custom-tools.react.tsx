@@ -50,9 +50,9 @@ const plugins = [
   }),
 ];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A toolbar that builds itself from the tools: every tool with a label gets a button.
@@ -94,7 +94,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />
         <Stage className="stage">

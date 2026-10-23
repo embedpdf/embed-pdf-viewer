@@ -8,7 +8,7 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const COLORS = ['#e5484d', '#1e90ff', '#30a46c', '#1a2748'];
 
@@ -101,7 +101,7 @@ export class StartWithThePen {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

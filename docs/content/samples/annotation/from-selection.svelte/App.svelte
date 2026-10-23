@@ -19,15 +19,15 @@
     annotationPlugin(),
   ];
 
-  // [!doc-source review]
-  const review = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-review.pdf');
-    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source article]
+  const article = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-article.pdf');
+    return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: article }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

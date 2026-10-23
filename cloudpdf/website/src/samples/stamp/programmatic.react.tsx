@@ -3,6 +3,7 @@ import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -23,11 +24,12 @@ const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
+  selectionPlugin(),
   annotationPlugin(),
   stampPlugin({ assetEngine }),
 ];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The middle of a Letter page, in page coordinates.
 const MIDDLE = { x: 306, y: 396 };
@@ -88,13 +90,14 @@ function PlaceStamps() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: approvals }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <PlaceStamps />
         <Stage className="stage">
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}

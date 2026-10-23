@@ -18,7 +18,7 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <script lang="ts">
@@ -49,7 +49,7 @@
   </div>
 {/snippet}
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: layout }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

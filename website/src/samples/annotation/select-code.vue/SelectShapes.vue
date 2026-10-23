@@ -4,12 +4,12 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
 import { useAnnotation, useAnnotationState } from '@embedpdf/vue/annotation';
 
-// On load: the shapes page, with everything on it selected.
+// On load: the home page wireframe, with everything on it selected.
 const annotation = useAnnotation();
 const stage = useStage();
 const ready = useAnnotationState((state) => state.status === 'ready');
 const pages = usePageList();
-const shapes = computed(() => pages.value[2]?.ref);
+const shapes = computed(() => pages.value[0]?.ref);
 let done = false;
 
 watch(

@@ -12,13 +12,14 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const notice = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-notice.pdf');
+  return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 type Format = 'bold' | 'italic' | 'underline';
@@ -84,15 +85,17 @@ export class RichTextToolbar {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     RichTextToolbar,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: notice }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -105,6 +108,7 @@ export class RichTextToolbar {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

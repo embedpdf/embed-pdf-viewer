@@ -18,16 +18,16 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// On page 2: the characters of the sentence in its “Your turn” box, and where it is.
-const SENTENCE = { start: 605, count: 44 };
-const SENTENCE_BOX = { x: 68, y: 446, width: 256, height: 16 };
+// On page 1: the characters of the title's first line, and where it is.
+const SENTENCE = { start: 6, count: 33 };
+const SENTENCE_BOX = { x: 60, y: 102, width: 363, height: 31 };
 
 const MARKUP = [
   { tool: 'highlight', label: 'Highlight' },
@@ -75,7 +75,7 @@ export class MarkupToolbar {
   constructor() {
     // On load: the sentence is selected, ready to mark, and in view.
     effect(() => {
-      const page = this.document.pages()[1]?.ref;
+      const page = this.document.pages()[0]?.ref;
       const stage = this.stage();
       if (!page) return;
       untracked(() => {
@@ -104,7 +104,7 @@ export class MarkupToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: article }] },
       withStage(),
       withRender(),
       withInteraction(),

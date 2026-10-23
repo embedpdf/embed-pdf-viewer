@@ -13,9 +13,9 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 @Component({
@@ -82,7 +82,7 @@ export class AfterDrawing {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

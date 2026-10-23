@@ -23,9 +23,9 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // One control per property, by the control it asks for.
@@ -236,7 +236,7 @@ export class StylePanel {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),

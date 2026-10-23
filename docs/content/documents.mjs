@@ -38,4 +38,9 @@ export const DEMO_DOCUMENTS = {
   review: { cloudSource: ebookCloudSource },
   report: { cloudSource: ebookCloudSource },
   proposal: { cloudSource: ebookCloudSource },
+  layout: { cloudSource: ebookCloudSource },
+  notice: { cloudSource: ebookCloudSource },
+  approvals: { cloudSource: ebookCloudSource },
+  article: { cloudSource: ebookCloudSource },
+  sketch: { cloudSource: ebookCloudSource },
 };

@@ -3,6 +3,7 @@ import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -18,12 +19,18 @@ import { localEngine } from '@embedpdf/engine';
 import './branded-text-box.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source notice]
+const notice = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-notice.pdf');
+  return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -89,7 +96,7 @@ function FormatButtons() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: notice }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectTextBox />
         <FormatButtons />
@@ -97,6 +104,7 @@ export default function App() {
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer renderers={RENDERERS} />
             </>
           )}

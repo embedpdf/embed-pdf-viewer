@@ -25,7 +25,7 @@ const plugins = [
   }),
 ];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // `--epdf-ghost-opacity` from CSS wins over each tool's own opacity, for every tool.
 const opacity = ref<number | null>(null);
@@ -35,7 +35,7 @@ const ghostOpacity = computed(() =>
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: sketch }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <Toolbar v-model:opacity="opacity" />

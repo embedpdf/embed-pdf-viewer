@@ -6,9 +6,9 @@ import { useStage } from '@embedpdf/vue/stage';
 import { useSelection, useSelectionState } from '@embedpdf/vue/selection';
 import { useAnnotation } from '@embedpdf/vue/annotation';
 
-// On page 2: the characters of the sentence in its “Your turn” box, and where it is.
-const SENTENCE = { start: 605, count: 44 };
-const SENTENCE_BOX = { x: 68, y: 446, width: 256, height: 16 };
+// On page 1: the characters of the title's first line, and where it is.
+const SENTENCE = { start: 6, count: 33 };
+const SENTENCE_BOX = { x: 60, y: 102, width: 363, height: 31 };
 
 const MARKUP = [
   { tool: 'highlight', label: 'Highlight' },
@@ -22,7 +22,7 @@ const selection = useSelection();
 const { hasSelection } = useSelectionState();
 const stage = useStage();
 const pages = usePageList();
-const page = computed(() => pages.value[1]?.ref);
+const page = computed(() => pages.value[0]?.ref);
 const status = ref('');
 
 // On load: the sentence is selected, ready to mark, and in view.

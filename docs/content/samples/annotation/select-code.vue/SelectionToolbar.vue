@@ -3,13 +3,13 @@ import { computed } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
 import { useAnnotation, useAnnotationState } from '@embedpdf/vue/annotation';
 
-// The top half of a page, where the box selects: on the shapes page, its first row.
+// The top half of a page, where the box selects: on the home page, the image and the button.
 const TOP_HALF = { x: 0, y: 0, width: 612, height: 396 };
 
 const annotation = useAnnotation();
 const { selected } = useAnnotationState(); // the selected annotations
 const pages = usePageList();
-const page = computed(() => pages.value[2]?.ref); // the shapes page
+const page = computed(() => pages.value[0]?.ref); // the home page wireframe
 
 function selectAll() {
   if (page.value) annotation.selection.selectAll(page.value);

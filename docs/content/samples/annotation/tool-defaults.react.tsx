@@ -26,10 +26,10 @@ const plugins = [
   }),
 ];
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -104,7 +104,7 @@ function StartWithThePen() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <StartWithThePen />
         <RememberDefaults />

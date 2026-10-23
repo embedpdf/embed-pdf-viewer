@@ -12,10 +12,10 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -91,7 +91,7 @@ export class Authors {
       {
         engine: () => localEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: review }],
+        initialDocuments: [{ source: sketch }],
       },
       withStage(),
       withRender(),

@@ -17,13 +17,13 @@ import '../handles.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const own = ref(false);
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: layout }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <SelectSquare />

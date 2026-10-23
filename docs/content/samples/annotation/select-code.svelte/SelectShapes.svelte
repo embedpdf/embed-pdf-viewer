@@ -1,4 +1,4 @@
-<!-- On load: the shapes page, with everything on it selected. -->
+<!-- On load: the home page wireframe, with everything on it selected. -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { usePageList } from '@embedpdf/svelte/runtime';
@@ -12,7 +12,7 @@
 
   let done = false;
   $effect(() => {
-    const page = pages.current[2]?.ref;
+    const page = pages.current[0]?.ref;
     if (!ready.current || !page || done) return;
     done = true;
     untrack(() => {

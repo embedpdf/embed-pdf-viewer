@@ -8,9 +8,9 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import type { AnnotationTool } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A toolbar that builds itself from the tools: every tool with a label gets a button.
@@ -69,7 +69,7 @@ export class Toolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

@@ -23,10 +23,10 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source layout]
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -238,7 +238,7 @@ export class StylePanel {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),

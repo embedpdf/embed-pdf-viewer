@@ -13,13 +13,13 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const review = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-review.pdf');
-    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const layout = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-layout.pdf');
+    return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: layout }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

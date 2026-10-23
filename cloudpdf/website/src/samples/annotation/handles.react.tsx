@@ -21,7 +21,7 @@ import './handles.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // On load: the document's square, selected, on its page.
 function SelectSquare() {
@@ -130,7 +130,7 @@ export default function App() {
   const [own, setOwn] = useState(false);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectSquare />
         <ChromeControls own={own} onOwn={setOwn} />

@@ -26,9 +26,9 @@ const plugins = [
   }),
 ];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const COLORS = ['#e5484d', '#1e90ff', '#30a46c', '#1a2748'];
@@ -102,7 +102,7 @@ function StartWithThePen() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <StartWithThePen />
         <RememberDefaults />

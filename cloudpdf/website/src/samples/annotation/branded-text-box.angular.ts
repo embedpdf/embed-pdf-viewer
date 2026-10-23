@@ -12,6 +12,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   EpdfAnnotation,
@@ -23,7 +24,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const notice: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const FORMATS = ['bold', 'italic', 'underline'] as const;
 
@@ -61,6 +62,7 @@ export class FormatButtons {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     EpdfAnnotationTemplate,
     EpdfRichTextEditor,
@@ -68,10 +70,11 @@ export class FormatButtons {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: notice }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -84,6 +87,7 @@ export class FormatButtons {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer>
             <!-- Your own text box, in your app's look: it fills its frame, which the layer
                  places and turns like the text box. The element inside is the editor and

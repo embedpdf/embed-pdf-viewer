@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Studio floor plan</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A light plan: walls, doors and windows in pale lines, rooms named in small caps. */
+  .sheet .title.plan { margin-top: 22px; font-size: 24px; }
+  .plan-area { position: relative; flex: none; width: 656px; height: 770px; margin-top: 18px; }
+  .plan-area svg { position: absolute; inset: 0; }
+  .room {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font: 600 10.5px/1.2 var(--font-body);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #a7b1c8;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
+    <span class="kind">Floor plan</span>
+  </div>
+  <h1 class="title plan">Studio, second floor</h1>
+  <p class="meta">Scale 1:100 · Empty, for planning the move in January 2027</p>
+
+  <div class="plan-area">
+    <svg viewBox="0 0 656 770" width="656" height="770" fill="none" stroke-linecap="square">
+      <g stroke="#c9d2e3" stroke-width="6">
+        <!-- Outer walls, with the entrance gap at the bottom -->
+        <path d="M3 3 H653 V767 H230 M170 767 H3 V3" />
+      </g>
+      <g stroke="#c9d2e3" stroke-width="3">
+        <!-- The wall between the open office and the rooms, with three doors -->
+        <path d="M430 3 V110 M430 160 V345 M430 395 V560 M430 610 V767" />
+        <!-- Between the rooms on the right -->
+        <path d="M430 250 H653 M430 490 H653" />
+        <!-- The entrance hall, open to the office in the middle -->
+        <path d="M3 620 H150 M290 620 H430" />
+      </g>
+      <g stroke="#dbe1ec" stroke-width="1.2" stroke-dasharray="4 4">
+        <!-- Doors and how they swing -->
+        <path d="M430 110 A50 50 0 0 1 480 160" />
+        <path d="M430 345 A50 50 0 0 1 480 395" />
+        <path d="M430 560 A50 50 0 0 1 480 610" />
+        <path d="M170 767 A60 60 0 0 1 230 707" />
+      </g>
+      <g stroke="#dbe1ec" stroke-width="1.5">
+        <!-- Windows: a double line in the outer wall -->
+        <path d="M80 1 H190 M80 6 H190 M260 1 H370 M260 6 H370 M500 1 H600 M500 6 H600" />
+        <path d="M1 120 V260 M6 120 V260 M1 380 V520 M6 380 V520" />
+        <path d="M651 300 V440 M656 300 V440 M651 540 V680 M656 540 V680" />
+      </g>
+      <g stroke="#c9d2e3" stroke-width="1.5">
+        <!-- Two columns in the open office -->
+        <rect x="140" y="230" width="16" height="16" />
+        <rect x="290" y="420" width="16" height="16" />
+      </g>
+    </svg>
+    <span class="room" style="left:216px; top:330px;">Open office</span>
+    <span class="room" style="left:541px; top:126px;">Meeting room</span>
+    <span class="room" style="left:541px; top:370px;">Quiet room</span>
+    <span class="room" style="left:541px; top:628px;">Kitchen</span>
+    <span class="room" style="left:216px; top:694px;">Entrance</span>
+  </div>
+
+  <div class="page-footer"><span>EmbedPDF · Studio floor plan</span><span>1 of 1</span></div>
+</section>
+</body>
+</html>

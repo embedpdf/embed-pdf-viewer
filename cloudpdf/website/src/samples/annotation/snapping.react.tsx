@@ -18,7 +18,7 @@ import './snapping.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const QUARTERS = [0, 90, 180, 270];
 const EIGHTHS = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -77,7 +77,7 @@ function SnapControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectCircle />
         <SnapControls />

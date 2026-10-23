@@ -12,6 +12,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   EpdfAnnotation,
@@ -21,7 +22,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const notice: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // What's in the menu depends on what's selected: text boxes get Bold and Edit.
 @Component({
@@ -60,16 +61,18 @@ export class SelectionActions {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     EpdfAnnotationMenu,
     SelectionActions,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: notice }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -81,6 +84,7 @@ export class SelectionActions {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
         <epdf-annotation-menu placement="bottom">

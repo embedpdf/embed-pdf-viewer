@@ -24,16 +24,16 @@ const plugins = [
   annotationPlugin(),
 ];
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// On page 2: the characters of the sentence in its “Your turn” box, and where it is.
-const SENTENCE = { start: 605, count: 44 };
-const SENTENCE_BOX = { x: 68, y: 446, width: 256, height: 16 };
+// On page 1: the characters of the title's first line, and where it is.
+const SENTENCE = { start: 6, count: 33 };
+const SENTENCE_BOX = { x: 60, y: 102, width: 363, height: 31 };
 
 const MARKUP = [
   { tool: 'highlight', label: 'Highlight' },
@@ -48,7 +48,7 @@ function MarkupToolbar() {
   const selection = useSelection();
   const { hasSelection } = useSelectionState();
   const stage = useStage();
-  const page = usePageList()[1]?.ref;
+  const page = usePageList()[0]?.ref;
   const [status, setStatus] = useState('');
 
   // On load: the sentence is selected, ready to mark, and in view.
@@ -86,7 +86,7 @@ function MarkupToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: article }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <MarkupToolbar />
         <Stage className="stage">

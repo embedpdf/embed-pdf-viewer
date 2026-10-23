@@ -20,14 +20,14 @@ const plugins = [
   annotationPlugin({ tools: [{ id: 'square', cursor: 'cell' }] }),
 ];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: sketch }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <InkCursor />

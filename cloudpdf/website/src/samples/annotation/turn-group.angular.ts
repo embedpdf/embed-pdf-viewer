@@ -16,7 +16,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-turn-and-group',
@@ -86,7 +86,7 @@ export class TurnAndGroup {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),

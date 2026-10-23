@@ -3,6 +3,7 @@ import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { Anchored } from '@embedpdf/react/anchored';
 import {
@@ -19,9 +20,15 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './stamp-status.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // One stamp's status, pinned to it: a check on its corner once it's signed off,
 // and a status with a button under it. Both stay there while the stamp moves.
@@ -102,7 +109,7 @@ function ShowStamps() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: approvals }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ShowStamps />
         <p className="hint">Sign a stamp off, then move it: its status goes with it.</p>
@@ -110,6 +117,7 @@ export default function App() {
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}

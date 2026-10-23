@@ -26,7 +26,7 @@ const plugins = [
   }),
 ];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const COLORS = ['#e5484d', '#1e90ff', '#30a46c', '#1a2748'];
 
@@ -99,7 +99,7 @@ function StartWithThePen() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <StartWithThePen />
         <RememberDefaults />

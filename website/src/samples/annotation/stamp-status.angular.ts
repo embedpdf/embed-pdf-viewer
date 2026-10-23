@@ -15,6 +15,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnchored } from '@embedpdf/angular/anchored';
 import {
@@ -25,9 +26,9 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const approvals = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+  return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // One stamp's status, pinned to it: a check on its corner once it's signed off,
@@ -108,15 +109,17 @@ export class Approvals {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     Approvals,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: approvals }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -129,6 +132,7 @@ export class Approvals {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
         <demo-approvals />

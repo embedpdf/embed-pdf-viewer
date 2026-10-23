@@ -17,7 +17,7 @@ import './turn-group.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // On load: the document's square and circle, both selected.
 function SelectShapes() {
@@ -93,7 +93,7 @@ function TurnAndGroup() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectShapes />
         <TurnAndGroup />

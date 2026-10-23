@@ -17,10 +17,10 @@ import '../handles.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source layout]
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -28,7 +28,7 @@ const own = ref(false);
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: review }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: layout }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <SelectSquare />

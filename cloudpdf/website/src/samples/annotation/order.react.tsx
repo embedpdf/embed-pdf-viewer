@@ -19,7 +19,7 @@ import './order.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // On load: the middle one of the document's three stacked rectangles, selected.
 function SelectMiddle() {
@@ -80,7 +80,7 @@ function OrderControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectMiddle />
         <OrderControls />

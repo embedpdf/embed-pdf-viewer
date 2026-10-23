@@ -19,10 +19,10 @@ import './order.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source layout]
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -85,7 +85,7 @@ function OrderControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectMiddle />
         <OrderControls />

@@ -46,15 +46,15 @@
     }),
   ];
 
-  // [!doc-source review]
-  const review = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-review.pdf');
-    return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source sketch]
+  const sketch = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+    return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: sketch }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

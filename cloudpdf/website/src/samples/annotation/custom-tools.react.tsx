@@ -50,7 +50,7 @@ const plugins = [
   }),
 ];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A toolbar that builds itself from the tools: every tool with a label gets a button.
 function Toolbar() {
@@ -91,7 +91,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />
         <Stage className="stage">

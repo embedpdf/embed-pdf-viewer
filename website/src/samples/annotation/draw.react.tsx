@@ -24,9 +24,9 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const TOOLS = [
@@ -70,7 +70,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: article }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />
         <Stage className="stage">

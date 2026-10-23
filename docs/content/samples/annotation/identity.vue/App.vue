@@ -14,10 +14,10 @@ import '../identity.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 </script>
@@ -27,7 +27,7 @@ const review = async (): Promise<OpenInput> => {
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: review }]"
+    :initial-documents="[{ source: sketch }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>

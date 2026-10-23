@@ -20,10 +20,10 @@ import './identity.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source review]
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -83,7 +83,7 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: review }]}
+      initialDocuments={[{ source: sketch }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />

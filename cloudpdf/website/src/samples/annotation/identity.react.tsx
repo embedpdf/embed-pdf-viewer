@@ -20,7 +20,7 @@ import './identity.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -78,7 +78,7 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: review }]}
+      initialDocuments={[{ source: sketch }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar />

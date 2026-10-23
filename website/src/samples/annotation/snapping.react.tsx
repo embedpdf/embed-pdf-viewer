@@ -18,9 +18,9 @@ import './snapping.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const QUARTERS = [0, 90, 180, 270];
@@ -80,7 +80,7 @@ function SnapControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectCircle />
         <SnapControls />

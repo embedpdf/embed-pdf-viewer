@@ -12,7 +12,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },
@@ -86,7 +86,7 @@ export class Authors {
       {
         engine: () => cloudEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: review }],
+        initialDocuments: [{ source: sketch }],
       },
       withStage(),
       withRender(),

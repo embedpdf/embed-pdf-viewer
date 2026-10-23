@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spending approvals, Q4 2026</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A request: what's asked on the left, its approval on the right, with room under the stamp. */
+  .request {
+    flex: none;
+    display: flex;
+    gap: 28px;
+    margin-top: 18px;
+    padding: 16px 18px 46px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+  .request .what { flex: 1; }
+  .request h2 { margin: 0; }
+  .request .amount { margin: 4px 0 0; font: 700 14px/1.3 var(--font-display); color: var(--color-fg); }
+  .request .label {
+    margin: 0 0 8px;
+    font: 700 10.5px/1.2 var(--font-display);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-fg-muted);
+  }
+  .attached { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--color-fg-muted); }
+  .sheet td.stamp-cell { width: 230px; height: 66px; }
+</style>
+</head>
+<body>
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
+    <span class="kind">Approvals</span>
+  </div>
+
+  <h1 class="title">Spending approvals, Q4 2026</h1>
+  <p class="meta">Prepared by Ada Lovelace · Finance review by Dana Smith · 21 October 2026</p>
+  <p class="lead">Two requests need sign-off before the end of October. Each one is approved with a stamp on this sheet.</p>
+
+  <div class="request">
+    <div class="what">
+      <h2>Budget 2027: infrastructure</h2>
+      <p class="amount">€48,000 for the year</p>
+      <p>Build servers, the documentation site and the demo services, at this year's prices plus room for twice the traffic.</p>
+    </div>
+    <div style="flex:none;">
+      <p class="label">Approval</p>
+      <div data-pdf="approval-budget" style="width:220px; height:70px;"></div>
+    </div>
+  </div>
+
+  <div class="request">
+    <div class="what">
+      <h2>Contract: CDN hosting</h2>
+      <p class="amount">€1,150 a month, for 24 months</p>
+      <p>The new CDN for snippet.embedpdf.com, from November. Notice period of three months after the first year.</p>
+      <div class="attached"><div data-pdf="attachment" style="flex:none; width:22px; height:22px;"></div><span>The provider's quote is attached.</span></div>
+    </div>
+    <div style="flex:none;">
+      <p class="label">Approval</p>
+      <div data-pdf="approval-contract" style="width:220px; height:70px;"></div>
+    </div>
+  </div>
+
+  <h2>Figures checked</h2>
+  <p>Both amounts were checked against the quotes and this year's invoices.</p>
+  <div data-pdf="checked" style="flex:none; width:200px; height:56px; margin-top:12px;"></div>
+
+  <div class="page-footer"><span>EmbedPDF · Spending approvals, Q4 2026</span><span>1 of 2</span></div>
+</section>
+
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
+    <span class="kind">Approvals</span>
+  </div>
+
+  <h2 style="margin-top:32px;">Requests for next quarter</h2>
+  <p>These are planned for January. They're approved the same way, once their quotes are in.</p>
+  <table>
+    <thead>
+      <tr><th>Request</th><th class="number">Amount</th><th>Approval</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Accessibility audit of the viewer</td><td class="number">€9,500</td><td class="stamp-cell"></td></tr>
+      <tr><td>Security review of the engine</td><td class="number">€14,000</td><td class="stamp-cell"></td></tr>
+      <tr><td>Design system for the docs</td><td class="number">€6,200</td><td class="stamp-cell"></td></tr>
+      <tr><td>Conference travel, three people</td><td class="number">€4,800</td><td class="stamp-cell"></td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer"><span>EmbedPDF · Spending approvals, Q4 2026</span><span>2 of 2</span></div>
+</section>
+</body>
+</html>

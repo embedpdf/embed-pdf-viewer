@@ -16,7 +16,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const QUARTERS = [0, 90, 180, 270];
 const EIGHTHS = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -72,7 +72,7 @@ export class SnapControls {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),

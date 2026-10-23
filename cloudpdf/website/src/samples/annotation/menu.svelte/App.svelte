@@ -2,6 +2,7 @@
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, AnnotationMenu, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { cloudEngine } from '@cloudpdf/engine';
@@ -11,12 +12,18 @@
   import '../menu.css';
 
   const engine = cloudEngine();
-  const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+  const plugins = [
+    stagePlugin(),
+    renderPlugin(),
+    interactionPlugin(),
+    selectionPlugin(),
+    annotationPlugin(),
+  ];
 
-  const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const notice: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: review }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: notice }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
@@ -24,6 +31,7 @@
     <SelectTextBox />
     <Stage class="stage">
       <RenderLayer />
+      <SelectionLayer />
       <AnnotationLayer />
       {#snippet overlay()}
         <AnnotationMenu placement="bottom">

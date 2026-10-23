@@ -17,20 +17,20 @@ import './select-code.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const review = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-review.pdf');
-  return { kind: 'bytes', id: 'review', bytes: new Uint8Array(await response.arrayBuffer()) };
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// The top half of a page, where the box selects: on the shapes page, its first row.
+// The top half of a page, where the box selects: on the home page, the image and the button.
 const TOP_HALF = { x: 0, y: 0, width: 612, height: 396 };
 
-// On load: the shapes page, with everything on it selected.
+// On load: the home page wireframe, with everything on it selected.
 function SelectShapes() {
   const annotation = useAnnotation();
   const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const page = usePageList()[2]?.ref;
+  const page = usePageList()[0]?.ref;
   const done = useRef(false);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function SelectShapes() {
 function SelectionToolbar() {
   const annotation = useAnnotation();
   const { selected } = useAnnotationState(); // the selected annotations
-  const page = usePageList()[2]?.ref; // the shapes page
+  const page = usePageList()[0]?.ref; // the home page wireframe
 
   return (
     <div className="toolbar">
@@ -82,7 +82,7 @@ function SelectionToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: review }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectShapes />
         <SelectionToolbar />

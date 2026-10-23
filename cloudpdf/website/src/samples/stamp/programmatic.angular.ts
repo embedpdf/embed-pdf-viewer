@@ -11,6 +11,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfStamp, withStamp } from '@embedpdf/angular/stamp';
@@ -21,7 +22,7 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The middle of a Letter page, in page coordinates.
 const MIDDLE = { x: 306, y: 396 };
@@ -92,15 +93,17 @@ export class PlaceStamps {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     PlaceStamps,
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: review }] },
+      { engine, initialDocuments: [{ source: approvals }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
       withStamp({ assetEngine }),
     ),
@@ -114,6 +117,7 @@ export class PlaceStamps {
       <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

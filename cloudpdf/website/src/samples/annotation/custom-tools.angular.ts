@@ -8,7 +8,7 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import type { AnnotationTool } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const review: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A toolbar that builds itself from the tools: every tool with a label gets a button.
 @Component({
@@ -66,7 +66,7 @@ export class Toolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: review }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),
