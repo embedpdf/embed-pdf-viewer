@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useState } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -19,49 +20,15 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './comments.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
-
-// On load: a note with two replies on the cover, and a highlight with a comment on page 2.
-function AddComments() {
-  const annotation = useAnnotation();
-  const comments = useComments();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const [cover, second] = usePageList();
-  const added = useRef(false);
-
-  useEffect(() => {
-    if (!ready || !cover || !second || added.current) return;
-    added.current = true;
-    void annotation
-      .create(cover.ref, {
-        subtype: 'text',
-        rect: { x: 470, y: 232, width: 20, height: 20 },
-        contents: 'Can we shorten the title?',
-        color: '#facc15',
-      })
-      .then(async ({ annotation: note }) => {
-        await comments.reply(note.ref, 'Maybe drop "(But they Don’t Have to Be)".');
-        await comments.reply(note.ref, 'I like it long. It’s a promise.');
-      });
-    void annotation.create(second.ref, {
-      subtype: 'highlight',
-      quadPoints: [
-        {
-          upperLeft: { x: 57, y: 57 },
-          upperRight: { x: 322, y: 57 },
-          lowerLeft: { x: 57, y: 129 },
-          lowerRight: { x: 322, y: 129 },
-        },
-      ],
-      color: '#ffcd45',
-      contents: 'A strong opening.',
-    });
-  }, [annotation, comments, ready, cover, second]);
-
-  return null;
-}
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // One thread: the first comment, its replies, a reply box, and a button that shows it.
 function Thread({ thread }: { thread: CommentThreadView }) {
@@ -136,15 +103,15 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: ebook }]}
+      initialDocuments={[{ source: proposal }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddComments />
         <div className="viewer">
           <Stage className="stage">
             {() => (
               <>
                 <RenderLayer />
+                <SelectionLayer />
                 <AnnotationLayer />
               </>
             )}

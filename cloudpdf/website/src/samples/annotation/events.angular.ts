@@ -1,21 +1,21 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  effect,
   inject,
   signal,
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const report: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 interface Entry {
   id: number;
@@ -123,6 +123,7 @@ export class Toolbar {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     ActivityLog,
     Toolbar,
@@ -132,11 +133,12 @@ export class Toolbar {
       {
         engine: () => cloudEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: ebook }],
+        initialDocuments: [{ source: report }],
       },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -150,6 +152,7 @@ export class Toolbar {
         <epdf-stage class="stage">
           <ng-template epdfPage>
             <epdf-render-layer />
+            <epdf-selection-layer />
             <epdf-annotation-layer />
           </ng-template>
         </epdf-stage>
@@ -160,23 +163,4 @@ export class Toolbar {
     <ng-template #loading><p class="loading">Loading…</p></ng-template>
   `,
 })
-export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly pages = inject(EpdfDocument).pages;
-  private added = false;
-
-  constructor() {
-    // On load: a rectangle on the cover, so the log starts with its event.
-    effect(() => {
-      const cover = this.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      void this.annotation.create(cover, {
-        subtype: 'square',
-        box: { x: 96, y: 506, width: 178, height: 54 },
-        color: '#e5484d',
-        strokeWidth: 3,
-      });
-    });
-  }
-}
+export class App {}

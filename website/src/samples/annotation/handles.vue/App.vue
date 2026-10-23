@@ -7,29 +7,29 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddRectangle from './AddRectangle.vue';
 import ChromeControls from './ChromeControls.vue';
 import Handle from './Handle.vue';
 import RotationHandle from './RotationHandle.vue';
+import SelectSquare from './SelectSquare.vue';
 
 import '../handles.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const own = ref(false);
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: layout }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddRectangle />
+      <SelectSquare />
       <ChromeControls v-model:own="own" />
       <Stage class="stage">
         <template #page>

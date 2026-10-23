@@ -2,9 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
-  untracked,
+  signal,
   viewChild,
   ViewEncapsulation,
 } from '@angular/core';
@@ -14,14 +13,19 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
+import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const registration: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// How the new fields look: part of the PDF, like the rest of the page.
-const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
+// The printed boxes are the fields' look: a new field only sets its text size.
+const look = { fontSize: 11 };
 
-/** A dropdown, the next row down the page. */
+// The printed table of group tickets: a row every 36 points from the top at 470, with a country
+// box at x 96 and a circle for each ticket at x 330 and 430.
+const rowTop = (row: number) => 470 + row * 36;
+
+/** A dropdown in a row's country box. */
 function addDropdown(form: EpdfForm, page: PageRef, row: number) {
   return form.create({
     family: 'combobox',
@@ -29,20 +33,21 @@ function addDropdown(form: EpdfForm, page: PageRef, row: number) {
     options: [
       { label: 'Netherlands', value: 'NL' },
       { label: 'Belgium', value: 'BE' },
+      { label: 'Germany', value: 'DE' },
     ],
-    widgets: [{ page, rect: { x: 72, y: 520 + row * 36, width: 160, height: 24 }, ...look }],
+    widgets: [{ page, rect: { x: 96, y: rowTop(row), width: 160, height: 24 }, ...look }],
   });
 }
 
-/** A radio group: one field with a widget per button, each with the value it stands for. */
+/** A radio group in a row's two circles: one field, a widget per circle, each with its value. */
 function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
-  const y = 524 + row * 36;
+  const y = rowTop(row) + 4;
   return form.create({
     family: 'radio',
-    name: `plan_${row + 1}`,
+    name: `ticket_${row + 1}`,
     widgets: [
-      { page, rect: { x: 72, y, width: 16, height: 16 }, exportValue: 'monthly', ...look },
-      { page, rect: { x: 112, y, width: 16, height: 16 }, exportValue: 'yearly', ...look },
+      { page, rect: { x: 330, y, width: 16, height: 16 }, exportValue: 'one-day', ...look },
+      { page, rect: { x: 430, y, width: 16, height: 16 }, exportValue: 'both-days', ...look },
     ],
   });
 }
@@ -52,7 +57,7 @@ function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfFormLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: registration }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -68,23 +73,23 @@ function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
         <button
           type="button"
           class="button"
-          [disabled]="!page() || full()"
-          (click)="add(addDropdown)"
+          [disabled]="!page() || rowFor('combobox') >= 5"
+          (click)="add(addDropdown, 'combobox')"
         >
           Add a dropdown
         </button>
         <button
           type="button"
           class="button"
-          [disabled]="!page() || full()"
-          (click)="add(addRadioGroup)"
+          [disabled]="!page() || rowFor('radio') >= 5"
+          (click)="add(addRadioGroup, 'radio')"
         >
           Add a radio group
         </button>
         <button type="button" class="button" [disabled]="!last()" (click)="removeLast()">
           Remove the last
         </button>
-        <output class="readout">{{ names() || 'No fields' }}</output>
+        <output class="readout">{{ names() || 'No fields in the table yet' }}</output>
       </div>
       <epdf-stage class="stage">
         <ng-template epdfPage>
@@ -101,42 +106,35 @@ export class App {
   private readonly form = inject(EpdfForm);
   private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
-  private added = false;
 
   protected readonly addDropdown = addDropdown;
   protected readonly addRadioGroup = addRadioGroup;
-  /** The last page, which has room for a form. */
-  protected readonly page = computed(() => this.document.pages().at(-1)?.ref);
-  protected readonly last = computed(() => this.form.fields().at(-1));
-  protected readonly full = computed(() => this.form.fields().length >= 5);
+  protected readonly page = computed(() => this.document.pages()[0]?.ref); // the printed form
+  private readonly added = signal<FormFieldDTO[]>([]);
+  protected readonly last = computed(() => this.added().at(-1));
   protected readonly names = computed(() =>
-    this.form
-      .fields()
+    this.added()
       .map((field) => field.name)
       .join(', '),
   );
 
-  constructor() {
-    // The ebook has no form: start with a dropdown on its last page.
-    effect(() => {
-      const page = this.page();
-      if (this.form.status() !== 'ready' || !page || !this.stage() || this.added) return;
-      this.added = true;
-      untracked(() => this.add(addDropdown));
-    });
+  /** Each kind of field fills its column from the top: the next row that hasn't got one. */
+  protected rowFor(family: FormFieldDTO['family']) {
+    return this.added().filter((field) => field.family === family).length;
   }
 
-  /** Each new field goes a row further down the page: bring it into view. */
-  protected add(addField: typeof addDropdown) {
+  protected async add(addField: typeof addDropdown, family: FormFieldDTO['family']) {
     const page = this.page();
     if (!page) return;
-    void addField(this.form, page, this.form.fields().length).then(({ field }) =>
-      this.stage()?.reveal(page, { rect: this.form.getWidget(field.widgets[0])!.rect }),
-    );
+    const { field } = await addField(this.form, page, this.rowFor(family));
+    this.added.update((fields) => [...fields, field]);
+    this.stage()?.reveal(page, { rect: this.form.getWidget(field.widgets[0])!.rect });
   }
 
-  protected removeLast() {
+  protected async removeLast() {
     const last = this.last();
-    if (last) void this.form.delete(last.ref);
+    if (!last) return;
+    await this.form.delete(last.ref);
+    this.added.update((fields) => fields.slice(0, -1));
   }
 }

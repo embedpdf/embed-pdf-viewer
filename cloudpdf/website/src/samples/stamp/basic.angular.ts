@@ -10,6 +10,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfStamp, withStamp, type StampAsset } from '@embedpdf/angular/stamp';
@@ -20,7 +21,7 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A stamp's button: its picture, and pressed while it's armed.
 @Component({
@@ -105,15 +106,17 @@ export class StampPicker {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     StampPicker,
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: approvals }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
       withStamp({ assetEngine }),
     ),
@@ -127,6 +130,7 @@ export class StampPicker {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

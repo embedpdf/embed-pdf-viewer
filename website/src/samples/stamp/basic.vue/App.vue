@@ -3,6 +3,7 @@ import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { stampPlugin } from '@embedpdf/vue/stamp';
@@ -17,24 +18,26 @@ const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
+  selectionPlugin(),
   annotationPlugin(),
   stampPlugin({ assetEngine }),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const approvals = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+  return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: approvals }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <StampPicker />
       <Stage class="stage">
         <template #page>
           <RenderLayer />
+          <SelectionLayer />
           <AnnotationLayer />
         </template>
       </Stage>

@@ -1,30 +1,18 @@
 <!-- A toolbar that builds itself from the tools: every tool with a label gets a button. -->
 <script lang="ts">
-  import { usePageList } from '@embedpdf/svelte/runtime';
+  import { onMount } from 'svelte';
   import { useInteraction, useInteractionState } from '@embedpdf/svelte/interaction';
-  import { useAnnotation, useAnnotationState } from '@embedpdf/svelte/annotation';
+  import { useAnnotation } from '@embedpdf/svelte/annotation';
 
   const annotation = useAnnotation();
   const interaction = useInteraction();
   const tools = useInteractionState();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const pages = usePageList();
   const labelled = $derived(
     annotation.tools.list().filter((tool) => typeof tool.meta?.label === 'string'),
   );
-  let added = false;
 
-  // On load: an arrow drawn with the arrow tool's defaults, and the arrow tool active.
-  $effect(() => {
-    const cover = pages.current[0]?.ref;
-    if (!ready.current || !cover || added) return;
-    added = true;
-    void annotation.create(
-      cover,
-      { subtype: 'line', linePoints: { start: { x: 520, y: 120 }, end: { x: 470, y: 230 } } },
-      undefined,
-      { tool: 'arrow' },
-    );
+  // On load: the arrow tool is active.
+  onMount(() => {
     interaction.activateTool('arrow');
   });
 </script>

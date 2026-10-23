@@ -1,6 +1,5 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
   import { useAnnotation } from '@embedpdf/svelte/annotation';
   import { toFieldRef, useForm, useFormState } from '@embedpdf/svelte/form';
@@ -18,24 +17,18 @@
   const signature = useSignature();
   const signatureState = useSignatureState();
   const status = useFormState((formState) => formState.status);
-  const pages = usePageList();
-  const page = $derived(pages.current.at(-1)?.ref);
   const signed = $derived(signatureState.signatures[0]);
   let warning = $state<string | null>(null);
 
-  // On load: a signature field on the last page, signed by Ada with a typed signature.
+  // On load: the agreement, with its signature field signed by Ada with a typed signature.
   let done = false;
   $effect(() => {
-    const last = page;
-    if (status.current !== 'ready' || !last || done) return;
+    if (status.current !== 'ready' || done) return;
     done = true;
     untrack(async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page: last, rect: { x: 72, y: 560, width: 220, height: 64 } }],
-      });
-      stage.goToPage(last);
+      // Bring the agreement's signature field into view.
+      const [widget] = form.getWidgets(toFieldRef('approval'));
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       const { asset } = await stamp.createAsset({
         libraryId: library.id,
@@ -56,7 +49,13 @@
     },
   );
 
+  // The page of the form's signature field: the box goes next to the signature.
+  function signaturePage() {
+    return form.getWidgets(toFieldRef('approval'))[0]?.page;
+  }
+
   function drawBox() {
+    const page = signaturePage();
     if (!page) return;
     void annotation.create(page, {
       subtype: 'square',
@@ -68,7 +67,7 @@
 </script>
 
 <div class="toolbar">
-  <button type="button" class="button" disabled={!signed || !page} onclick={drawBox}>
+  <button type="button" class="button" disabled={!signed || !signaturePage()} onclick={drawBox}>
     Draw a box on the page
   </button>
   <output class="readout">

@@ -3,40 +3,25 @@
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
-  import { annotationPlugin } from '@embedpdf/svelte/annotation';
   import { LinkLayer, linkPlugin } from '@embedpdf/svelte/link';
   import { cloudEngine } from '@cloudpdf/engine';
-  import AddLinks from './AddLinks.svelte';
   import LinkList from './LinkList.svelte';
 
   import '../list.css';
 
   const engine = cloudEngine();
-  // The annotation plugin is only here to make the links below.
-  const plugins = [
-    stagePlugin(),
-    renderPlugin(),
-    interactionPlugin(),
-    annotationPlugin(),
-    linkPlugin(),
-  ];
+  const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), linkPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<script lang="ts">
-  // The list reads the links once they're made.
-  let ready = $state(false);
-</script>
-
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: links }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddLinks onAdded={() => (ready = true)} />
     <div class="layout">
-      <LinkList {ready} />
+      <LinkList />
       <Stage class="stage">
         <RenderLayer />
         <LinkLayer />

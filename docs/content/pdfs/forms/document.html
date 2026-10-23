@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Apply for EmbedPDF Pro</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A paper form: a label over each printed box. The fields lie on the boxes, without a look of
+     their own, so the printed box is what shows. */
+  .sheet .title.form-title { margin-top: 24px; font-size: 28px; }
+  .fields { flex: none; display: grid; gap: 14px; margin-top: 12px; }
+  .fields .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+  .label { display: block; margin-bottom: 6px; font: 600 12.5px/1.2 var(--font-body); color: var(--color-deep-navy); }
+  .required { color: var(--color-brand-blue); }
+  .hint { font: 400 12px/1.4 var(--font-body); color: var(--color-fg-muted); }
+  .box { height: 32px; border: 1px solid var(--color-border); border-radius: 5px; background: #ffffff; }
+  .tick { flex: none; width: 18px; height: 18px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 4px; background: #ffffff; }
+  .dot { flex: none; width: 18px; height: 18px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 50%; background: #ffffff; }
+  .option { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--color-border-soft); border-radius: 10px; }
+  .option strong { display: block; font: 700 14px/1.3 var(--font-display); color: var(--color-deep-navy); }
+  .check-row { display: flex; align-items: center; gap: 12px; }
+</style>
+</head>
+<body>
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
+    <span class="kind">Membership</span>
+  </div>
+
+  <h1 class="title form-title">Apply for EmbedPDF Pro</h1>
+  <p class="meta">Priority support and an onboarding call for teams that build on EmbedPDF. Fields marked <span class="required">*</span> are required.</p>
+
+  <h2>About you</h2>
+  <div class="fields">
+    <div>
+      <span class="label">Full name <span class="required">*</span></span>
+      <div class="box" data-pdf="name"></div>
+    </div>
+    <div class="pair">
+      <div>
+        <span class="label">Email <span class="required">*</span></span>
+        <div class="box" data-pdf="email"></div>
+      </div>
+      <div>
+        <span class="label">Company</span>
+        <div class="box" data-pdf="company"></div>
+      </div>
+    </div>
+    <div>
+      <span class="label">Framework your app uses</span>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div class="box" data-pdf="framework" style="flex:none; width:220px;"></div>
+        <span class="hint">React, Vue, Svelte or Angular</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Your plan</h2>
+  <div class="fields pair" style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px;">
+    <div class="option">
+      <div class="dot" data-pdf="plan" data-pdf-value="monthly"></div>
+      <div><strong>Monthly</strong><span class="hint">$49 a month. Cancel at the end of any month.</span></div>
+    </div>
+    <div class="option">
+      <div class="dot" data-pdf="plan" data-pdf-value="yearly"></div>
+      <div><strong>Yearly</strong><span class="hint">$490 a year: two months free.</span></div>
+    </div>
+  </div>
+
+  <div class="fields" style="margin-top:18px;">
+    <div>
+      <span class="label">Topics for your onboarding call</span>
+      <div style="display:flex; align-items:flex-start; gap:18px;">
+        <div class="box" data-pdf="topics" style="flex:none; width:220px; height:74px;"></div>
+        <span class="hint" style="padding-top:4px; max-width:300px;">Forms, Annotations or Signatures. Choose all that apply; we plan the call around them.</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Before you send it</h2>
+  <div class="fields" style="gap:12px;">
+    <div class="check-row"><div class="tick" data-pdf="updates"></div><span>Send me product news, about once a month.</span></div>
+    <div class="check-row"><div class="tick" data-pdf="terms"></div><span>I agree to the membership terms. <span class="required">*</span></span></div>
+  </div>
+  <p class="hint" style="margin-top:18px;">We confirm your membership by email within one working day.</p>
+
+  <div class="page-footer"><span>EmbedPDF Pro · Membership application</span><span>1 of 1</span></div>
+</section>
+</body>
+</html>

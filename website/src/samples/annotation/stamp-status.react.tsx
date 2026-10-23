@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { Anchored } from '@embedpdf/react/anchored';
 import {
@@ -19,11 +20,17 @@ import { localEngine } from '@embedpdf/engine';
 import './stamp-status.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const approvals = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+  return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // One stamp's status, pinned to it: a check on its corner once it's signed off,
@@ -83,52 +90,37 @@ function Approvals() {
   });
 }
 
-// On load: two approval stamps on the cover, one signed off. The second sits
-// at the bottom, so its status hangs over the next page.
-function AddStamps() {
+// On load: the page with the document's two approval stamps, the budget one already signed off.
+function ShowStamps() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void approvedPicture().then(async (appearance) => {
-      await annotation.create(
-        cover,
-        {
-          subtype: 'stamp',
-          box: { x: 330, y: 470, width: 180, height: 60 },
-          name: 'approval-budget',
-        },
-        { appearance },
-      );
-      await annotation.create(
-        cover,
-        {
-          subtype: 'stamp',
-          box: { x: 96, y: 712, width: 180, height: 60 },
-          name: 'approval-contract',
-        },
-        { appearance },
-      );
-    });
-  }, [annotation, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const found = annotation
+      .list()
+      .filter((each) => each.nm === 'approval-budget' || each.nm === 'approval-contract');
+    if (found.length === 0) return;
+    stage.reveal(found[0].page, { rect: found[0].rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: approvals }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddStamps />
+        <ShowStamps />
         <p className="hint">Sign a stamp off, then move it: its status goes with it.</p>
         <Stage className="stage" overlay={<Approvals />}>
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}
@@ -136,21 +128,4 @@ export default function App() {
       </DocumentGate>
     </Viewer>
   );
-}
-
-// The stamp's picture, drawn on a canvas so the example needs no image file.
-function approvedPicture(): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  canvas.width = 360;
-  canvas.height = 120;
-  const context = canvas.getContext('2d')!;
-  context.strokeStyle = '#30a46c';
-  context.lineWidth = 10;
-  context.strokeRect(5, 5, 350, 110);
-  context.fillStyle = '#30a46c';
-  context.font = 'bold 54px sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText('APPROVED', 180, 64);
-  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/png'));
 }

@@ -27,10 +27,10 @@ const plugins = [
   }),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -100,7 +100,7 @@ export default function App() {
   const ghostOpacity = opacity === null ? undefined : { '--epdf-ghost-opacity': opacity };
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Toolbar opacity={opacity} onOpacity={setOpacity} />
         <Stage className="stage" style={ghostOpacity as CSSProperties | undefined}>

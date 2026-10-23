@@ -1,0 +1,80 @@
+# Demo PDFs
+
+The documents the docs' live examples open. Each one is built from HTML, so its design, text and
+links stay editable here, and anything Chrome can't print is added by the engine, so every PDF is
+built the same way each time.
+
+```sh
+pnpm --filter @embedpdf/docs-content pdfs          # every document
+pnpm --filter @embedpdf/docs-content pdfs forms    # one
+```
+
+The PDFs land in `website/public/pdfs/embedpdf-<folder>.pdf`, which embedpdf.com serves at
+`/pdfs/…`. The build needs Google Chrome installed (`CHROME_PATH` names another).
+
+## What a document is
+
+One document serves one family of examples: the ones that turn on the same things. Three rules
+keep it honest, since a reader judges the product by what the example shows:
+
+- **It never instructs.** No "click", "your turn" or "try each one": it reads like a document
+  your users would open, such as a manual, an invoice or a proposal. Nothing on it is about the
+  viewer.
+- **What it shows works.** Everything on its pages works in every example that opens it. A note
+  nobody can read, a link nobody can follow, a box nobody can type in: none of them belong. Notes
+  and replies go only in a document whose examples show comments.
+- **The example's hint says what to try.** Only the example knows what it turned on, so its hint
+  and the page's **Try it** carry the instruction, and name what's on the document (the note next
+  to the title, the box around the downloads row).
+
+## A document
+
+A folder with two files:
+
+- **`document.html`**: the pages. One `<section class="page">` per US Letter page, styled with
+  `../shared/document.css` (the palette, the fonts and the page box). Open it in a browser to see
+  the pages as they print. Chrome turns every `<a href>` into a real link: `#page-3` goes to that
+  page, `https://…` and `mailto:…` open outside the document.
+- **`bake.mjs`**: what the engine adds after Chrome printed the pages, in `edit()` steps:
+
+  ```js
+  export default async function bake({ edit }) {
+    await edit(async ({ doc, pages, place }) => { /* as EmbedPDF */ });
+    await edit({ userId: 'u_381', displayName: 'Dana Smith' }, async ({ doc }) => { /* as Dana */ });
+  }
+  ```
+
+  Each step opens the document as one person, so what it adds carries their name, as notes and
+  replies from several reviewers do. A step gets the engine, the open document (`doc`), its
+  `pages`, and `place(name)` / `places(name)`: the page and rectangle of each element the HTML
+  marks with `data-pdf="<name>"`, in PDF points. A radio group's buttons each carry their value
+  in `data-pdf-value`. Refs stay valid from one step to the next.
+
+The HTML draws a field's box; the bake puts the field over it, so moving a box in the HTML moves
+its field. Text markup needs no marker: the bake finds the phrase with `doc.search.query()` and
+marks the lines it covers. Give each annotation an `nm`, so the samples can find it by name. The
+build fails when a marked box has no use in `bake.mjs`, and when a page prints text in a font
+other than the shared ones.
+
+Most documents are ordinary ones (a report, a proposal), so `document.css` has their pieces: a
+`<section class="page sheet">` with a `.letterhead`, a `.title` and `.meta` line, a `.lead`,
+headings, tables and a `.page-footer`, and a `.note-slot` in the margin of a `.with-note` block
+for a note's icon. `shared/annotations.mjs` has the reviewers (`DANA`, `ADA`) and helpers that
+write annotations the way the viewer does: `markText()`, `addNote()`, `reply()`, `setStatus()`.
+
+## From a design tool
+
+A page made in a design tool, such as Claude Design, keeps its markup: copy each page's
+`<section class="page">` into `document.html`, link `../shared/document.css` in its `<head>`, and
+drop the tool's own scripts and stylesheets.
+
+- **Fonts.** `document.css` loads Inter, Manrope and JetBrains Mono as fixed weights. A variable
+  font, as Google Fonts serves them, prints as Type3 drawings, which select and search badly.
+- **Symbols.** The fonts hold Latin characters only. Draw arrows and other symbols as SVG
+  (`<svg class="arrow">` for the arrows after a label).
+
+## In a sample
+
+Each document has a key in `../documents.mjs`. A sample opens it with a
+`// [!doc-source <key>]` block that fetches `/pdfs/embedpdf-<key>.pdf`; the docs sync gives the
+cloud site's copy its own form of the block.

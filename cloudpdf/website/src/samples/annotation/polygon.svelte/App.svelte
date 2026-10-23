@@ -14,10 +14,10 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: layout }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

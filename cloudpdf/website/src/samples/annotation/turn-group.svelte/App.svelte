@@ -5,7 +5,7 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { cloudEngine } from '@cloudpdf/engine';
-  import AddShapes from './AddShapes.svelte';
+  import SelectShapes from './SelectShapes.svelte';
   import TurnAndGroup from './TurnAndGroup.svelte';
 
   import '../turn-group.css';
@@ -13,15 +13,15 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: layout }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddShapes />
+    <SelectShapes />
     <TurnAndGroup />
     <Stage class="stage">
       <RenderLayer />

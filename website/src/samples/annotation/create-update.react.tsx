@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
   annotationPlugin,
   useAnnotation,
   useAnnotationList,
-  useAnnotationState,
   type AnnotationRef,
 } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
@@ -17,40 +17,38 @@ import { localEngine } from '@embedpdf/engine';
 import './create-update.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const report = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-report.pdf');
+  return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Create a rectangle, then change, move and delete it, all from code.
 function SquareControls() {
   const annotation = useAnnotation();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
+  const stage = useStage();
+  const page = usePageList()[1]?.ref; // page 2, which has room at the bottom
   const [ref, setRef] = useState<AnnotationRef | null>(null);
-  const started = useRef(false);
   useAnnotationList(); // re-render as the annotations change, for the reads below
 
   const add = async () => {
-    if (!cover) return;
-    const { annotation: square } = await annotation.create(cover, {
+    if (!page) return;
+    const { annotation: square } = await annotation.create(page, {
       subtype: 'square',
       box: { x: 72, y: 592, width: 200, height: 100 },
       color: '#0078ff',
       strokeWidth: 3,
     });
     setRef(square.ref);
+    stage.reveal(page, { rect: square.rect });
   };
-
-  // On load: one rectangle, to change.
-  useEffect(() => {
-    if (!ready || started.current) return;
-    started.current = true;
-    void add();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
 
   const square = ref ? annotation.get(ref) : null;
   const canUpdate = square !== null && annotation.canUpdate(square.ref);
@@ -112,13 +110,14 @@ function SquareControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: report }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SquareControls />
         <Stage className="stage">
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}

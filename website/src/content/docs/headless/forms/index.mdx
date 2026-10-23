@@ -118,6 +118,8 @@ When a script refuses a value, such as a date in the wrong format, the field kee
 the box keeps what was typed so it can be corrected, as in Acrobat, and
 <Fw only={['react', 'vue', 'svelte']}>`onValidationRejected`</Fw><Fw only="angular">`validationRejected$`</Fw> tells you why, so you can show a message.
 
+<Example name="form/scripts" />
+
 The scripts read the form as the user sees it, values still on their way included, so nothing is
 read from the engine for them. Their engine starts when the first field of a form with scripts takes
 focus, so the first value doesn't wait for it; a form without scripts never starts it.

@@ -9,6 +9,12 @@
     "reference": "node scripts/reference.mjs",
     "snippets": "node scripts/snippets.mjs",
     "publish-gate": "node scripts/publish-gate.mjs",
-    "samples": "node scripts/samples.mjs"
+    "samples": "node scripts/samples.mjs",
+    "pdfs": "node pdfs/build.mjs"
+  },
+  "devDependencies": {
+    "@embedpdf/default-stamps": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
+    "playwright-core": "^1.63.0"
   }
 }

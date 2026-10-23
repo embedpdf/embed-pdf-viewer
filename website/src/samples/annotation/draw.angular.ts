@@ -14,9 +14,9 @@ import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const TOOLS = [
@@ -74,7 +74,7 @@ export class Toolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: article }] },
       withStage(),
       withRender(),
       withInteraction(),

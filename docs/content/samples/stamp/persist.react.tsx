@@ -3,6 +3,7 @@ import { Viewer, DocumentGate, saveFile } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
 import {
@@ -29,14 +30,15 @@ const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
+  selectionPlugin(),
   annotationPlugin(),
   stampPlugin({ assetEngine }),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source approvals]
+const approvals = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+  return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -132,13 +134,14 @@ function Libraries() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: approvals }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Libraries />
         <Stage className="stage">
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}

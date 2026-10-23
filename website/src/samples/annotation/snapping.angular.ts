@@ -5,9 +5,10 @@ import {
   effect,
   inject,
   untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -15,9 +16,9 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const QUARTERS = [0, 90, 180, 270];
@@ -74,7 +75,7 @@ export class SnapControls {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -100,33 +101,20 @@ export class SnapControls {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   constructor() {
-    // On load: two rectangles on the cover, the right one selected. Drag it next to the other.
+    // On load: the document's circle, selected. Drag it toward the square to see it snap.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
       untracked(() => {
-        void this.annotation.create(cover, {
-          subtype: 'square',
-          box: { x: 96, y: 506, width: 178, height: 54 },
-          color: '#1e90ff',
-          strokeWidth: 3,
-        });
-        void this.annotation.create(
-          cover,
-          {
-            subtype: 'square',
-            box: { x: 340, y: 560, width: 120, height: 80 },
-            color: '#e5484d',
-            strokeWidth: 3,
-          },
-          undefined,
-          { select: true },
-        );
+        const circle = this.annotation.list().find((each) => each.nm === 'circle');
+        if (!circle) return;
+        this.annotation.selection.set([circle.ref]);
+        stage.reveal(circle.page, { rect: circle.rect });
       });
     });
   }

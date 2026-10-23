@@ -588,7 +588,17 @@ importers:
         specifier: ^3.5.13
         version: 3.5.40(typescript@5.9.3)
 
-  docs/content: {}
+  docs/content:
+    devDependencies:
+      '@embedpdf/default-stamps':
+        specifier: workspace:*
+        version: link:../../packages/default-stamps
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine/main
+      playwright-core:
+        specifier: ^1.63.0
+        version: 1.63.0
 
   docs/kit:
     dependencies:

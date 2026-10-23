@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
@@ -16,45 +17,36 @@ import { localEngine } from '@embedpdf/engine';
 import './menu.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source notice]
+const notice = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-notice.pdf');
+  return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// On load: a rectangle and a text box on the cover, the text box selected so the menu shows.
-function AddAnnotations() {
+// On load: the document's text box, selected, so its menu shows.
+function SelectTextBox() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'square',
-      box: { x: 96, y: 506, width: 178, height: 54 },
-      color: '#1e90ff',
-      strokeWidth: 3,
-    });
-    void annotation.create(
-      cover,
-      {
-        subtype: 'free-text',
-        box: { x: 300, y: 512, width: 230, height: 40 },
-        contents: 'Ready for review',
-        fontSize: 16,
-        fontColor: '#1a2748',
-        interiorColor: '#fffbe6',
-      },
-      undefined,
-      { select: true },
-    );
-  }, [annotation, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const textBox = annotation.list().find((each) => each.nm === 'text-box');
+    if (!textBox) return;
+    annotation.selection.set([textBox.ref]);
+    stage.reveal(textBox.page, { rect: textBox.rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
@@ -90,9 +82,9 @@ function SelectionActions() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: notice }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddAnnotations />
+        <SelectTextBox />
         <Stage
           className="stage"
           overlay={
@@ -104,6 +96,7 @@ export default function App() {
           {() => (
             <>
               <RenderLayer />
+              <SelectionLayer />
               <AnnotationLayer />
             </>
           )}

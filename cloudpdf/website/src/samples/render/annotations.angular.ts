@@ -1,25 +1,13 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  signal,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, signal, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-} from '@embedpdf/angular/annotation';
+import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const report: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 type Painter = 'picture' | 'layer';
 
@@ -28,7 +16,7 @@ type Painter = 'picture' | 'layer';
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfAnnotationLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: report }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -81,28 +69,5 @@ type Painter = 'picture' | 'layer';
   `,
 })
 export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
   protected readonly painter = signal<Painter>('picture');
-
-  constructor() {
-    // A rectangle on the first page, made on load so there's an annotation to show.
-    effect(() => {
-      const firstPage = this.document.pages()[0]?.ref;
-      if (!firstPage || this.added) return;
-      this.added = true;
-      untracked(
-        () =>
-          void this.annotation.create(firstPage, {
-            subtype: 'square',
-            box: { x: 72, y: 96, width: 300, height: 140 },
-            color: '#e11d48',
-            interiorColor: '#ffe4e6',
-            opacity: 0.7,
-            strokeWidth: 3,
-          }),
-      );
-    });
-  }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -36,28 +36,24 @@ const plugins = [
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-/** On load: a signature field on the last page, signed by Ada with a typed signature. */
+/** On load: the agreement, with its signature field signed by Ada with a typed signature. */
 function useSignedDocument() {
   const form = useForm();
   const stamp = useStamp();
   const stage = useStage();
   const signature = useSignature();
   const status = useFormState((state) => state.status);
-  const page = usePageList().at(-1)?.ref;
   const done = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || done.current) return;
+    if (status !== 'ready' || done.current) return;
     done.current = true;
     void (async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 } }],
-      });
-      stage.goToPage(page);
+      // Bring the agreement's signature field into view.
+      const [widget] = form.getWidgets(toFieldRef('approval'));
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       const { asset } = await stamp.createAsset({
         libraryId: library.id,
@@ -67,14 +63,16 @@ function useSignedDocument() {
       });
       await signature.sign({ field: toFieldRef('approval'), mark: { assetId: asset.id } });
     })();
-  }, [form, stamp, stage, signature, status, page]);
+  }, [form, stamp, stage, signature, status]);
 }
 
 function WarningBar() {
   useSignedDocument();
   const annotation = useAnnotation();
   const signature = useSignature();
-  const page = usePageList().at(-1)?.ref;
+  const form = useForm();
+  // The page of the form's signature field: the box goes next to the signature.
+  const page = form.getWidgets(toFieldRef('approval'))[0]?.page;
   const { signatures } = useSignatureState();
   const [warning, setWarning] = useState<string | null>(null);
   const signed = signatures[0];
@@ -116,7 +114,7 @@ function WarningBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: agreement }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <WarningBar />
         <Stage className="stage">
