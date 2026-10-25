@@ -135,6 +135,53 @@ function document(objects: Objects, catalogExtra = ''): Uint8Array {
   });
 }
 
+/**
+ * A tagged page the way Chrome and Word write one: a structure tree
+ * (Document > sections > paragraphs) whose elements point at their parent
+ * (/P), their children (/K) and the page (/Pg), with a parent tree from the
+ * page's marked content back to the paragraphs. Root 40, Document 41,
+ * parent tree 44, its array 45; elements from 100. `/A` on the first
+ * paragraph points at `attribute` (object 46) when given.
+ */
+function taggedDocument(annots: number[], attribute?: string): Uint8Array {
+  const objects: Objects = {
+    3: `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Annots [${annots.map((n) => `${n} 0 R`).join(' ')}] /Resources <<>> /Contents 5 0 R /StructParents 0 /Tabs /S >>`,
+    10: acroForm([30]),
+    30: SIG_FIELD,
+    40: '<< /Type /StructTreeRoot /K 41 0 R /ParentTree 44 0 R /ParentTreeNextKey 1 >>',
+    44: '<< /Nums [0 45 0 R] >>',
+  };
+  if (attribute) objects[46] = attribute;
+  const sections: number[] = [];
+  const paragraphs: number[] = [];
+  let content = '';
+  let next = 100;
+  for (let s = 0; s < 6; s++) {
+    const section = next++;
+    const kids: number[] = [];
+    for (let p = 0; p < 6; p++) {
+      const paragraph = next++;
+      const mcid = paragraphs.length;
+      const a = attribute && mcid === 0 ? ' /A 46 0 R' : '';
+      objects[paragraph] =
+        `<< /Type /StructElem /S /P /P ${section} 0 R /Pg 3 0 R /K [<< /Type /MCR /Pg 3 0 R /MCID ${mcid} >>]${a} >>`;
+      content += `/P <</MCID ${mcid}>> BDC 72 ${700 - mcid * 12} m 300 ${700 - mcid * 12} l S EMC\n`;
+      kids.push(paragraph);
+      paragraphs.push(paragraph);
+    }
+    objects[section] =
+      `<< /Type /StructElem /S /Sect /P 41 0 R /Pg 3 0 R /K [${kids.map((n) => `${n} 0 R`).join(' ')}] >>`;
+    sections.push(section);
+  }
+  objects[41] = `<< /Type /StructElem /S /Document /P 40 0 R /Pg 3 0 R /K [${sections.map((n) => `${n} 0 R`).join(' ')}] >>`;
+  objects[45] = `[${paragraphs.map((n) => `${n} 0 R`).join(' ')}]`;
+  objects[5] = `<< /Length ${content.length} >>\nstream\n${content}endstream`;
+  return document(objects, ' /StructTreeRoot 40 0 R /MarkInfo << /Marked true >>');
+}
+
+const SQUARE =
+  '<< /Type /Annot /Subtype /Square /Rect [50 50 150 110] /C [1 0 0] /P 3 0 R /AP << /N 61 0 R >> >>';
+
 // ---------------------------------------------------------------------------
 
 describe('analysis: evidence must never fail open', () => {
@@ -244,6 +291,25 @@ describe('analysis: evidence must never fail open', () => {
       true,
     );
     expect(findings(analysis).some((f) => f.objectNumber === 20 && f.verdict === 'permitted')).toBe(
+      true,
+    );
+  });
+
+  test('a change hanging off a structure tree is judged, not lost in its loops', async () => {
+    // The structure tree is one loop of unchanged objects (/P up, /K down,
+    // the parent tree across). An attribute object under a paragraph,
+    // changed after an approval signature, is reached through it, and no
+    // rule explains it: forbidden, with the way in and out kept.
+    const attribute = (placement: string) => `<< /O /Layout /Placement /${placement} >>`;
+    const signed = await sign(taggedDocument([30], attribute('Block')));
+    const analysis = await analyze(append(signed, { 46: attribute('Inline') }));
+    expect(analysis.verdict).toBe('forbidden');
+    const changed = analysis.steps[0].changes.find((c) => c.objectNumber === 46)!;
+    expect(changed.usageIncomplete).toBeUndefined();
+    expect(changed.usage.new.map((e) => `${e.parent}:${e.label}`)).toEqual([
+      '1:StructTreeRoot/…/A',
+    ]);
+    expect(findings(analysis).some((f) => f.objectNumber === 46 && f.verdict === 'forbidden')).toBe(
       true,
     );
   });
@@ -379,6 +445,53 @@ describe('analysis: legitimate changes must not fail closed', () => {
     expect(findings(analysis).some((f) => f.objectNumber === 63 && f.verdict === 'permitted')).toBe(
       true,
     );
+  });
+
+  // Commenting after an approval signature keeps it valid in Acrobat (corpus
+  // v3/88). A tagged page changes the same objects: its structure tree points
+  // at the page (/Pg) from every element, but none of it changes, and Acrobat
+  // compares revisions object by object (signature-compat/TAGGED-DOCUMENTS.md).
+  // Most PDFs are tagged (Chrome, Word); these read `indeterminate` while the
+  // resolver walked every path through the tree's loops.
+  test('a comment added to a tagged page after an approval signature is permitted', async () => {
+    const signed = await sign(taggedDocument([30]));
+    const analysis = await analyze(
+      append(signed, {
+        3: lastObjectBody(signed, 3).replace('/Annots [30 0 R]', '/Annots [30 0 R 60 0 R]'),
+        60: SQUARE,
+        61: formStream('1 0 0 RG 2 w 1 1 98 58 re S'),
+      }),
+    );
+    expect(analysis.verdict).toBe('permitted');
+    expect(findings(analysis).filter((f) => f.verdict !== 'permitted')).toEqual([]);
+    const page = analysis.steps[0].changes.find((c) => c.objectNumber === 3)!;
+    for (const side of ['old', 'new'] as const) {
+      expect(page.usage[side].map((e) => `${e.parent}:${e.label}`)).toContain(
+        '1:StructTreeRoot/…/Pg',
+      );
+    }
+  });
+
+  test('our own comment on a tagged page after an approval signature is permitted, unsaved and saved', async () => {
+    const signed = await sign(taggedDocument([30]));
+    const doc = await open(signed);
+    try {
+      const page = (await doc.pages.list()).pages[0]!;
+      await doc.page(page.ref).annotations.create({
+        subtype: 'square',
+        rect: { x: 50, y: 50, width: 100, height: 60 },
+        color: '#ff0000',
+        strokeWidth: 2,
+      } as never);
+      const working = dump(
+        await doc.signatures.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' }),
+      );
+      expect(working.verdict).toBe('permitted');
+      const persisted = await analyze(new Uint8Array(await doc.download()));
+      expect(persisted.verdict).toBe('permitted');
+    } finally {
+      await doc.close();
+    }
   });
 });
 
