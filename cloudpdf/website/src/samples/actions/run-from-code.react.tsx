@@ -16,7 +16,7 @@ import './run-from-code.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), actionsPlugin()];
 
-const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const VERBS: ReadonlyArray<[PdfNamedAction, string]> = [
   ['FirstPage', '⇤ First'],
@@ -67,7 +67,7 @@ function NamedActions() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <NamedActions />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

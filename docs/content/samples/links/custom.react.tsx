@@ -11,7 +11,7 @@ import { localEngine } from '@embedpdf/engine';
 import './custom.css';
 
 const engine = localEngine();
-// The actions plugin runs a link that names a viewer command, such as the cover's "Next page".
+// The actions plugin runs a link that names a viewer command, such as the footer's Next.
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), actionsPlugin(), linkPlugin()];
 
 // [!doc-source links]

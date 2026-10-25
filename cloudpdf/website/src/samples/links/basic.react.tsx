@@ -10,7 +10,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './basic.css';
 
 const engine = cloudEngine();
-// The actions plugin runs a link that names a viewer command, such as the cover's "Next page".
+// The actions plugin runs a link that names a viewer command, such as the footer's Next.
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), actionsPlugin(), linkPlugin()];
 
 const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };

@@ -1,30 +1,32 @@
 /**
- * The links document. Chrome makes its links to pages and websites from the HTML's own links;
- * this adds the one Chrome can't: a button that runs a viewer command (a named action).
+ * The links document, a short manual. Chrome makes its links to pages, spots on a page, websites
+ * and email from the HTML's own links; this adds the ones Chrome can't: the footer's Previous and
+ * Next, which run a viewer command (a named action).
  */
 export default async function bake({ edit }) {
-  await edit(async ({ doc, pages, place }) => {
-    const nextPage = place('next-page');
-    await doc.page(nextPage.page).annotations.create({
-      subtype: 'link',
-      rect: nextPage.rect,
-      target: { kind: 'named', name: 'NextPage' },
-    });
+  await edit(async ({ doc, pages, places }) => {
+    const steps = [
+      ['previous-page', 'PrevPage'],
+      ['next-page', 'NextPage'],
+    ];
+    for (const [mark, name] of steps) {
+      for (const { page, rect } of places(mark)) {
+        await doc.page(page).annotations.create({
+          subtype: 'link',
+          rect,
+          target: { kind: 'named', name },
+        });
+      }
+    }
 
     await doc.metadata.update({
-      title: 'Every page, one click away',
+      title: 'Brand guidelines',
       author: 'EmbedPDF',
-      subject:
-        'A demo document with every kind of link: to a page, to a website, and a viewer command',
-      keywords: 'EmbedPDF, PDF, links, demo',
+      subject: 'How EmbedPDF looks: the logo, colour and type',
+      keywords: 'EmbedPDF, brand, logo, colour, type',
     });
 
-    const chapters = [
-      'Every page, one click away',
-      'Links to a page',
-      'You followed a link',
-      'Links to the web',
-    ];
+    const chapters = ['Contents', 'Logo', 'Colour', 'Type'];
     for (const [index, title] of chapters.entries()) {
       await doc.outline.create({
         title,

@@ -11,6 +11,7 @@ import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
+import { withActions, withActionsUi } from '@embedpdf/angular/actions';
 import { EpdfLink, EpdfLinkLayer, withLink } from '@embedpdf/angular/link';
 import type { Link } from '@embedpdf/angular/link';
 import { localEngine } from '@embedpdf/engine';
@@ -74,6 +75,10 @@ export class LinkList {
       withStage(),
       withRender(),
       withInteraction(),
+      // The actions plugin runs a link that names a viewer command, such as the footer's Next.
+      withActions(),
+      // The browser's way to open a website, once for the viewer.
+      withActionsUi(),
       withLink(),
     ),
   ],

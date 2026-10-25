@@ -4,6 +4,7 @@ import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
+import { actionsPlugin, useActionsUiAdapter } from '@embedpdf/react/actions';
 import { LinkLayer, linkPlugin, useLink, useLinkEvent } from '@embedpdf/react/link';
 import type { Link } from '@embedpdf/react/link';
 import { cloudEngine } from '@cloudpdf/engine';
@@ -11,9 +12,16 @@ import { cloudEngine } from '@cloudpdf/engine';
 import './list.css';
 
 const engine = cloudEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), linkPlugin()];
+// The actions plugin runs a link that names a viewer command, such as the footer's Next.
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), actionsPlugin(), linkPlugin()];
 
 const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+// The browser's way to open a website, once for the viewer.
+function BrowserActions() {
+  useActionsUiAdapter();
+  return null;
+}
 
 // The first page's links, read from the plugin, each with a button that follows it.
 function LinkList() {
@@ -59,6 +67,7 @@ export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <BrowserActions />
         <div className="layout">
           <LinkList />
           <Stage className="stage">

@@ -31,7 +31,7 @@ const links = async (): Promise<OpenInput> => {
       withStage(),
       withRender(),
       withInteraction(),
-      // The actions plugin runs a link that names a viewer command, such as the cover's "Next page".
+      // The actions plugin runs a link that names a viewer command, such as the footer's Next.
       withActions(),
       // The browser's way to open a website, once for the viewer.
       withActionsUi(),

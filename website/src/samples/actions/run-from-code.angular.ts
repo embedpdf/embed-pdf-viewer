@@ -19,9 +19,9 @@ import {
 } from '@embedpdf/angular/actions';
 import { localEngine } from '@embedpdf/engine';
 
-const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-links.pdf');
-  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const VERBS: ReadonlyArray<[PdfNamedAction, string]> = [
@@ -89,7 +89,7 @@ export class NamedActions {
   providers: [
     LastRun,
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: links }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withActions(),

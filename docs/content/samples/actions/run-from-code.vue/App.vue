@@ -12,16 +12,16 @@ import '../run-from-code.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), actionsPlugin()];
 
-// [!doc-source links]
-const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-links.pdf');
-  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: links }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: welcome }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <NamedActions />

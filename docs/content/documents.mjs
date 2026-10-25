@@ -38,7 +38,6 @@ export const DEMO_DOCUMENTS = {
   // cloud site's copies of their samples open the default grant.
   links: { cloudSource: defaultCloudSource },
   forms: { cloudSource: defaultCloudSource },
-  review: { cloudSource: defaultCloudSource },
   report: { cloudSource: defaultCloudSource },
   proposal: { cloudSource: defaultCloudSource },
   layout: { cloudSource: defaultCloudSource },

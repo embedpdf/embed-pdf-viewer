@@ -4,14 +4,17 @@ import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
+import { actionsPlugin } from '@embedpdf/vue/actions';
 import { LinkLayer, linkPlugin } from '@embedpdf/vue/link';
 import { localEngine } from '@embedpdf/engine';
+import BrowserActions from './BrowserActions.vue';
 import LinkList from './LinkList.vue';
 
 import '../list.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), linkPlugin()];
+// The actions plugin runs a link that names a viewer command, such as the footer's Next.
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), actionsPlugin(), linkPlugin()];
 
 const links = async (): Promise<OpenInput> => {
   const response = await fetch('/pdfs/embedpdf-links.pdf');
@@ -23,6 +26,7 @@ const links = async (): Promise<OpenInput> => {
   <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: links }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
+      <BrowserActions />
       <div class="layout">
         <LinkList />
         <Stage class="stage">

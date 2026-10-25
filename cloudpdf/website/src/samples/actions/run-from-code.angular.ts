@@ -19,7 +19,7 @@ import {
 } from '@embedpdf/angular/actions';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const VERBS: ReadonlyArray<[PdfNamedAction, string]> = [
   ['FirstPage', '⇤ First'],
@@ -86,7 +86,7 @@ export class NamedActions {
   providers: [
     LastRun,
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: links }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withActions(),
