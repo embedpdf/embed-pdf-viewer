@@ -20,7 +20,7 @@ const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswP
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: welcome, name: 'report.pdf' }]"
+    :initial-documents="[{ source: welcome, name: 'welcome.pdf' }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>

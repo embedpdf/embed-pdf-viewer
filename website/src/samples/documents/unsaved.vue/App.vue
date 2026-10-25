@@ -23,7 +23,7 @@ const welcome = async (): Promise<OpenInput> => {
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: welcome, name: 'report.pdf' }]"
+    :initial-documents="[{ source: welcome, name: 'welcome.pdf' }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>

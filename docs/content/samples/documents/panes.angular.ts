@@ -25,6 +25,13 @@ const welcome = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentScope, EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
@@ -33,8 +40,8 @@ const welcome = async (): Promise<OpenInput> => {
       {
         engine: () => localEngine(),
         initialDocuments: [
-          { source: welcome, name: 'Contract' },
-          { source: welcome, name: 'Report' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

@@ -20,6 +20,8 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentScope, EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
@@ -28,8 +30,8 @@ const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswP
       {
         engine: () => cloudEngine(),
         initialDocuments: [
-          { source: welcome, name: 'Contract' },
-          { source: welcome, name: 'Report' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

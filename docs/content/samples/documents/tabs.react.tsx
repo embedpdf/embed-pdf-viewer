@@ -22,6 +22,20 @@ const welcome = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
 function Tabs() {
   const documents = useDocuments();
   const { documents: open, activeId } = useDocumentsState();
@@ -52,8 +66,8 @@ function Tabs() {
       <button
         type="button"
         className="button"
-        aria-label="Open another copy"
-        onClick={() => documents.open(welcome, { name: `Copy ${open.length + 1}` })}
+        aria-label="Open the floor plan"
+        onClick={() => documents.open(sketch, { name: 'Floor plan' })}
       >
         +
       </button>
@@ -101,8 +115,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: welcome, name: 'Contract' },
-        { source: welcome, name: 'Report' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <Tabs />

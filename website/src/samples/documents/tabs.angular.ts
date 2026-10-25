@@ -21,6 +21,16 @@ const welcome = async (): Promise<OpenInput> => {
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+
 @Component({
   selector: 'demo-tabs',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,7 +57,12 @@ const welcome = async (): Promise<OpenInput> => {
           </button>
         </div>
       }
-      <button type="button" class="button" aria-label="Open another copy" (click)="openCopy()">
+      <button
+        type="button"
+        class="button"
+        aria-label="Open the floor plan"
+        (click)="openFloorPlan()"
+      >
         +
       </button>
     </div>
@@ -56,8 +71,8 @@ const welcome = async (): Promise<OpenInput> => {
 export class Tabs {
   protected readonly documents = inject(EpdfDocuments);
 
-  protected openCopy() {
-    void this.documents.open(welcome, { name: `Copy ${this.documents.documents().length + 1}` });
+  protected openFloorPlan() {
+    void this.documents.open(sketch, { name: 'Floor plan' });
   }
 }
 
@@ -105,8 +120,8 @@ export class TabTools {
       {
         engine: () => localEngine(),
         initialDocuments: [
-          { source: welcome, name: 'Contract' },
-          { source: welcome, name: 'Report' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

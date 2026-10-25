@@ -17,6 +17,8 @@ const plugins = [stagePlugin(), renderPlugin()];
 
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
 // The same component in both panes: each talks to the document its <DocumentScope> names.
 function Header() {
   const { name, pageCount } = useDocument();
@@ -67,8 +69,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: welcome, name: 'Original' },
-        { source: welcome, name: 'Revised' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <SideBySide />

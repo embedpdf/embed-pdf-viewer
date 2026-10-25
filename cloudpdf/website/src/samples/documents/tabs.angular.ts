@@ -18,6 +18,10 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
 @Component({
   selector: 'demo-tabs',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,7 +48,12 @@ const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswP
           </button>
         </div>
       }
-      <button type="button" class="button" aria-label="Open another copy" (click)="openCopy()">
+      <button
+        type="button"
+        class="button"
+        aria-label="Open the floor plan"
+        (click)="openFloorPlan()"
+      >
         +
       </button>
     </div>
@@ -53,8 +62,8 @@ const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswP
 export class Tabs {
   protected readonly documents = inject(EpdfDocuments);
 
-  protected openCopy() {
-    void this.documents.open(welcome, { name: `Copy ${this.documents.documents().length + 1}` });
+  protected openFloorPlan() {
+    void this.documents.open(sketch, { name: 'Floor plan' });
   }
 }
 
@@ -102,8 +111,8 @@ export class TabTools {
       {
         engine: () => cloudEngine(),
         initialDocuments: [
-          { source: welcome, name: 'Contract' },
-          { source: welcome, name: 'Report' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

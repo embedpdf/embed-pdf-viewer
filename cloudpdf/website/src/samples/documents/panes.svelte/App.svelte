@@ -12,14 +12,16 @@
   const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
   const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+  const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <Viewer
   {engine}
   {plugins}
   initialDocuments={[
-    { source: welcome, name: 'Contract' },
-    { source: welcome, name: 'Report' },
+    { source: welcome, name: 'Guide' },
+    { source: article, name: 'Article' },
   ]}
 >
   <Panes />

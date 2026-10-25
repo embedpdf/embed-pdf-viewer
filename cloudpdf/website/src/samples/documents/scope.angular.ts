@@ -19,6 +19,8 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
 // The same component in both panes: each talks to the document its [epdfDocumentScope] names.
 @Component({
   selector: 'demo-header',
@@ -61,8 +63,8 @@ export class Header {
       {
         engine: () => cloudEngine(),
         initialDocuments: [
-          { source: welcome, name: 'Original' },
-          { source: welcome, name: 'Revised' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

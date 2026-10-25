@@ -2,7 +2,7 @@
 import { useDocuments, useDocumentsState } from '@embedpdf/vue/runtime';
 import type { OpenSource } from '@embedpdf/vue/runtime';
 
-defineProps<{ welcome: OpenSource }>();
+defineProps<{ sketch: OpenSource }>();
 
 const documents = useDocuments();
 const { documents: open, activeId } = useDocumentsState();
@@ -37,8 +37,8 @@ const { documents: open, activeId } = useDocumentsState();
     <button
       type="button"
       class="button"
-      aria-label="Open another copy"
-      @click="documents.open(welcome, { name: `Copy ${open.length + 1}` })"
+      aria-label="Open the floor plan"
+      @click="documents.open(sketch, { name: 'Floor plan' })"
     >
       +
     </button>

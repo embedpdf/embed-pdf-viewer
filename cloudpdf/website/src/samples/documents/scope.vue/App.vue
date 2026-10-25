@@ -12,6 +12,8 @@ const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
@@ -19,8 +21,8 @@ const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswP
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: welcome, name: 'Original' },
-      { source: welcome, name: 'Revised' },
+      { source: welcome, name: 'Guide' },
+      { source: article, name: 'Article' },
     ]"
   >
     <SideBySide />
