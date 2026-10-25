@@ -94,6 +94,7 @@ import {
   selectionBoundsOnPage,
   selectionKnob,
   textBoxes,
+  textBoxOf,
 } from '../src/view';
 import { groupOf, irtOf, kindOf, shapeOf, styleOf, textOf, withShape } from '../src/record';
 import { placed } from '../src/frame';
@@ -4887,6 +4888,8 @@ describe('callout ↔ AP-generator mirror', () => {
     // At rest: baked like any shape — one renderer, the engine raster.
     expect(pageItems(model, PAGE)[0]!.source).toBe('baked');
     expect(textBoxes(model, PAGE)).toHaveLength(0);
+    // A renderer that draws the box itself has no raster under it: its box is there at rest too.
+    expect(textBoxOf(model, 'C1')).toMatchObject({ id: 'C1', editing: false });
 
     model = step(model, { type: 'beginTextEdit', id: 'C1' })[0];
     const it = pageItems(model, PAGE)[0]!;
