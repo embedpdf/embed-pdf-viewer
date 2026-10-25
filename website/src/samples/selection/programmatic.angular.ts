@@ -15,12 +15,12 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { localEngine } from '@embedpdf/engine';
 
 // On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 const POINT = { x: 260, y: 242 };
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Every button selects on the cover, the first page: by its ref, or by its index, 0.
@@ -120,7 +120,7 @@ export class SelectionToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

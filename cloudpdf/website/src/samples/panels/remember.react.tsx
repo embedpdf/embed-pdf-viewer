@@ -12,7 +12,7 @@ import './remember.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), shellPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The browser may refuse storage, in a private window: then nothing is remembered.
 const loadLayout = (): ShellSnapshot | null => {
@@ -126,7 +126,7 @@ function Workspace() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Workspace />
       </DocumentGate>

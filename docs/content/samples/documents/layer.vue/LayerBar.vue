@@ -37,7 +37,7 @@ async function openAgain() {
   // Said first: closing the document unmounts this bar, and then it can't emit.
   emit('reopened');
   await documents.close(id.value);
-  await documents.open(() => props.withLayer(stored), { name: 'ebook.pdf' });
+  await documents.open(() => props.withLayer(stored), { name: 'welcome.pdf' });
 }
 </script>
 

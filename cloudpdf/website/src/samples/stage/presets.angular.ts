@@ -18,14 +18,14 @@ const PRESENTATION: Partial<StageSettings> = {
   anchorAlign: { x: 'center', y: 'center' },
 };
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       // Zoomed in, so a page is wider than the view and you can see where it lands.
       withStage({ zoom: { level: 1.6 } }),
       withRender(),

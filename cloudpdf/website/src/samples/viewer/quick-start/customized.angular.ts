@@ -1,15 +1,15 @@
 import { Component } from '@angular/core';
 import { EpdfPdfViewer, type ViewerConfig } from '@cloudpdf/viewer-angular';
 
-const ebook = { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome = { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfPdfViewer],
-  template: `<epdf-pdf-viewer [src]="ebook" [config]="config" style="height: 100%" />`,
+  template: `<epdf-pdf-viewer [src]="welcome" [config]="config" style="height: 100%" />`,
 })
 export class App {
-  readonly ebook = ebook;
+  readonly welcome = welcome;
   readonly config: ViewerConfig = {
     theme: { accent: '#7c3aed' },
     disable: ['forms', 'redaction'],

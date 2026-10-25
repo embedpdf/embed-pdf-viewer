@@ -22,9 +22,9 @@ import {
 import { EpdfRedaction, withRedaction } from '@embedpdf/angular/redaction';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<div demoPendingMarks [stage]="stage"></div>`. */
@@ -92,7 +92,7 @@ export class PendingMarks {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -126,13 +126,13 @@ export class App {
   private started = false;
 
   constructor() {
-    // On load: the author's name, and every "commercial" in the document.
+    // On load: the cover's subtitle, and every "Adobe" in the document.
     effect(() => {
       if (this.annotation.status() !== 'ready' || this.started) return;
       this.started = true;
       void this.redaction
-        .markArea(0, { x: 100, y: 508, width: 172, height: 50 })
-        .then(() => this.redaction.markMatches({ text: 'commercial' }));
+        .markArea(0, { x: 44, y: 318, width: 206, height: 50 })
+        .then(() => this.redaction.markMatches({ text: 'Adobe' }));
     });
   }
 }

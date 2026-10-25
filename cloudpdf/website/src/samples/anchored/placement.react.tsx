@@ -13,7 +13,7 @@ import './placement.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const SIDES: AnchoredSide[] = ['top', 'right', 'bottom', 'left'];
 const ALIGNS = ['start', 'center', 'end'] as const;
@@ -137,7 +137,7 @@ function Pages() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Pages />
       </DocumentGate>

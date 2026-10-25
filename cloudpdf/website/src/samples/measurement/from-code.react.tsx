@@ -20,30 +20,30 @@ const plugins = [
   measurementPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// Points on the cover's empty lower half, in page coordinates: two for a
+// Points on the floor plan, in page coordinates: two for a
 // distance, the corners otherwise.
 const SHAPES: Record<MeasurementKind, { x: number; y: number }[]> = {
   distance: [
-    { x: 60, y: 750 },
-    { x: 550, y: 750 },
+    { x: 62, y: 723 },
+    { x: 550, y: 723 },
   ],
   perimeter: [
-    { x: 70, y: 600 },
-    { x: 150, y: 650 },
-    { x: 250, y: 600 },
+    { x: 62, y: 613 },
+    { x: 382, y: 613 },
+    { x: 382, y: 723 },
   ],
   area: [
-    { x: 70, y: 670 },
-    { x: 250, y: 670 },
-    { x: 250, y: 730 },
-    { x: 70, y: 730 },
+    { x: 382, y: 516 },
+    { x: 550, y: 516 },
+    { x: 550, y: 723 },
+    { x: 382, y: 723 },
   ],
 };
 
-// The cover's empty lower half, where the measurements go.
-const LOWER_HALF = { x: 40, y: 560, width: 532, height: 210 };
+// The floor plan's lower half, where the measurements go.
+const LOWER_HALF = { x: 50, y: 500, width: 512, height: 240 };
 
 function MeasureButtons() {
   const measurement = useMeasurement();
@@ -95,7 +95,7 @@ function MeasureButtons() {
       </button>
       <span className="spacer" />
       <output className="readout">
-        {count} {count === 1 ? 'measurement' : 'measurements'} on the cover
+        {count} {count === 1 ? 'measurement' : 'measurements'} on the plan
       </output>
     </div>
   );
@@ -103,7 +103,7 @@ function MeasureButtons() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <MeasureButtons />
         <Stage className="stage">

@@ -23,7 +23,7 @@ const COLORS = [
   { name: 'Pink', color: '#fcc2d7', activeColor: '#f06595' },
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function ColorPicker() {
   const search = useSearch();
@@ -58,7 +58,7 @@ export default function App() {
   const [fromCss, setFromCss] = useState(false);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="toolbar">
           <ColorPicker />

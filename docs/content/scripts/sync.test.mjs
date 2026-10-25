@@ -11,7 +11,7 @@ import { DEMO_DOCUMENTS } from '../documents.mjs';
 import { siteFiles, sitePages, transformViewerFile } from './sync.mjs';
 
 const cloud = (source, file) => transformViewerFile(source, 'cloud', file);
-const document = DEMO_DOCUMENTS.ebook.viewerCloud;
+const document = DEMO_DOCUMENTS.welcome.viewerCloud;
 
 describe('the cloud site’s copy of a viewer file', () => {
   it('names the cloud packages, but not a subpath only the local door has', () => {
@@ -85,19 +85,19 @@ describe('the cloud site’s copy of a viewer file', () => {
   });
 
   it('keeps a doc-source block’s declaration and gives it the cloud document', () => {
-    const source = `  // [!doc-source ebook]
-  readonly ebook = 'https://snippet.embedpdf.com/ebook.pdf';
+    const source = `  // [!doc-source welcome]
+  readonly welcome = '/pdfs/embedpdf-welcome.pdf';
   // [!/doc-source]
 `;
-    assert.equal(cloud(source, 'viewer/a.angular.ts'), `  readonly ebook = ${document};\n`);
+    assert.equal(cloud(source, 'viewer/a.angular.ts'), `  readonly welcome = ${document};\n`);
     assert.equal(
       transformViewerFile(source, 'local', 'viewer/a.angular.ts'),
-      "  readonly ebook = 'https://snippet.embedpdf.com/ebook.pdf';\n",
+      "  readonly welcome = '/pdfs/embedpdf-welcome.pdf';\n",
     );
     assert.throws(
       () =>
         cloud(
-          "// [!doc-source ebook]\nconst ebook: string = '/x.pdf';\n// [!/doc-source]\n",
+          "// [!doc-source welcome]\nconst welcome: string = '/x.pdf';\n// [!/doc-source]\n",
           'viewer/a.react.tsx',
         ),
       /declares one document, untyped/,

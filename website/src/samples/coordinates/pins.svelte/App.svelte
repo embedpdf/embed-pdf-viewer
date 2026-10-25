@@ -11,9 +11,9 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+    return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
@@ -24,7 +24,7 @@
   let pressed = { x: 0, y: 0 };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

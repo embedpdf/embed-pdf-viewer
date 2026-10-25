@@ -1,7 +1,7 @@
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-react';
 
-// [!doc-source ebook]
-const ebook = 'https://snippet.embedpdf.com/ebook.pdf';
+// [!doc-source welcome]
+const welcome = '/pdfs/embedpdf-welcome.pdf';
 // [!/doc-source]
 
 const config: ViewerConfig = {
@@ -22,5 +22,5 @@ const config: ViewerConfig = {
 };
 
 export default function App() {
-  return <PDFViewer src={ebook} {...config} style={{ height: '100%' }} />;
+  return <PDFViewer src={welcome} {...config} style={{ height: '100%' }} />;
 }

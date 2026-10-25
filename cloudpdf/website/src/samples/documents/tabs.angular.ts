@@ -16,7 +16,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-tabs',
@@ -54,7 +54,7 @@ export class Tabs {
   protected readonly documents = inject(EpdfDocuments);
 
   protected openCopy() {
-    void this.documents.open(ebook, { name: `Copy ${this.documents.documents().length + 1}` });
+    void this.documents.open(welcome, { name: `Copy ${this.documents.documents().length + 1}` });
   }
 }
 
@@ -102,8 +102,8 @@ export class TabTools {
       {
         engine: () => cloudEngine(),
         initialDocuments: [
-          { source: ebook, name: 'Contract' },
-          { source: ebook, name: 'Report' },
+          { source: welcome, name: 'Contract' },
+          { source: welcome, name: 'Report' },
         ],
       },
       withStage(),

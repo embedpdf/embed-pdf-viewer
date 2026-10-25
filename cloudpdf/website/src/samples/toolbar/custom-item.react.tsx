@@ -14,7 +14,7 @@ import './custom-item.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), commandsPlugin({ commands: standardCommands })];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The page number is an item of your own: it gets smaller first, and in the "More" menu it's the
 // 'page:go-to' command.
@@ -115,7 +115,7 @@ export default function App() {
   const [width, setWidth] = useState(100);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <label className="width">
           Toolbar width

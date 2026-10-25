@@ -16,7 +16,7 @@ import './panes.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function Pane({ pane, canRemove }: { pane: PaneInfo; canRemove: boolean }) {
   const views = useViewManager();
@@ -101,8 +101,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: ebook, name: 'Contract' },
-        { source: ebook, name: 'Report' },
+        { source: welcome, name: 'Contract' },
+        { source: welcome, name: 'Report' },
       ]}
     >
       <Panes />

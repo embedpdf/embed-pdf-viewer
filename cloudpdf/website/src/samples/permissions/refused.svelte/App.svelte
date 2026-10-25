@@ -10,13 +10,13 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
   // Read and select, but no downloading.
   const scope = ['doc.open', 'doc.render', 'doc.text.select'];
 </script>
 
-<Viewer {engine} {plugins} {scope} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} {scope} initialDocuments={[{ source: welcome }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

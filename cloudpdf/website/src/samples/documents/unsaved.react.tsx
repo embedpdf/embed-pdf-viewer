@@ -18,7 +18,7 @@ import './unsaved.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), metadataPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function TitleBar() {
   const documents = useDocuments();
@@ -88,7 +88,7 @@ export default function App() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: ebook, name: 'report.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'report.pdf' }]}
     >
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <TitleBar />

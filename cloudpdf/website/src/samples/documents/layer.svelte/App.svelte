@@ -13,7 +13,7 @@
 
   // The original stays as it is: the document opens with a layer over it, and the changes go there.
   const withLayer = async (layer?: Uint8Array): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+    const response = await fetch('/pdfs/embedpdf-welcome.pdf');
     return {
       kind: 'layerBytes',
       baseBytes: new Uint8Array(await response.arrayBuffer()),
@@ -26,7 +26,7 @@
   let reopened = $state(false);
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: () => withLayer(), name: 'ebook.pdf' }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: () => withLayer(), name: 'welcome.pdf' }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

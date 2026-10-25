@@ -17,13 +17,13 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import { EpdfRedaction, withRedaction } from '@embedpdf/angular/redaction';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// The author's name on the cover, in page coordinates.
-const AUTHOR = { x: 100, y: 508, width: 172, height: 50 };
+// The cover's subtitle, in page coordinates.
+const SUBTITLE = { x: 44, y: 318, width: 206, height: 50 };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<demo-redact-bar [stage]="stage" />`. */
 @Component({
@@ -65,12 +65,12 @@ export class RedactBar {
   private started = false;
 
   constructor() {
-    // On load: the author's name marked, and the redact tool on.
+    // On load: the cover's subtitle marked, and the redact tool on.
     effect(() => {
       if (this.annotation.status() !== 'ready' || this.started) return;
       this.started = true;
       const stage = this.stage();
-      void this.redaction.markArea(0, AUTHOR).then(() => stage.reveal(0, { rect: AUTHOR }));
+      void this.redaction.markArea(0, SUBTITLE).then(() => stage.reveal(0, { rect: SUBTITLE }));
       this.interaction.activateTool('redact');
     });
   }
@@ -90,7 +90,7 @@ export class RedactBar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

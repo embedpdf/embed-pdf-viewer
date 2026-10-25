@@ -11,7 +11,7 @@ import { localEngine } from '@embedpdf/engine';
 const en: Locale = {
   code: 'en',
   name: 'English',
-  translations: { app: { title: 'The ebook', switchTo: 'العربية' } },
+  translations: { app: { title: 'The guide', switchTo: 'العربية' } },
 };
 // Arabic reads right to left. The standard commands have no Arabic labels, so the app gives
 // them, under the same keys.
@@ -20,7 +20,7 @@ const ar: Locale = {
   name: 'العربية',
   direction: 'rtl',
   translations: {
-    app: { title: 'الكتاب الإلكتروني', switchTo: 'English' },
+    app: { title: 'الدليل', switchTo: 'English' },
     commands: {
       page: { previous: 'الصفحة السابقة', next: 'الصفحة التالية' },
       zoom: { in: 'تكبير', out: 'تصغير' },
@@ -28,9 +28,9 @@ const ar: Locale = {
   },
 };
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // The toolbar follows the language: in Arabic it runs from right to left.
@@ -39,7 +39,7 @@ const ebook = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfCommand, EpdfTPipe],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withCommands({ commands: standardCommands }),

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-svelte';
 
-  const ebook = 'https://snippet.embedpdf.com/ebook.pdf';
+  const welcome = '/pdfs/embedpdf-welcome.pdf';
 
   const config: ViewerConfig = {
     theme: { accent: '#7c3aed' },
@@ -21,4 +21,4 @@
   };
 </script>
 
-<PDFViewer src={ebook} {...config} style="height: 100%" />
+<PDFViewer src={welcome} {...config} style="height: 100%" />

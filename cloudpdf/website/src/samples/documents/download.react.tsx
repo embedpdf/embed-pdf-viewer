@@ -10,7 +10,7 @@ import './download.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const megabytes = (bytes: Uint8Array) => `${(bytes.byteLength / 1_000_000).toFixed(2)} MB`;
 
@@ -34,7 +34,7 @@ function DownloadBar() {
     return () => cancel.abort();
   }, [documents]);
 
-  const download = async () => saveFile(await documents.download(undefined, { mode }), 'ebook.pdf');
+  const download = async () => saveFile(await documents.download(undefined, { mode }), 'welcome.pdf');
 
   return (
     <div className="toolbar">
@@ -77,7 +77,7 @@ export default function App() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
     >
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <DownloadBar />

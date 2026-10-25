@@ -4,7 +4,7 @@ import { useDocument, useDocuments } from '@embedpdf/vue/runtime';
 import type { OpenSource } from '@embedpdf/vue/runtime';
 import type { Role } from './roles';
 
-const props = defineProps<{ ebook: OpenSource }>();
+const props = defineProps<{ welcome: OpenSource }>();
 const role = defineModel<Role>('role', { required: true });
 
 const documents = useDocuments();
@@ -18,7 +18,7 @@ const canPrint = computed(() => id.value !== '' && documents.canPrint());
 
 async function openAgain() {
   await documents.close(id.value);
-  await documents.open(props.ebook, { name: 'ebook.pdf' });
+  await documents.open(props.welcome, { name: 'welcome.pdf' });
   openedAs.value = role.value;
 }
 </script>

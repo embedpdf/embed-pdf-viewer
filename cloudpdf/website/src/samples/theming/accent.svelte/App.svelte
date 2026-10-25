@@ -14,7 +14,7 @@
 
   const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <script lang="ts">
@@ -39,7 +39,7 @@
     {/each}
     <code class="value">--epdf-accent: {accent}</code>
   </div>
-  <Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+  <Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
     <DocumentGate>
       {#snippet fallback()}
         <p class="loading">Loading…</p>

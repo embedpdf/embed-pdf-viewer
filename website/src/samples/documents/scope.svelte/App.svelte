@@ -10,8 +10,8 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-welcome.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
@@ -20,8 +20,8 @@
   {engine}
   {plugins}
   initialDocuments={[
-    { source: ebook, name: 'Original' },
-    { source: ebook, name: 'Revised' },
+    { source: welcome, name: 'Original' },
+    { source: welcome, name: 'Revised' },
   ]}
 >
   <SideBySide />

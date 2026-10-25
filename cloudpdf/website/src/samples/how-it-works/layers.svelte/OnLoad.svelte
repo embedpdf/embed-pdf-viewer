@@ -13,6 +13,6 @@
     void search.search({ text: 'PDF' });
   });
   $effect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 28, count: 30 });
   });
 </script>

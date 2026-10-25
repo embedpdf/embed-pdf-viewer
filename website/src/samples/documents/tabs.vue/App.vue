@@ -12,8 +12,8 @@ import '../tabs.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
@@ -23,11 +23,11 @@ const ebook = async (): Promise<OpenInput> => {
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: ebook, name: 'Contract' },
-      { source: ebook, name: 'Report' },
+      { source: welcome, name: 'Contract' },
+      { source: welcome, name: 'Report' },
     ]"
   >
-    <Tabs :ebook="ebook" />
+    <Tabs :welcome="welcome" />
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>
       <TabTools />

@@ -14,7 +14,7 @@ import { EpdfShell, withShell } from '@embedpdf/angular/shell';
 import type { ShellSnapshot } from '@embedpdf/angular/shell';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The browser may refuse storage, in a private window: then nothing is remembered.
 const loadLayout = (): ShellSnapshot | null => {
@@ -133,7 +133,7 @@ export class Workspace {
   imports: [EpdfDocumentGate, Workspace],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withShell(),

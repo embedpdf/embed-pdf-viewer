@@ -7,7 +7,7 @@ import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { measurementPlugin } from '@embedpdf/vue/measurement';
 import { cloudEngine } from '@cloudpdf/engine';
-import MeasureCover from './MeasureCover.vue';
+import MeasurePlan from './MeasurePlan.vue';
 import Readouts from './Readouts.vue';
 
 import '../readout.css';
@@ -21,14 +21,14 @@ const plugins = [
   measurementPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: sketch }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <MeasureCover />
+      <MeasurePlan />
       <div class="viewer">
         <Stage class="stage">
           <template #page>

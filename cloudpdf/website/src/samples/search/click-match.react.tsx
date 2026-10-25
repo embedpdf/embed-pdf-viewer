@@ -11,7 +11,7 @@ import './click-match.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Which match is the active one: the first on load, then the one you click.
 function ActiveMatch() {
@@ -49,7 +49,7 @@ function Pages() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ActiveMatch />
         <Pages />

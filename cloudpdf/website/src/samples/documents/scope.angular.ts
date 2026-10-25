@@ -17,7 +17,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The same component in both panes: each talks to the document its [epdfDocumentScope] names.
 @Component({
@@ -61,8 +61,8 @@ export class Header {
       {
         engine: () => cloudEngine(),
         initialDocuments: [
-          { source: ebook, name: 'Original' },
-          { source: ebook, name: 'Revised' },
+          { source: welcome, name: 'Original' },
+          { source: welcome, name: 'Revised' },
         ],
       },
       withStage(),

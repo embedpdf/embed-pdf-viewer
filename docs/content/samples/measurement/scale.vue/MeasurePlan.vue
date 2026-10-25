@@ -1,11 +1,11 @@
-<!-- On load: a distance and an area on the cover, at 1:100, scrolled into view. -->
+<!-- On load: a distance and an area on the floor plan, at 1:100, scrolled into view. -->
 <script setup lang="ts">
 import { watch } from 'vue';
 import { useStage } from '@embedpdf/vue/stage';
 import { useMeasurement, usePageScale } from '@embedpdf/vue/measurement';
 
-// The cover's empty lower half, where the measurements go.
-const LOWER_HALF = { x: 40, y: 560, width: 532, height: 210 };
+// The floor plan's lower half, where the measurements go.
+const LOWER_HALF = { x: 50, y: 500, width: 512, height: 240 };
 
 const measurement = useMeasurement();
 const stage = useStage();
@@ -23,18 +23,18 @@ watch(
           kind: 'distance',
           page: 0,
           points: [
-            { x: 60, y: 740 },
-            { x: 550, y: 740 },
+            { x: 62, y: 723 },
+            { x: 550, y: 723 },
           ],
         }),
         measurement.createMeasurement({
           kind: 'area',
           page: 0,
           points: [
-            { x: 60, y: 580 },
-            { x: 260, y: 580 },
-            { x: 260, y: 700 },
-            { x: 60, y: 700 },
+            { x: 382, y: 516 },
+            { x: 550, y: 516 },
+            { x: 550, y: 723 },
+            { x: 382, y: 723 },
           ],
         }),
       ]).then(() => stage.reveal(0, { rect: LOWER_HALF })),

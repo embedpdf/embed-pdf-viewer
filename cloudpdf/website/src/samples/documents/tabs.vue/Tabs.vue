@@ -2,7 +2,7 @@
 import { useDocuments, useDocumentsState } from '@embedpdf/vue/runtime';
 import type { OpenSource } from '@embedpdf/vue/runtime';
 
-defineProps<{ ebook: OpenSource }>();
+defineProps<{ welcome: OpenSource }>();
 
 const documents = useDocuments();
 const { documents: open, activeId } = useDocumentsState();
@@ -38,7 +38,7 @@ const { documents: open, activeId } = useDocumentsState();
       type="button"
       class="button"
       aria-label="Open another copy"
-      @click="documents.open(ebook, { name: `Copy ${open.length + 1}` })"
+      @click="documents.open(welcome, { name: `Copy ${open.length + 1}` })"
     >
       +
     </button>

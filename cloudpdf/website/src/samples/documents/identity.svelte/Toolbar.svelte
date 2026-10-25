@@ -3,7 +3,7 @@
   import { useDocument, useDocuments, type OpenSource } from '@embedpdf/svelte/runtime';
   import type { Role } from './roles';
 
-  let { role = $bindable(), ebook }: { role: Role; ebook: OpenSource } = $props();
+  let { role = $bindable(), welcome }: { role: Role; welcome: OpenSource } = $props();
 
   const documents = useDocuments();
   const document = useDocument();
@@ -12,7 +12,7 @@
 
   async function openAgain() {
     await documents.close(document.id);
-    await documents.open(ebook, { name: 'ebook.pdf' });
+    await documents.open(welcome, { name: 'welcome.pdf' });
     openedAs = role;
   }
 </script>

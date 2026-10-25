@@ -12,7 +12,7 @@ import '../tabs.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
@@ -20,11 +20,11 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: ebook, name: 'Contract' },
-      { source: ebook, name: 'Report' },
+      { source: welcome, name: 'Contract' },
+      { source: welcome, name: 'Report' },
     ]"
   >
-    <Tabs :ebook="ebook" />
+    <Tabs :welcome="welcome" />
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>
       <TabTools />

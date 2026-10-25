@@ -26,10 +26,10 @@ const plugins = [
   redactionPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// The author's name on the cover, in page coordinates.
-const AUTHOR = { x: 100, y: 508, width: 172, height: 50 };
+// The cover's subtitle, in page coordinates.
+const SUBTITLE = { x: 44, y: 318, width: 206, height: 50 };
 
 function RedactBar() {
   const interaction = useInteraction();
@@ -40,11 +40,11 @@ function RedactBar() {
   const ready = useAnnotationState((state) => state.status === 'ready');
   const started = useRef(false);
 
-  // On load: the author's name marked, and the redact tool on.
+  // On load: the cover's subtitle marked, and the redact tool on.
   useEffect(() => {
     if (!ready || started.current) return;
     started.current = true;
-    void redaction.markArea(0, AUTHOR).then(() => stage.reveal(0, { rect: AUTHOR }));
+    void redaction.markArea(0, SUBTITLE).then(() => stage.reveal(0, { rect: SUBTITLE }));
     interaction.activateTool('redact');
   }, [redaction, interaction, stage, ready]);
 
@@ -78,7 +78,7 @@ function RedactBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <RedactBar />
         <Stage className="stage">

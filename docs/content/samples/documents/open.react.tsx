@@ -9,9 +9,9 @@ import './open.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -20,7 +20,7 @@ function Toolbar() {
   const documents = useDocuments();
   const { id, name, status, pageCount } = useDocument();
 
-  // A file the user picks opens next to the ebook, and becomes the active document.
+  // A file the user picks opens next to the welcome, and becomes the active document.
   const openFile = async (file: File) => {
     await documents.open({ kind: 'bytes', bytes: await file.arrayBuffer() }, { name: file.name });
   };
@@ -57,9 +57,9 @@ function Toolbar() {
         <button
           type="button"
           className="button"
-          onClick={() => documents.open(ebook, { name: 'ebook.pdf' })}
+          onClick={() => documents.open(welcome, { name: 'welcome.pdf' })}
         >
-          Open the ebook again
+          Open the welcome again
         </button>
       )}
     </div>
@@ -79,7 +79,7 @@ export default function App() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
     >
       <Toolbar />
       <DocumentGate fallback={<Empty />}>

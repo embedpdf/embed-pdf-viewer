@@ -21,7 +21,7 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfMetadata, withMetadata } from '@embedpdf/angular/metadata';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-title-bar',
@@ -99,7 +99,7 @@ export class ChangeLog {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, TitleBar, ChangeLog],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook, name: 'report.pdf' }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome, name: 'report.pdf' }] },
       withStage(),
       withRender(),
       withMetadata(),

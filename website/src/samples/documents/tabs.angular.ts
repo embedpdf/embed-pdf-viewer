@@ -16,8 +16,8 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -57,7 +57,7 @@ export class Tabs {
   protected readonly documents = inject(EpdfDocuments);
 
   protected openCopy() {
-    void this.documents.open(ebook, { name: `Copy ${this.documents.documents().length + 1}` });
+    void this.documents.open(welcome, { name: `Copy ${this.documents.documents().length + 1}` });
   }
 }
 
@@ -105,8 +105,8 @@ export class TabTools {
       {
         engine: () => localEngine(),
         initialDocuments: [
-          { source: ebook, name: 'Contract' },
-          { source: ebook, name: 'Report' },
+          { source: welcome, name: 'Contract' },
+          { source: welcome, name: 'Report' },
         ],
       },
       withStage(),

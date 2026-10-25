@@ -17,10 +17,10 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import { EpdfRedaction, withRedaction } from '@embedpdf/angular/redaction';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// The author's name on the cover, in page coordinates.
-const AUTHOR = { x: 100, y: 508, width: 172, height: 50 };
+// The cover's subtitle, in page coordinates.
+const SUBTITLE = { x: 44, y: 318, width: 206, height: 50 };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<demo-redact-bar [stage]="stage" />`. */
 @Component({
@@ -62,12 +62,12 @@ export class RedactBar {
   private started = false;
 
   constructor() {
-    // On load: the author's name marked, and the redact tool on.
+    // On load: the cover's subtitle marked, and the redact tool on.
     effect(() => {
       if (this.annotation.status() !== 'ready' || this.started) return;
       this.started = true;
       const stage = this.stage();
-      void this.redaction.markArea(0, AUTHOR).then(() => stage.reveal(0, { rect: AUTHOR }));
+      void this.redaction.markArea(0, SUBTITLE).then(() => stage.reveal(0, { rect: SUBTITLE }));
       this.interaction.activateTool('redact');
     });
   }
@@ -87,7 +87,7 @@ export class RedactBar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

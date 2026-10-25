@@ -17,8 +17,8 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -84,7 +84,7 @@ export class DownloadBar {
   }
 
   protected async download() {
-    saveFile(await this.documents.download(undefined, { mode: this.mode() }), 'ebook.pdf');
+    saveFile(await this.documents.download(undefined, { mode: this.mode() }), 'welcome.pdf');
   }
 }
 
@@ -93,7 +93,7 @@ export class DownloadBar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, DownloadBar],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook, name: 'ebook.pdf' }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome, name: 'welcome.pdf' }] },
       withStage(),
       withRender(),
     ),

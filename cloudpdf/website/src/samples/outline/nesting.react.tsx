@@ -10,7 +10,7 @@ import './nesting.css';
 const engine = cloudEngine();
 const plugins = [outlinePlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const same = (left: OutlineItemRef | null, right: OutlineItemRef | null) =>
   left?.objectNumber === right?.objectNumber;
@@ -137,7 +137,7 @@ function OutlineEditor() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <OutlineEditor />
       </DocumentGate>

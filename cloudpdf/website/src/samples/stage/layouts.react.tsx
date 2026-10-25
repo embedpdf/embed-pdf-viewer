@@ -11,7 +11,7 @@ const engine = cloudEngine();
 // Facing pages from the start, like a book.
 const plugins = [stagePlugin({ spread: 'odd' }), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function LayoutControls() {
   const stage = useStage();
@@ -73,7 +73,7 @@ function LayoutControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <LayoutControls />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

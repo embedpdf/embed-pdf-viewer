@@ -14,7 +14,7 @@ const engine = cloudEngine();
 const en: Locale = {
   code: 'en',
   name: 'English',
-  translations: { app: { title: 'The ebook', switchTo: 'العربية' } },
+  translations: { app: { title: 'The guide', switchTo: 'العربية' } },
 };
 // Arabic reads right to left. The standard commands have no Arabic labels, so the app gives
 // them, under the same keys.
@@ -23,7 +23,7 @@ const ar: Locale = {
   name: 'العربية',
   direction: 'rtl',
   translations: {
-    app: { title: 'الكتاب الإلكتروني', switchTo: 'English' },
+    app: { title: 'الدليل', switchTo: 'English' },
     commands: {
       page: { previous: 'الصفحة السابقة', next: 'الصفحة التالية' },
       zoom: { in: 'تكبير', out: 'تصغير' },
@@ -38,7 +38,7 @@ const plugins = [
   i18nPlugin({ locale: 'ar', locales: [en, ar] }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);
@@ -80,7 +80,7 @@ function ViewerRoot() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">…</p>}>
         <ViewerRoot />
       </DocumentGate>

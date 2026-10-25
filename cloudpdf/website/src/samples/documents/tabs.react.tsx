@@ -15,7 +15,7 @@ import './tabs.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function Tabs() {
   const documents = useDocuments();
@@ -48,7 +48,7 @@ function Tabs() {
         type="button"
         className="button"
         aria-label="Open another copy"
-        onClick={() => documents.open(ebook, { name: `Copy ${open.length + 1}` })}
+        onClick={() => documents.open(welcome, { name: `Copy ${open.length + 1}` })}
       >
         +
       </button>
@@ -96,8 +96,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: ebook, name: 'Contract' },
-        { source: ebook, name: 'Report' },
+        { source: welcome, name: 'Contract' },
+        { source: welcome, name: 'Report' },
       ]}
     >
       <Tabs />

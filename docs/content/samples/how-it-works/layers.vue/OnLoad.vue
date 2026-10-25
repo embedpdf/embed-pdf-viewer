@@ -14,7 +14,7 @@ void search.search({ text: 'PDF' });
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, start: 10, count: 52 });
+    if (page) selection.select({ page, start: 28, count: 30 });
   },
   { immediate: true },
 );

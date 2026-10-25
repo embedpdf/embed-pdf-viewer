@@ -25,7 +25,7 @@ const plugins = [
   commandsPlugin({ commands: standardCommands }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // One row of the sheet: the key, and what it does. A command that can't run now is greyed out.
 function ShortcutRow({ id, shortcut }: { id: string; shortcut: string }) {
@@ -80,7 +80,7 @@ function ShortcutArea() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ShortcutArea />
       </DocumentGate>
