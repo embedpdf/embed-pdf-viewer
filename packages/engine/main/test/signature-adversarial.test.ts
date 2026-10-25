@@ -450,9 +450,10 @@ describe('analysis: legitimate changes must not fail closed', () => {
   // Commenting after an approval signature keeps it valid in Acrobat (corpus
   // v3/88). A tagged page changes the same objects: its structure tree points
   // at the page (/Pg) from every element, but none of it changes, and Acrobat
-  // compares revisions object by object (signature-compat/TAGGED-DOCUMENTS.md).
-  // Most PDFs are tagged (Chrome, Word); these read `indeterminate` while the
-  // resolver walked every path through the tree's loops.
+  // compares revisions object by object (see
+  // `fixtures/signature-compat/TAGGED-DOCUMENTS.md`). Most PDFs are tagged
+  // (Chrome, Word); these read `indeterminate` while the resolver walked every
+  // path through the tree's loops.
   test('a comment added to a tagged page after an approval signature is permitted', async () => {
     const signed = await sign(taggedDocument([30]));
     const analysis = await analyze(

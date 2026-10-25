@@ -78,6 +78,9 @@
     "@embedpdf/viewer-vue#test": {
       "dependsOn": ["^build", "build"]
     },
+    "@embedpdf/core-acrojs#test": {
+      "dependsOn": ["^build", "build"]
+    },
     "@embedpdf/engine#test": {
       "dependsOn": ["^build", "build"],
       "inputs": [
