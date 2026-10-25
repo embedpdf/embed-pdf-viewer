@@ -4,8 +4,9 @@
  * its write will be (the fonts plugin's `resolve`, with the box, so its own
  * font counts): when the edit starts, and again after a pause in typing once
  * the text has a character it wasn't resolved with. Any other box is drawn in
- * the fonts its names say. Without the fonts plugin there is nothing to say:
- * the callers draw in the system's look-alikes.
+ * the fonts its names say. Without the fonts plugin, a box is drawn in the
+ * standard font the engine falls back to for its font or face, in that
+ * font's built-in program (`@embedpdf/core-fonts`).
  */
 import {
   refOf,
@@ -16,11 +17,19 @@ import {
   type TextStyle,
 } from '@embedpdf/core-annotation';
 import {
+  STANDARD_FACES,
   faceForFontName,
   familyKey,
   type FontResolveRun,
+  type ResolvedFontRun,
   type RichTextBody,
 } from '@embedpdf/engine-core/runtime';
+import {
+  standardFontCss,
+  standardFontForFace,
+  standardFontOf,
+  standardFontOfProgramFamily,
+} from '@embedpdf/core-fonts';
 import { FontsToken, type FontCss, type FontsCapability } from '@embedpdf/plugin-fonts/contract';
 
 import type { AnnotationContext } from '../services/context';
@@ -46,10 +55,10 @@ const BODY = 'body';
 const codePointsOf = (text: string): number[] => Array.from(text, (char) => char.codePointAt(0)!);
 
 export interface TextFonts {
-  /** The CSS a box's body is drawn in; `null` without the fonts plugin. */
-  bodyCss(id: Id, style: TextStyle, body: TextFace): FontCss | null;
-  /** The CSS a face is drawn in inside a box (`null` id: no box yet); `null` without the fonts plugin. */
-  faceCss(id: Id | null, face: TextFace): FontCss | null;
+  /** The CSS a box's body is drawn in. */
+  bodyCss(id: Id, style: TextStyle, body: TextFace): FontCss;
+  /** The CSS a face is drawn in inside a box (`null` id: no box yet). */
+  faceCss(id: Id | null, face: TextFace): FontCss;
   /** The family a program's CSS family stands for, for text a browser drew itself. */
   familyOfCss(cssFamily: string): string | undefined;
   /** Changes whenever an answer above would: compare it to tell. */
@@ -65,14 +74,21 @@ export function createTextFonts(
 ): TextFonts {
   const fonts = (): FontsCapability | null => ctx.tryGet(FontsToken);
 
-  /** What the engine answered per box: the CSS of each face its text was resolved with. */
-  const answers = new Map<Id, ReadonlyMap<string, FontCss>>();
+  /**
+   * What the engine answered per box: the run each face its text was resolved with drew in, its
+   * CSS asked for on each read (it changes as the programs reach the browser).
+   */
+  const answers = new Map<Id, ReadonlyMap<string, ResolvedFontRun>>();
   /** The box being typed in, and the characters its last resolve asked about. */
   let asked: { readonly id: Id; readonly codePoints: Set<number> } | null = null;
   let resolving: AbortController | null = null;
   let cancelPause = () => {};
   let answered = 0;
-  let token: { list: unknown; answered: number } = { list: null, answered };
+  let token: { list: unknown; answered: number; epoch: number } = {
+    list: null,
+    answered,
+    epoch: 0,
+  };
 
   /** The body's face named by its font alone: then the box's font is the one drawn. */
   const bodyIsItsFont = (style: TextStyle, body: TextFace): boolean => {
@@ -126,10 +142,10 @@ export function createTextFonts(
         { signal: request.signal },
       );
       if (resolving !== request) return;
-      const byFace = new Map<string, FontCss>();
+      const byFace = new Map<string, ResolvedFontRun>();
       answer.runs.forEach((run, index) => {
         const face = faces[index]!;
-        if (!byFace.has(face)) byFace.set(face, api.getRunCss(run));
+        if (!byFace.has(face)) byFace.set(face, run);
       });
       // A run that names the body's own face is drawn as the body is.
       if (!byFace.has(faceKey(body))) byFace.set(faceKey(body), byFace.get(BODY)!);
@@ -155,21 +171,36 @@ export function createTextFonts(
   return {
     bodyCss: (id, style, body) => {
       const api = fonts();
-      if (!api) return null;
-      return (
-        answers.get(id)?.get(BODY) ??
-        (bodyIsItsFont(style, body) ? api.getFontCss(style.fontFamily) : api.getFaceCss(body))
-      );
+      const byFont = bodyIsItsFont(style, body);
+      if (!api) {
+        return standardFontCss(
+          byFont ? standardFontOf(style.fontFamily) : standardFontForFace(body),
+        );
+      }
+      const run = answers.get(id)?.get(BODY);
+      if (run) return api.getRunCss(run);
+      return byFont ? api.getFontCss(style.fontFamily) : api.getFaceCss(body);
     },
     faceCss: (id, face) => {
       const api = fonts();
-      if (!api) return null;
-      return (id !== null && answers.get(id)?.get(faceKey(face))) || api.getFaceCss(face);
+      if (!api) return standardFontCss(standardFontForFace(face));
+      const run = id !== null ? answers.get(id)?.get(faceKey(face)) : undefined;
+      return run ? api.getRunCss(run) : api.getFaceCss(face);
     },
-    familyOfCss: (cssFamily) => fonts()?.getFaceOfCssFamily(cssFamily)?.family,
+    familyOfCss: (cssFamily) => {
+      const face = fonts()?.getFaceOfCssFamily(cssFamily);
+      if (face) return face.family;
+      const standard = standardFontOfProgramFamily(cssFamily);
+      return standard && STANDARD_FACES[standard].family;
+    },
     version: () => {
-      const list = fonts()?.getFontList() ?? null;
-      if (token.list !== list || token.answered !== answered) token = { list, answered };
+      const api = fonts();
+      const list = api?.getFontList() ?? null;
+      // The epoch moves as programs reach the browser, and with them the CSS.
+      const epoch = api?.getPaintFontsEpoch() ?? 0;
+      if (token.list !== list || token.answered !== answered || token.epoch !== epoch) {
+        token = { list, answered, epoch };
+      }
       return token;
     },
     typed: (id) => {

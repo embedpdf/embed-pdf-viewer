@@ -5,10 +5,9 @@
  * widget's, one line's height and a comb's spacing. In points, in the
  * widget's upright frame.
  */
-import { standardFontStack, type MountableFontProgram } from '@embedpdf/core-fonts';
+import { standardFontOf, standardFontStack, type MountableFontProgram } from '@embedpdf/core-fonts';
 import type { FieldText, PaintFont, PaintFonts } from '@embedpdf/core-text';
 import {
-  isStandardFontName,
   type Coordinates,
   type FormFieldDTO,
   type PageCoordinates,
@@ -50,12 +49,11 @@ export interface TextEditorLayout {
 }
 
 /**
- * The CSS family list that draws text in `programs`, then the face's own
- * stack for before they load.
+ * The CSS family list that draws text in `programs`, then the look-alikes of
+ * the face's standard font (Helvetica's for any other) for before they load.
  */
 function familyList(fonts: PaintFonts, programs: readonly MountableFontProgram[]): string {
-  const { key } = fonts.face;
-  const stack = isStandardFontName(key) ? standardFontStack(key) : 'sans-serif';
+  const stack = standardFontStack(standardFontOf(fonts.face.key));
   return [...programs.map((program) => `"${program.family}"`), stack].join(', ');
 }
 

@@ -3,6 +3,7 @@
  * write will be when the edit starts, again after a pause once the text has a
  * character it wasn't resolved with, and drawn from the answer.
  */
+import { standardFontCss, standardFontProgram } from '@embedpdf/core-fonts';
 import type { FontCss, FontsCapability } from '@embedpdf/plugin-fonts/contract';
 import type { AnnotationRef, ResolvedFontRun } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
@@ -107,6 +108,7 @@ function fakeFonts() {
     getRunCss: vi.fn((run: ResolvedFontRun) => cssOf(run.program!)),
     getFaceOfCssFamily: (css: string) =>
       css === 'epdf-minion' ? { family: 'Minion', weight: 400, italic: false } : null,
+    getPaintFontsEpoch: () => 0,
     onFontListChanged: () => () => {},
   };
   return fonts as typeof fonts & FontsCapability;
@@ -185,20 +187,28 @@ describe('a text box being typed in', () => {
       '"epdf-face", sans-serif',
     );
     expect(harness.capability.getFamilyOfCss('epdf-minion')).toBe('Minion');
-    // A family mounted by key reads back as the key.
-    expect(harness.capability.getFamilyOfCss('epdf-brand-sans')).toBe('brand-sans');
+    // A family no font is reads back as it is.
+    expect(harness.capability.getFamilyOfCss('epdf-brand-sans')).toBe('epdf-brand-sans');
   });
 });
 
 describe('a text box without the fonts plugin', () => {
-  it("is drawn in the system's look-alikes, with no programs to mount", async () => {
+  it('is drawn in the standard font the engine falls back to, in its built-in program', async () => {
     const harness = annotationHarness();
     vi.useRealTimers();
-    await harness.load([{ ...freeText('hello'), fontFamily: 'helvetica' } as FileAnnotation]);
+    await harness.load([{ ...freeText('hello'), fontFamily: 'times-roman' } as FileAnnotation]);
     vi.useFakeTimers();
     harness.capability.text.begin(REF);
     const item = harness.capability.listTextItems(PAGE)[0]!;
-    expect(item.css.fontFamily).toBe('Helvetica, Arial, sans-serif');
-    expect(item.programs).toEqual([]);
+    expect(item.css.fontFamily).toBe(standardFontCss('times-roman').fontFamily);
+    expect(item.programs).toEqual([standardFontProgram('times-roman')]);
+    // A run's face, and a program's family read back as its face's.
+    const bold = { family: 'Times New Roman', weight: 700, italic: false };
+    expect(harness.capability.getCssFontFamily(bold, item.id)).toBe(
+      standardFontCss('times-bold').fontFamily,
+    );
+    expect(harness.capability.getFamilyOfCss(standardFontProgram('times-bold').family)).toBe(
+      'Times',
+    );
   });
 });

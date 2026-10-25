@@ -161,6 +161,8 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
   readonly strings: ConfigInput<'strings'> = input<ElementConfig['strings']>();
   readonly notAllowed: ConfigInput<'notAllowed'> = input<ElementConfig['notAllowed']>();
   readonly plugins: ConfigInput<'plugins'> = input<ElementConfig['plugins']>();
+  /** Your fonts, beyond the standard 14, registered on a local engine and offered for text. Read once. */
+  readonly fonts: ConfigInput<'fonts'> = input<ElementConfig['fonts']>();
 
   // ── what the viewer tells ──────────────────────────────────────────────────
 
@@ -212,6 +214,7 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
       strings: this.strings(),
       notAllowed: this.notAllowed(),
       plugins: this.plugins(),
+      fonts: this.fonts(),
     }),
   );
 

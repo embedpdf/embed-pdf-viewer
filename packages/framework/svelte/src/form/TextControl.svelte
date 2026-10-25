@@ -6,19 +6,20 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { FontsToken } from '@embedpdf/plugin-fonts';
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
   // The draft calls are the host lens's.
   import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
   import {
-    createFontMounts,
     createTextFieldEditor,
     cssText,
     rectInPixels,
     textFieldEditorStyleOf,
   } from '@embedpdf/web';
   import type { FormColors } from '@embedpdf/web';
+  import { useFontMounts } from '../runtime/font-mounts.svelte';
   import { usePage } from '../runtime/page';
-  import { useCapability } from '../runtime/readers.svelte';
+  import { useCapability, useOptionalSelector } from '../runtime/readers.svelte';
   import { useWidgetActivation } from './widget';
   import WidgetBox from './WidgetBox.svelte';
 
@@ -40,15 +41,13 @@
   // the edit ends.
   $effect(() => editor.setValue(item.value));
 
-  // The text being typed, where the engine will draw it, in its face.
-  const layout = $derived(
-    item.annotationRef ? form.getTextEditorLayout(item.annotationRef, editing.draft) : null,
-  );
-  const mounts = createFontMounts();
-  $effect(() => () => mounts.release());
-  $effect(() => {
-    if (layout) mounts.mount(layout.programs);
+  // The text being typed, where the engine will draw it, in its fonts: again once they're found.
+  const paintFonts = useOptionalSelector(FontsToken, (fonts) => fonts.getPaintFontsEpoch(), 0);
+  const layout = $derived.by(() => {
+    void paintFonts.current;
+    return item.annotationRef ? form.getTextEditorLayout(item.annotationRef, editing.draft) : null;
   });
+  useFontMounts(() => layout?.programs ?? []);
 
   const editorStyle = $derived(
     cssText(

@@ -3,6 +3,9 @@ import {
   fontProgramFamily,
   LAST_RESORT_HASH,
   lastResortFontProgram,
+  standardFontForFace,
+  standardFontOf,
+  standardFontOfProgramFamily,
   standardFontProgram,
   standardFontStack,
   type MountableFontProgram,
@@ -10,7 +13,6 @@ import {
 import {
   isStandardFontName,
   STANDARD_FACES,
-  STANDARD_FONTS,
   type Font,
   type FontList,
   type FontName,
@@ -25,7 +27,6 @@ import {
   fontForFace,
   fontNamed,
   foldFontList,
-  standardFontForFace,
   styleOfProgram,
 } from './model';
 import { createPaintFonts } from './paint';
@@ -34,14 +35,6 @@ import { createPaintFonts } from './paint';
 function programPrefixOf(cssFamily: string): string | undefined {
   const prefix = /^epdf-([0-9a-f]{16})$/.exec(cssFamily)?.[1];
   return prefix && !LAST_RESORT_HASH.startsWith(prefix) ? prefix : undefined;
-}
-
-let standardByHash: Map<string, StandardFont> | null = null;
-
-/** The standard font whose built-in program has this hash. */
-function standardFontOfHash(hash: string): StandardFont | undefined {
-  standardByHash ??= new Map(STANDARD_FONTS.map((font) => [standardFontProgram(font).hash, font]));
-  return standardByHash.get(hash);
 }
 
 /**
@@ -86,7 +79,7 @@ export function createFontsController(ctx: PluginContext<void>) {
     displayHash: string,
     style: { weight: number; italic: boolean },
   ): MountableFontProgram => {
-    const standard = standardFontOfHash(displayHash);
+    const standard = standardFontOfProgramFamily(fontProgramFamily(displayHash));
     if (standard) return standardFontProgram(standard);
     if (displayHash === LAST_RESORT_HASH) return lastResortFontProgram();
     let program = programs.get(displayHash);
@@ -145,8 +138,10 @@ export function createFontsController(ctx: PluginContext<void>) {
 
   /**
    * The CSS for text drawn by `primary`: then the fallbacks the host didn't
-   * refuse, then the last resort, then `tail`, the system's families for
-   * before they're mounted.
+   * refuse, then the last resort, then `tail`, the system's families. Until
+   * the host has every program (`ctx.measurer`; asking loads them), the list
+   * is `tail` alone: a program still loading would leave its text to the last
+   * resort, which draws every character as a box.
    */
   const cssOf = (
     primary: MountableFontProgram | null,
@@ -165,11 +160,17 @@ export function createFontsController(ctx: PluginContext<void>) {
       if (!refused(program)) add(program);
     }
     add(lastResortFontProgram());
+    // Each asked, so they all load at once.
+    const mounted = named
+      .map((program) => ctx.measurer?.ready(program) ?? true)
+      .every((ready) => ready);
     return {
-      fontFamily: cssFamilyList(
-        named.map((program) => program.family),
-        tail,
-      ),
+      fontFamily: mounted
+        ? cssFamilyList(
+            named.map((program) => program.family),
+            tail,
+          )
+        : tail,
       fontWeight: style.weight,
       fontStyle: style.italic ? 'italic' : 'normal',
       programs: named,
@@ -189,7 +190,8 @@ export function createFontsController(ctx: PluginContext<void>) {
 
   const paintFonts = createPaintFonts({
     measurer: ctx.measurer,
-    loadList: () => list.ensureLoaded(),
+    // After the asker's turn: a read (a render) that asks for fonts writes no state while it runs.
+    loadList: () => Promise.resolve().then(() => list.ensureLoaded()),
     resolve: (request) => ctx.doc.fonts.resolve(request),
     getProgram: programInfoOf,
     programOf: (hash, style) => programOf(hash, style ?? styleOfProgram(list.get(), hash)),
@@ -213,15 +215,20 @@ export function createFontsController(ctx: PluginContext<void>) {
   };
 
   /**
-   * The system's families for a font: a standard font's look-alikes; for a
-   * registered font, also the family an app mounts it under itself
-   * (`mountWebFont` in `@embedpdf/web`, named by its key).
+   * The system's families for a font, for before its programs are mounted:
+   * the look-alikes of the standard font the engine falls back to for it.
    */
-  const tailOf = (font: Font | undefined, standard: StandardFont | null): string => {
-    if (standard) return standardFontStack(standard);
-    if (font?.source === 'engine') return `"epdf-${font.name}", sans-serif`;
-    return 'sans-serif';
-  };
+  const tailOf = (font: Font | undefined, standard: StandardFont | null): string =>
+    standardFontStack(
+      standard ??
+        (font
+          ? standardFontForFace({
+              family: font.familyName,
+              weight: font.weight,
+              italic: font.italic,
+            })
+          : 'helvetica'),
+    );
 
   const standardCss = (font: StandardFont): FontCss =>
     cssOf(
@@ -269,9 +276,8 @@ export function createFontsController(ctx: PluginContext<void>) {
         if (isStandardFontName(font)) return standardCss(font);
         const current = list.get();
         const listed = current ? fontNamed(current, font) : undefined;
-        if (listed) return listedCss(listed);
-        // Not listed (yet): the family an app mounts a registered font under itself.
-        return cssOf(null, { weight: 400, italic: false }, [], `"epdf-${font}", sans-serif`);
+        // Not listed (yet): the standard font the engine falls back to.
+        return listed ? listedCss(listed) : standardCss(standardFontOf(font));
       }),
     getFaceCss: (face) =>
       cached(`face:${face.family}|${face.weight ?? 400}|${face.italic ?? false}`, () => {
@@ -297,12 +303,10 @@ export function createFontsController(ctx: PluginContext<void>) {
         },
       ),
     getFaceOfCssFamily: (cssFamily) => {
+      const standard = standardFontOfProgramFamily(cssFamily);
+      if (standard) return { ...STANDARD_FACES[standard] };
       const prefix = programPrefixOf(cssFamily);
       if (!prefix) return null;
-      const standard = [...STANDARD_FONTS].find((font) =>
-        standardFontProgram(font).hash.startsWith(prefix),
-      );
-      if (standard) return { ...STANDARD_FACES[standard] };
       const font = list
         .get()
         ?.fonts.find((candidate) =>

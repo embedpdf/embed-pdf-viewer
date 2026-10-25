@@ -67,9 +67,6 @@ describe('textFieldEditorStyleOf', () => {
       outline: '2px solid F',
       outlineOffset: '-2px',
       padding: '0 2px',
-      fontFamily: 'Helvetica, Arial, sans-serif',
-      fontWeight: 400,
-      fontStyle: 'normal',
       fontSize: '20px',
       textAlign: 'left',
       color: 'T',
@@ -169,15 +166,14 @@ describe('textFieldEditorStyleOf', () => {
 });
 
 describe('listBoxControlStyleOf', () => {
-  it('fills the box in the field’s look, with its own border', () => {
-    expect(listBoxControlStyleOf({ box, look, disabled: false }, frame, colors)).toEqual({
+  it('fills the box in the field’s look and the font the form plugin gives, with its own border', () => {
+    const font = { fontFamily: '"epdf-helvetica"', fontWeight: 400, fontStyle: 'normal' as const };
+    expect(listBoxControlStyleOf({ box, look, disabled: false }, frame, colors, font)).toEqual({
       ...FORM_CONTROL_FILL,
       padding: '0',
       borderRadius: '0',
       outline: 'none',
-      fontFamily: 'Helvetica, Arial, sans-serif',
-      fontWeight: 400,
-      fontStyle: 'normal',
+      ...font,
       fontSize: '20px',
       textAlign: 'left',
       color: 'T',

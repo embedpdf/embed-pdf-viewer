@@ -45,7 +45,7 @@ import { OUTLINE_PROPERTIES_DIALOG } from './config/outline';
 import { useLayoutEnv, useResolvedLayout } from './config-context';
 import { LayoutRoot } from './layout-root';
 import { EdgeBars, FloatingBars } from './places';
-import { AnnotationFontsProvider } from './ui/annotation-fonts';
+import { AppFonts } from './ui/app-fonts';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
 import { DropToOpen } from './ui/drop-to-open';
@@ -184,7 +184,9 @@ export function Shell({ components }: { components?: PlacedComponents }) {
   // with zero config, and sit outside the gate: they render before any
   // document. The root measures the viewer for the layout (layout-root.tsx).
   return (
-    <AnnotationFontsProvider>
+    <>
+      {/* the app's fonts, registered once on a local engine */}
+      <AppFonts />
       <LayoutRoot rootRef={root} className="bg-app text-fg flex h-full flex-col outline-none">
         {/* the viewer's own components in the page (<epdf-button>, <epdf-menu>), each drawn
           in its own shadow root */}
@@ -292,6 +294,6 @@ export function Shell({ components }: { components?: PlacedComponents }) {
         {/* The footer socket: below everything, empty until a child fills it. */}
         <slot name="footer" />
       </LayoutRoot>
-    </AnnotationFontsProvider>
+    </>
   );
 }

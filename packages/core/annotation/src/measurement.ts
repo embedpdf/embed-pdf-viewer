@@ -1,3 +1,4 @@
+import { standardPaintFont } from '@embedpdf/core-text';
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
 import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { endingNodes, endingPieces, endingPoints } from './endings';
@@ -586,6 +587,8 @@ export function measurementCaptionScene(
   style: Style,
 ): SceneNode[] {
   if (caption) {
+    // Laid out in Helvetica's widths: drawn in the engine's own Helvetica.
+    const helvetica = standardPaintFont('helvetica');
     const baseline = offsetPoint(caption.center, caption.normal, -CAPTION_SIZE * 0.33);
     const at = offsetPoint(baseline, caption.along, -caption.width / 2);
 
@@ -595,7 +598,8 @@ export function measurementCaptionScene(
         at,
         text: caption.text,
         fontSize: CAPTION_SIZE,
-        fontFamily: 'Helvetica, Arial, sans-serif',
+        fontFamily: helvetica.fontFamily,
+        program: helvetica.program,
         rotation: (Math.atan2(caption.along.y, caption.along.x) * 180) / Math.PI,
         paint: { fill: '#000000', opacity: style.opacity },
       },

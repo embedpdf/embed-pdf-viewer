@@ -101,7 +101,11 @@ export interface FontsCapability {
    * resort behind it.
    */
   getPaintFonts(font: FontName, text: string): PaintFonts | null;
-  /** Moves each time {@link getPaintFonts} may answer differently: ask again when it does. */
+  /**
+   * Moves each time {@link getPaintFonts} or a font's CSS ({@link getFontCss}, {@link getFaceCss},
+   * {@link getRunCss}) may answer differently: the list changed, or a program reached the browser.
+   * Ask again when it does.
+   */
   getPaintFontsEpoch(): number;
   /**
    * The face a CSS family this plugin names stands for (a program's family),

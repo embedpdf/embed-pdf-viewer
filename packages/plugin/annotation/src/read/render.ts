@@ -15,6 +15,7 @@ import {
   type AnnotationRef,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import {
   RenderToken as RenderHostToken,
   type AppearanceFamily,
@@ -57,9 +58,24 @@ export function createRenderReads(
       placing: AnnotationState['placing'];
       zoom: number | undefined;
       rotation: number | undefined;
+      fontsEpoch: number;
       v: RenderItem[];
     }
   >();
+  const fonts = () => ctx.tryGet(FontsToken);
+  /**
+   * A hovered redaction's label with the fonts its preview draws it in, as
+   * the engine picks them for the label's font; without the fonts plugin, or
+   * while it finds them, the label's standard font draws it.
+   */
+  const withLabelFonts = (item: RenderItem): RenderItem => {
+    if (!item.hovered || !item.label) return item;
+    const labelFonts = fonts()?.getPaintFonts(
+      item.text?.fontFamily ?? 'helvetica',
+      item.label.text,
+    );
+    return labelFonts ? { ...item, label: { ...item.label, fonts: labelFonts } } : item;
+  };
   const pageItemsOf = (page: PageRef, view?: ViewEnv): RenderItem[] => {
     const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
@@ -68,6 +84,7 @@ export function createRenderReads(
     const state = ctx.state.get();
     const ghostAt = state.ghostAt?.page.objectNumber === pageObjectNumber ? state.ghostAt : null;
     const placing = state.placing?.page.objectNumber === pageObjectNumber ? state.placing : null;
+    const fontsEpoch = fonts()?.getPaintFontsEpoch() ?? 0;
     const cached = itemsCache.get(pageObjectNumber);
     if (
       cached &&
@@ -75,13 +92,14 @@ export function createRenderReads(
       cached.ghostAt === ghostAt &&
       cached.placing === placing &&
       cached.zoom === view?.zoom &&
-      cached.rotation === view?.rotation
+      cached.rotation === view?.rotation &&
+      cached.fontsEpoch === fontsEpoch
     )
       return cached.v;
     // The tool's ghost and a sibling's placement paint on top, as the
     // annotations they will be (tools/ghost.ts).
     const items = [
-      ...corePageItems(model, page, view),
+      ...corePageItems(model, page, view).map(withLabelFonts),
       ...ghost.itemsOn(pageObjectNumber, model, view),
     ];
     itemsCache.set(pageObjectNumber, {
@@ -90,6 +108,7 @@ export function createRenderReads(
       placing,
       zoom: view?.zoom,
       rotation: view?.rotation,
+      fontsEpoch,
       v: items,
     });
     return items;

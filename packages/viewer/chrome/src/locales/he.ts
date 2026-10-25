@@ -438,6 +438,25 @@ export const he: Locale = {
       selected: 'נבחרו: {count}',
       toolDefaults: 'ברירות מחדל של {tool}',
       defaults: 'ברירות מחדל',
+      fontGroups: {
+        document: 'במסמך זה',
+        yours: 'הגופנים שלך',
+        server: 'גופני השרת',
+        standard: 'סטנדרטי',
+      },
+      fontStyles: {
+        bold: 'מודגש',
+        italic: 'נטוי',
+        boldItalic: 'מודגש נטוי',
+      },
+      fontRestrictions: {
+        notEmbedded: 'המסמך רק מציין את שמו',
+        subset: 'המסמך מכיל רק את התווים שבשימוש',
+        previewAndPrint: 'הרישיון שלו מתיר הצגה והדפסה בלבד',
+        unsupportedFormat: 'לא ניתן לכתוב טקסט חדש בסוג גופן זה',
+        noUnicodeMap: 'הוא לא מציין אילו תווים הוא מצייר',
+        other: 'לא ניתן לכתוב בו טקסט חדש',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

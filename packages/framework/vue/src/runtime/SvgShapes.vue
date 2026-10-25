@@ -5,17 +5,13 @@
   (Vue takes the namespace from it).
 -->
 <script setup lang="ts">
-import { onUnmounted, watchEffect } from 'vue';
-import { createFontMounts, type SvgShape } from '@embedpdf/web';
+import type { SvgShape } from '@embedpdf/web';
+import { useFontMounts } from './font-mounts';
 
 const props = defineProps<{ shapes: readonly SvgShape[] }>();
 
 // The faces of this level's text: a clipping `svg` mounts its own children's.
-const mounts = createFontMounts();
-onUnmounted(() => mounts.release());
-watchEffect(() =>
-  mounts.mount(props.shapes.flatMap((shape) => (shape.program ? [shape.program] : []))),
-);
+useFontMounts(() => props.shapes.flatMap((shape) => (shape.program ? [shape.program] : [])));
 </script>
 
 <template>

@@ -438,6 +438,25 @@ export const de: Locale = {
       selected: '{count} ausgewählt',
       toolDefaults: 'Standardwerte: {tool}',
       defaults: 'Standardwerte',
+      fontGroups: {
+        document: 'In diesem Dokument',
+        yours: 'Ihre Schriften',
+        server: 'Server-Schriften',
+        standard: 'Standard',
+      },
+      fontStyles: {
+        bold: 'Fett',
+        italic: 'Kursiv',
+        boldItalic: 'Fett Kursiv',
+      },
+      fontRestrictions: {
+        notEmbedded: 'Das Dokument nennt sie nur',
+        subset: 'Das Dokument enthält nur die verwendeten Zeichen',
+        previewAndPrint: 'Ihre Lizenz erlaubt nur Anzeigen und Drucken',
+        unsupportedFormat: 'In diesem Schrifttyp kann kein neuer Text geschrieben werden',
+        noUnicodeMap: 'Sie gibt nicht an, welche Zeichen sie darstellt',
+        other: 'Darin kann kein neuer Text geschrieben werden',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

@@ -17,7 +17,10 @@ import {
   LAST_RESORT_METRICS,
   lastResortFontBytes,
   standardFontCss,
+  standardFontForFace,
   standardFontMetrics,
+  standardFontOf,
+  standardFontOfProgramFamily,
   standardFontProgram,
 } from '../src';
 
@@ -154,6 +157,22 @@ describe('the standard faces', () => {
       `"epdf-${standardFontProgram('times-bold-italic').hash.slice(0, 16)}", "Times New Roman", Times, serif`,
     );
     expect([css.fontWeight, css.fontStyle]).toEqual([700, 'italic']);
+    expect(css.programs).toEqual([standardFontProgram('times-bold-italic')]);
+  });
+
+  it('draw any font without its program in the standard font the engine falls back to', () => {
+    expect(standardFontOf('courier-bold')).toBe('courier-bold');
+    expect(standardFontOf('Roboto-Regular')).toBe('helvetica');
+    expect(standardFontForFace({ family: 'Arial', weight: 700 })).toBe('helvetica-bold');
+    expect(standardFontForFace({ family: 'Times New Roman', italic: true })).toBe('times-italic');
+    expect(standardFontForFace({ family: 'Nowhere Sans' })).toBe('helvetica');
+  });
+
+  it('read a standard program back from its CSS family', () => {
+    for (const font of STANDARD_FONTS) {
+      expect(standardFontOfProgramFamily(standardFontProgram(font).family)).toBe(font);
+    }
+    expect(standardFontOfProgramFamily('Helvetica')).toBeUndefined();
   });
 });
 

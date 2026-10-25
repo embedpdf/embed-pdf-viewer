@@ -1,14 +1,16 @@
 <!--
-  A list: a visible native `<select>` in the field's own look, the settings where it has none.
-  It draws its own border, so the box gets no edge.
+  A list: a visible native `<select>` in the field's own look, the settings where it has none,
+  in the widget's font as the engine picks it. It draws its own border, so the box gets no edge.
 -->
 <script lang="ts">
+  import { FontsToken } from '@embedpdf/plugin-fonts';
   import type { FormWidgetItem } from '@embedpdf/plugin-form';
   import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
   import { cssText, listBoxControlStyleOf, rectInPixels } from '@embedpdf/web';
   import type { FormColors } from '@embedpdf/web';
+  import { useFontMounts } from '../runtime/font-mounts.svelte';
   import { usePage } from '../runtime/page';
-  import { useCapability } from '../runtime/readers.svelte';
+  import { useCapability, useOptionalSelector } from '../runtime/readers.svelte';
   import FormFocusRing from './FormFocusRing.svelte';
   import NativeListBox from './NativeListBox.svelte';
   import { useWidgetActivation } from './widget';
@@ -24,8 +26,16 @@
   const activate = useWidgetActivation(() => item.annotationRef);
   let focused = $state(false);
 
+  // The rows in the widget's font: again once the document's fonts are read or reach the browser.
+  const fontsEpoch = useOptionalSelector(FontsToken, (fonts) => fonts.getPaintFontsEpoch(), 0);
+  const font = $derived.by(() => {
+    void fontsEpoch.current;
+    return item.annotationRef ? form.getWidgetFontCss(item.annotationRef) : null;
+  });
+  useFontMounts(() => font?.programs ?? []);
+
   const listStyle = $derived(
-    cssText(listBoxControlStyleOf(item, rectInPixels(item.box, page.transform), colors)),
+    cssText(listBoxControlStyleOf(item, rectInPixels(item.box, page.transform), colors, font)),
   );
 
   async function select(values: string[]) {

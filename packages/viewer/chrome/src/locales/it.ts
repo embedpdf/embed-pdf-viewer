@@ -437,6 +437,25 @@ export const it: Locale = {
       selected: 'Selezionate: {count}',
       toolDefaults: 'Valori predefiniti: {tool}',
       defaults: 'Valori predefiniti',
+      fontGroups: {
+        document: 'In questo documento',
+        yours: 'I tuoi font',
+        server: 'Font del server',
+        standard: 'Standard',
+      },
+      fontStyles: {
+        bold: 'Grassetto',
+        italic: 'Corsivo',
+        boldItalic: 'Grassetto corsivo',
+      },
+      fontRestrictions: {
+        notEmbedded: 'Il documento lo nomina soltanto',
+        subset: 'Il documento contiene solo i caratteri che usa',
+        previewAndPrint: 'La sua licenza consente solo visualizzazione e stampa',
+        unsupportedFormat: 'Non è possibile scrivere nuovo testo in questo tipo di font',
+        noUnicodeMap: 'Non indica quali caratteri disegna',
+        other: 'Non è possibile scrivervi nuovo testo',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

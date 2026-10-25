@@ -12,11 +12,11 @@ import {
   fontProgramFamily,
   lastResortFontProgram,
   standardFontCss,
+  standardFontOf,
   standardFontProgram,
   type MountableFontProgram,
 } from '@embedpdf/core-fonts';
 import {
-  isStandardFontName,
   type CodePointRange,
   type FontProgramInfo,
   type StandardFont,
@@ -43,9 +43,12 @@ const standardFonts = new Map<StandardFont, PaintFont>();
 export function standardPaintFont(font: StandardFont): PaintFont {
   const known = standardFonts.get(font);
   if (known) return known;
+  const { fontFamily, fontWeight, fontStyle } = standardFontCss(font);
   const paintFont: PaintFont = {
     ...standardTextFont(font),
-    ...standardFontCss(font),
+    fontFamily,
+    fontWeight,
+    fontStyle,
     program: standardFontProgram(font),
   };
   standardFonts.set(font, paintFont);
@@ -138,6 +141,9 @@ export function lastResortPaintFont(): PaintFont {
  * (Helvetica for any other), no fallbacks, and the last resort.
  */
 export function defaultPaintFonts(fontFamily: string | null | undefined): PaintFonts {
-  const face = isStandardFontName(fontFamily ?? '') ? (fontFamily as StandardFont) : 'helvetica';
-  return { face: standardPaintFont(face), fallbacks: [], lastResort: lastResortPaintFont() };
+  return {
+    face: standardPaintFont(standardFontOf(fontFamily ?? 'helvetica')),
+    fallbacks: [],
+    lastResort: lastResortPaintFont(),
+  };
 }

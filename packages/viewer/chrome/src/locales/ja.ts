@@ -437,6 +437,25 @@ export const ja: Locale = {
       selected: '{count} 件を選択中',
       toolDefaults: '{tool}のデフォルト',
       defaults: 'デフォルト',
+      fontGroups: {
+        document: 'このドキュメント内',
+        yours: 'あなたのフォント',
+        server: 'サーバーのフォント',
+        standard: '標準',
+      },
+      fontStyles: {
+        bold: '太字',
+        italic: '斜体',
+        boldItalic: '太字斜体',
+      },
+      fontRestrictions: {
+        notEmbedded: 'ドキュメントは名前のみを参照しています',
+        subset: 'ドキュメントには使用されている文字のみが含まれています',
+        previewAndPrint: 'ライセンスで許可されているのは表示と印刷のみです',
+        unsupportedFormat: 'この種類のフォントでは新しいテキストを書けません',
+        noUnicodeMap: '描画する文字が示されていません',
+        other: '新しいテキストを書けません',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

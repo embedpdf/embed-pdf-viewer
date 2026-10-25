@@ -7,6 +7,7 @@
 import { createKernel, type DocumentHandle, type HostTextMeasurer } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine, localEngine } from '@embedpdf/engine';
+import { standardFontCss } from '@embedpdf/core-fonts';
 import { CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
 import type { AnnotationRef, Engine, PageRef } from '@embedpdf/engine-core/runtime';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
@@ -216,6 +217,35 @@ describe('a filled widget looks', () => {
       await filled;
     } finally {
       await kernel.destroy();
+    }
+  });
+
+  it('a widget’s font, for a control the painter doesn’t draw: the fonts plugin’s, else its standard font’s', async () => {
+    const real = createLocalEngine({ runtime: { prefer: 'wasm' } });
+    const bytes = await bytesOf(real);
+    for (const withFonts of [false, true]) {
+      const kernel = createKernel({
+        engine: real,
+        plugins: [interactionPlugin(), ...(withFonts ? [fontsPlugin()] : []), formPlugin()],
+      });
+      try {
+        await kernel.documents.open({ kind: 'bytes', id: `font-${withFonts}`, bytes });
+        const form = kernel.capability(FormToken);
+        await form.refresh();
+        const widget = form.get({ kind: 'fqn', name: 'greeting' })!.widgets[0]!;
+        const ref: AnnotationRef = {
+          kind: 'objectNumber',
+          page: widget.page!,
+          objectNumber: widget.objectNumber,
+        };
+        expect(form.getWidgetFontCss(ref)).toBe(
+          withFonts
+            ? kernel.capability(FontsToken).getFontCss('helvetica')
+            : standardFontCss('helvetica'),
+        );
+      } finally {
+        await kernel.destroy();
+      }
     }
   });
 });

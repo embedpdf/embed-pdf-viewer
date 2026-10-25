@@ -25,5 +25,5 @@ The adapter is set up and used the Angular way.
   ready document as context, and templates for a document waiting for its password and one that
   failed to open.
 - New: `<epdf-scrollbar>`, `<epdf-anchored>`, the render layer's sharp tiles when zoomed in,
-  `epdfTheme()`, `saveFile()` and `mountWebFont()`.
+  `epdfTheme()` and `saveFile()`.
 - Setup mistakes are numbered errors with the fix and a link: `EPDF-101` to `EPDF-105`.

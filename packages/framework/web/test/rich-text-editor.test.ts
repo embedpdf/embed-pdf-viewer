@@ -256,9 +256,9 @@ describe('styleDeltaOf', () => {
     expect(styleDeltaOf({ ...emptyStyle(), fontFamily: '"My Font", serif' }, 1)).toEqual({
       family: 'My Font',
     });
-    // A registered font's mounted family reads back as its key.
+    // Without a host to read it back, a family reads back as it is.
     expect(styleDeltaOf({ ...emptyStyle(), fontFamily: '"epdf-brand-sans"' }, 1)).toEqual({
-      family: 'brand-sans',
+      family: 'epdf-brand-sans',
     });
   });
 });

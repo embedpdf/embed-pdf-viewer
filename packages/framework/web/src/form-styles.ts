@@ -6,10 +6,10 @@
  * as CSS text with `cssText`. Each is a type alias, so it fits Vue's
  * `CSSProperties` (see the note in `form-field`). The field's own look inside them comes from
  * `form-field` ({@link textFieldStyleOf}, {@link listBoxStyleOf}); its colors
- * from the form settings ({@link formColorsOf}).
+ * from the form settings ({@link formColorsOf}); its font from the form plugin.
  */
 import { listBoxStyleOf, scaleOf, textFieldFontPxOf, textFieldStyleOf } from './form-field';
-import type { FieldLook, FormColors, ListBoxStyle, TextFieldStyle } from './form-field';
+import type { CssFont, FieldLook, FormColors, ListBoxStyle, TextFieldStyle } from './form-field';
 import { legibleScaleOf, legibleShrinkOf } from './legible-text';
 import type { PixelRect } from './page-pixels';
 
@@ -213,13 +213,14 @@ export function listBoxControlStyleOf(
   field: Parameters<typeof listBoxStyleOf>[0] & { disabled: boolean },
   frame: PixelRect,
   colors: FormColors,
+  font: CssFont | null = null,
 ): ListBoxControlStyle {
   return {
     ...FORM_CONTROL_FILL,
     padding: '0',
     borderRadius: '0',
     outline: 'none',
-    ...listBoxStyleOf(field, frame, colors),
+    ...listBoxStyleOf(field, frame, colors, font),
     cursor: field.disabled ? 'default' : 'pointer',
     ...(field.disabled ? { pointerEvents: 'none' as const } : {}),
   };

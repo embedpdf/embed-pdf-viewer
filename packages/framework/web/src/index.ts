@@ -133,15 +133,10 @@ export type {
   RichTextEditorScript,
   RichTextEditorStyle,
 } from './rich-text-editor';
-export {
-  createFontMounts,
-  mountFontProgram,
-  mountWebFont,
-  type MountableFontProgram,
-} from './web-font';
+export { createFontMounts, mountFontProgram, type MountableFontProgram } from './web-font';
 export { pictureOrPainting, type LookState, type PictureOrPainting } from './picture-or-painting';
 export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
-export type { LineModel, WebFontMetrics } from './web-font-metrics';
+export type { FamilyOfCss, LineModel, WebFontMetrics } from './web-font-metrics';
 export { EPDF_VARIABLES, epdfThemeVariables, mixAccent, paint, paintDefault } from './theme';
 export type {
   EpdfCssOnlyVariable,
@@ -255,7 +250,6 @@ export {
   bindWidgetEvents,
   createOptimisticSelection,
   createTextFieldEditor,
-  cssFontOf,
   formColorsOf,
   listBoxStyleOf,
   pressToggle,

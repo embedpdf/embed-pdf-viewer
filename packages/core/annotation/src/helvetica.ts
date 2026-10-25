@@ -1,7 +1,7 @@
 /**
- * Helvetica as the engine sets it. A label or caption that names no other
- * font is drawn in Helvetica, so measuring with these numbers lays text out
- * where the engine will, independent of the fonts a browser has.
+ * Helvetica as the engine sets it. A measurement's caption is drawn in
+ * Helvetica, so measuring with these numbers lays it out where the engine
+ * will, independent of the fonts a browser has.
  */
 
 // Standard Helvetica advances in 1/1000 em, ASCII 32–126.
@@ -22,12 +22,6 @@ const EXTRA_ADVANCES: Record<string, number> = {
   '−': 584,
   ' ': 278,
 };
-
-/** From a line's top to its baseline, in em. */
-export const HELVETICA_ASCENT = 0.962;
-
-/** From one line's top to the next, in em. */
-export const HELVETICA_LINE_HEIGHT = 1.169;
 
 /**
  * How far `text` advances, in em. A character without a width here counts as

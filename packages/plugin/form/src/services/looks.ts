@@ -21,13 +21,15 @@ import {
   type ShownValue,
   type TextEditorLayout,
 } from '@embedpdf/core-form';
+import { standardFontCss, standardFontOf } from '@embedpdf/core-fonts';
 import {
   isStandardFontName,
   type AnnotationRef,
+  type FontName,
   type FormFieldDTO,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
-import type { FontsCapability, PaintFonts } from '@embedpdf/plugin-fonts/contract';
+import type { FontCss, FontsCapability, PaintFonts } from '@embedpdf/plugin-fonts/contract';
 
 import {
   fieldForWidget,
@@ -177,17 +179,31 @@ export function createWidgetLooks({
   );
 
   /**
+   * How a browser draws text in a widget's font: the fonts plugin's CSS for
+   * it (the first widget in a font that isn't standard reads the document's
+   * fonts); without the plugin, the standard font the engine falls back to.
+   */
+  const fontCssOf = (font: FontName): FontCss => {
+    const api = fonts();
+    if (!api) return standardFontCss(standardFontOf(font));
+    // After the asker's turn: a read (a render) that asks writes no state while it runs.
+    if (!isStandardFontName(font) && api.getStatus() === 'idle') {
+      Promise.resolve()
+        .then(() => api.ensureLoaded())
+        .catch(() => {});
+    }
+    return api.getFontCss(font);
+  };
+
+  /**
    * Until the fonts plugin has found a field's fonts, the layout in its own
    * font, when it isn't a standard one: its program, the fallbacks and the
-   * last resort, as the fonts plugin draws it. The first field that asks
-   * reads the document's fonts. The layout's numbers stay the standard
-   * face's until then.
+   * last resort, as the fonts plugin draws it. The layout's numbers stay the
+   * standard face's until then.
    */
   const inItsFont = (layout: TextEditorLayout, font: string | null): TextEditorLayout => {
-    const api = fonts();
-    if (!api || !font || isStandardFontName(font)) return layout;
-    if (api.getStatus() === 'idle') api.ensureLoaded().catch(() => {});
-    const css = api.getFontCss(font);
+    if (!fonts() || !font || isStandardFontName(font)) return layout;
+    const css = fontCssOf(font);
     return {
       ...layout,
       programs: css.programs,
@@ -222,6 +238,10 @@ export function createWidgetLooks({
       const painted = paintFontsOf(row, widgetText(row, field, { text }));
       const layout = textEditorLayout(row, field, text, painted ?? undefined);
       return layout && (painted ? layout : inItsFont(layout, row.fontFamily ?? null));
+    },
+    getWidgetFontCss: (ref: AnnotationRef): FontCss | null => {
+      const row = widgetRowOf(fields.view(), numberOf(ref));
+      return row ? fontCssOf(row.fontFamily ?? 'helvetica') : null;
     },
   };
 }

@@ -372,7 +372,10 @@ export interface FormWidgetLook {
   readonly background: string | null;
   /** The text color (`/DA`), or `null` when the field names none. */
   readonly color: string | null;
-  /** One of the 14 standard PDF fonts, such as `'helvetica'`, or `null` when the field names none. */
+  /**
+   * The font the field names (a standard font such as `'helvetica'`, or another the document or
+   * the engine has), or `null` when it names none. How a browser draws it: `getWidgetFontCss`.
+   */
   readonly fontFamily: string | null;
   /** The font size in points; `0` or `null` sizes the text to the box. */
   readonly fontSize: number | null;

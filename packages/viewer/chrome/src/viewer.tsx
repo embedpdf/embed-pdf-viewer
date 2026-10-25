@@ -92,6 +92,7 @@ import { isMacPlatform } from '@embedpdf/web';
 import { ThemeProvider, themeConfigOf, type ThemeConfig, type ThemePreference } from './ui/theme';
 import { Shell } from './Shell';
 import type { PlacedComponents } from './ui/placed-components';
+import { stampFontsOf } from './ui/signature-fonts';
 import { SlottedEdgesProvider, createSlottedEdges } from './ui/slotted-edges';
 
 /**
@@ -155,6 +156,14 @@ export interface ViewerCustomization {
    * which marks people keep and their fonts. Read once.
    */
   plugins?: ViewerPluginsConfig;
+  /**
+   * Your fonts, beyond the standard 14: each read once (from `url`, or its `data`) and
+   * registered on a local engine under its key, the name a `fontFamily` takes. The style panel
+   * offers them for text boxes, form fields and redaction labels, and the browser draws them as
+   * the engine writes them. A cloud engine's fonts are its server's: there they're ignored, with
+   * a warning. Read once.
+   */
+  fonts?: readonly ViewerFont[];
   /** Light/dark preference (string shorthand), or the full theme config: the
    *  accent and the other tokens. Tokens are applied by the delivery (the
    *  custom element adopts them into its shadow root); direct
@@ -195,12 +204,6 @@ export interface FullViewerProps extends ViewerCustomization {
    * viewer draws — a delivery concern: the custom element passes the ones inside it.
    */
   components?: PlacedComponents;
-  /**
-   * Fonts beyond the standard 14 for the engine (a delivery's `engine.fonts`): each is read
-   * once, registered on a local engine and mounted for the live text editor, and the style
-   * panel offers it. A cloud engine's fonts are its server's, so none are offered there.
-   */
-  fonts?: readonly ViewerFont[];
 }
 
 /**
@@ -498,7 +501,9 @@ export function FullViewer({
     // stamps sidebar is the picker; placement rides annotation's armed stamp.
     // Libraries open on a local engine: the viewer's own unless the host
     // names one (`assetEngine`; a cloud viewer has to).
-    stampPlugin(settings.stamp),
+    // A typed signature's fonts go with the stamp plugin, which registers each on the engine
+    // marks are written on.
+    stampPlugin({ fonts: stampFontsOf(resolved.signature.fonts), ...settings.stamp }),
     // The action engine: /A and /AA trees dispatch through one policy-gated
     // executor spine, and the JavaScript switch lives here (the per-document
     // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,

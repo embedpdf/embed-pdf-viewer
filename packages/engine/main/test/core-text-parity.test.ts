@@ -19,6 +19,11 @@
  * The painter (`@embedpdf/core-form`) draws those runs: text fields, combo
  * boxes, list box rows and push button captions in mixed scripts, through
  * `widgetDrawing` with the same fonts, against what the engine writes.
+ *
+ * A redaction mark's label is laid out as a field's text too
+ * (`redactLabelText` in `@embedpdf/core-annotation`): set and fitted sizes,
+ * each alignment, wrapping, repeats, mixed scripts and another standard
+ * font, against the overlay the engine writes for the mark.
  */
 import {
   BARE_PAGE_FIXTURE_PDF,
@@ -49,6 +54,7 @@ import {
   type TextFonts,
 } from '../../../core/text/src';
 import { widgetDrawing, type DrawOp } from '../../../core/form/src';
+import { redactLabelText } from '../../../core/annotation/src/scene';
 import { localEngine } from '../src/index';
 
 const POSITION = 0.1;
@@ -473,6 +479,158 @@ describe('the painter draws mixed-script widget text as the engine writes it', (
           `${run.text}: baseline`,
         ).toBeLessThanOrEqual(POSITION);
       });
+    },
+  );
+});
+
+interface LabelCase {
+  name: string;
+  face: StandardFont;
+  size: { width: number; height: number };
+  text: string;
+  repeat: boolean;
+  fontSize: number;
+  textAlign: 'left' | 'center' | 'right';
+}
+
+const LABEL_CASES: LabelCase[] = [
+  ...(['left', 'center', 'right'] as const).map(
+    (textAlign): LabelCase => ({
+      name: `set size, ${textAlign}`,
+      face: 'helvetica',
+      size: { width: 200, height: 40 },
+      text: 'Hello שלום 123',
+      repeat: false,
+      fontSize: 12,
+      textAlign,
+    }),
+  ),
+  {
+    name: 'fitted',
+    face: 'helvetica',
+    size: { width: 260, height: 90 },
+    text: 'Classified',
+    repeat: false,
+    fontSize: 0,
+    textAlign: 'left',
+  },
+  {
+    name: 'wrapped',
+    face: 'helvetica',
+    size: { width: 70, height: 80 },
+    text: 'one two three مرحبا بالعالم',
+    repeat: false,
+    fontSize: 10,
+    textAlign: 'left',
+  },
+  {
+    name: 'repeated, fitted',
+    face: 'helvetica',
+    size: { width: 180, height: 120 },
+    text: 'Classified',
+    repeat: true,
+    fontSize: 0,
+    textAlign: 'center',
+  },
+  {
+    name: 'repeated, mixed scripts',
+    face: 'helvetica',
+    size: { width: 150, height: 60 },
+    text: 'סוד A中',
+    repeat: true,
+    fontSize: 9,
+    textAlign: 'right',
+  },
+  {
+    name: 'Times',
+    face: 'times-roman',
+    size: { width: 200, height: 40 },
+    text: 'Times שלום',
+    repeat: false,
+    fontSize: 14,
+    textAlign: 'left',
+  },
+];
+
+/** The twin's label runs, merged as the reader merges. */
+function laidLabel(labelCase: LabelCase, fonts: PaintFonts): Placed[] {
+  const laid = redactLabelText(
+    labelCase.size,
+    { text: labelCase.text, repeat: labelCase.repeat },
+    {
+      fontFamily: labelCase.face,
+      fontSize: labelCase.fontSize,
+      fontColor: '#ffffff',
+      textAlign: labelCase.textAlign,
+    },
+    fonts,
+  )!;
+  const placed: (Placed & { rtl: boolean })[] = [];
+  for (const line of laid.lines) {
+    for (const run of line.runs) {
+      const font = names.get(run.font.key) ?? run.font.key;
+      const last = placed[placed.length - 1];
+      if (
+        last &&
+        !last.rtl &&
+        !run.rtl &&
+        last.font === font &&
+        Math.abs(last.baseline - line.baseline) < 0.001
+      ) {
+        last.text += run.text;
+        continue;
+      }
+      placed.push({ font, text: run.text, x: run.x, baseline: line.baseline, rtl: run.rtl });
+    }
+  }
+  return placed.map(({ rtl: _rtl, ...rest }) => rest);
+}
+
+describe('core-annotation lays a redaction label out as the engine writes it', () => {
+  test.each(LABEL_CASES.map((labelCase) => [labelCase.name, labelCase] as const))(
+    '%s',
+    async (_name, labelCase) => {
+      const own = await engine.open({
+        kind: 'bytes',
+        id: `label-parity-${(fieldNumber += 1)}`,
+        bytes: BARE_PAGE_FIXTURE_PDF.slice(),
+      });
+      try {
+        const ownPage = (await own.pages.list()).pages[0]!.ref;
+        await own.page(ownPage).annotations.create({
+          subtype: 'redact',
+          rect: { x: 10, y: 10, ...labelCase.size },
+          interiorColor: '#000000',
+          overlayText: labelCase.text,
+          repeat: labelCase.repeat,
+          fontFamily: labelCase.face,
+          fontSize: labelCase.fontSize,
+          textAlign: labelCase.textAlign,
+        });
+        const drawn = await drawnTextOf(await own.download({ mode: 'rewrite' }));
+        expect(drawn).toHaveLength(1);
+        const { box, runs } = drawn[0]!;
+        const written = runs.map((run) => ({
+          font: run.font,
+          text: run.text,
+          x: run.x - box.left,
+          baseline: run.baseline - box.bottom,
+        }));
+        const painted = laidLabel(labelCase, await widgetFontsOf(labelCase.face));
+        expect(painted.map(({ font, text }) => [font, text])).toEqual(
+          written.map(({ font, text }) => [font, text]),
+        );
+        painted.forEach((run, index) => {
+          const expected = written[index]!;
+          expect(Math.abs(run.x - expected.x), `${run.text}: x`).toBeLessThanOrEqual(POSITION);
+          expect(
+            Math.abs(run.baseline - expected.baseline),
+            `${run.text}: baseline`,
+          ).toBeLessThanOrEqual(POSITION);
+        });
+      } finally {
+        await own.close();
+      }
     },
   );
 });

@@ -437,6 +437,25 @@ export const es: Locale = {
       selected: 'Seleccionadas: {count}',
       toolDefaults: 'Valores predeterminados: {tool}',
       defaults: 'Valores predeterminados',
+      fontGroups: {
+        document: 'En este documento',
+        yours: 'Sus fuentes',
+        server: 'Fuentes del servidor',
+        standard: 'Estándar',
+      },
+      fontStyles: {
+        bold: 'Negrita',
+        italic: 'Cursiva',
+        boldItalic: 'Negrita cursiva',
+      },
+      fontRestrictions: {
+        notEmbedded: 'El documento solo la nombra',
+        subset: 'El documento solo contiene los caracteres que usa',
+        previewAndPrint: 'Su licencia solo permite ver e imprimir',
+        unsupportedFormat: 'No se puede escribir texto nuevo en este tipo de fuente',
+        noUnicodeMap: 'No indica qué caracteres dibuja',
+        other: 'No se puede escribir texto nuevo en ella',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

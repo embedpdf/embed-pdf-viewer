@@ -141,6 +141,11 @@
       "svelte": "./src/form.ts",
       "default": "./src/form.ts"
     },
+    "./fonts": {
+      "types": "./src/fonts.ts",
+      "svelte": "./src/fonts.ts",
+      "default": "./src/fonts.ts"
+    },
     "./signature": {
       "types": "./src/signature.ts",
       "svelte": "./src/signature.ts",
@@ -276,6 +281,11 @@
         "svelte": "./dist/form.js",
         "default": "./dist/form.js"
       },
+      "./fonts": {
+        "types": "./dist/fonts.d.ts",
+        "svelte": "./dist/fonts.js",
+        "default": "./dist/fonts.js"
+      },
       "./signature": {
         "types": "./dist/signature.d.ts",
         "svelte": "./dist/signature.js",
@@ -296,6 +306,7 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",

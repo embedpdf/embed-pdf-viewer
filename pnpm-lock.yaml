@@ -1003,6 +1003,9 @@ importers:
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../geometry
+      '@embedpdf/core-text':
+        specifier: workspace:*
+        version: link:../text
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
@@ -1415,6 +1418,9 @@ importers:
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -1675,6 +1681,9 @@ importers:
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -1799,6 +1808,9 @@ importers:
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
+      '@embedpdf/plugin-fonts':
+        specifier: workspace:*
+        version: link:../../plugin/fonts
       '@embedpdf/plugin-form':
         specifier: workspace:*
         version: link:../../plugin/form
@@ -1942,6 +1954,9 @@ importers:
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../../core/geometry
@@ -2047,6 +2062,9 @@ importers:
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-form':
         specifier: workspace:*
         version: link:../../core/form
@@ -2597,6 +2615,9 @@ importers:
 
   packages/viewer/chrome:
     dependencies:
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui
@@ -2643,6 +2664,9 @@ importers:
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
+      '@embedpdf/core-fonts':
+        specifier: workspace:*
+        version: link:../../core/fonts
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui

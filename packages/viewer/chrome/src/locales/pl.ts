@@ -437,6 +437,25 @@ export const pl: Locale = {
       selected: 'Zaznaczone: {count}',
       toolDefaults: 'Ustawienia domyślne: {tool}',
       defaults: 'Ustawienia domyślne',
+      fontGroups: {
+        document: 'W tym dokumencie',
+        yours: 'Twoje czcionki',
+        server: 'Czcionki serwera',
+        standard: 'Standardowe',
+      },
+      fontStyles: {
+        bold: 'Pogrubiona',
+        italic: 'Kursywa',
+        boldItalic: 'Pogrubiona kursywa',
+      },
+      fontRestrictions: {
+        notEmbedded: 'Dokument tylko ją wymienia',
+        subset: 'Dokument zawiera tylko używane znaki',
+        previewAndPrint: 'Jej licencja pozwala tylko na wyświetlanie i drukowanie',
+        unsupportedFormat: 'W tym rodzaju czcionki nie można pisać nowego tekstu',
+        noUnicodeMap: 'Nie określa, jakie znaki rysuje',
+        other: 'Nie można nią pisać nowego tekstu',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

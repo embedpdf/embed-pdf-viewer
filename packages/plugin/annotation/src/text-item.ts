@@ -3,10 +3,10 @@
  * joined with the DTO-derived font + CSS into render-ready {@link TextItem}s. This
  * is the text analogue of the core's `scene()` "paint" for shapes, shared across
  * every web framework. The fonts are the text fonts' (the programs the engine
- * draws with), else the core's `cssFontFamilyForFont` look-alikes.
+ * draws with), else the standard font the engine falls back to.
  */
+import { standardFontCss, standardFontOf } from '@embedpdf/core-fonts';
 import {
-  cssFontFamilyForFont,
   type FontLookup,
   initialTextStyle,
   type Model,
@@ -24,8 +24,6 @@ import { stripBodyDefaults } from './rich-text';
 import { styleOf, textOf } from '@embedpdf/core-annotation';
 
 type Programs = TextItem['programs'];
-
-const NO_PROGRAMS: Programs = [];
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
@@ -48,7 +46,8 @@ export function buildTextItems(
     const face = doc
       ? { family: doc.body.family, weight: doc.body.weight, italic: doc.body.italic }
       : { family: 'Helvetica', weight: 400, italic: false };
-    const bodyCss = fonts?.text.bodyCss(tb.id, style, face) ?? null;
+    const bodyCss =
+      fonts?.text.bodyCss(tb.id, style, face) ?? standardFontCss(standardFontOf(style.fontFamily));
     return {
       id: tb.id,
       ref: refOf(record),
@@ -63,11 +62,13 @@ export function buildTextItems(
       },
       face,
       programs:
-        bodyCss && doc ? programsOf(tb.id, doc, face, bodyCss.programs, fonts!.text) : NO_PROGRAMS,
+        fonts && doc
+          ? programsOf(tb.id, doc, face, bodyCss.programs, fonts.text)
+          : bodyCss.programs,
       editing: tb.editing,
       ...(tb.rot ? { rot: tb.rot } : {}),
       css: {
-        fontFamily: bodyCss?.fontFamily ?? cssFontFamilyForFont(style.fontFamily),
+        fontFamily: bodyCss.fontFamily,
         fontSize: style.fontSize,
         color: style.fontColor,
         fontWeight: style.bold ? 700 : 400,
@@ -100,7 +101,7 @@ function programsOf(
         weight: own.weight ?? body.weight,
         italic: own.italic ?? body.italic,
       });
-      for (const program of css?.programs ?? []) {
+      for (const program of css.programs) {
         if (!programs.some((known) => known.hash === program.hash)) programs.push(program);
       }
     }

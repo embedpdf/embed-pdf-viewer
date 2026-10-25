@@ -10,7 +10,8 @@ import type { MountTarget, ViewerConfigBase } from '../kernel';
 
 /**
  * Configuration for the built-in local engine (PDFium wasm in a worker) —
- * the `localEngine()` options, verbatim. The common fields are plain data
+ * the `localEngine()` options, verbatim, but `fonts`: your fonts go in the
+ * viewer's own `fonts` setting, which registers them. The common fields are plain data
  * (`wasmUrl`, `assetsUrl`, `worker`/`encoderWorker` as URLs), so a
  * self-hosting or strict-CSP setup stays declarative:
  *
@@ -22,7 +23,7 @@ import type { MountTarget, ViewerConfigBase } from '../kernel';
  * });
  * ```
  */
-export type LocalEngineConfig = LocalEngineRecipeOptions;
+export type LocalEngineConfig = Omit<LocalEngineRecipeOptions, 'fonts'>;
 
 /**
  * The local door's config: the built-in PDFium engine is registered as the
@@ -34,8 +35,8 @@ export interface ViewerConfig extends ViewerConfigBase {
   /**
    * The engine seam. Omit for the built-in local engine with its defaults;
    * pass a {@link LocalEngineConfig} to configure it (self-hosted wasm,
-   * strict-CSP workers, fallback fonts, ...: its `fonts` the style panel
-   * offers for text boxes, too); or inject a different
+   * strict-CSP workers, fallback fonts, ...; your fonts go in the viewer's
+   * own `fonts`); or inject a different
    * implementation entirely — an `Engine` instance (borrowed: you own its
    * lifetime) or an `EngineFactory` thunk (viewer-owned: created on mount,
    * destroyed on unmount), e.g. a cloud engine.

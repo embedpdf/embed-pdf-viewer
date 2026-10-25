@@ -351,6 +351,11 @@ function ListControl({ item, page, colors }: ControlProps<'choice'>) {
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
   const frame = rectInPixels(item.box, page.transform);
+  // The rows in the widget's font, as the engine picks it: again once the document's fonts are read.
+  const font = useSelector(FormHostToken, (host) =>
+    item.annotationRef ? host.getWidgetFontCss(item.annotationRef) : null,
+  );
+  useFontMounts(font ? font.programs : NO_PROGRAMS);
   return (
     <WidgetBox item={item} page={page} colors={colors} edge={false} onClick={activate}>
       <NativeListBox
@@ -364,7 +369,7 @@ function ListControl({ item, page, colors }: ControlProps<'choice'>) {
         onSelect={async (values) => {
           await form.setValue(item.fieldRef, { selectedValues: values });
         }}
-        style={listBoxControlStyleOf(item, frame, colors)}
+        style={listBoxControlStyleOf(item, frame, colors, font)}
       />
       <FormFocusRing visible={focused} color={colors.focus} />
     </WidgetBox>

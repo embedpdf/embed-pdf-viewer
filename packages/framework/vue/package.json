@@ -24,6 +24,7 @@
     "./annotation": "./src/annotation.ts",
     "./commands": "./src/commands.ts",
     "./form": "./src/form.ts",
+    "./fonts": "./src/fonts.ts",
     "./i18n": "./src/i18n.ts",
     "./interaction": "./src/interaction.ts",
     "./link": "./src/link.ts",
@@ -74,6 +75,10 @@
       "./form": {
         "import": "./dist/form.js",
         "require": "./dist/form.cjs"
+      },
+      "./fonts": {
+        "import": "./dist/fonts.js",
+        "require": "./dist/fonts.cjs"
       },
       "./i18n": {
         "import": "./dist/i18n.js",
@@ -169,6 +174,7 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",

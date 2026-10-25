@@ -18,9 +18,10 @@ things:
   it, so the text shows exactly as the server will draw it.
 
 This is a **server-side** decision on purpose. Cloud clients can't register fonts (the client
-`engine.fonts` API is local-engine only); the deployment owns the font policy and applies it
-uniformly to every render and every saved appearance. The local engine, which runs in the
-browser, registers its fonts there instead.
+`engine.fonts` API is local-engine only, and the viewer's `fonts` setting is ignored on the cloud,
+with a warning); the deployment owns the font policy and applies it uniformly to every render and
+every saved appearance. The local engine, which runs in the browser, registers its fonts there
+instead.
 
 ## Configure with `CLOUDPDF_FONTS`
 
@@ -44,9 +45,10 @@ CLOUDPDF_FONTS='[
 | `fallback` | no | Fill in characters other fonts lack. Defaults to `true`. |
 | `serve` | no | Send the font to browsers, so text being typed shows in it before the server draws it. Defaults to `false`. |
 
-Order matters: fonts are tried as fallbacks in the order listed, so put your preferred faces
-first. Noto Sans Hebrew and Noto Naskh Arabic come with the server and are tried after yours; a
-font of yours with the same key replaces them.
+Your fallback fonts are tried before the ones the server comes with (Noto Sans Hebrew and Noto
+Naskh Arabic). Within each, the font closest to the text's style comes first (a bold one for bold
+text), then the order listed, so put your preferred faces first. A font of yours with the same key
+as one the server comes with replaces it.
 
 ## Sending fonts to browsers
 

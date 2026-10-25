@@ -5,14 +5,10 @@
 import { reload, type DocumentEvent, type MirrorReload } from '@embedpdf/core';
 import {
   familyKey,
-  fontNameForFace,
-  isStandardFontName,
-  standardFamilyOf,
   type FaceRequest,
   type Font,
   type FontList,
   type FontName,
-  type StandardFont,
 } from '@embedpdf/engine-core/runtime';
 
 /** Apply one confirmed event to the list: a change of the document's fonts reads it again. */
@@ -44,20 +40,6 @@ export function fontForFace(list: FontList, face: FaceRequest): Font | undefined
     if (!best || score < best.score) best = { font, score };
   }
   return best?.font;
-}
-
-/**
- * The standard font the engine draws a face in when no other font is that
- * face: its own standard family's (Arial is Helvetica), else Helvetica, in the
- * face's weight and italic.
- */
-export function standardFontForFace(face: FaceRequest): StandardFont {
-  const name = fontNameForFace({
-    family: standardFamilyOf(face.family) ?? 'Helvetica',
-    weight: face.weight ?? 400,
-    italic: face.italic ?? false,
-  });
-  return isStandardFontName(name) ? name : 'helvetica';
 }
 
 /** The weight and italic of the font a program belongs to; regular when no listed font has it. */

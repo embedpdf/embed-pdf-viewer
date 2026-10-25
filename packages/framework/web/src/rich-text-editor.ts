@@ -28,7 +28,7 @@
  * the appearance stream is the truth.
  */
 
-import { fontKeyOfWebFamily, observeWebFonts } from './web-font';
+import { observeWebFonts } from './web-font';
 import {
   firstLineShiftFor,
   lineModelFor,
@@ -99,10 +99,11 @@ export interface RichTextEditorHost {
    */
   cssFontFamily(face: RichTextEditorFace): string;
   /**
-   * The family a CSS family the editor drew with stands for. Only for a span
-   * the browser made itself (a span this binding draws keeps its family as
-   * data); without it, a family mounted by key (`mountWebFont`) reads back
-   * as its key, and any other as it is.
+   * The family a CSS family the editor drew with stands for (a program's
+   * family, the face it is): for a span the browser made itself (a span this
+   * binding draws keeps its family as data), and for the line model, which
+   * draws a standard family's lines as the engine does. Without it, a family
+   * reads back as it is.
    */
   familyOfCss?(cssFamily: string): string | undefined;
 }
@@ -241,12 +242,11 @@ function round2(value: number): number {
 
 /** The inline style declarations a span carries, as a style delta. Only what
  *  the span itself sets: an unset property means "inherit", never a value. A
- *  CSS family reads back through `familyOfCss`, by default the key a family
- *  mounted by key (`mountWebFont`) was made from. */
+ *  CSS family reads back through `familyOfCss`, by default as it is. */
 export function styleDeltaOf(
   style: EditorStyle | undefined,
   scale: number,
-  familyOfCss: (cssFamily: string) => string | undefined = fontKeyOfWebFamily,
+  familyOfCss: (cssFamily: string) => string | undefined = (cssFamily) => cssFamily,
 ): RichTextEditorStyle {
   const delta: RichTextEditorStyle = {};
   if (!style) return delta;
@@ -781,6 +781,7 @@ export function attachRichTextEditor(
     // Deduplicate measurements only within this synchronous refresh. They
     // must be measured again after fonts or their descriptors change.
     const measured = new Map<string, WebFontMetrics | null>();
+    const familyOf = (cssFamily: string) => host.familyOfCss?.(cssFamily) ?? cssFamily;
     const measureFor = (face: typeof body) => (family: string) => {
       const key = JSON.stringify([family, face.weight, face.style]);
       if (!measured.has(key)) measured.set(key, webFontMetrics(family, doc, face));
@@ -796,12 +797,15 @@ export function attachRichTextEditor(
           weight: style.fontWeight || body.weight,
           style: style.fontStyle || body.style,
         };
-        return { node, lineHeight: lineModelFor(face.family, measureFor(face)).lineHeight };
+        return {
+          node,
+          lineHeight: lineModelFor(face.family, measureFor(face), familyOf).lineHeight,
+        };
       },
     );
     const measure = measureFor(body);
-    const lineHeight = lineModelFor(body.family, measure).lineHeight;
-    const shift = firstLineShiftFor(body.family, size, measure);
+    const lineHeight = lineModelFor(body.family, measure, familyOf).lineHeight;
+    const shift = firstLineShiftFor(body.family, size, measure, familyOf);
     element.style.lineHeight = String(lineHeight);
     for (const run of runs) run.node.style.lineHeight = String(run.lineHeight);
     applyFirstLineShift(root, shift);

@@ -41,6 +41,7 @@
   "dependencies": {
     "@embedpdf/core": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-fonts": "workspace:*",
     "@embedpdf/core-ui": "workspace:*",
     "@embedpdf/default-signature-fonts": "workspace:*",
     "@embedpdf/default-stamps": "workspace:*",

@@ -22,7 +22,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import { createFontsController } from '../src/controller';
-import { fallbackHashes, fontForFace, foldFontList, standardFontForFace } from '../src/model';
+import { fallbackHashes, fontForFace, foldFontList } from '../src/model';
 
 const hashOf = (seed: string) => seed.repeat(64).slice(0, 64);
 
@@ -159,12 +159,6 @@ describe('the font list model', () => {
     expect(fontForFace(LIST, { family: 'Arial' })).toBeUndefined();
   });
 
-  it('draws a face no font has in its standard family, else Helvetica, in its style', () => {
-    expect(standardFontForFace({ family: 'Arial', weight: 700 })).toBe('helvetica-bold');
-    expect(standardFontForFace({ family: 'Times New Roman', italic: true })).toBe('times-italic');
-    expect(standardFontForFace({ family: 'Nowhere Sans' })).toBe('helvetica');
-  });
-
   it("names the fallbacks' programs in the list's order", () => {
     expect(fallbackHashes(LIST)).toEqual([hashOf('c')]);
     expect(fallbackHashes(null)).toEqual([]);
@@ -214,7 +208,8 @@ describe('the fonts controller', () => {
       LAST_RESORT_HASH,
     ]);
     expect(css.fontFamily.startsWith(`"epdf-${hashOf('a').slice(0, 16)}", "epdf-`)).toBe(true);
-    expect(css.fontFamily.endsWith('sans-serif')).toBe(true);
+    // Before they're mounted: the look-alikes of the standard font of its face.
+    expect(css.fontFamily.endsWith(', Helvetica, Arial, sans-serif')).toBe(true);
 
     await css.programs[0]!.load();
     await css.programs[0]!.load();
@@ -229,6 +224,12 @@ describe('the fonts controller', () => {
     expect(api.getFaceCss({ family: 'Courier New', weight: 700 }).programs[0]).toBe(
       standardFontProgram('courier-bold'),
     );
+  });
+
+  it('draws a font the list doesn’t name, or before the list is loaded, in Helvetica', () => {
+    const { api } = harness();
+    expect(api.getFontCss('brand-sans').programs[0]).toBe(standardFontProgram('helvetica'));
+    expect(api.getFontCss('brand-sans').fontFamily).not.toContain('brand-sans');
   });
 
   it("draws a font whose program can't reach the browser in the standard font of its face", async () => {
@@ -406,6 +407,22 @@ describe("a box's paint fonts", () => {
     });
     expect(roboto.face.width('Hi', false)).toBe(1200);
     expect(api.getPaintFonts('Minion', 'Hi שלום')!.face.key).toBe('helvetica');
+  });
+
+  it('names the programs once the host has them all: until then the look-alikes, never the last resort’s boxes', async () => {
+    const host = fakeMeasurer();
+    const { api } = harness({ measurer: host.measurer });
+    await api.ensureLoaded();
+    const loading = api.getFontCss('Roboto-Regular');
+    expect(loading.fontFamily).toBe('Helvetica, Arial, sans-serif');
+    // Asking loads every program it names: the consumer mounts them meanwhile.
+    expect(host.asked).toEqual(loading.programs.map((program) => program.family));
+    for (const program of loading.programs) host.load(program.family);
+    const mounted = api.getFontCss('Roboto-Regular');
+    expect(mounted.programs).toEqual(loading.programs);
+    expect(mounted.fontFamily).toBe(
+      `${loading.programs.map((program) => `"${program.family}"`).join(', ')}, Helvetica, Arial, sans-serif`,
+    );
   });
 
   it("draws a program the browser refuses as one it can't get: the face's look-alike, no such fallback", async () => {

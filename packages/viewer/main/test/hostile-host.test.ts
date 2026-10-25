@@ -2,8 +2,8 @@
  * The viewer on a page that does everything a real site might to the
  * elements around it: a smaller root font size, body text styles that
  * inherit, a global reset and `button` rule, a transformed ancestor, a fixed
- * header above everything, its own `@font-face` named like the viewer's
- * annotation font. The viewer must look exactly as it does on a plain page,
+ * header above everything, its own `@font-face` named like one of the
+ * viewer's fonts. The viewer must look exactly as it does on a plain page,
  * keep its overlays inside its own box, and still take the page's
  * `--epdf-*` variables and `::part()` rules.
  *
@@ -62,9 +62,7 @@ function hostPage(hostile: boolean): string {
     target: '#viewer',
     src: '/sample.pdf',
     theme: 'light',
-    engine: {
-      fonts: [{ key: 'brand-sans', url: '/fonts/brand.ttf', familyName: 'Brand Sans' }],
-    },
+    fonts: [{ key: 'brand-sans', url: '/fonts/brand.ttf', label: 'Brand Sans' }],
   });
 </script>
 </body></html>`;
@@ -75,12 +73,8 @@ async function openHost(browser: Browser, url: string): Promise<{ page: Page; sh
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await page.goto(url);
   await waitForDocument(page);
-  // The registered font is fetched, registered and mounted after the first paint.
-  await page.waitForFunction(
-    () => [...document.fonts].some((face) => face.family.replace(/"/g, '') === 'epdf-brand-sans'),
-    null,
-    { timeout: 30_000 },
-  );
+  // The fonts the viewer mounts after the first paint have loaded.
+  await page.evaluate(() => document.fonts.ready);
   const viewer = page.locator('embedpdf-viewer');
   let previous = await viewer.screenshot();
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -216,16 +210,15 @@ describe('the viewer on a hostile page', () => {
     }
   });
 
-  it("mounts its annotation font under its own family, apart from the page's", async () => {
+  it("mounts its fonts under their programs' own families, apart from the page's", async () => {
     const families = await hostile.page.evaluate(() =>
       [...document.fonts].map((face) => face.family.replace(/"/g, '')).sort(),
     );
-    // The page's own face stays as it is; the registered key is mounted under its namespaced
-    // family, and every face the viewer adds (its standard fonts too) is in that namespace.
+    // The page's own face stays as it is; every face the viewer adds is named by its program's
+    // hash, never by a font's key, so the page's `brand-sans` and the viewer's never meet.
     expect(families).toContain('brand-sans');
-    expect(families).toContain('epdf-brand-sans');
     expect(
-      families.filter((family) => family !== 'brand-sans' && !family.startsWith('epdf-')),
+      families.filter((family) => family !== 'brand-sans' && !/^epdf-[0-9a-f]{16}$/.test(family)),
     ).toEqual([]);
   });
 

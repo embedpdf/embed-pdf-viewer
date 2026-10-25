@@ -16,7 +16,7 @@ import {
 
 import { setTextSelection } from '../model';
 import type { ChromeReads } from '../read/chrome';
-import { cssFontFamilyForFace, textCommitPatch, type TextSelection } from '../rich-text';
+import { textCommitPatch, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Commit, StoreHold, Written } from '../services/store';
 
@@ -136,10 +136,8 @@ export function createTextEditing(
       ctx.state.update(setTextSelection, next);
     },
     getCssFontFamily: (face: { family: string; weight: number; italic: boolean }, id: Id | null) =>
-      textFonts.faceCss(id, face)?.fontFamily ?? cssFontFamilyForFace(face.family, fonts),
-    getFamilyOfCss: (cssFamily: string) =>
-      textFonts.familyOfCss(cssFamily) ??
-      (cssFamily.startsWith('epdf-') ? cssFamily.slice('epdf-'.length) : cssFamily),
+      textFonts.faceCss(id, face).fontFamily,
+    getFamilyOfCss: (cssFamily: string) => textFonts.familyOfCss(cssFamily) ?? cssFamily,
   };
 
   return { type, sendTyping, text, api };

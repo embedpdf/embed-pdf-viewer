@@ -438,6 +438,25 @@ export const ar: Locale = {
       selected: 'المحدد: {count}',
       toolDefaults: 'إعدادات {tool} الافتراضية',
       defaults: 'الإعدادات الافتراضية',
+      fontGroups: {
+        document: 'في هذا المستند',
+        yours: 'خطوطك',
+        server: 'خطوط الخادم',
+        standard: 'قياسي',
+      },
+      fontStyles: {
+        bold: 'غامق',
+        italic: 'مائل',
+        boldItalic: 'غامق مائل',
+      },
+      fontRestrictions: {
+        notEmbedded: 'المستند يذكر اسمه فقط',
+        subset: 'يحتوي المستند على الأحرف المستخدمة فقط',
+        previewAndPrint: 'ترخيصه يسمح بالعرض والطباعة فقط',
+        unsupportedFormat: 'لا يمكن كتابة نص جديد بهذا النوع من الخطوط',
+        noUnicodeMap: 'لا يحدد الأحرف التي يرسمها',
+        other: 'لا يمكن كتابة نص جديد به',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

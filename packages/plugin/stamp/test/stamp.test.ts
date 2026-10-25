@@ -70,7 +70,11 @@ function makeStamp(
   const ctx = createTestContext({
     id: 'stamp',
     state: initialStampState(),
-    settings: { defaults: STAMP_DEFAULTS, registered: options.config, whole: ['assetEngine'] },
+    settings: {
+      defaults: STAMP_DEFAULTS,
+      registered: options.config,
+      whole: ['assetEngine', 'fonts'],
+    },
     engine,
     documentId: options.target?.id,
     doc: options.target?.handle ?? null,
@@ -1132,11 +1136,40 @@ function withFakeRenders(engine: Engine): LocalEngine {
         },
       });
     },
+    // The engine's own fonts: a typed mark's font is registered there.
+    fonts: (engine as LocalEngine).fonts,
     destroy: () => engine.destroy(),
   } as unknown as LocalEngine;
 }
 
 describe('stamp plugin: authoring marks (real engine)', () => {
+  it('writes a typed mark in one of its fonts: registered on the asset engine once, and embedded', async () => {
+    const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    const caveat = resolve(here, '../../../default-signature-fonts/fonts/Caveat-Regular.ttf');
+    const load = vi.fn(async () => new Uint8Array(await readFile(caveat)));
+    const { stamp } = makeStamp(withFakeRenders(engine), {
+      config: { fonts: [{ key: 'caveat', load }] },
+    });
+    try {
+      const libraryId = (await stamp.createLibrary('Bob Singor', { kind: 'signatures' })).library
+        .id;
+      for (const name of ['one', 'two']) {
+        await stamp.createAsset({
+          libraryId,
+          name,
+          kind: 'signature',
+          mark: { kind: 'text', text: 'Bob', fontFamily: 'caveat', fontSize: 36 },
+        });
+      }
+      expect(load).toHaveBeenCalledTimes(1);
+      expect((await engine.fonts.list()).map((font) => font.key)).toContain('caveat');
+      const saved = new TextDecoder('latin1').decode(await stamp.exportLibrary(libraryId));
+      expect(saved).toMatch(/\/BaseFont\s*\/[A-Z]{6}\+Caveat/);
+    } finally {
+      await engine.destroy();
+    }
+  });
+
   it('renders a drawn mark and a typed mark into vector pages the size of the mark', async () => {
     const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const { stamp } = makeStamp(withFakeRenders(engine));

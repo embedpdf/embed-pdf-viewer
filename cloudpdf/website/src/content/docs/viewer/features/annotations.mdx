@@ -82,33 +82,36 @@ annotations, comments and replies as they're made, and every change is stored on
 
 ## Fonts
 
+The style panel offers every font text can be written in, for text boxes, callouts, form fields and
+redaction labels alike: the fonts the document has, then the engine's, then the standard PDF fonts.
+A font of the document's that new text can't be written in shows greyed, with why: the document
+holds only the characters it uses, say. A box keeps its own font either way.
+
 <Engine local>
 
-Text boxes and callouts use the 14 standard PDF fonts. Give the engine more, such as your brand's
-typeface or a script the standard fonts don't cover, and the style panel offers them:
+Give the viewer more fonts, such as your brand's typeface or a script the standard fonts don't
+cover, and the style panel offers them under Your fonts:
 
 ```js
 {
-  engine: {
-    fonts: [
-      { key: 'brand-sans', familyName: 'Brand Sans', url: '/fonts/BrandSans-Regular.ttf' },
-      { key: 'noto-sc', familyName: 'Noto Sans SC', url: '/fonts/NotoSansSC-Regular.otf' },
-    ],
-  },
+  fonts: [
+    { key: 'brand-sans', url: '/fonts/BrandSans-Regular.ttf', label: 'Brand Sans' },
+    { key: 'noto-sc', url: '/fonts/NotoSansSC-Regular.otf', label: 'Noto Sans SC' },
+  ],
 }
 ```
 
-Each font is fetched once, and the text box shows the very face the PDF will carry: only the
-characters people use are embedded when they save. A `key` can't be one of the standard names,
-such as `helvetica`.
+Each font is fetched once, and the text shows in the very face the PDF will carry while people
+type: only the characters they use are embedded when they save. A `key` can't be one of the
+standard names, such as `helvetica`.
 
 </Engine>
 
 <Engine cloud>
 
-Text boxes and callouts use the 14 standard PDF fonts. The server draws them, so fonts are your
-server's to configure, not the browser's: a script the standard fonts don't cover needs a fallback
-font on the server. See [Fallback fonts](/docs/server/configuration/fonts).
+The server writes the text, so its fonts are the ones offered, under Server fonts: configure them on
+the server, as [Fonts](/docs/server/configuration/fonts) shows. A `fonts` setting in the viewer is
+ignored, with a warning in the console.
 
 </Engine>
 

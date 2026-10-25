@@ -19,7 +19,7 @@ export const stampPlugin = (config?: StampConfig) =>
     optional: [AnnotationToken, ActionsToken],
     state: initialStampState,
     // An engine is one value: a change replaces it, never merges into it.
-    settings: { defaults: STAMP_DEFAULTS, registered: config, whole: ['assetEngine'] },
+    settings: { defaults: STAMP_DEFAULTS, registered: config, whole: ['assetEngine', 'fonts'] },
     create: createStampController,
     // Inside a document's scope, a placing call that leaves out the document is for that one.
     inScope: (stamp, documentId) => {

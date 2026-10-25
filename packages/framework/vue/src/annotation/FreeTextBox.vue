@@ -11,6 +11,7 @@ import { computed } from 'vue';
 import type { TextItem } from '@embedpdf/plugin-annotation';
 import { annotationChromePaint, freeTextBoxOf } from '@embedpdf/web';
 import { useViewerSettings } from '../runtime/documents';
+import { useFontMounts } from '../runtime/font-mounts';
 import type { PageContextValue } from '../runtime/page';
 import { useAnnotationSettings } from './state';
 import { useTextBoxEditor } from './text-box';
@@ -21,6 +22,8 @@ const chrome = useAnnotationSettings((settings) => settings.chrome);
 const accent = useViewerSettings((settings) => settings.accent);
 const outline = computed(() => annotationChromePaint(chrome.value, accent.value).textOutline);
 
+// The programs the engine draws the text in, so the box shows them.
+useFontMounts(() => props.item.programs);
 // On the engine's text plate (the box inset by its padding), laid out at a legible size.
 const box = computed(() => freeTextBoxOf(props.item, props.page.transform, outline.value));
 const element = useTextBoxEditor(

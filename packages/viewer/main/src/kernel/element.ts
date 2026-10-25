@@ -25,7 +25,6 @@ import {
   type FullViewerProps,
   type PanelResizeEvent,
   type Viewer,
-  type ViewerFont,
   type ViewerPluginsConfig,
 } from '@embedpdf/viewer-chrome';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
@@ -49,8 +48,6 @@ import { chromeSheet, sheetOf } from './sheets';
 /** What a door makes of a config's `engine` field. */
 export interface DoorEngine {
   readonly engine: Engine | EngineFactory;
-  /** The fonts the field names, which the viewer registers on the engine and offers. */
-  readonly fonts?: readonly ViewerFont[];
   /**
    * What a `src` in the words of this engine opens as, for an engine whose documents aren't a
    * URL, a file or bytes: the cloud's `{ token }` is the engine's `{ kind: 'token' }`. The
@@ -106,7 +103,7 @@ const adoptSheets = (): CSSStyleSheet[] => {
  * - a function → an EngineFactory, passed through (viewer-owned lifetime);
  * - an object with `open` → a live Engine instance, passed through (borrowed);
  * - anything else (that door's engine OPTIONS, or nothing) → the door's
- *   registered default, with the fonts its options name. The local/snippet
+ *   registered default. The local/snippet
  *   doors register the built-in engine; the `core` door registers nothing, so
  *   an engine-less config there is a configuration error, taught here.
  *
@@ -452,11 +449,10 @@ export class EmbedPdfViewerElement extends ElementBase {
     const { src: _src, documents, engine: _engine, theme, ...customization } = config;
     this.#adoptSheets(theme);
     this.#shown = config;
-    const { engine, fonts, sourceOf = (src) => src, plugins } = engineOf(config);
+    const { engine, sourceOf = (src) => src, plugins } = engineOf(config);
     this.#sourceOf = sourceOf;
     this.#props = {
       engine,
-      fonts,
       initialDocuments: documents && initialDocumentsOf(documents, sourceOf),
       theme,
       themeTarget: this.#wrapper,

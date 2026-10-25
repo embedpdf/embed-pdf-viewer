@@ -438,6 +438,25 @@ export const pt: Locale = {
       selected: 'Selecionados: {count}',
       toolDefaults: 'Padrões de {tool}',
       defaults: 'Padrões',
+      fontGroups: {
+        document: 'Neste documento',
+        yours: 'Suas fontes',
+        server: 'Fontes do servidor',
+        standard: 'Padrão',
+      },
+      fontStyles: {
+        bold: 'Negrito',
+        italic: 'Itálico',
+        boldItalic: 'Negrito itálico',
+      },
+      fontRestrictions: {
+        notEmbedded: 'O documento apenas a nomeia',
+        subset: 'O documento contém apenas os caracteres que usa',
+        previewAndPrint: 'Sua licença permite apenas visualizar e imprimir',
+        unsupportedFormat: 'Não é possível escrever texto novo neste tipo de fonte',
+        noUnicodeMap: 'Ela não indica quais caracteres desenha',
+        other: 'Não é possível escrever texto novo nela',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

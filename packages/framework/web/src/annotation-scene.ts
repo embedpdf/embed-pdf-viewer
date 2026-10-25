@@ -59,6 +59,7 @@ export type SceneShapeNode = (
       fontSize: number;
       fontFamily?: string;
       rotation?: number;
+      program?: MountableFontProgram;
       paint: ScenePaint;
     }
   | {
@@ -245,6 +246,7 @@ function svgShapeOf(node: SceneShapeNode, options: SvgShapesOptions): SvgShape {
         },
         text: node.text,
         ...styled,
+        ...(node.program ? { program: node.program } : {}),
       };
     case 'poly':
       return {

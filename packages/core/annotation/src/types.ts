@@ -1,4 +1,5 @@
 import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
+import type { PaintFonts } from '@embedpdf/core-text';
 import type {
   AnnotationBorderStyle,
   AnnotationDraft,
@@ -866,8 +867,12 @@ export interface RenderItem {
   /** The pointer is over this annotation — scene-level hover affordances
    *  (e.g. a redaction mark previews its applied look). */
   hovered?: boolean;
-  /** Redaction label projection (redact kind only) — see {@link ModelAnnotation.label}. */
-  label?: { text: string; repeat: boolean };
+  /**
+   * A redaction's overlay text (redact kind only), and the fonts its hover
+   * preview draws it in: the fonts plugin's, as the engine picks them for
+   * the label's font; without them, its standard font or Helvetica.
+   */
+  label?: { text: string; repeat: boolean; fonts?: PaintFonts };
   /**
    * The box a painter draws into: `box` before its turn, and that turn,
    * degrees clockwise about the box's middle. Everything the item draws sits
@@ -946,7 +951,7 @@ export type SceneNode = (
   | { kind: 'path'; d: string; paint: Paint }
   /** Painted (non-interactive) text — `at` is the baseline start point in
    *  content units. Editable text (free text) stays a framework element;
-   *  this is for pure pixels, e.g. a redaction label preview. */
+   *  this is for pure pixels, e.g. a measurement's caption. */
   | {
       kind: 'text';
       at: Point;
@@ -954,6 +959,8 @@ export type SceneNode = (
       fontSize: number;
       fontFamily?: string;
       rotation?: number;
+      /** The face it draws in, for whatever draws it to mount (`fontFamily` names it first). */
+      program?: SceneFontProgram;
       paint: Paint;
     }
   /** A run of painted text in one font and one direction, as a layout

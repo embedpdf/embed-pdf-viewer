@@ -48,6 +48,15 @@ import type {
   PdfDestination,
   Identity,
   PrintDpi,
+  Font,
+  FontList,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
 } from '@embedpdf/engine-core/runtime';
 
 // re-export the engine contracts so consumers import them from @embedpdf/core
@@ -77,6 +86,16 @@ export type {
   CustomMetadata,
   CustomMetadataPatch,
   CustomMetadataUpdateResult,
+  /** The fonts that can be named in a document, what each allows, and their programs (`doc.fonts`). */
+  FontList,
+  Font,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
   DocumentEvent,
   /** Who the user is: the author of what they make, and whom `:self` and `:group` permissions are checked against. */
   Identity,

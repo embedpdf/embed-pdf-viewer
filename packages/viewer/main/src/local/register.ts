@@ -31,13 +31,11 @@ export function registerLocalEngine(
   defaults: LocalEngineDefaults = {},
 ): void {
   EmbedPdfViewerElement.defaultEngineProvider = (option: unknown) => {
-    // The viewer registers `fonts` itself, reading each once: the style panel offers a font
-    // only when it's registered on the engine and mounted for the live text editor too.
-    const { fonts, ...local }: LocalEngineConfig = { ...(option as LocalEngineConfig | undefined) };
+    const local: LocalEngineConfig = { ...(option as LocalEngineConfig | undefined) };
     if (defaults.wasmUrl && !local.wasmUrl && !local.wasmBinary && !local.assetsUrl) {
       local.wasmUrl = defaults.wasmUrl;
     }
     // A thunk, so the viewer owns the engine's lifetime.
-    return { engine: () => localEngine(local), fonts };
+    return { engine: () => localEngine(local) };
   };
 }
