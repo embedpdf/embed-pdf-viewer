@@ -40,10 +40,14 @@ import {
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type {
+  Font,
   FontList,
+  FontProgram,
   FontProgramInfo,
   FontResolution,
   FontResolveRequest,
+  FontResolveRun,
+  ResolvedFontRun,
 } from '../dto/DocumentFonts';
 import type { LayerScopes } from '../dto/LayerScopes';
 import type { CustomMetadata } from '../dto/CustomMetadata';
@@ -1836,45 +1840,50 @@ export const OutlineWireComponents = {
 // ---------------------------------------------------------------------------
 // Fonts: a document's font list, a program's facts, and a resolve.
 
-const FontProgramSchema = z.object({
+const fontProgramShape = {
   displayHash: z.string().nullable(),
   sourceHash: z.string().nullable(),
   embedded: z.enum(['whole', 'subset', 'none']),
   format: z.enum(['truetype', 'opentype', 'cff', 'type1', 'type3']).nullable(),
   embeddingPermission: z.enum(['installable', 'editable', 'preview-and-print']).nullable(),
   canDownload: z.boolean(),
+};
+
+/** A font file: by the hash of the file a browser loads, and of the one the PDF holds. */
+const FontProgramSchema: z.ZodType<FontProgram> = z.object(fontProgramShape);
+
+/** A font that can be named in a document. */
+const FontSchema: z.ZodType<Font> = z.object({
+  name: z.string(),
+  source: z.enum(['standard', 'engine', 'document']),
+  familyName: z.string(),
+  weight: z.number().int(),
+  italic: z.boolean(),
+  postScriptName: z.string().nullable(),
+  canChoose: z.boolean(),
+  restrictions: z.array(
+    z.enum([
+      'subset',
+      'not-embedded',
+      'preview-and-print',
+      'unsupported-format',
+      'no-unicode-map',
+      'not-served',
+    ]),
+  ),
+  programs: z.array(FontProgramSchema),
 });
 
 /** `GET …/fonts@{fontsVersion,serverFonts}`: `doc.fonts.list()`. */
 export const FontListSchema: z.ZodType<FontList> = z.object({
-  fonts: z.array(
-    z.object({
-      name: z.string(),
-      source: z.enum(['standard', 'engine', 'document']),
-      familyName: z.string(),
-      weight: z.number().int(),
-      italic: z.boolean(),
-      postScriptName: z.string().nullable(),
-      canChoose: z.boolean(),
-      restrictions: z.array(
-        z.enum([
-          'subset',
-          'not-embedded',
-          'preview-and-print',
-          'unsupported-format',
-          'no-unicode-map',
-          'not-served',
-        ]),
-      ),
-      programs: z.array(FontProgramSchema),
-    }),
-  ),
+  fonts: z.array(FontSchema),
   fallbacks: z.array(z.string()),
   lastResort: FontProgramSchema,
 });
 
 /** `GET …/font-programs/{displayHash}`: `doc.fonts.getProgram()`. */
-export const FontProgramInfoSchema: z.ZodType<FontProgramInfo> = FontProgramSchema.extend({
+export const FontProgramInfoSchema: z.ZodType<FontProgramInfo> = z.object({
+  ...fontProgramShape,
   covers: z.array(
     z.object({ start: z.number().int().nonnegative(), count: z.number().int().positive() }),
   ),
@@ -1882,42 +1891,66 @@ export const FontProgramInfoSchema: z.ZodType<FontProgramInfo> = FontProgramSche
   descent: z.number(),
 });
 
+/**
+ * A run of text and the font it asks for: by name (`fontFamily`), as a box
+ * does, or by face (`family`, `weight`, `italic`), as rich text does. One
+ * object with exactly one of the two, so the projection has no untagged union.
+ */
+const FontResolveRunSchema = z
+  .object({
+    text: z.string().max(65_536),
+    fontFamily: z.string().optional(),
+    family: z.string().optional(),
+    weight: z.number().optional(),
+    italic: z.boolean().optional(),
+  })
+  .strict()
+  .refine(
+    (run) =>
+      run.fontFamily !== undefined
+        ? run.family === undefined && run.weight === undefined && run.italic === undefined
+        : run.family !== undefined && run.weight !== undefined && run.italic !== undefined,
+    { message: 'a run names its font by fontFamily, or by family, weight and italic' },
+  ) as unknown as z.ZodType<FontResolveRun>;
+
 /** The body of `POST …/fonts/resolve`. */
 export const FontResolveRequestSchema: z.ZodType<FontResolveRequest> = z
   .object({
     annotation: AnnotationRefSchema.optional(),
-    runs: z
-      .array(
-        z.union([
-          z.object({ text: z.string().max(65_536), fontFamily: z.string() }).strict(),
-          z
-            .object({
-              text: z.string().max(65_536),
-              family: z.string(),
-              weight: z.number(),
-              italic: z.boolean(),
-            })
-            .strict(),
-        ]),
-      )
-      .max(1_000),
+    runs: z.array(FontResolveRunSchema).max(1_000),
   })
   .strict();
 
+/** A run as `resolve` answers it: the font a write draws it in, and the fallbacks behind it. */
+const ResolvedFontRunSchema: z.ZodType<ResolvedFontRun> = z.object({
+  font: z.string(),
+  weight: z.number(),
+  italic: z.boolean(),
+  substituted: z.boolean(),
+  program: z.string().nullable(),
+  fallbacks: z.array(z.string()),
+});
+
 /** `POST …/fonts/resolve`: `doc.fonts.resolve()`. */
 export const FontResolutionSchema: z.ZodType<FontResolution> = z.object({
-  runs: z.array(
-    z.object({
-      font: z.string(),
-      weight: z.number(),
-      italic: z.boolean(),
-      substituted: z.boolean(),
-      program: z.string().nullable(),
-      fallbacks: z.array(z.string()),
-    }),
-  ),
+  runs: z.array(ResolvedFontRunSchema),
   missingCharacters: z.array(z.string()),
 });
+
+/**
+ * Stable public component names for the fonts wire model, so an OpenAPI
+ * projection names each once, like `OutlineWireComponents`.
+ */
+export const FontWireComponents = {
+  FontProgram: FontProgramSchema,
+  Font: FontSchema,
+  FontList: FontListSchema,
+  FontProgramInfo: FontProgramInfoSchema,
+  FontResolveRun: FontResolveRunSchema,
+  FontResolveRequest: FontResolveRequestSchema,
+  ResolvedFontRun: ResolvedFontRunSchema,
+  FontResolution: FontResolutionSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 // ---------------------------------------------------------------------------
 // Digital signatures: the JSON forms of the two-phase signing DTOs.

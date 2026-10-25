@@ -31,8 +31,9 @@ export interface FontCss {
   /**
    * The CSS `font-family` list: the program's family, the fallbacks' in the
    * engine's order, the last resort's (a box for a character no font has),
-   * then the system's closest families, for the moment before the programs
-   * are mounted.
+   * then the system's closest families. Until the browser has every program,
+   * the system's families alone: a program still loading would leave its
+   * text to the last resort's boxes.
    */
   readonly fontFamily: string;
   readonly fontWeight: number;
@@ -75,14 +76,16 @@ export interface FontsCapability {
   getProgram(displayHash: string, options?: OperationOptions): Promise<FontProgramInfo>;
   /**
    * How a browser draws text in the font a box names (its `fontFamily`). A
-   * standard font needs no list; another font is drawn in the system's
-   * closest look-alike until the list is loaded.
+   * standard font needs no list; another font is drawn in the standard font
+   * the engine falls back to until the list is loaded, which asking for it
+   * starts.
    */
   getFontCss(font: FontName): FontCss;
   /**
    * How a browser draws text in a face, as rich text names one: the font of
    * that family with the closest weight and italic, else the standard font
-   * the engine falls back to.
+   * the engine falls back to. A family that isn't a standard one starts
+   * loading the list.
    */
   getFaceCss(face: FaceRequest): FontCss;
   /** How a browser draws a run as {@link resolve} answered it. */

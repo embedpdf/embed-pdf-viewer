@@ -183,17 +183,8 @@ export function createWidgetLooks({
    * it (the first widget in a font that isn't standard reads the document's
    * fonts); without the plugin, the standard font the engine falls back to.
    */
-  const fontCssOf = (font: FontName): FontCss => {
-    const api = fonts();
-    if (!api) return standardFontCss(standardFontOf(font));
-    // After the asker's turn: a read (a render) that asks writes no state while it runs.
-    if (!isStandardFontName(font) && api.getStatus() === 'idle') {
-      Promise.resolve()
-        .then(() => api.ensureLoaded())
-        .catch(() => {});
-    }
-    return api.getFontCss(font);
-  };
+  const fontCssOf = (font: FontName): FontCss =>
+    fonts()?.getFontCss(font) ?? standardFontCss(standardFontOf(font));
 
   /**
    * Until the fonts plugin has found a field's fonts, the layout in its own

@@ -4,6 +4,7 @@ export default {
   saving: 'Saving & downloading',
   pages: 'Organizing pages',
   metadata: 'Metadata',
+  fonts: 'Fonts',
   outline: 'Outline',
   actions: 'Actions & scripts',
 };

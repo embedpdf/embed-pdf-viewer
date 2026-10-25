@@ -164,16 +164,31 @@ const programRank = (program: FontProgramFacts): number =>
 
 // ── names ──────────────────────────────────────────────────────────────────
 
+/** A weight's word in a style suffix, as font files name their weights; 400 has none. */
+const WEIGHT_WORDS: Readonly<Record<number, string>> = {
+  100: 'Thin',
+  200: 'ExtraLight',
+  300: 'Light',
+  400: '',
+  500: 'Medium',
+  600: 'SemiBold',
+  700: 'Bold',
+  800: 'ExtraBold',
+  900: 'Black',
+};
+
 /**
  * The name `fontFamily` takes for a document face: its PostScript name, which
- * says the style the family alone doesn't, else the family with PDF's own
- * style suffix (`'Arial,Bold'`).
+ * says the style the family alone doesn't, else the family with a style suffix
+ * in PDF's form that names the exact weight (`'Inter'`, `'Inter,Medium'`,
+ * `'Inter,BoldItalic'`; `'Inter,450'` off the hundreds). The document's faces
+ * differ in family, weight or italic, so no two share a name this way.
  */
 export function documentFontNameOf(face: DocumentFaceFacts): FontName {
   const named = face.programs.find((program) => program.postScriptName);
   if (named?.postScriptName) return named.postScriptName;
-  const bold = face.weight >= 600;
-  const style = bold && face.italic ? 'BoldItalic' : bold ? 'Bold' : face.italic ? 'Italic' : '';
+  const weight = WEIGHT_WORDS[face.weight] ?? String(face.weight);
+  const style = `${weight}${face.italic ? 'Italic' : ''}`;
   return style ? `${face.familyName},${style}` : face.familyName;
 }
 

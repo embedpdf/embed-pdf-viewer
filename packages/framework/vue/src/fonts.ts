@@ -5,19 +5,20 @@
  *
  *   const fonts = useFonts();
  *   const { fonts: list, status } = useFontsState();
- *   const css = fonts.getFontCss('helvetica'); // mount css.programs where you draw it
- *   useFontMounts(() => css.programs);
+ *   const css = useFontCss('helvetica'); // its programs mounted while the component lives
  */
 
 // One line per feature: registration travels with the UI.
 export * from '@embedpdf/plugin-fonts';
+import { toValue, type MaybeRefOrGetter, type Ref } from 'vue';
 import { FontsToken, fontsState } from '@embedpdf/plugin-fonts';
-import type { FontsCapability } from '@embedpdf/plugin-fonts';
-import type { EventHook } from '@embedpdf/core';
-import { useCapability, useCapabilityEvent } from './runtime/capabilities';
+import type { FontCss, FontsCapability } from '@embedpdf/plugin-fonts';
+import type { EventHook, FontName } from '@embedpdf/core';
+import { useCapability, useCapabilityEvent, useOptionalSelector } from './runtime/capabilities';
+import { useFontMounts } from './runtime/font-mounts';
 import { stateComposable } from './state';
 
-export { useFontMounts } from './runtime/font-mounts';
+export { useFontMounts };
 
 /**
  * The fonts API (the list, `resolve`, and the CSS a font is drawn with) of
@@ -42,4 +43,23 @@ export function useFontsEvent<Event>(
   handler: (event: Event) => void,
 ): void {
   useCapabilityEvent(FontsToken, select, handler);
+}
+
+/**
+ * How to draw text in `font` as the engine draws it, as a ref: its CSS (`fontFamily`,
+ * `fontWeight`, `fontStyle`; draw with `font-synthesis: none`), again once its programs reach the
+ * browser, with the programs mounted while the component lives. `null` for a `null` font, and
+ * outside a document with the fonts plugin.
+ */
+export function useFontCss(font: MaybeRefOrGetter<FontName | null>): Readonly<Ref<FontCss | null>> {
+  const css = useOptionalSelector(
+    FontsToken,
+    (fonts) => {
+      const name = toValue(font);
+      return name === null ? null : fonts.getFontCss(name);
+    },
+    null,
+  );
+  useFontMounts(() => css.value?.programs ?? []);
+  return css;
 }

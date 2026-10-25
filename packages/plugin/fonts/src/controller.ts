@@ -12,6 +12,7 @@ import {
 } from '@embedpdf/core-fonts';
 import {
   isStandardFontName,
+  standardFamilyOf,
   STANDARD_FACES,
   type Font,
   type FontList,
@@ -49,6 +50,8 @@ export function createFontsController(ctx: PluginContext<void>) {
   const programs = new Map<string, MountableFontProgram>();
   const programInfos = new Map<string, Promise<FontProgramInfo>>();
   let css = new Map<string, FontCss>();
+  // Per style (`weight|italic`): the engine's fallback order, or `null` while it's read.
+  let styleFallbacks = new Map<string, readonly string[] | null>();
   let paintFontsEpoch = 0;
   const paintFontsChanged = () => {
     paintFontsEpoch++;
@@ -63,6 +66,7 @@ export function createFontsController(ctx: PluginContext<void>) {
     fold: foldFontList,
     changed: ({ previous, next }) => {
       css = new Map();
+      styleFallbacks = new Map();
       // A change can move the fallbacks; what the first read was asked for meanwhile still holds.
       if (previous) paintFonts.reset();
       paintFontsChanged();
@@ -205,6 +209,50 @@ export function createFontsController(ctx: PluginContext<void>) {
     paintFontsChanged();
   });
 
+  /**
+   * Read the document's fonts the first time a font needs them, after the asker's turn: a read
+   * (a render) that asks writes no state while it runs.
+   */
+  const loadListSoon = () => {
+    if (list.getStatus() !== 'idle') return;
+    Promise.resolve()
+      .then(() => list.ensureLoaded())
+      .catch(() => {});
+  };
+
+  /**
+   * The fallbacks text in `style` draws with, in the order the engine tries them for it (a bold
+   * run tries the bold ones first). The engine says, once per style, after the asker's turn; the
+   * list's order until it has.
+   */
+  const fallbacksFor = (style: { weight: number; italic: boolean }): readonly string[] => {
+    const current = list.get();
+    const key = `${style.weight}|${style.italic}`;
+    const known = styleFallbacks.get(key);
+    if (known) return known;
+    if (current && known === undefined) {
+      const reading = styleFallbacks;
+      reading.set(key, null);
+      Promise.resolve()
+        .then(() =>
+          ctx.doc.fonts.resolve({
+            runs: [{ text: ' ', family: 'Helvetica', weight: style.weight, italic: style.italic }],
+          }),
+        )
+        .then(({ runs }) => {
+          // The list changed meanwhile: its fallbacks may have too.
+          if (reading !== styleFallbacks) return;
+          reading.set(key, runs[0]?.fallbacks ?? []);
+          css = new Map();
+          paintFontsChanged();
+        })
+        .catch(() => {
+          if (reading === styleFallbacks) reading.delete(key);
+        });
+    }
+    return fallbackHashes(current);
+  };
+
   const cached = (key: string, build: () => FontCss): FontCss => {
     let known = css.get(key);
     if (!known) {
@@ -234,7 +282,7 @@ export function createFontsController(ctx: PluginContext<void>) {
     cssOf(
       standardFontProgram(font),
       STANDARD_FACES[font],
-      fallbackHashes(list.get()),
+      fallbacksFor(STANDARD_FACES[font]),
       tailOf(undefined, font),
     );
 
@@ -253,7 +301,7 @@ export function createFontsController(ctx: PluginContext<void>) {
         standardFontForFace({ family: font.familyName, weight: font.weight, italic: font.italic }),
       );
     }
-    return cssOf(mountable, font, fallbackHashes(list.get()), tailOf(font, null));
+    return cssOf(mountable, font, fallbacksFor(font), tailOf(font, null));
   };
 
   const api: FontsCapability = {
@@ -271,20 +319,24 @@ export function createFontsController(ctx: PluginContext<void>) {
       ),
     getPaintFonts: (font, text) => paintFonts.get(font, text),
     getPaintFontsEpoch: () => paintFontsEpoch,
-    getFontCss: (font) =>
-      cached(`font:${font}`, () => {
+    getFontCss: (font) => {
+      if (!isStandardFontName(font)) loadListSoon();
+      return cached(`font:${font}`, () => {
         if (isStandardFontName(font)) return standardCss(font);
         const current = list.get();
         const listed = current ? fontNamed(current, font) : undefined;
         // Not listed (yet): the standard font the engine falls back to.
         return listed ? listedCss(listed) : standardCss(standardFontOf(font));
-      }),
-    getFaceCss: (face) =>
-      cached(`face:${face.family}|${face.weight ?? 400}|${face.italic ?? false}`, () => {
+      });
+    },
+    getFaceCss: (face) => {
+      if (!standardFamilyOf(face.family)) loadListSoon();
+      return cached(`face:${face.family}|${face.weight ?? 400}|${face.italic ?? false}`, () => {
         const current = list.get();
         const listed = current ? fontForFace(current, face) : undefined;
         return listed ? listedCss(listed) : standardCss(standardFontForFace(face));
-      }),
+      });
+    },
     getRunCss: (run) =>
       cached(
         `run:${run.font}|${run.weight}|${run.italic}|${run.program}|${run.fallbacks.join(',')}`,

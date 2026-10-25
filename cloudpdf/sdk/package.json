@@ -96,6 +96,17 @@
             },
             "default": "./dist/cjs/api/resources/doc/resources/annotations/exports.js"
         },
+        "./doc/fonts": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/fonts/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/fonts/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/fonts/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/fonts/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/fonts/exports.js"
+        },
         "./doc/forms": {
             "import": {
                 "types": "./dist/esm/api/resources/doc/resources/forms/exports.d.mts",
@@ -172,6 +183,17 @@
                 "default": "./dist/cjs/api/resources/doc/resources/versions/exports.js"
             },
             "default": "./dist/cjs/api/resources/doc/resources/versions/exports.js"
+        },
+        "./doc/fonts/programs": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/fonts/resources/programs/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/fonts/resources/programs/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/fonts/resources/programs/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/fonts/resources/programs/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/fonts/resources/programs/exports.js"
         },
         "./doc/metadata/custom": {
             "import": {

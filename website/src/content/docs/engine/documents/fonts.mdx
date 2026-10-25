@@ -43,7 +43,7 @@ for (const font of fonts) {
 | :----------- | :-------------------------------------------------------------------------------------------- | :--------------------------------- |
 | `'standard'` | The 14 standard PDF fonts. They only cover Latin text.                                        | `'helvetica'`, `'times-bold'`, …   |
 | `'engine'`   | The engine's fonts: the ones you [register](#register-a-font) locally, your server's on the cloud. | the `key` they were given          |
-| `'document'` | Fonts the PDF already has.                                                                    | the font's own name, such as `'MinionPro-Regular'` |
+| `'document'` | Fonts the PDF already has.                                                                    | its PostScript name, such as `'MinionPro-Regular'`; without one, its family and style, such as `'Inter,Medium'` |
 
 Pass a font's `name` as `fontFamily` to write with it. A font with `canChoose: false` can't be
 named for new text; `restrictions` says why (see [What a font allows](#what-a-font-allows)). A
@@ -248,8 +248,10 @@ write.
 
 ## Show typed text in a browser
 
-The viewer shows text being typed in the font the engine will write it in. If you build your own
-editor, ask the engine the same question the viewer does: which fonts will it draw this text in?
+The viewer shows text being typed in the font the engine will write it in, and so do the headless
+adapters' layers with the [fonts plugin](/docs/headless/documents/fonts), which also gives you a
+font's CSS in one call. If you build your own editor without them, ask the engine the same question
+the viewer does: which fonts will it draw this text in?
 
 ```ts
 const { runs, missingCharacters } = await doc.fonts.resolve({

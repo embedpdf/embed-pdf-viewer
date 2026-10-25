@@ -1337,6 +1337,381 @@
         }
       }
     },
+    "/v1/docs/{docId}/layers/{layerName}/font-program-files/{displayHash}": {
+      "get": {
+        "operationId": "doc.fonts.programs.download",
+        "x-fern-sdk-group-name": ["doc", "fonts", "programs"],
+        "x-fern-sdk-method-name": "download",
+        "x-docs-title": "Download font program",
+        "summary": "A font file a browser can load, by its hash: to show text being typed in the font the engine writes it with.",
+        "description": "A document token needs any one of the listed capabilities: one that may write text in the document. A file the list says can't be downloaded (`canDownload: false`) is not found.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": [
+          "doc.annotate.modify",
+          "doc.forms.fill",
+          "doc.forms.modify",
+          "doc.redact"
+        ],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "displayHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "font/sfnt": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsProgramsDownload403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsProgramsDownload404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/font-programs/{displayHash}": {
+      "get": {
+        "operationId": "doc.fonts.programs.get",
+        "x-fern-sdk-group-name": ["doc", "fonts", "programs"],
+        "x-fern-sdk-method-name": "get",
+        "x-docs-title": "Get font program",
+        "summary": "A font file's facts, by the hash of the file a browser loads: the characters the engine can write with it and its line metrics.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.open"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "displayHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsProgramsGet200Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsProgramsGet404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/fonts": {
+      "get": {
+        "operationId": "doc.fonts.list",
+        "x-fern-sdk-group-name": ["doc", "fonts"],
+        "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List fonts",
+        "summary": "Every font text can be written in, in a layer: the standard fonts, the server's, and the document's own, each with whether new text can be written in it and why not, and its font files.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.open"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsList200Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsList404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/fonts/resolve": {
+      "post": {
+        "operationId": "doc.fonts.resolve",
+        "x-fern-sdk-group-name": ["doc", "fonts"],
+        "x-fern-sdk-method-name": "resolve",
+        "x-docs-title": "Resolve fonts",
+        "summary": "The fonts a write would draw each run of text in, found the way the write finds them, without writing: what an editor shows while someone types.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.open"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocFontsResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsResolve200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsResolve400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFontsResolve404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/layers/{layerName}/form": {
       "get": {
         "operationId": "doc.forms.list",
@@ -6976,6 +7351,12 @@
     "doc.annotations": {
       "title": "Annotations"
     },
+    "doc.fonts": {
+      "title": "Fonts"
+    },
+    "doc.fonts.programs": {
+      "title": "Font programs"
+    },
     "doc.forms": {
       "title": "Forms"
     },
@@ -7175,6 +7556,11 @@
             "exclusiveMinimum": true,
             "minimum": 0
           },
+          "fontsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
           "layerVersion": {
             "type": "integer",
             "minimum": 0
@@ -7243,6 +7629,12 @@
           },
           "undoable": {
             "type": "boolean"
+          },
+          "missingCharacters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": ["affectedPages", "cacheDelta", "opId", "undoable"],
@@ -18755,6 +19147,12 @@
           "undoable": {
             "type": "boolean"
           },
+          "missingCharacters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "changed": {
             "type": "array",
             "items": {
@@ -20955,6 +21353,12 @@
           "undoable": {
             "type": "boolean"
           },
+          "missingCharacters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "changedFields": {
             "type": "array",
             "items": {
@@ -21203,6 +21607,12 @@
           },
           "undoable": {
             "type": "boolean"
+          },
+          "missingCharacters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "changed": {
             "type": "array",
@@ -22452,6 +22862,282 @@
           }
         },
         "required": ["items", "meta"],
+        "additionalProperties": false
+      },
+      "FontProgram": {
+        "type": "object",
+        "properties": {
+          "displayHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "embedded": {
+            "type": "string",
+            "enum": ["whole", "subset", "none"]
+          },
+          "format": {
+            "type": "string",
+            "enum": ["truetype", "opentype", "cff", "type1", "type3"],
+            "nullable": true
+          },
+          "embeddingPermission": {
+            "type": "string",
+            "enum": ["installable", "editable", "preview-and-print"],
+            "nullable": true
+          },
+          "canDownload": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "displayHash",
+          "sourceHash",
+          "embedded",
+          "format",
+          "embeddingPermission",
+          "canDownload"
+        ],
+        "additionalProperties": false
+      },
+      "Font": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["standard", "engine", "document"]
+          },
+          "familyName": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer"
+          },
+          "italic": {
+            "type": "boolean"
+          },
+          "postScriptName": {
+            "type": "string",
+            "nullable": true
+          },
+          "canChoose": {
+            "type": "boolean"
+          },
+          "restrictions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "subset",
+                "not-embedded",
+                "preview-and-print",
+                "unsupported-format",
+                "no-unicode-map",
+                "not-served"
+              ]
+            }
+          },
+          "programs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FontProgram"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "source",
+          "familyName",
+          "weight",
+          "italic",
+          "postScriptName",
+          "canChoose",
+          "restrictions",
+          "programs"
+        ],
+        "additionalProperties": false
+      },
+      "FontList": {
+        "type": "object",
+        "properties": {
+          "fonts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Font"
+            }
+          },
+          "fallbacks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastResort": {
+            "$ref": "#/components/schemas/FontProgram"
+          }
+        },
+        "required": ["fonts", "fallbacks", "lastResort"],
+        "additionalProperties": false
+      },
+      "FontProgramInfo": {
+        "type": "object",
+        "properties": {
+          "displayHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "embedded": {
+            "type": "string",
+            "enum": ["whole", "subset", "none"]
+          },
+          "format": {
+            "type": "string",
+            "enum": ["truetype", "opentype", "cff", "type1", "type3"],
+            "nullable": true
+          },
+          "embeddingPermission": {
+            "type": "string",
+            "enum": ["installable", "editable", "preview-and-print"],
+            "nullable": true
+          },
+          "canDownload": {
+            "type": "boolean"
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "count": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              },
+              "required": ["start", "count"],
+              "additionalProperties": false
+            }
+          },
+          "ascent": {
+            "type": "number"
+          },
+          "descent": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "displayHash",
+          "sourceHash",
+          "embedded",
+          "format",
+          "embeddingPermission",
+          "canDownload",
+          "covers",
+          "ascent",
+          "descent"
+        ],
+        "additionalProperties": false
+      },
+      "FontResolveRun": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 65536
+          },
+          "fontFamily": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "italic": {
+            "type": "boolean"
+          }
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      },
+      "FontResolveRequest": {
+        "type": "object",
+        "properties": {
+          "annotation": {
+            "$ref": "#/components/schemas/AnnotationRef"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FontResolveRun"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": ["runs"],
+        "additionalProperties": false
+      },
+      "ResolvedFontRun": {
+        "type": "object",
+        "properties": {
+          "font": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "italic": {
+            "type": "boolean"
+          },
+          "substituted": {
+            "type": "boolean"
+          },
+          "program": {
+            "type": "string",
+            "nullable": true
+          },
+          "fallbacks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["font", "weight", "italic", "substituted", "program", "fallbacks"],
+        "additionalProperties": false
+      },
+      "FontResolution": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedFontRun"
+            }
+          },
+          "missingCharacters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["runs", "missingCharacters"],
         "additionalProperties": false
       },
       "TenantsCreateRequest": {
@@ -24296,6 +24982,15 @@
             "minimum": 0,
             "default": 1
           },
+          "fontsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "default": 1
+          },
+          "serverFonts": {
+            "type": "string"
+          },
           "auditHead": {
             "type": "integer",
             "minimum": 0
@@ -24488,6 +25183,7 @@
           "docVersion",
           "layoutVersion",
           "metadataVersion",
+          "serverFonts",
           "auditHead",
           "baseSha",
           "protection",
@@ -24517,6 +25213,36 @@
         "$ref": "#/components/schemas/DocumentOutline"
       },
       "DocOutlineGet404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFontsList200Response": {
+        "$ref": "#/components/schemas/FontList"
+      },
+      "DocFontsList404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFontsResolveRequest": {
+        "$ref": "#/components/schemas/FontResolveRequest"
+      },
+      "DocFontsResolve200Response": {
+        "$ref": "#/components/schemas/FontResolution"
+      },
+      "DocFontsResolve400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFontsResolve404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFontsProgramsGet200Response": {
+        "$ref": "#/components/schemas/FontProgramInfo"
+      },
+      "DocFontsProgramsGet404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFontsProgramsDownload403Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFontsProgramsDownload404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocSignaturesList200Response": {

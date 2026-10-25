@@ -14,6 +14,7 @@ import {
   ChangeWireComponents,
   DocumentWireComponents,
   EngineErrorPayloadSchema,
+  FontWireComponents,
   FormWireComponents,
   OutlineWireComponents,
   PdfActionWireComponents,
@@ -65,6 +66,7 @@ const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   FormWireComponents,
   OutlineWireComponents,
   ChangeWireComponents,
+  FontWireComponents,
 ]);
 
 const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(

@@ -6,12 +6,11 @@
  *
  *   const fonts = useFonts();
  *   const state = useFontsState(); // state.fonts, state.status
- *   const css = fonts.getFontCss('helvetica'); // mount css.programs where you draw it
- *   useFontMounts(() => css.programs);
+ *   const css = useFontCss('helvetica'); // css.current, its programs mounted while the component lives
  */
 
 // Registration travels with the UI.
 export * from '@embedpdf/plugin-fonts';
 
-export { useFonts, useFontsEvent, useFontsState } from './fonts/readers';
+export { useFontCss, useFonts, useFontsEvent, useFontsState } from './fonts/readers';
 export { useFontMounts } from './runtime/font-mounts.svelte';

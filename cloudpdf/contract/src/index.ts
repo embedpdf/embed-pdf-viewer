@@ -31,6 +31,10 @@ import {
   FormResetResultSchema,
   FormSetValueResultSchema,
   FormSnapshotSchema,
+  FontListSchema,
+  FontProgramInfoSchema,
+  FontResolutionSchema,
+  FontResolveRequestSchema,
   IdentitySchema,
   PageDeleteResultSchema,
   PageFlattenResultSchema,
@@ -1381,6 +1385,10 @@ export const idempotencyKeyHeader: AdminOperationHeader = {
 const looseJson = z.record(z.string(), z.unknown());
 const docCredentials = ['api-token', 'doc-jwt'] as const;
 
+/** A font program, by the hash of the file a browser loads. */
+export const DocFontProgramParamsSchema = DocLayerParamsSchema.extend({
+  displayHash: z.string().regex(sha256Hex),
+});
 export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),
 });
@@ -1491,6 +1499,80 @@ export const docOperations = {
       200: { contentType: 'application/json', schema: DocumentOutlineSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
+  },
+  'doc.fonts.list': {
+    operationId: 'doc.fonts.list',
+    title: 'List fonts',
+    summary:
+      "Every font text can be written in, in a layer: the standard fonts, the server's, and the document's own, each with whether new text can be written in it and why not, and its font files.",
+    method: 'GET',
+    path: wireTemplates.layerFonts,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FontListSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.fonts.resolve': {
+    operationId: 'doc.fonts.resolve',
+    title: 'Resolve fonts',
+    summary:
+      'The fonts a write would draw each run of text in, found the way the write finds them, without writing: what an editor shows while someone types.',
+    method: 'POST',
+    path: wireTemplates.layerFontsResolve,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    body: { contentType: 'application/json', schema: FontResolveRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FontResolutionSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.fonts.programs.get': {
+    operationId: 'doc.fonts.programs.get',
+    title: 'Get font program',
+    summary:
+      "A font file's facts, by the hash of the file a browser loads: the characters the engine can write with it and its line metrics.",
+    method: 'GET',
+    path: wireTemplates.layerFontProgram,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocFontProgramParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FontProgramInfoSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.fonts.programs.download': {
+    operationId: 'doc.fonts.programs.download',
+    title: 'Download font program',
+    summary:
+      'A font file a browser can load, by its hash: to show text being typed in the font the engine writes it with.',
+    method: 'GET',
+    path: wireTemplates.layerFontProgramFile,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.annotate.modify', 'doc.forms.fill', 'doc.forms.modify', 'doc.redact'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocFontProgramParamsSchema,
+    responses: {
+      200: { contentType: 'font/sfnt' },
+      403: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      'A document token needs any one of the listed capabilities: one that may write text in the document. ' +
+      "A file the list says can't be downloaded (`canDownload: false`) is not found.",
   },
   'doc.signatures.list': {
     operationId: 'doc.signatures.list',
@@ -2362,6 +2444,8 @@ export const docsGroups = {
   shares: { title: 'Shares' },
   doc: { title: 'Document operations', slug: 'document-operations' },
   'doc.annotations': { title: 'Annotations' },
+  'doc.fonts': { title: 'Fonts' },
+  'doc.fonts.programs': { title: 'Font programs' },
   'doc.forms': { title: 'Forms' },
   'doc.metadata': { title: 'Metadata' },
   'doc.metadata.custom': { title: 'Custom keys' },

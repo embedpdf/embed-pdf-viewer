@@ -14,7 +14,7 @@ import { readUtf8String } from '../../../../runtime/memory/strings';
  * The `fontFamily` that names a box's font face, as `doc.fonts.list()` names
  * it: one of the engine's fonts by its key; a standard font's name; a
  * document font by its PostScript name (the font `/DA` names, when that is
- * this face); else the family with PDF's style suffix (`'Arial,Bold'`).
+ * this face); else the family with its style (`'Inter,Medium'`).
  */
 export function boxFontName(
   fn: PdfFunctions,

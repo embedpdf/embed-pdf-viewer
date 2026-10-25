@@ -52,6 +52,7 @@ export {
   FontProgramInfoSchema,
   FontResolveRequestSchema,
   FontResolutionSchema,
+  FontWireComponents,
   AccessRequestSchema,
   AccessResponseSchema,
   EditSessionAccessSchema,

@@ -6,18 +6,27 @@
  *
  *   const fonts = useFonts();
  *   const { fonts: list, status } = useFontsState();
- *   const css = fonts.getFontCss('helvetica'); // mount css.programs where you draw it
+ *   const css = useFontCss('helvetica'); // its programs mounted while the component lives
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-fonts';
-import type { EventHook } from '@embedpdf/core';
-import { FontsToken, fontsState, type FontsCapability } from '@embedpdf/plugin-fonts';
+import type { EventHook, FontName } from '@embedpdf/core';
+import {
+  FontsToken,
+  fontsState,
+  type FontCss,
+  type FontsCapability,
+  type MountableFontProgram,
+} from '@embedpdf/plugin-fonts';
 
-import { useCapability, useCapabilityEvent } from './runtime';
+import { useFontMounts } from './font-mounts';
+import { useCapability, useCapabilityEvent, useOptionalSelector } from './runtime';
 import { stateHook } from './state';
 
-export { useFontMounts } from './font-mounts';
+export { useFontMounts };
+
+const NO_PROGRAMS: readonly MountableFontProgram[] = [];
 
 /**
  * The fonts capability (the list, `resolve`, and the CSS a font is drawn
@@ -41,4 +50,20 @@ export function useFontsEvent<T>(
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(FontsToken, select, handler);
+}
+
+/**
+ * How to draw text in `font` as the engine draws it: its CSS (`fontFamily`, `fontWeight`,
+ * `fontStyle`; draw with `fontSynthesis: 'none'`), again once its programs reach the browser, with
+ * the programs mounted while the component lives. `null` for a `null` font, and outside a document
+ * with the fonts plugin.
+ */
+export function useFontCss(font: FontName | null): FontCss | null {
+  const css = useOptionalSelector(
+    FontsToken,
+    (fonts) => (font === null ? null : fonts.getFontCss(font)),
+    null,
+  );
+  useFontMounts(css?.programs ?? NO_PROGRAMS);
+  return css;
 }

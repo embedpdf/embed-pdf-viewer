@@ -5,15 +5,15 @@
  *
  *   protected readonly fonts = inject(EpdfFonts);
  *   names = computed(() => this.fonts.list()?.fonts.map((font) => font.name) ?? []);
- *   const css = this.fonts.getFontCss('helvetica'); // mount css.programs: injectFontMounts()
+ *   css = injectFontCss(() => 'helvetica'); // its programs mounted while the caller lives
  *
  * The plugin's State table reads a little differently here: the font list is `list()` (React's
  * `fonts`).
  */
-import { Injectable, type Signal } from '@angular/core';
-import { pluginService, type EmbedPdfFeature } from '@embedpdf/angular/runtime';
-import type { FontList, ResourceStatus } from '@embedpdf/angular/runtime';
-import { fontsPlugin, fontsState, FontsToken } from '@embedpdf/plugin-fonts';
+import { inject, Injectable, type Signal } from '@angular/core';
+import { injectFontMounts, pluginService, type EmbedPdfFeature } from '@embedpdf/angular/runtime';
+import type { FontList, FontName, ResourceStatus } from '@embedpdf/angular/runtime';
+import { fontsPlugin, fontsState, FontsToken, type FontCss } from '@embedpdf/plugin-fonts';
 
 /**
  * The fonts of the document in scope (`[epdfDocumentScope]`), else the active one: the font list
@@ -59,6 +59,33 @@ export class EpdfFonts extends pluginService({
     'idle',
     Object.is,
   );
+
+  /**
+   * The CSS `font()` is drawn with, again once its programs reach the browser; `null` for a `null`
+   * font. Mount its programs where the text is drawn: {@link injectFontCss} does both.
+   */
+  fontCss(font: () => FontName | null): Signal<FontCss | null> {
+    return this.binding.select(
+      (fonts) => {
+        const name = font();
+        return name === null ? null : fonts.getFontCss(name);
+      },
+      null,
+      Object.is,
+    );
+  }
+}
+
+/**
+ * How to draw text in `font()` as the engine draws it: its CSS (`fontFamily`, `fontWeight`,
+ * `fontStyle`; draw with `font-synthesis: none`), again once its programs reach the browser, with
+ * the programs mounted while the caller lives. `null` for a `null` font. Call it in an injection
+ * context.
+ */
+export function injectFontCss(font: () => FontName | null): Signal<FontCss | null> {
+  const css = inject(EpdfFonts).fontCss(font);
+  injectFontMounts(() => css()?.programs ?? []);
+  return css;
 }
 
 /** Fonts, for `provideEmbedPdf()`. */

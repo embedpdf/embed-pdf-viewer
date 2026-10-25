@@ -217,6 +217,58 @@ describe('the fonts controller', () => {
     expect(fonts.downloadProgram).toHaveBeenCalledWith(hashOf('a'));
   });
 
+  it("draws a style's fallbacks in the order the engine tries them for it, once it has said", async () => {
+    const HEBREW_BOLD = font({
+      name: 'noto-hebrew-bold',
+      familyName: 'Noto Sans Hebrew',
+      source: 'engine',
+      weight: 700,
+      programs: [program(hashOf('f'))],
+    });
+    const { fonts, api } = harness({
+      list: {
+        ...LIST,
+        fonts: [...LIST.fonts, HEBREW_BOLD],
+        fallbacks: ['noto-hebrew', 'noto-hebrew-bold'],
+      },
+    });
+    // The engine tries a bold run's bold fallback first.
+    fonts.resolve.mockImplementation(async (request: FontResolveRequest) => ({
+      runs: request.runs.map((run) => ({
+        font: 'helvetica',
+        weight: 400,
+        italic: false,
+        substituted: false,
+        program: null,
+        fallbacks:
+          'weight' in run && run.weight === 700
+            ? [hashOf('f'), hashOf('c')]
+            : [hashOf('c'), hashOf('f')],
+      })),
+      missingCharacters: [],
+    }));
+    const fallbacksOf = (name: string) =>
+      api
+        .getFontCss(name)
+        .programs.slice(1, 3)
+        .map((mounted) => mounted.hash);
+    await api.ensureLoaded();
+    const epoch = api.getPaintFontsEpoch();
+    // The list's order until the engine says.
+    expect(fallbacksOf('helvetica-bold')).toEqual([hashOf('c'), hashOf('f')]);
+    await settle();
+    expect(api.getPaintFontsEpoch()).toBeGreaterThan(epoch);
+    expect(fallbacksOf('helvetica-bold')).toEqual([hashOf('f'), hashOf('c')]);
+    expect(fallbacksOf('times-bold')).toEqual([hashOf('f'), hashOf('c')]);
+    expect(fallbacksOf('Roboto-Regular')).toEqual([hashOf('c'), hashOf('f')]);
+    await settle();
+    // Once per style.
+    expect(fonts.resolve.mock.calls.map(([request]) => request.runs[0])).toEqual([
+      { text: ' ', family: 'Helvetica', weight: 700, italic: false },
+      { text: ' ', family: 'Helvetica', weight: 400, italic: false },
+    ]);
+  });
+
   it("finds a rich text face's program, and a face no font has in the engine's standard fallback", async () => {
     const { api } = harness();
     await api.ensureLoaded();
@@ -224,6 +276,19 @@ describe('the fonts controller', () => {
     expect(api.getFaceCss({ family: 'Courier New', weight: 700 }).programs[0]).toBe(
       standardFontProgram('courier-bold'),
     );
+  });
+
+  it('reads the list after the asker’s turn the first time a font that isn’t standard is asked for', async () => {
+    const { fonts, api } = harness();
+    api.getFontCss('helvetica');
+    api.getFaceCss({ family: 'Arial', weight: 700 });
+    await settle();
+    expect(fonts.list).not.toHaveBeenCalled();
+    api.getFontCss('Roboto-Regular');
+    expect(fonts.list).not.toHaveBeenCalled();
+    await settle();
+    expect(fonts.list).toHaveBeenCalledTimes(1);
+    expect(api.getStatus()).toBe('ready');
   });
 
   it('draws a font the list doesn’t name, or before the list is loaded, in Helvetica', () => {

@@ -3,4 +3,5 @@ export default {
   'turning-off': 'Turn features off',
   annotations: 'Annotations',
   'forms-and-signatures': 'Forms & signatures',
+  fonts: 'Fonts',
 };

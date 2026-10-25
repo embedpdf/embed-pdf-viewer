@@ -22,6 +22,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -33,6 +34,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -203,6 +205,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -214,6 +217,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -311,6 +315,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -322,6 +327,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -442,6 +448,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -453,6 +460,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -572,6 +580,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -583,6 +592,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -702,6 +712,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -713,6 +724,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -833,6 +845,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -844,6 +857,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -991,6 +1005,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -1002,6 +1017,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
