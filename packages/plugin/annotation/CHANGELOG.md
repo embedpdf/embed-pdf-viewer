@@ -1,5 +1,17 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#895](https://github.com/embedpdf/embed-pdf-viewer/pull/895) by [@bobsingor](https://github.com/bobsingor) – New host read `getTextItem(ref, view?)`: one free text's text item (its runs, body style and box) in every state, saved and idle included. A renderer that draws a text box itself reads it, since no engine picture is drawn under its element. `listTextItems` is unchanged: it lists only the text boxes the layer draws as elements.
+
+### Patch Changes
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – The annotations of pages an undo brings back are read again.
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – When pages go, come or come back, the pages whose annotations link to them are read again, so a link to a deleted page that an undo brought back works again.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

@@ -1,5 +1,25 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Attachment ops apply inside changes, with their reverses: a delete keeps the file so its undo puts it back under its name, and undoing an add leaves a file someone put under that name since, even with the same bytes. The `attachments.create` and `attachments.delete` worker jobs are removed. A decode refused past its limit names the limit (`details.limit`).
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – Read and write the document's outline in the worker: an outline reader with loop guards and read limits, the outline ops with undo (deleted items come back from a capture under the numbers they had), and the `outline.read` worker job. Link and outline targets share one writer, so an outline item's target is written as `/A`, as a link's is.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – Page ops apply inside changes, with their reverses: a delete keeps each page so its undo puts it back where it was, and undoing an insert, a move or a turn leaves the pages someone changed since.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The worker's page extract makes flattened copies with the runtime's `EPDFDoc_ExportPagesFlattened`: annotations and form fields painted in as they draw for the usage (an annotation without a stored appearance included), no annotations or page actions left, layers in their state for the usage. Every extracted copy keeps the document's title.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The page renderer draws print pictures (`usage: 'print'`): with PDFium's printing flag, so layers take their print state and annotations and form fields draw by their `print` flag, sized by the picture's `dpi` viewport.
+
+- [#884](https://github.com/embedpdf/embed-pdf-viewer/pull/884) by [@bobsingor](https://github.com/bobsingor) – Rename `DocumentSession.useObjectNumber()` to `claimObjectNumber()`. It claims a number from the session's reserved object numbers for the open transaction, the counterpart of `reserveObjectNumbers()`. The old name read as a React hook, so dev tools that look for hooks rewrote the engine worker around it.
+
+### Patch Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Undo fixes. Each op of a change converts to and from page space as it runs, so changes sent together (or ops of one change) that delete, make or bring back a page another one names apply instead of failing the job. Guards compare canonical bytes, which a save that only encodes a stream again, or the layer learning its file's hash, no longer changes: the undo of a page insert applies after the page was turned and turned back. The undo of opening an outline item counts the items above it again; the undo of a delete or move that emptied an open item opens it again; the undo of an item made applies after the page its target goes to was deleted; the undo of a retarget skips the target when its old page is gone. No outline item is made under the deepest item a read shows.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

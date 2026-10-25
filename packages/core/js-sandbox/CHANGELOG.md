@@ -1,5 +1,7 @@
 # @embedpdf/core-js-sandbox
 
+## 3.0.0-next.16
+
 ## 3.0.0-next.15
 
 ### Patch Changes

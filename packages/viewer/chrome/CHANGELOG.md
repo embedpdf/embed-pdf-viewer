@@ -1,5 +1,27 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – The attachments panel: the files the document carries, its attachments and then the files on its pages, each with its kind, its name (without the characters that can disguise one), its size, its page and its description. Clicking an attachment saves it, clicking a page's file goes to it, and a row's menu saves, goes to the page and deletes, each as one undoable step. Add file in its header, or files dropped on it, attach them, a name the document has already getting a number. The outline and attachments panels show while they have a job: their list holds entries, or the session may add some with the feature on. A selected file attachment annotation's strip has Save file (`annotation:save-file`). New commands `attachment:add`, `attachment:save`, `attachment:go-to`, `attachment:delete` and the `attachment-item` menu.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The Outline panel shows the document's bookmarks as a tree, beside Thumbnails, for every document (one without an outline says so). A row goes where its item goes; the item for where you are reading is marked and scrolls into view; a filter finds items by their title, in their place; the keyboard works the tree as the ARIA tree pattern does. A session that may change the outline adds items (`Mod+B`, after the selected one, at the place in view, renaming at once), renames them in their row, drags them to another place and level, deletes them, and edits an item's title, colour, style, open state and destination in its Properties. Each edit is one step of the history. The new `outline:*` commands and the `outline-item` menu are in the layout, and `outline.editing` is a feature `readOnly` turns off. The page number field gives focus back to the number in the same frame it closes.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – Pages are organized in the thumbnails panel, where the user may change them (`pages` feature, `doc.pages.assemble`).
+  - A click selects a page and goes to it; Ctrl/Cmd+click and Shift+click select more. Each page has a menu (its ⋯ button, a right-click or a long press) with rotate, insert a blank page or a PDF, duplicate, extract and delete. Dragging moves pages, with a line where they land; a PDF dropped between pages is inserted there instead of opening as a tab. The arrows, Shift, Space, Alt+arrows, Delete and Ctrl/Cmd+A work while the list has focus.
+  - The panel's header inserts a blank page, rotates and deletes the selection, opens its menu, and has undo and redo: every page edit is a step of the history.
+  - New commands: `page:rotate-clockwise`, `page:rotate-counterclockwise`, `page:delete`, `page:duplicate`, `page:insert-blank`, `page:insert-file` (`args: { position, files }`), `page:extract` (in `documents.download`, so `readOnly` keeps it), `page:select-all` and `menu:page`, with the `page` menu. New icons: `pageRotateClockwise`, `pageRotateCounterClockwise`, `filePlus`, `fileExport`. Their strings are in all 13 languages.
+  - Downloads of the document, a stamp library, a signature and a signed revision share one way of saving a file.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – **Print** (`document:print`, `Ctrl`/`Cmd`+`P`) opens a Print dialog: every page, the current page or pages such as `1-3, 5`, and whether annotations print. Nothing is made while the user chooses: **Print** prepares the chosen pages, shows how far it is with a progress bar (Cancel stops it), and opens the browser's print dialog when they're ready. In Safari, which prints only from a tap, it says the pages are ready and prints from the next tap on **Print**. It says when the document allows only low-resolution printing. In every language the viewer ships.
+
+### Patch Changes
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – With a finger as the main way of pointing, the viewer's own fields (search, the page number, comments, signatures and the rest) write in 16 px text, so iOS Safari doesn't zoom the page in when one takes focus.
+
+- [#872](https://github.com/embedpdf/embed-pdf-viewer/pull/872) by [@bobsingor](https://github.com/bobsingor) – Fix sheets on a phone: a menu or panel sheet slides straight up from the bottom of the viewer instead of landing too high and dropping into place, and the whole viewer stays dimmed behind it while it slides in or is dragged. Dragging a sheet's handle down fades the dimming with it, and the dimming returns when the sheet is let go at rest.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

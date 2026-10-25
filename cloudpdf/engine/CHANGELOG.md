@@ -1,5 +1,23 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – On the cloud engine, `doc.attachments.create()` and `delete()` are changes that can be undone, sent through `POST …/changes`, and `download()` returns the bytes. Another session follows `attachments.restored`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `doc.outline` on the cloud engine: the outline is read from the shared URL while the layer inherits it, from the layer's otherwise, and its edits are undoable changes.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – On the cloud engine, `doc.pages.rotate()`, `reorder()`, `delete()`, `insert()` and `insertBlank()` are changes that can be undone, sent through `POST …/changes`.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `pages.extract(pages, options)` sends its options to the server, so a cloud document makes flattened copies too: `{ flatten: { usage: 'print' } }` returns the pages as they print.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `page.render.image()` makes print pictures (`usage: 'print'`, `viewport: { kind: 'dpi', dpi: 150 | 300 }`), fetched from the print family's path at its tier (`render/print/…` or `render/print-high/…`). A session whose rights the client knows is refused before the request without `doc.print`, or `doc.print.high` at 300 DPI.
+
+### Patch Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Another session's outline edits, and its undos of annotation deletes, move this session's cached pins, so it never reads the old outline or annotations from a cached URL. Every remote event kind is named where they are absorbed, so a new one can't be forgotten.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

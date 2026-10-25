@@ -1,5 +1,7 @@
 # @embedpdf/plugin-history
 
+## 3.0.0-next.16
+
 ## 3.0.0-next.15
 
 ### Major Changes
