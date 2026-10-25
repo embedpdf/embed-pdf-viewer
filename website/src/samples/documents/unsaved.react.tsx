@@ -31,7 +31,7 @@ function TitleBar() {
 
   // A change on load: the document gets a new title, so it has something to lose.
   useEffect(() => {
-    void metadata.update({ title: 'Quarterly report (draft)' });
+    void metadata.update({ title: 'Documents belong on the web (draft)' });
   }, [metadata]);
 
   // While there's something to lose, the browser asks before the page closes.
@@ -57,7 +57,7 @@ function TitleBar() {
       <button
         type="button"
         className="button"
-        onClick={async () => saveFile(await documents.download(), 'report.pdf')}
+        onClick={async () => saveFile(await documents.download(), 'welcome.pdf')}
       >
         Download
       </button>
@@ -91,7 +91,7 @@ export default function App() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: welcome, name: 'report.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
     >
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <TitleBar />

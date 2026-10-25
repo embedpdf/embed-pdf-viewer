@@ -24,6 +24,13 @@ const welcome = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
 // The same component in both panes: each talks to the document its [epdfDocumentScope] names.
 @Component({
   selector: 'demo-header',
@@ -66,8 +73,8 @@ export class Header {
       {
         engine: () => localEngine(),
         initialDocuments: [
-          { source: welcome, name: 'Original' },
-          { source: welcome, name: 'Revised' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

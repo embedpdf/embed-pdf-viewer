@@ -15,7 +15,7 @@
   const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: welcome, name: 'report.pdf' }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

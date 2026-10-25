@@ -12,17 +12,21 @@
   const plugins = [stagePlugin(), renderPlugin()];
 
   const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+  const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+  const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <Viewer
   {engine}
   {plugins}
   initialDocuments={[
-    { source: welcome, name: 'Contract' },
-    { source: welcome, name: 'Report' },
+    { source: welcome, name: 'Guide' },
+    { source: article, name: 'Article' },
   ]}
 >
-  <Tabs {welcome} />
+  <Tabs {sketch} />
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

@@ -18,7 +18,7 @@
   };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: welcome, name: 'report.pdf' }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

@@ -23,6 +23,13 @@ const welcome = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
 function Pane({ pane, canRemove }: { pane: PaneInfo; canRemove: boolean }) {
   const views = useViewManager();
   const focusedPaneId = useViewManagerState((state) => state.focusedPaneId);
@@ -106,8 +113,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: welcome, name: 'Contract' },
-        { source: welcome, name: 'Report' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <Panes />

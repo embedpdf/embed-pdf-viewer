@@ -50,7 +50,7 @@ export class TitleBar {
 
   constructor() {
     // A change on load: the document gets a new title, so it has something to lose.
-    void this.metadata.update({ title: 'Quarterly report (draft)' });
+    void this.metadata.update({ title: 'Documents belong on the web (draft)' });
 
     // While there's something to lose, the browser asks before the page closes.
     effect((onCleanup) => {
@@ -62,7 +62,7 @@ export class TitleBar {
   }
 
   protected async download() {
-    saveFile(await this.documents.download(), 'report.pdf');
+    saveFile(await this.documents.download(), 'welcome.pdf');
   }
 }
 
@@ -99,7 +99,7 @@ export class ChangeLog {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, TitleBar, ChangeLog],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome, name: 'report.pdf' }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome, name: 'welcome.pdf' }] },
       withStage(),
       withRender(),
       withMetadata(),

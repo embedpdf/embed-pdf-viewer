@@ -18,6 +18,20 @@ const welcome = async (): Promise<OpenInput> => {
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
+
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
 </script>
 
 <template>
@@ -25,11 +39,11 @@ const welcome = async (): Promise<OpenInput> => {
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: welcome, name: 'Contract' },
-      { source: welcome, name: 'Report' },
+      { source: welcome, name: 'Guide' },
+      { source: article, name: 'Article' },
     ]"
   >
-    <Tabs :welcome="welcome" />
+    <Tabs :sketch="sketch" />
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>
       <TabTools />

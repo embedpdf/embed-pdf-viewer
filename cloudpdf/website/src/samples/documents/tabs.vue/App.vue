@@ -13,6 +13,10 @@ const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
@@ -20,11 +24,11 @@ const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswP
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: welcome, name: 'Contract' },
-      { source: welcome, name: 'Report' },
+      { source: welcome, name: 'Guide' },
+      { source: article, name: 'Article' },
     ]"
   >
-    <Tabs :welcome="welcome" />
+    <Tabs :sketch="sketch" />
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>
       <TabTools />

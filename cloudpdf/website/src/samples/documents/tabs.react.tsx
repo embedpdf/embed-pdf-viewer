@@ -17,6 +17,10 @@ const plugins = [stagePlugin(), renderPlugin()];
 
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
+const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+
 function Tabs() {
   const documents = useDocuments();
   const { documents: open, activeId } = useDocumentsState();
@@ -47,8 +51,8 @@ function Tabs() {
       <button
         type="button"
         className="button"
-        aria-label="Open another copy"
-        onClick={() => documents.open(welcome, { name: `Copy ${open.length + 1}` })}
+        aria-label="Open the floor plan"
+        onClick={() => documents.open(sketch, { name: 'Floor plan' })}
       >
         +
       </button>
@@ -96,8 +100,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: welcome, name: 'Contract' },
-        { source: welcome, name: 'Report' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <Tabs />
