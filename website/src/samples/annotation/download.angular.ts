@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   ViewEncapsulation,
 } from '@angular/core';
@@ -16,13 +15,14 @@ import {
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
-import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
+import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const report = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-report.pdf');
+  return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // The annotations are part of the document: the downloaded PDF has every one.
@@ -54,7 +54,7 @@ export class SaveBar {
   protected readonly drawing = computed(() => this.interaction.activeToolId() === 'ink');
 
   protected async download() {
-    saveFile(await this.documents.download(), 'ebook-annotated.pdf');
+    saveFile(await this.documents.download(), 'annotated.pdf');
   }
 }
 
@@ -65,15 +65,17 @@ export class SaveBar {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     SaveBar,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: report }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -86,6 +88,7 @@ export class SaveBar {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>
@@ -94,23 +97,4 @@ export class SaveBar {
     <ng-template #loading><p class="loading">Loading…</p></ng-template>
   `,
 })
-export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly pages = inject(EpdfDocument).pages;
-  private added = false;
-
-  constructor() {
-    // On load: a rectangle on the cover, so there's a change to save.
-    effect(() => {
-      const cover = this.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      void this.annotation.create(cover, {
-        subtype: 'square',
-        box: { x: 96, y: 506, width: 178, height: 54 },
-        color: '#e5484d',
-        strokeWidth: 3,
-      });
-    });
-  }
-}
+export class App {}

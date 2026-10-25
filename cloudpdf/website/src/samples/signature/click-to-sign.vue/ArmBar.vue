@@ -1,33 +1,27 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
-import { useForm, useFormState } from '@embedpdf/vue/form';
+import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import { useStamp, useStampState } from '@embedpdf/vue/stamp';
 import { useSignatureState, useSignerRows } from '@embedpdf/vue/signature';
 
-/** On load: a signature field on the last page, and a person's signature, armed. */
+/** On load: the agreement, where the form's signature field is, and a person's signature, armed. */
 function useSetUp() {
   const form = useForm();
   const stamp = useStamp();
   const stage = useStage();
   const status = useFormState((state) => state.status);
-  const pages = usePageList();
-  const lastPage = computed(() => pages.value.at(-1)?.ref);
   let done = false;
 
   watch(
-    [status, lastPage],
-    ([current, page]) => {
-      if (current !== 'ready' || !page || done) return;
+    status,
+    (current) => {
+      if (current !== 'ready' || done) return;
       done = true;
       void (async () => {
-        await form.create({
-          family: 'signature',
-          name: 'approval',
-          widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-        });
-        stage.goToPage(page);
+        // Bring the agreement's signature field into view.
+        const [widget] = form.getWidgets(toFieldRef('approval'));
+        if (widget) stage.reveal(widget.page, { rect: widget.rect });
         const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
         const { asset } = await stamp.createAsset({
           libraryId: library.id,
@@ -50,7 +44,9 @@ const { signatures } = useSignatureState();
 const mark = computed(() => rows.value[0]?.signatures[0]);
 
 const hint = computed(() => {
-  if (signatures.value[0]) return `The field is signed by ${signatures.value[0].signer.name}`;
+  // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+  const signed = signatures.value.find((each) => each.fieldName === 'approval');
+  if (signed) return `The field is signed by ${signed.signer.name}`;
   if (armedAsset.value) return 'Click the empty field to sign it, or anywhere else to place it';
   if (mark.value) return 'Arm the signature, then click where it goes';
   return 'Getting ready…';

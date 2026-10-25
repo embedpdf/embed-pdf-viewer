@@ -10,7 +10,7 @@ const engine = cloudEngine();
 // Zoomed in, where the budget and the tiles show.
 const plugins = [stagePlugin({ zoom: { level: 2 } }), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const BUDGETS = [320, 640, 1280];
 
@@ -78,7 +78,7 @@ function BudgetControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <BudgetControls />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

@@ -9,7 +9,7 @@ const { activeToolId } = useInteractionState();
 const { hasUnsavedChanges } = useDocument();
 
 async function download() {
-  saveFile(await documents.download(), 'ebook-annotated.pdf');
+  saveFile(await documents.download(), 'annotated.pdf');
 }
 </script>
 

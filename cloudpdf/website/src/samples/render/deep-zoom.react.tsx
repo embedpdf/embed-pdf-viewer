@@ -10,7 +10,7 @@ const engine = cloudEngine();
 // Open at 250%: past what a whole-page picture shows sharply, so tiles carry it.
 const plugins = [stagePlugin({ zoom: { level: 2.5 } }), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function ZoomBar() {
   const stage = useStage();
@@ -39,7 +39,7 @@ function ZoomBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ZoomBar />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

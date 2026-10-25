@@ -9,7 +9,7 @@ import './custom-fields.css';
 const engine = cloudEngine();
 const plugins = [metadataPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Your own fields, kept in the document: add one, change one, remove one.
 function CustomFields() {
@@ -100,7 +100,7 @@ function CustomFields() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <CustomFields />
       </DocumentGate>

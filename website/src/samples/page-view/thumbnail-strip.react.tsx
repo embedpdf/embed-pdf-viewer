@@ -30,9 +30,9 @@ const plugins = [
   renderPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 function Thumbnails() {
@@ -72,7 +72,7 @@ function Thumbnails() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="reader">
           <Thumbnails />

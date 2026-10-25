@@ -11,9 +11,9 @@ import './extract.css';
 const engine = localEngine();
 const plugins = [renderPlugin(), pageEditPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Tick pages, then download them as a PDF of their own. This document doesn't change.
@@ -79,7 +79,7 @@ function ExtractPages() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ExtractPages />
       </DocumentGate>

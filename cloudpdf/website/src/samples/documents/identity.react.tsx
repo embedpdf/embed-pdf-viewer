@@ -10,7 +10,7 @@ import './identity.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const dana = { userId: 'u_381', displayName: 'Dana Smith' };
 
@@ -37,7 +37,7 @@ function Toolbar({ role, onRoleChange }: { role: Role; onRoleChange: (role: Role
 
   const openAgain = async () => {
     await documents.close(id);
-    await documents.open(ebook, { name: 'ebook.pdf' });
+    await documents.open(welcome, { name: 'welcome.pdf' });
     setOpenedAs(role);
   };
 
@@ -82,7 +82,7 @@ export default function App() {
       plugins={plugins}
       identity={dana}
       scope={roles[role]}
-      initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
     >
       <Toolbar role={role} onRoleChange={setRole} />
       <DocumentGate fallback={<p className="loading">Opening…</p>}>

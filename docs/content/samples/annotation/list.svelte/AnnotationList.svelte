@@ -18,9 +18,9 @@
   ];
 
   let kind = $state.raw(KINDS[0]!);
-  const annotations = useAnnotationList(() =>
-    kind.subtype ? { subtype: kind.subtype } : undefined,
-  );
+  const ofKind = useAnnotationList(() => (kind.subtype ? { subtype: kind.subtype } : undefined));
+  // Replies and review states belong to their comment's thread: the list leaves them out.
+  const annotations = $derived(ofKind.current.filter((each) => each.reply?.type !== 'reply'));
   const pages = usePageList();
   const stage = useStage();
   const annotation = useAnnotation();
@@ -42,9 +42,9 @@
       </button>
     {/each}
   </div>
-  <p class="count">{annotations.current.length} found</p>
+  <p class="count">{annotations.length} found</p>
   <ul class="items">
-    {#each annotations.current as each (annotationKey(each.ref))}
+    {#each annotations as each (annotationKey(each.ref))}
       <li>
         <button type="button" class="item" onclick={() => show(each)}>
           <span class="kind">

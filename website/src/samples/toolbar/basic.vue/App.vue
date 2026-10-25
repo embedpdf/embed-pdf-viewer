@@ -23,9 +23,9 @@ const plugins = [
   commandsPlugin({ commands: standardCommands }),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Narrow the toolbar to watch it make room: labels go first, then the tools fold, then "More".
@@ -33,7 +33,7 @@ const width = ref(100);
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: welcome }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <label class="width">

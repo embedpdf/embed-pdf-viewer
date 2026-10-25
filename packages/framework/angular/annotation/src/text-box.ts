@@ -11,10 +11,10 @@
  * made again while someone types (the caret would jump).
  */
 import {
+  afterRenderEffect,
   computed,
   DestroyRef,
   Directive,
-  effect,
   ElementRef,
   inject,
   InjectionToken,
@@ -22,7 +22,6 @@ import {
   untracked,
   type Signal,
 } from '@angular/core';
-import { annotationKey } from '@embedpdf/core';
 import { injectPage } from '@embedpdf/angular/runtime';
 import type { Annotation, AnnotationRef, TextItem } from '@embedpdf/plugin-annotation';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
@@ -46,6 +45,10 @@ export const EPDF_LOOK_SCALE = new InjectionToken<Signal<number>>('EPDF_LOOK_SCA
  * Make `element` the editor of the text box `item()` reads, at `scale()` pixels per point: the
  * binding attaches when the plugin is there (again for another document), and redraws only
  * when the text differs. Call it in an injection context; it lets go when the caller goes.
+ *
+ * It follows after the render, not before: when typing starts, the look's frame around the
+ * element stops being inert in that same render, and an element inside an inert one can't take
+ * focus (the editor's `focus()` would do nothing, and the keys would go to the page).
  */
 export function bindTextBoxEditor(
   element: HTMLElement,
@@ -54,11 +57,13 @@ export function bindTextBoxEditor(
   scale: Signal<number>,
 ): void {
   const follower = createTextBoxEditorFollower<AnnotationRef>();
-  effect(() => {
-    const host = annotation();
-    const next = item();
-    const at = scale();
-    untracked(() => follower.follow(element, host, next, at));
+  afterRenderEffect({
+    write: () => {
+      const host = annotation();
+      const next = item();
+      const at = scale();
+      untracked(() => follower.follow(element, host, next, at));
+    },
   });
   inject(DestroyRef).onDestroy(() => follower.detach());
 }
@@ -129,16 +134,9 @@ export class EpdfRichTextEditor {
   private readonly view = pageViewOf(this.page);
   private readonly pixels = pagePixelsOf(this.page);
 
-  /** The annotation's text box on the page, or null while there is none. */
+  /** The annotation's text box, saved and idle too (this element draws its text), or null. */
   private readonly item = this.host.select(
-    (annotation) => {
-      const key = annotationKey(this.annotation().ref);
-      return (
-        annotation
-          .listTextItems(this.page.ref, this.view())
-          .find((text) => text.ref !== null && annotationKey(text.ref) === key) ?? null
-      );
-    },
+    (annotation) => annotation.getTextItem(this.annotation().ref, this.view()),
     null,
   );
 

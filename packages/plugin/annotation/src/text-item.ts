@@ -7,10 +7,13 @@
 import {
   cssFontFamilyForFont,
   initialTextStyle,
+  type Id,
   type Model,
   refOf,
   richDocOf,
   textBoxes,
+  textBoxOf,
+  type TextBox,
   textPlateInset,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
@@ -24,39 +27,49 @@ import { styleOf, textOf } from '@embedpdf/core-annotation';
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
  *  model identity at the call site so selectors get a stable reference. */
 export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): TextItem[] {
-  return textBoxes(model, page, view).map((tb) => {
-    const record = model.byId[tb.id];
-    // The text shows the user's pending change (a props edit lands here
-    // before the engine confirms it), so the editor restyles instantly.
-    const style = (record && textOf(record.annotation)) ?? initialTextStyle;
-    // Match the engine's text plate inset. Browser font metrics and line
-    // heights belong to the shared editor binding.
-    const sw = record ? styleOf(record.annotation).strokeWidth : 0;
-    const doc = record ? richDocOf(record.annotation) : null;
-    return {
-      id: tb.id,
-      ref: refOf(record),
-      box: tb.box,
-      contents: record?.annotation.contents ?? '',
-      // Paragraph alignment/direction equal to the body's is inherited, not
-      // an override: the element carries the body's (`css.align`), so a
-      // block must not pin itself to a resolved value — or the Align
-      // buttons (which move the body) would stop moving the text.
-      richText: {
-        paragraphs: doc ? stripBodyDefaults(doc.paragraphs, doc.body) : [{ runs: [{ text: '' }] }],
-      },
-      editing: tb.editing,
-      ...(tb.rot ? { rot: tb.rot } : {}),
-      css: {
-        fontFamily: cssFontFamilyForFont(style.fontFamily),
-        fontSize: style.fontSize,
-        color: style.fontColor,
-        fontWeight: style.bold ? 700 : 400,
-        fontStyle: style.italic ? 'italic' : 'normal',
-        textDecoration: style.underline ? 'underline' : 'none',
-        align: style.textAlign,
-        padding: textPlateInset(sw),
-      },
-    };
-  });
+  return textBoxes(model, page, view).map((tb) => textItemOf(model, tb));
+}
+
+/** One free text's {@link TextItem}, live or baked (`textBoxOf`): what a renderer
+ *  that draws the text box itself edits. `null` for a record that isn't one. */
+export function buildTextItem(model: Model, id: Id, view?: ViewEnv): TextItem | null {
+  const tb = textBoxOf(model, id, view);
+  return tb && textItemOf(model, tb);
+}
+
+/** A text box joined with its record's text, style and plate inset. */
+function textItemOf(model: Model, tb: TextBox): TextItem {
+  const record = model.byId[tb.id];
+  // The text shows the user's pending change (a props edit lands here
+  // before the engine confirms it), so the editor restyles instantly.
+  const style = (record && textOf(record.annotation)) ?? initialTextStyle;
+  // Match the engine's text plate inset. Browser font metrics and line
+  // heights belong to the shared editor binding.
+  const sw = record ? styleOf(record.annotation).strokeWidth : 0;
+  const doc = record ? richDocOf(record.annotation) : null;
+  return {
+    id: tb.id,
+    ref: refOf(record),
+    box: tb.box,
+    contents: record?.annotation.contents ?? '',
+    // Paragraph alignment/direction equal to the body's is inherited, not
+    // an override: the element carries the body's (`css.align`), so a
+    // block must not pin itself to a resolved value — or the Align
+    // buttons (which move the body) would stop moving the text.
+    richText: {
+      paragraphs: doc ? stripBodyDefaults(doc.paragraphs, doc.body) : [{ runs: [{ text: '' }] }],
+    },
+    editing: tb.editing,
+    ...(tb.rot ? { rot: tb.rot } : {}),
+    css: {
+      fontFamily: cssFontFamilyForFont(style.fontFamily),
+      fontSize: style.fontSize,
+      color: style.fontColor,
+      fontWeight: style.bold ? 700 : 400,
+      fontStyle: style.italic ? 'italic' : 'normal',
+      textDecoration: style.underline ? 'underline' : 'none',
+      align: style.textAlign,
+      padding: textPlateInset(sw),
+    },
+  };
 }

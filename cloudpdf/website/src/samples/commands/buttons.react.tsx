@@ -10,7 +10,7 @@ import './buttons.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), commandsPlugin({ commands: standardCommands })];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // One button, drawn from its command: the label, the shortcut, and whether it can run now.
 function CommandButton({ id }: { id: string }) {
@@ -34,7 +34,7 @@ function CommandButton({ id }: { id: string }) {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="toolbar">
           <CommandButton id="page:previous" />

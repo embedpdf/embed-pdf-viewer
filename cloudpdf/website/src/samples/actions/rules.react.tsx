@@ -24,7 +24,7 @@ const plugins = [
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
@@ -129,7 +129,7 @@ function WebsiteRules() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <WebsiteRules />
       </DocumentGate>

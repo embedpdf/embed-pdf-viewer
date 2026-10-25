@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useEffect } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -10,7 +10,6 @@ import {
   useAnnotation,
   useAnnotationDefaults,
   useAnnotationEvent,
-  useAnnotationState,
 } from '@embedpdf/react/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
@@ -27,7 +26,7 @@ const plugins = [
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const COLORS = ['#e5484d', '#1e90ff', '#30a46c', '#1a2748'];
 
@@ -87,31 +86,20 @@ function RememberDefaults() {
   return null;
 }
 
-// On load: the pen is active, with a stroke drawn in its current style.
+// On load: the pen is active.
 function StartWithThePen() {
-  const annotation = useAnnotation();
   const interaction = useInteraction();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    const wave = Array.from({ length: 24 }, (_, i) => ({
-      x: 300 + i * 10,
-      y: 540 + Math.sin(i / 2) * 14,
-    }));
-    void annotation.create(cover, { subtype: 'ink', inkList: [wave] }, undefined, { tool: 'ink' });
     interaction.activateTool('ink');
-  }, [annotation, interaction, ready, cover]);
+  }, [interaction]);
 
   return null;
 }
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <StartWithThePen />
         <RememberDefaults />

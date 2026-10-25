@@ -21,8 +21,8 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfMetadata, withMetadata } from '@embedpdf/angular/metadata';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -102,7 +102,7 @@ export class ChangeLog {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, TitleBar, ChangeLog],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook, name: 'report.pdf' }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome, name: 'report.pdf' }] },
       withStage(),
       withRender(),
       withMetadata(),

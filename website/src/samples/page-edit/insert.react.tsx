@@ -11,13 +11,13 @@ import './insert.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), pageEditPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('https://snippet.embedpdf.com/ebook.pdf')).arrayBuffer();
+const otherPdf = async () => (await fetch('/pdfs/embedpdf-welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 function InsertToolbar() {
@@ -93,7 +93,7 @@ function InsertToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <InsertToolbar />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

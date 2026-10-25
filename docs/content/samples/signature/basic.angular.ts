@@ -11,12 +11,12 @@ import {
   viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
-import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
-import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
+import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
 import { EpdfStamp, withStamp } from '@embedpdf/angular/stamp';
 import { createTestSigner, EpdfSignature, withSignature } from '@embedpdf/angular/signature';
 import { localEngine } from '@embedpdf/engine';
@@ -29,10 +29,10 @@ const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they o
 // service with `remoteSigner`, or a person's own with `personalSigner`.
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source agreement]
+const agreement = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -68,7 +68,7 @@ export class MarkButton {
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: agreement }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -108,7 +108,6 @@ export class App {
   private readonly form = inject(EpdfForm);
   private readonly stamp = inject(EpdfStamp);
   private readonly signature = inject(EpdfSignature);
-  private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
   private done = false;
 
@@ -119,7 +118,8 @@ export class App {
   private readonly error = signal<string | null>(null);
 
   protected readonly status = computed(() => {
-    const signed = this.signature.signatures()[0];
+    // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+    const signed = this.signature.signatures().find((each) => each.fieldName === 'approval');
     const error = this.error();
     if (!this.person() || !this.field()) return 'Getting ready…';
     if (error) return error;
@@ -130,14 +130,13 @@ export class App {
   });
 
   constructor() {
-    // The ebook has no signature field, and the browser holds no signatures yet: add a field
-    // to the last page, and one person with a typed signature.
+    // Start at the agreement's signature field. The browser holds no signatures
+    // yet: add one person with a typed signature.
     effect(() => {
-      const page = this.document.pages().at(-1)?.ref;
       const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.done) return;
+      if (this.form.status() !== 'ready' || !stage || this.done) return;
       this.done = true;
-      untracked(() => void this.setUp(page, stage));
+      untracked(() => void this.setUp(stage));
     });
   }
 
@@ -151,13 +150,11 @@ export class App {
       .catch((reason: Error) => this.error.set(reason.message));
   }
 
-  private async setUp(page: PageRef, stage: EpdfStage) {
-    await this.form.create({
-      family: 'signature',
-      name: 'approval',
-      widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-    });
-    stage.goToPage(page);
+  private async setUp(stage: EpdfStage) {
+    // Bring the agreement's signature field into view.
+    const first = this.form.get(toFieldRef('approval'))?.widgets[0];
+    const widget = first ? this.form.getWidget(first) : null;
+    if (widget) stage.reveal(widget.page, { rect: widget.rect });
     const { library } = await this.stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
     await this.stamp.createAsset({
       libraryId: library.id,

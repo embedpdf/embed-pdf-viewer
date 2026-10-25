@@ -7,7 +7,7 @@ import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { measurementPlugin } from '@embedpdf/vue/measurement';
 import { localEngine } from '@embedpdf/engine';
-import MeasureCover from './MeasureCover.vue';
+import MeasurePlan from './MeasurePlan.vue';
 import Readouts from './Readouts.vue';
 
 import '../readout.css';
@@ -21,17 +21,17 @@ const plugins = [
   measurementPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: sketch }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <MeasureCover />
+      <MeasurePlan />
       <div class="viewer">
         <Stage class="stage">
           <template #page>

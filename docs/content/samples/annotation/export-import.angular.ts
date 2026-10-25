@@ -6,10 +6,11 @@ import {
   signal,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   AnnotationTransfer,
@@ -19,10 +20,10 @@ import {
 } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source report]
+const report = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-report.pdf');
+  return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -59,32 +60,17 @@ const ebook = async (): Promise<OpenInput> => {
 })
 export class Transfer {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly pages = inject(EpdfDocument).pages;
   protected readonly annotations = this.annotation.watch();
   protected readonly text = signal('');
   protected readonly status = signal('');
   private started = false;
 
   constructor() {
-    // On load: a note and a rectangle on the cover, exported at once.
+    // On load: everything in the document, exported at once.
     effect(() => {
-      const cover = this.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.started) return;
+      if (this.annotation.status() !== 'ready' || this.started) return;
       this.started = true;
-      void Promise.all([
-        this.annotation.create(cover, {
-          subtype: 'text',
-          rect: { x: 470, y: 232, width: 20, height: 20 },
-          contents: 'Can we shorten the title?',
-          color: '#facc15',
-        }),
-        this.annotation.create(cover, {
-          subtype: 'square',
-          box: { x: 96, y: 506, width: 178, height: 54 },
-          color: '#e5484d',
-          strokeWidth: 3,
-        }),
-      ]).then(() => this.exportAll());
+      void this.exportAll();
     });
   }
 
@@ -118,15 +104,17 @@ export class Transfer {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     Transfer,
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: report }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -139,6 +127,7 @@ export class Transfer {
         <epdf-stage class="stage">
           <ng-template epdfPage>
             <epdf-render-layer />
+            <epdf-selection-layer />
             <epdf-annotation-layer />
           </ng-template>
         </epdf-stage>

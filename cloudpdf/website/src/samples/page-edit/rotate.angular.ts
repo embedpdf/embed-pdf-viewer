@@ -13,7 +13,7 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfPageEdit, withPageEdit } from '@embedpdf/angular/page-edit';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Rotates the page you're on, in the file: the turn is kept when the document is downloaded.
 @Component({
@@ -81,7 +81,7 @@ export class RotateToolbar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, RotateToolbar],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withPageEdit(),

@@ -21,9 +21,9 @@ const plugins = [
   searchPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Your app's own switch: the colors are in the stylesheet, under [data-theme='dark'].
@@ -42,7 +42,7 @@ const theme = ref<'light' | 'dark'>('dark');
         </button>
       </div>
     </div>
-    <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+    <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: welcome }]">
       <DocumentGate>
         <template #fallback><p class="loading">Loading…</p></template>
         <ShowColors />

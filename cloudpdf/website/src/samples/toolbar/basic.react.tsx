@@ -23,7 +23,7 @@ const plugins = [
   commandsPlugin({ commands: standardCommands }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Your icons, by the names the standard commands give them.
 const ICONS: Record<string, string> = {
@@ -91,7 +91,7 @@ export default function App() {
   const [width, setWidth] = useState(100);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <label className="width">
           Toolbar width

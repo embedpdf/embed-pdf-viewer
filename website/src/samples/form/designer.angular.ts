@@ -5,7 +5,6 @@ import {
   effect,
   inject,
   untracked,
-  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
@@ -17,9 +16,9 @@ import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotatio
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const registration = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-registration.pdf');
+  return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const FIELD_TOOLS = [
@@ -43,7 +42,7 @@ const FIELD_TOOLS = [
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: registration }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -90,11 +89,7 @@ const FIELD_TOOLS = [
             </button>
           }
           <output class="readout">
-            @if (form.fields().length === 0) {
-              Click the page to place a field
-            } @else {
-              {{ form.fields().length }} fields
-            }
+            {{ form.fields().length }} fields: click the page to place another
           </output>
         </div>
       }
@@ -115,23 +110,17 @@ export class App {
   protected readonly interaction = inject(EpdfInteraction);
   protected readonly tools = FIELD_TOOLS;
   private readonly document = inject(EpdfDocument);
-  private readonly stage = viewChild(EpdfStage);
   private started = false;
 
   /** The pointer fills the form in; every other tool here designs it. */
   protected readonly filling = computed(() => this.interaction.activeToolId() === 'pointer');
 
   constructor() {
-    // Start on the ebook's last page, which has room for a form, with the text tool picked.
+    // Start with the text tool picked: the printed form has boxes, but no fields yet.
     effect(() => {
-      const page = this.document.pages().at(-1)?.ref;
-      const stage = this.stage();
-      if (!page || !stage || this.started) return;
+      if (this.document.status() !== 'ready' || this.started) return;
       this.started = true;
-      untracked(() => {
-        stage.goToPage(page);
-        this.interaction.activateTool('form-text');
-      });
+      untracked(() => this.interaction.activateTool('form-text'));
     });
   }
 }

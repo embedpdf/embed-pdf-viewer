@@ -1,8 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
-  import { useForm, useFormState } from '@embedpdf/svelte/form';
+  import { toFieldRef, useForm, useFormState } from '@embedpdf/svelte/form';
   import { useStamp } from '@embedpdf/svelte/stamp';
   import { useSignature, useSignatureState, useSignerRows } from '@embedpdf/svelte/signature';
   import MarkButton from './MarkButton.svelte';
@@ -17,25 +16,21 @@
   const field = useFormState((formState) =>
     formState.fields.find((candidate) => candidate.family === 'signature'),
   );
-  const pages = usePageList();
   const person = $derived(rows.current[0]);
-  const signed = $derived(signatureState.signatures[0]);
+  // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+  const signed = $derived(signatureState.signatures.find((each) => each.fieldName === 'approval'));
   let error = $state<string | null>(null);
 
-  // The ebook has no signature field, and the browser holds no signatures yet:
-  // add a field to the last page, and one person with a typed signature.
+  // Start at the agreement's signature field. The browser holds no signatures
+  // yet: add one person with a typed signature.
   let done = false;
   $effect(() => {
-    const page = pages.current.at(-1)?.ref;
-    if (status.current !== 'ready' || !page || done) return;
+    if (status.current !== 'ready' || done) return;
     done = true;
     untrack(async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-      });
-      stage.goToPage(page);
+      // Bring the agreement's signature field into view.
+      const [widget] = form.getWidgets(toFieldRef('approval'));
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       await stamp.createAsset({
         libraryId: library.id,

@@ -21,11 +21,11 @@ const plugins = [
   formPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const registration: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: registration }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <FieldPalette />

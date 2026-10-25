@@ -12,10 +12,10 @@ import './basic.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -25,7 +25,7 @@ function SelectTitle() {
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 28, count: 30 });
   }, [selection, cover]);
 
   return null;
@@ -33,7 +33,7 @@ function SelectTitle() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectTitle />
         <Stage className="stage">

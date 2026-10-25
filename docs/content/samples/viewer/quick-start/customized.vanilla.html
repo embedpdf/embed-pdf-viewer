@@ -3,12 +3,12 @@
 <script type="module">
   import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
 
-  // [!doc-source ebook]
-  const ebook = 'https://snippet.embedpdf.com/ebook.pdf';
+  // [!doc-source welcome]
+  const welcome = '/pdfs/embedpdf-welcome.pdf';
   // [!/doc-source]
 
   document.getElementById('viewer').config = {
-    src: ebook,
+    src: welcome,
     theme: { accent: '#7c3aed' },
     disable: ['forms', 'redaction'],
     icons: {

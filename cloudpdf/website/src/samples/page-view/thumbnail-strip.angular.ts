@@ -13,14 +13,14 @@ import { cloudEngine } from '@cloudpdf/engine';
 // The strip is a second view of the document, with its own token and settings.
 const ThumbsToken = createCapabilityToken<StageCapability>('stage-thumbs');
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfPageChrome, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(), // the main view
       withStage({
         id: 'stage-thumbs',

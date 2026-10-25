@@ -1,49 +1,41 @@
+<!-- Two edits after an approval signature: a comment keeps it valid, a new form field breaks it. -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
   import { useAnnotation } from '@embedpdf/svelte/annotation';
   import { toFieldRef, useForm, useFormState } from '@embedpdf/svelte/form';
-  import { useStamp } from '@embedpdf/svelte/stamp';
   import {
     useSignature,
     useSignatureEvent,
     useSignatureState,
   } from '@embedpdf/svelte/signature';
 
+  // EmbedPDF's signature field, signed before the agreement was sent.
+  const EMBEDPDF = toFieldRef('embedpdf');
+
   const form = useForm();
-  const stamp = useStamp();
   const stage = useStage();
   const annotation = useAnnotation();
   const signature = useSignature();
   const signatureState = useSignatureState();
   const status = useFormState((formState) => formState.status);
-  const pages = usePageList();
-  const page = $derived(pages.current.at(-1)?.ref);
-  const signed = $derived(signatureState.signatures[0]);
+  const signed = $derived(signatureState.signatures.find((each) => each.signed));
   let warning = $state<string | null>(null);
+  let made = $state({ comment: false, field: false });
 
-  // On load: a signature field on the last page, signed by Ada with a typed signature.
-  let done = false;
+  // Where the signature is: the edits go next to it.
+  function signatureWidget() {
+    return form.getWidgets(EMBEDPDF)[0];
+  }
+
+  // On load: the signatures, in view. Nothing is changed until a button is pressed.
+  let revealed = false;
   $effect(() => {
-    const last = page;
-    if (status.current !== 'ready' || !last || done) return;
-    done = true;
-    untrack(async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page: last, rect: { x: 72, y: 560, width: 220, height: 64 } }],
-      });
-      stage.goToPage(last);
-      const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
-      const { asset } = await stamp.createAsset({
-        libraryId: library.id,
-        name: 'signature',
-        label: 'Signature',
-        mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
-      });
-      await signature.sign({ field: toFieldRef('approval'), mark: { assetId: asset.id } });
+    if (status.current !== 'ready' || revealed) return;
+    revealed = true;
+    untrack(() => {
+      const widget = signatureWidget();
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
     });
   });
 
@@ -56,25 +48,47 @@
     },
   );
 
-  function drawBox() {
-    if (!page) return;
-    void annotation.create(page, {
-      subtype: 'square',
-      box: { x: 320, y: 560, width: 140, height: 64 },
-      color: '#e11d48',
-      strokeWidth: 2,
+  async function addComment() {
+    const widget = signatureWidget();
+    if (!widget) return;
+    const { rect } = widget;
+    await annotation.create(widget.page, {
+      subtype: 'text',
+      rect: { x: rect.x + rect.width + 6, y: rect.y, width: 20, height: 20 },
+      contents: 'Looks good to us.',
     });
+    made.comment = true;
+  }
+
+  async function addField() {
+    const widget = signatureWidget();
+    if (!widget) return;
+    const { rect } = widget;
+    await form.create({
+      family: 'text',
+      name: 'purchase_order',
+      widgets: [
+        {
+          page: widget.page,
+          rect: { x: rect.x, y: rect.y + rect.height + 36, width: rect.width, height: 24 },
+        },
+      ],
+    });
+    made.field = true;
   }
 </script>
 
 <div class="toolbar">
-  <button type="button" class="button" disabled={!signed || !page} onclick={drawBox}>
-    Draw a box on the page
+  <button type="button" class="button" disabled={!signed || made.comment} onclick={addComment}>
+    Add a comment
+  </button>
+  <button type="button" class="button" disabled={!signed || made.field} onclick={addField}>
+    Add a form field
   </button>
   <output class="readout">
     {signed
       ? `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}`
-      : 'Signing…'}
+      : 'Opening…'}
   </output>
   {#if warning}<output class="warning">{warning}</output>{/if}
 </div>

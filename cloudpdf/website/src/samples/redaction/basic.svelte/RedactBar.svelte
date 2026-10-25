@@ -5,8 +5,8 @@
   import { useAnnotationState } from '@embedpdf/svelte/annotation';
   import { useRedaction, useRedactionState } from '@embedpdf/svelte/redaction';
 
-  // The author's name on the cover, in page coordinates.
-  const AUTHOR = { x: 100, y: 508, width: 172, height: 50 };
+  // The cover's subtitle, in page coordinates.
+  const SUBTITLE = { x: 44, y: 318, width: 206, height: 50 };
 
   const interaction = useInteraction();
   const activeToolId = useInteractionState((state) => state.activeToolId);
@@ -15,13 +15,13 @@
   const redactionState = useRedactionState();
   const ready = useAnnotationState((state) => state.status === 'ready');
 
-  // On load: the author's name marked, and the redact tool on.
+  // On load: the cover's subtitle marked, and the redact tool on.
   let started = false;
   $effect(() => {
     if (!ready.current || started) return;
     started = true;
     untrack(() => {
-      void redaction.markArea(0, AUTHOR).then(() => stage.reveal(0, { rect: AUTHOR }));
+      void redaction.markArea(0, SUBTITLE).then(() => stage.reveal(0, { rect: SUBTITLE }));
       interaction.activateTool('redact');
     });
   });

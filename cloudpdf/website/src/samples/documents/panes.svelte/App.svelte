@@ -11,15 +11,15 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <Viewer
   {engine}
   {plugins}
   initialDocuments={[
-    { source: ebook, name: 'Contract' },
-    { source: ebook, name: 'Report' },
+    { source: welcome, name: 'Contract' },
+    { source: welcome, name: 'Report' },
   ]}
 >
   <Panes />

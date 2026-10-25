@@ -11,6 +11,7 @@ import { EpdfDocumentGate, provideEmbedPdf, saveFile } from '@embedpdf/angular/r
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import {
@@ -27,9 +28,9 @@ import { localEngine } from '@embedpdf/engine';
 const engine = localEngine();
 const assetEngine = engine; // stamp libraries are PDFs; they open here too
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const approvals = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+  return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Where the libraries live between visits: this browser's IndexedDB.
@@ -146,15 +147,17 @@ export class Libraries {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     Libraries,
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: approvals }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
       withStamp({ assetEngine }),
     ),
@@ -168,6 +171,7 @@ export class Libraries {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

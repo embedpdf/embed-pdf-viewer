@@ -198,7 +198,17 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    */
   getAnnotationAnchor(ref: AnnotationRef, view?: ViewEnv): AnnotationAnchor | null;
   listPageItems(page: PageRef, view?: ViewEnv): RenderItem[];
+  /**
+   * The text boxes the layer draws as elements: the ones typed in or redrawn
+   * live. A saved, idle one shows its engine picture instead.
+   */
   listTextItems(page: PageRef, view?: ViewEnv): TextItem[];
+  /**
+   * One free text's text box in every state, saved and idle included: for a
+   * renderer that draws the box itself (`useRichTextEditor`), which no
+   * engine picture is drawn under. `null` for one that isn't a free text here.
+   */
+  getTextItem(ref: AnnotationRef, view?: ViewEnv): TextItem | null;
   listChromeNodes(
     page: PageRef,
     scale?: number,

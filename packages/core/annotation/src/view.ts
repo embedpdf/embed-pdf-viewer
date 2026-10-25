@@ -403,23 +403,29 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
   const out: TextBox[] = [];
   for (const id of model.order) {
     const record = model.byId[id];
-    if (
-      record.annotation.page.objectNumber !== pageObjectNumber ||
-      shapeOf(record.annotation).kind !== 'text-box'
-    )
-      continue;
+    if (record.annotation.page.objectNumber !== pageObjectNumber) continue;
     if (!viewable(record.annotation, model.selected.includes(id))) continue; // `/F`-hidden
     if (!textIsLive(model, id)) continue; // baked → rendered as the /AP image instead
-    const geometry = effGeom(model, id, view);
-    if (geometry.kind !== 'text-box') continue;
-    out.push({
-      id,
-      box: geometry.box,
-      editing: model.editing === id,
-      rot: geomRotation(geometry),
-    });
+    const box = textBoxOf(model, id, view);
+    if (box) out.push(box);
   }
   return out;
+}
+
+/** One free text's box, live or baked: a renderer that draws the box itself
+ *  shows its text in every state, as no /AP image is drawn under it. `null`
+ *  for a record that isn't a text box. */
+export function textBoxOf(model: Model, id: Id, view?: ViewEnv): TextBox | null {
+  const record = model.byId[id];
+  if (!record || shapeOf(record.annotation).kind !== 'text-box') return null;
+  const geometry = effGeom(model, id, view);
+  if (geometry.kind !== 'text-box') return null;
+  return {
+    id,
+    box: geometry.box,
+    editing: model.editing === id,
+    rot: geomRotation(geometry),
+  };
 }
 
 /** The currently selected annotations as render items (live gesture applied) —

@@ -31,14 +31,14 @@ const plugins = [
   redactionPlugin(),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// On load: the author's name, and every "commercial" in the document.
+// On load: the cover's subtitle, and every "Adobe" in the document.
 function MarkSome() {
   const redaction = useRedaction();
   const ready = useAnnotationState((state) => state.status === 'ready');
@@ -48,8 +48,8 @@ function MarkSome() {
     if (!ready || started.current) return;
     started.current = true;
     void redaction
-      .markArea(0, { x: 100, y: 508, width: 172, height: 50 })
-      .then(() => redaction.markMatches({ text: 'commercial' }));
+      .markArea(0, { x: 44, y: 318, width: 206, height: 50 })
+      .then(() => redaction.markMatches({ text: 'Adobe' }));
   }, [redaction, ready]);
 
   return null;
@@ -104,7 +104,7 @@ function PendingMarks() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <MarkSome />
         <div className="viewer">

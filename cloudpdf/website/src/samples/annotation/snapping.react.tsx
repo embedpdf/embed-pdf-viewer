@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -18,39 +18,26 @@ import './snapping.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const QUARTERS = [0, 90, 180, 270];
 const EIGHTHS = [0, 45, 90, 135, 180, 225, 270, 315];
 
-// On load: two rectangles on the cover, the right one selected. Drag it next to the other.
-function AddRectangles() {
+// On load: the document's circle, selected. Drag it toward the square to see it snap.
+function SelectCircle() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'square',
-      box: { x: 96, y: 506, width: 178, height: 54 },
-      color: '#1e90ff',
-      strokeWidth: 3,
-    });
-    void annotation.create(
-      cover,
-      {
-        subtype: 'square',
-        box: { x: 340, y: 560, width: 120, height: 80 },
-        color: '#e5484d',
-        strokeWidth: 3,
-      },
-      undefined,
-      { select: true },
-    );
-  }, [annotation, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const circle = annotation.list().find((each) => each.nm === 'circle');
+    if (!circle) return;
+    annotation.selection.set([circle.ref]);
+    stage.reveal(circle.page, { rect: circle.rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
@@ -90,9 +77,9 @@ function SnapControls() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddRectangles />
+        <SelectCircle />
         <SnapControls />
         <Stage className="stage">
           {() => (

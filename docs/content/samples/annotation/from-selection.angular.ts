@@ -4,7 +4,9 @@ import {
   computed,
   effect,
   inject,
+  input,
   signal,
+  untracked,
   ViewEncapsulation,
 } from '@angular/core';
 import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
@@ -16,15 +18,16 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// On the cover: the characters of the title's first line.
-const FIRST_LINE = { start: 10, count: 17 };
+// On page 1: the characters of the title's first line, and where it is.
+const SENTENCE = { start: 6, count: 33 };
+const SENTENCE_BOX = { x: 60, y: 102, width: 363, height: 31 };
 
 const MARKUP = [
   { tool: 'highlight', label: 'Highlight' },
@@ -33,7 +36,10 @@ const MARKUP = [
   { tool: 'squiggly', label: 'Squiggly' },
 ];
 
-// The selected text becomes a mark, one per page; the selection is cleared afterwards.
+/**
+ * The selected text becomes a mark, one per page; the selection is cleared afterwards. Next to
+ * `<epdf-stage #stage="epdfStage">`: `<demo-markup-toolbar [stage]="stage" />`.
+ */
 @Component({
   selector: 'demo-markup-toolbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -55,6 +61,8 @@ const MARKUP = [
   `,
 })
 export class MarkupToolbar {
+  readonly stage = input.required<EpdfStage>();
+
   private readonly annotation = inject(EpdfAnnotation);
   protected readonly selection = inject(EpdfSelection);
   private readonly document = inject(EpdfDocument);
@@ -65,10 +73,15 @@ export class MarkupToolbar {
   );
 
   constructor() {
-    // On load: the title's first line is selected, ready to mark.
+    // On load: the sentence is selected, ready to mark, and in view.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, ...FIRST_LINE });
+      const page = this.document.pages()[0]?.ref;
+      const stage = this.stage();
+      if (!page) return;
+      untracked(() => {
+        this.selection.select({ page, ...SENTENCE });
+        stage.reveal(page, { rect: SENTENCE_BOX });
+      });
     });
   }
 
@@ -91,7 +104,7 @@ export class MarkupToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: article }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -104,8 +117,8 @@ export class MarkupToolbar {
   encapsulation: ViewEncapsulation.None,
   template: `
     <ng-container *epdfDocumentGate="let document; fallback: loading">
-      <demo-markup-toolbar />
-      <epdf-stage class="stage">
+      <demo-markup-toolbar [stage]="stage" />
+      <epdf-stage #stage="epdfStage" class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
           <epdf-selection-layer />

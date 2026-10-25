@@ -1,37 +1,31 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
-import { useForm, useFormState } from '@embedpdf/vue/form';
+import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import { useStamp } from '@embedpdf/vue/stamp';
 import { useSignature, useSignatureState, useSignerRows } from '@embedpdf/vue/signature';
 import MarkButton from './MarkButton.vue';
 
 /**
- * The ebook has no signature field, and the browser holds no signatures yet:
- * add a field to the last page, and one person with a typed signature.
+ * Start at the agreement's signature field. The browser holds no signatures
+ * yet: add one person with a typed signature.
  */
 function useSetUp() {
   const form = useForm();
   const stamp = useStamp();
   const stage = useStage();
   const status = useFormState((state) => state.status);
-  const pages = usePageList();
-  const lastPage = computed(() => pages.value.at(-1)?.ref);
   let done = false;
 
   watch(
-    [status, lastPage],
-    ([current, page]) => {
-      if (current !== 'ready' || !page || done) return;
+    status,
+    (current) => {
+      if (current !== 'ready' || done) return;
       done = true;
       void (async () => {
-        await form.create({
-          family: 'signature',
-          name: 'approval',
-          widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-        });
-        stage.goToPage(page);
+        // Bring the agreement's signature field into view.
+        const [widget] = form.getWidgets(toFieldRef('approval'));
+        if (widget) stage.reveal(widget.page, { rect: widget.rect });
         const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
         await stamp.createAsset({
           libraryId: library.id,
@@ -54,7 +48,8 @@ const field = useFormState((state) =>
   state.fields.find((candidate) => candidate.family === 'signature'),
 );
 const error = ref<string | null>(null);
-const signed = computed(() => signatures.value[0]);
+// Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+const signed = computed(() => signatures.value.find((each) => each.fieldName === 'approval'));
 
 // The target is the field someone clicked; without one, the form's signature field.
 function sign(assetId: string) {

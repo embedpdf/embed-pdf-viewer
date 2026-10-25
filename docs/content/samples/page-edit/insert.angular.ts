@@ -16,15 +16,15 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfPageEdit, withPageEdit } from '@embedpdf/angular/page-edit';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('https://snippet.embedpdf.com/ebook.pdf')).arrayBuffer();
+const otherPdf = async () => (await fetch('/pdfs/embedpdf-welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 @Component({
@@ -120,7 +120,7 @@ export class InsertToolbar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, InsertToolbar],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withPageEdit(),

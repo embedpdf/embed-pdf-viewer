@@ -1,13 +1,6 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, ViewEncapsulation } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -15,9 +8,9 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const COLORS = ['#e5484d', '#1e90ff', '#30a46c', '#1a2748'];
@@ -85,34 +78,15 @@ export class RememberDefaults {
   }
 }
 
-// On load: the pen is active, with a stroke drawn in its current style.
+// On load: the pen is active.
 @Component({
   selector: 'demo-start-with-the-pen',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: '',
 })
 export class StartWithThePen {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly interaction = inject(EpdfInteraction);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
-
   constructor() {
-    effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      untracked(() => {
-        const wave = Array.from({ length: 24 }, (_, i) => ({
-          x: 300 + i * 10,
-          y: 540 + Math.sin(i / 2) * 14,
-        }));
-        void this.annotation.create(cover, { subtype: 'ink', inkList: [wave] }, undefined, {
-          tool: 'ink',
-        });
-        this.interaction.activateTool('ink');
-      });
-    });
+    inject(EpdfInteraction).activateTool('ink');
   }
 }
 
@@ -130,7 +104,7 @@ export class StartWithThePen {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

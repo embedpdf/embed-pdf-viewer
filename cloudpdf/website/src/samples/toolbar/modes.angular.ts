@@ -17,7 +17,7 @@ import { EpdfToolbar, EpdfToolbarCommandTemplate, group } from '@embedpdf/angula
 import type { BarSchema } from '@embedpdf/angular/toolbar';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A bar per mode.
 const viewBar: BarSchema = {
@@ -58,7 +58,7 @@ const TOOL_OF_MODE: Record<Mode, string> = { view: 'pointer', annotate: 'highlig
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

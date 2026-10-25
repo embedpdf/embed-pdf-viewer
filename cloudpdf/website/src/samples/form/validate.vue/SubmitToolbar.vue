@@ -1,53 +1,21 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
+import { ref, watch } from 'vue';
 import { useStage } from '@embedpdf/vue/stage';
 import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import type { FormValidation } from '@embedpdf/vue/form';
 
-// How the new fields look: part of the PDF, like the rest of the page.
-const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
-
-/** The ebook has no form, so this adds one to its last page, with three required fields. */
-function useSignUpForm(onReady: () => void) {
+/** Fill in a name, then check the form, as if it was submitted. */
+function useFilledInName(onReady: () => void) {
   const form = useForm();
   const status = useFormState((state) => state.status);
-  const pages = usePageList();
-  const lastPage = computed(() => pages.value.at(-1)?.ref);
-  let added = false;
+  let started = false;
 
   watch(
-    [status, lastPage],
-    ([current, page]) => {
-      if (current !== 'ready' || !page || added) return;
-      added = true;
-      const at = (y: number, width = 240, height = 24) => ({
-        page,
-        rect: { x: 72, y, width, height },
-      });
-      void (async () => {
-        await form.create({
-          family: 'text',
-          name: 'name',
-          required: true,
-          widgets: [{ ...at(540), ...look }],
-        });
-        await form.create({
-          family: 'text',
-          name: 'email',
-          required: true,
-          widgets: [{ ...at(576), ...look }],
-        });
-        await form.create({ family: 'text', name: 'company', widgets: [{ ...at(612), ...look }] });
-        await form.create({
-          family: 'checkbox',
-          name: 'terms',
-          required: true,
-          widgets: [{ ...at(650, 16, 16), ...look }],
-        });
-        await form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' });
-        onReady();
-      })();
+    status,
+    (current) => {
+      if (current !== 'ready' || started) return;
+      started = true;
+      void form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' }).then(onReady);
     },
     { immediate: true },
   );
@@ -66,7 +34,7 @@ function submit() {
   const widget = first ? form.getWidget(first) : null;
   if (widget) stage.reveal(widget.page, { rect: widget.rect });
 }
-useSignUpForm(submit);
+useFilledInName(submit);
 </script>
 
 <template>

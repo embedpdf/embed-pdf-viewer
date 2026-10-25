@@ -3,40 +3,39 @@
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
-  import { annotationPlugin } from '@embedpdf/svelte/annotation';
+  import { actionsPlugin } from '@embedpdf/svelte/actions';
   import { LinkLayer, linkPlugin } from '@embedpdf/svelte/link';
   import { localEngine } from '@embedpdf/engine';
-  import AddLinks from './AddLinks.svelte';
+  import BrowserActions from './BrowserActions.svelte';
 
   import '../basic.css';
 
   const engine = localEngine();
-  // The annotation plugin is only here to make the links below.
+  // The actions plugin runs a link that names a viewer command, such as the footer's Next.
   const plugins = [
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
-    annotationPlugin(),
+    actionsPlugin(),
     linkPlugin(),
   ];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source links]
+  const links = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-links.pdf');
+    return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: links }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddLinks />
+    <BrowserActions />
     <p class="hint">
-      Two links at the top of the first page. Click one, or press Tab to reach it and Enter to
-      follow it.
+      Every blue label is a link. Click one, or press Tab to reach it and Enter to follow it.
     </p>
     <Stage class="stage">
       <RenderLayer />

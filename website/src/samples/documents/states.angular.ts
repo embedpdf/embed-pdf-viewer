@@ -13,8 +13,8 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -95,7 +95,7 @@ export class OpenError {
       {
         engine: () => localEngine(),
         initialDocuments: [
-          { source: ebook, name: 'ebook.pdf' },
+          { source: welcome, name: 'welcome.pdf' },
           { source: broken, name: 'broken.pdf', active: true },
         ],
       },

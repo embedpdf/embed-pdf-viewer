@@ -20,13 +20,13 @@
     annotationPlugin(),
   ];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const article = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-article.pdf');
+    return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: article }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

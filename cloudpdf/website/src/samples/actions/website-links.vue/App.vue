@@ -10,11 +10,11 @@ import '../website-links.css';
 const engine = cloudEngine();
 const plugins = [actionsPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: links }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <AskBeforeOpening />

@@ -1,12 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  untracked,
-  ViewEncapsulation,
-} from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { ChangeDetectionStrategy, Component, inject, ViewEncapsulation } from '@angular/core';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -15,7 +8,7 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import type { AnnotationTool } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A toolbar that builds itself from the tools: every tool with a label gets a button.
 @Component({
@@ -47,28 +40,13 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 export class Toolbar {
   private readonly annotation = inject(EpdfAnnotation);
   protected readonly interaction = inject(EpdfInteraction);
-  private readonly document = inject(EpdfDocument);
   protected readonly labelled = this.annotation.tools
     .list()
     .filter((tool) => typeof tool.meta?.label === 'string');
-  private added = false;
 
   constructor() {
-    // On load: an arrow drawn with the arrow tool's defaults, and the arrow tool active.
-    effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      untracked(() => {
-        void this.annotation.create(
-          cover,
-          { subtype: 'line', linePoints: { start: { x: 520, y: 120 }, end: { x: 470, y: 230 } } },
-          undefined,
-          { tool: 'arrow' },
-        );
-        this.interaction.activateTool('arrow');
-      });
-    });
+    // On load: the arrow tool is active.
+    this.interaction.activateTool('arrow');
   }
 
   protected label(tool: AnnotationTool) {
@@ -88,7 +66,7 @@ export class Toolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

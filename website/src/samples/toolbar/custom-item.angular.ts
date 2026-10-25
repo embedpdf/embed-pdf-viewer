@@ -24,9 +24,9 @@ import {
 import type { BarSchema } from '@embedpdf/angular/toolbar';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // The page number is an item of your own: it gets smaller first, and in the "More" menu it's the
@@ -136,7 +136,7 @@ export class GoToPage {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withCommands({ commands: standardCommands }),

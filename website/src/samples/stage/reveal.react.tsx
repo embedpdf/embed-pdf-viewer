@@ -11,9 +11,9 @@ import './reveal.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Spots to jump to: a page index and a box in page coordinates (points from
@@ -35,7 +35,7 @@ export default function App() {
   const [zoom, setZoom] = useState<RevealZoom>('fit-width');
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SpotPicker active={active} zoom={zoom} onActive={setActive} onZoom={setZoom} />
         <Stage

@@ -8,7 +8,6 @@
  */
 import { getContext, hasContext, setContext, untrack } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
-import { annotationKey } from '@embedpdf/core';
 import type { Annotation, AnnotationRef, TextItem } from '@embedpdf/plugin-annotation';
 // Typing reaches the plugin through its host lens (drafts, the text selection).
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
@@ -78,16 +77,15 @@ function lookScaleOf(): () => number {
 export function useRichTextEditor(annotation: MaybeGetter<Annotation>): RichTextEditor {
   const page = usePage();
   const lookScale = lookScaleOf();
+  // Saved and idle too: your element draws its text, no engine picture does.
   const item = useOptionalSelector(
     AnnotationHostToken,
     (host) => {
-      const key = annotationKey(valueOf(annotation).ref);
       const { transform } = page;
-      return (
-        host
-          .listTextItems(page.ref, { zoom: transform.zoom, rotation: transform.rotation })
-          .find((text) => text.ref !== null && annotationKey(text.ref) === key) ?? null
-      );
+      return host.getTextItem(valueOf(annotation).ref, {
+        zoom: transform.zoom,
+        rotation: transform.rotation,
+      });
     },
     null,
   );

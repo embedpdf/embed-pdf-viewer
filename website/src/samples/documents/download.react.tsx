@@ -10,8 +10,8 @@ import './download.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -37,7 +37,7 @@ function DownloadBar() {
     return () => cancel.abort();
   }, [documents]);
 
-  const download = async () => saveFile(await documents.download(undefined, { mode }), 'ebook.pdf');
+  const download = async () => saveFile(await documents.download(undefined, { mode }), 'welcome.pdf');
 
   return (
     <div className="toolbar">
@@ -80,7 +80,7 @@ export default function App() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
     >
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <DownloadBar />

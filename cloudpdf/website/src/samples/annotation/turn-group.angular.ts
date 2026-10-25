@@ -5,9 +5,10 @@ import {
   effect,
   inject,
   untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -15,7 +16,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-turn-and-group',
@@ -85,7 +86,7 @@ export class TurnAndGroup {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -111,31 +112,22 @@ export class TurnAndGroup {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   constructor() {
-    // On load: a rectangle and a circle on the cover, both selected.
+    // On load: the document's square and circle, both selected.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
       untracked(() => {
-        void Promise.all([
-          this.annotation.create(cover, {
-            subtype: 'square',
-            box: { x: 300, y: 560, width: 140, height: 60 },
-            color: '#e5484d',
-            interiorColor: '#ffe4e1',
-            strokeWidth: 3,
-          }),
-          this.annotation.create(cover, {
-            subtype: 'circle',
-            box: { x: 460, y: 550, width: 80, height: 80 },
-            color: '#1e90ff',
-            strokeWidth: 3,
-          }),
-        ]).then((created) => this.annotation.selection.set(created.map((c) => c.annotation.ref)));
+        const found = this.annotation
+          .list()
+          .filter((each) => each.nm === 'square' || each.nm === 'circle');
+        if (found.length === 0) return;
+        this.annotation.selection.set(found.map((each) => each.ref));
+        stage.reveal(found[0].page, { rect: found[0].rect });
       });
     });
   }

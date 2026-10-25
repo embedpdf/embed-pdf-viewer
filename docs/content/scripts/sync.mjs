@@ -332,7 +332,7 @@ function swapDocSources(source, relative, replace) {
 
 // ── the ready-made viewer ───────────────────────────────────────────────────
 
-/** A viewer document's declaration, up to its value: `const ebook = `, `readonly ebook = `. */
+/** A viewer document's declaration, up to its value: `const welcome = `, `readonly welcome = `. */
 const DECLARATION =
   /^([ \t]*(?:(?:export|public|protected|private|static|readonly|const|let|var)\s+)+[A-Za-z_$][\w$]*\s*=\s*)/;
 
@@ -411,7 +411,7 @@ export function transformViewerFile(source, engine, relative) {
     if (!declaration || !/;\s*$/.test(body)) {
       throw new Error(
         `${relative}: a viewer doc-source block declares one document, untyped: ` +
-          '`const ebook = …;`',
+          '`const welcome = …;`',
       );
     }
     const value = DEMO_DOCUMENTS[key].viewerCloud;

@@ -17,10 +17,10 @@ import { EpdfToolbar, EpdfToolbarCommandTemplate, group } from '@embedpdf/angula
 import type { BarSchema } from '@embedpdf/angular/toolbar';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -63,7 +63,7 @@ const TOOL_OF_MODE: Record<Mode, string> = { view: 'pointer', annotate: 'highlig
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

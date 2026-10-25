@@ -10,10 +10,10 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
   <div style="height: 500px">
     <!-- Document UI is defined over a document — gate it on having one. -->
     <DocumentGate>

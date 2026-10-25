@@ -23,7 +23,7 @@ const PRESENTATION: Partial<StageSettings> = {
   anchorAlign: { x: 'center', y: 'center' },
 };
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function FeelSwitcher() {
   const stage = useStage();
@@ -62,7 +62,7 @@ function FeelSwitcher() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <FeelSwitcher />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

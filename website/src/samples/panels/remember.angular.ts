@@ -14,9 +14,9 @@ import { EpdfShell, withShell } from '@embedpdf/angular/shell';
 import type { ShellSnapshot } from '@embedpdf/angular/shell';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // The browser may refuse storage, in a private window: then nothing is remembered.
@@ -136,7 +136,7 @@ export class Workspace {
   imports: [EpdfDocumentGate, Workspace],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withShell(),

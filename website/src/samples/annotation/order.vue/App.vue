@@ -6,25 +6,25 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddRectangles from './AddRectangles.vue';
 import OrderControls from './OrderControls.vue';
+import SelectMiddle from './SelectMiddle.vue';
 
 import '../order.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: layout }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddRectangles />
+      <SelectMiddle />
       <OrderControls />
       <Stage class="stage">
         <template #page>

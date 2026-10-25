@@ -1,6 +1,6 @@
 <script lang="ts" module>
   // The characters of the cover's title.
-  const TITLE = { start: 10, count: 52 };
+  const TITLE = { start: 28, count: 30 };
 </script>
 
 <!-- The cover's title is selected on load, so the accent shows; drag over any text to see more. -->

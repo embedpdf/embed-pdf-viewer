@@ -4,7 +4,7 @@ import type { DocumentMetadata, OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfMetadata, withMetadata } from '@embedpdf/angular/metadata';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const FIELDS = [
   ['title', 'Title'],
@@ -31,7 +31,7 @@ const show = (field: string, value: string | null) => {
   imports: [EpdfDocumentGate],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withMetadata(),
     ),
   ],

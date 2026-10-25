@@ -10,7 +10,7 @@ import './bookmarks.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), outlinePlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // Bookmarks the reader adds: each one goes to the place in view when it's added.
 function Bookmarks() {
@@ -77,7 +77,7 @@ function Bookmarks() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="layout">
           <Bookmarks />

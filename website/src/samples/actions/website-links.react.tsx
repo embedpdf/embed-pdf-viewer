@@ -15,9 +15,9 @@ import './website-links.css';
 const engine = localEngine();
 const plugins = [actionsPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const links = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-links.pdf');
+  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
@@ -84,7 +84,7 @@ function AskBeforeOpening() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <AskBeforeOpening />
       </DocumentGate>

@@ -10,9 +10,9 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -22,7 +22,7 @@ const ebook = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook, name: 'ebook.pdf' }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome, name: 'welcome.pdf' }] },
       withStage(),
       withRender(),
     ),
@@ -51,8 +51,8 @@ const ebook = async (): Promise<OpenInput> => {
       @if (document.id()) {
         <button type="button" class="button" (click)="documents.close(document.id())">Close</button>
       } @else {
-        <button type="button" class="button" (click)="documents.open(ebook, { name: 'ebook.pdf' })">
-          Open the ebook again
+        <button type="button" class="button" (click)="documents.open(welcome, { name: 'welcome.pdf' })">
+          Open the welcome again
         </button>
       }
     </div>
@@ -74,9 +74,9 @@ const ebook = async (): Promise<OpenInput> => {
 export class App {
   protected readonly documents = inject(EpdfDocuments);
   protected readonly document = inject(EpdfDocument);
-  protected readonly ebook = ebook;
+  protected readonly welcome = welcome;
 
-  // A file the user picks opens next to the ebook, and becomes the active document.
+  // A file the user picks opens next to the welcome, and becomes the active document.
   protected async pick(picker: HTMLInputElement) {
     const file = picker.files?.[0];
     picker.value = '';

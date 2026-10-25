@@ -20,8 +20,8 @@
     searchPlugin(),
   ];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-welcome.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
@@ -31,7 +31,7 @@
   let showSelection = $state(true);
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

@@ -13,7 +13,7 @@ import '../states.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A file that isn't a PDF, so its document can't be opened.
 const broken: OpenInput = { kind: 'bytes', bytes: new TextEncoder().encode('Not a PDF') };
@@ -24,7 +24,7 @@ const broken: OpenInput = { kind: 'bytes', bytes: new TextEncoder().encode('Not 
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: ebook, name: 'ebook.pdf' },
+      { source: welcome, name: 'welcome.pdf' },
       { source: broken, name: 'broken.pdf', active: true },
     ]"
   >

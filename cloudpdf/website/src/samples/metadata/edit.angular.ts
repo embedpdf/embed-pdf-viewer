@@ -14,7 +14,7 @@ import type { DocumentMetadata, OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfMetadata, withMetadata } from '@embedpdf/angular/metadata';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const EDITABLE = ['title', 'author', 'subject', 'keywords'] as const;
 type Draft = Record<(typeof EDITABLE)[number], string>;
@@ -129,7 +129,7 @@ export class PropertiesForm implements OnInit {
   imports: [EpdfDocumentGate, PropertiesForm],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withMetadata(),
     ),
   ],

@@ -14,7 +14,7 @@ import type { SearchHit } from '@embedpdf/angular/search';
 import { EpdfShell, withShell } from '@embedpdf/angular/shell';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The panel shows the match its props name, and steps to the next one without reopening.
 @Component({
@@ -105,7 +105,7 @@ export class Workspace {
   imports: [EpdfDocumentGate, Workspace],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withSearch(),

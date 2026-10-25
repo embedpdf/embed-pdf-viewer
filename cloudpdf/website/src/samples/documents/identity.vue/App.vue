@@ -13,7 +13,7 @@ import '../identity.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const dana = { userId: 'u_381', displayName: 'Dana Smith' };
 const role = ref<Role>('reader');
@@ -25,9 +25,9 @@ const role = ref<Role>('reader');
     :plugins="plugins"
     :identity="dana"
     :scope="roles[role]"
-    :initial-documents="[{ source: ebook, name: 'ebook.pdf' }]"
+    :initial-documents="[{ source: welcome, name: 'welcome.pdf' }]"
   >
-    <Toolbar v-model:role="role" :ebook="ebook" />
+    <Toolbar v-model:role="role" :welcome="welcome" />
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>
       <Stage class="stage">

@@ -11,7 +11,7 @@ import '../scope.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 </script>
 
 <template>
@@ -19,8 +19,8 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: ebook, name: 'Original' },
-      { source: ebook, name: 'Revised' },
+      { source: welcome, name: 'Original' },
+      { source: welcome, name: 'Revised' },
     ]"
   >
     <SideBySide />

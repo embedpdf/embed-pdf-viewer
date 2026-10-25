@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useDocuments, useDocumentsState, type OpenSource } from '@embedpdf/svelte/runtime';
 
-  let { ebook }: { ebook: OpenSource } = $props();
+  let { welcome }: { welcome: OpenSource } = $props();
 
   const documents = useDocuments();
   const tabs = useDocumentsState();
@@ -33,7 +33,7 @@
     type="button"
     class="button"
     aria-label="Open another copy"
-    onclick={() => documents.open(ebook, { name: `Copy ${tabs.documents.length + 1}` })}
+    onclick={() => documents.open(welcome, { name: `Copy ${tabs.documents.length + 1}` })}
   >
     +
   </button>

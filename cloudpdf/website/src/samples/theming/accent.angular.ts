@@ -22,10 +22,10 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { cloudEngine } from '@cloudpdf/engine';
 
 // The characters of the cover's title.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The cover's title is selected on load, so the accent shows; drag over any text to see more.
 @Component({
@@ -56,7 +56,7 @@ export class SelectTitle {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

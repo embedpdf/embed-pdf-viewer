@@ -1,15 +1,13 @@
-import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
   annotationKey,
   annotationPlugin,
-  useAnnotation,
-  useAnnotationState,
   useComments,
   useCommentThreads,
   type CommentThreadView,
@@ -19,44 +17,20 @@ import { localEngine } from '@embedpdf/engine';
 import './review.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source proposal]
+const proposal = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-proposal.pdf');
+  return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
-
-// On load: two notes on the cover, one already accepted.
-function AddNotes() {
-  const annotation = useAnnotation();
-  const comments = useComments();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
-
-  useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(cover, {
-      subtype: 'text',
-      rect: { x: 470, y: 232, width: 20, height: 20 },
-      contents: 'Can we shorten the title?',
-      color: '#facc15',
-    });
-    void annotation
-      .create(cover, {
-        subtype: 'text',
-        rect: { x: 280, y: 520, width: 20, height: 20 },
-        contents: 'Add the co-author',
-        color: '#facc15',
-      })
-      .then(({ annotation: note }) => comments.setStatus(note.ref, 'accepted'));
-  }, [annotation, comments, ready, cover]);
-
-  return null;
-}
 
 // A thread's verdict, its check mark, and the buttons the user may use.
 function Review({ thread }: { thread: CommentThreadView }) {
@@ -132,15 +106,15 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-      initialDocuments={[{ source: ebook }]}
+      initialDocuments={[{ source: proposal }]}
     >
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddNotes />
         <div className="viewer">
           <Stage className="stage">
             {() => (
               <>
                 <RenderLayer />
+                <SelectionLayer />
                 <AnnotationLayer />
               </>
             )}

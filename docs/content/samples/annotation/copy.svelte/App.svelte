@@ -5,7 +5,7 @@
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { localEngine } from '@embedpdf/engine';
-  import AddAnnotations from './AddAnnotations.svelte';
+  import SelectSquare from './SelectSquare.svelte';
   import CopyButton from './CopyButton.svelte';
 
   import '../copy.css';
@@ -13,20 +13,20 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source layout]
+  const layout = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-layout.pdf');
+    return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: layout }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddAnnotations />
+    <SelectSquare />
     <CopyButton />
     <Stage class="stage">
       <RenderLayer />

@@ -6,7 +6,7 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddAnnotations from './AddAnnotations.vue';
+import SelectSquare from './SelectSquare.vue';
 import StylePanel from './StylePanel.vue';
 
 import '../style-panel.css';
@@ -14,19 +14,19 @@ import '../style-panel.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source layout]
+const layout = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: layout }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddAnnotations />
+      <SelectSquare />
       <div class="viewer">
         <Stage class="stage">
           <template #page>

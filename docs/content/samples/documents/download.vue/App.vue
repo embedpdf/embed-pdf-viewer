@@ -11,9 +11,9 @@ import '../download.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -23,7 +23,7 @@ const ebook = async (): Promise<OpenInput> => {
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: ebook, name: 'ebook.pdf' }]"
+    :initial-documents="[{ source: welcome, name: 'welcome.pdf' }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>

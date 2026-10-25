@@ -6,7 +6,7 @@ import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'app-root',
@@ -15,7 +15,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
     provideEmbedPdf(
       {
         engine: () => cloudEngine(),
-        initialDocuments: [{ source: ebook }],
+        initialDocuments: [{ source: welcome }],
       },
       withStage(),
       withRender(),

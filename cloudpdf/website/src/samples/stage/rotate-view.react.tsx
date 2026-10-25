@@ -10,7 +10,7 @@ const engine = cloudEngine();
 // The pages start a quarter turn round, like a scan that came out sideways.
 const plugins = [stagePlugin({ viewRotation: 90 }), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function RotateButtons() {
   const stage = useStage();
@@ -39,7 +39,7 @@ function RotateButtons() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <RotateButtons />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

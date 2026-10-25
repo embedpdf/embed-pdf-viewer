@@ -13,7 +13,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 // A second view of the same document: its own id and token, its own zoom and layout.
 const OverviewToken = createCapabilityToken<StageCapability>('stage-overview');
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 @Component({
   selector: 'demo-zoom-bar',
@@ -45,7 +45,7 @@ export class ZoomBar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, ZoomBar],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(), // the main view
       withStage({
         id: 'stage-overview',

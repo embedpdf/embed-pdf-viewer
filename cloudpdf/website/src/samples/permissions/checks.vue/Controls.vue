@@ -25,7 +25,7 @@ watch(
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, start: 10, count: 52 });
+    if (page) selection.select({ page, start: 28, count: 30 });
   },
   { immediate: true },
 );
@@ -36,7 +36,7 @@ async function copy() {
 }
 
 async function download() {
-  saveFile(await documents.download(), 'ebook.pdf');
+  saveFile(await documents.download(), 'welcome.pdf');
 }
 </script>
 

@@ -11,6 +11,7 @@ import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfStamp, withStamp, type StampAsset } from '@embedpdf/angular/stamp';
@@ -20,7 +21,7 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A signature as a pen would draw it: two strokes, in points.
 const loop = Array.from({ length: 48 }, (_, i) => ({
@@ -131,15 +132,17 @@ export class Marks {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     Marks,
   ],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: approvals }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
       withStamp({ assetEngine }),
     ),
@@ -153,6 +156,7 @@ export class Marks {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer />
         </ng-template>
       </epdf-stage>

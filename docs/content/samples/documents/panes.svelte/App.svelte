@@ -11,9 +11,9 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  // [!doc-source welcome]
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-welcome.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
@@ -23,8 +23,8 @@
   {engine}
   {plugins}
   initialDocuments={[
-    { source: ebook, name: 'Contract' },
-    { source: ebook, name: 'Report' },
+    { source: welcome, name: 'Contract' },
+    { source: welcome, name: 'Report' },
   ]}
 >
   <Panes />

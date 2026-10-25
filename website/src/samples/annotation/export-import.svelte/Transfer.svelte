@@ -1,7 +1,6 @@
 <!-- The bundle as one JSON text: what you'd store in your own database. -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { usePageList } from '@embedpdf/svelte/runtime';
   import {
     AnnotationTransfer,
     useAnnotation,
@@ -11,7 +10,6 @@
 
   const annotation = useAnnotation();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const pages = usePageList();
   const annotations = useAnnotationList();
   let text = $state('');
   let status = $state('');
@@ -38,28 +36,12 @@
     }
   }
 
-  // On load: a note and a rectangle on the cover, exported at once.
+  // On load: everything in the document, exported at once.
   let started = false;
   $effect(() => {
-    const cover = pages.current[0]?.ref;
-    if (!ready.current || !cover || started) return;
+    if (!ready.current || started) return;
     started = true;
-    untrack(() => {
-      void Promise.all([
-        annotation.create(cover, {
-          subtype: 'text',
-          rect: { x: 470, y: 232, width: 20, height: 20 },
-          contents: 'Can we shorten the title?',
-          color: '#facc15',
-        }),
-        annotation.create(cover, {
-          subtype: 'square',
-          box: { x: 96, y: 506, width: 178, height: 54 },
-          color: '#e5484d',
-          strokeWidth: 3,
-        }),
-      ]).then(exportAll);
-    });
+    untrack(() => void exportAll());
   });
 </script>
 

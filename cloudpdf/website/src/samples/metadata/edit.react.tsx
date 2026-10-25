@@ -14,7 +14,7 @@ import './edit.css';
 const engine = cloudEngine();
 const plugins = [metadataPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const EDITABLE = ['title', 'author', 'subject', 'keywords'] as const;
 type Draft = Record<(typeof EDITABLE)[number], string>;
@@ -113,7 +113,7 @@ function PropertiesEditor() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <PropertiesEditor />
       </DocumentGate>

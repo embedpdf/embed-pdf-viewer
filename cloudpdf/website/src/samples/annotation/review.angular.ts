@@ -2,19 +2,18 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   input,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   annotationKey,
-  EpdfAnnotation,
   EpdfAnnotationLayer,
   EpdfComments,
   withAnnotation,
@@ -22,7 +21,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // A thread's verdict, its check mark, and the buttons the user may use.
 @Component({
@@ -110,6 +109,7 @@ export class Reviews {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     Reviews,
   ],
@@ -118,11 +118,12 @@ export class Reviews {
       {
         engine: () => cloudEngine(),
         identity: { userId: 'u_381', displayName: 'Dana Smith' },
-        initialDocuments: [{ source: ebook }],
+        initialDocuments: [{ source: proposal }],
       },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -135,6 +136,7 @@ export class Reviews {
         <epdf-stage class="stage">
           <ng-template epdfPage>
             <epdf-render-layer />
+            <epdf-selection-layer />
             <epdf-annotation-layer />
           </ng-template>
         </epdf-stage>
@@ -145,32 +147,4 @@ export class Reviews {
     <ng-template #loading><p class="loading">Loading…</p></ng-template>
   `,
 })
-export class App {
-  private readonly annotation = inject(EpdfAnnotation);
-  private readonly comments = inject(EpdfComments);
-  private readonly pages = inject(EpdfDocument).pages;
-  private added = false;
-
-  constructor() {
-    // On load: two notes on the cover, one already accepted.
-    effect(() => {
-      const cover = this.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      void this.annotation.create(cover, {
-        subtype: 'text',
-        rect: { x: 470, y: 232, width: 20, height: 20 },
-        contents: 'Can we shorten the title?',
-        color: '#facc15',
-      });
-      void this.annotation
-        .create(cover, {
-          subtype: 'text',
-          rect: { x: 280, y: 520, width: 20, height: 20 },
-          contents: 'Add the co-author',
-          color: '#facc15',
-        })
-        .then(({ annotation: note }) => this.comments.setStatus(note.ref, 'accepted'));
-    });
-  }
-}
+export class App {}

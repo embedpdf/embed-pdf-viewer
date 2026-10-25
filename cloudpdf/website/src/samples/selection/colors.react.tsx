@@ -31,7 +31,7 @@ const COLORS = [
   { name: 'Pink', color: 'rgb(236 72 153 / 0.3)', handles: '#db2777', swatch: '#ec4899' },
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function ColorPicker() {
   const selection = useSelection();
@@ -63,7 +63,7 @@ function SelectTitle() {
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 28, count: 30 });
   }, [selection, cover]);
 
   return null;
@@ -73,7 +73,7 @@ export default function App() {
   const [fromCss, setFromCss] = useState(false);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SelectTitle />
         <div className="toolbar">

@@ -17,8 +17,8 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -64,8 +64,8 @@ export class Header {
       {
         engine: () => localEngine(),
         initialDocuments: [
-          { source: ebook, name: 'Original' },
-          { source: ebook, name: 'Revised' },
+          { source: welcome, name: 'Original' },
+          { source: welcome, name: 'Revised' },
         ],
       },
       withStage(),

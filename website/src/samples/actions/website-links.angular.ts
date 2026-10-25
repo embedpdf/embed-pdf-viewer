@@ -17,9 +17,9 @@ import {
 } from '@embedpdf/angular/actions';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const links = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-links.pdf');
+  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
@@ -93,7 +93,7 @@ export class AskBeforeOpening {
   providers: [
     LinkPrompt,
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: links }] },
       withActions(),
       withActionsUi(() => {
         const prompt = inject(LinkPrompt);

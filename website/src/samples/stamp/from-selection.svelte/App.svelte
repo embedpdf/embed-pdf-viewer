@@ -2,11 +2,12 @@
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { stampPlugin } from '@embedpdf/svelte/stamp';
   import { localEngine } from '@embedpdf/engine';
-  import DrawSeal from './DrawSeal.svelte';
+  import SelectSeal from './SelectSeal.svelte';
   import MakeStamp from './MakeStamp.svelte';
 
   import '../from-selection.css';
@@ -17,25 +18,27 @@
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
+    selectionPlugin(),
     annotationPlugin(),
     stampPlugin({ assetEngine }),
   ];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const approvals = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+    return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: approvals }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <DrawSeal />
+    <SelectSeal />
     <MakeStamp />
     <Stage class="stage">
       <RenderLayer />
+      <SelectionLayer />
       <AnnotationLayer />
     </Stage>
   </DocumentGate>

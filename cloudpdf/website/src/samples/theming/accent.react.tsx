@@ -13,10 +13,10 @@ const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 // The characters of the cover's title.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The cover's title is selected on load, so the accent shows; drag over any text to see more.
 function SelectTitle() {
@@ -51,7 +51,7 @@ export default function App() {
         ))}
         <code className="value">--epdf-accent: {accent}</code>
       </div>
-      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
         <DocumentGate fallback={<p className="loading">Loading…</p>}>
           <SelectTitle />
           <Stage className="stage">

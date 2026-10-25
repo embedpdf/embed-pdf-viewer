@@ -28,8 +28,8 @@ import {
 import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/search';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -99,7 +99,7 @@ export class Controls {
     });
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) untracked(() => this.selection.select({ page: cover, start: 10, count: 52 }));
+      if (cover) untracked(() => this.selection.select({ page: cover, start: 28, count: 30 }));
     });
   }
 
@@ -109,7 +109,7 @@ export class Controls {
   }
 
   protected async download() {
-    saveFile(await this.documents.download(), 'ebook.pdf');
+    saveFile(await this.documents.download(), 'welcome.pdf');
   }
 }
 
@@ -129,7 +129,7 @@ export class Controls {
       {
         engine: () => localEngine(),
         scope: roles.reviewer,
-        initialDocuments: [{ source: ebook, name: 'ebook.pdf' }],
+        initialDocuments: [{ source: welcome, name: 'welcome.pdf' }],
       },
       withStage(),
       withRender(),
@@ -180,6 +180,6 @@ export class App {
     const id = this.document.id();
     if (!id) return;
     await this.documents.close(id);
-    await this.documents.open(ebook, { name: 'ebook.pdf' });
+    await this.documents.open(welcome, { name: 'welcome.pdf' });
   }
 }

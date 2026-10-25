@@ -4,7 +4,7 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import { useSelection } from '@embedpdf/vue/selection';
 import { useSearch } from '@embedpdf/vue/search';
 
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 
 // On load: the cover's title is selected and "PDF" is found, so every color has something to paint.
 const selection = useSelection();

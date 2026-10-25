@@ -13,8 +13,8 @@ import '../unsaved.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), metadataPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
@@ -23,7 +23,7 @@ const ebook = async (): Promise<OpenInput> => {
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: ebook, name: 'report.pdf' }]"
+    :initial-documents="[{ source: welcome, name: 'report.pdf' }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>

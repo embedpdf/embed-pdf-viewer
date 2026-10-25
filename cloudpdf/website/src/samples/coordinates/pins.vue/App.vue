@@ -13,7 +13,7 @@ import '../pins.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // One pin to start with: an inch in from the first page's top-left corner.
 const pins = ref<Pin[]>([{ pageIndex: 0, point: { x: 72, y: 72 } }]);
@@ -35,7 +35,7 @@ function drop(page: PageContextValue, event: MouseEvent) {
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: welcome }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <Controls :last="last" @clear="pins = []" />

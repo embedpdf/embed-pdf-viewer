@@ -451,6 +451,8 @@ describe('<epdf-annotation-layer>', () => {
     // It can take the keys and the pointer: nothing above it is inert while typing.
     expect(editor().closest('[inert]')).toBeNull();
     expect(editor().style.pointerEvents).toBe('auto');
+    // And it has them: it took focus once its frame let it, so typing lands in it.
+    expect(document.activeElement).toBe(editor());
     expect(editor().style.fontSize).toMatch(/px$/);
 
     await annotation.text.end();

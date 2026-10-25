@@ -11,14 +11,14 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/embedpdf-welcome.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}>
-  <Toolbar {ebook} />
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}>
+  <Toolbar {welcome} />
   <DocumentGate>
     {#snippet fallback()}
       <Empty />

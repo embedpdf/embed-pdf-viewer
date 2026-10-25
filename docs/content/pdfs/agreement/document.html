@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Support agreement</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A short agreement: numbered clauses, then a signature block for each side. */
+  .sheet .title.form-title { margin-top: 24px; font-size: 28px; }
+  .clauses { flex: none; margin: 14px 0 0; padding-left: 22px; display: grid; gap: 8px; }
+  .clauses li { padding-left: 4px; }
+  .clauses strong { color: var(--color-deep-navy); }
+  .signatures { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; margin-top: 18px; }
+  .side .label { display: block; margin-bottom: 8px; font: 700 11px/1.2 var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-fg-muted); }
+  .sign-box { height: 64px; border-bottom: 1.5px solid var(--color-fg); }
+  .side p { margin: 8px 0 0; font-size: 12.5px; color: var(--color-fg-muted); }
+</style>
+</head>
+<body>
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
+    <span class="kind">Agreement</span>
+  </div>
+
+  <h1 class="title form-title">Support agreement</h1>
+  <p class="meta">Between EmbedPDF and Analytical Engines Ltd · Reference SA-2026-031</p>
+
+  <p class="lead" style="font-size:14.5px;">EmbedPDF gives Analytical Engines Ltd priority support for the EmbedPDF libraries it uses in production, on the terms below.</p>
+
+  <ol class="clauses">
+    <li><strong>Scope.</strong> Support covers the open source EmbedPDF packages and the PDF engine, in the versions EmbedPDF still maintains. It doesn't cover changes to the customer's own code.</li>
+    <li><strong>Response times.</strong> EmbedPDF answers an issue that stops production within one working day, and any other issue within three working days.</li>
+    <li><strong>Term.</strong> The agreement runs for twelve months from 1 November 2026. It renews each year unless either side ends it in writing with 30 days' notice.</li>
+    <li><strong>Price.</strong> $1,440 a year, invoiced in advance and due within 30 days.</li>
+    <li><strong>Confidentiality.</strong> Both sides keep what they learn about each other's systems to themselves, during the agreement and after it ends.</li>
+  </ol>
+
+  <h2>Signatures</h2>
+  <div class="signatures">
+    <div class="side">
+      <span class="label">For Analytical Engines Ltd</span>
+      <div class="sign-box" data-pdf="approval"></div>
+      <p>Ada Lovelace, Chief Technology Officer</p>
+    </div>
+    <div class="side">
+      <span class="label">For EmbedPDF</span>
+      <div class="sign-box" data-pdf="embedpdf"></div>
+      <p>Dana Smith, Operations</p>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>EmbedPDF · Support agreement SA-2026-031</span><span>1 of 1</span></div>
+</section>
+</body>
+</html>

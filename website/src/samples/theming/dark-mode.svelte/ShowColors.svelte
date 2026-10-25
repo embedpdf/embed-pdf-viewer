@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  const TITLE = { start: 10, count: 52 };
+  const TITLE = { start: 28, count: 30 };
 </script>
 
 <!-- On load: the cover's title is selected and "PDF" is found, so every color has something to paint. -->

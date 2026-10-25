@@ -11,7 +11,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 const en: Locale = {
   code: 'en',
   name: 'English',
-  translations: { app: { title: 'The ebook', switchTo: 'العربية' } },
+  translations: { app: { title: 'The guide', switchTo: 'العربية' } },
 };
 // Arabic reads right to left. The standard commands have no Arabic labels, so the app gives
 // them, under the same keys.
@@ -20,7 +20,7 @@ const ar: Locale = {
   name: 'العربية',
   direction: 'rtl',
   translations: {
-    app: { title: 'الكتاب الإلكتروني', switchTo: 'English' },
+    app: { title: 'الدليل', switchTo: 'English' },
     commands: {
       page: { previous: 'الصفحة السابقة', next: 'الصفحة التالية' },
       zoom: { in: 'تكبير', out: 'تصغير' },
@@ -28,7 +28,7 @@ const ar: Locale = {
   },
 };
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // The toolbar follows the language: in Arabic it runs from right to left.
 @Component({
@@ -36,7 +36,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfCommand, EpdfTPipe],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withCommands({ commands: standardCommands }),

@@ -20,7 +20,7 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfInteraction, svgCursor, withInteraction } from '@embedpdf/angular/interaction';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 interface Pin {
   readonly id: number;
@@ -126,7 +126,7 @@ export class PinBoard {
   imports: [EpdfDocumentGate, PinBoard],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

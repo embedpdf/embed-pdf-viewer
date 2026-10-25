@@ -16,9 +16,9 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/search';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 // On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
 @Component({
@@ -51,7 +51,7 @@ export class ShowColors {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
