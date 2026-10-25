@@ -24,7 +24,7 @@ useSignatureEvent(
   () => (drawn.value = false),
 );
 
-// On load: the agreement, with a typed signature drawn into its signature field.
+// On load: Ada's typed signature, ready to draw in, and the signature field in view.
 let done = false;
 watch(
   status,
@@ -43,7 +43,6 @@ watch(
         mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
       });
       assetId.value = asset.id;
-      await signature.fillField(APPROVAL, { assetId: asset.id });
     })();
   },
   { immediate: true },

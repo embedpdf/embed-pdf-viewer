@@ -85,7 +85,8 @@ function SignBar() {
   const { signatures, target, busy } = useSignatureState();
   const field = useFormState((state) => state.fields.find((candidate) => candidate.family === 'signature'));
   const [error, setError] = useState<string | null>(null);
-  const signed = signatures[0];
+  // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+  const signed = signatures.find((each) => each.fieldName === 'approval');
 
   // The target is the field someone clicked; without one, the form's signature field.
   const sign = (assetId: string) => {

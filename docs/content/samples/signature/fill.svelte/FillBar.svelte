@@ -24,7 +24,7 @@
     () => (drawn = false),
   );
 
-  // On load: the agreement, with a typed signature drawn into its signature field.
+  // On load: Ada's typed signature, ready to draw in, and the signature field in view.
   let done = false;
   $effect(() => {
     if (status.current !== 'ready' || done) return;
@@ -41,7 +41,6 @@
         mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
       });
       assetId = asset.id;
-      await signature.fillField(APPROVAL, { assetId: asset.id });
     });
   });
 

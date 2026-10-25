@@ -69,7 +69,9 @@ function ArmBar() {
   const mark = person?.signatures[0];
 
   let hint = 'Getting ready…';
-  if (signatures[0]) hint = `The field is signed by ${signatures[0].signer.name}`;
+  // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+  const signed = signatures.find((each) => each.fieldName === 'approval');
+  if (signed) hint = `The field is signed by ${signed.signer.name}`;
   else if (armedAsset) hint = 'Click the empty field to sign it, or anywhere else to place it';
   else if (mark) hint = 'Arm the signature, then click where it goes';
 

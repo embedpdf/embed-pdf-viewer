@@ -5,10 +5,8 @@ import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin, useAnnotation } from '@embedpdf/react/annotation';
-import { formPlugin, toFieldRef, useForm, useFormState } from '@embedpdf/react/form';
-import { stampPlugin, useStamp } from '@embedpdf/react/stamp';
+import { formPlugin, toFieldRef, useForm } from '@embedpdf/react/form';
 import {
-  createTestSigner,
   signaturePlugin,
   useSignature,
   useSignatureEvent,
@@ -19,20 +17,21 @@ import { localEngine } from '@embedpdf/engine';
 import './break-warning.css';
 
 const engine = localEngine();
-const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
-const signer = createTestSigner({ commonName: 'Ada Lovelace' });
+
+// The certificate EmbedPDF signed the agreement with, published next to it. Trusting it is what
+// makes the signature read 'valid'; your app trusts its own certificates the same way.
+const embedpdfCertificate = async () => {
+  const response = await fetch('/pdfs/embedpdf-agreement.cer');
+  return new Uint8Array(await response.arrayBuffer());
+};
+
 const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  stampPlugin({ assetEngine }),
-  signaturePlugin({
-    key: () => signer,
-    // Trust the demo key itself, so its signature checks out as 'valid'.
-    trust: { anchors: async () => [(await signer).certificate] },
-  }),
+  signaturePlugin({ trust: { anchors: async () => [await embedpdfCertificate()] } }),
 ];
 
 const agreement = async (): Promise<OpenInput> => {
@@ -40,44 +39,29 @@ const agreement = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-/** On load: the agreement, with its signature field signed by Ada with a typed signature. */
-function useSignedDocument() {
+// EmbedPDF's signature field, signed before the agreement was sent.
+const EMBEDPDF = toFieldRef('embedpdf');
+
+// Two edits after an approval signature: a comment keeps it valid, a new form field breaks it.
+function WarningBar() {
+  const annotation = useAnnotation();
   const form = useForm();
-  const stamp = useStamp();
   const stage = useStage();
   const signature = useSignature();
-  const status = useFormState((state) => state.status);
-  const done = useRef(false);
-
-  useEffect(() => {
-    if (status !== 'ready' || done.current) return;
-    done.current = true;
-    void (async () => {
-      // Bring the agreement's signature field into view.
-      const [widget] = form.getWidgets(toFieldRef('approval'));
-      if (widget) stage.reveal(widget.page, { rect: widget.rect });
-      const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
-      const { asset } = await stamp.createAsset({
-        libraryId: library.id,
-        name: 'signature',
-        label: 'Signature',
-        mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
-      });
-      await signature.sign({ field: toFieldRef('approval'), mark: { assetId: asset.id } });
-    })();
-  }, [form, stamp, stage, signature, status]);
-}
-
-function WarningBar() {
-  useSignedDocument();
-  const annotation = useAnnotation();
-  const signature = useSignature();
-  const form = useForm();
-  // The page of the form's signature field: the box goes next to the signature.
-  const page = form.getWidgets(toFieldRef('approval'))[0]?.page;
   const { signatures } = useSignatureState();
   const [warning, setWarning] = useState<string | null>(null);
-  const signed = signatures[0];
+  const [made, setMade] = useState({ comment: false, field: false });
+  const signed = signatures.find((each) => each.signed);
+  // Where the signature is: the edits go next to it.
+  const widget = form.getWidgets(EMBEDPDF)[0];
+  const revealed = useRef(false);
+
+  // On load: the signatures, in view. Nothing is changed until a button is pressed.
+  useEffect(() => {
+    if (!widget || revealed.current) return;
+    revealed.current = true;
+    stage.reveal(widget.page, { rect: widget.rect });
+  }, [stage, widget]);
 
   // The moment a change would break a signature once it's saved, as Acrobat warns.
   useSignatureEvent(
@@ -88,26 +72,55 @@ function WarningBar() {
     },
   );
 
+  const addComment = async () => {
+    if (!widget) return;
+    const { rect } = widget;
+    await annotation.create(widget.page, {
+      subtype: 'text',
+      rect: { x: rect.x + rect.width + 6, y: rect.y, width: 20, height: 20 },
+      contents: 'Looks good to us.',
+    });
+    setMade((current) => ({ ...current, comment: true }));
+  };
+
+  const addField = async () => {
+    if (!widget) return;
+    const { rect } = widget;
+    await form.create({
+      family: 'text',
+      name: 'purchase_order',
+      widgets: [
+        {
+          page: widget.page,
+          rect: { x: rect.x, y: rect.y + rect.height + 36, width: rect.width, height: 24 },
+        },
+      ],
+    });
+    setMade((current) => ({ ...current, field: true }));
+  };
+
   return (
     <div className="toolbar">
       <button
         type="button"
         className="button"
-        disabled={!signed || !page}
-        onClick={() =>
-          page &&
-          void annotation.create(page, {
-            subtype: 'square',
-            box: { x: 320, y: 560, width: 140, height: 64 },
-            color: '#e11d48',
-            strokeWidth: 2,
-          })
-        }
+        disabled={!signed || made.comment}
+        onClick={() => void addComment()}
       >
-        Draw a box on the page
+        Add a comment
+      </button>
+      <button
+        type="button"
+        className="button"
+        disabled={!signed || made.field}
+        onClick={() => void addField()}
+      >
+        Add a form field
       </button>
       <output className="readout">
-        {signed ? `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}` : 'Signing…'}
+        {signed
+          ? `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}`
+          : 'Opening…'}
       </output>
       {warning && <output className="warning">{warning}</output>}
     </div>

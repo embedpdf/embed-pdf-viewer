@@ -112,7 +112,8 @@ export class App {
   private readonly error = signal<string | null>(null);
 
   protected readonly status = computed(() => {
-    const signed = this.signature.signatures()[0];
+    // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+    const signed = this.signature.signatures().find((each) => each.fieldName === 'approval');
     const error = this.error();
     if (!this.person() || !this.field()) return 'Getting ready…';
     if (error) return error;

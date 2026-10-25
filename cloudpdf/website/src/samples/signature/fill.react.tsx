@@ -41,7 +41,7 @@ function FillBar() {
   useSignatureEvent((plugin) => plugin.onFilled, () => setDrawn(true));
   useSignatureEvent((plugin) => plugin.onCleared, () => setDrawn(false));
 
-  // On load: the agreement, with a typed signature drawn into its signature field.
+  // On load: Ada's typed signature, ready to draw in, and the signature field in view.
   useEffect(() => {
     if (status !== 'ready' || done.current) return;
     done.current = true;
@@ -57,7 +57,6 @@ function FillBar() {
         mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
       });
       setAssetId(asset.id);
-      await signature.fillField(APPROVAL, { assetId: asset.id });
     })();
   }, [form, stamp, stage, signature, status]);
 

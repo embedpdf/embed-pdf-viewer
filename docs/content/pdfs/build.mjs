@@ -49,10 +49,15 @@ const engine = localEngine({ runtime: { prefer: 'wasm' } });
 try {
   for (const name of documents) {
     const { pdf, marks } = await print(join(here, name, 'document.html'));
-    const bytes = await bake(name, pdf, marks);
+    const { bytes, published } = await bake(name, pdf, marks);
     const file = join(output, `embedpdf-${name}.pdf`);
     await writeFile(file, bytes);
     console.log(`${name}: ${marks.length} marked boxes, ${bytes.length} bytes → ${file}`);
+    for (const [extension, data] of published) {
+      const beside = join(output, `embedpdf-${name}${extension}`);
+      await writeFile(beside, data);
+      console.log(`${name}: ${data.length} bytes → ${beside}`);
+    }
   }
 } finally {
   await browser.close();
@@ -97,14 +102,18 @@ async function print(htmlFile) {
  * Runs the document's `bake.mjs` on the printed PDF, and saves the result whole. Each `edit()`
  * step opens the PDF as one person, so what it adds carries their name, and saves it before the
  * next step opens it. The saves add to the file, so refs stay valid from step to step.
+ *
+ * A bake may also export `sign()`: one more step, on the file as saved whole, whose save is added
+ * to it, so a signature made there seals the finished document. Its `publish(extension, bytes)`
+ * puts a file next to the PDF, such as the certificate a signature can be checked against.
  */
 async function bake(name, pdf, marks) {
-  const { default: bakeDocument } = await import(pathToFileURL(join(here, name, 'bake.mjs')).href);
+  const bakeModule = await import(pathToFileURL(join(here, name, 'bake.mjs')).href);
   let bytes = new Uint8Array(pdf);
   const used = new Set();
+  const published = [];
 
-  const edit = async (...args) => {
-    const [identity, work] = args.length === 1 ? [EMBEDPDF, args[0]] : args;
+  const step = async (identity, work) => {
     const doc = await engine.open({ kind: 'bytes', bytes }, { identity });
     try {
       const { pages } = await doc.pages.list();
@@ -124,23 +133,28 @@ async function bake(name, pdf, marks) {
         if (more.length > 0) throw new Error(`${name}: more than one box marked "${markName}"`);
         return only;
       };
-      await work({ engine, doc, pages, place, places });
+      const publish = (extension, data) => published.push([extension, data]);
+      await work({ engine, doc, pages, place, places, publish });
       bytes = await doc.download();
     } finally {
       await doc.close();
     }
   };
+  const edit = (...args) => step(...(args.length === 1 ? [EMBEDPDF, args[0]] : args));
 
-  await bakeDocument({ edit });
+  await bakeModule.default({ edit });
+
+  const whole = await engine.open({ kind: 'bytes', bytes });
+  try {
+    bytes = await whole.download({ mode: 'rewrite' });
+  } finally {
+    await whole.close();
+  }
+  if (bakeModule.sign) await step(EMBEDPDF, bakeModule.sign);
+
   const unused = [...new Set(marks.map((mark) => mark.name))].filter((mark) => !used.has(mark));
   if (unused.length > 0) throw new Error(`${name}: bake.mjs never uses ${unused.join(', ')}`);
-
-  const doc = await engine.open({ kind: 'bytes', bytes });
-  try {
-    return await doc.download({ mode: 'rewrite' });
-  } finally {
-    await doc.close();
-  }
+  return { bytes, published };
 }
 
 /** Fails when a page drew text in a font of its own instead of one `document.css` loads. */

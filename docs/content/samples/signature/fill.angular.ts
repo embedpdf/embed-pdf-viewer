@@ -87,7 +87,7 @@ export class App {
     this.signature.filled$.pipe(takeUntilDestroyed()).subscribe(() => this.drawn.set(true));
     this.signature.cleared$.pipe(takeUntilDestroyed()).subscribe(() => this.drawn.set(false));
 
-    // On load: the agreement, with a typed signature drawn into its signature field.
+    // On load: Ada's typed signature, ready to draw in, and the signature field in view.
     effect(() => {
       const stage = this.stage();
       if (this.form.status() !== 'ready' || !stage || this.done) return;
@@ -118,6 +118,5 @@ export class App {
       mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
     });
     this.assetId.set(asset.id);
-    await this.signature.fillField(APPROVAL, { assetId: asset.id });
   }
 }

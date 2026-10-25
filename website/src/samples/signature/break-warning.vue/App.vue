@@ -6,28 +6,28 @@ import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { formPlugin } from '@embedpdf/vue/form';
-import { stampPlugin } from '@embedpdf/vue/stamp';
-import { createTestSigner, signaturePlugin } from '@embedpdf/vue/signature';
+import { signaturePlugin } from '@embedpdf/vue/signature';
 import { localEngine } from '@embedpdf/engine';
 import WarningBar from './WarningBar.vue';
 
 import '../break-warning.css';
 
 const engine = localEngine();
-const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they open here too
-const signer = createTestSigner({ commonName: 'Ada Lovelace' });
+
+// The certificate EmbedPDF signed the agreement with, published next to it. Trusting it is what
+// makes the signature read 'valid'; your app trusts its own certificates the same way.
+const embedpdfCertificate = async () => {
+  const response = await fetch('/pdfs/embedpdf-agreement.cer');
+  return new Uint8Array(await response.arrayBuffer());
+};
+
 const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  stampPlugin({ assetEngine }),
-  signaturePlugin({
-    key: () => signer,
-    // Trust the demo key itself, so its signature checks out as 'valid'.
-    trust: { anchors: async () => [(await signer).certificate] },
-  }),
+  signaturePlugin({ trust: { anchors: async () => [await embedpdfCertificate()] } }),
 ];
 
 const agreement = async (): Promise<OpenInput> => {

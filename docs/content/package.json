@@ -10,11 +10,13 @@
     "snippets": "node scripts/snippets.mjs",
     "publish-gate": "node scripts/publish-gate.mjs",
     "samples": "node scripts/samples.mjs",
-    "pdfs": "node pdfs/build.mjs"
+    "pdfs": "tsx pdfs/build.mjs"
   },
   "devDependencies": {
+    "@embedpdf/core-signature": "workspace:*",
     "@embedpdf/default-stamps": "workspace:*",
     "@embedpdf/engine": "workspace:*",
-    "playwright-core": "^1.63.0"
+    "playwright-core": "^1.63.0",
+    "tsx": "^4.19.0"
   }
 }

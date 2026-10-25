@@ -590,6 +590,9 @@ importers:
 
   docs/content:
     devDependencies:
+      '@embedpdf/core-signature':
+        specifier: workspace:*
+        version: link:../../packages/core/signature
       '@embedpdf/default-stamps':
         specifier: workspace:*
         version: link:../../packages/default-stamps
@@ -599,6 +602,9 @@ importers:
       playwright-core:
         specifier: ^1.63.0
         version: 1.63.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
 
   docs/kit:
     dependencies:

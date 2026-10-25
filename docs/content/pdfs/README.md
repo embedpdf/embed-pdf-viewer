@@ -50,6 +50,20 @@ A folder with two files:
   marks with `data-pdf="<name>"`, in PDF points. A radio group's buttons each carry their value
   in `data-pdf-value`. Refs stay valid from one step to the next.
 
+  After the steps the build saves the document whole, which would undo a signature. So a bake that
+  signs exports a `sign()` step too, which runs on the saved file and adds to it:
+
+  ```js
+  export async function sign({ engine, doc, pages, place, publish }) {
+    /* sign a field with @embedpdf/core-signature */
+    publish('.cer', certificate); // → embedpdf-<folder>.cer, next to the PDF
+  }
+  ```
+
+  `publish()` puts a file next to the PDF, such as the certificate an example trusts. The build
+  runs with `tsx`, so a bake can import a workspace package that ships TypeScript source, as
+  `@embedpdf/core-signature` does.
+
 The HTML draws a field's box; the bake puts the field over it, so moving a box in the HTML moves
 its field. Text markup needs no marker: the bake finds the phrase with `doc.search.query()` and
 marks the lines it covers. Give each annotation an `nm`, so the samples can find it by name. The
