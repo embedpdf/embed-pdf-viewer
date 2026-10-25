@@ -1,5 +1,11 @@
 # @embedpdf/plugin-commands
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `document:print` prints the document in scope through the kernel's `documents.print()`, which runs the document's own print actions around the dialog. `StandardCommandsPlatform` no longer has `print`, and the package no longer depends on `@embedpdf/plugin-actions`.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @embedpdf/viewer
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – The viewer brings the attachment plugin: `viewer.get('attachment')` lists, adds, removes and saves the files a document carries, and the sidebar has the attachments panel.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The viewer includes the outline plugin and its panel: `viewer.get('outline')` reads and edits the document's bookmarks.
+
 ## 3.0.0-next.15
 
 ### Minor Changes
