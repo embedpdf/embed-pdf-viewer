@@ -78,6 +78,8 @@ import down039 from './039_visitor_layer_deletion_opt_in.down.sql';
 import sql039 from './039_visitor_layer_deletion_opt_in.sql';
 import down040 from './040_layers_list_index.down.sql';
 import sql040 from './040_layers_list_index.sql';
+import down041 from './041_share_grants_archived.down.sql';
+import sql041 from './041_share_grants_archived.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -181,5 +183,11 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '040_layers_list_index.sql',
     sql: sql040,
     down: down040,
+  },
+  {
+    version: '041',
+    name: '041_share_grants_archived.sql',
+    sql: sql041,
+    down: down041,
   },
 ];

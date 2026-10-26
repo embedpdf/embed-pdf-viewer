@@ -16,6 +16,7 @@ export type SecurityEventKind =
   | 'share.created'
   | 'share.updated'
   | 'share.revoked'
+  | 'share.archived'
   | 'tenant.suspended'
   | 'tenant.resumed';
 

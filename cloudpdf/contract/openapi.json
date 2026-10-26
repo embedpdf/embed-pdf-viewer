@@ -6465,6 +6465,14 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
             }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6646,6 +6654,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesUpdate409Response"
+                }
+              }
+            }
+          },
           "default": {
             "description": "Error",
             "content": {
@@ -6662,8 +6680,8 @@
         "operationId": "shares.delete",
         "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "delete",
-        "x-docs-title": "Revoke share",
-        "summary": "Delete a grant; exchange stops immediately, live sessions lapse at their exp.",
+        "x-docs-title": "Delete share",
+        "summary": "Delete a link whose visitors made no changes; exchange stops immediately, live sessions lapse at their exp. A link whose visitors have layers is archived instead (409).",
         "security": [
           {
             "apiToken": []
@@ -6702,7 +6720,88 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesDeleteResponse"
+                  "$ref": "#/components/schemas/SharesDelete404Response"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesDelete409Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/shares/{shareId}/archive": {
+      "post": {
+        "operationId": "shares.archive",
+        "x-fern-sdk-group-name": ["shares"],
+        "x-fern-sdk-method-name": "archive",
+        "x-docs-title": "Archive share",
+        "summary": "End a link for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
+        "description": "Archiving is final: an archived link never exchanges again, and to share again you create a new link. Pausing (`disabled`) is the reversible stop. An archived link no longer counts as using its shared layer, so that layer can be deleted.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["shares.manage"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "shareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesArchive200Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesArchive404Response"
                 }
               }
             }
@@ -24638,6 +24737,10 @@
               "disabled": {
                 "type": "boolean"
               },
+              "archivedAt": {
+                "type": "number",
+                "nullable": true
+              },
               "expiresAt": {
                 "type": "number",
                 "nullable": true
@@ -24672,6 +24775,7 @@
               "passwordProtected",
               "sessionTtlSeconds",
               "disabled",
+              "archivedAt",
               "expiresAt",
               "exchangeCount",
               "lastExchangedAt",
@@ -24748,6 +24852,10 @@
                 "disabled": {
                   "type": "boolean"
                 },
+                "archivedAt": {
+                  "type": "number",
+                  "nullable": true
+                },
                 "expiresAt": {
                   "type": "number",
                   "nullable": true
@@ -24782,6 +24890,7 @@
                 "passwordProtected",
                 "sessionTtlSeconds",
                 "disabled",
+                "archivedAt",
                 "expiresAt",
                 "exchangeCount",
                 "lastExchangedAt",
@@ -24855,6 +24964,10 @@
               "disabled": {
                 "type": "boolean"
               },
+              "archivedAt": {
+                "type": "number",
+                "nullable": true
+              },
               "expiresAt": {
                 "type": "number",
                 "nullable": true
@@ -24889,6 +25002,7 @@
               "passwordProtected",
               "sessionTtlSeconds",
               "disabled",
+              "archivedAt",
               "expiresAt",
               "exchangeCount",
               "lastExchangedAt",
@@ -25022,6 +25136,10 @@
               "disabled": {
                 "type": "boolean"
               },
+              "archivedAt": {
+                "type": "number",
+                "nullable": true
+              },
               "expiresAt": {
                 "type": "number",
                 "nullable": true
@@ -25056,6 +25174,7 @@
               "passwordProtected",
               "sessionTtlSeconds",
               "disabled",
+              "archivedAt",
               "expiresAt",
               "exchangeCount",
               "lastExchangedAt",
@@ -25075,7 +25194,120 @@
       "SharesUpdate404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesDeleteResponse": {
+      "SharesUpdate409Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "SharesArchive200Response": {
+        "type": "object",
+        "properties": {
+          "share": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "docId": {
+                "type": "string"
+              },
+              "layerMode": {
+                "type": "string",
+                "enum": ["shared", "per-visitor"]
+              },
+              "layerName": {
+                "type": "string",
+                "nullable": true
+              },
+              "keepVisitorLayers": {
+                "type": "boolean"
+              },
+              "visitorLayerIdleSeconds": {
+                "type": "number",
+                "nullable": true
+              },
+              "scope": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "origins": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true
+              },
+              "passwordProtected": {
+                "type": "boolean"
+              },
+              "sessionTtlSeconds": {
+                "type": "number"
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "archivedAt": {
+                "type": "number",
+                "nullable": true
+              },
+              "expiresAt": {
+                "type": "number",
+                "nullable": true
+              },
+              "exchangeCount": {
+                "type": "number"
+              },
+              "lastExchangedAt": {
+                "type": "number",
+                "nullable": true
+              },
+              "createdBy": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "docId",
+              "layerMode",
+              "layerName",
+              "keepVisitorLayers",
+              "visitorLayerIdleSeconds",
+              "scope",
+              "origins",
+              "passwordProtected",
+              "sessionTtlSeconds",
+              "disabled",
+              "archivedAt",
+              "expiresAt",
+              "exchangeCount",
+              "lastExchangedAt",
+              "createdBy",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["share"],
+        "additionalProperties": false
+      },
+      "SharesArchive404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "SharesDelete404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "SharesDelete409Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "SharesExchangeRequest": {

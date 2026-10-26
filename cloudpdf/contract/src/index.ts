@@ -730,6 +730,11 @@ export const ShareGrantRecordSchema = z.object({
   sessionTtlSeconds: z.number(),
   /** Paused grants refuse exchange (404) but keep their configuration. */
   disabled: z.boolean(),
+  /**
+   * Unix epoch ms the link was archived: it refuses exchange for good and
+   * keeps what its visitors made. Null while it works.
+   */
+  archivedAt: z.number().nullable(),
   /** Unix epoch ms after which exchange returns 410; null = no expiry. */
   expiresAt: z.number().nullable(),
   /** Total successful exchanges — a dashboard convenience, not the usage meter. */
@@ -815,6 +820,12 @@ export const ShareGrantResponseSchema = z.object({
 });
 export type ShareGrantResponse = z.infer<typeof ShareGrantResponseSchema>;
 
+/** A query-string flag, `true` or `false`. */
+const queryFlag = z.preprocess(
+  (value) => (value === 'true' ? true : value === 'false' ? false : value),
+  z.boolean(),
+);
+
 export const ShareGrantListQuerySchema = z.object({
   limit: z.coerce
     .number()
@@ -825,6 +836,8 @@ export const ShareGrantListQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   /** Filter to one document's grants. */
   docId: z.string().regex(docIdPattern).optional(),
+  /** `true` lists the archived links instead of the ones that still work. */
+  archived: queryFlag.optional(),
 });
 export type ShareGrantListQuery = z.infer<typeof ShareGrantListQuerySchema>;
 
@@ -1414,12 +1427,31 @@ export const adminOperations = {
       200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
+  },
+  'shares.archive': {
+    operationId: 'shares.archive',
+    title: 'Archive share',
+    summary:
+      "End a link for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/shares/:shareId/archive',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantShareParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Archiving is final: an archived link never exchanges again, and to share again you create a new link. Pausing (`disabled`) is the reversible stop. An archived link no longer counts as using its shared layer, so that layer can be deleted.',
   },
   'shares.delete': {
     operationId: 'shares.delete',
-    title: 'Revoke share',
-    summary: 'Delete a grant; exchange stops immediately, live sessions lapse at their exp.',
+    title: 'Delete share',
+    summary:
+      "Delete a link whose visitors made no changes; exchange stops immediately, live sessions lapse at their exp. A link whose visitors have layers is archived instead (409).",
     method: 'DELETE',
     path: '/v1/tenants/:tenantId/shares/:shareId',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1428,6 +1460,7 @@ export const adminOperations = {
     responses: {
       204: {},
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
   'shares.exchange': {

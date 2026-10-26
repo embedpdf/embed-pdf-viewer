@@ -25,6 +25,8 @@ export interface ShareGrantRow {
   passwordHash: string | null;
   sessionTtlSeconds: number;
   disabled: boolean;
+  /** Unix epoch ms the link was archived: it exchanges no more, for good. Null while it works. */
+  archivedAt: number | null;
   expiresAt: number | null;
   exchangeCount: number;
   lastExchangedAt: number | null;
@@ -73,6 +75,8 @@ export interface ShareGrantUpdateInput {
 export interface ShareGrantListOptions {
   tenantId: string;
   docId?: string;
+  /** true lists the archived links only; otherwise only the ones that still work. */
+  archived?: boolean;
   limit?: number;
   /** Keyset cursor, same shape as the documents/tenants lists. */
   before?: { createdAt: number; id: string };
@@ -171,6 +175,27 @@ export class ShareGrantsRepo {
     return this.findById(id);
   }
 
+  /**
+   * End the link for good: it exchanges no more, and keeps its row and what
+   * its visitors made. Archiving an archived link changes nothing. Returns
+   * the row, or null when it is gone.
+   */
+  async archive(
+    id: string,
+    tenantId: string,
+    now: number = Date.now(),
+  ): Promise<ShareGrantRow | null> {
+    await this.db
+      .updateTable('share_grants')
+      .set({ archived_at: now, updated_at: now })
+      .where('id', '=', id)
+      .where('tenant_id', '=', tenantId)
+      .where('archived_at', 'is', null)
+      .execute();
+    const row = await this.findById(id);
+    return row && row.tenantId === tenantId ? row : null;
+  }
+
   async delete(id: string, tenantId: string): Promise<boolean> {
     const res = await this.db
       .deleteFrom('share_grants')
@@ -188,6 +213,7 @@ export class ShareGrantsRepo {
       .orderBy('created_at', 'desc')
       .orderBy('id', 'desc');
     if (opts.docId !== undefined) q = q.where('doc_id', '=', opts.docId);
+    q = q.where('archived_at', opts.archived ? 'is not' : 'is', null);
     if (opts.before) {
       const { createdAt, id } = opts.before;
       q = q.where((eb) =>
@@ -202,7 +228,10 @@ export class ShareGrantsRepo {
     return rows.map(mapRow);
   }
 
-  /** The grants whose visitors land in the layer: deleting it would leave them a dead link. */
+  /**
+   * The working links whose visitors land in the layer: deleting it would
+   * leave them a dead link. An archived link gives no access any more.
+   */
   async listByLayer(tenantId: string, docId: string, layerName: string): Promise<ShareGrantRow[]> {
     const rows = await this.db
       .selectFrom('share_grants')
@@ -210,6 +239,7 @@ export class ShareGrantsRepo {
       .where('tenant_id', '=', tenantId)
       .where('doc_id', '=', docId)
       .where('layer_mode', '=', 'shared')
+      .where('archived_at', 'is', null)
       .where('layer_name', '=', layerName)
       .execute();
     return rows.map(mapRow);
@@ -250,6 +280,7 @@ function mapRow(r: {
   password_hash: string | null;
   session_ttl_seconds: number;
   disabled: number;
+  archived_at: number | null;
   expires_at: number | null;
   exchange_count: number;
   last_exchanged_at: number | null;
@@ -271,6 +302,7 @@ function mapRow(r: {
     passwordHash: r.password_hash,
     sessionTtlSeconds: Number(r.session_ttl_seconds),
     disabled: Number(r.disabled) !== 0,
+    archivedAt: r.archived_at === null ? null : Number(r.archived_at),
     expiresAt: r.expires_at === null ? null : Number(r.expires_at),
     exchangeCount: Number(r.exchange_count),
     lastExchangedAt: r.last_exchanged_at === null ? null : Number(r.last_exchanged_at),

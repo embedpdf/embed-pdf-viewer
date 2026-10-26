@@ -324,6 +324,11 @@ export interface ShareGrantsTable {
   session_ttl_seconds: number;
   /** 1 = paused: exchange refuses (404) but configuration is kept. */
   disabled: number;
+  /**
+   * When the link was archived (migration 041): it exchanges no more, for
+   * good, and keeps what its visitors made. NULL while it works.
+   */
+  archived_at: number | null;
   /** Unix epoch ms; NULL = no expiry. */
   expires_at: number | null;
   /** Successful exchanges — dashboard convenience, not the usage meter. */

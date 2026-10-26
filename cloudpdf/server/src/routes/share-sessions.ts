@@ -144,7 +144,8 @@ export async function registerShareSessionRoutes(
         return notFound(reply);
       }
 
-      if (grant.disabled) return notFound(reply);
+      // Paused and archived links refuse alike: stale, not a probe.
+      if (grant.disabled || grant.archivedAt !== null) return notFound(reply);
       if (await suspendedTenants.isSuspended(grant.tenantId)) return notFound(reply);
       const doc = await documents.findById(grant.docId);
       if (!doc || doc.tenantId !== grant.tenantId || doc.state !== 'ready') {

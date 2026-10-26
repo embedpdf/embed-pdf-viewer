@@ -9,6 +9,8 @@
  * Visitors' layers stay until deleted on purpose, unless their link sets an
  * idle time (throwaway layers, like examples): then the sweep deletes the
  * ones unseen for longer. A visit is one view however often it renews.
+ * Ending a link archives it, for good and keeping what its visitors made;
+ * a link is deleted only once its visitors have no layers.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -130,6 +132,9 @@ const createLink = (body: Record<string, unknown>) =>
 
 const updateLink = (id: string, body: Record<string, unknown>) =>
   call('PATCH', `/v1/tenants/${TENANT}/shares/${id}`, { token: API_TOKEN, body });
+
+const archiveLink = (id: string) =>
+  call('POST', `/v1/tenants/${TENANT}/shares/${id}/archive`, { token: API_TOKEN });
 
 const exchange = (body: Record<string, unknown>) =>
   call('POST', '/v1/share-sessions', { body, origin: ORIGIN });
@@ -413,20 +418,103 @@ describe('the idle sweep', () => {
     expect(await sweep(now)).toBe(0);
   });
 
-  test("a deleted link's visitors' layers stay until deleted on purpose", async () => {
-    const link = (await createLink({ layerMode: 'per-visitor', visitorLayerIdleSeconds: 3600 }))
+  test("an archived link's visitors' layers keep to the link's own setting", async () => {
+    const keeping = (await createLink({ layerMode: 'per-visitor' })).body.share;
+    const hourly = (await createLink({ layerMode: 'per-visitor', visitorLayerIdleSeconds: 3600 }))
       .body.share;
-    const visitor = await visit(link.id);
-    expect((await annotate(visitor, 'filled in')).status).toBe(200);
-    expect(
-      (await call('DELETE', `/v1/tenants/${TENANT}/shares/${link.id}`, { token: API_TOKEN }))
-        .status,
-    ).toBe(204);
+    const filledIn = await visit(keeping.id);
+    const throwaway = await visit(hourly.id);
+    expect((await annotate(filledIn, 'filled in')).status).toBe(200);
+    expect((await annotate(throwaway, 'example')).status).toBe(200);
+    for (const link of [keeping, hourly]) {
+      expect((await archiveLink(link.id)).status).toBe(200);
+    }
     const now = Date.now();
-    await lastSeen(visitor.layerName, now - YEAR_MS);
+    await lastSeen(filledIn.layerName, now - YEAR_MS);
+    await lastSeen(throwaway.layerName, now - 2 * HOUR_MS);
 
     await sweep(now);
+    expect((await layerRow(filledIn.layerName))?.deleted_at).toBeNull();
+    expect((await layerRow(throwaway.layerName))?.deleted_at).not.toBeNull();
+  });
+});
+
+describe('ending a link', () => {
+  const listLinks = (query = '') =>
+    call('GET', `/v1/tenants/${TENANT}/shares?docId=${DOC}${query}`, { token: API_TOKEN });
+  const deleteLink = (id: string) =>
+    call('DELETE', `/v1/tenants/${TENANT}/shares/${id}`, { token: API_TOKEN });
+  const ids = (answer: Answer) => answer.body.shares.map((share: { id: string }) => share.id);
+
+  test('archiving stops it for good and keeps it, listed apart', async () => {
+    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
+    const visitor = await visit(link.id);
+    expect((await annotate(visitor, 'kept')).status).toBe(200);
+
+    const archived = await archiveLink(link.id);
+    expect(archived.status).toBe(200);
+    expect(archived.body.share.archivedAt).toEqual(expect.any(Number));
+    // Final: no exchange, with or without a handle, and no more changes.
+    expect((await exchange({ shareToken: link.id })).status).toBe(404);
+    expect(
+      (await exchange({ shareToken: link.id, visitorHandle: visitor.visitor.handle })).status,
+    ).toBe(404);
+    const changed = await updateLink(link.id, { disabled: false });
+    expect(changed.status).toBe(409);
+    expect(changed.body.error.message).toMatch(/archived/);
+    // Archiving again changes nothing.
+    const again = await archiveLink(link.id);
+    expect(again.body.share.archivedAt).toBe(archived.body.share.archivedAt);
+
+    expect(ids(await listLinks())).not.toContain(link.id);
+    expect(ids(await listLinks('&archived=false'))).not.toContain(link.id);
+    expect(ids(await listLinks('&archived=true'))).toContain(link.id);
+    expect((await listLinks('&archived=yes')).status).toBe(400);
+    // What its visitor made is still there.
     expect((await layerRow(visitor.layerName))?.deleted_at).toBeNull();
+  });
+
+  test("deleting is refused while its visitors have layers, and works once they don't", async () => {
+    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
+    const [alice, bob] = [await visit(link.id), await visit(link.id)];
+    expect((await annotate(alice, 'alice')).status).toBe(200);
+    expect((await annotate(bob, 'bob')).status).toBe(200);
+
+    const refused = await deleteLink(link.id);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatchObject({
+      code: 'Conflict',
+      details: { visitorLayers: 2 },
+    });
+    expect(refused.body.error.message).toMatch(/archive it instead/);
+
+    for (const session of [alice, bob]) {
+      const removed = await call(
+        'DELETE',
+        `/v1/tenants/${TENANT}/documents/${DOC}/layers/${session.layerName}`,
+        { token: API_TOKEN },
+      );
+      expect(removed.status).toBe(204);
+    }
+    expect((await deleteLink(link.id)).status).toBe(204);
+  });
+
+  test('a link whose visitors only looked can be deleted', async () => {
+    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
+    await visit(link.id);
+    expect((await deleteLink(link.id)).status).toBe(204);
+  });
+
+  test('an archived shared link no longer keeps its layer from being deleted', async () => {
+    const link = (await createLink({ layerName: 'ended-review' })).body.share;
+    expect((await annotate(await visit(link.id), 'comment')).status).toBe(200);
+    const deleteLayer = () =>
+      call('DELETE', `/v1/tenants/${TENANT}/documents/${DOC}/layers/ended-review`, {
+        token: API_TOKEN,
+      });
+    expect((await deleteLayer()).status).toBe(409);
+    expect((await archiveLink(link.id)).status).toBe(200);
+    expect((await deleteLayer()).status).toBe(204);
   });
 });
 

@@ -234,6 +234,17 @@ export class LayersRepo {
     }));
   }
 
+  /** How many live layers a share link's visitors made: what keeps the link from being deleted. */
+  async countForGrant(grantId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom('layers')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('grant_id', '=', grantId)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
+  }
+
   /**
    * A visitor opened their layer again: its idle clock restarts. `false`
    * when the layer was deleted, so the visitor starts over. A layer nobody

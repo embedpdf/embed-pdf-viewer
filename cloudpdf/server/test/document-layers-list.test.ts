@@ -3,7 +3,7 @@
  * hold changes, newest first, paged like the other tenant lists (`limit`,
  * an opaque keyset `cursor`, `nextCursor` null on the last page). Named and
  * shared layers are listed with share-link visitors' own; `shareId` keeps
- * one link's visitors, a deleted link's too. A layer appears at its first
+ * one link's visitors, an archived link's too. A layer appears at its first
  * change, and a deleted one is not listed.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -239,7 +239,7 @@ describe("a document's layers", () => {
     ]);
   });
 
-  test("shareId keeps one link's visitors' layers, a deleted link's too", async () => {
+  test("shareId keeps one link's visitors' layers, an archived link's too", async () => {
     const docId = await seedDocument();
     await writeNamed(docId, 'user-1');
     const first = await createLink(docId, { layerMode: 'per-visitor' });
@@ -253,12 +253,12 @@ describe("a document's layers", () => {
       filtered.body.layers.map((layer: { layerName: string }) => layer.layerName).sort(),
     ).toEqual([...firsts].sort());
 
-    const unlinked = await call('DELETE', `/v1/tenants/${TENANT}/shares/${first.id}`, {
+    const archived = await call('POST', `/v1/tenants/${TENANT}/shares/${first.id}/archive`, {
       token: API_TOKEN,
     });
-    expect(unlinked.status).toBe(204);
-    const afterDelete = await listLayers(docId, `?shareId=${first.id}`);
-    expect(afterDelete.body.layers).toHaveLength(2);
+    expect(archived.status).toBe(200);
+    const afterArchive = await listLayers(docId, `?shareId=${first.id}`);
+    expect(afterArchive.body.layers).toHaveLength(2);
   });
 });
 

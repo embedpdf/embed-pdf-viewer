@@ -154,11 +154,12 @@ export async function registerAdminSharesRoutes(
         .code(400)
         .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
     }
-    const { limit, cursor, docId } = parsed.data;
+    const { limit, cursor, docId, archived } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
     const rows = await grants.list({
       tenantId,
       ...(docId !== undefined ? { docId } : {}),
+      ...(archived !== undefined ? { archived } : {}),
       limit: limit + 1,
       ...(before ? { before } : {}),
     });
@@ -207,6 +208,7 @@ export async function registerAdminSharesRoutes(
         .code(404)
         .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
     }
+    if (existing.archivedAt !== null) return archivedConflict(reply, shareId);
     const layerMode = body.layerMode ?? existing.layerMode;
     const layerChanges = body.layerMode !== undefined || body.layerName !== undefined;
     if (layerChanges) {
@@ -262,6 +264,36 @@ export async function registerAdminSharesRoutes(
     return reply.send({ share: sharePublic(updated) });
   });
 
+  const archiveOp = adminOperations['shares.archive'];
+  mount(archiveOp, async (req, reply) => {
+    const { tenantId, shareId } = req.params as { tenantId: string; shareId: string };
+    const ctx = requireTenantAccess(req, tenantId, archiveOp.scope);
+    const existing = await grants.findById(shareId);
+    if (!existing || existing.tenantId !== tenantId) {
+      return reply
+        .code(404)
+        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+    }
+    const archived = await grants.archive(shareId, tenantId);
+    if (!archived) {
+      return reply
+        .code(404)
+        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+    }
+    if (existing.archivedAt === null) {
+      await securityEvents.append({
+        tenantId,
+        kind: 'share.archived',
+        jti: shareId,
+        docId: archived.docId,
+        scope: archived.scope,
+        actor: ctx.sub,
+        via: ctx.via,
+      });
+    }
+    return reply.send({ share: sharePublic(archived) });
+  });
+
   const deleteOp = adminOperations['shares.delete'];
   mount(deleteOp, async (req, reply) => {
     const { tenantId, shareId } = req.params as { tenantId: string; shareId: string };
@@ -271,6 +303,18 @@ export async function registerAdminSharesRoutes(
       return reply
         .code(404)
         .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+    }
+    // Deleting a link never deletes what its visitors made: one whose
+    // visitors have layers is archived instead.
+    const visitorLayers = await layers.countForGrant(shareId);
+    if (visitorLayers > 0) {
+      return reply.code(409).send({
+        error: {
+          code: 'Conflict',
+          message: `share ${shareId} has ${visitorLayers} visitors' layers: archive it instead, or delete those layers first`,
+          details: { visitorLayers },
+        },
+      });
     }
     await grants.delete(shareId, tenantId);
     await securityEvents.append({
@@ -283,6 +327,16 @@ export async function registerAdminSharesRoutes(
       via: ctx.via,
     });
     return reply.code(204).send();
+  });
+}
+
+/** An archived link is final: it takes no more changes. */
+function archivedConflict(reply: FastifyReply, shareId: string): FastifyReply {
+  return reply.code(409).send({
+    error: {
+      code: 'Conflict',
+      message: `share ${shareId} is archived: create a new link to share again`,
+    },
   });
 }
 
@@ -301,6 +355,7 @@ function sharePublic(g: ShareGrantRow): Record<string, unknown> {
     passwordProtected: g.passwordHash !== null,
     sessionTtlSeconds: g.sessionTtlSeconds,
     disabled: g.disabled,
+    archivedAt: g.archivedAt,
     expiresAt: g.expiresAt,
     exchangeCount: g.exchangeCount,
     lastExchangedAt: g.lastExchangedAt,
