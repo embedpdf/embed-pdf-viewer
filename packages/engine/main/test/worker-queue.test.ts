@@ -1,7 +1,8 @@
 /**
  * The queue's abort contract: a job aborted while it waits never reaches the
  * worker; a job aborted after it was sent rejects at once, the worker is told
- * to stop it, and its slot stays taken until the worker answers. Its ranking:
+ * to stop it, and its slot stays taken until the worker answers; a document
+ * the worker opened anyway is closed before anything asked after it. Its ranking:
  * a call's priority, then where its page is in the working sets as they are
  * when the next job is picked (the order itself: job-order.test.ts). And a
  * running read giving way to a job that clearly outranks it.
@@ -40,12 +41,27 @@ function fakeTransport() {
       jobId,
       error: { name: 'EngineError', code: 'Aborted', message: 'stopped' },
     } as WorkerResponse);
-  return { transport, sent, answer, stopped };
+  /** The worker's answer to an open: the document is open there. */
+  const opened = (jobId: number, docId: string) =>
+    handler({ kind: 'resolve', jobId, result: { tag: 'open', docId } } as WorkerResponse);
+  return { transport, sent, answer, stopped, opened };
 }
 
 const job = (docId: string) => ({
   buildPack: (jobId: number) =>
     wirePack({ kind: 'close', effect: 'close', jobId, docId } as WorkerJobRequest),
+});
+
+const open = (docId: string) => ({
+  buildPack: (jobId: number) =>
+    wirePack({
+      kind: 'open.fatMem',
+      effect: 'open',
+      jobId,
+      docId,
+      bytes: new ArrayBuffer(0),
+      password: null,
+    } as WorkerJobRequest),
 });
 
 describe('WorkerQueue', () => {
@@ -83,6 +99,39 @@ describe('WorkerQueue', () => {
     );
     answer(sent[2]!.jobId);
     await second;
+  });
+
+  test('closes what the worker opened for an aborted open, before an open asked after it', async () => {
+    const { transport, sent, answer, opened } = fakeTransport();
+    const queue = new WorkerQueue(transport);
+    const left = queue.enqueue(open('a'));
+    left.abort('left');
+    await expect(left).rejects.toBeInstanceOf(AbortError);
+    const again = queue.enqueue(open('a')); // waits for the first open
+
+    // The worker can't stop an open: it opened the document anyway.
+    opened(sent[0]!.jobId, 'a');
+    expect(sent.slice(1)).toEqual([
+      { kind: 'abort', jobId: sent[0]!.jobId },
+      expect.objectContaining({ kind: 'close', effect: 'close', docId: 'a' }),
+    ]);
+
+    answer(sent[2]!.jobId);
+    expect(sent[3]).toEqual(expect.objectContaining({ kind: 'open.fatMem', docId: 'a' }));
+    opened(sent[3]!.jobId, 'a');
+    await expect(again).resolves.toEqual({ tag: 'open', docId: 'a' });
+  });
+
+  test('closes nothing for an aborted open the worker stopped before it ran', async () => {
+    const { transport, sent, stopped } = fakeTransport();
+    const queue = new WorkerQueue(transport);
+    const left = queue.enqueue(open('a'));
+    left.abort('left');
+    await expect(left).rejects.toBeInstanceOf(AbortError);
+    void queue.enqueue(open('a'));
+
+    stopped(sent[0]!.jobId);
+    expect(sent.slice(1).map((request) => request.kind)).toEqual(['abort', 'open.fatMem']);
   });
 
   test('tells the worker a message at once, past waiting jobs, without taking a slot', async () => {

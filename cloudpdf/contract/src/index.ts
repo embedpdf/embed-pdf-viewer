@@ -653,7 +653,7 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
 export const ShareLayerModeSchema = z.enum(['shared', 'per-visitor']);
 export type ShareLayerMode = z.infer<typeof ShareLayerModeSchema>;
 
-/** How long a visitor's layer lives unvisited before it is deleted: an hour to 30 days. */
+/** Delete a visitor's layer after this long unvisited: an hour to 30 days. */
 const visitorLayerIdleSecondsSchema = z
   .number()
   .int()
@@ -670,8 +670,11 @@ export const ShareGrantRecordSchema = z.object({
   layerName: z.string().nullable(),
   /** Per-visitor links: a visitor's browser keeps its layer for the next visit. */
   keepVisitorLayers: z.boolean(),
-  /** Per-visitor links: how long a visitor's layer lives unvisited before it is deleted. */
-  visitorLayerIdleSeconds: z.number(),
+  /**
+   * Per-visitor links: delete a visitor's layer after this long unvisited;
+   * null keeps it until it is deleted on purpose.
+   */
+  visitorLayerIdleSeconds: z.number().nullable(),
   /** Doc capabilities the exchanged session carries. */
   scope: z.array(z.string()),
   /** Origin allowlist; null means any origin. */
@@ -701,8 +704,12 @@ export const ShareGrantCreateRequestSchema = z.object({
   layerName: z.string().min(1).max(256).optional(),
   /** Per-visitor links: keep a visitor's layer for their next visit. Default true. */
   keepVisitorLayers: z.boolean().optional(),
-  /** Per-visitor links: delete a visitor's layer after this long unvisited. Default 7 days. */
-  visitorLayerIdleSeconds: visitorLayerIdleSecondsSchema.optional(),
+  /**
+   * Per-visitor links: delete a visitor's layer after this long unvisited,
+   * for layers that are throwaway (examples, demos). Omit or null to keep
+   * visitors' layers until they are deleted on purpose (the default).
+   */
+  visitorLayerIdleSeconds: visitorLayerIdleSecondsSchema.nullable().optional(),
   /**
    * Doc capability scopes the exchanged session will carry. Validated
    * server-side against the engine's scope vocabulary, same as
@@ -742,7 +749,8 @@ export const ShareGrantUpdateRequestSchema = z.object({
   /** A shared link's layer. Not for a per-visitor link, and never `visitor-…`. */
   layerName: z.string().min(1).max(256).optional(),
   keepVisitorLayers: z.boolean().optional(),
-  visitorLayerIdleSeconds: visitorLayerIdleSecondsSchema.optional(),
+  /** null stops deleting visitors' layers that go unvisited. */
+  visitorLayerIdleSeconds: visitorLayerIdleSecondsSchema.nullable().optional(),
   scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   origins: originPatternArray.nullable().optional(),
   password: z.string().min(1).max(1024).nullable().optional(),

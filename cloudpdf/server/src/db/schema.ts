@@ -310,8 +310,11 @@ export interface ShareGrantsTable {
   layer_name: string | null;
   /** 1 = a visitor's browser keeps its layer for the next visit (per-visitor links). */
   keep_visitor_layers: number;
-  /** How long a visitor's layer lives unvisited before it is deleted. */
-  visitor_layer_idle_seconds: number;
+  /**
+   * Delete a visitor's layer after this long unvisited (migration 039: NULL,
+   * the default, keeps it until it is deleted on purpose).
+   */
+  visitor_layer_idle_seconds: number | null;
   /** Doc capability scopes the exchanged session carries (JSON array). */
   scope_json: string;
   /** Origin allowlist (JSON array); NULL = any origin. */

@@ -16,8 +16,8 @@ export interface ShareGrantRow {
   layerName: string | null;
   /** A visitor's browser keeps its layer for the next visit (per-visitor links). */
   keepVisitorLayers: boolean;
-  /** How long a visitor's layer lives unvisited before it is deleted. */
-  visitorLayerIdleSeconds: number;
+  /** Delete a visitor's layer after this long unvisited; null keeps it until deleted on purpose. */
+  visitorLayerIdleSeconds: number | null;
   scope: ReadonlyArray<string>;
   /** Origin allowlist; null = any origin. */
   origins: ReadonlyArray<string> | null;
@@ -36,9 +36,6 @@ export interface ShareGrantRow {
 /** Whose layer a link's visitors write into. */
 export type ShareLayerMode = 'shared' | 'per-visitor';
 
-/** A visitor's layer lives a week unvisited unless the link says otherwise. */
-export const DEFAULT_VISITOR_LAYER_IDLE_SECONDS = 7 * 24 * 60 * 60;
-
 export interface ShareGrantCreateInput {
   tenantId: string;
   docId: string;
@@ -46,7 +43,8 @@ export interface ShareGrantCreateInput {
   layerName?: string;
   layerMode?: ShareLayerMode;
   keepVisitorLayers?: boolean;
-  visitorLayerIdleSeconds?: number;
+  /** Omitted or null: visitors' layers stay until deleted on purpose. */
+  visitorLayerIdleSeconds?: number | null;
   scope: ReadonlyArray<string>;
   origins?: ReadonlyArray<string>;
   passwordHash?: string;
@@ -59,7 +57,8 @@ export interface ShareGrantUpdateInput {
   /** The mode and its layer move together: a shared link names its layer, a per-visitor link none. */
   layer?: { mode: 'shared'; name: string } | { mode: 'per-visitor' };
   keepVisitorLayers?: boolean;
-  visitorLayerIdleSeconds?: number;
+  /** null stops deleting visitors' layers that go unvisited. */
+  visitorLayerIdleSeconds?: number | null;
   scope?: ReadonlyArray<string>;
   /** null clears the allowlist (any origin). */
   origins?: ReadonlyArray<string> | null;
@@ -116,8 +115,7 @@ export class ShareGrantsRepo {
             ? (input.layerName ?? DEFAULT_LAYER_NAME)
             : null,
         keep_visitor_layers: input.keepVisitorLayers === false ? 0 : 1,
-        visitor_layer_idle_seconds:
-          input.visitorLayerIdleSeconds ?? DEFAULT_VISITOR_LAYER_IDLE_SECONDS,
+        visitor_layer_idle_seconds: input.visitorLayerIdleSeconds ?? null,
         scope_json: JSON.stringify(input.scope),
         origins_json: input.origins ? JSON.stringify(input.origins) : null,
         password_hash: input.passwordHash ?? null,
@@ -246,7 +244,7 @@ function mapRow(r: {
   layer_mode: ShareLayerMode;
   layer_name: string | null;
   keep_visitor_layers: number;
-  visitor_layer_idle_seconds: number;
+  visitor_layer_idle_seconds: number | null;
   scope_json: string;
   origins_json: string | null;
   password_hash: string | null;
@@ -266,7 +264,8 @@ function mapRow(r: {
     layerMode: r.layer_mode,
     layerName: r.layer_name,
     keepVisitorLayers: Number(r.keep_visitor_layers) !== 0,
-    visitorLayerIdleSeconds: Number(r.visitor_layer_idle_seconds),
+    visitorLayerIdleSeconds:
+      r.visitor_layer_idle_seconds === null ? null : Number(r.visitor_layer_idle_seconds),
     scope: JSON.parse(r.scope_json) as string[],
     origins: r.origins_json ? (JSON.parse(r.origins_json) as string[]) : null,
     passwordHash: r.password_hash,

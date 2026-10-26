@@ -106,6 +106,7 @@ import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
 import { LayerStateService } from '../services/LayerStateService';
 import { ObjectNumberService } from '../services/ObjectNumberService';
+import { sweepIdleVisitorLayers } from '../services/sweepIdleVisitorLayers';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -1443,6 +1444,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         layerService
           ?.sweepObjectNumbers()
           .catch((err) => app.log.error({ err }, 'sweepObjectNumbers failed'));
+        sweepIdleVisitorLayers({ db: opts.db!, deleteLayer }, Date.now()).catch((err) =>
+          app.log.error({ err }, 'sweepIdleVisitorLayers failed'),
+        );
         documentService
           ?.closeIdleLayerSessions(Date.now())
           .catch((err) => app.log.error({ err }, 'closeIdleLayerSessions failed'));

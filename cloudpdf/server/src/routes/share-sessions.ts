@@ -22,6 +22,9 @@ import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
 
+/** How long past a session's lifetime its renewal still continues the visit (a throttled timer, a slow network). */
+const VISIT_GRACE_SECONDS = 5 * 60;
+
 export interface ShareSessionRouteDeps {
   sign: (input: SignDevTokenInput) => string;
   grants: ShareGrantsRepo;
@@ -177,13 +180,21 @@ export async function registerShareSessionRoutes(
       // Who this is: the visitor the handle names, when this link issued
       // it; anyone else is a new visitor. On a per-visitor link the visitor
       // keeps their layer, unless they start over or it was deleted.
-      let visitorId = visitorHandle ? visitors.read(grant.id, visitorHandle) : null;
+      const now = Date.now();
+      const returning = visitorHandle ? visitors.read(grant.id, visitorHandle) : null;
+      // A visit goes on while its sessions renew: a handle issued within a
+      // session lifetime and a little more is a renewal, not a new view. Its
+      // time is signed, so a client can't pass an old visit off as this one.
+      const sameVisit =
+        returning !== null &&
+        now - returning.issuedAt <= (grant.sessionTtlSeconds + VISIT_GRACE_SECONDS) * 1000;
+      let visitorId = returning?.visitorId ?? null;
       if (visitorId && grant.layerMode === 'per-visitor') {
         const own = visitorLayerName(visitorId);
         if (restart) {
           await deleteLayer(grant.tenantId, { docId: grant.docId, layerName: own });
           visitorId = null;
-        } else if (!(await layers.seeVisitorLayer(grant.docId, own, Date.now()))) {
+        } else if (!(await layers.seeVisitorLayer(grant.docId, own, now))) {
           visitorId = null;
         }
       }
@@ -209,11 +220,14 @@ export async function registerShareSessionRoutes(
       });
 
       await grants.touchExchanged(grant.id);
-      // A view = a share exchange or an authorized /v1/access grant,
-      // deduplicated via the sub prefix above. Both meters move here:
-      // the deployment-wide license counter and the per-tenant fact.
-      await usageMeters?.recordView();
-      await tenantUsage.recordView(grant.tenantId);
+      // A view = a visit through a share link (its first exchange, not its
+      // renewals) or an authorized /v1/access grant, deduplicated via the
+      // sub prefix above. Both meters move here: the deployment-wide
+      // license counter and the per-tenant fact.
+      if (!sameVisit) {
+        await usageMeters?.recordView();
+        await tenantUsage.recordView(grant.tenantId);
+      }
 
       setNoStore(reply);
       return reply.send({
@@ -222,7 +236,7 @@ export async function registerShareSessionRoutes(
         layerName,
         layerMode: grant.layerMode,
         visitor: {
-          handle: visitors.issue(grant.id, visitorId),
+          handle: visitors.issue(grant.id, visitorId, now),
           keep: grant.layerMode === 'per-visitor' && grant.keepVisitorLayers,
         },
         expiresAt: Math.floor(Date.now() / 1000) + ttl,

@@ -24257,7 +24257,8 @@
           "visitorLayerIdleSeconds": {
             "type": "integer",
             "minimum": 3600,
-            "maximum": 2592000
+            "maximum": 2592000,
+            "nullable": true
           },
           "scope": {
             "type": "array",
@@ -24325,7 +24326,8 @@
                 "type": "boolean"
               },
               "visitorLayerIdleSeconds": {
-                "type": "number"
+                "type": "number",
+                "nullable": true
               },
               "scope": {
                 "type": "array",
@@ -24434,7 +24436,8 @@
                   "type": "boolean"
                 },
                 "visitorLayerIdleSeconds": {
-                  "type": "number"
+                  "type": "number",
+                  "nullable": true
                 },
                 "scope": {
                   "type": "array",
@@ -24540,7 +24543,8 @@
                 "type": "boolean"
               },
               "visitorLayerIdleSeconds": {
-                "type": "number"
+                "type": "number",
+                "nullable": true
               },
               "scope": {
                 "type": "array",
@@ -24632,7 +24636,8 @@
           "visitorLayerIdleSeconds": {
             "type": "integer",
             "minimum": 3600,
-            "maximum": 2592000
+            "maximum": 2592000,
+            "nullable": true
           },
           "scope": {
             "type": "array",
@@ -24705,7 +24710,8 @@
                 "type": "boolean"
               },
               "visitorLayerIdleSeconds": {
-                "type": "number"
+                "type": "number",
+                "nullable": true
               },
               "scope": {
                 "type": "array",

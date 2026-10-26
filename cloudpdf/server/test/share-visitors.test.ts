@@ -6,6 +6,9 @@
  * them back: renewals keep the visitor, and on a per-visitor link their
  * layer, whose idle clock restarts. Starting over deletes the layer; a
  * deleted layer, or a handle the link didn't issue, gets a new visitor.
+ * Visitors' layers stay until deleted on purpose, unless their link sets an
+ * idle time (throwaway layers, like examples): then the sweep deletes the
+ * ones unseen for longer. A visit is one view however often it renews.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -23,7 +26,9 @@ import {
   type DbSchema,
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
+import { VisitorHandles } from '../src/auth/visitor-handle';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { sweepIdleVisitorLayers } from '../src/services/sweepIdleVisitorLayers';
 import { highlightDraft } from './_helpers/two-replica-harness';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
@@ -32,7 +37,8 @@ const API_TOKEN = 'share-visitors-root-token';
 const TENANT = 'tenant-visitors';
 const DOC = 'doc-visitors';
 const ORIGIN = 'https://acme.example';
-const WEEK = 7 * 24 * 60 * 60;
+const HOUR_MS = 60 * 60 * 1000;
+const YEAR_MS = 365 * 24 * HOUR_MS;
 
 let dir: string;
 let db: Kysely<DbSchema>;
@@ -180,7 +186,13 @@ describe("a link's layer policy", () => {
       layerMode: 'shared',
       layerName: 'default',
       keepVisitorLayers: true,
-      visitorLayerIdleSeconds: WEEK,
+      visitorLayerIdleSeconds: null,
+    });
+    // Visitors' layers stay unless the link asks for them to go.
+    const kept = await createLink({ layerMode: 'per-visitor' });
+    expect(kept.body.share).toMatchObject({
+      layerMode: 'per-visitor',
+      visitorLayerIdleSeconds: null,
     });
 
     const perVisitor = await createLink({
@@ -243,6 +255,8 @@ describe("a link's layer policy", () => {
       keepVisitorLayers: false,
       visitorLayerIdleSeconds: 7200,
     });
+    const keepAgain = await updateLink(link.id, { visitorLayerIdleSeconds: null });
+    expect(keepAgain.body.share.visitorLayerIdleSeconds).toBeNull();
   });
 });
 
@@ -251,7 +265,7 @@ describe('the exchange names a visitor', () => {
     const link = (await createLink({ layerName: 'together' })).body.share;
     const first = await visit(link.id);
     expect(first).toMatchObject({ layerName: 'together', layerMode: 'shared' });
-    expect(first.visitor.handle).toMatch(/^vis_[0-9a-f]{24}\.[A-Za-z0-9_-]{22}$/);
+    expect(first.visitor.handle).toMatch(/^vis_[0-9a-f]{24}\.[0-9a-z]+\.[A-Za-z0-9_-]{22}$/);
     expect(first.visitor.keep).toBe(false);
     const claims = claimsOf(first.token);
     expect(claims).toMatchObject({ sub: `share:${link.id}`, layer_name: 'together' });
@@ -268,8 +282,8 @@ describe('the exchange names a visitor', () => {
     const link = (await createLink({})).body.share;
     const other = (await createLink({})).body.share;
     const theirs = await visit(other.id);
-    const [, mac] = theirs.visitor.handle.split('.');
-    const forged = `vis_${'0'.repeat(24)}.${mac}`;
+    const [, issued, mac] = theirs.visitor.handle.split('.');
+    const forged = `vis_${'0'.repeat(24)}.${issued}.${mac}`;
     for (const visitorHandle of [theirs.visitor.handle, forged, 'not-a-handle']) {
       const answer = await visit(link.id, { visitorHandle });
       expect(answer.visitor.handle).not.toBe(visitorHandle);
@@ -358,5 +372,160 @@ describe('a per-visitor link', () => {
     const renewed = await visit(link.id, { visitorHandle: first.visitor.handle });
     expect(renewed.layerName).toBe(first.layerName);
     expect(await layerRow(first.layerName)).toBeUndefined();
+  });
+});
+
+describe('the idle sweep', () => {
+  const sweep = (now: number) =>
+    sweepIdleVisitorLayers(
+      { db, deleteLayer: (tenantId, input) => bundle.layerService!.deleteLayer(tenantId, input) },
+      now,
+    );
+  const lastSeen = (layerName: string, at: number) =>
+    db.updateTable('layers').set({ last_seen_at: at }).where('name', '=', layerName).execute();
+
+  test("deletes visitors' layers unseen past their link's idle time, and only those", async () => {
+    const hourly = (await createLink({ layerMode: 'per-visitor', visitorLayerIdleSeconds: 3600 }))
+      .body.share;
+    const keeping = (await createLink({ layerMode: 'per-visitor' })).body.share;
+    const shared = (await createLink({ layerName: 'swept-never' })).body.share;
+    const gone = await visit(hourly.id);
+    const recent = await visit(hourly.id);
+    const filledIn = await visit(keeping.id);
+    const together = await visit(shared.id);
+    for (const session of [gone, recent, filledIn, together]) {
+      expect((await annotate(session, 'mine')).status).toBe(200);
+    }
+    const now = Date.now();
+    await lastSeen(gone.layerName, now - 2 * HOUR_MS);
+    await lastSeen(recent.layerName, now - HOUR_MS / 2);
+    // A link that sets no idle time keeps what its visitors filled in, however long ago.
+    await lastSeen(filledIn.layerName, now - YEAR_MS);
+
+    expect(await sweep(now)).toBe(1);
+    expect((await layerRow(gone.layerName))?.deleted_at).not.toBeNull();
+    for (const kept of [recent, filledIn, together]) {
+      expect((await layerRow(kept.layerName))?.deleted_at).toBeNull();
+    }
+    // The swept visitor comes back as someone new.
+    const back = await visit(hourly.id, { visitorHandle: gone.visitor.handle });
+    expect(back.layerName).not.toBe(gone.layerName);
+    expect(await sweep(now)).toBe(0);
+  });
+
+  test("a deleted link's visitors' layers stay until deleted on purpose", async () => {
+    const link = (await createLink({ layerMode: 'per-visitor', visitorLayerIdleSeconds: 3600 }))
+      .body.share;
+    const visitor = await visit(link.id);
+    expect((await annotate(visitor, 'filled in')).status).toBe(200);
+    expect(
+      (await call('DELETE', `/v1/tenants/${TENANT}/shares/${link.id}`, { token: API_TOKEN }))
+        .status,
+    ).toBe(204);
+    const now = Date.now();
+    await lastSeen(visitor.layerName, now - YEAR_MS);
+
+    await sweep(now);
+    expect((await layerRow(visitor.layerName))?.deleted_at).toBeNull();
+  });
+});
+
+describe('views', () => {
+  const views = async () => {
+    const usage = await call('GET', `/v1/tenants/${TENANT}/usage`, { token: API_TOKEN });
+    expect(usage.status).toBe(200);
+    return usage.body.metrics['pdf.views'] as number;
+  };
+
+  test('a visit is one view however often it renews; a new or returning visit is another', async () => {
+    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
+    const other = (await createLink({})).body.share;
+    const start = await views();
+
+    const first = await visit(link.id);
+    expect(await views()).toBe(start + 1);
+    const renewed = await visit(link.id, { visitorHandle: first.visitor.handle });
+    const again = await visit(link.id, { visitorHandle: renewed.visitor.handle });
+    expect(again.layerName).toBe(first.layerName);
+    expect(await views()).toBe(start + 1);
+
+    // Someone else, the other link's visitor, that visitor's handle here
+    // (another link issued it), and the first visitor coming back after
+    // their session lapsed: four more visits.
+    await visit(link.id);
+    await visit(link.id, { visitorHandle: (await visit(other.id)).visitor.handle });
+    const lapsed = new VisitorHandles(SECRET).issue(
+      link.id,
+      first.layerName.slice('visitor-'.length),
+      Date.now() - HOUR_MS,
+    );
+    const returning = await visit(link.id, { visitorHandle: lapsed });
+    expect(returning.layerName).toBe(first.layerName);
+    expect(await views()).toBe(start + 5);
+  });
+});
+
+describe('migration 039', () => {
+  test("links on the old 7-day default keep their visitors' layers; a chosen idle time stays", async () => {
+    const fresh = createSqliteDb({ path: ':memory:' });
+    try {
+      const upTo038 = sqliteMigrations.filter((m) => m.version < '039');
+      expect(upTo038.at(-1)?.version).toBe('038');
+      await migrate(fresh, { source: { kind: 'inline', migrations: upTo038 } });
+      await fresh.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
+      await fresh
+        .insertInto('documents')
+        .values({
+          id: DOC,
+          tenant_id: TENANT,
+          state: 'ready',
+          base_sha: null,
+          storage_size_bytes: 1,
+          metadata_json: null,
+          idempotency_key: null,
+          failure_reason: null,
+          created_at: 1,
+          updated_at: 1,
+          created_by: null,
+        })
+        .execute();
+      const link = (id: string, idle: number) => ({
+        id,
+        tenant_id: TENANT,
+        doc_id: DOC,
+        layer_mode: 'per-visitor' as const,
+        layer_name: null,
+        keep_visitor_layers: 1,
+        visitor_layer_idle_seconds: idle,
+        scope_json: '["*"]',
+        origins_json: null,
+        password_hash: null,
+        session_ttl_seconds: 600,
+        disabled: 0,
+        expires_at: null,
+        exchange_count: 0,
+        last_exchanged_at: null,
+        created_by: 'test',
+        created_at: 1,
+        updated_at: 1,
+      });
+      await fresh
+        .insertInto('share_grants')
+        .values([link('shr_defaulted', 604800), link('shr_hourly', 3600)])
+        .execute();
+
+      await migrate(fresh, { source: { kind: 'inline', migrations: sqliteMigrations } });
+      const rows = await fresh
+        .selectFrom('share_grants')
+        .select(['id', 'visitor_layer_idle_seconds'])
+        .orderBy('id')
+        .execute();
+      expect(rows).toEqual([
+        { id: 'shr_defaulted', visitor_layer_idle_seconds: null },
+        { id: 'shr_hourly', visitor_layer_idle_seconds: 3600 },
+      ]);
+    } finally {
+      await fresh.destroy();
+    }
   });
 });
