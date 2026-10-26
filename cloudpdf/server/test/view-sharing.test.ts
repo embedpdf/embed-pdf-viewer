@@ -466,7 +466,8 @@ describe('attachments plane (independent axis)', () => {
     const b = await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) });
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
-    expect(a.headers.get('cache-control')).toContain('immutable');
+    // This fixture's signer fronts the engine with a CDN, so shared caches may keep it.
+    expect(a.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
     // The sidebar-on-open economics: base session only, no layer sessions.
     expect(spy.count('open.layerFileBase')).toBe(0);
   });

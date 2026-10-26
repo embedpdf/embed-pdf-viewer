@@ -590,6 +590,9 @@ importers:
 
   docs/content:
     devDependencies:
+      '@cloudpdf/sdk':
+        specifier: workspace:*
+        version: link:../../cloudpdf/sdk
       '@embedpdf/core-signature':
         specifier: workspace:*
         version: link:../../packages/core/signature

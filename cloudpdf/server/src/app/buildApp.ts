@@ -56,6 +56,7 @@ import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
 import { UsageMeters } from '../licensing/UsageMeters';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
+import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_helpers';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminSharesRoutes } from '../routes/admin/shares';
@@ -558,6 +559,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     // codec separately enforces a 512-char limit, so this stays bounded.
     maxParamLength: 512,
   });
+  // A CDN in front of the engine: shared caches may keep versioned reads,
+  // and /head asks for /access before the first cacheable read.
+  const cdnFronted = (opts.cdnSigner?.info.kind ?? 'none') !== 'none';
+  app.decorate('immutableCache', cdnFronted ? IMMUTABLE_CACHE_SHARED : IMMUTABLE_CACHE_PRIVATE);
   const usageMeters = opts.db ? new UsageMeters(opts.db, opts.licenseGate) : undefined;
   app.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?', 1)[0] ?? request.url;
@@ -1274,7 +1279,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       // to be called before the first cacheable read so the SDK has
       // the signed URLs/cookies. The default (`none`) keeps /head
       // saying "no access needed" so public shares stay cheap.
-      const cdnAccessRequired = (opts.cdnSigner?.info.kind ?? 'none') !== 'none';
+      const cdnAccessRequired = cdnFronted;
       const passwordSessionsRepo = opts.kms
         ? new PdfPasswordSessionsRepo(opts.db, {
             keyring: opts.kms,

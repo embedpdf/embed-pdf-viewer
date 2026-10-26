@@ -21,7 +21,8 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-versioned-secret';
-const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable';
+// No CDN in this fixture: only the caller's browser may keep versioned reads.
+const IMMUTABLE_CACHE = 'private, max-age=31536000, immutable';
 const NO_STORE = 'private, no-store';
 
 interface Fixture {
@@ -148,7 +149,7 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(NO_STORE);
   });
 
-  test('/manifest@dN sets public, immutable', async () => {
+  test('/manifest@dN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-m';
     const docId = 'doccch002';
     await seedDocument(fx, tenantId, docId);
@@ -160,7 +161,7 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
   });
 
-  test('/text@cN sets public, immutable', async () => {
+  test('/text@cN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-t';
     const docId = 'doccch003';
     await seedDocument(fx, tenantId, docId);
@@ -175,7 +176,7 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
   });
 
-  test('/annotations@aN sets public, immutable', async () => {
+  test('/annotations@aN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-a';
     const docId = 'doccch004';
     await seedDocument(fx, tenantId, docId);
