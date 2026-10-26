@@ -1020,7 +1020,10 @@ export class DocumentService {
     return closing.length;
   }
 
-  /** Mark a layer as asked for now: the idle sweep and the cap close the longest-unasked first. */
+  /**
+   * Mark a layer as just asked for: the idle sweep and the per-document cap
+   * close the longest-unasked first.
+   */
   private touchLayer(docId: string, layerName: string): void {
     this.layerTouches.set(layerSessionKey(docId, layerName), { docId, layerName, at: Date.now() });
   }

@@ -51,7 +51,7 @@ beforeEach(async () => {
   await documents.commit({ id: DOC, tenantId: TENANT, baseSha: BASE, storageSizeBytes: 1 });
   clock = 1_000_000;
   numbers = new ObjectNumberService({ db, now: () => clock });
-  // The engine opened the layer on BASE: its last object is 99.
+  // The engine opened the layer on `BASE`: its last object is 99.
   await numbers.startCounter(LAYER, BASE, 99);
 });
 
