@@ -3,6 +3,7 @@ export default {
   head: 'Head',
   changes: 'Changes',
   download: 'Download',
+  'download-link': 'Download Link',
   manifest: 'Manifest',
   render: 'Render',
   text: 'Text',

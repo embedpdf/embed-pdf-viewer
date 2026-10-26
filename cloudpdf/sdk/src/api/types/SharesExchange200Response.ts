@@ -4,5 +4,20 @@ export interface SharesExchange200Response {
     token: string;
     docId: string;
     layerName: string;
+    layerMode: SharesExchange200Response.LayerMode;
+    visitor: SharesExchange200Response.Visitor;
     expiresAt: number;
+}
+
+export namespace SharesExchange200Response {
+    export const LayerMode = {
+        Shared: "shared",
+        PerVisitor: "per-visitor",
+    } as const;
+    export type LayerMode = (typeof LayerMode)[keyof typeof LayerMode];
+
+    export interface Visitor {
+        handle: string;
+        keep: boolean;
+    }
 }

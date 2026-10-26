@@ -11,10 +11,21 @@
 export interface SharesCreateRequest {
     tenantId: string;
     docId: string;
+    layerMode?: SharesCreateRequest.LayerMode;
     layerName?: string;
+    keepVisitorLayers?: boolean;
+    visitorLayerIdleSeconds?: number | null;
     scope: string[];
     origins?: string[];
     password?: string;
     sessionTtlSeconds?: number;
     expiresAt?: number;
+}
+
+export namespace SharesCreateRequest {
+    export const LayerMode = {
+        Shared: "shared",
+        PerVisitor: "per-visitor",
+    } as const;
+    export type LayerMode = (typeof LayerMode)[keyof typeof LayerMode];
 }

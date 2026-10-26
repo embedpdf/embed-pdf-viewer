@@ -9,4 +9,6 @@
 export interface SharesExchangeRequest {
     shareToken: string;
     password?: string;
+    visitorHandle?: string;
+    restart?: boolean;
 }

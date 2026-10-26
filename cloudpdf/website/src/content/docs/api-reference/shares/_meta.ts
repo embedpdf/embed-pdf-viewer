@@ -6,4 +6,5 @@ export default {
   get: 'Get',
   update: 'Update',
   delete: 'Delete',
+  archive: 'Archive',
 };

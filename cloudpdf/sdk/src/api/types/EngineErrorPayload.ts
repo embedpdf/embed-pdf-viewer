@@ -42,6 +42,7 @@ export namespace EngineErrorPayload {
         ChangeConflict: "ChangeConflict",
         UndoUnavailable: "UndoUnavailable",
         IdempotencyKeyReused: "IdempotencyKeyReused",
+        LayerDeleted: "LayerDeleted",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

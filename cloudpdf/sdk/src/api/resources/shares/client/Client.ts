@@ -129,11 +129,12 @@ export class SharesClient {
         request: CloudPDF.ListSharesRequest,
         requestOptions?: SharesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.SharesList200Response>> {
-        const { tenantId, limit, cursor, docId } = request;
+        const { tenantId, limit, cursor, docId, archived } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
             cursor,
             docId,
+            archived,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -341,6 +342,7 @@ export class SharesClient {
      * @param {SharesClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link CloudPDF.ConflictError}
      * @throws {@link errors.CloudPDFError}
      * @throws {@link errors.CloudPDFTimeoutError}
      *
@@ -391,6 +393,8 @@ export class SharesClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -414,6 +418,7 @@ export class SharesClient {
      *
      * @throws {@link CloudPDF.BadRequestError}
      * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link CloudPDF.ConflictError}
      * @throws {@link errors.CloudPDFError}
      * @throws {@link errors.CloudPDFTimeoutError}
      *
@@ -469,6 +474,8 @@ export class SharesClient {
                     throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -483,6 +490,80 @@ export class SharesClient {
             _response.rawResponse,
             "PATCH",
             "/v1/tenants/{tenantId}/shares/{shareId}",
+        );
+    }
+
+    /**
+     * Archiving is final: an archived link never exchanges again, and to share again you create a new link. Pausing (`disabled`) is the reversible stop. An archived link no longer counts as using its shared layer, so that layer can be deleted.
+     *
+     * @param {CloudPDF.ArchiveSharesRequest} request
+     * @param {SharesClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.shares.archive({
+     *         tenantId: "tenantId",
+     *         shareId: "shareId"
+     *     })
+     */
+    public archive(
+        request: CloudPDF.ArchiveSharesRequest,
+        requestOptions?: SharesClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.SharesArchive200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__archive(request, requestOptions));
+    }
+
+    private async __archive(
+        request: CloudPDF.ArchiveSharesRequest,
+        requestOptions?: SharesClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.SharesArchive200Response>> {
+        const { tenantId, shareId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/shares/${core.url.encodePathParam(shareId)}/archive`,
+            ),
+            method: "POST",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as CloudPDF.SharesArchive200Response, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/tenants/{tenantId}/shares/{shareId}/archive",
         );
     }
 }

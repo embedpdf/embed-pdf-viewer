@@ -10,10 +10,22 @@
 export interface SharesUpdateRequest {
     tenantId: string;
     shareId: string;
+    layerMode?: SharesUpdateRequest.LayerMode;
+    layerName?: string;
+    keepVisitorLayers?: boolean;
+    visitorLayerIdleSeconds?: number | null;
     scope?: string[];
     origins?: string[] | null;
     password?: string | null;
     sessionTtlSeconds?: number;
     disabled?: boolean;
     expiresAt?: number | null;
+}
+
+export namespace SharesUpdateRequest {
+    export const LayerMode = {
+        Shared: "shared",
+        PerVisitor: "per-visitor",
+    } as const;
+    export type LayerMode = (typeof LayerMode)[keyof typeof LayerMode];
 }

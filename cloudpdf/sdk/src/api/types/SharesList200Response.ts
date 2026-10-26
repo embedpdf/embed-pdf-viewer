@@ -13,18 +13,30 @@ export namespace SharesList200Response {
             id: string;
             tenantId: string;
             docId: string;
-            layerName: string;
+            layerMode: Item.LayerMode;
+            layerName: string | null;
+            keepVisitorLayers: boolean;
+            visitorLayerIdleSeconds: number | null;
             scope: string[];
             origins: string[] | null;
             passwordProtected: boolean;
             sessionTtlSeconds: number;
             disabled: boolean;
+            archivedAt: number | null;
             expiresAt: number | null;
             exchangeCount: number;
             lastExchangedAt: number | null;
             createdBy: string;
             createdAt: number;
             updatedAt: number;
+        }
+
+        export namespace Item {
+            export const LayerMode = {
+                Shared: "shared",
+                PerVisitor: "per-visitor",
+            } as const;
+            export type LayerMode = (typeof LayerMode)[keyof typeof LayerMode];
         }
     }
 }

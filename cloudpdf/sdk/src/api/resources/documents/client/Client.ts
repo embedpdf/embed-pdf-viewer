@@ -8,6 +8,7 @@ import { mergeAdditionalBodyParameters } from "../../../../core/requestBody.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
 import * as CloudPDF from "../../../index.js";
+import { LayersClient } from "../resources/layers/client/Client.js";
 
 export declare namespace DocumentsClient {
     export type Options = BaseClientOptions;
@@ -17,9 +18,14 @@ export declare namespace DocumentsClient {
 
 export class DocumentsClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<DocumentsClient.Options>;
+    protected _layers: LayersClient | undefined;
 
     constructor(options: DocumentsClient.Options) {
         this._options = normalizeClientOptionsWithAuth(options);
+    }
+
+    public get layers(): LayersClient {
+        return (this._layers ??= new LayersClient(this._options));
     }
 
     /**
