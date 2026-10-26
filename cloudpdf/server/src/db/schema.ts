@@ -164,6 +164,12 @@ export interface LayersTable {
    * so its name is never used again. NULL for a live layer.
    */
   deleted_at: number | null;
+  /** A visitor's layer (migration 038): the share link that made it; NULL otherwise. */
+  grant_id: string | null;
+  /** A visitor's layer: the visitor (its name is `visitor-<visitor_id>`). */
+  visitor_id: string | null;
+  /** A visitor's layer: when the visitor last opened it, the idle clock. */
+  last_seen_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -295,7 +301,17 @@ export interface ShareGrantsTable {
   id: string;
   tenant_id: string;
   doc_id: string;
-  layer_name: string;
+  /**
+   * Whose layer visitors write into (migration 038): one shared layer, the
+   * link's `layer_name`, or a layer per visitor (`visitor-<id>`).
+   */
+  layer_mode: 'shared' | 'per-visitor';
+  /** The shared layer; NULL for a per-visitor link. */
+  layer_name: string | null;
+  /** 1 = a visitor's browser keeps its layer for the next visit (per-visitor links). */
+  keep_visitor_layers: number;
+  /** How long a visitor's layer lives unvisited before it is deleted. */
+  visitor_layer_idle_seconds: number;
   /** Doc capability scopes the exchanged session carries (JSON array). */
   scope_json: string;
   /** Origin allowlist (JSON array); NULL = any origin. */

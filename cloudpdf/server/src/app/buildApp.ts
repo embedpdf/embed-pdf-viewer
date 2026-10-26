@@ -31,6 +31,7 @@ import {
 } from '../auth/JwtVerifier';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
 import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
+import { VisitorHandles } from '../auth/visitor-handle';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import { validate as validateMigrations, type MigrationSource } from '../db/migrator/runner';
@@ -709,6 +710,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     verifierForSigning.mode === 'hs256'
       ? (input: SignDevTokenInput) => signDevToken(verifierForSigning.secret, input)
       : undefined;
+  // Share-link visitors' handles are signed by the same authority.
+  const visitorHandles =
+    verifierForSigning.mode === 'hs256' ? new VisitorHandles(verifierForSigning.secret) : undefined;
 
   // Inject the revocation + cache store into whichever mode the
   // caller picked. We don't overwrite if they're already set.
@@ -1121,14 +1125,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       storage: opts.objectStore,
       documents: new DocumentsRepo(opts.db),
     };
-    await registerAdminLayersRoutes(app, {
-      // The layer service exists only where the engine runs; it is made below.
-      deleteLayer: (tenantId, input) =>
-        layerService
-          ? layerService.deleteLayer(tenantId, input)
-          : deleteStoredLayer(storedLayers, tenantId, input),
-      grants: new ShareGrantsRepo(opts.db),
-    });
+    // The layer service exists only where the engine runs; it is made below.
+    const deleteLayer = (tenantId: string, input: { docId: string; layerName: string }) =>
+      layerService
+        ? layerService.deleteLayer(tenantId, input)
+        : deleteStoredLayer(storedLayers, tenantId, input);
+    await registerAdminLayersRoutes(app, { deleteLayer, grants: new ShareGrantsRepo(opts.db) });
     // The async-import claim loop: in-process (like the sweeper), one
     // per replica, safe under multi-replica via fenced leased claims.
     if (importPolicy.enabled) {
@@ -1163,7 +1165,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     // The share family (grant lifecycle + public exchange) exists only
     // where minting does — same condition as tokens.issue, because a
     // grant is a standing mint capability.
-    if (signer) {
+    if (signer && visitorHandles) {
       const shareGrants = new ShareGrantsRepo(opts.db);
       await registerAdminSharesRoutes(app, {
         grants: shareGrants,
@@ -1175,6 +1177,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         sign: signer,
         grants: shareGrants,
         documents: new DocumentsRepo(opts.db),
+        layers: new LayersRepo(opts.db),
+        visitors: visitorHandles,
+        deleteLayer,
         suspendedTenants: suspendedTenantsGuard!,
         ...(usageMeters ? { usageMeters } : {}),
         tenantUsage,

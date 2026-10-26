@@ -645,12 +645,33 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
 // revocable. The only credential it ever produces is an ordinary
 // short-lived doc JWT, minted downward at `shares.exchange`.
 
+/**
+ * Whose layer a link's visitors write into: `'shared'`, one layer everyone
+ * reads and writes (`layerName`), or `'per-visitor'`, a layer of each
+ * visitor's own (`visitor-<id>`), made at their first change.
+ */
+export const ShareLayerModeSchema = z.enum(['shared', 'per-visitor']);
+export type ShareLayerMode = z.infer<typeof ShareLayerModeSchema>;
+
+/** How long a visitor's layer lives unvisited before it is deleted: an hour to 30 days. */
+const visitorLayerIdleSecondsSchema = z
+  .number()
+  .int()
+  .min(60 * 60)
+  .max(30 * 24 * 60 * 60);
+
 export const ShareGrantRecordSchema = z.object({
   /** Grant id; doubles as the public share token (`shr_…`). */
   id: z.string(),
   tenantId: z.string(),
   docId: z.string(),
-  layerName: z.string(),
+  layerMode: ShareLayerModeSchema,
+  /** The layer every visitor shares; null for a per-visitor link. */
+  layerName: z.string().nullable(),
+  /** Per-visitor links: a visitor's browser keeps its layer for the next visit. */
+  keepVisitorLayers: z.boolean(),
+  /** Per-visitor links: how long a visitor's layer lives unvisited before it is deleted. */
+  visitorLayerIdleSeconds: z.number(),
   /** Doc capabilities the exchanged session carries. */
   scope: z.array(z.string()),
   /** Origin allowlist; null means any origin. */
@@ -674,7 +695,14 @@ export type ShareGrantRecord = z.infer<typeof ShareGrantRecordSchema>;
 
 export const ShareGrantCreateRequestSchema = z.object({
   docId: z.string().regex(docIdPattern),
+  /** Default `'shared'`. */
+  layerMode: ShareLayerModeSchema.optional(),
+  /** The shared layer, default `default`. Not for a per-visitor link, and never `visitor-…`. */
   layerName: z.string().min(1).max(256).optional(),
+  /** Per-visitor links: keep a visitor's layer for their next visit. Default true. */
+  keepVisitorLayers: z.boolean().optional(),
+  /** Per-visitor links: delete a visitor's layer after this long unvisited. Default 7 days. */
+  visitorLayerIdleSeconds: visitorLayerIdleSecondsSchema.optional(),
   /**
    * Doc capability scopes the exchanged session will carry. Validated
    * server-side against the engine's scope vocabulary, same as
@@ -705,6 +733,16 @@ export type ShareGrantCreateRequest = z.infer<typeof ShareGrantCreateRequestSche
  * grant retargets the copies already pasted into pages.
  */
 export const ShareGrantUpdateRequestSchema = z.object({
+  /**
+   * Switching to `'per-visitor'` stops visitors writing into the shared
+   * layer (it stays); switching to `'shared'` takes `layerName`, default
+   * `default`. The token stays the same either way.
+   */
+  layerMode: ShareLayerModeSchema.optional(),
+  /** A shared link's layer. Not for a per-visitor link, and never `visitor-…`. */
+  layerName: z.string().min(1).max(256).optional(),
+  keepVisitorLayers: z.boolean().optional(),
+  visitorLayerIdleSeconds: visitorLayerIdleSecondsSchema.optional(),
   scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   origins: originPatternArray.nullable().optional(),
   password: z.string().min(1).max(1024).nullable().optional(),
@@ -758,6 +796,14 @@ export const ShareExchangeRequestSchema = z.object({
   shareToken: z.string().regex(shareTokenPattern),
   /** Required when the grant is passphrase-protected (422 otherwise). */
   password: z.string().min(1).max(1024).optional(),
+  /**
+   * The `visitor.handle` an earlier exchange answered: the same visitor, and
+   * on a per-visitor link the same layer. One the link didn't issue, or
+   * whose layer was deleted, gets a new visitor.
+   */
+  visitorHandle: z.string().min(1).max(256).optional(),
+  /** With `visitorHandle` on a per-visitor link: delete that visitor's layer and start a new visitor. */
+  restart: z.boolean().optional(),
 });
 export type ShareExchangeRequest = z.infer<typeof ShareExchangeRequestSchema>;
 
@@ -765,7 +811,16 @@ export const ShareSessionResponseSchema = z.object({
   /** A doc-scoped session JWT carrying the grant's capabilities and origin lock. */
   token: z.string(),
   docId: z.string(),
+  /** The layer the session reads and writes: the shared one, or this visitor's own. */
   layerName: z.string(),
+  layerMode: ShareLayerModeSchema,
+  /** Who the session acts as: the session token names them as the author of what they add. */
+  visitor: z.object({
+    /** Send it back with the next exchange: renewals keep the same visitor. */
+    handle: z.string(),
+    /** Keep the handle for the next visit too: the link keeps a visitor's layer. */
+    keep: z.boolean(),
+  }),
   /** Unix seconds when the session token expires; exchange again for a fresh one. */
   expiresAt: z.number(),
 });

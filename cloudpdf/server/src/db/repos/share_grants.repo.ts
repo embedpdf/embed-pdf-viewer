@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import { DEFAULT_LAYER_NAME } from '@embedpdf/engine-core/wire';
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
 
@@ -10,7 +11,13 @@ export interface ShareGrantRow {
   id: string;
   tenantId: string;
   docId: string;
-  layerName: string;
+  layerMode: ShareLayerMode;
+  /** The layer every visitor shares; null for a per-visitor link. */
+  layerName: string | null;
+  /** A visitor's browser keeps its layer for the next visit (per-visitor links). */
+  keepVisitorLayers: boolean;
+  /** How long a visitor's layer lives unvisited before it is deleted. */
+  visitorLayerIdleSeconds: number;
   scope: ReadonlyArray<string>;
   /** Origin allowlist; null = any origin. */
   origins: ReadonlyArray<string> | null;
@@ -26,10 +33,20 @@ export interface ShareGrantRow {
   updatedAt: number;
 }
 
+/** Whose layer a link's visitors write into. */
+export type ShareLayerMode = 'shared' | 'per-visitor';
+
+/** A visitor's layer lives a week unvisited unless the link says otherwise. */
+export const DEFAULT_VISITOR_LAYER_IDLE_SECONDS = 7 * 24 * 60 * 60;
+
 export interface ShareGrantCreateInput {
   tenantId: string;
   docId: string;
+  /** The shared layer, when `layerMode` is `'shared'` (the default). */
   layerName?: string;
+  layerMode?: ShareLayerMode;
+  keepVisitorLayers?: boolean;
+  visitorLayerIdleSeconds?: number;
   scope: ReadonlyArray<string>;
   origins?: ReadonlyArray<string>;
   passwordHash?: string;
@@ -39,6 +56,10 @@ export interface ShareGrantCreateInput {
 }
 
 export interface ShareGrantUpdateInput {
+  /** The mode and its layer move together: a shared link names its layer, a per-visitor link none. */
+  layer?: { mode: 'shared'; name: string } | { mode: 'per-visitor' };
+  keepVisitorLayers?: boolean;
+  visitorLayerIdleSeconds?: number;
   scope?: ReadonlyArray<string>;
   /** null clears the allowlist (any origin). */
   origins?: ReadonlyArray<string> | null;
@@ -89,7 +110,14 @@ export class ShareGrantsRepo {
         id,
         tenant_id: input.tenantId,
         doc_id: input.docId,
-        layer_name: input.layerName ?? 'default',
+        layer_mode: input.layerMode ?? 'shared',
+        layer_name:
+          (input.layerMode ?? 'shared') === 'shared'
+            ? (input.layerName ?? DEFAULT_LAYER_NAME)
+            : null,
+        keep_visitor_layers: input.keepVisitorLayers === false ? 0 : 1,
+        visitor_layer_idle_seconds:
+          input.visitorLayerIdleSeconds ?? DEFAULT_VISITOR_LAYER_IDLE_SECONDS,
         scope_json: JSON.stringify(input.scope),
         origins_json: input.origins ? JSON.stringify(input.origins) : null,
         password_hash: input.passwordHash ?? null,
@@ -115,6 +143,16 @@ export class ShareGrantsRepo {
     input: ShareGrantUpdateInput,
   ): Promise<ShareGrantRow | null> {
     const patch: Record<string, unknown> = { updated_at: Date.now() };
+    if (input.layer !== undefined) {
+      patch['layer_mode'] = input.layer.mode;
+      patch['layer_name'] = input.layer.mode === 'shared' ? input.layer.name : null;
+    }
+    if (input.keepVisitorLayers !== undefined) {
+      patch['keep_visitor_layers'] = input.keepVisitorLayers ? 1 : 0;
+    }
+    if (input.visitorLayerIdleSeconds !== undefined) {
+      patch['visitor_layer_idle_seconds'] = input.visitorLayerIdleSeconds;
+    }
     if (input.scope !== undefined) patch['scope_json'] = JSON.stringify(input.scope);
     if (input.origins !== undefined) {
       patch['origins_json'] = input.origins === null ? null : JSON.stringify(input.origins);
@@ -173,6 +211,7 @@ export class ShareGrantsRepo {
       .selectAll()
       .where('tenant_id', '=', tenantId)
       .where('doc_id', '=', docId)
+      .where('layer_mode', '=', 'shared')
       .where('layer_name', '=', layerName)
       .execute();
     return rows.map(mapRow);
@@ -204,7 +243,10 @@ function mapRow(r: {
   id: string;
   tenant_id: string;
   doc_id: string;
-  layer_name: string;
+  layer_mode: ShareLayerMode;
+  layer_name: string | null;
+  keep_visitor_layers: number;
+  visitor_layer_idle_seconds: number;
   scope_json: string;
   origins_json: string | null;
   password_hash: string | null;
@@ -221,7 +263,10 @@ function mapRow(r: {
     id: r.id,
     tenantId: r.tenant_id,
     docId: r.doc_id,
+    layerMode: r.layer_mode,
     layerName: r.layer_name,
+    keepVisitorLayers: Number(r.keep_visitor_layers) !== 0,
+    visitorLayerIdleSeconds: Number(r.visitor_layer_idle_seconds),
     scope: JSON.parse(r.scope_json) as string[],
     origins: r.origins_json ? (JSON.parse(r.origins_json) as string[]) : null,
     passwordHash: r.password_hash,

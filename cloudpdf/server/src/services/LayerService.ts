@@ -140,6 +140,7 @@ import {
 } from './ObjectNumberService';
 import type { EngineCounters } from '../app/engine-counters';
 import { RequestRateLimiter } from '../app/request-rate-limiter';
+import { visitorLayerOf } from '../auth/visitor-handle';
 import { AuditLogRepo, type AuditMutationKind } from '../db/repos/audit_log.repo';
 import { ChangeOutcomesRepo, type ChangeOutcomeRow } from '../db/repos/change_outcomes.repo';
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
@@ -384,12 +385,15 @@ export class LayerService {
     const base = doc.baseSha
       ? await this.layerState.baseVersionFacts(docId, doc.baseSha, doc.storageSizeBytes)
       : null;
+    // A share session's own layer is stamped with its link and visitor.
+    const visitor = visitorLayerOf(ctx.sub, layerName);
     const layer = await this.layerState.repos.layers.createEmpty({
       id: `layer_${randomUUID()}`,
       docId,
       tenantId: ctx.tenantId,
       name: layerName,
       baseSha: doc.baseSha,
+      ...(visitor ? { visitor: { ...visitor, seenAt: Date.now() } } : {}),
       docVersion: doc.docVersion,
       ...(base
         ? {

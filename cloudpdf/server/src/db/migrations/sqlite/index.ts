@@ -72,6 +72,8 @@ import down036 from './036_object_numbers_by_layer_name.down.sql';
 import sql036 from './036_object_numbers_by_layer_name.sql';
 import down037 from './037_layer_tombstones.down.sql';
 import sql037 from './037_layer_tombstones.sql';
+import down038 from './038_visitor_layers.down.sql';
+import sql038 from './038_visitor_layers.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -157,5 +159,11 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
     name: '037_layer_tombstones.sql',
     sql: sql037,
     down: down037,
+  },
+  {
+    version: '038',
+    name: '038_visitor_layers.sql',
+    sql: sql038,
+    down: down038,
   },
 ];

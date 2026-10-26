@@ -15,6 +15,7 @@ import {
 } from '../../app/jwt-plugin';
 import type { SignDevTokenInput } from '../../auth/JwtVerifier';
 import type { RevokedJtisGuard } from '../../auth/RevokedJtisGuard';
+import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
 
@@ -77,6 +78,14 @@ export async function registerAdminTokensRoutes(
           } catch (err) {
             return reply.code(400).send({
               error: { code: 'InvalidArg', message: (err as Error).message },
+            });
+          }
+          if (body.layerName !== undefined && isVisitorLayerName(body.layerName)) {
+            return reply.code(400).send({
+              error: {
+                code: 'InvalidArg',
+                message: `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for share-link visitors' own layers`,
+              },
             });
           }
           const doc = await deps.documents.findById(body.docId);

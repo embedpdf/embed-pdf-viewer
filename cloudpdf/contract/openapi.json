@@ -24242,10 +24242,22 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]+$"
           },
+          "layerMode": {
+            "type": "string",
+            "enum": ["shared", "per-visitor"]
+          },
           "layerName": {
             "type": "string",
             "minLength": 1,
             "maxLength": 256
+          },
+          "keepVisitorLayers": {
+            "type": "boolean"
+          },
+          "visitorLayerIdleSeconds": {
+            "type": "integer",
+            "minimum": 3600,
+            "maximum": 2592000
           },
           "scope": {
             "type": "array",
@@ -24301,8 +24313,19 @@
               "docId": {
                 "type": "string"
               },
+              "layerMode": {
+                "type": "string",
+                "enum": ["shared", "per-visitor"]
+              },
               "layerName": {
-                "type": "string"
+                "type": "string",
+                "nullable": true
+              },
+              "keepVisitorLayers": {
+                "type": "boolean"
+              },
+              "visitorLayerIdleSeconds": {
+                "type": "number"
               },
               "scope": {
                 "type": "array",
@@ -24351,7 +24374,10 @@
               "id",
               "tenantId",
               "docId",
+              "layerMode",
               "layerName",
+              "keepVisitorLayers",
+              "visitorLayerIdleSeconds",
               "scope",
               "origins",
               "passwordProtected",
@@ -24396,8 +24422,19 @@
                 "docId": {
                   "type": "string"
                 },
+                "layerMode": {
+                  "type": "string",
+                  "enum": ["shared", "per-visitor"]
+                },
                 "layerName": {
-                  "type": "string"
+                  "type": "string",
+                  "nullable": true
+                },
+                "keepVisitorLayers": {
+                  "type": "boolean"
+                },
+                "visitorLayerIdleSeconds": {
+                  "type": "number"
                 },
                 "scope": {
                   "type": "array",
@@ -24446,7 +24483,10 @@
                 "id",
                 "tenantId",
                 "docId",
+                "layerMode",
                 "layerName",
+                "keepVisitorLayers",
+                "visitorLayerIdleSeconds",
                 "scope",
                 "origins",
                 "passwordProtected",
@@ -24488,8 +24528,19 @@
               "docId": {
                 "type": "string"
               },
+              "layerMode": {
+                "type": "string",
+                "enum": ["shared", "per-visitor"]
+              },
               "layerName": {
-                "type": "string"
+                "type": "string",
+                "nullable": true
+              },
+              "keepVisitorLayers": {
+                "type": "boolean"
+              },
+              "visitorLayerIdleSeconds": {
+                "type": "number"
               },
               "scope": {
                 "type": "array",
@@ -24538,7 +24589,10 @@
               "id",
               "tenantId",
               "docId",
+              "layerMode",
               "layerName",
+              "keepVisitorLayers",
+              "visitorLayerIdleSeconds",
               "scope",
               "origins",
               "passwordProtected",
@@ -24563,6 +24617,23 @@
       "SharesUpdateRequest": {
         "type": "object",
         "properties": {
+          "layerMode": {
+            "type": "string",
+            "enum": ["shared", "per-visitor"]
+          },
+          "layerName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "keepVisitorLayers": {
+            "type": "boolean"
+          },
+          "visitorLayerIdleSeconds": {
+            "type": "integer",
+            "minimum": 3600,
+            "maximum": 2592000
+          },
           "scope": {
             "type": "array",
             "items": {
@@ -24622,8 +24693,19 @@
               "docId": {
                 "type": "string"
               },
+              "layerMode": {
+                "type": "string",
+                "enum": ["shared", "per-visitor"]
+              },
               "layerName": {
-                "type": "string"
+                "type": "string",
+                "nullable": true
+              },
+              "keepVisitorLayers": {
+                "type": "boolean"
+              },
+              "visitorLayerIdleSeconds": {
+                "type": "number"
               },
               "scope": {
                 "type": "array",
@@ -24672,7 +24754,10 @@
               "id",
               "tenantId",
               "docId",
+              "layerMode",
               "layerName",
+              "keepVisitorLayers",
+              "visitorLayerIdleSeconds",
               "scope",
               "origins",
               "passwordProtected",
@@ -24711,6 +24796,14 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024
+          },
+          "visitorHandle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "restart": {
+            "type": "boolean"
           }
         },
         "required": ["shareToken"],
@@ -24728,11 +24821,28 @@
           "layerName": {
             "type": "string"
           },
+          "layerMode": {
+            "type": "string",
+            "enum": ["shared", "per-visitor"]
+          },
+          "visitor": {
+            "type": "object",
+            "properties": {
+              "handle": {
+                "type": "string"
+              },
+              "keep": {
+                "type": "boolean"
+              }
+            },
+            "required": ["handle", "keep"],
+            "additionalProperties": false
+          },
           "expiresAt": {
             "type": "number"
           }
         },
-        "required": ["token", "docId", "layerName", "expiresAt"],
+        "required": ["token", "docId", "layerName", "layerMode", "visitor", "expiresAt"],
         "additionalProperties": false
       },
       "SharesExchange400Response": {

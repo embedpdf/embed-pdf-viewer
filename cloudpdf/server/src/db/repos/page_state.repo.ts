@@ -140,6 +140,8 @@ export interface CreateLayerInput {
   annotationsVersion?: number;
   formsVersion?: number;
   outlineVersion?: number;
+  /** A visitor's layer: the share link that made it and the visitor, seen now. */
+  visitor?: { grantId: string; visitorId: string; seenAt: number };
 }
 
 export class LayersRepo {
@@ -160,6 +162,29 @@ export class LayersRepo {
       .executeTakeFirst();
     if (row?.deleted_at != null) throw layerDeleted(docId, name);
     return row ? mapLayerRow(row) : null;
+  }
+
+  /**
+   * A visitor opened their layer again: its idle clock restarts. `false`
+   * when the layer was deleted, so the visitor starts over. A layer nobody
+   * wrote has no row, and no clock until its first write.
+   */
+  async seeVisitorLayer(docId: string, name: string, now: number): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('layers')
+      .select(['id', 'deleted_at'])
+      .where('doc_id', '=', docId)
+      .where('name', '=', name)
+      .executeTakeFirst();
+    if (!row) return true;
+    if (row.deleted_at != null) return false;
+    await this.db
+      .updateTable('layers')
+      .set({ last_seen_at: now })
+      .where('id', '=', row.id)
+      .where('deleted_at', 'is', null)
+      .execute();
+    return true;
   }
 
   async createEmpty(input: CreateLayerInput): Promise<LayerRow> {
@@ -184,6 +209,9 @@ export class LayersRepo {
         current_artifact_key: null,
         current_artifact_sha: null,
         current_artifact_size: null,
+        grant_id: input.visitor?.grantId ?? null,
+        visitor_id: input.visitor?.visitorId ?? null,
+        last_seen_at: input.visitor?.seenAt ?? null,
         created_at: now,
         updated_at: now,
       })

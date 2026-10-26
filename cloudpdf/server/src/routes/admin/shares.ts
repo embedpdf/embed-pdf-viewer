@@ -12,10 +12,15 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { decodeListCursor, encodeListCursor } from './_cursor';
 import { requireTenantAccess } from '../../app/jwt-plugin';
 import { hashSharePassword } from '../../auth/share-password';
+import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { LayersRepo } from '../../db/repos/page_state.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
-import type { ShareGrantRow, ShareGrantsRepo } from '../../db/repos/share_grants.repo';
+import type {
+  ShareGrantRow,
+  ShareGrantsRepo,
+  ShareLayerMode,
+} from '../../db/repos/share_grants.repo';
 
 export interface AdminSharesRoutesDeps {
   grants: ShareGrantsRepo;
@@ -43,6 +48,28 @@ export async function registerAdminSharesRoutes(
   deps: AdminSharesRoutesDeps,
 ): Promise<void> {
   const { grants, documents, layers, securityEvents } = deps;
+
+  /**
+   * Why a link can't take this layer, or `null`. A per-visitor link names
+   * none (each visitor gets their own); a shared one names a layer that
+   * isn't a visitor's and wasn't deleted (`LayerDeleted` throws).
+   */
+  const refuseLayer = async (
+    docId: string,
+    layerMode: ShareLayerMode,
+    layerName: string | undefined,
+  ): Promise<string | null> => {
+    if (layerMode === 'per-visitor') {
+      return layerName === undefined
+        ? null
+        : 'layerName: a per-visitor link names no layer; each visitor gets their own';
+    }
+    if (layerName !== undefined && isVisitorLayerName(layerName)) {
+      return `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for visitors' own layers`;
+    }
+    await layers.findByDocAndName(docId, layerName ?? DEFAULT_LAYER_NAME);
+    return null;
+  };
 
   const mount = (
     op: AdminOperation,
@@ -80,12 +107,20 @@ export async function registerAdminSharesRoutes(
         error: { code: 'Forbidden', message: 'document does not belong to this tenant' },
       });
     }
-    // Refuses a deleted layer's name (`LayerDeleted`).
-    await layers.findByDocAndName(doc.id, body.layerName ?? DEFAULT_LAYER_NAME);
+    const layerMode = body.layerMode ?? 'shared';
+    const refusal = await refuseLayer(doc.id, layerMode, body.layerName);
+    if (refusal) return reply.code(400).send({ error: { code: 'InvalidArg', message: refusal } });
     const grant = await grants.create({
       tenantId,
       docId: body.docId,
+      layerMode,
       ...(body.layerName !== undefined ? { layerName: body.layerName } : {}),
+      ...(body.keepVisitorLayers !== undefined
+        ? { keepVisitorLayers: body.keepVisitorLayers }
+        : {}),
+      ...(body.visitorLayerIdleSeconds !== undefined
+        ? { visitorLayerIdleSeconds: body.visitorLayerIdleSeconds }
+        : {}),
       scope: body.scope,
       ...(body.origins !== undefined ? { origins: body.origins } : {}),
       ...(body.password !== undefined ? { passwordHash: hashSharePassword(body.password) } : {}),
@@ -171,7 +206,32 @@ export async function registerAdminSharesRoutes(
         .code(404)
         .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
     }
+    const layerMode = body.layerMode ?? existing.layerMode;
+    const layerChanges = body.layerMode !== undefined || body.layerName !== undefined;
+    if (layerChanges) {
+      const refusal = await refuseLayer(existing.docId, layerMode, body.layerName);
+      if (refusal) {
+        return reply.code(400).send({ error: { code: 'InvalidArg', message: refusal } });
+      }
+    }
     const updated = await grants.update(shareId, tenantId, {
+      ...(layerChanges
+        ? {
+            layer:
+              layerMode === 'shared'
+                ? {
+                    mode: 'shared' as const,
+                    name: body.layerName ?? existing.layerName ?? DEFAULT_LAYER_NAME,
+                  }
+                : { mode: 'per-visitor' as const },
+          }
+        : {}),
+      ...(body.keepVisitorLayers !== undefined
+        ? { keepVisitorLayers: body.keepVisitorLayers }
+        : {}),
+      ...(body.visitorLayerIdleSeconds !== undefined
+        ? { visitorLayerIdleSeconds: body.visitorLayerIdleSeconds }
+        : {}),
       ...(body.scope !== undefined ? { scope: body.scope } : {}),
       ...(body.origins !== undefined ? { origins: body.origins } : {}),
       ...(body.password !== undefined
@@ -231,7 +291,10 @@ function sharePublic(g: ShareGrantRow): Record<string, unknown> {
     id: g.id,
     tenantId: g.tenantId,
     docId: g.docId,
+    layerMode: g.layerMode,
     layerName: g.layerName,
+    keepVisitorLayers: g.keepVisitorLayers,
+    visitorLayerIdleSeconds: g.visitorLayerIdleSeconds,
     scope: [...g.scope],
     origins: g.origins ? [...g.origins] : null,
     passwordProtected: g.passwordHash !== null,
