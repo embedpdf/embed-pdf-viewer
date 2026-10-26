@@ -119,6 +119,29 @@ export interface LayerRow {
   updatedAt: number;
 }
 
+/** A layer as `documents.layers.list` shows it. */
+export interface ListedLayer {
+  /** The row id: only the list cursor's tie-breaker. */
+  id: string;
+  docId: string;
+  name: string;
+  /** A visitor's layer: the share link that made it. */
+  grantId: string | null;
+  visitorId: string | null;
+  storageSizeBytes: number | null;
+  createdAt: number;
+  updatedAt: number;
+  lastSeenAt: number | null;
+}
+
+export interface LayerListOptions {
+  /** Only this share link's visitors' layers. */
+  grantId?: string;
+  limit: number;
+  /** Keyset cursor, the same shape as the documents, tenants and shares lists. */
+  before?: { createdAt: number; id: string };
+}
+
 export interface CreateLayerInput {
   id: string;
   docId: string;
@@ -162,6 +185,53 @@ export class LayersRepo {
       .executeTakeFirst();
     if (row?.deleted_at != null) throw layerDeleted(docId, name);
     return row ? mapLayerRow(row) : null;
+  }
+
+  /**
+   * A document's live layers newest first (`created_at`, then `id`,
+   * descending), after `before` when given. A deleted layer isn't listed.
+   */
+  async listForDocument(docId: string, opts: LayerListOptions): Promise<ListedLayer[]> {
+    let q = this.db
+      .selectFrom('layers')
+      .select([
+        'id',
+        'doc_id',
+        'name',
+        'grant_id',
+        'visitor_id',
+        'current_artifact_size',
+        'created_at',
+        'updated_at',
+        'last_seen_at',
+      ])
+      .where('doc_id', '=', docId)
+      .where('deleted_at', 'is', null)
+      .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc');
+    if (opts.grantId !== undefined) q = q.where('grant_id', '=', opts.grantId);
+    if (opts.before) {
+      const { createdAt, id } = opts.before;
+      q = q.where((eb) =>
+        eb.or([
+          eb('created_at', '<', createdAt),
+          eb.and([eb('created_at', '=', createdAt), eb('id', '<', id)]),
+        ]),
+      );
+    }
+    const rows = await q.limit(opts.limit).execute();
+    return rows.map((row) => ({
+      id: row.id,
+      docId: row.doc_id,
+      name: row.name,
+      grantId: row.grant_id,
+      visitorId: row.visitor_id,
+      storageSizeBytes:
+        row.current_artifact_size === null ? null : Number(row.current_artifact_size),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at),
+      lastSeenAt: row.last_seen_at === null ? null : Number(row.last_seen_at),
+    }));
   }
 
   /**

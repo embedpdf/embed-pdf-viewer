@@ -76,6 +76,8 @@ import down038 from './038_visitor_layers.down.sql';
 import sql038 from './038_visitor_layers.sql';
 import down039 from './039_visitor_layer_deletion_opt_in.down.sql';
 import sql039 from './039_visitor_layer_deletion_opt_in.sql';
+import down040 from './040_layers_list_index.down.sql';
+import sql040 from './040_layers_list_index.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -173,5 +175,11 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
     name: '039_visitor_layer_deletion_opt_in.sql',
     sql: sql039,
     down: down039,
+  },
+  {
+    version: '040',
+    name: '040_layers_list_index.sql',
+    sql: sql040,
+    down: down040,
   },
 ];

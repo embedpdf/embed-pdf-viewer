@@ -8,6 +8,7 @@ import {
 import { validateScopeArray, type Identity } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance } from 'fastify';
 
+import { formatIssues } from './_issues';
 import {
   requireApiToken,
   requireTenantAccess,
@@ -186,13 +187,4 @@ export async function registerAdminTokensRoutes(
 
 function identityExtras(body: { identity?: Identity }): Record<string, unknown> {
   return body.identity ? { identity: body.identity } : {};
-}
-
-function formatIssues(issues: Array<{ path: Array<string | number>; message: string }>): string {
-  return issues
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : 'request body';
-      return `${path}: ${issue.message}`;
-    })
-    .join('; ');
 }

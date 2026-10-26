@@ -12,6 +12,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeListCursor, encodeListCursor } from './_cursor';
+import { formatIssues } from './_issues';
 import { requireTenantAccess } from '../../app/jwt-plugin';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
@@ -178,7 +179,7 @@ export async function registerAdminDocumentsRoutes(
     const ctx = requireTenantAccess(req, tenantId, listOp.scope);
     const parsed = listOp.query.safeParse(req.query ?? {});
     if (!parsed.success) {
-      throw makeError('InvalidArg', 400, formatSchemaError(parsed.error.issues));
+      throw makeError('InvalidArg', 400, formatIssues(parsed.error.issues));
     }
     const { limit, cursor, state } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
@@ -258,7 +259,7 @@ export async function registerAdminDocumentsRoutes(
 function parseInitBody(req: FastifyRequest): AdminDocumentInitRequest {
   const result = AdminDocumentInitRequestSchema.safeParse(req.body);
   if (!result.success) {
-    throw makeError('InvalidArg', 400, formatSchemaError(result.error.issues));
+    throw makeError('InvalidArg', 400, formatIssues(result.error.issues));
   }
   return {
     ...result.data,
@@ -269,7 +270,7 @@ function parseInitBody(req: FastifyRequest): AdminDocumentInitRequest {
 function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
   const result = AdminDocumentCommitRequestSchema.safeParse(req.body);
   if (!result.success) {
-    throw makeError('InvalidArg', 400, formatSchemaError(result.error.issues));
+    throw makeError('InvalidArg', 400, formatIssues(result.error.issues));
   }
   return {
     ...result.data,
@@ -280,7 +281,7 @@ function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
 function parseImportBody(req: FastifyRequest): AdminDocumentImportRequest {
   const result = AdminDocumentImportRequestSchema.safeParse(req.body);
   if (!result.success) {
-    throw makeError('InvalidArg', 400, formatSchemaError(result.error.issues));
+    throw makeError('InvalidArg', 400, formatIssues(result.error.issues));
   }
   const expected = result.data.expected;
   return {
@@ -289,17 +290,6 @@ function parseImportBody(req: FastifyRequest): AdminDocumentImportRequest {
       ? { expected: { ...expected, sha256: expected.sha256.toLowerCase() } }
       : {}),
   };
-}
-
-function formatSchemaError(
-  issues: Array<{ path: Array<string | number>; message: string }>,
-): string {
-  return issues
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : 'request body';
-      return `${path}: ${issue.message}`;
-    })
-    .join('; ');
 }
 
 function docPublic(d: {

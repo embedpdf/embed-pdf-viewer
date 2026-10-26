@@ -441,6 +441,51 @@ export const AdminTenantDocLayerParamsSchema = AdminTenantDocParamsSchema.extend
 });
 export type AdminTenantDocLayerParams = z.infer<typeof AdminTenantDocLayerParamsSchema>;
 
+/**
+ * A layer that holds changes: one a link or your tokens name, or a
+ * share-link visitor's own. A layer appears at its first change, and a
+ * deleted one is no longer listed. Read and download it with the API token
+ * through `/v1/docs/{docId}/layers/{layerName}`.
+ */
+export const AdminLayerRecordSchema = z.object({
+  docId: z.string(),
+  layerName: z.string(),
+  /** The share link whose visitor made it (the link may since be deleted); null otherwise. */
+  shareId: z.string().nullable(),
+  /** That visitor; null for a layer a link or token names. */
+  visitorId: z.string().nullable(),
+  /** Bytes the layer stores: its changes over the document, not the whole PDF. */
+  storageSizeBytes: z.number().nullable(),
+  /** Unix epoch ms of its first change. */
+  createdAt: z.number(),
+  /** Unix epoch ms of its last change. */
+  updatedAt: z.number(),
+  /** A visitor's layer: Unix epoch ms the visitor last opened it; null otherwise. */
+  lastSeenAt: z.number().nullable(),
+});
+export type AdminLayerRecord = z.infer<typeof AdminLayerRecordSchema>;
+
+/** Query parameters for `documents.layers.list`, as for the other lists. */
+export const AdminDocumentLayerListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+  /** Only the layers this share link's visitors made, a deleted link's too. */
+  shareId: z.string().regex(shareTokenPattern).optional(),
+});
+export type AdminDocumentLayerListQuery = z.infer<typeof AdminDocumentLayerListQuerySchema>;
+
+export const AdminDocumentLayerListResponseSchema = z.object({
+  layers: z.array(AdminLayerRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable().optional(),
+});
+export type AdminDocumentLayerListResponse = z.infer<typeof AdminDocumentLayerListResponseSchema>;
+
 export const AdminTenantJtiParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
   jti: z.string().min(1).max(256),
@@ -1147,6 +1192,24 @@ export const adminOperations = {
     params: AdminTenantDocParamsSchema,
     responses: {
       204: {},
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'documents.layers.list': {
+    operationId: 'documents.layers.list',
+    title: 'List layers',
+    summary:
+      "A document's layers that hold changes, newest first, cursor-paginated: the ones links and your tokens name, and each share-link visitor's own.",
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/documents/:id/layers',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantDocParamsSchema,
+    query: AdminDocumentLayerListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: AdminDocumentLayerListResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },

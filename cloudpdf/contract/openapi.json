@@ -5710,6 +5710,125 @@
         }
       }
     },
+    "/v1/tenants/{tenantId}/documents/{id}/layers": {
+      "get": {
+        "operationId": "documents.layers.list",
+        "x-fern-sdk-group-name": ["documents", "layers"],
+        "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List layers",
+        "summary": "A document's layers that hold changes, newest first, cursor-paginated: the ones links and your tokens name, and each share-link visitor's own.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.read"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "shareId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsLayersList200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsLayersList400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsLayersList403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsLayersList404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/tenants/{tenantId}/documents/{id}/layers/{layerName}": {
       "delete": {
         "operationId": "documents.layers.delete",
@@ -24052,6 +24171,73 @@
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsDelete404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsLayersList200Response": {
+        "type": "object",
+        "properties": {
+          "layers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "docId": {
+                  "type": "string"
+                },
+                "layerName": {
+                  "type": "string"
+                },
+                "shareId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "visitorId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "storageSizeBytes": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "lastSeenAt": {
+                  "type": "number",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "docId",
+                "layerName",
+                "shareId",
+                "visitorId",
+                "storageSizeBytes",
+                "createdAt",
+                "updatedAt",
+                "lastSeenAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["layers"],
+        "additionalProperties": false
+      },
+      "DocumentsLayersList400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsLayersList403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsLayersList404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsLayersDelete403Response": {

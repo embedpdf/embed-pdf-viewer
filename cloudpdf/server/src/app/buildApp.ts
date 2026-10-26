@@ -1131,7 +1131,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       layerService
         ? layerService.deleteLayer(tenantId, input)
         : deleteStoredLayer(storedLayers, tenantId, input);
-    await registerAdminLayersRoutes(app, { deleteLayer, grants: new ShareGrantsRepo(opts.db) });
+    await registerAdminLayersRoutes(app, {
+      deleteLayer,
+      layers: new LayersRepo(opts.db),
+      documents: new DocumentsRepo(opts.db),
+      grants: new ShareGrantsRepo(opts.db),
+    });
     // The async-import claim loop: in-process (like the sweeper), one
     // per replica, safe under multi-replica via fenced leased claims.
     if (importPolicy.enabled) {
