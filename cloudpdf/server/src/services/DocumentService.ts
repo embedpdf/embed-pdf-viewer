@@ -1,8 +1,10 @@
 import type { PageExtractFlatten, PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 
 import {
   EngineError,
@@ -55,6 +57,7 @@ import type { EnginePool } from '../runtime/EnginePool';
 import { signPasswordGrant, verifyPasswordGrant, type PasswordSessionBinding } from '../security';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
+import { readLayerArtifactHeader } from '../storage/layerArtifact';
 import type { ObjectStore } from '../storage/ObjectStore';
 
 /**
@@ -161,6 +164,13 @@ export interface OpenContext {
 export interface SavedPdfFile {
   path: string;
   size: number;
+  cleanup(): Promise<void>;
+}
+
+/** A PDF to send: its length, its bytes, and what to release once sent. */
+export interface PdfDownload {
+  size: number;
+  open(): Readable;
   cleanup(): Promise<void>;
 }
 
@@ -1804,6 +1814,77 @@ export class DocumentService {
     return new Uint8Array(result.bytes);
   }
 
+  /**
+   * The layer's PDF saved incrementally, without the engine: its base
+   * version's file followed by the delta its artifact stores. A layer opens
+   * exactly so, so this is the document the engine sees, and a signed
+   * file's bytes stay as they were stored. The caller's document password
+   * is checked as an open checks it, unless a download link was made by a
+   * caller who passed that check (`passwordChecked`). `null` when the
+   * artifact is one this server doesn't read: the engine saves the layer
+   * then.
+   */
+  async incrementalLayerDownload(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    opts: { passwordChecked?: boolean } = {},
+  ): Promise<PdfDownload | null> {
+    const row = await this.requireReadyRow(ctx, docId);
+    if (!opts.passwordChecked) await this.passwordForOpen(ctx, row, layerName);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    const baseSha = layer?.baseSha ?? requireBaseSha(row);
+    const base = await this.acquireBaseFile(row, baseSha);
+    let artifact: LocalFileHandle | null = null;
+    const release = () => {
+      base.release();
+      artifact?.release();
+    };
+    try {
+      const parts: FileRange[] = [{ path: base.path, start: 0, size: base.size }];
+      artifact = layer ? (await this.readLayerOpenSource(layer)).handle : null;
+      if (artifact) {
+        const header = await readLayerArtifactHeader(artifact.path, artifact.size);
+        if (!header) {
+          release();
+          return null;
+        }
+        if (header.baseSha256 !== baseSha || header.baseSize !== base.size) {
+          throw new EngineError(
+            EngineErrorCode.MalformedPdf,
+            `layer artifact ${layer!.currentArtifactKey} is not a delta of base ${baseSha}`,
+          );
+        }
+        parts.push({ path: artifact.path, start: header.deltaOffset, size: header.deltaSize });
+      }
+      let released = false;
+      return {
+        size: parts.reduce((total, part) => total + part.size, 0),
+        open: () => readFileRanges(parts),
+        async cleanup() {
+          if (released) return;
+          released = true;
+          release();
+        },
+      };
+    } catch (err) {
+      release();
+      throw err;
+    }
+  }
+
+  /** Check the caller's document password as an open checks it (`DocPasswordRequired` without it). */
+  async checkOpenPassword(ctx: OpenContext, docId: string, layerName: string): Promise<void> {
+    await this.passwordForOpen(ctx, await this.requireReadyRow(ctx, docId), layerName);
+  }
+
+  /** The layer's current `docVersion` (the head's for a layer nobody wrote), read without opening anything. */
+  async layerDocVersion(ctx: OpenContext, docId: string, layerName: string): Promise<number> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    return layer?.docVersion ?? row.docVersion;
+  }
+
   async saveLayerDownloadToTemp(
     ctx: OpenContext,
     docId: string,
@@ -2659,4 +2740,23 @@ function isEncrypted(row: DocumentRow): boolean {
 function safeFilePart(value: string): string {
   const cleaned = value.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
   return cleaned.length > 0 ? cleaned : 'document';
+}
+
+/** A byte range of a local file. */
+interface FileRange {
+  path: string;
+  start: number;
+  size: number;
+}
+
+/** The ranges' bytes, one after the other, as one stream. */
+function readFileRanges(parts: readonly FileRange[]): Readable {
+  return Readable.from(
+    (async function* () {
+      for (const part of parts) {
+        if (part.size === 0) continue;
+        yield* createReadStream(part.path, { start: part.start, end: part.start + part.size - 1 });
+      }
+    })(),
+  );
 }

@@ -1414,6 +1414,28 @@ export const DocIdParamsSchema = z.object({
 export const DocLayerParamsSchema = DocIdParamsSchema.extend({
   layerName: z.string().min(1),
 });
+
+export const DownloadLinkRequestSchema = z.object({
+  /** Seconds the link works for: 60 to 3600, default 300. */
+  expiresIn: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60)
+    .optional(),
+});
+export type DownloadLinkRequest = z.infer<typeof DownloadLinkRequestSchema>;
+
+export const DownloadLinkResponseSchema = z.object({
+  /**
+   * Downloads the layer's PDF as it is now, saved incrementally, with a
+   * plain GET and no Authorization header. Use it as given.
+   */
+  url: z.string(),
+  /** Unix seconds after which the link no longer works. */
+  expiresAt: z.number(),
+});
+export type DownloadLinkResponse = z.infer<typeof DownloadLinkResponseSchema>;
 export const DocPageParamsSchema = DocLayerParamsSchema.extend({
   pageKey: z
     .string()
@@ -2372,6 +2394,27 @@ export const docOperations = {
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
+  },
+  'doc.downloadLink': {
+    operationId: 'doc.downloadLink',
+    title: 'Create download link',
+    summary:
+      "A short-lived URL that downloads the layer's current PDF without an Authorization header, for services that only take a plain URL.",
+    method: 'POST',
+    path: wireTemplates.layerDownloadLink,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    body: { contentType: 'application/json', schema: DownloadLinkRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: DownloadLinkResponseSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      501: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      'The link opens the layer as it is when created: once the layer changes, it answers 404, so create it right before handing it over. It downloads that one file and nothing else, and a password-protected document is checked when the link is created. Deployments that verify tokens with their own keys (JWKS) mint links on their backend: a doc token with `layer_name`, a `download: { docVersion, mode: "incremental" }` claim and a short `exp`, passed as `link` on the versioned download URL.',
   },
   'doc.download': {
     operationId: 'doc.download',

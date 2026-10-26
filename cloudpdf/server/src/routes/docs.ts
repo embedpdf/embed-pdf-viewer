@@ -1,4 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
+
+import { DownloadLinkRequestSchema } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import {
   DEFAULT_PDF_SAVE_MODE,
@@ -20,13 +23,19 @@ import {
   requireLayerResource,
   requireResource,
 } from '../app/jwt-plugin';
-import type { DocumentService, SavedPdfFile } from '../services/DocumentService';
+import type { SignDevTokenInput } from '../auth/JwtVerifier';
+import type { DocumentService, OpenContext, PdfDownload } from '../services/DocumentService';
 import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
 
 export interface DocsRouteDeps {
   service: DocumentService;
+  /** Mints download links; absent where the deployment only verifies tokens (JWKS). */
+  sign?: (input: SignDevTokenInput) => string;
 }
+
+/** How long a download link works unless its maker says otherwise. */
+const DEFAULT_DOWNLOAD_LINK_SECONDS = 5 * 60;
 
 /**
  * Document-level cloud routes: heads, manifests, and pre-warm.
@@ -226,27 +235,113 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     return snapshot;
   });
 
+  /**
+   * A layer's PDF. Incremental (the default) is its base file followed by
+   * its stored delta, with no engine involved; a rewrite, or an artifact
+   * this server doesn't read, is saved by the engine.
+   */
+  const layerDownload = async (
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    mode: PdfSaveMode,
+    opts: { passwordChecked?: boolean } = {},
+  ): Promise<PdfDownload> => {
+    if (mode === 'incremental') {
+      const direct = await service.incrementalLayerDownload(ctx, docId, layerName, opts);
+      if (direct) return direct;
+    }
+    const file = await service.saveLayerDownloadToTemp(ctx, docId, layerName, mode);
+    return { size: file.size, open: () => createReadStream(file.path), cleanup: file.cleanup };
+  };
+
   app.get('/v1/docs/:docId/layers/:layerName/download@:token', async (req, reply) => {
     const { docId, layerName, token } = req.params as {
       docId: string;
       layerName: string;
       token: string;
     };
-    rejectQueryParamsOnTokenUrl(req.query);
+    // A download link (`?link=`) opens exactly the version it was made for.
+    const link = req.downloadLink;
+    rejectQueryParamsOnTokenUrl(req.query, link ? ['link'] : []);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'download-versioned', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeDownloadToken, token, 'download token');
-    const head = await service.getLayerHead(ctx, docId, layerName);
-    if (requested.docVersion !== head.docVersion) {
+    if (link && (link.docVersion !== requested.docVersion || link.mode !== requested.mode)) {
+      throw new EngineError(
+        EngineErrorCode.Forbidden,
+        `this link downloads version ${link.docVersion} (${link.mode}) only`,
+      );
+    }
+    const current = await service.layerDocVersion(ctx, docId, layerName);
+    if (requested.docVersion !== current) {
       setNoStore(reply);
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `download version ${requested.docVersion} no longer current (current=${head.docVersion})`,
+        `download version ${requested.docVersion} no longer current (current=${current})`,
       );
     }
-    const file = await service.saveLayerDownloadToTemp(ctx, docId, layerName, requested.mode);
-    return sendDownload(reply, file, docId, layerName, requested.mode, 'immutable');
+    // The link's maker passed the password check; the link carries no password.
+    const file = await layerDownload(ctx, docId, layerName, requested.mode, {
+      passwordChecked: link !== undefined,
+    });
+    return sendDownload(
+      reply,
+      file,
+      docId,
+      layerName,
+      requested.mode,
+      link ? 'no-store' : 'immutable',
+    );
+  });
+
+  /**
+   * A download link: the layer's versioned download URL with a token in
+   * `link` that opens only that download, for a service that takes a plain
+   * URL and no Authorization header. It downloads the layer as it is now;
+   * once the layer changes it answers 404.
+   */
+  app.post('/v1/docs/:docId/layers/:layerName/download-link', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'download-current', pdfBits);
+    const parsed = DownloadLinkRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `invalid download link request: ${parsed.error.message}`,
+      );
+    }
+    if (!deps.sign) {
+      throw new EngineError(
+        EngineErrorCode.NotImplemented,
+        'this deployment verifies tokens with its own keys: make download links on your backend, as a doc token with layer_name and a `download` claim',
+      );
+    }
+    await service.checkOpenPassword(ctx, docId, layerName);
+    const download = {
+      docVersion: await service.layerDocVersion(ctx, docId, layerName),
+      mode: 'incremental' as const,
+    };
+    const expiresIn = parsed.data.expiresIn ?? DEFAULT_DOWNLOAD_LINK_SECONDS;
+    const linkToken = deps.sign({
+      sub: `link:${ctx.sub}`,
+      tenant_id: ctx.tenantId,
+      doc_id: docId,
+      layer_name: layerName,
+      scope: ['doc.download'],
+      jti: randomUUID(),
+      ttlSeconds: expiresIn,
+      extras: { download },
+    });
+    const path = wirePaths.layerDownloadVersioned(docId, layerName, download);
+    setNoStore(reply);
+    return {
+      url: `${req.protocol}://${req.host}${path}?link=${encodeURIComponent(linkToken)}`,
+      expiresAt: Math.floor(Date.now() / 1000) + expiresIn,
+    };
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/download', async (req, reply) => {
@@ -255,7 +350,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'download-current', pdfBits);
     const mode = parseDownloadMode(req.query);
-    const file = await service.saveLayerDownloadToTemp(ctx, docId, layerName, mode);
+    const file = await layerDownload(ctx, docId, layerName, mode);
     return sendDownload(reply, file, docId, layerName, mode, 'no-store');
   });
 
@@ -273,8 +368,12 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   });
 }
 
-function rejectQueryParamsOnTokenUrl(query: unknown): void {
-  if (query && typeof query === 'object' && Object.keys(query).length > 0) {
+function rejectQueryParamsOnTokenUrl(query: unknown, allowed: readonly string[] = []): void {
+  if (
+    query &&
+    typeof query === 'object' &&
+    Object.keys(query).some((key) => !allowed.includes(key))
+  ) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'versioned download URLs must encode download options in the path token, not query params',
@@ -284,7 +383,7 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 function sendDownload(
   reply: FastifyReply,
-  file: SavedPdfFile,
+  file: PdfDownload,
   docId: string,
   layerName: string,
   mode: PdfSaveMode,
@@ -298,7 +397,7 @@ function sendDownload(
     `attachment; filename="${downloadFileName(docId, layerName, mode)}"`,
   );
 
-  const stream = createReadStream(file.path);
+  const stream = file.open();
   let cleaned = false;
   const cleanup = () => {
     if (cleaned) return;

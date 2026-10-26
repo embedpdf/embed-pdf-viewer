@@ -1386,7 +1386,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
       await registerObjectNumberRoutes(app, { documentService, layerService });
       await registerChangeRoutes(app, { documentService, layerService });
-      await registerDocsRoutes(app, { service: documentService });
+      await registerDocsRoutes(app, {
+        service: documentService,
+        ...(signer ? { sign: signer } : {}),
+      });
       await registerMetadataRoutes(app, { service: documentService, layerService });
       await registerOutlineRoutes(app, { service: documentService });
       await registerSignatureRoutes(app, { service: documentService, layerService });

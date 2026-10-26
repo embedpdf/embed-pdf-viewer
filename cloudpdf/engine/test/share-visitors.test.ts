@@ -201,10 +201,12 @@ describe('a share link visitor', () => {
       const atOpen = exchanges.length;
       await pause(1_500);
       expect(exchanges.length).toBeGreaterThan(atOpen);
-      for (const renewal of exchanges.slice(1)) {
-        expect(renewal.sent.visitorHandle).toBe(first.answered.visitor.handle);
+      // Each renewal sends the handle the exchange before it answered: a
+      // handle carries when it was issued, so it changes as the visit goes on.
+      exchanges.slice(1).forEach((renewal, i) => {
+        expect(renewal.sent.visitorHandle).toBe(exchanges[i]!.answered.visitor.handle);
         expect(renewal.answered.layerName).toBe(first.answered.layerName);
-      }
+      });
 
       await doc.close();
       const afterClose = exchanges.length;
