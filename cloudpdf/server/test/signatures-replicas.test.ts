@@ -177,15 +177,16 @@ async function handOut(replica: Replica, session: string): Promise<number[] | nu
 /** The layer's object number counter and the blocks handed out on it. */
 async function layerNumbers(): Promise<{ counter: number; blocks: number }> {
   const row = await a.db
-    .selectFrom('layers')
-    .select(['id', 'next_object_number'])
+    .selectFrom('object_number_counters')
+    .select('next_object_number')
     .where('doc_id', '=', DOC)
-    .where('name', '=', 'alice')
+    .where('layer_name', '=', 'alice')
     .executeTakeFirstOrThrow();
   const blocks = await a.db
     .selectFrom('object_number_blocks')
     .select('first')
-    .where('layer_id', '=', row.id)
+    .where('doc_id', '=', DOC)
+    .where('layer_name', '=', 'alice')
     .execute();
   return { counter: Number(row.next_object_number), blocks: blocks.length };
 }

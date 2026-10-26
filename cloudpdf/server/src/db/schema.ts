@@ -155,12 +155,6 @@ export interface LayersTable {
   current_artifact_sha: string | null;
   current_artifact_size: number | null;
   /**
-   * The layer's object number counter (migration 032): every number below it
-   * was handed out, to an editing session or to a write. NULL until the
-   * layer first needs one.
-   */
-  next_object_number: number | null;
-  /**
    * The audit id of the layer's last final change (migration 033): no change
    * before it can be undone. NULL until the first.
    */
@@ -515,12 +509,26 @@ export interface BaseVersionsTable {
 }
 
 /**
- * An editing session (migration 032): one open document (its
+ * A layer's object number counter (migration 036), by the layer's document
+ * and name: a layer nobody changed has no row, and is numbered all the
+ * same. Every number below `next_object_number` was handed out, to an
+ * editing session or to a write, on base version `base_sha`.
+ */
+export interface ObjectNumberCountersTable {
+  doc_id: string;
+  layer_name: string;
+  base_sha: string | null;
+  next_object_number: number;
+}
+
+/**
+ * An editing session (migrations 032, 036): one open document (its
  * `X-Engine-Session-Id`) acting for one token subject on one layer. Its
  * blocks of object numbers stay its own while its expiry keeps moving.
  */
 export interface EditSessionsTable {
-  layer_id: string;
+  doc_id: string;
+  layer_name: string;
   session_id: string;
   sub: string;
   expires_at: number;
@@ -528,12 +536,13 @@ export interface EditSessionsTable {
 }
 
 /**
- * Up to 32 consecutive object numbers from `first` (migration 032): bit i of
+ * Up to 32 consecutive object numbers from `first` (migrations 032, 036): bit i of
  * `available` is set while `first + i` is unspent. `session_id` NULL: a
  * write returned them, for any session.
  */
 export interface ObjectNumberBlocksTable {
-  layer_id: string;
+  doc_id: string;
+  layer_name: string;
   first: number;
   available: number;
   session_id: string | null;
@@ -617,6 +626,7 @@ export interface Database {
   layer_pages: LayerPagesTable;
   base_versions: BaseVersionsTable;
   document_signings: DocumentSigningsTable;
+  object_number_counters: ObjectNumberCountersTable;
   edit_sessions: EditSessionsTable;
   object_number_blocks: ObjectNumberBlocksTable;
   change_outcomes: ChangeOutcomesTable;

@@ -266,6 +266,10 @@ export interface BuildAppOptions {
    * than `pendingTtlMs`. Set to 0 to disable. Defaults to 60_000 ms.
    */
   sweepIntervalMs?: number;
+  /** How long a layer's worker session may go unasked before the sweeper closes it. Default 10 minutes. */
+  layerSessionIdleMs?: number;
+  /** Most layer sessions one document keeps open; opening one more closes the least recently asked-for. Default 32. */
+  maxLayerSessionsPerDoc?: number;
   /** Max age of a `pending` doc before it's considered abandoned. */
   pendingTtlMs?: number;
   /**
@@ -1295,6 +1299,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         pool,
         layerState: layerStateService,
         cdnAccessRequired,
+        ...(opts.layerSessionIdleMs !== undefined
+          ? { layerSessionIdleMs: opts.layerSessionIdleMs }
+          : {}),
+        ...(opts.maxLayerSessionsPerDoc !== undefined
+          ? { maxLayerSessionsPerDoc: opts.maxLayerSessionsPerDoc }
+          : {}),
         passwordVerifications: new PdfPasswordVerificationsRepo(opts.db, {
           // The proof rows are HMACs over real document passwords: on a
           // production license a strong secret is mandatory, or a leaked DB
@@ -1409,6 +1419,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         layerService
           ?.sweepChanges(Date.now())
           .catch((err) => app.log.error({ err }, 'sweepChanges failed'));
+        layerService
+          ?.sweepObjectNumbers()
+          .catch((err) => app.log.error({ err }, 'sweepObjectNumbers failed'));
+        documentService
+          ?.closeIdleLayerSessions(Date.now())
+          .catch((err) => app.log.error({ err }, 'closeIdleLayerSessions failed'));
       }, sweepIntervalMs);
       sweeperTimer.unref();
     }

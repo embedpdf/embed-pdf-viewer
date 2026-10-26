@@ -123,6 +123,19 @@ export interface DocumentServiceOptions {
    * CdnSigner.
    */
   cdnAccessRequired?: boolean;
+  /**
+   * How long a layer's worker session may go unasked before the idle sweep
+   * ({@link DocumentService.closeIdleLayerSessions}) closes it. The next
+   * request reopens it from the durable artifact. Default 10 minutes.
+   */
+  layerSessionIdleMs?: number;
+  /**
+   * Most layer sessions one document keeps open. Opening one more closes the
+   * document's least recently asked-for sessions beyond it — a document with
+   * a layer per visitor would otherwise hold one open PDF per visitor.
+   * Default 32.
+   */
+  maxLayerSessionsPerDoc?: number;
 }
 
 export interface OpenContext {
@@ -222,6 +235,12 @@ export class DocumentService {
    * bytes, so an entry never goes stale.
    */
   private readonly protections = new Map<string, DocumentProtection | null>();
+  /**
+   * Each base version's last object number, by the version's sha, as the
+   * worker reported it on opening the version's bytes: where a layer nobody
+   * changed counts its object numbers from. It belongs to the bytes too.
+   */
+  private readonly baseObjectNumbers = new Map<string, number>();
   private readonly baseHandles = new Map<string, LocalFileHandle>();
   private readonly layerArtifactHandles = new Map<string, LocalFileHandle>();
   /**
@@ -264,6 +283,17 @@ export class DocumentService {
    * engine died.
    */
   private readonly writeAlignGens = new Map<string, number>();
+  /**
+   * When each layer was last asked for (session key → the layer and the
+   * time): what the idle sweep and the per-document cap read to pick the
+   * sessions nobody is using.
+   */
+  private readonly layerTouches = new Map<
+    string,
+    { docId: string; layerName: string; at: number }
+  >();
+  private readonly layerSessionIdleMs: number;
+  private readonly maxLayerSessionsPerDoc: number;
 
   private readonly counters?: EngineCounters;
 
@@ -281,6 +311,8 @@ export class DocumentService {
     this.passwordSessionTtlMs = opts.passwordSessionTtlMs ?? 60 * 60 * 1000;
     this.passwordSessionRenewalTtlMs = opts.passwordSessionRenewalTtlMs ?? 60 * 60 * 1000;
     this.cdnAccessRequired = opts.cdnAccessRequired ?? false;
+    this.layerSessionIdleMs = opts.layerSessionIdleMs ?? 10 * 60 * 1000;
+    this.maxLayerSessionsPerDoc = opts.maxLayerSessionsPerDoc ?? 32;
   }
 
   /**
@@ -503,7 +535,7 @@ export class DocumentService {
       if (result.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
-      this.recordProtection(baseSha, result);
+      this.recordOpened(baseSha, result);
       const head = buildHead(row, this.cdnAccessRequired);
       this.replaceBaseHandle(docId, baseSha, handle);
       handle = null;
@@ -736,6 +768,7 @@ export class DocumentService {
     layerName: string,
     password: string | null = null,
   ): Promise<void> {
+    this.touchLayer(docId, layerName);
     // Park behind any in-flight write first: its uncommitted worker state
     // must never be served as a clean materialization, and the layer row
     // must be read after the write settles or the freshness compare would
@@ -765,6 +798,7 @@ export class DocumentService {
     opts: { forWrite?: boolean } = {},
   ): Promise<void> {
     const key = layerSessionKey(docId, layerName);
+    this.touchLayer(docId, layerName);
     // Write alignment records the engine generation the aligned session
     // lives under — the datum advanceLayerSession later compares against
     // the then-current generation to refuse blessing a session that was
@@ -793,6 +827,29 @@ export class DocumentService {
     return this.layerOpenObjectNumbers.get(layerSessionKey(docId, layerName));
   }
 
+  /**
+   * The version a layer nobody changed reads (the head), and its last object
+   * number: as the document's base session reported it on opening, so
+   * nothing opens for the layer. A base session that opened locked reports
+   * none; then the layer's own session opens, still with no row made.
+   */
+  async headObjectNumbers(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+  ): Promise<{ baseSha: string; lastObjectNumber: number }> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const head = await this.openOnPool(ctx, docId, await this.passwordForOpen(ctx, row, layerName));
+    const known = this.baseObjectNumbers.get(head.baseSha);
+    if (known !== undefined) return { baseSha: head.baseSha, lastObjectNumber: known };
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const opened = this.lastObjectNumberAtOpen(docId, layerName);
+    if (opened === undefined) {
+      throw new EngineError(EngineErrorCode.Unknown, `layer ${layerName} of ${docId} is not open`);
+    }
+    return { baseSha: head.baseSha, lastObjectNumber: opened };
+  }
+
   /** Mark a layer session stale: the next fresh-ensure reloads it. */
   invalidateLayerSession(docId: string, layerName: string): void {
     this.layerSessionVersions.delete(layerSessionKey(docId, layerName));
@@ -809,10 +866,13 @@ export class DocumentService {
     let settle!: () => void;
     const marker = new Promise<void>((resolve) => (settle = resolve));
     this.layerWritesInFlight.set(key, marker);
+    this.touchLayer(docId, layerName);
     return () => {
       if (this.layerWritesInFlight.get(key) === marker) {
         this.layerWritesInFlight.delete(key);
       }
+      // A long write ends as fresh as it started: idle counts from here.
+      this.touchLayer(docId, layerName);
       settle();
     };
   }
@@ -910,6 +970,78 @@ export class DocumentService {
       }
     }
     this.releaseLayerArtifactHandle(key);
+  }
+
+  /**
+   * The idle sweep: close every layer session nobody asked for in
+   * `layerSessionIdleMs`. A session with a write in flight, or one opening
+   * or closing, stays. A request that races the close finds the session
+   * gone and reopens it: reads through `runReadWithReopen`, writes through
+   * the rebase retry, both on `DocNotOpen`. Returns how many it closed.
+   */
+  async closeIdleLayerSessions(now: number): Promise<number> {
+    const closing: Promise<void>[] = [];
+    for (const [key, touch] of this.layerTouches) {
+      if (now - touch.at < this.layerSessionIdleMs) continue;
+      if (!this.layerSessionVersions.has(key)) {
+        // Asked for once, never (or no longer) open: nothing to close.
+        if (!this.layerOpens.has(key)) this.layerTouches.delete(key);
+        continue;
+      }
+      if (this.canCloseLayerSession(key)) {
+        closing.push(this.closeLayerSession(key, touch.docId, touch.layerName));
+      }
+    }
+    await Promise.all(closing);
+    return closing.length;
+  }
+
+  /** Mark a layer as asked for now: the idle sweep and the cap close the longest-unasked first. */
+  private touchLayer(docId: string, layerName: string): void {
+    this.layerTouches.set(layerSessionKey(docId, layerName), { docId, layerName, at: Date.now() });
+  }
+
+  /** A live session nothing is writing, opening or closing. */
+  private canCloseLayerSession(key: string): boolean {
+    return (
+      this.layerSessionVersions.has(key) &&
+      !this.layerWritesInFlight.has(key) &&
+      !this.layerOpens.has(key)
+    );
+  }
+
+  /**
+   * Close one layer session on purpose (idle or over the cap). Registered as
+   * the key's open-in-flight, so a request that arrives meanwhile waits for
+   * the close and then reopens instead of dispatching into a closing session.
+   */
+  private closeLayerSession(key: string, docId: string, layerName: string): Promise<void> {
+    this.layerTouches.delete(key);
+    const closing: Promise<void> = this.closeLayerOnPool(docId, layerName).finally(() => {
+      if (this.layerOpens.get(key) === closing) this.layerOpens.delete(key);
+    });
+    this.layerOpens.set(key, closing);
+    return closing;
+  }
+
+  /**
+   * Keep a document within `maxLayerSessionsPerDoc` after `opened` joined it:
+   * close its longest-unasked sessions beyond the cap. Not awaited — the
+   * request that opened a session doesn't wait for others to close. A close
+   * that fails leaves its worker session to that layer's next reload, which
+   * closes before it opens.
+   */
+  private trimLayerSessions(docId: string, opened: string): void {
+    const live = [...this.layerTouches].filter(
+      ([key, touch]) => touch.docId === docId && this.layerSessionVersions.has(key),
+    );
+    let excess = live.length - this.maxLayerSessionsPerDoc;
+    for (const [key, touch] of live.sort(([, a], [, b]) => a.at - b.at)) {
+      if (excess <= 0) return;
+      if (key === opened || !this.canCloseLayerSession(key)) continue;
+      void this.closeLayerSession(key, docId, touch.layerName).catch(() => undefined);
+      excess -= 1;
+    }
   }
 
   async readPageViewports(
@@ -1949,12 +2081,14 @@ export class DocumentService {
     inflightOpens: number;
     pinnedBaseFiles: number;
     pinnedLayerArtifacts: number;
+    openLayerSessions: number;
   } {
     return {
       openHeads: this.heads.size,
       inflightOpens: this.opens.size,
       pinnedBaseFiles: this.baseHandles.size,
       pinnedLayerArtifacts: this.layerArtifactHandles.size,
+      openLayerSessions: this.layerSessionVersions.size,
     };
   }
 
@@ -2031,6 +2165,7 @@ export class DocumentService {
       // The fence entry: this session is a materialization of exactly the
       // layer version whose artifact was just opened (0 = fresh, no row).
       this.layerSessionVersions.set(sessionKey, layer?.currentVersion ?? 0);
+      this.trimLayerSessions(docId, sessionKey);
     } finally {
       layerHandle?.release();
     }
@@ -2210,7 +2345,7 @@ export class DocumentService {
       if (opened.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${opened.tag}`);
       }
-      this.recordProtection(version.sha256, opened);
+      this.recordOpened(version.sha256, opened);
       return await run(sessionId);
     } finally {
       await this.pool.close(sessionId).catch(() => undefined);
@@ -2259,9 +2394,15 @@ export class DocumentService {
     return this.protections.get(sha) ?? null;
   }
 
-  /** Keep what an open of `sha`'s bytes reported its signatures forbid. */
-  private recordProtection(sha: string, opened: { protection?: DocumentProtection | null }): void {
+  /** Keep what an open of `sha`'s bytes reported: what its signatures forbid, its last object number. */
+  private recordOpened(
+    sha: string,
+    opened: { protection?: DocumentProtection | null; lastObjectNumber?: number },
+  ): void {
     if (opened.protection !== undefined) this.protections.set(sha, opened.protection);
+    if (opened.lastObjectNumber !== undefined) {
+      this.baseObjectNumbers.set(sha, opened.lastObjectNumber);
+    }
   }
 
   /** The local file of one base version of a document the caller may read (signing rebuilds a candidate from it). */
