@@ -1,5 +1,13 @@
 # @embedpdf/web
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – Editors on a page no longer make iOS Safari zoom the page in when they take focus. A text field's editor (`textFieldEditorStyleOf()`) and a free text box's editor lay their text out at 16 px or more and draw it back at the page's size with a transform, so they look the same in every browser. New: `freeTextBoxOf()`, the layer's own text box (its place on the plate, its turn and its style, in place of `textPlateInPixels()`); `ownTextBoxOf()`, your own element as a text box's editor, filling its parent; `legibleScaleOf()`, `legibleShrinkOf()`, `LEGIBLE_FONT_PX` and `textFieldFontPxOf()`. `textFieldStyleOf()` takes the legible scale. `textPlateInPixels()`, `TextPlatePixels` and the `textBoxStyleOf()` export are removed.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – Add `browserPrinter()`, the browser's print dialog for `createKernel({ printer })`. Where the browser's own PDF viewer prints PDFs (a desktop browser with it on), it prints the kernel's PDF copy from a hidden frame, keeping the frame until the next PDF so the browser can finish; a print the browser refuses rejects, so the kernel prints pictures instead. Everywhere else it prints pictures: one sheet per page, sized to the page with a named `@page`, from a hidden frame, or from the page itself on iOS, which prints a frame as a picture of the page around it. In Safari's engine it `needsTap`: Safari prints only from a tap (later, iOS refuses the print dialog and the Mac prints blank pages). `standardCommandsBrowser` no longer has `print`: printing goes through the kernel.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

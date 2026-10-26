@@ -1,5 +1,19 @@
 # @embedpdf/core
 
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – `@embedpdf/core/testing` gains `gate(engine)`, an engine whose documents hold every change until a test releases or refuses it, so a plugin's tests can see what the reads show while a change is on its way. A predicted `attachments.restore` op lets a view draw an undone attachment removal before the engine answers.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `PredictedOp` gains `outline.restore`: the items as they were, at their place, which is how an undo of an outline change is drawn before the engine answers.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The documents capability prints. `print(id?, { pages, includeAnnotations, onProgress })` makes the pages as they print (layers, annotations and form fields by their print settings) and hands them to the host's print dialog. `preparePrint(id?, options)` does that ahead and resolves `{ quality, pageCount, needsTap, print(), dispose() }`, so a dialog prepares when the user presses Print and then prints; its `print()` prepares again when the document changed since. `needsTap` is the printer's: `true` where printing works only from a tap (Safari), so a dialog asks for another tap once the print is ready. `getPrintQuality(id?)` says how it prints: `{ kind: 'pdf' }` — a copy of the pages as they print (`pages.extract` with `flatten: { usage: 'print' }`), sharp text and lines — with `doc.print.high`, a right to keep the copy (`doc.download` or `doc.download.flattened`) and a printer that prints PDFs; else pictures, `{ kind: 'images', dpi: 300 }` with `doc.print.high` or 150 DPI with `doc.print` only; `null` when it can't. When the printer turns the PDF down, preparing or printing, the same pages print as 300 DPI pictures. Form fields print whenever the user may read the form, with or without the annotations. Printing waits for changes still on their way, as a download does. The host hands the kernel its printer, `createKernel({ printer })` (`HostPrinter`, with `stagePdf` when it prints PDFs and `needsTap` when it prints only from a tap), and `canPrint()` is `doc.print` and a printer. A plugin runs the document's own around the print dialog with `ctx.aroundPrint(wrap)`; the test context's `print(run)` runs those wraps.
+
+### Patch Changes
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – The page list follows `pages.restored`: pages an undo brings back show again.
+
 ## 3.0.0-next.15
 
 ### Minor Changes
