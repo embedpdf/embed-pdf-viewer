@@ -100,6 +100,7 @@ import {
 import { packChangeRecord, unpackChangeRecord } from '@embedpdf/engine-services';
 import { sql, type Kysely, type Transaction } from 'kysely';
 
+import { deleteStoredLayer } from './deleteStoredLayer';
 import type { DocumentService, OpenContext } from './DocumentService';
 import type { AuditEvent, EventLogService } from './EventLogService';
 import {
@@ -3332,6 +3333,26 @@ export class LayerService {
     return expired.length;
   }
 
+  // ── deleting a layer ──────────────────────────────────────────────────────
+
+  /**
+   * Delete a layer and what it stored (see `deleteStoredLayer`), once this
+   * replica's writes queued on it have ended, and close its worker session
+   * here. Writes that arrive after it find the name deleted.
+   */
+  async deleteLayer(tenantId: string, input: { docId: string; layerName: string }): Promise<void> {
+    const { docId, layerName } = input;
+    const deps = {
+      db: this.requireDb(),
+      storage: this.requireStorage(),
+      documents: this.documents,
+    };
+    await this.queueOnLayer(`${tenantId}::${docId}::${layerName}`, async () => {
+      await deleteStoredLayer(deps, tenantId, input);
+      await this.requireDocumentService().forgetLayer(docId, layerName);
+    });
+  }
+
   /** The sweep tick for object numbers: what layers nobody changed were handed goes, once long expired. */
   async sweepObjectNumbers(): Promise<number> {
     return this.objectNumbers ? this.objectNumbers.sweepUntouched() : 0;
@@ -3748,9 +3769,9 @@ export class LayerService {
           createdAt: now,
         });
 
-        // (5) Promote the whole layer into the base catalog; every sibling's
-        //     manifest body changes too (scopes flip), so their docVersion
-        //     advances — in id order.
+        // (5) Promote the whole layer into the base catalog; every live
+        //     sibling's manifest body changes too (scopes flip), so their
+        //     docVersion advances — in id order.
         const promoted = await this.layerState.promoteLayerToBase(trx, {
           docId: input.docId,
           layerId: layer.id,
@@ -3762,6 +3783,7 @@ export class LayerService {
           .select('id')
           .where('doc_id', '=', input.docId)
           .where('id', '!=', layer.id)
+          .where('deleted_at', 'is', null)
           .orderBy('id')
           .execute();
         for (const sibling of siblings) {
@@ -3983,11 +4005,15 @@ export class LayerService {
     layerName: string,
     op: () => Promise<T>,
   ): Promise<T> {
-    const key = layerWriteKey(ctx, docId, layerName);
+    return this.queueOnLayer(layerWriteKey(ctx, docId, layerName), () =>
+      this.runWithRebase(ctx, docId, layerName, op),
+    );
+  }
+
+  /** Run `op` once every operation queued before it on the layer, on this replica, has ended. */
+  private queueOnLayer<T>(key: string, op: () => Promise<T>): Promise<T> {
     const previous = this.layerWriteQueues.get(key) ?? Promise.resolve();
-    const operation = previous
-      .catch(() => undefined)
-      .then(() => this.runWithRebase(ctx, docId, layerName, op));
+    const operation = previous.catch(() => undefined).then(op);
 
     const queueEntry = operation
       .catch(() => undefined)

@@ -1,3 +1,4 @@
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { Kysely } from 'kysely';
 
 import type { Database as Schema } from '../schema';
@@ -144,6 +145,12 @@ export interface CreateLayerInput {
 export class LayersRepo {
   constructor(private readonly db: Kysely<Schema>) {}
 
+  /**
+   * The live layer, or `null` when nobody wrote it yet. A deleted layer is
+   * neither: its name is gone for good, so asking for it throws
+   * `LayerDeleted`, and every path that reads, writes or opens a layer by
+   * name refuses it here.
+   */
   async findByDocAndName(docId: string, name: string): Promise<LayerRow | null> {
     const row = await this.db
       .selectFrom('layers')
@@ -151,6 +158,7 @@ export class LayersRepo {
       .where('doc_id', '=', docId)
       .where('name', '=', name)
       .executeTakeFirst();
+    if (row?.deleted_at != null) throw layerDeleted(docId, name);
     return row ? mapLayerRow(row) : null;
   }
 
@@ -287,6 +295,15 @@ function mapLayerPageRow(row: {
   updated_at: number;
 }): DurablePageRow {
   return mapDocumentPageRow(row);
+}
+
+/** A deleted layer's name, asked for. */
+export function layerDeleted(docId: string, name: string): EngineError {
+  return new EngineError(
+    EngineErrorCode.LayerDeleted,
+    `layer ${name} of document ${docId} was deleted; its name is not used again`,
+    { details: { docId, layerName: name } },
+  );
 }
 
 function mapLayerRow(row: {

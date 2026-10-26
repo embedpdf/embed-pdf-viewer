@@ -850,6 +850,20 @@ export class DocumentService {
     return { baseSha: head.baseSha, lastObjectNumber: opened };
   }
 
+  /**
+   * A deleted layer: wait for what is in flight on it, close its worker
+   * session on this replica and forget what was kept for it. Its row
+   * already refuses every later request; another replica's session closes
+   * when it goes idle.
+   */
+  async forgetLayer(docId: string, layerName: string): Promise<void> {
+    const key = layerSessionKey(docId, layerName);
+    await this.awaitLayerWriteSettled(key);
+    await this.layerOpens.get(key)?.catch(() => undefined);
+    this.layerTouches.delete(key);
+    await this.closeLayerOnPool(docId, layerName);
+  }
+
   /** Mark a layer session stale: the next fresh-ensure reloads it. */
   invalidateLayerSession(docId: string, layerName: string): void {
     this.layerSessionVersions.delete(layerSessionKey(docId, layerName));

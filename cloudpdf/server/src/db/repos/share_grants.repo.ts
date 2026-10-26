@@ -166,6 +166,18 @@ export class ShareGrantsRepo {
     return rows.map(mapRow);
   }
 
+  /** The grants whose visitors land in the layer: deleting it would leave them a dead link. */
+  async listByLayer(tenantId: string, docId: string, layerName: string): Promise<ShareGrantRow[]> {
+    const rows = await this.db
+      .selectFrom('share_grants')
+      .selectAll()
+      .where('tenant_id', '=', tenantId)
+      .where('doc_id', '=', docId)
+      .where('layer_name', '=', layerName)
+      .execute();
+    return rows.map(mapRow);
+  }
+
   /** Bump the dashboard-convenience counters after a successful exchange. */
   async touchExchanged(id: string, now: number = Date.now()): Promise<void> {
     await this.db

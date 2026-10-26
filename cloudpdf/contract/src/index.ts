@@ -436,6 +436,11 @@ export const AdminTenantDocParamsSchema = z.object({
 });
 export type AdminTenantDocParams = z.infer<typeof AdminTenantDocParamsSchema>;
 
+export const AdminTenantDocLayerParamsSchema = AdminTenantDocParamsSchema.extend({
+  layerName: z.string().min(1).max(256),
+});
+export type AdminTenantDocLayerParams = z.infer<typeof AdminTenantDocLayerParamsSchema>;
+
 export const AdminTenantJtiParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
   jti: z.string().min(1).max(256),
@@ -1081,6 +1086,23 @@ export const adminOperations = {
       204: {},
       403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'documents.layers.delete': {
+    operationId: 'documents.layers.delete',
+    title: 'Delete layer',
+    summary:
+      "Delete a layer and everything it stored. A layer that was written can't be used again under its name; one nobody wrote stays usable.",
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/documents/:id/layers/:layerName',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.delete'],
+    params: AdminTenantDocLayerParamsSchema,
+    responses: {
+      204: {},
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
   'documents.thumbnail': {
@@ -2327,6 +2349,7 @@ export const docsGroups = {
   deployment: { title: 'Deployment' },
   tenants: { title: 'Tenants' },
   documents: { title: 'Tenant documents' },
+  'documents.layers': { title: 'Layers' },
   tokens: { title: 'Tokens' },
   shares: { title: 'Shares' },
   doc: { title: 'Document operations', slug: 'document-operations' },

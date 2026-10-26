@@ -159,6 +159,11 @@ export interface LayersTable {
    * before it can be undone. NULL until the first.
    */
   undo_horizon: number | null;
+  /**
+   * When the layer was deleted (migration 037): the row stays as a tombstone
+   * so its name is never used again. NULL for a live layer.
+   */
+  deleted_at: number | null;
   created_at: number;
   updated_at: number;
 }

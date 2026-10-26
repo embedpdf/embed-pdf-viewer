@@ -59,6 +59,7 @@ import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_helpers';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminLayersRoutes } from '../routes/admin/layers';
 import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
@@ -74,8 +75,8 @@ import { registerOutlineRoutes } from '../routes/outline';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
-import { registerSignatureRoutes } from '../routes/signatures';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
+import { registerSignatureRoutes } from '../routes/signatures';
 import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { EngineHostClient } from '../runtime/EngineHostClient';
 import type { EnginePool } from '../runtime/EnginePool';
@@ -92,6 +93,7 @@ import { resolvePoolSize } from '../runtime/WorkerThreadPool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CrashJournal, DocumentQuarantinedError } from '../services/CrashJournal';
+import { deleteStoredLayer } from '../services/deleteStoredLayer';
 import { DerivedRenderService } from '../services/DerivedRenderService';
 import {
   DocumentLifecycleService,
@@ -101,8 +103,8 @@ import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
 import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
-import { ObjectNumberService } from '../services/ObjectNumberService';
 import { LayerStateService } from '../services/LayerStateService';
+import { ObjectNumberService } from '../services/ObjectNumberService';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -1114,6 +1116,19 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       lifecycle,
       storage: opts.objectStore,
     });
+    const storedLayers = {
+      db: opts.db,
+      storage: opts.objectStore,
+      documents: new DocumentsRepo(opts.db),
+    };
+    await registerAdminLayersRoutes(app, {
+      // The layer service exists only where the engine runs; it is made below.
+      deleteLayer: (tenantId, input) =>
+        layerService
+          ? layerService.deleteLayer(tenantId, input)
+          : deleteStoredLayer(storedLayers, tenantId, input),
+      grants: new ShareGrantsRepo(opts.db),
+    });
     // The async-import claim loop: in-process (like the sweeper), one
     // per replica, safe under multi-replica via fenced leased claims.
     if (importPolicy.enabled) {
@@ -1153,6 +1168,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerAdminSharesRoutes(app, {
         grants: shareGrants,
         documents: new DocumentsRepo(opts.db),
+        layers: new LayersRepo(opts.db),
         securityEvents: new SecurityEventsRepo(opts.db),
       });
       await registerShareSessionRoutes(app, {
@@ -1675,6 +1691,7 @@ function mapToHttp(code: string): number {
     case EngineErrorCode.DocNotOpen:
       return 404;
     case EngineErrorCode.SigningExpired:
+    case EngineErrorCode.LayerDeleted:
       return 410;
     case EngineErrorCode.PayloadTooLarge:
       return 413;

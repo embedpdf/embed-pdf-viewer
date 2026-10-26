@@ -6,18 +6,22 @@ import {
   type AdminOperation,
 } from '@cloudpdf/contract';
 import { validateScopeArray } from '@embedpdf/engine-core/runtime';
+import { DEFAULT_LAYER_NAME } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeListCursor, encodeListCursor } from './_cursor';
 import { requireTenantAccess } from '../../app/jwt-plugin';
 import { hashSharePassword } from '../../auth/share-password';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
+import type { LayersRepo } from '../../db/repos/page_state.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
 import type { ShareGrantRow, ShareGrantsRepo } from '../../db/repos/share_grants.repo';
 
 export interface AdminSharesRoutesDeps {
   grants: ShareGrantsRepo;
   documents: DocumentsRepo;
+  /** A link can't name a deleted layer: its name is refused for good. */
+  layers: LayersRepo;
   securityEvents: SecurityEventsRepo;
 }
 
@@ -38,7 +42,7 @@ export async function registerAdminSharesRoutes(
   app: FastifyInstance,
   deps: AdminSharesRoutesDeps,
 ): Promise<void> {
-  const { grants, documents, securityEvents } = deps;
+  const { grants, documents, layers, securityEvents } = deps;
 
   const mount = (
     op: AdminOperation,
@@ -76,6 +80,8 @@ export async function registerAdminSharesRoutes(
         error: { code: 'Forbidden', message: 'document does not belong to this tenant' },
       });
     }
+    // Refuses a deleted layer's name (`LayerDeleted`).
+    await layers.findByDocAndName(doc.id, body.layerName ?? DEFAULT_LAYER_NAME);
     const grant = await grants.create({
       tenantId,
       docId: body.docId,

@@ -37,6 +37,10 @@ export const StorageKeys = {
   basePdf(tenantId: string, docId: string): string {
     return `${tenantId}/docs/${shard(docId)}/${docId}/base.pdf`;
   },
+  /** Everything a layer stores: its artifacts, renders and change captures. */
+  layerRoot(tenantId: string, docId: string, layerName: string): string {
+    return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(layerName)}/`;
+  },
   /**
    * Layer artifact. `version` is a 1-based monotonic integer stored
    * zero-padded for lexical sort and human readability. Padding is not

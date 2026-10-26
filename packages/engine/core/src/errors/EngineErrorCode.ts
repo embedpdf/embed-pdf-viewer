@@ -126,6 +126,12 @@ export const EngineErrorCode = {
    * payload. Nothing ran; a retry must send the same change.
    */
   IdempotencyKeyReused: 'IdempotencyKeyReused',
+  /**
+   * The layer was deleted: what it held is gone, and its name is refused
+   * from then on (its read URLs were cached as immutable). Work on another
+   * layer name.
+   */
+  LayerDeleted: 'LayerDeleted',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

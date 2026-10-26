@@ -523,6 +523,21 @@ export class ObjectNumbersRepo {
     return Number(result.numDeletedRows) === 1;
   }
 
+  /** Delete the layer's numbering: its blocks, sessions and counter (the layer was deleted). */
+  async deleteNumbering(executor: DbExecutor, layer: NumberedLayer): Promise<void> {
+    for (const table of [
+      'object_number_blocks',
+      'edit_sessions',
+      'object_number_counters',
+    ] as const) {
+      await executor
+        .deleteFrom(table)
+        .where('doc_id', '=', layer.docId)
+        .where('layer_name', '=', layer.layerName)
+        .execute();
+    }
+  }
+
   /** Delete every block of the layer (a publish numbers objects anew). */
   async deleteLayerBlocks(executor: DbExecutor, layer: NumberedLayer): Promise<void> {
     await executor

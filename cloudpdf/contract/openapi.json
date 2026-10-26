@@ -5609,6 +5609,99 @@
         }
       }
     },
+    "/v1/tenants/{tenantId}/documents/{id}/layers/{layerName}": {
+      "delete": {
+        "operationId": "documents.layers.delete",
+        "x-fern-sdk-group-name": ["documents", "layers"],
+        "x-fern-sdk-method-name": "delete",
+        "x-docs-title": "Delete layer",
+        "summary": "Delete a layer and everything it stored. A layer that was written can't be used again under its name; one nobody wrote stays usable.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.delete"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsLayersDelete403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsLayersDelete404Response"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsLayersDelete409Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/tenants/{tenantId}/documents/{id}/thumbnail": {
       "get": {
         "operationId": "documents.thumbnail",
@@ -6728,6 +6821,9 @@
     "documents": {
       "title": "Tenant documents"
     },
+    "documents.layers": {
+      "title": "Layers"
+    },
     "tokens": {
       "title": "Tokens"
     },
@@ -6851,7 +6947,8 @@
               "LayerFull",
               "ChangeConflict",
               "UndoUnavailable",
-              "IdempotencyKeyReused"
+              "IdempotencyKeyReused",
+              "LayerDeleted"
             ]
           },
           "message": {
@@ -23854,6 +23951,15 @@
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsDelete404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsLayersDelete403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsLayersDelete404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsLayersDelete409Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsThumbnailResponse": {
