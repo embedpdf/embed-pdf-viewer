@@ -7,6 +7,7 @@ import {
   type Engine,
   type OpenInput,
   type OpenOptions,
+  type TokenSource,
 } from '@embedpdf/engine-core/runtime';
 import {
   DEFAULT_LAYER_NAME,
@@ -17,7 +18,13 @@ import {
 
 import { CloudDocumentHandle } from './document/CloudDocumentHandle';
 import { CloudDocumentSecurityService } from './document/CloudDocumentSecurityService';
-import { engineErrorFromShareExchange, ShareExchangeError, shareSessionSource } from './share';
+import {
+  browserVisitorStore,
+  engineErrorFromShareExchange,
+  ShareExchangeError,
+  ShareSessionSource,
+  type VisitorStore,
+} from './share';
 import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 
@@ -25,7 +32,15 @@ import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
  * `cloudEngine()`'s options: the HTTP client's, minus the session id, which
  * the engine mints for each document it opens.
  */
-export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {}
+export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {
+  /**
+   * Where a share link's visitor waits for the next visit, when the link
+   * keeps visitors' layers. Default: the browser's `localStorage`; outside
+   * a browser none, since a server's engine opens links for many people.
+   * `null` keeps a visitor for one open only.
+   */
+  visitorStore?: VisitorStore | null;
+}
 
 /**
  * Cloud engine: speaks the same Engine interface as @embedpdf/engine
@@ -34,7 +49,11 @@ export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'>
  */
 export class CloudEngine implements Engine {
   static fromOptions(opts: CloudEngineOptions): CloudEngine {
-    return new CloudEngine(new HttpClient(opts));
+    const { visitorStore, ...http } = opts;
+    return new CloudEngine(
+      new HttpClient(http),
+      visitorStore === undefined ? browserVisitorStore() : visitorStore,
+    );
   }
 
   /** It opens the documents your server holds, never a file's bytes. */
@@ -43,7 +62,10 @@ export class CloudEngine implements Engine {
   /** The documents this engine opened and nobody closed yet. */
   private readonly handles = new Set<CloudDocumentHandle>();
 
-  private constructor(private readonly http: HttpClient) {}
+  private constructor(
+    private readonly http: HttpClient,
+    private readonly visitorStore: VisitorStore | null,
+  ) {}
 
   open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle> {
     if (this.destroyed) {
@@ -64,73 +86,31 @@ export class CloudEngine implements Engine {
 
     if (input.kind === 'share') {
       // Open by public share token: exchange `shr_…` for a short-lived
-      // doc-scoped session JWT, then delegate to the 'token' arm — the
+      // doc-scoped session JWT, then open as the 'token' arm does — the
       // handle binds to a self-renewing source, so revoking or editing
       // the share retargets this open at the next renewal. The exchange
       // rides the engine's own transport config (baseUrl + fetch);
       // exchange failures surface as EngineErrors on open and on every
       // later renewal (RPCs, SSE reconnects), never as raw
       // ShareExchangeErrors.
-      const raw = shareSessionSource(this.http.baseUrl, input.shareToken, {
+      const share = new ShareSessionSource(this.http.baseUrl, input.shareToken, {
         ...(input.sharePassword !== undefined ? { password: input.sharePassword } : {}),
+        ...(input.restart ? { restart: true } : {}),
+        visitorStore: this.visitorStore,
         fetch: this.http.fetchImpl,
       });
       const token = async () => {
         try {
-          return await raw();
+          return await share.token();
         } catch (error) {
           throw error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
         }
       };
-      return this.open({ kind: 'token', token }, options);
+      return this.openWithToken(token, effectivePassword, share);
     }
 
     if (input.kind === 'token') {
-      // Open by doc-scoped JWT. We never verify the token SDK-side
-      // (server is the verifier of record); we just decode the
-      // unsigned payload to learn `doc_id`, then route to /head with
-      // the per-open bearer. The resulting handle owns its own
-      // scoped HttpClient — every subsequent RPC carries this
-      // token, not the engine-level one, so one engine can hold
-      // many handles each with a different bearer.
-      const tokenSource = input.token;
-      return AbortablePromise.run<DocumentHandle>(async (signal) => {
-        const docHttp = this.http.forDocument({ sessionId: newSessionId(), token: tokenSource });
-        const token = await docHttp.currentToken();
-        const claims = decodeUnverifiedClaims(token);
-        const docId = claims.doc_id;
-        if (typeof docId !== 'string' || docId.length === 0) {
-          throw new EngineError(
-            EngineErrorCode.InvalidArg,
-            'cloud engine: token has no doc_id claim — mint a doc-scoped JWT',
-          );
-        }
-        const layerName =
-          typeof claims.layer_name === 'string' && claims.layer_name.length > 0
-            ? claims.layer_name
-            : DEFAULT_LAYER_NAME;
-        const head = await docHttp.getJson(
-          wirePaths.layerHead(docId, layerName),
-          (raw) => DocumentHeadSchema.parse(raw),
-          signal,
-        );
-        const handle = new CloudDocumentHandle(
-          docHttp,
-          head.id,
-          layerName,
-          head,
-          token,
-          () => this.handles.delete(handle),
-        );
-        this.handles.add(handle);
-        try {
-          await establishOnOpen(handle, head, signal, effectivePassword, false);
-        } catch (error) {
-          await handle.close();
-          throw error;
-        }
-        return handle;
-      });
+      return this.openWithToken(input.token, effectivePassword, null);
     }
 
     if (input.kind === 'id') {
@@ -196,6 +176,66 @@ export class CloudEngine implements Engine {
         `cloud engine supports OpenInput.kind === 'token', 'id', or 'share' (got '${(input as { kind?: string }).kind}')`,
       ),
     );
+  }
+
+  /**
+   * Open by doc-scoped JWT. We never verify the token SDK-side (server is
+   * the verifier of record); we just decode the unsigned payload to learn
+   * `doc_id`, then route to /head with the per-open bearer. The resulting
+   * handle owns its own scoped HttpClient — every subsequent RPC carries
+   * this token, not the engine-level one, so one engine can hold many
+   * handles each with a different bearer. A share session also renews on a
+   * timer while the document is open, and tells the handle how it reaches
+   * its layer.
+   */
+  private openWithToken(
+    tokenSource: TokenSource,
+    password: string | null,
+    share: ShareSessionSource | null,
+  ): AbortablePromise<DocumentHandle> {
+    return AbortablePromise.run<DocumentHandle>(async (signal) => {
+      const docHttp = this.http.forDocument({ sessionId: newSessionId(), token: tokenSource });
+      const token = await docHttp.currentToken();
+      const claims = decodeUnverifiedClaims(token);
+      const docId = claims.doc_id;
+      if (typeof docId !== 'string' || docId.length === 0) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'cloud engine: token has no doc_id claim — mint a doc-scoped JWT',
+        );
+      }
+      const layerName =
+        typeof claims.layer_name === 'string' && claims.layer_name.length > 0
+          ? claims.layer_name
+          : DEFAULT_LAYER_NAME;
+      const head = await docHttp.getJson(
+        wirePaths.layerHead(docId, layerName),
+        (raw) => DocumentHeadSchema.parse(raw),
+        signal,
+      );
+      let stopRenewing = () => {};
+      const handle = new CloudDocumentHandle(
+        docHttp,
+        head.id,
+        layerName,
+        head,
+        token,
+        () => {
+          this.handles.delete(handle);
+          stopRenewing();
+        },
+        share ? () => share.info() ?? undefined : null,
+      );
+      this.handles.add(handle);
+      try {
+        await establishOnOpen(handle, head, signal, password, false);
+      } catch (error) {
+        await handle.close();
+        throw error;
+      }
+      if (share) stopRenewing = share.keepAlive();
+      return handle;
+    });
   }
 
   /**

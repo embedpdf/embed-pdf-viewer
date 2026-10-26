@@ -124,6 +124,13 @@ export interface OpenInputShare {
    * password, which goes in `OpenOptions.password` like every other kind.
    */
   sharePassword?: string;
+  /**
+   * Start over: on a link that gives each visitor their own layer and keeps
+   * it for their next visit, delete the layer this browser kept and open a
+   * fresh one as a new visitor (the document's `share.keep` says when that
+   * applies). Elsewhere it changes nothing.
+   */
+  restart?: boolean;
 }
 
 export type OpenInputLayerFileSource =

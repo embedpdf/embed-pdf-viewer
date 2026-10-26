@@ -20,6 +20,14 @@ import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { CallFacts, WorkingSetPage } from '../scheduling/facts';
 
+/** How a document opened from a share link reaches its layer. */
+export interface DocumentShareInfo {
+  /** `'shared'`: everyone with the link works in one layer. `'per-visitor'`: this visitor's own. */
+  readonly layerMode: 'shared' | 'per-visitor';
+  /** This browser keeps the visitor, and their layer, for the next visit. */
+  readonly keep: boolean;
+}
+
 /**
  * A document an engine opened: the same on every engine. What only the local
  * engine can do lives on `LocalDocumentHandle` (see `isLocalDocument`).
@@ -83,6 +91,13 @@ export interface DocumentHandle {
    * for life. Creates without a number still work; the engine picks one.
    */
   readonly objectNumbers: ObjectNumberPool;
+  /**
+   * How a document opened from a share link (`open({ kind: 'share' })`)
+   * reaches its layer; absent otherwise. A UI shows "Your copy" for a
+   * per-visitor layer, and "Start over" when the browser keeps it
+   * (`open({ kind: 'share', shareToken, restart: true })`).
+   */
+  readonly share?: DocumentShareInfo;
   /**
    * A handle for the page `ref` names: an address with the page's verbs,
    * made without asking the engine anything (so synchronous). The page is

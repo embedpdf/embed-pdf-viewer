@@ -19,6 +19,7 @@ import {
   type DocumentFormsService,
   type DocumentPagesService,
   type DocumentHandle,
+  type DocumentShareInfo,
   type DocumentOutlineService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
@@ -157,6 +158,8 @@ export class CloudDocumentHandle implements DocumentHandle {
     initialToken: string | null = null,
     /** Called once, when the handle closes (the engine forgets it). */
     private readonly onClose: () => void = () => {},
+    /** A share session's: how it reaches its layer (`share`). */
+    private readonly shareInfo: (() => DocumentShareInfo | undefined) | null = null,
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
@@ -382,6 +385,10 @@ export class CloudDocumentHandle implements DocumentHandle {
   }
 
   /** Ignored: the server learns what's needed from what is asked of it. */
+  get share(): DocumentShareInfo | undefined {
+    return this.shareInfo?.() ?? undefined;
+  }
+
   setWorkingSet(_view: string, _pages: readonly WorkingSetPage[]): void {}
 
   download(options: DownloadOptions = {}): AbortablePromise<Uint8Array> {

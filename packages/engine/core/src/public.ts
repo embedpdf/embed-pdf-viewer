@@ -86,6 +86,7 @@ export type {
   Engine,
   EngineFactory,
   DocumentHandle,
+  DocumentShareInfo,
   PageHandle,
   LocalEngine,
   LocalDocumentHandle,
