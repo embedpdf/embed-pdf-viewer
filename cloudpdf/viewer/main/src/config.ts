@@ -8,7 +8,7 @@
  * by its id or by a share link. The token says who the user is and what they may do, so there is
  * no `scope` or `identity`.
  */
-import type { CloudEngineOptions, OpenInput, TokenSource } from '@cloudpdf/engine';
+import type { CloudEngineOptions, OpenInput, TokenSource, VisitorAnswers } from '@cloudpdf/engine';
 import type {
   DocumentEntry as ViewerDocumentEntry,
   ElementSrc,
@@ -22,14 +22,20 @@ import type {
  * A CloudPDF document, in the three ways the engine opens one: with a document token your
  * backend creates for the user, which names the document; by its id, which the engine's
  * `token` (or this one) must allow; or with a share link from the dashboard (`shr_…`), with
- * its passphrase when it has one, and `restart` to start over on a link that keeps each
- * visitor's layer. A token is a string, or a function that gives a fresh one when the old one
- * runs out.
+ * its passphrase when it has one, `restart` to start over on a link that keeps each visitor's
+ * layer, and `visitor`: the visitor's answers to what the link asks, when your page already
+ * has them (the same as the visitor typing them). A token is a string, or a function that
+ * gives a fresh one when the old one runs out.
  */
 export type DocumentSrc =
   | { readonly token: TokenSource }
   | { readonly id: string; readonly token?: TokenSource }
-  | { readonly shareToken: string; readonly sharePassword?: string; readonly restart?: boolean };
+  | {
+      readonly shareToken: string;
+      readonly sharePassword?: string;
+      readonly restart?: boolean;
+      readonly visitor?: VisitorAnswers;
+    };
 
 /** One of the documents `documents` opens, each in a tab of its own. */
 export type DocumentEntry = ViewerDocumentEntry<DocumentSrc>;
@@ -54,16 +60,18 @@ export interface InitOptions extends ViewerConfig, MountTarget {}
 export function openInputOf(src: ElementSrc): ElementSrc {
   if (typeof src !== 'object' || src === null || 'kind' in src) return src;
   if ('shareToken' in src && typeof src.shareToken === 'string') {
-    const { shareToken, sharePassword, restart } = src as {
+    const { shareToken, sharePassword, restart, visitor } = src as {
       shareToken: string;
       sharePassword?: string;
       restart?: boolean;
+      visitor?: VisitorAnswers;
     };
     return {
       kind: 'share',
       shareToken,
       ...(sharePassword !== undefined ? { sharePassword } : {}),
       ...(restart ? { restart } : {}),
+      ...(visitor !== undefined ? { visitor } : {}),
     } satisfies OpenInput;
   }
   if ('id' in src && typeof src.id === 'string') {

@@ -4,6 +4,7 @@ import { DEFAULT_LAYER_NAME } from '@embedpdf/engine-core/wire';
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
 
+import type { VisitorIdentityConfig } from '../../auth/visitor-identity';
 import type { Database as Schema } from '../schema';
 
 export interface ShareGrantRow {
@@ -16,8 +17,10 @@ export interface ShareGrantRow {
   layerName: string | null;
   /** A visitor's browser keeps its layer for the next visit (per-visitor links). */
   keepVisitorLayers: boolean;
-  /** Delete a visitor's layer after this long unvisited; null keeps it until deleted on purpose. */
-  visitorLayerIdleSeconds: number | null;
+  /** Delete a visitor and their layer after this long unseen; null keeps them until deleted on purpose. */
+  visitorIdleSeconds: number | null;
+  /** What the link asks its visitors; null asks nothing. */
+  visitorIdentity: VisitorIdentityConfig | null;
   scope: ReadonlyArray<string>;
   /** Origin allowlist; null = any origin. */
   origins: ReadonlyArray<string> | null;
@@ -45,8 +48,9 @@ export interface ShareGrantCreateInput {
   layerName?: string;
   layerMode?: ShareLayerMode;
   keepVisitorLayers?: boolean;
-  /** Omitted or null: visitors' layers stay until deleted on purpose. */
-  visitorLayerIdleSeconds?: number | null;
+  /** Omitted or null: visitors stay until deleted on purpose. */
+  visitorIdleSeconds?: number | null;
+  visitorIdentity?: VisitorIdentityConfig | null;
   scope: ReadonlyArray<string>;
   origins?: ReadonlyArray<string>;
   passwordHash?: string;
@@ -59,8 +63,10 @@ export interface ShareGrantUpdateInput {
   /** The mode and its layer move together: a shared link names its layer, a per-visitor link none. */
   layer?: { mode: 'shared'; name: string } | { mode: 'per-visitor' };
   keepVisitorLayers?: boolean;
-  /** null stops deleting visitors' layers that go unvisited. */
-  visitorLayerIdleSeconds?: number | null;
+  /** null stops deleting visitors who go unseen. */
+  visitorIdleSeconds?: number | null;
+  /** null stops asking visitors who they are. */
+  visitorIdentity?: VisitorIdentityConfig | null;
   scope?: ReadonlyArray<string>;
   /** null clears the allowlist (any origin). */
   origins?: ReadonlyArray<string> | null;
@@ -119,7 +125,8 @@ export class ShareGrantsRepo {
             ? (input.layerName ?? DEFAULT_LAYER_NAME)
             : null,
         keep_visitor_layers: input.keepVisitorLayers === false ? 0 : 1,
-        visitor_layer_idle_seconds: input.visitorLayerIdleSeconds ?? null,
+        visitor_idle_seconds: input.visitorIdleSeconds ?? null,
+        visitor_identity_json: input.visitorIdentity ? JSON.stringify(input.visitorIdentity) : null,
         scope_json: JSON.stringify(input.scope),
         origins_json: input.origins ? JSON.stringify(input.origins) : null,
         password_hash: input.passwordHash ?? null,
@@ -152,8 +159,12 @@ export class ShareGrantsRepo {
     if (input.keepVisitorLayers !== undefined) {
       patch['keep_visitor_layers'] = input.keepVisitorLayers ? 1 : 0;
     }
-    if (input.visitorLayerIdleSeconds !== undefined) {
-      patch['visitor_layer_idle_seconds'] = input.visitorLayerIdleSeconds;
+    if (input.visitorIdentity !== undefined) {
+      patch['visitor_identity_json'] =
+        input.visitorIdentity === null ? null : JSON.stringify(input.visitorIdentity);
+    }
+    if (input.visitorIdleSeconds !== undefined) {
+      patch['visitor_idle_seconds'] = input.visitorIdleSeconds;
     }
     if (input.scope !== undefined) patch['scope_json'] = JSON.stringify(input.scope);
     if (input.origins !== undefined) {
@@ -274,7 +285,8 @@ function mapRow(r: {
   layer_mode: ShareLayerMode;
   layer_name: string | null;
   keep_visitor_layers: number;
-  visitor_layer_idle_seconds: number | null;
+  visitor_idle_seconds: number | null;
+  visitor_identity_json: string | null;
   scope_json: string;
   origins_json: string | null;
   password_hash: string | null;
@@ -295,8 +307,10 @@ function mapRow(r: {
     layerMode: r.layer_mode,
     layerName: r.layer_name,
     keepVisitorLayers: Number(r.keep_visitor_layers) !== 0,
-    visitorLayerIdleSeconds:
-      r.visitor_layer_idle_seconds === null ? null : Number(r.visitor_layer_idle_seconds),
+    visitorIdleSeconds: r.visitor_idle_seconds === null ? null : Number(r.visitor_idle_seconds),
+    visitorIdentity: r.visitor_identity_json
+      ? (JSON.parse(r.visitor_identity_json) as VisitorIdentityConfig)
+      : null,
     scope: JSON.parse(r.scope_json) as string[],
     origins: r.origins_json ? (JSON.parse(r.origins_json) as string[]) : null,
     passwordHash: r.password_hash,

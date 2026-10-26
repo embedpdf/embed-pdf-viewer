@@ -16,9 +16,11 @@ import {
   visitorUserId,
   type VisitorHandles,
 } from '../auth/visitor-handle';
+import { settleVisitorIdentity } from '../auth/visitor-identity';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { LayersRepo } from '../db/repos/page_state.repo';
 import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import type { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
 
@@ -29,9 +31,11 @@ export interface ShareSessionRouteDeps {
   sign: (input: SignDevTokenInput) => string;
   grants: ShareGrantsRepo;
   documents: DocumentsRepo;
-  /** Visitors' layers: their idle clock, and whether they were deleted. */
+  /** Visitors' layers: whether one was deleted. */
   layers: LayersRepo;
-  visitors: VisitorHandles;
+  /** Who the visitors are: their answers and their idle clock. */
+  visitors: ShareVisitorsRepo;
+  handles: VisitorHandles;
   /** Start over: a visitor's layer goes (`LayerService.deleteLayer` where the engine runs). */
   deleteLayer: (tenantId: string, input: { docId: string; layerName: string }) => Promise<void>;
   suspendedTenants: SuspendedTenantsGuard;
@@ -82,7 +86,7 @@ export async function registerShareSessionRoutes(
   app: FastifyInstance,
   deps: ShareSessionRouteDeps,
 ): Promise<void> {
-  const { sign, grants, documents, layers, visitors, deleteLayer } = deps;
+  const { sign, grants, documents, layers, visitors, handles, deleteLayer } = deps;
   const { suspendedTenants, usageMeters, tenantUsage } = deps;
   const ipAttempts = new RequestRateLimiter(
     deps.ipAttemptLimit ?? { maxAttempts: 300, windowMs: 60_000 },
@@ -118,6 +122,7 @@ export async function registerShareSessionRoutes(
           .send({ error: { code: 'InvalidArg', message: 'invalid share exchange request' } });
       }
       const { shareToken, password, visitorHandle, restart } = parsed.data;
+      const answersGiven = parsed.data.visitorIdentity;
 
       // Browser-only endpoint: exchange exists to put a credential into
       // a page, and every cross-origin fetch carries Origin. A missing
@@ -182,7 +187,7 @@ export async function registerShareSessionRoutes(
       // it; anyone else is a new visitor. On a per-visitor link the visitor
       // keeps their layer, unless they start over or it was deleted.
       const now = Date.now();
-      const returning = visitorHandle ? visitors.read(grant.id, visitorHandle) : null;
+      const returning = visitorHandle ? handles.read(grant.id, visitorHandle) : null;
       // A visit goes on while its sessions renew: a handle issued within a
       // session lifetime and a little more is a renewal, not a new view. Its
       // time is signed, so a client can't pass an old visit off as this one.
@@ -190,18 +195,60 @@ export async function registerShareSessionRoutes(
         returning !== null &&
         now - returning.issuedAt <= (grant.sessionTtlSeconds + VISIT_GRACE_SECONDS) * 1000;
       let visitorId = returning?.visitorId ?? null;
-      if (visitorId && grant.layerMode === 'per-visitor') {
-        const own = visitorLayerName(visitorId);
-        if (restart) {
-          await deleteLayer(grant.tenantId, { docId: grant.docId, layerName: own });
-          visitorId = null;
-        } else if (!(await layers.seeVisitorLayer(grant.docId, own, now))) {
-          visitorId = null;
+      if (visitorId && restart) {
+        // Starting over makes a new visitor, who is asked again. On a
+        // per-visitor link the old visitor and their layer go.
+        if (grant.layerMode === 'per-visitor') {
+          await deleteLayer(grant.tenantId, {
+            docId: grant.docId,
+            layerName: visitorLayerName(visitorId),
+          });
+          await visitors.delete(grant.id, visitorId);
         }
+        visitorId = null;
+      } else if (
+        visitorId &&
+        grant.layerMode === 'per-visitor' &&
+        (await layers.isDeleted(grant.docId, visitorLayerName(visitorId)))
+      ) {
+        visitorId = null;
       }
       visitorId ??= newVisitorId();
       const layerName =
         grant.layerMode === 'per-visitor' ? visitorLayerName(visitorId) : grant.layerName!;
+
+      // Who they are: answers once given stand; new ones fill what the link
+      // asks and they haven't answered. A link that asks on open waits for
+      // what it requires (the same roundtrip as a passphrase); one that asks
+      // before the first change lets them read, and refuses their writes
+      // until they answer. Answers it can't take are refused either way.
+      const stored = await visitors.find(grant.id, visitorId);
+      const settled = settleVisitorIdentity(
+        grant.visitorIdentity,
+        stored?.answers ?? {},
+        answersGiven,
+      );
+      const pending = settled.request;
+      if (pending && (grant.visitorIdentity?.ask === 'on-open' || pending.invalid.length > 0)) {
+        return reply.code(422).send({
+          error: {
+            code: 'VisitorIdentityRequired',
+            message: "answer the share link's questions to open it",
+            details: pending,
+          },
+        });
+      }
+      if (Object.keys(settled.added).length > 0) {
+        await visitors.record({
+          grantId: grant.id,
+          visitorId,
+          docId: grant.docId,
+          added: settled.added,
+          now,
+        });
+      } else if (stored) {
+        await visitors.see(grant.id, visitorId, now);
+      }
 
       const ttl = grant.sessionTtlSeconds;
       const token = sign({
@@ -217,7 +264,10 @@ export async function registerShareSessionRoutes(
         ...(grant.origins ? { origins: grant.origins } : {}),
         jti: randomUUID(),
         ttlSeconds: ttl,
-        extras: { identity: { userId: visitorUserId(visitorId) } },
+        extras: {
+          identity: { ...settled.answers, userId: visitorUserId(visitorId) },
+          ...(pending ? { identity_pending: pending } : {}),
+        },
       });
 
       await grants.touchExchanged(grant.id);
@@ -237,8 +287,9 @@ export async function registerShareSessionRoutes(
         layerName,
         layerMode: grant.layerMode,
         visitor: {
-          handle: visitors.issue(grant.id, visitorId, now),
+          handle: handles.issue(grant.id, visitorId, now),
           keep: grant.layerMode === 'per-visitor' && grant.keepVisitorLayers,
+          identityRequest: pending,
         },
         expiresAt: Math.floor(Date.now() / 1000) + ttl,
       });

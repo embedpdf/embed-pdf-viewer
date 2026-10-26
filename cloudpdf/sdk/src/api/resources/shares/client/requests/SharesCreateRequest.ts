@@ -14,7 +14,8 @@ export interface SharesCreateRequest {
     layerMode?: SharesCreateRequest.LayerMode;
     layerName?: string;
     keepVisitorLayers?: boolean;
-    visitorLayerIdleSeconds?: number | null;
+    visitorIdleSeconds?: number | null;
+    visitorIdentity?: SharesCreateRequest.VisitorIdentity | null;
     scope: string[];
     origins?: string[];
     password?: string;
@@ -28,4 +29,55 @@ export namespace SharesCreateRequest {
         PerVisitor: "per-visitor",
     } as const;
     export type LayerMode = (typeof LayerMode)[keyof typeof LayerMode];
+
+    export interface VisitorIdentity {
+        fields: VisitorIdentity.Fields;
+        ask: VisitorIdentity.Ask;
+        purpose?: string | undefined;
+        privacyUrl?: string | undefined;
+    }
+
+    export namespace VisitorIdentity {
+        export interface Fields {
+            displayName?: Fields.DisplayName | undefined;
+            email?: Fields.Email | undefined;
+            title?: Fields.Title | undefined;
+            organization?: Fields.Organization | undefined;
+            organizationalUnit?: Fields.OrganizationalUnit | undefined;
+        }
+
+        export namespace Fields {
+            export const DisplayName = {
+                Required: "required",
+                Optional: "optional",
+            } as const;
+            export type DisplayName = (typeof DisplayName)[keyof typeof DisplayName];
+            export const Email = {
+                Required: "required",
+                Optional: "optional",
+            } as const;
+            export type Email = (typeof Email)[keyof typeof Email];
+            export const Title = {
+                Required: "required",
+                Optional: "optional",
+            } as const;
+            export type Title = (typeof Title)[keyof typeof Title];
+            export const Organization = {
+                Required: "required",
+                Optional: "optional",
+            } as const;
+            export type Organization = (typeof Organization)[keyof typeof Organization];
+            export const OrganizationalUnit = {
+                Required: "required",
+                Optional: "optional",
+            } as const;
+            export type OrganizationalUnit = (typeof OrganizationalUnit)[keyof typeof OrganizationalUnit];
+        }
+
+        export const Ask = {
+            OnOpen: "on-open",
+            BeforeFirstChange: "before-first-change",
+        } as const;
+        export type Ask = (typeof Ask)[keyof typeof Ask];
+    }
 }

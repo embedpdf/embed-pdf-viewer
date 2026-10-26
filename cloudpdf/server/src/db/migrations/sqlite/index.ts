@@ -80,6 +80,8 @@ import down040 from './040_layers_list_index.down.sql';
 import sql040 from './040_layers_list_index.sql';
 import down041 from './041_share_grants_archived.down.sql';
 import sql041 from './041_share_grants_archived.sql';
+import down042 from './042_share_visitors.down.sql';
+import sql042 from './042_share_visitors.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -189,5 +191,11 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
     name: '041_share_grants_archived.sql',
     sql: sql041,
     down: down041,
+  },
+  {
+    version: '042',
+    name: '042_share_visitors.sql',
+    sql: sql042,
+    down: down042,
   },
 ];

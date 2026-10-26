@@ -147,6 +147,7 @@ import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_sign
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
 import type { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
+import { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import type { Database as Schema } from '../db/schema';
 import { isUniqueViolation } from '../db/uniqueViolation';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
@@ -393,7 +394,7 @@ export class LayerService {
       tenantId: ctx.tenantId,
       name: layerName,
       baseSha: doc.baseSha,
-      ...(visitor ? { visitor: { ...visitor, seenAt: Date.now() } } : {}),
+      ...(visitor ? { visitor } : {}),
       docVersion: doc.docVersion,
       ...(base
         ? {
@@ -406,6 +407,10 @@ export class LayerService {
           }
         : {}),
     });
+    // Their layer's first write makes a visitor of them, if answering didn't.
+    if (visitor && layer.currentVersion === 0) {
+      await new ShareVisitorsRepo(this.requireDb()).record({ ...visitor, docId, now: Date.now() });
+    }
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     return { layer, pages };
   }
@@ -4009,6 +4014,18 @@ export class LayerService {
     layerName: string,
     op: () => Promise<T>,
   ): Promise<T> {
+    // A share-link visitor answers the link's questions before their first
+    // change: decided from the token alone, before anything runs.
+    const pending = ctx.jwt?.claims.identity_pending;
+    if (pending) {
+      return Promise.reject(
+        new EngineError(
+          EngineErrorCode.VisitorIdentityRequired,
+          "answer the share link's questions before making changes",
+          { details: { ...pending } },
+        ),
+      );
+    }
     return this.queueOnLayer(layerWriteKey(ctx, docId, layerName), () =>
       this.runWithRebase(ctx, docId, layerName, op),
     );

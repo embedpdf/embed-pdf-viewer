@@ -19,5 +19,80 @@ export namespace SharesExchange200Response {
     export interface Visitor {
         handle: string;
         keep: boolean;
+        identityRequest: Visitor.IdentityRequest | null;
+    }
+
+    export namespace Visitor {
+        export interface IdentityRequest {
+            fields: IdentityRequest.Fields;
+            missing: IdentityRequest.Missing.Item[];
+            invalid: IdentityRequest.Invalid.Item[];
+            purpose?: string | undefined;
+            privacyUrl?: string | undefined;
+        }
+
+        export namespace IdentityRequest {
+            export interface Fields {
+                displayName?: Fields.DisplayName | undefined;
+                email?: Fields.Email | undefined;
+                title?: Fields.Title | undefined;
+                organization?: Fields.Organization | undefined;
+                organizationalUnit?: Fields.OrganizationalUnit | undefined;
+            }
+
+            export namespace Fields {
+                export const DisplayName = {
+                    Required: "required",
+                    Optional: "optional",
+                } as const;
+                export type DisplayName = (typeof DisplayName)[keyof typeof DisplayName];
+                export const Email = {
+                    Required: "required",
+                    Optional: "optional",
+                } as const;
+                export type Email = (typeof Email)[keyof typeof Email];
+                export const Title = {
+                    Required: "required",
+                    Optional: "optional",
+                } as const;
+                export type Title = (typeof Title)[keyof typeof Title];
+                export const Organization = {
+                    Required: "required",
+                    Optional: "optional",
+                } as const;
+                export type Organization = (typeof Organization)[keyof typeof Organization];
+                export const OrganizationalUnit = {
+                    Required: "required",
+                    Optional: "optional",
+                } as const;
+                export type OrganizationalUnit = (typeof OrganizationalUnit)[keyof typeof OrganizationalUnit];
+            }
+
+            export type Missing = Missing.Item[];
+
+            export namespace Missing {
+                export const Item = {
+                    DisplayName: "displayName",
+                    Email: "email",
+                    Title: "title",
+                    Organization: "organization",
+                    OrganizationalUnit: "organizationalUnit",
+                } as const;
+                export type Item = (typeof Item)[keyof typeof Item];
+            }
+
+            export type Invalid = Invalid.Item[];
+
+            export namespace Invalid {
+                export const Item = {
+                    DisplayName: "displayName",
+                    Email: "email",
+                    Title: "title",
+                    Organization: "organization",
+                    OrganizationalUnit: "organizationalUnit",
+                } as const;
+                export type Item = (typeof Item)[keyof typeof Item];
+            }
+        }
     }
 }

@@ -1,8 +1,15 @@
 import {
+  AbortablePromise,
+  AbortError,
   EngineError,
   EngineErrorCode,
-  type DocumentShareInfo,
+  type DocumentShare,
+  type VisitorAnswers,
+  type VisitorIdentityRequest,
+  visitorIdentityRequestOf,
 } from '@embedpdf/engine-core/runtime';
+
+import type { WriteGate } from './document/CloudWrites';
 
 /**
  * Share-session exchange: the client half of the no-backend embed flow.
@@ -21,6 +28,10 @@ import {
  * their layer). When the link keeps visitors' layers (`visitor.keep`),
  * the handle also waits in a {@link VisitorStore} for the next visit.
  *
+ * A link can ask its visitors who they are: on open (the exchange answers
+ * `VisitorIdentityRequired` until they answer), or before their first change
+ * (the session reads at once, and its writes wait for the answers).
+ *
  * The endpoint requires a browser `Origin` header (the server checks
  * it against the grant's allowlist). Browsers attach it automatically;
  * non-browser callers (tests, SSR) must supply a `fetch` that does.
@@ -32,12 +43,14 @@ export interface ShareSession {
   docId: string;
   /** The layer the session reads and writes: the link's shared one, or this visitor's own. */
   layerName: string;
-  layerMode: DocumentShareInfo['layerMode'];
+  layerMode: DocumentShare['layerMode'];
   visitor: {
     /** Send it back with the next exchange to stay the same visitor. */
     handle: string;
     /** Keep the handle for the next visit too: the link keeps visitors' layers. */
     keep: boolean;
+    /** What the link asks before this visitor's first change, unanswered; `null` when nothing. */
+    identityRequest: VisitorIdentityRequest | null;
   };
   /** Unix seconds when `token` expires. */
   expiresAt: number;
@@ -50,7 +63,10 @@ export interface ShareExchangeOptions {
   visitorHandle?: string;
   /** With `visitorHandle` on a per-visitor link: delete that visitor's layer and start a new one. */
   restart?: boolean;
+  /** The visitor's answers to what the link asks; an answer once given stays. */
+  visitorIdentity?: VisitorAnswers;
   fetch?: typeof globalThis.fetch;
+  signal?: AbortSignal;
 }
 
 /**
@@ -96,8 +112,9 @@ export function browserVisitorStore(): VisitorStore | null {
 /**
  * Thrown on a non-OK exchange. `code` is the server's wire code:
  * `SharePasswordRequired` (prompt and retry with a password),
- * `OriginNotAllowed` / `OriginRequired`, `ShareExpired`, `NotFound`
- * (unknown or revoked — indistinguishable by design), or
+ * `VisitorIdentityRequired` (ask the link's questions, `details`, and retry
+ * with the answers), `OriginNotAllowed` / `OriginRequired`, `ShareExpired`,
+ * `NotFound` (unknown or revoked — indistinguishable by design), or
  * `TooManyRequests`.
  */
 export class ShareExchangeError extends Error {
@@ -105,6 +122,7 @@ export class ShareExchangeError extends Error {
     readonly code: string,
     message: string,
     readonly status: number,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ShareExchangeError';
@@ -125,19 +143,25 @@ export async function exchangeShareToken(
       ...(opts.password !== undefined ? { password: opts.password } : {}),
       ...(opts.visitorHandle !== undefined ? { visitorHandle: opts.visitorHandle } : {}),
       ...(opts.restart ? { restart: true } : {}),
+      ...(opts.visitorIdentity ? { visitorIdentity: opts.visitorIdentity } : {}),
     }),
+    ...(opts.signal ? { signal: opts.signal } : {}),
   });
   if (!res.ok) {
     let code = 'Unknown';
     let message = `share exchange failed with status ${res.status}`;
+    let details: Record<string, unknown> | undefined;
     try {
-      const payload = (await res.json()) as { error?: { code?: string; message?: string } };
+      const payload = (await res.json()) as {
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+      };
       if (payload.error?.code) code = payload.error.code;
       if (payload.error?.message) message = payload.error.message;
+      details = payload.error?.details;
     } catch {
       // Non-JSON error body; keep the status-shaped message.
     }
-    throw new ShareExchangeError(code, message, res.status);
+    throw new ShareExchangeError(code, message, res.status, details);
   }
   return (await res.json()) as ShareSession;
 }
@@ -148,30 +172,38 @@ export async function exchangeShareToken(
  * `EngineError` family as all other engine calls. The wire code and HTTP
  * status survive in `details`; the original error rides as `cause`.
  *
- * `SharePasswordRequired` gets its own engine code — it is the one outcome
- * callers branch on programmatically (prompt for the grant passphrase and
- * retry). Everything else maps by meaning, with the HTTP status as the
- * fallback discriminator.
+ * `SharePasswordRequired` and `VisitorIdentityRequired` keep their own
+ * engine codes — the outcomes callers branch on programmatically (prompt for
+ * the passphrase or the link's questions, and retry); the latter's `details`
+ * are the questions. Everything else maps by meaning, with the HTTP status as
+ * the fallback discriminator.
  */
 export function engineErrorFromShareExchange(error: ShareExchangeError): EngineError {
   const code =
     error.code === 'SharePasswordRequired'
       ? EngineErrorCode.SharePasswordRequired
-      : error.code === 'NotFound'
-        ? EngineErrorCode.NotFound
-        : error.code === 'ShareExpired' ||
-            error.code === 'OriginNotAllowed' ||
-            error.code === 'OriginRequired'
-          ? EngineErrorCode.Forbidden
-          : error.status === 401
-            ? EngineErrorCode.Unauthenticated
-            : error.status === 400
-              ? EngineErrorCode.InvalidArg
-              : EngineErrorCode.Unknown;
+      : error.code === 'VisitorIdentityRequired'
+        ? EngineErrorCode.VisitorIdentityRequired
+        : error.code === 'NotFound'
+          ? EngineErrorCode.NotFound
+          : error.code === 'ShareExpired' ||
+              error.code === 'OriginNotAllowed' ||
+              error.code === 'OriginRequired'
+            ? EngineErrorCode.Forbidden
+            : error.status === 401
+              ? EngineErrorCode.Unauthenticated
+              : error.status === 400
+                ? EngineErrorCode.InvalidArg
+                : EngineErrorCode.Unknown;
   return new EngineError(code, `share exchange failed: ${error.message}`, {
-    details: { shareCode: error.code, status: error.status },
+    details: { ...error.details, shareCode: error.code, status: error.status },
     cause: error,
   });
+}
+
+/** The exchange's failure as an engine error; any other error as it is. */
+function asEngineError(error: unknown): unknown {
+  return error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
 }
 
 /** Renew this many seconds before `expiresAt` so in-flight requests never race expiry. */
@@ -184,6 +216,8 @@ export interface ShareSessionOptions {
   password?: string;
   /** Start over: the first exchange deletes the kept visitor's layer (see `OpenInputShare.restart`). */
   restart?: boolean;
+  /** The visitor's answers, sent with the first exchange (see `OpenInputShare.visitor`). */
+  visitor?: VisitorAnswers;
   /** Where a kept visitor waits for the next visit; none keeps the visitor for this session only. */
   visitorStore?: VisitorStore | null;
   fetch?: typeof globalThis.fetch;
@@ -196,6 +230,11 @@ export interface ShareSessionOptions {
  * on another layer (the visitor's layer was deleted, or the link changed
  * whose layer it gives) can't serve this open, which was made on the first:
  * from then on it refuses, and opening again picks the new layer up.
+ *
+ * When the link asks before the first change and the visitor hasn't
+ * answered, the document's writes wait at {@link writeGate} while someone
+ * listens (`share.onIdentityRequest`), until `share.identify` exchanges again
+ * with the answers or `share.decline` lets them fail.
  */
 export class ShareSessionSource {
   private session: ShareSession | null = null;
@@ -203,7 +242,18 @@ export class ShareSessionSource {
   /** The visitor to send: `undefined` until the store was read. */
   private handle: string | null | undefined;
   private restart: boolean;
+  /** Answers given at open, sent until an exchange takes them. */
+  private answers: VisitorAnswers | undefined;
   private lost: EngineError | null = null;
+  /** What the link asks before the first change, unanswered: the gate is closed while set. */
+  private request: VisitorIdentityRequest | null = null;
+  private readonly listeners = new Set<(request: VisitorIdentityRequest) => void>();
+  /** The writes waiting for the visitor's answers; `null` when none wait. */
+  private waiting: {
+    readonly answered: Promise<void>;
+    readonly resolve: () => void;
+    readonly reject: (error: unknown) => void;
+  } | null = null;
 
   constructor(
     private readonly baseUrl: string,
@@ -211,6 +261,7 @@ export class ShareSessionSource {
     private readonly opts: ShareSessionOptions = {},
   ) {
     this.restart = opts.restart === true;
+    this.answers = opts.visitor;
   }
 
   /** A session token that isn't about to expire, exchanging when it is. */
@@ -226,11 +277,19 @@ export class ShareSessionSource {
     return (await this.inflight).token;
   }
 
-  /** How the session reaches its layer, as of the last exchange; `null` before the first. */
-  info(): DocumentShareInfo | null {
-    const session = this.session;
-    return session ? { layerMode: session.layerMode, keep: session.visitor.keep } : null;
-  }
+  /** The document's view of the session (`DocumentHandle.share`), once it has opened. */
+  readonly share: DocumentShare = new SessionShare(this);
+
+  /** The gate the document's writes pass: the visitor's answers, when the link asks for them. */
+  readonly writeGate: WriteGate = {
+    passed: (signal) => this.untilAnswered(signal),
+    refused: (error) => {
+      const request = visitorIdentityRequestOf(error);
+      if (!request) return false;
+      this.request = request;
+      return true;
+    },
+  };
 
   /**
    * Renew shortly before each expiry until stopped, so an open document
@@ -258,6 +317,27 @@ export class ShareSessionSource {
     };
   }
 
+  /** The session as of the last exchange. */
+  opened(): ShareSession {
+    if (!this.session) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'the share session has not opened yet');
+    }
+    return this.session;
+  }
+
+  /** What the link asks before the first change, unanswered; `null` when nothing. */
+  get identityRequest(): VisitorIdentityRequest | null {
+    return this.request;
+  }
+
+  /** Called when a write waits for the visitor's answers. Returns the unsubscriber. */
+  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
   /** A second into the renewal margin: when `token()` exchanges again. */
   private untilRenewalMs(): number {
     const session = this.session;
@@ -266,18 +346,71 @@ export class ShareSessionSource {
     return Math.max(1_000, renewAt - Date.now());
   }
 
-  private async exchange(): Promise<ShareSession> {
+  /**
+   * Exchange again with the visitor's answers. Writes waiting for them go
+   * out once nothing is asked any more; answers the link can't take, or a
+   * required one still missing, reject, and the writes keep waiting.
+   */
+  async identify(answers: VisitorAnswers, signal?: AbortSignal): Promise<void> {
+    await this.inflight?.catch(() => undefined);
+    const exchanged = this.exchange(answers, signal).finally(() => {
+      this.inflight = null;
+    });
+    this.inflight = exchanged;
+    try {
+      await exchanged;
+    } catch (error) {
+      throw asEngineError(error);
+    }
+    // Answers it took, but something required is still missing: the writes keep waiting.
+    if (this.request !== null) throw identityRequired(this.request);
+    this.waiting?.resolve();
+    this.waiting = null;
+  }
+
+  /** Not now: the writes waiting fail with `VisitorIdentityRequired`. */
+  decline(): void {
+    const request = this.request;
+    if (request) this.waiting?.reject(identityRequired(request));
+    this.waiting = null;
+  }
+
+  /** Resolves once a write may go out: at once, unless the visitor's answers are asked for. */
+  private async untilAnswered(signal: AbortSignal): Promise<void> {
+    const request = this.request;
+    if (!request) return;
+    // Nobody to ask: the write fails instead of waiting for nothing.
+    if (this.listeners.size === 0) throw identityRequired(request);
+    if (!this.waiting) {
+      let resolve!: () => void;
+      let reject!: (error: unknown) => void;
+      const answered = new Promise<void>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      answered.catch(() => undefined);
+      this.waiting = { answered, resolve, reject };
+      for (const listener of [...this.listeners]) listener(request);
+    }
+    await untilAbort(this.waiting.answered, signal);
+  }
+
+  private async exchange(answers?: VisitorAnswers, signal?: AbortSignal): Promise<ShareSession> {
     const store = this.opts.visitorStore ?? null;
     if (this.handle === undefined) {
       this.handle = store ? await store.get(this.shareToken) : null;
     }
+    const visitorIdentity = answers ?? this.answers;
     const next = await exchangeShareToken(this.baseUrl, this.shareToken, {
       ...(this.opts.password !== undefined ? { password: this.opts.password } : {}),
       ...(this.handle ? { visitorHandle: this.handle } : {}),
       ...(this.restart ? { restart: true } : {}),
+      ...(visitorIdentity ? { visitorIdentity } : {}),
       ...(this.opts.fetch ? { fetch: this.opts.fetch } : {}),
+      ...(signal ? { signal } : {}),
     });
     this.restart = false;
+    this.answers = undefined;
     const opened = this.session;
     if (opened && next.layerName !== opened.layerName) {
       // The store isn't touched: when another tab started over, its new
@@ -295,8 +428,65 @@ export class ShareSessionSource {
       else await store.delete(this.shareToken);
     }
     this.session = next;
+    this.request = next.visitor.identityRequest;
     return next;
   }
+}
+
+/** `DocumentHandle.share` for a share session: what the document's user may do with it. */
+class SessionShare implements DocumentShare {
+  constructor(private readonly source: ShareSessionSource) {}
+
+  get layerMode(): DocumentShare['layerMode'] {
+    return this.source.opened().layerMode;
+  }
+
+  get keep(): boolean {
+    return this.source.opened().visitor.keep;
+  }
+
+  get identityRequest(): VisitorIdentityRequest | null {
+    return this.source.identityRequest;
+  }
+
+  identify(answers: VisitorAnswers): AbortablePromise<void> {
+    return AbortablePromise.run((signal) => this.source.identify(answers, signal));
+  }
+
+  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void {
+    return this.source.onIdentityRequest(listener);
+  }
+
+  decline(): void {
+    this.source.decline();
+  }
+}
+
+function identityRequired(request: VisitorIdentityRequest): EngineError {
+  return new EngineError(
+    EngineErrorCode.VisitorIdentityRequired,
+    "answer the share link's questions before making changes",
+    { details: { ...request } },
+  );
+}
+
+/** `promise`, or an `AbortError` once `signal` aborts. */
+function untilAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new AbortError(signal.reason ?? 'aborted'));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(new AbortError(signal.reason ?? 'aborted'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /**

@@ -19,7 +19,7 @@ import {
   type DocumentFormsService,
   type DocumentPagesService,
   type DocumentHandle,
-  type DocumentShareInfo,
+  type DocumentShare,
   type DocumentOutlineService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
@@ -64,6 +64,7 @@ import { CloudPageHandle } from './CloudPageHandle';
 import { CloudWrites } from './CloudWrites';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
+import type { ShareSessionSource } from '../share';
 import { awaitSignal } from '../shared/awaitSignal';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -158,8 +159,8 @@ export class CloudDocumentHandle implements DocumentHandle {
     initialToken: string | null = null,
     /** Called once, when the handle closes (the engine forgets it). */
     private readonly onClose: () => void = () => {},
-    /** A share session's: how it reaches its layer (`share`). */
-    private readonly shareInfo: (() => DocumentShareInfo | undefined) | null = null,
+    /** A share session's: the document's `share`, and the gate its writes pass. */
+    private readonly shareSession: Pick<ShareSessionSource, 'share' | 'writeGate'> | null = null,
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
@@ -177,7 +178,11 @@ export class CloudDocumentHandle implements DocumentHandle {
     });
     this.pool = pool;
     this.objectNumbers = pool;
-    this.writes = new CloudWrites(pool, changeSender(http, id, layerName));
+    this.writes = new CloudWrites(
+      pool,
+      changeSender(http, id, layerName),
+      shareSession?.writeGate ?? null,
+    );
     const security = new CloudDocumentSecurityService(
       http,
       id,
@@ -384,11 +389,11 @@ export class CloudDocumentHandle implements DocumentHandle {
     return this.changes.apply(change, options);
   }
 
-  /** Ignored: the server learns what's needed from what is asked of it. */
-  get share(): DocumentShareInfo | undefined {
-    return this.shareInfo?.() ?? undefined;
+  get share(): DocumentShare | undefined {
+    return this.shareSession?.share;
   }
 
+  /** Ignored: the server learns what's needed from what is asked of it. */
   setWorkingSet(_view: string, _pages: readonly WorkingSetPage[]): void {}
 
   download(options: DownloadOptions = {}): AbortablePromise<Uint8Array> {

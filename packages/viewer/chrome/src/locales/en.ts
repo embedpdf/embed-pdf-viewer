@@ -206,6 +206,35 @@ export const en: Locale = {
       open: 'Open',
       opening: 'Opening…',
     },
+    // A share link's passphrase, and what it asks its visitors before they open or change the document.
+    sharePrompt: {
+      passphraseTitle: 'Passphrase required',
+      passphraseRequired:
+        'This link is protected. Enter the passphrase you were given to open the document.',
+      passphraseIncorrect: 'That passphrase didn’t work. Please try again.',
+      passphraseLabel: 'Passphrase',
+      openTitle: 'Before you open this document',
+      changeTitle: 'Before you make changes',
+      asks: 'The owner of this document asks who you are.',
+      shownOnChanges: 'Your name is shown on what you add.',
+      final: 'You can’t change your answers later.',
+      privacy: 'Privacy notice',
+      optional: 'optional',
+      invalid: 'Check this answer.',
+      invalidEmail: 'Enter a valid email address.',
+      fields: {
+        displayName: 'Name',
+        email: 'Email',
+        title: 'Job title',
+        organization: 'Organization',
+        organizationalUnit: 'Department',
+      },
+      open: 'Open',
+      cancel: 'Cancel',
+      continue: 'Continue',
+      saving: 'Saving…',
+      notNow: 'Not now',
+    },
     // The drop target over the pages while a PDF is dragged over them.
     dropToOpen: { label: 'Drop a PDF to open it' },
     // A document that couldn't be opened: why, by its error, in its tab and on its pane.

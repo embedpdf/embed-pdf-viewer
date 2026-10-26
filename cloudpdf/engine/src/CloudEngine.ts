@@ -96,6 +96,7 @@ export class CloudEngine implements Engine {
       const share = new ShareSessionSource(this.http.baseUrl, input.shareToken, {
         ...(input.sharePassword !== undefined ? { password: input.sharePassword } : {}),
         ...(input.restart ? { restart: true } : {}),
+        ...(input.visitor ? { visitor: input.visitor } : {}),
         visitorStore: this.visitorStore,
         fetch: this.http.fetchImpl,
       });
@@ -224,7 +225,7 @@ export class CloudEngine implements Engine {
           this.handles.delete(handle);
           stopRenewing();
         },
-        share ? () => share.info() ?? undefined : null,
+        share,
       );
       this.handles.add(handle);
       try {

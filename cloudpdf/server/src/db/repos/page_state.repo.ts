@@ -163,8 +163,8 @@ export interface CreateLayerInput {
   annotationsVersion?: number;
   formsVersion?: number;
   outlineVersion?: number;
-  /** A visitor's layer: the share link that made it and the visitor, seen now. */
-  visitor?: { grantId: string; visitorId: string; seenAt: number };
+  /** A visitor's layer: the share link that made it and the visitor. */
+  visitor?: { grantId: string; visitorId: string };
 }
 
 export class LayersRepo {
@@ -192,30 +192,34 @@ export class LayersRepo {
    * descending), after `before` when given. A deleted layer isn't listed.
    */
   async listForDocument(docId: string, opts: LayerListOptions): Promise<ListedLayer[]> {
+    // A visitor's last visit is the visitor's (`share_visitors`), not the layer's.
     let q = this.db
-      .selectFrom('layers')
+      .selectFrom('layers as l')
+      .leftJoin('share_visitors as v', (join) =>
+        join.onRef('v.grant_id', '=', 'l.grant_id').onRef('v.visitor_id', '=', 'l.visitor_id'),
+      )
       .select([
-        'id',
-        'doc_id',
-        'name',
-        'grant_id',
-        'visitor_id',
-        'current_artifact_size',
-        'created_at',
-        'updated_at',
-        'last_seen_at',
+        'l.id',
+        'l.doc_id',
+        'l.name',
+        'l.grant_id',
+        'l.visitor_id',
+        'l.current_artifact_size',
+        'l.created_at',
+        'l.updated_at',
+        'v.last_seen_at',
       ])
-      .where('doc_id', '=', docId)
-      .where('deleted_at', 'is', null)
-      .orderBy('created_at', 'desc')
-      .orderBy('id', 'desc');
-    if (opts.grantId !== undefined) q = q.where('grant_id', '=', opts.grantId);
+      .where('l.doc_id', '=', docId)
+      .where('l.deleted_at', 'is', null)
+      .orderBy('l.created_at', 'desc')
+      .orderBy('l.id', 'desc');
+    if (opts.grantId !== undefined) q = q.where('l.grant_id', '=', opts.grantId);
     if (opts.before) {
       const { createdAt, id } = opts.before;
       q = q.where((eb) =>
         eb.or([
-          eb('created_at', '<', createdAt),
-          eb.and([eb('created_at', '=', createdAt), eb('id', '<', id)]),
+          eb('l.created_at', '<', createdAt),
+          eb.and([eb('l.created_at', '=', createdAt), eb('l.id', '<', id)]),
         ]),
       );
     }
@@ -245,27 +249,15 @@ export class LayersRepo {
     return Number(row.count);
   }
 
-  /**
-   * A visitor opened their layer again: its idle clock restarts. `false`
-   * when the layer was deleted, so the visitor starts over. A layer nobody
-   * wrote has no row, and no clock until its first write.
-   */
-  async seeVisitorLayer(docId: string, name: string, now: number): Promise<boolean> {
+  /** Whether the layer was deleted: a visitor whose layer was starts over as someone new. */
+  async isDeleted(docId: string, name: string): Promise<boolean> {
     const row = await this.db
       .selectFrom('layers')
-      .select(['id', 'deleted_at'])
+      .select('deleted_at')
       .where('doc_id', '=', docId)
       .where('name', '=', name)
       .executeTakeFirst();
-    if (!row) return true;
-    if (row.deleted_at != null) return false;
-    await this.db
-      .updateTable('layers')
-      .set({ last_seen_at: now })
-      .where('id', '=', row.id)
-      .where('deleted_at', 'is', null)
-      .execute();
-    return true;
+    return row?.deleted_at != null;
   }
 
   async createEmpty(input: CreateLayerInput): Promise<LayerRow> {
@@ -292,7 +284,6 @@ export class LayersRepo {
         current_artifact_size: null,
         grant_id: input.visitor?.grantId ?? null,
         visitor_id: input.visitor?.visitorId ?? null,
-        last_seen_at: input.visitor?.seenAt ?? null,
         created_at: now,
         updated_at: now,
       })

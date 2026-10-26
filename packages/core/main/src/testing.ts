@@ -191,6 +191,8 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     canOpenFiles: () => false,
     open: unsupported('open'),
     retry: unsupported('retry'),
+    identify: unsupported('identify'),
+    declineIdentity: unsupported('declineIdentity'),
     rename: unsupported('rename'),
     openAll: unsupported('openAll'),
     unlock: unsupported('unlock'),

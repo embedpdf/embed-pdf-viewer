@@ -166,10 +166,8 @@ export interface LayersTable {
   deleted_at: number | null;
   /** A visitor's layer (migration 038): the share link that made it; NULL otherwise. */
   grant_id: string | null;
-  /** A visitor's layer: the visitor (its name is `visitor-<visitor_id>`). */
+  /** A visitor's layer: the visitor (its name is `visitor-<visitor_id>`); see `share_visitors`. */
   visitor_id: string | null;
-  /** A visitor's layer: when the visitor last opened it, the idle clock. */
-  last_seen_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -296,6 +294,27 @@ export interface SecurityEventsTable {
  * which is what makes grants long-lived, editable, and revocable while
  * every credential that reaches a browser stays a short-lived doc JWT.
  */
+/**
+ * A share link's visitor who answered its questions or wrote (migration 042):
+ * the answers, given once and the server's from then on, and the visitor's
+ * idle clock.
+ */
+export interface ShareVisitorsTable {
+  grant_id: string;
+  visitor_id: string;
+  doc_id: string;
+  display_name: string | null;
+  email: string | null;
+  title: string | null;
+  organization: string | null;
+  organizational_unit: string | null;
+  email_verified_at: number | null;
+  /** When the visitor gave their answers; NULL for one who only wrote. */
+  consented_at: number | null;
+  first_seen_at: number;
+  last_seen_at: number;
+}
+
 export interface ShareGrantsTable {
   /** `shr_` + 24 url-safe random chars; doubles as the public share token. */
   id: string;
@@ -311,10 +330,16 @@ export interface ShareGrantsTable {
   /** 1 = a visitor's browser keeps its layer for the next visit (per-visitor links). */
   keep_visitor_layers: number;
   /**
-   * Delete a visitor's layer after this long unvisited (migration 039: NULL,
-   * the default, keeps it until it is deleted on purpose).
+   * Delete a visitor (their answers and their layer) after this long unseen
+   * (migrations 039, 042: NULL, the default, keeps them until deleted on
+   * purpose).
    */
-  visitor_layer_idle_seconds: number | null;
+  visitor_idle_seconds: number | null;
+  /**
+   * What the link asks its visitors (migration 042): JSON
+   * `{ fields, ask, purpose?, privacyUrl? }`; NULL asks nothing.
+   */
+  visitor_identity_json: string | null;
   /** Doc capability scopes the exchanged session carries (JSON array). */
   scope_json: string;
   /** Origin allowlist (JSON array); NULL = any origin. */
@@ -665,6 +690,7 @@ export interface Database {
   pdf_password_sessions: PdfPasswordSessionsTable;
   security_events: SecurityEventsTable & { id: Generated<number> };
   share_grants: ShareGrantsTable;
+  share_visitors: ShareVisitorsTable;
   document_imports: DocumentImportsTable;
   tenant_usage_counter: TenantUsageCounterTable;
   engine_crashes: EngineCrashesTable;

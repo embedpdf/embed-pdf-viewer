@@ -132,6 +132,16 @@ export const EngineErrorCode = {
    * layer name.
    */
   LayerDeleted: 'LayerDeleted',
+  /**
+   * The share link asks its visitors who they are, and this visitor hasn't
+   * answered what it requires: opening (a link that asks on open), or a
+   * change (one that asks before the first change), waits for the answers.
+   * `details` is a `VisitorIdentityRequest`: `fields` (what the link asks,
+   * each required or optional), `missing`, `invalid`, `purpose` and
+   * `privacyUrl`. Answer by opening again with `visitor`, or with
+   * `doc.share.identify()`.
+   */
+  VisitorIdentityRequired: 'VisitorIdentityRequired',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

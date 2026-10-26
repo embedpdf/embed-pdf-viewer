@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.15",
-  "openapiSha256": "a18fa7ef3fe1c3a952cde6051e0f15a6f78a01c4454e8a9e59e837cfd8ce1fe8",
+  "openapiSha256": "f86cea6898afd3e99cffd98ce76abf6ad8073688e1399c03ae37193c691980e2",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -2722,6 +2722,80 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.archive(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "shares.visitors.list": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.visitors.list({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.visitors.list(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->visitors->list(\n    'tenantId',\n    'shareId',\n    new ListVisitorsRequest([]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.Visitors.ListAsync(\n    new ListVisitorsRequest { TenantId = \"tenantId\", ShareId = \"shareId\" }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &shares.ListVisitorsRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n}\nclient.Shares.Visitors.List(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().visitors().list(\n    \"tenantId\",\n    \"shareId\",\n    ListVisitorsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.visitors.list(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "shares.visitors.delete": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.visitors.delete({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\",\n  visitorId: \"visitorId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.visitors.delete(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n    visitor_id=\"visitorId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->visitors->delete(\n    'tenantId',\n    'shareId',\n    'visitorId',\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.Visitors.DeleteAsync(\n    new DeleteVisitorsRequest\n    {\n        TenantId = \"tenantId\",\n        ShareId = \"shareId\",\n        VisitorId = \"visitorId\",\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &shares.DeleteVisitorsRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n    VisitorID: \"visitorId\",\n}\nclient.Shares.Visitors.Delete(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().visitors().delete(\n    \"tenantId\",\n    \"shareId\",\n    \"visitorId\",\n    DeleteVisitorsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.visitors.delete(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\",\n  visitor_id: \"visitorId\"\n)",
         "frameLines": 7
       }
     },

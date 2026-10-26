@@ -206,6 +206,17 @@
             },
             "default": "./dist/cjs/api/resources/documents/resources/layers/exports.js"
         },
+        "./shares/visitors": {
+            "import": {
+                "types": "./dist/esm/api/resources/shares/resources/visitors/exports.d.mts",
+                "default": "./dist/esm/api/resources/shares/resources/visitors/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/shares/resources/visitors/exports.d.ts",
+                "default": "./dist/cjs/api/resources/shares/resources/visitors/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/shares/resources/visitors/exports.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [

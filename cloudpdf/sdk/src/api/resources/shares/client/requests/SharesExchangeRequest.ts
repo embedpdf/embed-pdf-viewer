@@ -11,4 +11,15 @@ export interface SharesExchangeRequest {
     password?: string;
     visitorHandle?: string;
     restart?: boolean;
+    visitorIdentity?: SharesExchangeRequest.VisitorIdentity;
+}
+
+export namespace SharesExchangeRequest {
+    export interface VisitorIdentity {
+        displayName?: string | undefined;
+        email?: string | undefined;
+        title?: string | undefined;
+        organization?: string | undefined;
+        organizationalUnit?: string | undefined;
+    }
 }

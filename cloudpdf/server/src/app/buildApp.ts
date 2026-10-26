@@ -44,6 +44,7 @@ import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo'
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
 import { SecurityEventsRepo } from '../db/repos/security-events.repo';
 import { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import type { Database as Schema } from '../db/schema';
@@ -106,7 +107,7 @@ import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
 import { LayerStateService } from '../services/LayerStateService';
 import { ObjectNumberService } from '../services/ObjectNumberService';
-import { sweepIdleVisitorLayers } from '../services/sweepIdleVisitorLayers';
+import { deleteVisitor, sweepIdleVisitors } from '../services/shareVisitors';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -1177,6 +1178,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         grants: shareGrants,
         documents: new DocumentsRepo(opts.db),
         layers: new LayersRepo(opts.db),
+        visitors: new ShareVisitorsRepo(opts.db),
+        deleteVisitor: (visitor) => deleteVisitor({ db: opts.db!, deleteLayer }, visitor),
         securityEvents: new SecurityEventsRepo(opts.db),
       });
       await registerShareSessionRoutes(app, {
@@ -1184,7 +1187,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         grants: shareGrants,
         documents: new DocumentsRepo(opts.db),
         layers: new LayersRepo(opts.db),
-        visitors: visitorHandles,
+        visitors: new ShareVisitorsRepo(opts.db),
+        handles: visitorHandles,
         deleteLayer,
         suspendedTenants: suspendedTenantsGuard!,
         ...(usageMeters ? { usageMeters } : {}),
@@ -1452,8 +1456,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         layerService
           ?.sweepObjectNumbers()
           .catch((err) => app.log.error({ err }, 'sweepObjectNumbers failed'));
-        sweepIdleVisitorLayers({ db: opts.db!, deleteLayer }, Date.now()).catch((err) =>
-          app.log.error({ err }, 'sweepIdleVisitorLayers failed'),
+        sweepIdleVisitors({ db: opts.db!, deleteLayer }, Date.now()).catch((err) =>
+          app.log.error({ err }, 'sweepIdleVisitors failed'),
         );
         documentService
           ?.closeIdleLayerSessions(Date.now())
@@ -1690,6 +1694,7 @@ function mapToHttp(code: string): number {
     case EngineErrorCode.Unauthenticated:
       return 401;
     case EngineErrorCode.Forbidden:
+    case EngineErrorCode.VisitorIdentityRequired:
       return 403;
     // Signing: a pending candidate, a moved fence, or a layer behind the
     // head are all conflicts the client resolves by re-preparing; a dead

@@ -47,10 +47,14 @@ import type {
   PdfDestination,
   Identity,
   PrintDpi,
+  VisitorAnswers,
+  VisitorIdentityRequest,
 } from '@embedpdf/engine-core/runtime';
 
 // re-export the engine contracts so consumers import them from @embedpdf/core
 export type {
+  VisitorAnswers,
+  VisitorIdentityRequest,
   DocumentHandle,
   Engine,
   EngineFactory,
@@ -222,6 +226,11 @@ export interface DocumentMeta {
    * as it's made.
    */
   readonly hasUnsavedChanges: boolean;
+  /**
+   * A change waits for the visitor's answers to what the share link asks before the first
+   * change: answer with `documents.identify()`, or `declineIdentity()`.
+   */
+  readonly identityRequest?: VisitorIdentityRequest;
 }
 
 /**
@@ -240,7 +249,18 @@ export interface PendingMeta {
   readonly passwordProvided?: boolean;
   /** `error` only: what the open rejected with. Never carries a password. */
   readonly error?: unknown;
+  /** `error` only: the share link's passphrase or questions the open waits for. */
+  readonly shareRequest?: ShareOpenRequest;
 }
+
+/**
+ * What a document from a share link waits for before it opens: the link's passphrase
+ * (`passwordProvided`: one was tried and was wrong), or the visitor's answers to what the link
+ * asks. `documents.retry(id, { sharePassword })` or `retry(id, { visitor })` gives it.
+ */
+export type ShareOpenRequest =
+  | { readonly kind: 'passphrase'; readonly passwordProvided: boolean }
+  | { readonly kind: 'identity'; readonly request: VisitorIdentityRequest };
 
 /** The document registry — what document scope is built on. */
 export interface CoreState {
@@ -559,6 +579,13 @@ export interface DocumentInfo {
   readonly passwordProvided?: boolean;
   /** `error` only: why it couldn't be opened, in the plugin error vocabulary. */
   readonly error?: PluginErrorInfo;
+  /** `error` only: the share link's passphrase or questions the open waits for (`retry` with them). */
+  readonly shareRequest?: ShareOpenRequest;
+  /**
+   * `ready` only: a change waits for the visitor's answers to what the share link asks before
+   * the first change. Show the questions, then `identify()` or `declineIdentity()`.
+   */
+  readonly identityRequest?: VisitorIdentityRequest;
 }
 
 /** A document waiting for its password. */
@@ -608,6 +635,14 @@ export interface OpenDocumentResult {
 /** Options for `unlock()`: the password, and a `signal` that stops trying it. */
 export interface UnlockOptions extends OperationOptions {
   readonly password: string;
+}
+
+/** Options for `retry()`: what a document from a share link waited for (`shareRequest`). */
+export interface RetryOptions extends OperationOptions {
+  /** The share link's passphrase. */
+  readonly sharePassword?: string;
+  /** The visitor's answers to what the link asks; ones given before stay. */
+  readonly visitor?: VisitorAnswers;
 }
 
 /** Options for `download()`. */
@@ -792,10 +827,21 @@ export interface DocumentsCapability {
   canOpenFiles(): boolean;
   /**
    * Open a failed document (`status: 'error'`) again, with the same source and options, in its
-   * own tab: it keeps its id and its place, and the active document stays the active one.
-   * Resolves like `open()`. Rejects `invalid-input` for a document that didn't fail.
+   * own tab: it keeps its id and its place, and the active document stays the active one. A
+   * document from a share link that waited for its passphrase or the visitor's answers
+   * (`shareRequest`) opens with `sharePassword` or `visitor`. Resolves like `open()`. Rejects
+   * `invalid-input` for a document that didn't fail, or answers for one not from a share link.
    */
-  retry(id: string, options?: OperationOptions): Promise<OpenDocumentResult>;
+  retry(id: string, options?: RetryOptions): Promise<OpenDocumentResult>;
+  /**
+   * Answer what the document's share link asks before the first change (`identityRequest`):
+   * the changes waiting go out. An answer once given stays. Rejects `permission-denied` while
+   * something required is missing or an answer can't be taken (its details say which), and the
+   * changes keep waiting.
+   */
+  identify(id: string, answers: VisitorAnswers): Promise<void>;
+  /** Not now: the changes waiting for the visitor's answers fail, and the next change asks again. */
+  declineIdentity(id: string): void;
   /** Change the name its tab shows; the file doesn't change. */
   rename(id: string, name: string): void;
   /**

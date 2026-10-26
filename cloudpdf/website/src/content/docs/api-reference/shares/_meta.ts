@@ -7,4 +7,5 @@ export default {
   update: 'Update',
   delete: 'Delete',
   archive: 'Archive',
+  visitors: 'Visitors',
 };

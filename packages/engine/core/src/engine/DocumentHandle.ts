@@ -12,6 +12,7 @@ import type { DocumentSignaturesService } from './DocumentSignaturesService';
 import type { MetadataService } from './MetadataService';
 import type { PageHandle } from './PageHandle';
 import type { DownloadOptions } from '../dto/PdfSaveMode';
+import type { VisitorAnswers, VisitorIdentityRequest } from '../dto/ShareVisitor';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
 import type { ObjectNumberPool } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
@@ -20,12 +21,39 @@ import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { CallFacts, WorkingSetPage } from '../scheduling/facts';
 
-/** How a document opened from a share link reaches its layer. */
-export interface DocumentShareInfo {
+/**
+ * A document opened from a share link: how it reaches its layer, and who the
+ * visitor is. A link that asks before the first change lets the visitor
+ * read at once; their changes wait for their answers.
+ */
+export interface DocumentShare {
   /** `'shared'`: everyone with the link works in one layer. `'per-visitor'`: this visitor's own. */
   readonly layerMode: 'shared' | 'per-visitor';
   /** This browser keeps the visitor, and their layer, for the next visit. */
   readonly keep: boolean;
+  /**
+   * What the link asks before this visitor's first change, while they
+   * haven't answered it; `null` when nothing is asked.
+   */
+  readonly identityRequest: VisitorIdentityRequest | null;
+  /**
+   * Answer what the link asks. An answer once given stays: a visitor who
+   * mistyped starts over (`open({ kind: 'share', shareToken, restart: true })`).
+   * The changes waiting for the answers go out. Rejects with
+   * `VisitorIdentityRequired` while something required is missing or an
+   * answer can't be taken (its `details` say which), and the changes keep
+   * waiting.
+   */
+  identify(answers: VisitorAnswers): AbortablePromise<void>;
+  /**
+   * Called when a change waits for the visitor's answers: show the link's
+   * questions, then `identify` or `decline`. A change made while nothing
+   * listens doesn't wait: it fails with `VisitorIdentityRequired`. Returns
+   * the unsubscriber.
+   */
+  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void;
+  /** Not now: the changes waiting fail with `VisitorIdentityRequired`, and the next one asks again. */
+  decline(): void;
 }
 
 /**
@@ -92,12 +120,13 @@ export interface DocumentHandle {
    */
   readonly objectNumbers: ObjectNumberPool;
   /**
-   * How a document opened from a share link (`open({ kind: 'share' })`)
-   * reaches its layer; absent otherwise. A UI shows "Your copy" for a
-   * per-visitor layer, and "Start over" when the browser keeps it
-   * (`open({ kind: 'share', shareToken, restart: true })`).
+   * A document opened from a share link (`open({ kind: 'share' })`): how it
+   * reaches its layer, and the visitor's answers to what the link asks;
+   * absent otherwise. A UI shows "Your copy" for a per-visitor layer, "Start
+   * over" when the browser keeps it, and the link's questions when a change
+   * waits for them.
    */
-  readonly share?: DocumentShareInfo;
+  readonly share?: DocumentShare;
   /**
    * A handle for the page `ref` names: an address with the page's verbs,
    * made without asking the engine anything (so synchronous). The page is

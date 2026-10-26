@@ -43,6 +43,7 @@ export namespace EngineErrorPayload {
         UndoUnavailable: "UndoUnavailable",
         IdempotencyKeyReused: "IdempotencyKeyReused",
         LayerDeleted: "LayerDeleted",
+        VisitorIdentityRequired: "VisitorIdentityRequired",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

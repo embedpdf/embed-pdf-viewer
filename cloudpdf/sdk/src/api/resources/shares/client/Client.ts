@@ -8,6 +8,7 @@ import { mergeAdditionalBodyParameters } from "../../../../core/requestBody.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
 import * as CloudPDF from "../../../index.js";
+import { VisitorsClient } from "../resources/visitors/client/Client.js";
 
 export declare namespace SharesClient {
     export type Options = BaseClientOptions;
@@ -17,13 +18,18 @@ export declare namespace SharesClient {
 
 export class SharesClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<SharesClient.Options>;
+    protected _visitors: VisitorsClient | undefined;
 
     constructor(options: SharesClient.Options) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 
+    public get visitors(): VisitorsClient {
+        return (this._visitors ??= new VisitorsClient(this._options));
+    }
+
     /**
-     * Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. Mounted only when the deployment can sign (HS256 mode).
+     * Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. A link that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the link asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A link that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any link. Mounted only when the deployment can sign (HS256 mode).
      *
      * @param {CloudPDF.SharesExchangeRequest} request
      * @param {SharesClient.RequestOptions} requestOptions - Request-specific configuration.

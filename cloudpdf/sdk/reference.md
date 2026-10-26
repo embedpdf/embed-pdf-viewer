@@ -465,7 +465,7 @@ await client.doc.text({
 <dl>
 <dd>
 
-Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. Mounted only when the deployment can sign (HS256 mode).
+Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. A link that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the link asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A link that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any link. Mounted only when the deployment can sign (HS256 mode).
 </dd>
 </dl>
 </dd>
@@ -4418,6 +4418,140 @@ await client.documents.layers.delete({
 <dd>
 
 **requestOptions:** `LayersClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+## Shares Visitors
+<details><summary><code>client.shares.visitors.<a href="/src/api/resources/shares/resources/visitors/client/Client.ts">list</a>({ ...params }) -> CloudPDF.SharesVisitorsList200Response</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+An archived link's visitors are listed too.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.shares.visitors.list({
+    tenantId: "tenantId",
+    shareId: "shareId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.shares.ListVisitorsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `VisitorsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.shares.visitors.<a href="/src/api/resources/shares/resources/visitors/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Their handle brings them back as a new visitor, who is asked again. Deleting a visitor already deleted changes nothing.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.shares.visitors.delete({
+    tenantId: "tenantId",
+    shareId: "shareId",
+    visitorId: "visitorId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.shares.DeleteVisitorsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `VisitorsClient.RequestOptions` 
     
 </dd>
 </dl>

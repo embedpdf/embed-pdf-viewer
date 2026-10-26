@@ -8,5 +8,6 @@ export namespace AdminErrorPayload {
     export interface Error_ {
         code: string;
         message: string;
+        details?: Record<string, unknown> | undefined;
     }
 }

@@ -20,6 +20,12 @@ export type {
   OpenOptions,
   TokenSource,
 } from './dto/OpenInput';
+export type {
+  VisitorAnswers,
+  VisitorIdentityField,
+  VisitorIdentityRequest,
+} from './dto/ShareVisitor';
+export { visitorIdentityRequestOf } from './dto/ShareVisitor';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
 export type {
   DocumentOutline,

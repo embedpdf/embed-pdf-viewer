@@ -11,6 +11,8 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 
+import type { VisitorIdentityRequest } from './visitor-identity';
+
 // jose@5+ removed the public `KeyLike` alias. The verifier holds a
 // reference to whatever `importSPKI` returns (a `CryptoKey` /
 // `KeyObject`); derive the type structurally so we don't depend on a
@@ -28,6 +30,12 @@ export interface BaseClaims {
   tenant_id: string;
   /** Who the token acts for; see `Identity` in `@embedpdf/engine-core`. */
   identity?: Identity;
+  /**
+   * A share-link visitor who still has to answer the link's questions
+   * before changing anything: what they're asked. Reads work; every write
+   * is refused with `VisitorIdentityRequired`, decided from the token alone.
+   */
+  identity_pending?: VisitorIdentityRequest;
   iat: number;
   exp: number;
   /**
@@ -558,6 +566,13 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
   if (typeof payload.jti === 'string') base.jti = payload.jti;
   const identity = coerceIdentityClaim(payload);
   if (identity) base.identity = identity;
+  const pending = (payload as { identity_pending?: unknown }).identity_pending;
+  if (pending !== undefined && pending !== null) {
+    if (typeof pending !== 'object' || Array.isArray(pending)) {
+      throw new Error('identity_pending must be an object');
+    }
+    base.identity_pending = pending as VisitorIdentityRequest;
+  }
   const embedpdf = (payload as { embedpdf?: unknown }).embedpdf;
   if (embedpdf && typeof embedpdf === 'object') {
     const nested = (embedpdf as { unlock_key?: unknown }).unlock_key;

@@ -1,3 +1,4 @@
+import type { VisitorAnswers } from './ShareVisitor';
 import type { Identity } from '../auth/scope';
 
 /**
@@ -131,6 +132,13 @@ export interface OpenInputShare {
    * applies). Elsewhere it changes nothing.
    */
   restart?: boolean;
+  /**
+   * The visitor's answers to what the link asks (its `visitorIdentity`),
+   * sent with the first exchange. The same as the visitor typing them: a
+   * site that knows its users for certain issues them tokens instead. Only
+   * fields the link asks and the visitor hasn't answered count.
+   */
+  visitor?: VisitorAnswers;
 }
 
 export type OpenInputLayerFileSource =

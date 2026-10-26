@@ -4979,7 +4979,7 @@
         "x-fern-sdk-method-name": "exchange",
         "x-docs-title": "Exchange share token",
         "summary": "Trade a public share token for a short-lived document session JWT.",
-        "description": "Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. Mounted only when the deployment can sign (HS256 mode).",
+        "description": "Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. A link that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the link asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A link that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any link. Mounted only when the deployment can sign (HS256 mode).",
         "security": [],
         "x-required-scope": [],
         "requestBody": {
@@ -6681,7 +6681,7 @@
         "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete share",
-        "summary": "Delete a link whose visitors made no changes; exchange stops immediately, live sessions lapse at their exp. A link whose visitors have layers is archived instead (409).",
+        "summary": "Delete a link that has no visitors; exchange stops immediately, live sessions lapse at their exp. A link whose visitors answered its questions or have layers is archived instead (409).",
         "security": [
           {
             "apiToken": []
@@ -6802,6 +6802,180 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SharesArchive404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/shares/{shareId}/visitors": {
+      "get": {
+        "operationId": "shares.visitors.list",
+        "x-fern-sdk-group-name": ["shares", "visitors"],
+        "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List visitors",
+        "summary": "A share link's visitors who answered its questions or made a change, newest first, cursor-paginated: their answers and their layer.",
+        "description": "An archived link's visitors are listed too.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["shares.manage"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "shareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesVisitorsList200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesVisitorsList400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesVisitorsList404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/shares/{shareId}/visitors/{visitorId}": {
+      "delete": {
+        "operationId": "shares.visitors.delete",
+        "x-fern-sdk-group-name": ["shares", "visitors"],
+        "x-fern-sdk-method-name": "delete",
+        "x-docs-title": "Delete visitor",
+        "summary": "Erase a share link's visitor: their answers and their own layer.",
+        "description": "Their handle brings them back as a new visitor, who is asked again. Deleting a visitor already deleted changes nothing.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["shares.manage"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "shareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+            }
+          },
+          {
+            "name": "visitorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesVisitorsDeleteResponse"
                 }
               }
             }
@@ -7149,6 +7323,9 @@
     "shares": {
       "title": "Shares"
     },
+    "shares.visitors": {
+      "title": "Visitors"
+    },
     "doc": {
       "title": "Document operations",
       "slug": "document-operations"
@@ -7219,6 +7396,10 @@
               },
               "message": {
                 "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": {}
               }
             },
             "required": ["code", "message"],
@@ -7267,7 +7448,8 @@
               "ChangeConflict",
               "UndoUnavailable",
               "IdempotencyKeyReused",
-              "LayerDeleted"
+              "LayerDeleted",
+              "VisitorIdentityRequired"
             ]
           },
           "message": {
@@ -24640,10 +24822,54 @@
           "keepVisitorLayers": {
             "type": "boolean"
           },
-          "visitorLayerIdleSeconds": {
+          "visitorIdleSeconds": {
             "type": "integer",
             "minimum": 3600,
             "maximum": 2592000,
+            "nullable": true
+          },
+          "visitorIdentity": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "enum": ["required", "optional"]
+                  },
+                  "email": {
+                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  },
+                  "title": {
+                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  },
+                  "organization": {
+                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  },
+                  "organizationalUnit": {
+                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "ask": {
+                "type": "string",
+                "enum": ["on-open", "before-first-change"]
+              },
+              "purpose": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "privacyUrl": {
+                "type": "string",
+                "format": "uri",
+                "maxLength": 2048
+              }
+            },
+            "required": ["fields", "ask"],
+            "additionalProperties": false,
             "nullable": true
           },
           "scope": {
@@ -24711,8 +24937,52 @@
               "keepVisitorLayers": {
                 "type": "boolean"
               },
-              "visitorLayerIdleSeconds": {
+              "visitorIdleSeconds": {
                 "type": "number",
+                "nullable": true
+              },
+              "visitorIdentity": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "enum": ["required", "optional"]
+                      },
+                      "email": {
+                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "title": {
+                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organization": {
+                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organizationalUnit": {
+                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "ask": {
+                    "type": "string",
+                    "enum": ["on-open", "before-first-change"]
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "privacyUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  }
+                },
+                "required": ["fields", "ask"],
+                "additionalProperties": false,
                 "nullable": true
               },
               "scope": {
@@ -24769,7 +25039,8 @@
               "layerMode",
               "layerName",
               "keepVisitorLayers",
-              "visitorLayerIdleSeconds",
+              "visitorIdleSeconds",
+              "visitorIdentity",
               "scope",
               "origins",
               "passwordProtected",
@@ -24826,8 +25097,52 @@
                 "keepVisitorLayers": {
                   "type": "boolean"
                 },
-                "visitorLayerIdleSeconds": {
+                "visitorIdleSeconds": {
                   "type": "number",
+                  "nullable": true
+                },
+                "visitorIdentity": {
+                  "type": "object",
+                  "properties": {
+                    "fields": {
+                      "type": "object",
+                      "properties": {
+                        "displayName": {
+                          "type": "string",
+                          "enum": ["required", "optional"]
+                        },
+                        "email": {
+                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                        },
+                        "title": {
+                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                        },
+                        "organization": {
+                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                        },
+                        "organizationalUnit": {
+                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "ask": {
+                      "type": "string",
+                      "enum": ["on-open", "before-first-change"]
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "privacyUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "maxLength": 2048
+                    }
+                  },
+                  "required": ["fields", "ask"],
+                  "additionalProperties": false,
                   "nullable": true
                 },
                 "scope": {
@@ -24884,7 +25199,8 @@
                 "layerMode",
                 "layerName",
                 "keepVisitorLayers",
-                "visitorLayerIdleSeconds",
+                "visitorIdleSeconds",
+                "visitorIdentity",
                 "scope",
                 "origins",
                 "passwordProtected",
@@ -24938,8 +25254,52 @@
               "keepVisitorLayers": {
                 "type": "boolean"
               },
-              "visitorLayerIdleSeconds": {
+              "visitorIdleSeconds": {
                 "type": "number",
+                "nullable": true
+              },
+              "visitorIdentity": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "enum": ["required", "optional"]
+                      },
+                      "email": {
+                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "title": {
+                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organization": {
+                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organizationalUnit": {
+                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "ask": {
+                    "type": "string",
+                    "enum": ["on-open", "before-first-change"]
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "privacyUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  }
+                },
+                "required": ["fields", "ask"],
+                "additionalProperties": false,
                 "nullable": true
               },
               "scope": {
@@ -24996,7 +25356,8 @@
               "layerMode",
               "layerName",
               "keepVisitorLayers",
-              "visitorLayerIdleSeconds",
+              "visitorIdleSeconds",
+              "visitorIdentity",
               "scope",
               "origins",
               "passwordProtected",
@@ -25034,10 +25395,54 @@
           "keepVisitorLayers": {
             "type": "boolean"
           },
-          "visitorLayerIdleSeconds": {
+          "visitorIdleSeconds": {
             "type": "integer",
             "minimum": 3600,
             "maximum": 2592000,
+            "nullable": true
+          },
+          "visitorIdentity": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "enum": ["required", "optional"]
+                  },
+                  "email": {
+                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  },
+                  "title": {
+                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  },
+                  "organization": {
+                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  },
+                  "organizationalUnit": {
+                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "ask": {
+                "type": "string",
+                "enum": ["on-open", "before-first-change"]
+              },
+              "purpose": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "privacyUrl": {
+                "type": "string",
+                "format": "uri",
+                "maxLength": 2048
+              }
+            },
+            "required": ["fields", "ask"],
+            "additionalProperties": false,
             "nullable": true
           },
           "scope": {
@@ -25110,8 +25515,52 @@
               "keepVisitorLayers": {
                 "type": "boolean"
               },
-              "visitorLayerIdleSeconds": {
+              "visitorIdleSeconds": {
                 "type": "number",
+                "nullable": true
+              },
+              "visitorIdentity": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "enum": ["required", "optional"]
+                      },
+                      "email": {
+                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "title": {
+                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organization": {
+                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organizationalUnit": {
+                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "ask": {
+                    "type": "string",
+                    "enum": ["on-open", "before-first-change"]
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "privacyUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  }
+                },
+                "required": ["fields", "ask"],
+                "additionalProperties": false,
                 "nullable": true
               },
               "scope": {
@@ -25168,7 +25617,8 @@
               "layerMode",
               "layerName",
               "keepVisitorLayers",
-              "visitorLayerIdleSeconds",
+              "visitorIdleSeconds",
+              "visitorIdentity",
               "scope",
               "origins",
               "passwordProtected",
@@ -25223,8 +25673,52 @@
               "keepVisitorLayers": {
                 "type": "boolean"
               },
-              "visitorLayerIdleSeconds": {
+              "visitorIdleSeconds": {
                 "type": "number",
+                "nullable": true
+              },
+              "visitorIdentity": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "enum": ["required", "optional"]
+                      },
+                      "email": {
+                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "title": {
+                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organization": {
+                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      },
+                      "organizationalUnit": {
+                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "ask": {
+                    "type": "string",
+                    "enum": ["on-open", "before-first-change"]
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "privacyUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  }
+                },
+                "required": ["fields", "ask"],
+                "additionalProperties": false,
                 "nullable": true
               },
               "scope": {
@@ -25281,7 +25775,8 @@
               "layerMode",
               "layerName",
               "keepVisitorLayers",
-              "visitorLayerIdleSeconds",
+              "visitorIdleSeconds",
+              "visitorIdentity",
               "scope",
               "origins",
               "passwordProtected",
@@ -25302,6 +25797,101 @@
         "additionalProperties": false
       },
       "SharesArchive404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "SharesVisitorsList200Response": {
+        "type": "object",
+        "properties": {
+          "visitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "visitorId": {
+                  "type": "string"
+                },
+                "answers": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "email": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "organization": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "organizationalUnit": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "emailVerified": {
+                  "type": "boolean"
+                },
+                "consentedAt": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "firstSeenAt": {
+                  "type": "number"
+                },
+                "lastSeenAt": {
+                  "type": "number"
+                },
+                "layer": {
+                  "type": "object",
+                  "properties": {
+                    "layerName": {
+                      "type": "string"
+                    },
+                    "storageSizeBytes": {
+                      "type": "number",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["layerName", "storageSizeBytes"],
+                  "additionalProperties": false,
+                  "nullable": true
+                }
+              },
+              "required": [
+                "visitorId",
+                "answers",
+                "emailVerified",
+                "consentedAt",
+                "firstSeenAt",
+                "lastSeenAt",
+                "layer"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["visitors"],
+        "additionalProperties": false
+      },
+      "SharesVisitorsList400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "SharesVisitorsList404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "SharesVisitorsDeleteResponse": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "SharesDelete404Response": {
@@ -25329,6 +25919,32 @@
           },
           "restart": {
             "type": "boolean"
+          },
+          "visitorIdentity": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "email": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "organization": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "organizationalUnit": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            },
+            "additionalProperties": false
           }
         },
         "required": ["shareToken"],
@@ -25358,9 +25974,64 @@
               },
               "keep": {
                 "type": "boolean"
+              },
+              "identityRequest": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "enum": ["required", "optional"]
+                      },
+                      "email": {
+                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                      },
+                      "title": {
+                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                      },
+                      "organization": {
+                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                      },
+                      "organizationalUnit": {
+                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "missing": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "displayName",
+                        "email",
+                        "title",
+                        "organization",
+                        "organizationalUnit"
+                      ]
+                    }
+                  },
+                  "invalid": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/missing/items"
+                    }
+                  },
+                  "purpose": {
+                    "type": "string"
+                  },
+                  "privacyUrl": {
+                    "type": "string"
+                  }
+                },
+                "required": ["fields", "missing", "invalid"],
+                "additionalProperties": false,
+                "nullable": true
               }
             },
-            "required": ["handle", "keep"],
+            "required": ["handle", "keep", "identityRequest"],
             "additionalProperties": false
           },
           "expiresAt": {

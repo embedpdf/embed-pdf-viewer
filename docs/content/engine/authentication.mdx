@@ -71,7 +71,8 @@ A share link gives everyone who opens it one shared layer, or each visitor a lay
 made at their first change. `doc.share` says which:
 
 ```ts
-doc.share; // { layerMode: 'per-visitor', keep: true }
+doc.share?.layerMode; // 'per-visitor'
+doc.share?.keep; // true
 ```
 
 When the link keeps each visitor's layer (`keep`), the engine remembers the visitor in the
@@ -84,6 +85,47 @@ const doc = await engine.open({ kind: 'share', shareToken, restart: true });
 
 Outside a browser the engine remembers no visitors, since a server opens links for many people.
 To keep them somewhere else, pass a `visitorStore` to `cloudEngine()`.
+
+### Who the visitor is
+
+A share link can ask its visitors who they are: their name, email, job title, organization or
+department, each required or optional. It asks when they open the document, or before their first
+change. The answers are given once. They become the visitor's identity in every session, so their
+name shows on what they add, and they can't be changed later: a visitor who made a typo starts
+over with `restart`.
+
+A link that asks on open makes `open()` fail with `VisitorIdentityRequired` until the answers come
+with it. `error.details` says what the link asks (`fields`), what's still `missing`, which answers
+were `invalid`, and the owner's `purpose` and `privacyUrl` to show with the questions:
+
+```ts
+try {
+  doc = await engine.open({ kind: 'share', shareToken });
+} catch (error) {
+  if (!EngineError.is(error, EngineErrorCode.VisitorIdentityRequired)) throw error;
+  const answers = await askTheVisitor(error.details); // your form
+  doc = await engine.open({ kind: 'share', shareToken, visitor: answers });
+}
+```
+
+When your page already knows who the visitor is, pass `visitor` on the first open. It counts the
+same as the visitor typing it: a site that knows its users for certain gives them tokens from its
+backend instead.
+
+A link that asks before the first change opens at once, and the visitor reads freely.
+`doc.share.identityRequest` says what it asks. Their changes wait for the answers: listen for a
+change that waits, ask, and answer with `identify()`, or let the waiting changes fail with
+`decline()`.
+
+```ts
+doc.share?.onIdentityRequest(async (request) => {
+  const answers = await askTheVisitor(request);
+  if (answers) await doc.share!.identify(answers);
+  else doc.share!.decline();
+});
+```
+
+A change made while nothing listens doesn't wait: it fails with `VisitorIdentityRequired`.
 
 ## Password-protected PDFs
 

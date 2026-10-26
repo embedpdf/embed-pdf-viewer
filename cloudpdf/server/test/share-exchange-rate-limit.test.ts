@@ -14,6 +14,7 @@ import { SuspendedTenantsGuard } from '../src/auth/SuspendedTenantsGuard';
 import { DocumentsRepo } from '../src/db/repos/documents.repo';
 import { ShareGrantsRepo, type ShareGrantRow } from '../src/db/repos/share_grants.repo';
 import { LayersRepo } from '../src/db/repos/page_state.repo';
+import { ShareVisitorsRepo } from '../src/db/repos/share_visitors.repo';
 import { VisitorHandles } from '../src/auth/visitor-handle';
 import { TenantUsageRepo } from '../src/db/repos/tenant_usage.repo';
 import { registerShareSessionRoutes } from '../src/routes/share-sessions';
@@ -83,7 +84,8 @@ async function makeFixture(limits: Limits = {}): Promise<Fixture> {
     grants,
     documents: new DocumentsRepo(db),
     layers: new LayersRepo(db),
-    visitors: new VisitorHandles(SECRET),
+    visitors: new ShareVisitorsRepo(db),
+    handles: new VisitorHandles(SECRET),
     deleteLayer: async () => undefined,
     suspendedTenants: new SuspendedTenantsGuard({ db }),
     tenantUsage: new TenantUsageRepo(db),
