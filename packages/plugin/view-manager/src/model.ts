@@ -18,7 +18,7 @@ export interface Pane {
   readonly activeDocumentId: string | null;
 }
 
-export interface ViewManagerState {
+export interface ViewManagerModel {
   readonly panes: Readonly<Record<string, Pane>>;
   /** Display order of the panes. */
   readonly order: readonly PaneId[];
@@ -27,7 +27,7 @@ export interface ViewManagerState {
   readonly seq: number;
 }
 
-export const initialViewManagerState = (): ViewManagerState => ({
+export const initialViewManagerModel = (): ViewManagerModel => ({
   panes: {},
   order: [],
   focusedPaneId: null,
@@ -35,10 +35,10 @@ export const initialViewManagerState = (): ViewManagerState => ({
 });
 
 /** The id the next created pane gets. */
-export const nextPaneId = (state: ViewManagerState): PaneId => `pane-${state.seq + 1}`;
+export const nextPaneId = (state: ViewManagerModel): PaneId => `pane-${state.seq + 1}`;
 
 /** The pane holding a document, or null. */
-export const paneOfDocument = (state: ViewManagerState, documentId: string): PaneId | null =>
+export const paneOfDocument = (state: ViewManagerModel, documentId: string): PaneId | null =>
   state.order.find((id) => state.panes[id].documentIds.includes(documentId)) ?? null;
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ const withValidActive = (pane: Pane): Pane => {
   return { ...pane, activeDocumentId: pane.documentIds[0] ?? null };
 };
 
-const withPane = (state: ViewManagerState, pane: Pane): ViewManagerState => ({
+const withPane = (state: ViewManagerModel, pane: Pane): ViewManagerModel => ({
   ...state,
   panes: { ...state.panes, [pane.id]: pane },
 });
@@ -74,7 +74,7 @@ const withPane = (state: ViewManagerState, pane: Pane): ViewManagerState => ({
 // ── transitions ────────────────────────────────────────────────────────────
 
 /** Add an empty pane with the next id at `index` (the end when left out), and focus it. */
-export function createPane(state: ViewManagerState, index?: number): ViewManagerState {
+export function createPane(state: ViewManagerModel, index?: number): ViewManagerModel {
   const id = nextPaneId(state);
   return {
     ...state,
@@ -85,7 +85,7 @@ export function createPane(state: ViewManagerState, index?: number): ViewManager
   };
 }
 
-export function removePane(state: ViewManagerState, id: PaneId): ViewManagerState {
+export function removePane(state: ViewManagerModel, id: PaneId): ViewManagerModel {
   if (!state.panes[id]) return state;
   const { [id]: _removed, ...panes } = state.panes;
   const order = state.order.filter((other) => other !== id);
@@ -94,22 +94,22 @@ export function removePane(state: ViewManagerState, id: PaneId): ViewManagerStat
   return { ...state, panes, order, focusedPaneId };
 }
 
-export function movePane(state: ViewManagerState, id: PaneId, toIndex: number): ViewManagerState {
+export function movePane(state: ViewManagerModel, id: PaneId, toIndex: number): ViewManagerModel {
   const without = state.order.filter((other) => other !== id);
   if (without.length === state.order.length) return state;
   const at = Math.max(0, Math.min(toIndex, without.length));
   return { ...state, order: [...without.slice(0, at), id, ...without.slice(at)] };
 }
 
-export function setFocusedPane(state: ViewManagerState, id: PaneId | null): ViewManagerState {
+export function setFocusedPane(state: ViewManagerModel, id: PaneId | null): ViewManagerModel {
   return state.focusedPaneId === id ? state : { ...state, focusedPaneId: id };
 }
 
 export function setActiveDocument(
-  state: ViewManagerState,
+  state: ViewManagerModel,
   paneId: PaneId,
   documentId: string | null,
-): ViewManagerState {
+): ViewManagerModel {
   const pane = state.panes[paneId];
   if (!pane || pane.activeDocumentId === documentId) return state;
   if (documentId !== null && !pane.documentIds.includes(documentId)) return state;
@@ -118,11 +118,11 @@ export function setActiveDocument(
 
 /** Add a document to a pane; a document another pane holds moves here. */
 export function addDocument(
-  state: ViewManagerState,
+  state: ViewManagerModel,
   paneId: PaneId,
   documentId: string,
   index?: number,
-): ViewManagerState {
+): ViewManagerModel {
   const pane = state.panes[paneId];
   if (!pane || pane.documentIds.includes(documentId)) return state;
   const holderId = paneOfDocument(state, documentId);
@@ -138,10 +138,10 @@ export function addDocument(
 }
 
 export function removeDocument(
-  state: ViewManagerState,
+  state: ViewManagerModel,
   paneId: PaneId,
   documentId: string,
-): ViewManagerState {
+): ViewManagerModel {
   const pane = state.panes[paneId];
   if (!pane) return state;
   const next = withoutDocument(pane, documentId);
@@ -149,11 +149,11 @@ export function removeDocument(
 }
 
 export function moveDocumentWithin(
-  state: ViewManagerState,
+  state: ViewManagerModel,
   paneId: PaneId,
   documentId: string,
   toIndex: number,
-): ViewManagerState {
+): ViewManagerModel {
   const pane = state.panes[paneId];
   if (!pane || !pane.documentIds.includes(documentId)) return state;
   const without = pane.documentIds.filter((id) => id !== documentId);
@@ -161,12 +161,12 @@ export function moveDocumentWithin(
 }
 
 export function moveDocumentBetween(
-  state: ViewManagerState,
+  state: ViewManagerModel,
   fromPaneId: PaneId,
   toPaneId: PaneId,
   documentId: string,
   toIndex?: number,
-): ViewManagerState {
+): ViewManagerModel {
   const from = state.panes[fromPaneId];
   const to = state.panes[toPaneId];
   if (!from || !to || !from.documentIds.includes(documentId)) return state;
@@ -191,10 +191,10 @@ export function moveDocumentBetween(
  * its pane, its place in the tabs, and whether it's shown.
  */
 export function renameDocument(
-  state: ViewManagerState,
+  state: ViewManagerModel,
   previousId: string,
   nextId: string,
-): ViewManagerState {
+): ViewManagerModel {
   const paneId = paneOfDocument(state, previousId);
   if (!paneId) return state;
   const pane = state.panes[paneId];
@@ -212,10 +212,10 @@ export function renameDocument(
  * what turns "one open document" into "one pane with one tab".
  */
 export function reconcile(
-  state: ViewManagerState,
+  state: ViewManagerModel,
   open: readonly string[],
   preferPaneId: PaneId | null,
-): ViewManagerState {
+): ViewManagerModel {
   const openSet = new Set(open);
   const panes: Record<string, Pane> = {};
   for (const id of state.order) {

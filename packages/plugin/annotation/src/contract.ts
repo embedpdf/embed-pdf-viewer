@@ -58,7 +58,7 @@ import type { TextFormat } from './rich-text';
 import type { AnnotationToolInput, ResolvedGhost } from './tools/definitions';
 
 export { AnnotationToken } from './token';
-export { annotationState } from './state';
+export { annotationState, type AnnotationState } from './state';
 export { AnnotationTransfer } from '@embedpdf/engine-core/public';
 export type { Face, TextFormat, TextSelection } from './rich-text';
 export type {

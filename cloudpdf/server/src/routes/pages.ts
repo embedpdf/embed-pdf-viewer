@@ -727,7 +727,7 @@ async function renderPageImage(input: {
 
 async function readPageText(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
@@ -789,7 +789,7 @@ async function readPageText(input: {
 
 async function readPageGeometry(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;

@@ -1,3 +1,4 @@
+import type { VisitorAnswers } from './ShareVisitor';
 import type { Identity } from '../auth/scope';
 
 /**
@@ -124,6 +125,20 @@ export interface OpenInputShare {
    * password, which goes in `OpenOptions.password` like every other kind.
    */
   sharePassword?: string;
+  /**
+   * Start over: on a link that gives each visitor their own layer and keeps
+   * it for their next visit, delete the layer this browser kept and open a
+   * fresh one as a new visitor (the document's `share.keep` says when that
+   * applies). Elsewhere it changes nothing.
+   */
+  restart?: boolean;
+  /**
+   * The visitor's answers to what the link asks (its `visitorIdentity`),
+   * sent with the first exchange. The same as the visitor typing them: a
+   * site that knows its users for certain issues them tokens instead. Only
+   * fields the link asks and the visitor hasn't answered count.
+   */
+  visitor?: VisitorAnswers;
 }
 
 export type OpenInputLayerFileSource =

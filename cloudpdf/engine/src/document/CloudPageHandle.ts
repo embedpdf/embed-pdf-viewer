@@ -10,9 +10,9 @@ import type {
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { CloudPageAnnotationsService } from './CloudPageAnnotationsService';
 import { CloudPageFormsService } from './CloudPageFormsService';
+import { CloudPageMeasureService } from './CloudPageMeasureService';
 import { CloudPageRenderService } from './CloudPageRenderService';
 import { CloudPageTextService } from './CloudPageTextService';
-import { CloudPageMeasureService } from './CloudPageMeasureService';
 import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 

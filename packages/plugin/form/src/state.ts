@@ -4,15 +4,27 @@
  * (`useFormValue(ref)`), so a total in your own UI re-renders only when that
  * field changes.
  */
-import { defineState } from '@embedpdf/core';
-import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import { defineState, type ResourceStatus } from '@embedpdf/core';
+import type { FormFieldDTO, FormKind } from '@embedpdf/engine-core/runtime';
 
 import { FormToken } from './contract';
+
+/** Every field, whether the form is read, what kind of form it is, and the selected widget's field. */
+export interface FormState {
+  /** Every field. The same array while nothing changes. */
+  readonly fields: readonly FormFieldDTO[];
+  /** Whether the form is read. */
+  readonly status: ResourceStatus;
+  /** What the document has: `'none'`, `'acroform'` or `'xfa'`. */
+  readonly formKind: FormKind;
+  /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
+  readonly selectedField: FormFieldDTO | null;
+}
 
 const NO_FIELDS: readonly FormFieldDTO[] = Object.freeze([]);
 
 export const formState = defineState(FormToken, {
-  read: (form) => ({
+  read: (form): FormState => ({
     fields: form.list(),
     status: form.getStatus(),
     formKind: form.getFormKind(),

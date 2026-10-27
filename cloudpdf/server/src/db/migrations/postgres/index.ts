@@ -68,6 +68,20 @@ import down034 from './034_forms_version.down.sql';
 import sql034 from './034_forms_version.sql';
 import down035 from './035_outline_version.down.sql';
 import sql035 from './035_outline_version.sql';
+import down036 from './036_object_numbers_by_layer_name.down.sql';
+import sql036 from './036_object_numbers_by_layer_name.sql';
+import down037 from './037_layer_tombstones.down.sql';
+import sql037 from './037_layer_tombstones.sql';
+import down038 from './038_visitor_layers.down.sql';
+import sql038 from './038_visitor_layers.sql';
+import down039 from './039_visitor_layer_deletion_opt_in.down.sql';
+import sql039 from './039_visitor_layer_deletion_opt_in.sql';
+import down040 from './040_layers_list_index.down.sql';
+import sql040 from './040_layers_list_index.sql';
+import down041 from './041_share_grants_archived.down.sql';
+import sql041 from './041_share_grants_archived.sql';
+import down042 from './042_share_visitors.down.sql';
+import sql042 from './042_share_visitors.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -141,5 +155,47 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '035_outline_version.sql',
     sql: sql035,
     down: down035,
+  },
+  {
+    version: '036',
+    name: '036_object_numbers_by_layer_name.sql',
+    sql: sql036,
+    down: down036,
+  },
+  {
+    version: '037',
+    name: '037_layer_tombstones.sql',
+    sql: sql037,
+    down: down037,
+  },
+  {
+    version: '038',
+    name: '038_visitor_layers.sql',
+    sql: sql038,
+    down: down038,
+  },
+  {
+    version: '039',
+    name: '039_visitor_layer_deletion_opt_in.sql',
+    sql: sql039,
+    down: down039,
+  },
+  {
+    version: '040',
+    name: '040_layers_list_index.sql',
+    sql: sql040,
+    down: down040,
+  },
+  {
+    version: '041',
+    name: '041_share_grants_archived.sql',
+    sql: sql041,
+    down: down041,
+  },
+  {
+    version: '042',
+    name: '042_share_visitors.sql',
+    sql: sql042,
+    down: down042,
   },
 ];

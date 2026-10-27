@@ -18,7 +18,7 @@ import type {
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, setActiveRules, setCursor, type StageState } from '../model';
+import { patchSettings, setActiveRules, setCursor, type StageModel } from '../model';
 import type { StageArrival } from '../navigation/arrive';
 import { boxOf, eqSetting, mergeSettings, resolveResponsive } from '../responsive';
 import type { StageServices } from '../services';
@@ -34,7 +34,7 @@ const EFFECT_RANK: Record<SettingEffect, number> = {
 };
 
 export function createSettings(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene }: Pick<StageServices, 'scene'>,
   config: StageConfig,
   { writeCamera }: Pick<StageCameraWrite, 'writeCamera'>,

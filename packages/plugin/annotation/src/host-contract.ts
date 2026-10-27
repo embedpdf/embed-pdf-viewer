@@ -51,7 +51,7 @@ import { AnnotationToken as PublicAnnotationToken } from './token';
 import type { ResolvedTool } from './tools/definitions';
 
 export * from './contract';
-export type { AnnotationState } from './model';
+export type { AnnotationModel } from './model';
 export {
   ANNOTATION_DRAW_PRIORITY,
   ANNOTATION_EDIT_PRIORITY,

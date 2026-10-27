@@ -38,7 +38,7 @@ import {
   type GlyphPosition,
   type SegmentsByPage,
   type SelectionRange,
-  type SelectionState,
+  type SelectionModel,
 } from './model';
 
 const SELECT_SCOPE: DocCapability = 'doc.text.select';
@@ -84,7 +84,7 @@ interface ReadModel {
  * The settings belong to the plugin registration; the pointer handler reads
  * the drag threshold from them, and the framework layers read the colors.
  */
-export function createSelectionController(ctx: PluginContext<SelectionState, SelectionSettings>) {
+export function createSelectionController(ctx: PluginContext<SelectionModel, SelectionSettings>) {
   const settings = ctx.settings();
   const changed = ctx.events.source<SelectionChangedEvent>();
   const committed = ctx.events.source<SelectionCommittedEvent>();

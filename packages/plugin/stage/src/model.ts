@@ -10,7 +10,7 @@ import type { StageConfig, StageSettings } from './contract';
 import { mergeSettings } from './responsive';
 import { DEFAULT_SETTINGS } from './settings';
 
-export interface StageState extends StageSettings {
+export interface StageModel extends StageSettings {
   readonly camera: Camera;
   /**
    * One-way render-commit latch. False while the initial viewport-driven
@@ -58,7 +58,7 @@ export interface StageState extends StageSettings {
   readonly motionCause: 'user' | 'programmatic';
 }
 
-export const initialStageState = (config: StageConfig): StageState => {
+export const initialStageModel = (config: StageConfig): StageModel => {
   // `responsive` configures the capability, not the settings: strip it so the
   // spread below stays a pure settings override.
   const { responsive: _responsive, ...overrides } = config;
@@ -75,35 +75,35 @@ export const initialStageState = (config: StageConfig): StageState => {
   };
 };
 
-export const setCamera = (state: StageState, camera: Camera): StageState =>
+export const setCamera = (state: StageModel, camera: Camera): StageModel =>
   state.camera === camera ? state : { ...state, camera };
 
-export const setCameraResting = (state: StageState, resting: boolean): StageState =>
+export const setCameraResting = (state: StageModel, resting: boolean): StageModel =>
   state.cameraResting === resting ? state : { ...state, cameraResting: resting };
 
-export const markPlaced = (state: StageState): StageState =>
+export const markPlaced = (state: StageModel): StageModel =>
   state.placed ? state : { ...state, placed: true };
 
-export const setViewport = (state: StageState, viewport: Size): StageState =>
+export const setViewport = (state: StageModel, viewport: Size): StageModel =>
   state.viewport === viewport ? state : { ...state, viewport };
 
-export const setDpr = (state: StageState, dpr: number): StageState =>
+export const setDpr = (state: StageModel, dpr: number): StageModel =>
   state.dpr === dpr ? state : { ...state, dpr };
 
-export const setCursor = (state: StageState, cursor: number): StageState =>
+export const setCursor = (state: StageModel, cursor: number): StageModel =>
   state.cursor === cursor ? state : { ...state, cursor };
 
 export const setMotionCause = (
-  state: StageState,
-  motionCause: StageState['motionCause'],
-): StageState => (state.motionCause === motionCause ? state : { ...state, motionCause });
+  state: StageModel,
+  motionCause: StageModel['motionCause'],
+): StageModel => (state.motionCause === motionCause ? state : { ...state, motionCause });
 
 /**
  * Merge a settings patch. Undefined values are skipped, so a partial restore
  * never clears a setting; the area that patches decides what camera
  * follow-up the change needs.
  */
-export function patchSettings(state: StageState, patch: Partial<StageSettings>): StageState {
+export function patchSettings(state: StageModel, patch: Partial<StageSettings>): StageModel {
   let next = state;
   let key: keyof StageSettings;
   for (key in patch) {
@@ -115,5 +115,5 @@ export function patchSettings(state: StageState, patch: Partial<StageSettings>):
   return next;
 }
 
-export const setActiveRules = (state: StageState, activeRules: readonly string[]): StageState =>
+export const setActiveRules = (state: StageModel, activeRules: readonly string[]): StageModel =>
   state.activeRules === activeRules ? state : { ...state, activeRules };

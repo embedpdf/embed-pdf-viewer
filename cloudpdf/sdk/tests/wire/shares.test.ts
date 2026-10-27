@@ -9,7 +9,24 @@ describe("SharesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { shareToken: "shareToken" };
-        const rawResponseBody = { token: "token", docId: "docId", layerName: "layerName", expiresAt: 1.1 };
+        const rawResponseBody = {
+            token: "token",
+            docId: "docId",
+            layerName: "layerName",
+            layerMode: "shared",
+            visitor: {
+                handle: "handle",
+                keep: true,
+                identityRequest: {
+                    fields: {},
+                    missing: ["displayName"],
+                    invalid: ["displayName"],
+                    purpose: "purpose",
+                    privacyUrl: "privacyUrl",
+                },
+            },
+            expiresAt: 1.1,
+        };
 
         server
             .mockEndpoint()
@@ -146,12 +163,17 @@ describe("SharesClient", () => {
                     id: "id",
                     tenantId: "tenantId",
                     docId: "docId",
+                    layerMode: "shared",
                     layerName: "layerName",
+                    keepVisitorLayers: true,
+                    visitorIdleSeconds: 1.1,
+                    visitorIdentity: { fields: {}, ask: "on-open" },
                     scope: ["scope"],
                     origins: ["origins"],
                     passwordProtected: true,
                     sessionTtlSeconds: 1.1,
                     disabled: true,
+                    archivedAt: 1.1,
                     expiresAt: 1.1,
                     exchangeCount: 1.1,
                     lastExchangedAt: 1.1,
@@ -207,12 +229,17 @@ describe("SharesClient", () => {
                 id: "id",
                 tenantId: "tenantId",
                 docId: "docId",
+                layerMode: "shared",
                 layerName: "layerName",
+                keepVisitorLayers: true,
+                visitorIdleSeconds: 1.1,
+                visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
                 scope: ["scope"],
                 origins: ["origins"],
                 passwordProtected: true,
                 sessionTtlSeconds: 1.1,
                 disabled: true,
+                archivedAt: 1.1,
                 expiresAt: 1.1,
                 exchangeCount: 1.1,
                 lastExchangedAt: 1.1,
@@ -320,12 +347,17 @@ describe("SharesClient", () => {
                 id: "id",
                 tenantId: "tenantId",
                 docId: "docId",
+                layerMode: "shared",
                 layerName: "layerName",
+                keepVisitorLayers: true,
+                visitorIdleSeconds: 1.1,
+                visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
                 scope: ["scope"],
                 origins: ["origins"],
                 passwordProtected: true,
                 sessionTtlSeconds: 1.1,
                 disabled: true,
+                archivedAt: 1.1,
                 expiresAt: 1.1,
                 exchangeCount: 1.1,
                 lastExchangedAt: 1.1,
@@ -407,6 +439,28 @@ describe("SharesClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
+    test("delete (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .delete("/v1/tenants/tenantId/shares/shareId")
+            .respondWith()
+            .statusCode(409)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.shares.delete({
+                tenantId: "tenantId",
+                shareId: "shareId",
+            });
+        }).rejects.toThrow(CloudPDF.ConflictError);
+    });
+
     test("update (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
@@ -416,12 +470,17 @@ describe("SharesClient", () => {
                 id: "id",
                 tenantId: "tenantId",
                 docId: "docId",
+                layerMode: "shared",
                 layerName: "layerName",
+                keepVisitorLayers: true,
+                visitorIdleSeconds: 1.1,
+                visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
                 scope: ["scope"],
                 origins: ["origins"],
                 passwordProtected: true,
                 sessionTtlSeconds: 1.1,
                 disabled: true,
+                archivedAt: 1.1,
                 expiresAt: 1.1,
                 exchangeCount: 1.1,
                 lastExchangedAt: 1.1,
@@ -487,6 +546,95 @@ describe("SharesClient", () => {
 
         await expect(async () => {
             return await client.shares.update({
+                tenantId: "tenantId",
+                shareId: "shareId",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("update (4)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/tenants/tenantId/shares/shareId")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(409)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.shares.update({
+                tenantId: "tenantId",
+                shareId: "shareId",
+            });
+        }).rejects.toThrow(CloudPDF.ConflictError);
+    });
+
+    test("archive (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = {
+            share: {
+                id: "id",
+                tenantId: "tenantId",
+                docId: "docId",
+                layerMode: "shared",
+                layerName: "layerName",
+                keepVisitorLayers: true,
+                visitorIdleSeconds: 1.1,
+                visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
+                scope: ["scope"],
+                origins: ["origins"],
+                passwordProtected: true,
+                sessionTtlSeconds: 1.1,
+                disabled: true,
+                archivedAt: 1.1,
+                expiresAt: 1.1,
+                exchangeCount: 1.1,
+                lastExchangedAt: 1.1,
+                createdBy: "createdBy",
+                createdAt: 1.1,
+                updatedAt: 1.1,
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/tenants/tenantId/shares/shareId/archive")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.shares.archive({
+            tenantId: "tenantId",
+            shareId: "shareId",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("archive (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/tenants/tenantId/shares/shareId/archive")
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.shares.archive({
                 tenantId: "tenantId",
                 shareId: "shareId",
             });

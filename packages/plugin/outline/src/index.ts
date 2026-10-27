@@ -5,5 +5,5 @@
  * Layout: contract.ts · model.ts · controller.ts · state.ts · outline.plugin.ts.
  */
 export { outlinePlugin } from './outline.plugin';
-export { outlineState } from './state';
+export { outlineState, type OutlineState } from './state';
 export * from './contract';

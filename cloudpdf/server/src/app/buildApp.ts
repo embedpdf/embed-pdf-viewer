@@ -31,6 +31,7 @@ import {
 } from '../auth/JwtVerifier';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
 import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
+import { VisitorHandles } from '../auth/visitor-handle';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import { validate as validateMigrations, type MigrationSource } from '../db/migrator/runner';
@@ -43,6 +44,7 @@ import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo'
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
 import { SecurityEventsRepo } from '../db/repos/security-events.repo';
 import { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import type { Database as Schema } from '../db/schema';
@@ -56,8 +58,10 @@ import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
 import { UsageMeters } from '../licensing/UsageMeters';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
+import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_helpers';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminLayersRoutes } from '../routes/admin/layers';
 import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
@@ -73,8 +77,8 @@ import { registerOutlineRoutes } from '../routes/outline';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
-import { registerSignatureRoutes } from '../routes/signatures';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
+import { registerSignatureRoutes } from '../routes/signatures';
 import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { EngineHostClient } from '../runtime/EngineHostClient';
 import type { EnginePool } from '../runtime/EnginePool';
@@ -91,6 +95,7 @@ import { resolvePoolSize } from '../runtime/WorkerThreadPool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CrashJournal, DocumentQuarantinedError } from '../services/CrashJournal';
+import { deleteStoredLayer } from '../services/deleteStoredLayer';
 import { DerivedRenderService } from '../services/DerivedRenderService';
 import {
   DocumentLifecycleService,
@@ -100,8 +105,9 @@ import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
 import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
-import { ObjectNumberService } from '../services/ObjectNumberService';
 import { LayerStateService } from '../services/LayerStateService';
+import { ObjectNumberService } from '../services/ObjectNumberService';
+import { deleteVisitor, sweepIdleVisitors } from '../services/shareVisitors';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -265,6 +271,10 @@ export interface BuildAppOptions {
    * than `pendingTtlMs`. Set to 0 to disable. Defaults to 60_000 ms.
    */
   sweepIntervalMs?: number;
+  /** How long a layer's worker session may go unasked before the sweeper closes it. Default 10 minutes. */
+  layerSessionIdleMs?: number;
+  /** Most layer sessions one document keeps open; opening one more closes the least recently asked-for. Default 32. */
+  maxLayerSessionsPerDoc?: number;
   /** Max age of a `pending` doc before it's considered abandoned. */
   pendingTtlMs?: number;
   /**
@@ -558,6 +568,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     // codec separately enforces a 512-char limit, so this stays bounded.
     maxParamLength: 512,
   });
+  // A CDN in front of the engine: shared caches may keep versioned reads,
+  // and /head asks for /access before the first cacheable read.
+  const cdnFronted = (opts.cdnSigner?.info.kind ?? 'none') !== 'none';
+  app.decorate('immutableCache', cdnFronted ? IMMUTABLE_CACHE_SHARED : IMMUTABLE_CACHE_PRIVATE);
   const usageMeters = opts.db ? new UsageMeters(opts.db, opts.licenseGate) : undefined;
   app.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?', 1)[0] ?? request.url;
@@ -698,6 +712,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     verifierForSigning.mode === 'hs256'
       ? (input: SignDevTokenInput) => signDevToken(verifierForSigning.secret, input)
       : undefined;
+  // Share-link visitors' handles are signed by the same authority.
+  const visitorHandles =
+    verifierForSigning.mode === 'hs256' ? new VisitorHandles(verifierForSigning.secret) : undefined;
 
   // Inject the revocation + cache store into whichever mode the
   // caller picked. We don't overwrite if they're already set.
@@ -1105,6 +1122,22 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       lifecycle,
       storage: opts.objectStore,
     });
+    const storedLayers = {
+      db: opts.db,
+      storage: opts.objectStore,
+      documents: new DocumentsRepo(opts.db),
+    };
+    // The layer service exists only where the engine runs; it is made below.
+    const deleteLayer = (tenantId: string, input: { docId: string; layerName: string }) =>
+      layerService
+        ? layerService.deleteLayer(tenantId, input)
+        : deleteStoredLayer(storedLayers, tenantId, input);
+    await registerAdminLayersRoutes(app, {
+      deleteLayer,
+      layers: new LayersRepo(opts.db),
+      documents: new DocumentsRepo(opts.db),
+      grants: new ShareGrantsRepo(opts.db),
+    });
     // The async-import claim loop: in-process (like the sweeper), one
     // per replica, safe under multi-replica via fenced leased claims.
     if (importPolicy.enabled) {
@@ -1139,17 +1172,24 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     // The share family (grant lifecycle + public exchange) exists only
     // where minting does — same condition as tokens.issue, because a
     // grant is a standing mint capability.
-    if (signer) {
+    if (signer && visitorHandles) {
       const shareGrants = new ShareGrantsRepo(opts.db);
       await registerAdminSharesRoutes(app, {
         grants: shareGrants,
         documents: new DocumentsRepo(opts.db),
+        layers: new LayersRepo(opts.db),
+        visitors: new ShareVisitorsRepo(opts.db),
+        deleteVisitor: (visitor) => deleteVisitor({ db: opts.db!, deleteLayer }, visitor),
         securityEvents: new SecurityEventsRepo(opts.db),
       });
       await registerShareSessionRoutes(app, {
         sign: signer,
         grants: shareGrants,
         documents: new DocumentsRepo(opts.db),
+        layers: new LayersRepo(opts.db),
+        visitors: new ShareVisitorsRepo(opts.db),
+        handles: visitorHandles,
+        deleteLayer,
         suspendedTenants: suspendedTenantsGuard!,
         ...(usageMeters ? { usageMeters } : {}),
         tenantUsage,
@@ -1274,7 +1314,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       // to be called before the first cacheable read so the SDK has
       // the signed URLs/cookies. The default (`none`) keeps /head
       // saying "no access needed" so public shares stay cheap.
-      const cdnAccessRequired = (opts.cdnSigner?.info.kind ?? 'none') !== 'none';
+      const cdnAccessRequired = cdnFronted;
       const passwordSessionsRepo = opts.kms
         ? new PdfPasswordSessionsRepo(opts.db, {
             keyring: opts.kms,
@@ -1290,6 +1330,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         pool,
         layerState: layerStateService,
         cdnAccessRequired,
+        ...(opts.layerSessionIdleMs !== undefined
+          ? { layerSessionIdleMs: opts.layerSessionIdleMs }
+          : {}),
+        ...(opts.maxLayerSessionsPerDoc !== undefined
+          ? { maxLayerSessionsPerDoc: opts.maxLayerSessionsPerDoc }
+          : {}),
         passwordVerifications: new PdfPasswordVerificationsRepo(opts.db, {
           // The proof rows are HMACs over real document passwords: on a
           // production license a strong secret is mandatory, or a leaked DB
@@ -1349,7 +1395,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
       await registerObjectNumberRoutes(app, { documentService, layerService });
       await registerChangeRoutes(app, { documentService, layerService });
-      await registerDocsRoutes(app, { service: documentService });
+      await registerDocsRoutes(app, {
+        service: documentService,
+        ...(signer ? { sign: signer } : {}),
+      });
       await registerMetadataRoutes(app, { service: documentService, layerService });
       await registerOutlineRoutes(app, { service: documentService });
       await registerSignatureRoutes(app, { service: documentService, layerService });
@@ -1404,6 +1453,15 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         layerService
           ?.sweepChanges(Date.now())
           .catch((err) => app.log.error({ err }, 'sweepChanges failed'));
+        layerService
+          ?.sweepObjectNumbers()
+          .catch((err) => app.log.error({ err }, 'sweepObjectNumbers failed'));
+        sweepIdleVisitors({ db: opts.db!, deleteLayer }, Date.now()).catch((err) =>
+          app.log.error({ err }, 'sweepIdleVisitors failed'),
+        );
+        documentService
+          ?.closeIdleLayerSessions(Date.now())
+          .catch((err) => app.log.error({ err }, 'closeIdleLayerSessions failed'));
       }, sweepIntervalMs);
       sweeperTimer.unref();
     }
@@ -1636,6 +1694,7 @@ function mapToHttp(code: string): number {
     case EngineErrorCode.Unauthenticated:
       return 401;
     case EngineErrorCode.Forbidden:
+    case EngineErrorCode.VisitorIdentityRequired:
       return 403;
     // Signing: a pending candidate, a moved fence, or a layer behind the
     // head are all conflicts the client resolves by re-preparing; a dead
@@ -1654,6 +1713,7 @@ function mapToHttp(code: string): number {
     case EngineErrorCode.DocNotOpen:
       return 404;
     case EngineErrorCode.SigningExpired:
+    case EngineErrorCode.LayerDeleted:
       return 410;
     case EngineErrorCode.PayloadTooLarge:
       return 413;

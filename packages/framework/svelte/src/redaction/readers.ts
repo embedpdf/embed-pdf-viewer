@@ -16,7 +16,7 @@ import {
   useCapabilityEvent,
   useOptionalSelector,
 } from '../runtime/readers.svelte';
-import { settingsReader, stateReader, type StateReader } from '../runtime/state.svelte';
+import { settingsReader, stateReader } from '../runtime/state.svelte';
 import { valueOf, type CurrentValue, type MaybeGetter } from '../runtime/values.svelte';
 
 /**
@@ -41,13 +41,8 @@ export function useRedactionEvent<T>(
  * result (the page's State table, declared once in `redactionState`), as a reactive object
  * (`state.pendingCount`). With a selector, the value it picks as `{ current }`. Empty without a
  * document.
- *
- * Typed through the declaration, so the published types name it from `@embedpdf/plugin-redaction`, a
- * dependency of this package, and not from the engine package `lastResult`'s type comes from, which
- * isn't one.
  */
-export const useRedactionState: StateReader<ReturnType<typeof redactionState.read>> =
-  stateReader(redactionState);
+export const useRedactionState = stateReader(redactionState);
 
 /** The redaction settings (`overlay`), with or without a document. */
 export const useRedactionSettings = settingsReader(RedactionToken);

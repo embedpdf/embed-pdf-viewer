@@ -2,7 +2,7 @@
  * Object numbers over HTTP, on the native engine: the editing session
  * `/access` opens, creates at the numbers it was handed, the write top-up,
  * the bulk reservation, the event stream's `session` event, idempotent
- * retries, and the ceiling. The races between replicas are in
+ * retries, the ceiling, and a layer nobody changed (numbered with no row). The races between replicas are in
  * _helpers/object-numbers-replica-suite.ts.
  */
 import { createHash } from 'node:crypto';
@@ -29,6 +29,7 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { EDIT_SESSION_LIFETIME_MS } from '../src/services/ObjectNumberService';
 
 const SECRET = 'object-numbers-http-secret';
 const TENANT = 'tenant-numbers-http';
@@ -37,6 +38,9 @@ const DOC = 'doc-numbers-http';
 const FIRST_PAGE = 3;
 const SECOND_PAGE = 4;
 const MERGED_FIELD = 5;
+/** The fixture's last object: the merged field. */
+const LAST_OBJECT = MERGED_FIELD;
+const BASE_SHA = createHash('sha256').update(OBJECT_NUMBER_FIXTURE_PDF).digest('hex');
 
 let dir: string;
 let db: Kysely<DbSchema>;
@@ -198,6 +202,116 @@ describe('/access', () => {
     await access({ layer, session: 'cloud:mine', sub: 'alice' });
     const taken = await access({ layer, session: 'cloud:mine', sub: 'bob' });
     expect(taken.status).toBe(403);
+  });
+});
+
+/**
+ * A layer nobody changed has no row: it is the head version. Opening it to
+ * edit hands out numbers all the same, counted past the head's last object,
+ * and makes nothing; its row comes with its first write.
+ */
+describe('a layer nobody changed', () => {
+  test('opening it to edit makes no layer and opens nothing for it, and hands numbers out', async () => {
+    const layer = 'untouched-open';
+    let opened!: Answer;
+    const dispatched = await dispatchedDuring(async () => {
+      opened = await access({ layer, session: 'cloud:untouched' });
+    });
+    expect(opened.status).toBe(200);
+    expect(opened.body.edit).toMatchObject({ session: 'new' });
+    expect(objectNumbersIn(opened.body.edit.objectNumbers)).toEqual(
+      Array.from({ length: 8 }, (_, i) => LAST_OBJECT + 1 + i),
+    );
+
+    expect(await layerRow(layer)).toBeUndefined();
+    expect(dispatched.filter((job) => job.endsWith(`:${layer}`))).toEqual([]);
+    const numbering = await numberingOf(layer);
+    expect(numbering.counters).toEqual([
+      { base_sha: BASE_SHA, next_object_number: LAST_OBJECT + 9 },
+    ]);
+    expect(numbering.sessions).toEqual(['cloud:untouched']);
+  });
+
+  test('its first write makes it, at the number handed out at open, and tops the session up', async () => {
+    const layer = 'untouched-write';
+    const session = 'cloud:first-write';
+    const handed = objectNumbersIn((await access({ layer, session })).body.edit.objectNumbers);
+    expect(await layerRow(layer)).toBeUndefined();
+
+    const created = await createSquare(SECOND_PAGE, handed[0]!, {
+      layer,
+      session,
+      headers: { 'EmbedPDF-Reserve-Object-Numbers': '4' },
+    });
+    expect(created.status).toBe(200);
+    expect(created.body.annotation.ref.objectNumber).toBe(handed[0]);
+    expect(await layerRow(layer)).toMatchObject({ current_version: 1, base_sha: BASE_SHA });
+    const topUp = objectNumbersIn(
+      parseObjectNumberRanges(created.headers.get('embedpdf-object-numbers')),
+    );
+    expect(topUp).toHaveLength(4);
+    expect(topUp.some((number) => handed.includes(number))).toBe(false);
+
+    // The numbers from open stay good on the layer the write made.
+    const second = await createSquare(SECOND_PAGE, handed[1]!, { layer, session });
+    expect(second.status).toBe(200);
+    expect(second.body.annotation.ref.objectNumber).toBe(handed[1]);
+    // What the engine names for itself never takes a number handed out.
+    const unnamed = await createSquare(SECOND_PAGE, null, { layer, session });
+    expect(unnamed.status).toBe(200);
+    expect([...handed, ...topUp]).not.toContain(unnamed.body.annotation.ref.objectNumber);
+  });
+
+  test('two editors of one shared layer get numbers of their own, and both first writes land', async () => {
+    const layer = 'untouched-shared';
+    const alice = { layer, session: 'cloud:alice', sub: 'alice' };
+    const bob = { layer, session: 'cloud:bob', sub: 'bob' };
+    const [forAlice, forBob] = await Promise.all([access(alice), access(bob)]);
+    const aliceNumbers = objectNumbersIn(forAlice.body.edit.objectNumbers);
+    const bobNumbers = objectNumbersIn(forBob.body.edit.objectNumbers);
+    expect(aliceNumbers.some((number) => bobNumbers.includes(number))).toBe(false);
+    expect(await layerRow(layer)).toBeUndefined();
+
+    const [byAlice, byBob] = await Promise.all([
+      createSquare(SECOND_PAGE, aliceNumbers[0]!, alice),
+      createSquare(SECOND_PAGE, bobNumbers[0]!, bob),
+    ]);
+    expect(byAlice.status).toBe(200);
+    expect(byBob.status).toBe(200);
+    const listed = await call('GET', `/annotations/pages/obj:${SECOND_PAGE}/items`, alice);
+    expect(
+      listed.body.annotations.map(
+        (item: { ref: { objectNumber: number } }) => item.ref.objectNumber,
+      ),
+    ).toEqual(expect.arrayContaining([aliceNumbers[0], bobNumbers[0]]));
+  });
+
+  test('someone who only looked leaves nothing behind once their session is long expired', async () => {
+    const looked = 'untouched-looked';
+    const live = 'untouched-live';
+    const written = 'untouched-written';
+    await access({ layer: looked, session: 'cloud:looked' });
+    await access({ layer: live, session: 'cloud:live' });
+    const handed = objectNumbersIn(
+      (await access({ layer: written, session: 'cloud:written' })).body.edit.objectNumbers,
+    );
+    expect(
+      (await createSquare(SECOND_PAGE, handed[0]!, { layer: written, session: 'cloud:written' }))
+        .status,
+    ).toBe(200);
+    await expireSessions(looked);
+    await expireSessions(written);
+
+    await bundle.layerService!.sweepObjectNumbers();
+    expect(await numberingOf(looked)).toEqual({ counters: [], sessions: [], blocks: [] });
+    // A session still alive keeps its numbers; a layer with a row keeps its counter.
+    expect((await numberingOf(live)).sessions).toEqual(['cloud:live']);
+    expect((await numberingOf(written)).counters).toHaveLength(1);
+
+    // Nothing was ever written with them, so the next visit counts from the base again.
+    const again = await access({ layer: looked, session: 'cloud:looked' });
+    expect(again.body.edit.session).toBe('new');
+    expect(Math.min(...objectNumbersIn(again.body.edit.objectNumbers))).toBe(LAST_OBJECT + 1);
   });
 });
 
@@ -501,27 +615,20 @@ describe('the ceiling', () => {
     const layer = 'ceiling';
     const session = 'cloud:ceiling';
     await access({ layer, session });
-    const row = await db
-      .selectFrom('layers')
-      .select('id')
-      .where('doc_id', '=', DOC)
-      .where('name', '=', layer)
-      .executeTakeFirstOrThrow();
+    const setCounter = (next: number) =>
+      db
+        .updateTable('object_number_counters')
+        .set({ next_object_number: next })
+        .where('doc_id', '=', DOC)
+        .where('layer_name', '=', layer)
+        .execute();
 
-    await db
-      .updateTable('layers')
-      .set({ next_object_number: 8_388_600 })
-      .where('id', '=', row.id)
-      .execute();
+    await setCounter(8_388_600);
     const write = await createSquare(SECOND_PAGE, null, { layer, session });
     expect(write.status).toBe(409);
     expect(write.body.error.code).toBe('LayerFull');
 
-    await db
-      .updateTable('layers')
-      .set({ next_object_number: 7_999_996 })
-      .where('id', '=', row.id)
-      .execute();
+    await setCounter(7_999_996);
     const reserved = await call('POST', '/object-numbers', { layer, session, body: { count: 10 } });
     expect(reserved.status).toBe(409);
     expect(reserved.body.error.code).toBe('LayerFull');
@@ -535,6 +642,80 @@ interface StreamEvent {
 }
 
 /** Read the layer's event stream as `session` until `done` says so, or for `ms`. */
+/** The worker jobs dispatched while `run` ran, as `kind:layerName`. */
+async function dispatchedDuring(run: () => Promise<void>): Promise<string[]> {
+  type Build = (jobId: number) => { payload: { kind: string; layerName?: string } };
+  const pool = bundle.pool as unknown as {
+    run: (docId: string, build: Build, signal?: unknown) => Promise<unknown>;
+  };
+  const original = pool.run;
+  const jobs: string[] = [];
+  pool.run = (docId, build, signal) =>
+    original.call(
+      pool,
+      docId,
+      (jobId) => {
+        const pack = build(jobId);
+        jobs.push(`${pack.payload.kind}:${pack.payload.layerName ?? ''}`);
+        return pack;
+      },
+      signal,
+    );
+  try {
+    await run();
+  } finally {
+    pool.run = original;
+  }
+  return jobs;
+}
+
+const layerRow = (layer: string) =>
+  db
+    .selectFrom('layers')
+    .selectAll()
+    .where('doc_id', '=', DOC)
+    .where('name', '=', layer)
+    .executeTakeFirst();
+
+/** The layer's object number counter, its sessions and its blocks. */
+async function numberingOf(layer: string) {
+  const counters = await db
+    .selectFrom('object_number_counters')
+    .select(['base_sha', 'next_object_number'])
+    .where('doc_id', '=', DOC)
+    .where('layer_name', '=', layer)
+    .execute();
+  const sessions = await db
+    .selectFrom('edit_sessions')
+    .select('session_id')
+    .where('doc_id', '=', DOC)
+    .where('layer_name', '=', layer)
+    .execute();
+  const blocks = await db
+    .selectFrom('object_number_blocks')
+    .select('first')
+    .where('doc_id', '=', DOC)
+    .where('layer_name', '=', layer)
+    .execute();
+  return {
+    counters: counters.map((row) => ({
+      ...row,
+      next_object_number: Number(row.next_object_number),
+    })),
+    sessions: sessions.map((row) => row.session_id),
+    blocks: blocks.map((row) => Number(row.first)),
+  };
+}
+
+/** Move the layer's sessions' expiry past the sweep's wait: expired a lifetime ago, and more. */
+const expireSessions = (layer: string) =>
+  db
+    .updateTable('edit_sessions')
+    .set({ expires_at: Date.now() - 2 * EDIT_SESSION_LIFETIME_MS - 1_000 })
+    .where('doc_id', '=', DOC)
+    .where('layer_name', '=', layer)
+    .execute();
+
 async function readEvents(
   layer: string,
   session: string,

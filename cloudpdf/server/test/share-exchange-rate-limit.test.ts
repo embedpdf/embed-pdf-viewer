@@ -2,11 +2,20 @@ import { afterEach, describe, expect, test } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 
-import { createSqliteDb, migrate, signDevToken, sqliteMigrations, type DbSchema } from '../src/index';
+import {
+  createSqliteDb,
+  migrate,
+  signDevToken,
+  sqliteMigrations,
+  type DbSchema,
+} from '../src/index';
 import { hashSharePassword } from '../src/auth/share-password';
 import { SuspendedTenantsGuard } from '../src/auth/SuspendedTenantsGuard';
 import { DocumentsRepo } from '../src/db/repos/documents.repo';
 import { ShareGrantsRepo, type ShareGrantRow } from '../src/db/repos/share_grants.repo';
+import { LayersRepo } from '../src/db/repos/page_state.repo';
+import { ShareVisitorsRepo } from '../src/db/repos/share_visitors.repo';
+import { VisitorHandles } from '../src/auth/visitor-handle';
 import { TenantUsageRepo } from '../src/db/repos/tenant_usage.repo';
 import { registerShareSessionRoutes } from '../src/routes/share-sessions';
 
@@ -74,6 +83,10 @@ async function makeFixture(limits: Limits = {}): Promise<Fixture> {
     sign: (input) => signDevToken(SECRET, input),
     grants,
     documents: new DocumentsRepo(db),
+    layers: new LayersRepo(db),
+    visitors: new ShareVisitorsRepo(db),
+    handles: new VisitorHandles(SECRET),
+    deleteLayer: async () => undefined,
     suspendedTenants: new SuspendedTenantsGuard({ db }),
     tenantUsage: new TenantUsageRepo(db),
     ...limits,
@@ -90,10 +103,7 @@ async function makeFixture(limits: Limits = {}): Promise<Fixture> {
   };
 }
 
-function createGrant(
-  fx: Fixture,
-  extra: { passwordHash?: string } = {},
-): Promise<ShareGrantRow> {
+function createGrant(fx: Fixture, extra: { passwordHash?: string } = {}): Promise<ShareGrantRow> {
   return fx.grants.create({
     tenantId: TENANT,
     docId: DOC,
@@ -186,9 +196,9 @@ describe('share exchange rate limiting', () => {
     // Blocked before parsing — a valid token does not help the source.
     expect((await exchange(fx, { shareToken: share.id })).statusCode).toBe(429);
     // A different source proceeds.
-    expect(
-      (await exchange(fx, { shareToken: share.id }, { ip: '203.0.113.9' })).statusCode,
-    ).toBe(200);
+    expect((await exchange(fx, { shareToken: share.id }, { ip: '203.0.113.9' })).statusCode).toBe(
+      200,
+    );
   });
 
   test('a blocked token leaves other tokens from the same IP working', async () => {

@@ -23,6 +23,7 @@ import {
   MAX_OBJECT_NUMBER_TOP_UP,
   objectNumberNotHeld,
   type EditSessionKey,
+  type NumberedLayer,
   type ObjectNumberService,
   type WriteObjectNumberRange,
 } from './ObjectNumberService';
@@ -70,7 +71,6 @@ export class LayerWriteObjectNumbers {
   constructor(
     private readonly service: ObjectNumberService,
     private readonly db: Kysely<Schema>,
-    readonly layerId: string,
     readonly docId: string,
     readonly layerName: string,
     /** The editing session acting, when the request named one. */
@@ -79,6 +79,10 @@ export class LayerWriteObjectNumbers {
     /** How many numbers to top the session up by at the commit. */
     private readonly topUp: number,
   ) {}
+
+  private get layer(): NumberedLayer {
+    return { docId: this.docId, layerName: this.layerName };
+  }
 
   /** The first number the write's own objects may take. */
   get floor(): number {
@@ -100,7 +104,7 @@ export class LayerWriteObjectNumbers {
       await this.service.assertHeld(this.db, this.session, this.named);
     }
     this.current = await this.service.reserveForWrite(
-      this.layerId,
+      this.layer,
       baseSha,
       input.estimate ?? OBJECT_NUMBER_ESTIMATES.default,
     );
@@ -131,7 +135,7 @@ export class LayerWriteObjectNumbers {
     if (this.current && this.lastObjectNumber !== null) {
       const settled = await this.service.settleWrite(
         trx,
-        this.layerId,
+        this.layer,
         this.current,
         this.lastObjectNumber,
       );
@@ -160,7 +164,7 @@ export class LayerWriteObjectNumbers {
   /** After the write, won or lost: every range that didn't settle goes back. */
   async release(): Promise<void> {
     for (const range of this.open.splice(0)) {
-      await this.service.releaseWrite(this.layerId, range);
+      await this.service.releaseWrite(this.layer, range);
     }
   }
 }

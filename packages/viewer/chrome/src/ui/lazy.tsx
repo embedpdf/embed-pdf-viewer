@@ -14,6 +14,11 @@ import { Suspense, lazy, useEffect, type ComponentType } from 'react';
 interface LazyOptions {
   /** A hook: whether the component shows now. Until it first does, its chunk isn't needed. */
   readonly shownWhile?: () => boolean;
+  /**
+   * Fetch its chunk in the background with the features' (true unless given). False for one
+   * only some documents need, like a share link's prompts: it loads when it first shows.
+   */
+  readonly prefetch?: boolean;
 }
 
 /** Every lazy component's chunk, as the one load it shares with its component. */
@@ -22,7 +27,7 @@ const chunks: (() => Promise<unknown>)[] = [];
 /** `load`'s component, imported when it first renders (and `shownWhile` says it shows). */
 export function lazyComponent<Props extends object>(
   load: () => Promise<ComponentType<Props>>,
-  { shownWhile }: LazyOptions = {},
+  { shownWhile, prefetch = true }: LazyOptions = {},
 ): ComponentType<Props> {
   let loading: Promise<ComponentType<Props>> | null = null;
   // One load shared by the component and the background fetch; a failed one is tried again.
@@ -31,7 +36,7 @@ export function lazyComponent<Props extends object>(
       loading = null;
       throw error;
     }));
-  chunks.push(loadOnce);
+  if (prefetch) chunks.push(loadOnce);
   // `lazy` types its component's props with a ref; these components take none.
   const Loaded = lazy(async () => ({
     default: await loadOnce(),

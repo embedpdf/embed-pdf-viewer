@@ -6,25 +6,25 @@
  */
 import type { RedactionApplyResult } from '@embedpdf/engine-core';
 
-export interface RedactionState {
+export interface RedactionModel {
   /** An apply of this session is running at the engine. */
   readonly applying: boolean;
   /** The last confirmed apply result, from this session or another. */
   readonly lastResult: RedactionApplyResult | null;
 }
 
-export const initialRedactionState = (): RedactionState => ({
+export const initialRedactionModel = (): RedactionModel => ({
   applying: false,
   lastResult: null,
 });
 
-export const startApply = (state: RedactionState): RedactionState =>
+export const startApply = (state: RedactionModel): RedactionModel =>
   state.applying ? state : { ...state, applying: true };
 
-export const finishApply = (state: RedactionState): RedactionState =>
+export const finishApply = (state: RedactionModel): RedactionModel =>
   state.applying ? { ...state, applying: false } : state;
 
 export const setLastResult = (
-  state: RedactionState,
+  state: RedactionModel,
   result: RedactionApplyResult,
-): RedactionState => (state.lastResult === result ? state : { ...state, lastResult: result });
+): RedactionModel => (state.lastResult === result ? state : { ...state, lastResult: result });

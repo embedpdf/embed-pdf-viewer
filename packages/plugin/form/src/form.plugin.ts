@@ -7,7 +7,7 @@ import { RenderToken } from '@embedpdf/plugin-render/contract';
 import { FORM_DEFAULTS, type FormConfig } from './contract';
 import { createFormController } from './controller';
 import { FormToken } from './host-contract';
-import { initialFormState } from './model';
+import { initialFormModel } from './model';
 
 /**
  * The form plugin: the field plane. Document-scoped; requires the
@@ -28,7 +28,7 @@ export const formPlugin = (config?: FormConfig) =>
     scope: 'document',
     requires: [InteractionToken],
     optional: [AnnotationToken, ActionsToken, RenderToken],
-    state: initialFormState,
+    state: initialFormModel,
     settings: { defaults: FORM_DEFAULTS, registered: config },
     create: createFormController,
   });

@@ -9,4 +9,5 @@ export default {
   'upload-proxy': 'Upload Proxy',
   'import-from': 'Import From',
   init: 'Init',
+  layers: 'Layers',
 };

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { UserConfig } from 'tsdown';
+import { ownSourceOnly } from './own-source-only.mjs';
 
 /**
  * The one library preset (see tooling/build/package.json for scope).
@@ -60,6 +61,9 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
       customExports: (generated) => withConditions({ ...generated, ...rawEntries }),
     },
     ...(neverBundle.length > 0 ? { deps: { neverBundle } } : {}),
+    // dist holds the package's own files and nothing from another package; epdf.bundle
+    // (package.json) lists the packages meant to ship inside it (see own-source-only.mjs).
+    plugins: [ownSourceOnly(pkg, fs.realpathSync(process.cwd()))],
     publint: true,
     // node16 profile: subpath exports are invisible to legacy node10 module
     // resolution; v3's documented floor is TS >= 4.7 with node16/bundler.
@@ -81,6 +85,7 @@ interface PackageJson {
     devExports?: true | string;
     conditions?: Record<string, Record<string, string>>;
     neverBundle?: string[];
+    bundle?: string[];
   };
 }
 

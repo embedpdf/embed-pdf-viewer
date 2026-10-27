@@ -131,7 +131,13 @@ along and nobody is asked:
 ```
 
 That's the PDF's own password. A share link's passphrase is another one: it goes with the link,
-`src: { shareToken, sharePassword }`.
+`src: { shareToken, sharePassword }`. Without it, the viewer asks for it in the document's tab.
+
+A share link can also ask who the visitor is. The viewer asks in the document's tab before it
+opens, or in a dialog when the visitor first changes something, as the link says. When your page
+already knows who the visitor is, pass the answers with the link:
+`src: { shareToken, visitor: { displayName, email } }`. See
+[Authentication](/docs/engine/authentication#who-the-visitor-is) for what a link can ask.
 
 </Engine>
 

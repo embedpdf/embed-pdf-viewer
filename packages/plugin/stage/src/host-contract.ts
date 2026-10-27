@@ -6,7 +6,7 @@ import type { StageCapability, StageViewState, ViewportPoint } from './contract'
 import { StageToken as PublicStageToken } from './token';
 
 export * from './contract';
-export type { StageState } from './model';
+export type { StageModel } from './model';
 
 /**
  * The host lens: what the surface binding, the gesture controller and sibling

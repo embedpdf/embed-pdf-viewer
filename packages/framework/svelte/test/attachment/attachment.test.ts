@@ -5,6 +5,7 @@ import {
   AttachmentToken,
   attachmentPlugin,
   attachmentState,
+  type AttachmentState,
   useAttachment,
   useAttachmentState,
 } from '../../src/attachment';
@@ -67,7 +68,7 @@ describe('useAttachmentState', () => {
     await kernel.documents.open(bytesInput('doc'));
     await vi.waitFor(() => expect(kernel.capability(AttachmentToken).getStatus()).toBe('ready'));
     flushSync();
-    const seen = latest(state.seen) as ReturnType<typeof attachmentState.read>;
+    const seen = latest(state.seen) as AttachmentState;
     expect(seen.files.map((file) => file.name)).toEqual(['notes.txt', 'scan.pdf']);
     expect(seen).toMatchObject({ status: 'ready', canAdd: true, canDownload: true });
   });

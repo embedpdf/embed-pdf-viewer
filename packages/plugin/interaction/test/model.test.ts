@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { activateTool, initialInteractionState, popTool, pushTool, setCursor } from '../src/model';
+import { activateTool, initialInteractionModel, popTool, pushTool, setCursor } from '../src/model';
 
 describe('interaction transitions', () => {
   it('starts on the pointer tool', () => {
-    expect(initialInteractionState()).toEqual({
+    expect(initialInteractionModel()).toEqual({
       activeToolId: 'pointer',
       toolStack: [],
       cursor: 'default',
@@ -12,14 +12,14 @@ describe('interaction transitions', () => {
   });
 
   it('activates a tool and clears the stack, returning the same state when already armed', () => {
-    const state = initialInteractionState();
+    const state = initialInteractionModel();
     expect(activateTool(state, 'pointer')).toBe(state);
     const pushed = pushTool(state, 'pan');
     expect(activateTool(pushed, 'pan')).toEqual({ ...state, activeToolId: 'pan', toolStack: [] });
   });
 
   it('pushes and pops tools in order, and an empty stack pops nothing', () => {
-    const state = initialInteractionState();
+    const state = initialInteractionModel();
     const pushed = pushTool(pushTool(state, 'pan'), 'ink');
     expect(pushed.toolStack).toEqual(['pointer', 'pan']);
     expect(pushed.activeToolId).toBe('ink');
@@ -31,7 +31,7 @@ describe('interaction transitions', () => {
   });
 
   it('sets the cursor, returning the same state for the same cursor', () => {
-    const state = initialInteractionState();
+    const state = initialInteractionModel();
     expect(setCursor(state, 'default')).toBe(state);
     expect(setCursor(state, 'grab').cursor).toBe('grab');
   });

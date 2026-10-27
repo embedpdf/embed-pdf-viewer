@@ -94,6 +94,16 @@ const PrintDialog = lazyComponent(() => import('./ui/print-dialog').then((ui) =>
   shownWhile: usePrintDialogOpen,
 });
 const useOutlinePropertiesOpen = () => useSurface(OUTLINE_PROPERTIES_DIALOG).isOpen;
+// A share link's passphrase or questions: only documents from share links ask, so these load
+// when they first show, never in the background.
+const SharePrompt = lazyComponent(() => import('./ui/share-prompt').then((ui) => ui.SharePrompt), {
+  prefetch: false,
+});
+const useIdentityAsked = () => useDocument((document) => document.identityRequest !== undefined);
+const VisitorIdentityDialog = lazyComponent(
+  () => import('./ui/share-prompt').then((ui) => ui.VisitorIdentityDialog),
+  { shownWhile: useIdentityAsked, prefetch: false },
+);
 const OutlinePropertiesDialog = lazyComponent(
   () => import('./ui/outline-properties').then((ui) => ui.OutlinePropertiesDialog),
   { shownWhile: useOutlinePropertiesOpen },
@@ -127,13 +137,15 @@ function OpeningDocuments() {
 /**
  * The document area's lifecycle switch. With no document open it shows the
  * `empty` region, or nothing. A `locked` tab shows its password prompt, an
- * `error` tab its error pane — per tab (keyed by document), so several can
- * coexist and tab switching stays free. Everything else is the ready-gated
- * Stage; the gate's fallback covers `loading`.
+ * `error` tab its error pane, or the share link's passphrase or questions it
+ * waits for — per tab (keyed by document), so several can coexist and tab
+ * switching stays free. Everything else is the ready-gated Stage; the gate's
+ * fallback covers `loading`.
  */
 function DocumentArea({ children }: { children: ReactNode }) {
   const docId = useDocumentId();
   const status = useDocument((document) => document.status);
+  const shareAsks = useDocument((document) => document.shareRequest !== undefined);
   if (docId === null) {
     return (
       <div className="min-w-0 flex-1 overflow-auto">
@@ -142,7 +154,9 @@ function DocumentArea({ children }: { children: ReactNode }) {
     );
   }
   if (status === 'locked') return <PasswordPrompt key={docId} />;
-  if (status === 'error') return <DocumentError key={docId} />;
+  if (status === 'error') {
+    return shareAsks ? <SharePrompt key={docId} /> : <DocumentError key={docId} />;
+  }
   return <DocumentGate fallback={<OpeningDocuments />}>{children}</DocumentGate>;
 }
 
@@ -285,6 +299,7 @@ export function Shell({ components }: { components?: PlacedComponents }) {
               <FeaturePrefetch />
               <SignDialog />
               <SignatureMakerModal />
+              <VisitorIdentityDialog />
             </DocumentArea>
           </DropToOpen>
           <EdgeBars edge="end" />

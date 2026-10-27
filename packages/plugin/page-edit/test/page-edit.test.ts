@@ -17,7 +17,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { createPageEditController } from '../src/controller';
-import { initialPageEditState } from '../src/model';
+import { initialPageEditModel } from '../src/model';
 
 /**
  * The controller turns page edits into changes on the document's queue, with
@@ -66,7 +66,7 @@ function harness(
   const allows = vi.fn(options.allows ?? (() => true));
   const ctx = createTestContext({
     id: 'page-edit',
-    state: initialPageEditState(),
+    state: initialPageEditModel(),
     pages: options.pages ?? [],
     doc: {
       security: { allows },

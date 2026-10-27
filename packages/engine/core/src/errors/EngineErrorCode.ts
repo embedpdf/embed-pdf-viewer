@@ -126,6 +126,22 @@ export const EngineErrorCode = {
    * payload. Nothing ran; a retry must send the same change.
    */
   IdempotencyKeyReused: 'IdempotencyKeyReused',
+  /**
+   * The layer was deleted: what it held is gone, and its name is refused
+   * from then on (its read URLs were cached as immutable). Work on another
+   * layer name.
+   */
+  LayerDeleted: 'LayerDeleted',
+  /**
+   * The share link asks its visitors who they are, and this visitor hasn't
+   * answered what it requires: opening (a link that asks on open), or a
+   * change (one that asks before the first change), waits for the answers.
+   * `details` is a `VisitorIdentityRequest`: `fields` (what the link asks,
+   * each required or optional), `missing`, `invalid`, `purpose` and
+   * `privacyUrl`. Answer by opening again with `visitor`, or with
+   * `doc.share.identify()`.
+   */
+  VisitorIdentityRequired: 'VisitorIdentityRequired',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

@@ -8,7 +8,7 @@
  *
  *   const ctx = createTestContext({
  *     id: 'measurement',
- *     state: initialMeasurementState(),
+ *     state: initialMeasurementModel(),
  *     pages: [{ ref: toPageRef(1), size: { width: 600, height: 800 } }],
  *     capabilities: [[AnnotationToken, fakeAnnotation]],
  *     doc: { security: { allows: () => true } },
@@ -191,6 +191,8 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     canOpenFiles: () => false,
     open: unsupported('open'),
     retry: unsupported('retry'),
+    identify: unsupported('identify'),
+    declineIdentity: unsupported('declineIdentity'),
     rename: unsupported('rename'),
     openAll: unsupported('openAll'),
     unlock: unsupported('unlock'),

@@ -11,4 +11,5 @@ export interface ListSharesRequest {
     limit?: number;
     cursor?: string;
     docId?: string;
+    archived?: boolean;
 }

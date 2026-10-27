@@ -11,6 +11,8 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 
+import type { VisitorIdentityRequest } from './visitor-identity';
+
 // jose@5+ removed the public `KeyLike` alias. The verifier holds a
 // reference to whatever `importSPKI` returns (a `CryptoKey` /
 // `KeyObject`); derive the type structurally so we don't depend on a
@@ -28,6 +30,12 @@ export interface BaseClaims {
   tenant_id: string;
   /** Who the token acts for; see `Identity` in `@embedpdf/engine-core`. */
   identity?: Identity;
+  /**
+   * A share-link visitor who still has to answer the link's questions
+   * before changing anything: what they're asked. Reads work; every write
+   * is refused with `VisitorIdentityRequired`, decided from the token alone.
+   */
+  identity_pending?: VisitorIdentityRequest;
   iat: number;
   exp: number;
   /**
@@ -103,6 +111,18 @@ export interface DocUserClaims extends BaseClaims {
    * misconfigured token. Absent = any origin.
    */
   origins?: ReadonlyArray<string>;
+  /**
+   * A download link: the token opens one thing, this layer's PDF at this
+   * version, and only as the `link` query parameter of that download URL.
+   * It is never a bearer token. Needs `layer_name`.
+   */
+  download?: DownloadLinkClaim;
+}
+
+/** What a download link downloads: the layer at `docVersion`, saved incrementally. */
+export interface DownloadLinkClaim {
+  docVersion: number;
+  mode: 'incremental';
 }
 
 /**
@@ -546,6 +566,13 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
   if (typeof payload.jti === 'string') base.jti = payload.jti;
   const identity = coerceIdentityClaim(payload);
   if (identity) base.identity = identity;
+  const pending = (payload as { identity_pending?: unknown }).identity_pending;
+  if (pending !== undefined && pending !== null) {
+    if (typeof pending !== 'object' || Array.isArray(pending)) {
+      throw new Error('identity_pending must be an object');
+    }
+    base.identity_pending = pending as VisitorIdentityRequest;
+  }
   const embedpdf = (payload as { embedpdf?: unknown }).embedpdf;
   if (embedpdf && typeof embedpdf === 'object') {
     const nested = (embedpdf as { unlock_key?: unknown }).unlock_key;
@@ -614,6 +641,11 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
     throw new Error('jwt origins requires doc_id');
   }
 
+  const download = coerceDownloadClaim(payload);
+  if (download && layerName === undefined) {
+    throw new Error('jwt download requires doc_id and layer_name');
+  }
+
   if (docId !== undefined) {
     // Doc-scoped class. We tolerate a missing `scope` field on the
     // wire and synthesize `[]`; the route guard then rejects it.
@@ -641,6 +673,7 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
       scope: docScope,
       ...(layerName !== undefined ? { layer_name: layerName } : {}),
       ...(origins !== undefined ? { origins } : {}),
+      ...(download ? { download } : {}),
     };
     return out;
   }
@@ -651,6 +684,21 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
   const tenantScope = (scope ?? []) as ReadonlyArray<TenantScope>;
   const out: TenantClaims = { ...base, scope: tenantScope };
   return out;
+}
+
+/** The `download` claim (see `DocUserClaims.download`); a malformed one rejects the token. */
+function coerceDownloadClaim(payload: JWTPayload): DownloadLinkClaim | undefined {
+  const value = (payload as Record<string, unknown>).download;
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('jwt download must be an object');
+  }
+  const { docVersion, mode } = value as Record<string, unknown>;
+  if (typeof docVersion !== 'number' || !Number.isInteger(docVersion) || docVersion < 1) {
+    throw new Error('jwt download.docVersion must be a positive integer');
+  }
+  if (mode !== 'incremental') throw new Error('jwt download.mode must be "incremental"');
+  return { docVersion, mode };
 }
 
 function validateClaims(claims: JwtClaims, profile: JwtAudienceProfile, skew: number): void {

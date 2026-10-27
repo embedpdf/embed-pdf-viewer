@@ -10,15 +10,34 @@ import type { SignDevTokenInput } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
 import { verifySharePassword } from '../auth/share-password';
 import type { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
+import {
+  newVisitorId,
+  visitorLayerName,
+  visitorUserId,
+  type VisitorHandles,
+} from '../auth/visitor-handle';
+import { settleVisitorIdentity } from '../auth/visitor-identity';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
+import type { LayersRepo } from '../db/repos/page_state.repo';
 import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import type { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
+
+/** How long past a session's lifetime its renewal still continues the visit (a throttled timer, a slow network). */
+const VISIT_GRACE_SECONDS = 5 * 60;
 
 export interface ShareSessionRouteDeps {
   sign: (input: SignDevTokenInput) => string;
   grants: ShareGrantsRepo;
   documents: DocumentsRepo;
+  /** Visitors' layers: whether one was deleted. */
+  layers: LayersRepo;
+  /** Who the visitors are: their answers and their idle clock. */
+  visitors: ShareVisitorsRepo;
+  handles: VisitorHandles;
+  /** Start over: a visitor's layer goes (`LayerService.deleteLayer` where the engine runs). */
+  deleteLayer: (tenantId: string, input: { docId: string; layerName: string }) => Promise<void>;
   suspendedTenants: SuspendedTenantsGuard;
   usageMeters?: UsageMeters;
   tenantUsage: TenantUsageRepo;
@@ -67,7 +86,8 @@ export async function registerShareSessionRoutes(
   app: FastifyInstance,
   deps: ShareSessionRouteDeps,
 ): Promise<void> {
-  const { sign, grants, documents, suspendedTenants, usageMeters, tenantUsage } = deps;
+  const { sign, grants, documents, layers, visitors, handles, deleteLayer } = deps;
+  const { suspendedTenants, usageMeters, tenantUsage } = deps;
   const ipAttempts = new RequestRateLimiter(
     deps.ipAttemptLimit ?? { maxAttempts: 300, windowMs: 60_000 },
   );
@@ -101,7 +121,8 @@ export async function registerShareSessionRoutes(
           .code(400)
           .send({ error: { code: 'InvalidArg', message: 'invalid share exchange request' } });
       }
-      const { shareToken, password } = parsed.data;
+      const { shareToken, password, visitorHandle, restart } = parsed.data;
+      const answersGiven = parsed.data.visitorIdentity;
 
       // Browser-only endpoint: exchange exists to put a credential into
       // a page, and every cross-origin fetch carries Origin. A missing
@@ -128,7 +149,8 @@ export async function registerShareSessionRoutes(
         return notFound(reply);
       }
 
-      if (grant.disabled) return notFound(reply);
+      // Paused and archived links refuse alike: stale, not a probe.
+      if (grant.disabled || grant.archivedAt !== null) return notFound(reply);
       if (await suspendedTenants.isSuspended(grant.tenantId)) return notFound(reply);
       const doc = await documents.findById(grant.docId);
       if (!doc || doc.tenantId !== grant.tenantId || doc.state !== 'ready') {
@@ -161,33 +183,114 @@ export async function registerShareSessionRoutes(
         }
       }
 
+      // Who this is: the visitor the handle names, when this link issued
+      // it; anyone else is a new visitor. On a per-visitor link the visitor
+      // keeps their layer, unless they start over or it was deleted.
+      const now = Date.now();
+      const returning = visitorHandle ? handles.read(grant.id, visitorHandle) : null;
+      // A visit goes on while its sessions renew: a handle issued within a
+      // session lifetime and a little more is a renewal, not a new view. Its
+      // time is signed, so a client can't pass an old visit off as this one.
+      const sameVisit =
+        returning !== null &&
+        now - returning.issuedAt <= (grant.sessionTtlSeconds + VISIT_GRACE_SECONDS) * 1000;
+      let visitorId = returning?.visitorId ?? null;
+      if (visitorId && restart) {
+        // Starting over makes a new visitor, who is asked again. On a
+        // per-visitor link the old visitor and their layer go.
+        if (grant.layerMode === 'per-visitor') {
+          await deleteLayer(grant.tenantId, {
+            docId: grant.docId,
+            layerName: visitorLayerName(visitorId),
+          });
+          await visitors.delete(grant.id, visitorId);
+        }
+        visitorId = null;
+      } else if (
+        visitorId &&
+        grant.layerMode === 'per-visitor' &&
+        (await layers.isDeleted(grant.docId, visitorLayerName(visitorId)))
+      ) {
+        visitorId = null;
+      }
+      visitorId ??= newVisitorId();
+      const layerName =
+        grant.layerMode === 'per-visitor' ? visitorLayerName(visitorId) : grant.layerName!;
+
+      // Who they are: answers once given stand; new ones fill what the link
+      // asks and they haven't answered. A link that asks on open waits for
+      // what it requires (the same roundtrip as a passphrase); one that asks
+      // before the first change lets them read, and refuses their writes
+      // until they answer. Answers it can't take are refused either way.
+      const stored = await visitors.find(grant.id, visitorId);
+      const settled = settleVisitorIdentity(
+        grant.visitorIdentity,
+        stored?.answers ?? {},
+        answersGiven,
+      );
+      const pending = settled.request;
+      if (pending && (grant.visitorIdentity?.ask === 'on-open' || pending.invalid.length > 0)) {
+        return reply.code(422).send({
+          error: {
+            code: 'VisitorIdentityRequired',
+            message: "answer the share link's questions to open it",
+            details: pending,
+          },
+        });
+      }
+      if (Object.keys(settled.added).length > 0) {
+        await visitors.record({
+          grantId: grant.id,
+          visitorId,
+          docId: grant.docId,
+          added: settled.added,
+          now,
+        });
+      } else if (stored) {
+        await visitors.see(grant.id, visitorId, now);
+      }
+
       const ttl = grant.sessionTtlSeconds;
       const token = sign({
         // The sub prefix is load-bearing: /v1/access skips view counting
-        // for `share:` subjects (counted here), and the audit trail
-        // honestly labels share-session actors.
+        // for `share:` subjects (counted here), the audit trail honestly
+        // labels share-session actors, and a visitor's layer is stamped
+        // with its link from it at the first write.
         sub: `share:${grant.id}`,
         tenant_id: grant.tenantId,
         doc_id: grant.docId,
-        layer_name: grant.layerName,
+        layer_name: layerName,
         scope: grant.scope,
         ...(grant.origins ? { origins: grant.origins } : {}),
         jti: randomUUID(),
         ttlSeconds: ttl,
+        extras: {
+          identity: { ...settled.answers, userId: visitorUserId(visitorId) },
+          ...(pending ? { identity_pending: pending } : {}),
+        },
       });
 
       await grants.touchExchanged(grant.id);
-      // A view = a share exchange or an authorized /v1/access grant,
-      // deduplicated via the sub prefix above. Both meters move here:
-      // the deployment-wide license counter and the per-tenant fact.
-      await usageMeters?.recordView();
-      await tenantUsage.recordView(grant.tenantId);
+      // A view = a visit through a share link (its first exchange, not its
+      // renewals) or an authorized /v1/access grant, deduplicated via the
+      // sub prefix above. Both meters move here: the deployment-wide
+      // license counter and the per-tenant fact.
+      if (!sameVisit) {
+        await usageMeters?.recordView();
+        await tenantUsage.recordView(grant.tenantId);
+      }
 
       setNoStore(reply);
       return reply.send({
         token,
         docId: grant.docId,
-        layerName: grant.layerName,
+        layerName,
+        layerMode: grant.layerMode,
+        visitor: {
+          handle: handles.issue(grant.id, visitorId, now),
+          keep: grant.layerMode === 'per-visitor' && grant.keepVisitorLayers,
+          identityRequest: pending,
+        },
         expiresAt: Math.floor(Date.now() / 1000) + ttl,
       });
     },

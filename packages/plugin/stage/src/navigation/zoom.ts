@@ -12,7 +12,7 @@ import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageGestures } from '../camera/gestures';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, type StageState } from '../model';
+import { patchSettings, type StageModel } from '../model';
 import type { StageServices } from '../services';
 import type { StageSettingsArea } from '../settings/settings';
 
@@ -20,7 +20,7 @@ import type { StageSettingsArea } from '../settings/settings';
 const ZOOM_STEP = 1.2;
 
 export function createZoom(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene }: Pick<StageServices, 'scene'>,
   { syncCursorFromCamera }: Pick<StageCameraWrite, 'syncCursorFromCamera'>,
   {

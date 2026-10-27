@@ -13,7 +13,12 @@ export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { createScrollHandler, DEFAULT_SETTINGS, stageState } from '@embedpdf/plugin-stage';
-import type { StageCapability, StageSettings, VisiblePage } from '@embedpdf/plugin-stage';
+import type {
+  StageCapability,
+  StageSettings,
+  StageState,
+  VisiblePage,
+} from '@embedpdf/plugin-stage';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { shallowEqual, toPageRef } from '@embedpdf/core';
 import type { CapabilityToken, EventHook } from '@embedpdf/core';
@@ -332,17 +337,14 @@ export function useStageEvent<T>(
   useCapabilityEvent(useStageToken(token), select, handler);
 }
 
-/** What `useStageState()` returns: the Stage page's State table. */
-type StageStateValue = (typeof stageState)['empty'];
-
 /**
  * The view's state: the zoom, the current page, the page count, the view
  * rotation and the responsive rules that apply (the page's State table,
  * declared once in `stageState`). Takes a selector, and re-renders only when
  * what it returns changes. Without a document it is `stageState.empty`.
  */
-export function useStageState<Selected = StageStateValue>(
-  select?: (state: StageStateValue) => Selected,
+export function useStageState<Selected = StageState>(
+  select?: (state: StageState) => Selected,
   token?: StageTokenProp,
 ): Selected {
   const lens = useStageToken(token);

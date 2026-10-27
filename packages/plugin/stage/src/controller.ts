@@ -21,7 +21,7 @@ import { createCameraWrite } from './camera/write';
 import { connectStage } from './connect';
 import type { StageConfig } from './contract';
 import type { StageHostCapability } from './host-contract';
-import type { StageState } from './model';
+import type { StageModel } from './model';
 import { createArrival } from './navigation/arrive';
 import { createReveal } from './navigation/reveal';
 import { createZoom } from './navigation/zoom';
@@ -31,7 +31,7 @@ import { createSettings } from './settings/settings';
 import { createViewLifecycle } from './view/lifecycle';
 
 export function createStageController(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   config: StageConfig = {},
 ) {
   const services = createServices(ctx);

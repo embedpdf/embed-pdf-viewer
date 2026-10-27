@@ -20,12 +20,18 @@ export type { HttpClientOptions } from './transport/HttpClient';
 export { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export type { UnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export {
+  browserVisitorStore,
   exchangeShareToken,
   shareSessionSource,
   ShareExchangeError,
   engineErrorFromShareExchange,
 } from './share';
-export type { ShareSession, ShareExchangeOptions } from './share';
+export type {
+  ShareSession,
+  ShareExchangeOptions,
+  ShareSessionOptions,
+  VisitorStore,
+} from './share';
 
 import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
 

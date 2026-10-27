@@ -15,11 +15,11 @@ import type {
   StageViewportChangedEvent,
   StageZoomChangedEvent,
 } from '../contract';
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import { eqSetting } from '../responsive';
 import { pickSettings, SETTING_KEYS } from '../settings';
 
-export function createEvents(ctx: PluginContext<StageState>) {
+export function createEvents(ctx: PluginContext<StageModel>) {
   const pageChanged = ctx.events.source<StagePageChangedEvent>();
   const zoomChanged = ctx.events.source<StageZoomChangedEvent>();
   const cameraChanged = ctx.events.source<StageCameraChangedEvent>();

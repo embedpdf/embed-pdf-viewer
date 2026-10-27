@@ -7,6 +7,7 @@ import { toPageRef } from '../src/runtime';
 import {
   outlinePlugin,
   outlineState,
+  type OutlineState,
   OutlineToken,
   useOutline,
   useOutlineState,
@@ -83,7 +84,7 @@ describe('useOutlineState', () => {
     // Nothing reads the outline as the document opens: the hook's reading it loads it.
     await act(() => kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() }));
     await waitFor(() => expect(kernel.capability(OutlineToken).getStatus()).toBe('ready'));
-    const state = latest(renders) as ReturnType<typeof outlineState.read>;
+    const state = latest(renders) as OutlineState;
     expect(state.items.map((each) => each.title)).toEqual(['Chapter', 'Section', 'Appendix']);
     // The file opens Chapter, so its section's row shows.
     expect(state.rows.map((row) => [row.item.title, row.depth])).toEqual([

@@ -20,7 +20,7 @@ import {
   type RedactionConfig,
 } from '../src/contract';
 import { createRedactionController } from '../src/controller';
-import { initialRedactionState } from '../src/model';
+import { initialRedactionModel } from '../src/model';
 import { redactionState } from '../src/state';
 
 const PAGE = toPageRef(7);
@@ -147,7 +147,7 @@ function harness(
   );
   const ctx = createTestContext({
     id: 'redaction',
-    state: initialRedactionState(),
+    state: initialRedactionModel(),
     settings: { defaults: REDACTION_DEFAULTS, registered: options.config },
     pages: [{ ref: PAGE }, { ref: OTHER_PAGE }],
     capabilities: [

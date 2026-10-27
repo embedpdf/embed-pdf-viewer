@@ -93,6 +93,8 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
   SigningVersionMismatch: 'conflict',
   ObjectNumberUnavailable: 'conflict',
   LayerFull: 'conflict',
+  LayerDeleted: 'not-found',
+  VisitorIdentityRequired: 'permission-denied',
   ChangeConflict: 'conflict',
   UndoUnavailable: 'conflict',
   IdempotencyKeyReused: 'invalid-input',

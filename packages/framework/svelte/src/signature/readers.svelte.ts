@@ -12,7 +12,7 @@ import {
 } from '@embedpdf/plugin-signature';
 import type { SignatureCapability, SignerRow } from '@embedpdf/plugin-signature';
 import { useCapability, useCapabilityEvent } from '../runtime/readers.svelte';
-import { settingsReader, stateReader, type StateReader } from '../runtime/state.svelte';
+import { settingsReader, stateReader } from '../runtime/state.svelte';
 import { currentOf, derivedValue, type CurrentValue } from '../runtime/values.svelte';
 import { useStampAssets, useStampLibraries } from '../stamp/readers.svelte';
 
@@ -29,13 +29,8 @@ export function useSignature(): SignatureCapability {
  * the `target`, whether a signing runs (`busy`), a two-step signing in progress, and whether
  * they're read, declared once in `signatureState`. A reactive object (`state.signatures`), or
  * with a selector one value as `{ current }`. Empty without a document.
- *
- * Typed through the declaration, so the published types name it from `@embedpdf/plugin-signature`, a
- * dependency of this package, and not from the engine package `protection`'s type comes from, which
- * isn't one.
  */
-export const useSignatureState: StateReader<ReturnType<typeof signatureState.read>> =
-  stateReader(signatureState);
+export const useSignatureState = stateReader(signatureState);
 
 /**
  * The signature settings (`key`, `mode`, `trust`, `allowCertify`), with or without a document.

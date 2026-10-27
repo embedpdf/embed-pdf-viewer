@@ -215,6 +215,35 @@ export function holdNextUpload(replica: Replica): { held: Promise<void>; release
   return { held, release: gateResolve };
 }
 
+/**
+ * Trap the replica's next write alignment (`ensureLayerFreshOnPool` for a
+ * write): `held` resolves once the write checked for an earlier answer and
+ * is about to open the layer, before its object numbers are checked.
+ * `release()` lets it proceed.
+ */
+export function holdNextWriteAlignment(replica: Replica): {
+  held: Promise<void>;
+  release: () => void;
+} {
+  const service = replica.bundle.documentService as unknown as {
+    ensureLayerFreshOnPool: (...args: unknown[]) => Promise<void>;
+  };
+  const original = service.ensureLayerFreshOnPool.bind(service);
+  let heldResolve!: () => void;
+  let gateResolve!: () => void;
+  const held = new Promise<void>((resolve) => (heldResolve = resolve));
+  const gate = new Promise<void>((resolve) => (gateResolve = resolve));
+  service.ensureLayerFreshOnPool = async (...args: unknown[]) => {
+    const opts = args[5] as { forWrite?: boolean } | undefined;
+    if (!opts?.forWrite) return original(...args);
+    service.ensureLayerFreshOnPool = original;
+    heldResolve();
+    await gate;
+    return original(...args);
+  };
+  return { held, release: gateResolve };
+}
+
 /** Make the replica's next artifact upload fail (post-apply, pre-commit). */
 export function failNextUpload(replica: Replica, message = 'injected upload failure'): void {
   const svc = replica.bundle.layerService as unknown as UploadPatchable;

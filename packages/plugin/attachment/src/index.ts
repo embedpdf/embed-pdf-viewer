@@ -5,5 +5,5 @@
  * Layout: contract.ts · model.ts · controller.ts · state.ts · attachment.plugin.ts.
  */
 export { attachmentPlugin } from './attachment.plugin';
-export { attachmentState } from './state';
+export { attachmentState, type AttachmentState } from './state';
 export * from './contract';

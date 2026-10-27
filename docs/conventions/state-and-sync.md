@@ -47,12 +47,12 @@ From `packages/plugin/shell`:
 
 ```ts
 // model.ts
-export function openMenu(state: ShellState, id: string): ShellState {
+export function openMenu(state: ShellModel, id: string): ShellModel {
   if (state.openMenus.includes(id)) return state;
   return { ...state, openMenus: [...state.openMenus, id] };
 }
 
-export function closeMenu(state: ShellState, id: string): ShellState {
+export function closeMenu(state: ShellModel, id: string): ShellModel {
   if (!state.openMenus.includes(id)) return state;
   return { ...state, openMenus: state.openMenus.filter((menu) => menu !== id) };
 }

@@ -2,4 +2,4 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type SharesDeleteResponse = CloudPDF.AdminErrorPayload;
+export type SharesArchive404Response = CloudPDF.AdminErrorPayload;

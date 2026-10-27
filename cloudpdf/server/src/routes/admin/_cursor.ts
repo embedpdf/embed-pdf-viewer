@@ -1,10 +1,10 @@
 /**
  * List cursors are opaque `v1.<base64url(JSON)>` tokens over a keyset
  * position `{ t: createdAt, id }`, shared by every cursor-paginated
- * admin list (documents, tenants). Opaque by contract — the format may
- * change, so clients round-trip `nextCursor` verbatim. Anything that
- * does not decode to a well-formed v1 position fails closed as
- * InvalidArg.
+ * admin list (documents, tenants, shares, a document's layers). Opaque by
+ * contract — the format may change, so clients round-trip `nextCursor`
+ * verbatim. Anything that does not decode to a well-formed v1 position
+ * fails closed as InvalidArg.
  */
 
 export function encodeListCursor(row: { createdAt: number; id: string }): string {

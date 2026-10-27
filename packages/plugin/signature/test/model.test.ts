@@ -12,7 +12,7 @@ import type {
 import {
   emptySignatureRecord,
   foldSignatureEvent,
-  initialSignatureState,
+  initialSignatureModel,
   newlyInvalidated,
   setBusy,
   setTarget,
@@ -54,7 +54,7 @@ const verdict = (index: number, summary: string, basis: string) =>
 
 describe('session transitions', () => {
   it('return the same state when nothing changes', () => {
-    const state = initialSignatureState();
+    const state = initialSignatureModel();
     expect(setBusy(state, false)).toBe(state);
     expect(setTarget(state, null)).toBe(state);
     expect(setVerdicts(state, null)).toBe(state);

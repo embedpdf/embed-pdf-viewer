@@ -72,7 +72,7 @@ The smallest harness (`packages/plugin/shell/test/shell.test.ts`):
 
 ```ts
 const harness = () => {
-  const ctx = createTestContext({ id: 'shell', state: initialShellState() });
+  const ctx = createTestContext({ id: 'shell', state: initialShellModel() });
   return ctx.connect(createShellController(ctx));
 };
 ```
@@ -90,7 +90,7 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { createTitleController } from '../src/controller';
-import { foldTitle, initialTitleState } from '../src/model';
+import { foldTitle, initialTitleModel } from '../src/model';
 
 const origin = (kind: 'local' | 'remote') => ({
   kind,
@@ -114,7 +114,7 @@ function harness(initial: string | null) {
   let metadata = { title: initial } as DocumentMetadata;
   const ctx = createTestContext({
     id: 'title',
-    state: initialTitleState(),
+    state: initialTitleModel(),
     doc: {
       metadata: {
         read: async () => metadata,

@@ -7,7 +7,7 @@ import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { OutlineToken } from './contract';
 import { createOutlineController } from './controller';
-import { initialOutlineState } from './model';
+import { initialOutlineModel } from './model';
 
 /**
  * The document's outline (its bookmarks). Document-scoped; optionally uses
@@ -20,6 +20,6 @@ export const outlinePlugin = () =>
     token: OutlineToken,
     scope: 'document',
     optional: [StageToken, ActionsToken, LinkToken, SelectionToken, I18nToken],
-    state: initialOutlineState,
+    state: initialOutlineModel,
     create: createOutlineController,
   });

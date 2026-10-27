@@ -5,6 +5,7 @@ import {
   OutlineToken,
   outlinePlugin,
   outlineState,
+  type OutlineState,
   useOutline,
   useOutlineState,
   type OutlineItem,
@@ -69,7 +70,7 @@ describe('useOutlineState', () => {
     await kernel.documents.open(bytesInput('doc'));
     await vi.waitFor(() => expect(kernel.capability(OutlineToken).getStatus()).toBe('ready'));
     flushSync();
-    const seen = latest(state.seen) as ReturnType<typeof outlineState.read>;
+    const seen = latest(state.seen) as OutlineState;
     expect(seen.rows.map((row) => [row.item.title, row.depth])).toEqual([
       ['Chapter', 0],
       ['Section', 1],

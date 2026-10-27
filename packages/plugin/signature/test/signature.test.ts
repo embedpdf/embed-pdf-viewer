@@ -43,7 +43,7 @@ import {
   type SignatureSignedEvent,
 } from '../src/contract';
 import { createSignatureController } from '../src/controller';
-import { initialSignatureState, type SignatureState } from '../src/model';
+import { initialSignatureModel, type SignatureModel } from '../src/model';
 import { signatureState } from '../src/state';
 import { createArmedMarkHandler } from '../src/tools/armed-mark';
 
@@ -121,7 +121,7 @@ function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
 }
 
 /** Contexts a case opened; disposed after it, so no re-judgement timer outlives its case. */
-const contexts: TestContext<SignatureState, SignatureSettings>[] = [];
+const contexts: TestContext<SignatureModel, SignatureSettings>[] = [];
 afterEach(async () => {
   for (const ctx of contexts.splice(0)) await ctx.dispose();
 });
@@ -138,7 +138,7 @@ function makeSignature(
   if (options.stamp) capabilities.push([StampToken, options.stamp]);
   const ctx = createTestContext({
     id: 'signature',
-    state: initialSignatureState(),
+    state: initialSignatureModel(),
     settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['key', 'trust'] },
     documentId: 'doc-1',
     doc,

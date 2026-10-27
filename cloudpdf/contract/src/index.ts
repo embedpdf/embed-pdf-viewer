@@ -405,6 +405,8 @@ export const AdminErrorPayloadSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
+    /** Structured context for some codes, named in each operation's notes. */
+    details: z.record(z.string(), z.unknown()).optional(),
   }),
 });
 export type AdminErrorPayload = z.infer<typeof AdminErrorPayloadSchema>;
@@ -435,6 +437,56 @@ export const AdminTenantDocParamsSchema = z.object({
   id: z.string().regex(docIdPattern),
 });
 export type AdminTenantDocParams = z.infer<typeof AdminTenantDocParamsSchema>;
+
+export const AdminTenantDocLayerParamsSchema = AdminTenantDocParamsSchema.extend({
+  layerName: z.string().min(1).max(256),
+});
+export type AdminTenantDocLayerParams = z.infer<typeof AdminTenantDocLayerParamsSchema>;
+
+/**
+ * A layer that holds changes: one a link or your tokens name, or a
+ * share-link visitor's own. A layer appears at its first change, and a
+ * deleted one is no longer listed. Read and download it with the API token
+ * through `/v1/docs/{docId}/layers/{layerName}`.
+ */
+export const AdminLayerRecordSchema = z.object({
+  docId: z.string(),
+  layerName: z.string(),
+  /** The share link whose visitor made it (the link may since be deleted); null otherwise. */
+  shareId: z.string().nullable(),
+  /** That visitor; null for a layer a link or token names. */
+  visitorId: z.string().nullable(),
+  /** Bytes the layer stores: its changes over the document, not the whole PDF. */
+  storageSizeBytes: z.number().nullable(),
+  /** Unix epoch ms of its first change. */
+  createdAt: z.number(),
+  /** Unix epoch ms of its last change. */
+  updatedAt: z.number(),
+  /** A visitor's layer: Unix epoch ms the visitor last opened it; null otherwise. */
+  lastSeenAt: z.number().nullable(),
+});
+export type AdminLayerRecord = z.infer<typeof AdminLayerRecordSchema>;
+
+/** Query parameters for `documents.layers.list`, as for the other lists. */
+export const AdminDocumentLayerListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+  /** Only the layers this share link's visitors made, a deleted link's too. */
+  shareId: z.string().regex(shareTokenPattern).optional(),
+});
+export type AdminDocumentLayerListQuery = z.infer<typeof AdminDocumentLayerListQuerySchema>;
+
+export const AdminDocumentLayerListResponseSchema = z.object({
+  layers: z.array(AdminLayerRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable().optional(),
+});
+export type AdminDocumentLayerListResponse = z.infer<typeof AdminDocumentLayerListResponseSchema>;
 
 export const AdminTenantJtiParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
@@ -640,12 +692,104 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
 // revocable. The only credential it ever produces is an ordinary
 // short-lived doc JWT, minted downward at `shares.exchange`.
 
+/**
+ * Whose layer a link's visitors write into: `'shared'`, one layer everyone
+ * reads and writes (`layerName`), or `'per-visitor'`, a layer of each
+ * visitor's own (`visitor-<id>`), made at their first change.
+ */
+export const ShareLayerModeSchema = z.enum(['shared', 'per-visitor']);
+export type ShareLayerMode = z.infer<typeof ShareLayerModeSchema>;
+
+/** Delete a visitor after this long unseen: an hour to 30 days. */
+const visitorIdleSecondsSchema = z
+  .number()
+  .int()
+  .min(60 * 60)
+  .max(30 * 24 * 60 * 60);
+
+const visitorQuestionSchema = z.enum(['required', 'optional']);
+
+/**
+ * What a link asks its visitors, so what they add carries their name and
+ * the owner learns who they are. The answers are stored once per visitor
+ * and go into every session token issued for them; a visitor can't change
+ * an answer they gave (they start over instead). `userId` is never asked: a
+ * visitor's is `visitor_<id>`.
+ */
+export const ShareVisitorIdentitySchema = z.object({
+  /** The identity fields to ask, each required or optional; at least one. */
+  fields: z.object({
+    /** Their name: the author of what they add. */
+    displayName: visitorQuestionSchema.optional(),
+    email: visitorQuestionSchema.optional(),
+    title: visitorQuestionSchema.optional(),
+    organization: visitorQuestionSchema.optional(),
+    organizationalUnit: visitorQuestionSchema.optional(),
+  }),
+  /**
+   * `'on-open'`: before the document opens (a lead gate). `'before-first-change'`:
+   * reading is free, and the first change asks (a review link).
+   */
+  ask: z.enum(['on-open', 'before-first-change']),
+  /** Shown with the questions: why they're asked. */
+  purpose: z.string().min(1).max(500).optional(),
+  /** The link owner's privacy notice, linked from the questions. */
+  privacyUrl: z.string().url().max(2048).optional(),
+});
+export type ShareVisitorIdentity = z.infer<typeof ShareVisitorIdentitySchema>;
+
+/** A visitor's answers, the identity fields a link asks. */
+export const ShareVisitorAnswersSchema = z.object({
+  displayName: z.string().max(4096).optional(),
+  email: z.string().max(4096).optional(),
+  title: z.string().max(4096).optional(),
+  organization: z.string().max(4096).optional(),
+  organizationalUnit: z.string().max(4096).optional(),
+});
+export type ShareVisitorAnswers = z.infer<typeof ShareVisitorAnswersSchema>;
+
+const visitorFieldSchema = z.enum([
+  'displayName',
+  'email',
+  'title',
+  'organization',
+  'organizationalUnit',
+]);
+
+/**
+ * What a visitor is still asked: the details of `VisitorIdentityRequired`,
+ * and the exchange's `visitor.identityRequest` on a link that asks before
+ * the first change.
+ */
+export const ShareVisitorIdentityRequestSchema = z.object({
+  /** What the link asks, each required or optional. */
+  fields: ShareVisitorIdentitySchema.shape.fields,
+  /** Required fields not answered yet. */
+  missing: z.array(visitorFieldSchema),
+  /** Answers given this time that can't be taken (an email that isn't one, too long). */
+  invalid: z.array(visitorFieldSchema),
+  purpose: z.string().optional(),
+  privacyUrl: z.string().optional(),
+});
+export type ShareVisitorIdentityRequest = z.infer<typeof ShareVisitorIdentityRequestSchema>;
+
 export const ShareGrantRecordSchema = z.object({
   /** Grant id; doubles as the public share token (`shr_…`). */
   id: z.string(),
   tenantId: z.string(),
   docId: z.string(),
-  layerName: z.string(),
+  layerMode: ShareLayerModeSchema,
+  /** The layer every visitor shares; null for a per-visitor link. */
+  layerName: z.string().nullable(),
+  /** Per-visitor links: a visitor's browser keeps its layer for the next visit. */
+  keepVisitorLayers: z.boolean(),
+  /**
+   * Delete a visitor (their answers and their layer) after this long
+   * unseen; null keeps them until they are deleted on purpose.
+   */
+  visitorIdleSeconds: z.number().nullable(),
+  /** What the link asks its visitors; null asks nothing. */
+  visitorIdentity: ShareVisitorIdentitySchema.nullable(),
   /** Doc capabilities the exchanged session carries. */
   scope: z.array(z.string()),
   /** Origin allowlist; null means any origin. */
@@ -656,6 +800,11 @@ export const ShareGrantRecordSchema = z.object({
   sessionTtlSeconds: z.number(),
   /** Paused grants refuse exchange (404) but keep their configuration. */
   disabled: z.boolean(),
+  /**
+   * Unix epoch ms the link was archived: it refuses exchange for good and
+   * keeps what its visitors made. Null while it works.
+   */
+  archivedAt: z.number().nullable(),
   /** Unix epoch ms after which exchange returns 410; null = no expiry. */
   expiresAt: z.number().nullable(),
   /** Total successful exchanges — a dashboard convenience, not the usage meter. */
@@ -669,7 +818,20 @@ export type ShareGrantRecord = z.infer<typeof ShareGrantRecordSchema>;
 
 export const ShareGrantCreateRequestSchema = z.object({
   docId: z.string().regex(docIdPattern),
+  /** Default `'shared'`. */
+  layerMode: ShareLayerModeSchema.optional(),
+  /** The shared layer, default `default`. Not for a per-visitor link, and never `visitor-…`. */
   layerName: z.string().min(1).max(256).optional(),
+  /** Per-visitor links: keep a visitor's layer for their next visit. Default true. */
+  keepVisitorLayers: z.boolean().optional(),
+  /**
+   * Delete a visitor (their answers and their layer) after this long unseen,
+   * for links whose visitors' work is throwaway (examples, demos). Omit or
+   * null to keep visitors until they are deleted on purpose (the default).
+   */
+  visitorIdleSeconds: visitorIdleSecondsSchema.nullable().optional(),
+  /** Ask visitors who they are; omit or null to ask nothing. */
+  visitorIdentity: ShareVisitorIdentitySchema.nullable().optional(),
   /**
    * Doc capability scopes the exchanged session will carry. Validated
    * server-side against the engine's scope vocabulary, same as
@@ -700,6 +862,19 @@ export type ShareGrantCreateRequest = z.infer<typeof ShareGrantCreateRequestSche
  * grant retargets the copies already pasted into pages.
  */
 export const ShareGrantUpdateRequestSchema = z.object({
+  /**
+   * Switching to `'per-visitor'` stops visitors writing into the shared
+   * layer (it stays); switching to `'shared'` takes `layerName`, default
+   * `default`. The token stays the same either way.
+   */
+  layerMode: ShareLayerModeSchema.optional(),
+  /** A shared link's layer. Not for a per-visitor link, and never `visitor-…`. */
+  layerName: z.string().min(1).max(256).optional(),
+  keepVisitorLayers: z.boolean().optional(),
+  /** null stops deleting visitors who go unseen. */
+  visitorIdleSeconds: visitorIdleSecondsSchema.nullable().optional(),
+  /** null stops asking; a change applies at each visitor's next exchange. */
+  visitorIdentity: ShareVisitorIdentitySchema.nullable().optional(),
   scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   origins: originPatternArray.nullable().optional(),
   password: z.string().min(1).max(1024).nullable().optional(),
@@ -719,6 +894,12 @@ export const ShareGrantResponseSchema = z.object({
 });
 export type ShareGrantResponse = z.infer<typeof ShareGrantResponseSchema>;
 
+/** A query-string flag, `true` or `false`. */
+const queryFlag = z.preprocess(
+  (value) => (value === 'true' ? true : value === 'false' ? false : value),
+  z.boolean(),
+);
+
 export const ShareGrantListQuerySchema = z.object({
   limit: z.coerce
     .number()
@@ -729,6 +910,8 @@ export const ShareGrantListQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   /** Filter to one document's grants. */
   docId: z.string().regex(docIdPattern).optional(),
+  /** `true` lists the archived links instead of the ones that still work. */
+  archived: queryFlag.optional(),
 });
 export type ShareGrantListQuery = z.infer<typeof ShareGrantListQuerySchema>;
 
@@ -745,6 +928,54 @@ export const AdminTenantShareParamsSchema = z.object({
 });
 export type AdminTenantShareParams = z.infer<typeof AdminTenantShareParamsSchema>;
 
+export const AdminTenantShareVisitorParamsSchema = AdminTenantShareParamsSchema.extend({
+  visitorId: z.string().regex(/^[0-9a-f]{24}$/),
+});
+export type AdminTenantShareVisitorParams = z.infer<typeof AdminTenantShareVisitorParamsSchema>;
+
+/**
+ * A share link's visitor who answered its questions or made a change: their
+ * answers, when they agreed and were last seen, and their own layer.
+ */
+export const ShareVisitorRecordSchema = z.object({
+  visitorId: z.string(),
+  /** Their answers to what the link asked; empty for a visitor who was asked nothing. */
+  answers: ShareVisitorAnswersSchema,
+  /** Whether their email was verified (not yet offered: always false). */
+  emailVerified: z.boolean(),
+  /** Unix epoch ms they gave their answers; null for one who was asked nothing. */
+  consentedAt: z.number().nullable(),
+  firstSeenAt: z.number(),
+  lastSeenAt: z.number(),
+  /** Their own layer, when it holds changes (per-visitor links). */
+  layer: z
+    .object({
+      layerName: z.string(),
+      storageSizeBytes: z.number().nullable(),
+    })
+    .nullable(),
+});
+export type ShareVisitorRecord = z.infer<typeof ShareVisitorRecordSchema>;
+
+/** Query parameters for `shares.visitors.list`, as for the other lists. */
+export const ShareVisitorListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+});
+export type ShareVisitorListQuery = z.infer<typeof ShareVisitorListQuerySchema>;
+
+export const ShareVisitorListResponseSchema = z.object({
+  visitors: z.array(ShareVisitorRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable().optional(),
+});
+export type ShareVisitorListResponse = z.infer<typeof ShareVisitorListResponseSchema>;
+
 /**
  * The share token travels in the body, never the path — URLs land in
  * access logs and proxy logs, and the token is the whole credential.
@@ -753,6 +984,19 @@ export const ShareExchangeRequestSchema = z.object({
   shareToken: z.string().regex(shareTokenPattern),
   /** Required when the grant is passphrase-protected (422 otherwise). */
   password: z.string().min(1).max(1024).optional(),
+  /**
+   * The `visitor.handle` an earlier exchange answered: the same visitor, and
+   * on a per-visitor link the same layer. One the link didn't issue, or
+   * whose layer was deleted, gets a new visitor.
+   */
+  visitorHandle: z.string().min(1).max(256).optional(),
+  /** With `visitorHandle` on a per-visitor link: delete that visitor's layer and start a new visitor. */
+  restart: z.boolean().optional(),
+  /**
+   * The visitor's answers to what the link asks (`visitorIdentity`). Only
+   * the fields they haven't answered count: an answer once given stays.
+   */
+  visitorIdentity: ShareVisitorAnswersSchema.optional(),
 });
 export type ShareExchangeRequest = z.infer<typeof ShareExchangeRequestSchema>;
 
@@ -760,7 +1004,23 @@ export const ShareSessionResponseSchema = z.object({
   /** A doc-scoped session JWT carrying the grant's capabilities and origin lock. */
   token: z.string(),
   docId: z.string(),
+  /** The layer the session reads and writes: the shared one, or this visitor's own. */
   layerName: z.string(),
+  layerMode: ShareLayerModeSchema,
+  /** Who the session acts as: the session token names them as the author of what they add. */
+  visitor: z.object({
+    /** Send it back with the next exchange: renewals keep the same visitor. */
+    handle: z.string(),
+    /** Keep the handle for the next visit too: the link keeps a visitor's layer. */
+    keep: z.boolean(),
+    /**
+     * What the link asks before this visitor's first change, when they
+     * haven't answered it: their writes are refused (403
+     * `VisitorIdentityRequired`) until they exchange again with their
+     * answers. `null` when nothing is asked.
+     */
+    identityRequest: ShareVisitorIdentityRequestSchema.nullable(),
+  }),
   /** Unix seconds when the session token expires; exchange again for a fresh one. */
   expiresAt: z.number(),
 });
@@ -1083,6 +1343,41 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
+  'documents.layers.list': {
+    operationId: 'documents.layers.list',
+    title: 'List layers',
+    summary:
+      "A document's layers that hold changes, newest first, cursor-paginated: the ones links and your tokens name, and each share-link visitor's own.",
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/documents/:id/layers',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantDocParamsSchema,
+    query: AdminDocumentLayerListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: AdminDocumentLayerListResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'documents.layers.delete': {
+    operationId: 'documents.layers.delete',
+    title: 'Delete layer',
+    summary:
+      "Delete a layer and everything it stored. A layer that was written can't be used again under its name; one nobody wrote stays usable.",
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/documents/:id/layers/:layerName',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.delete'],
+    params: AdminTenantDocLayerParamsSchema,
+    responses: {
+      204: {},
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
   'documents.thumbnail': {
     operationId: 'documents.thumbnail',
     title: 'Get thumbnail',
@@ -1266,12 +1561,65 @@ export const adminOperations = {
       200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
+  },
+  'shares.archive': {
+    operationId: 'shares.archive',
+    title: 'Archive share',
+    summary:
+      "End a link for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/shares/:shareId/archive',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantShareParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Archiving is final: an archived link never exchanges again, and to share again you create a new link. Pausing (`disabled`) is the reversible stop. An archived link no longer counts as using its shared layer, so that layer can be deleted.',
+  },
+  'shares.visitors.list': {
+    operationId: 'shares.visitors.list',
+    title: 'List visitors',
+    summary:
+      "A share link's visitors who answered its questions or made a change, newest first, cursor-paginated: their answers and their layer.",
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/shares/:shareId/visitors',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantShareParamsSchema,
+    query: ShareVisitorListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: ShareVisitorListResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes: "An archived link's visitors are listed too.",
+  },
+  'shares.visitors.delete': {
+    operationId: 'shares.visitors.delete',
+    title: 'Delete visitor',
+    summary: "Erase a share link's visitor: their answers and their own layer.",
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/shares/:shareId/visitors/:visitorId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantShareVisitorParamsSchema,
+    responses: {
+      204: {},
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Their handle brings them back as a new visitor, who is asked again. Deleting a visitor already deleted changes nothing.',
   },
   'shares.delete': {
     operationId: 'shares.delete',
-    title: 'Revoke share',
-    summary: 'Delete a grant; exchange stops immediately, live sessions lapse at their exp.',
+    title: 'Delete share',
+    summary:
+      'Delete a link that has no visitors; exchange stops immediately, live sessions lapse at their exp. A link whose visitors answered its questions or have layers is archived instead (409).',
     method: 'DELETE',
     path: '/v1/tenants/:tenantId/shares/:shareId',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1280,6 +1628,7 @@ export const adminOperations = {
     responses: {
       204: {},
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
   'shares.exchange': {
@@ -1303,7 +1652,13 @@ export const adminOperations = {
       'Unauthenticated, but requires a browser Origin header, checked against the grant ' +
       'allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). ' +
       'Passphrase-protected grants return 422 SharePasswordRequired until `password` is ' +
-      'supplied. Mounted only when the deployment can sign (HS256 mode).',
+      'supplied. A link that asks its visitors who they are on open returns 422 ' +
+      'VisitorIdentityRequired until the required answers are given; `error.details` carries ' +
+      '`fields` (what the link asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A link ' +
+      'that asks before the first change issues the session at once with ' +
+      '`visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same ' +
+      'details until the visitor exchanges again with their answers. Answers that can not be ' +
+      'taken answer 422 on any link. Mounted only when the deployment can sign (HS256 mode).',
   },
 } as const satisfies Record<string, AdminOperation>;
 export type AdminOperationId = keyof typeof adminOperations;
@@ -1329,6 +1684,28 @@ export const DocIdParamsSchema = z.object({
 export const DocLayerParamsSchema = DocIdParamsSchema.extend({
   layerName: z.string().min(1),
 });
+
+export const DownloadLinkRequestSchema = z.object({
+  /** Seconds the link works for: 60 to 3600, default 300. */
+  expiresIn: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60)
+    .optional(),
+});
+export type DownloadLinkRequest = z.infer<typeof DownloadLinkRequestSchema>;
+
+export const DownloadLinkResponseSchema = z.object({
+  /**
+   * Downloads the layer's PDF as it is now, saved incrementally, with a
+   * plain GET and no Authorization header. Use it as given.
+   */
+  url: z.string(),
+  /** Unix seconds after which the link no longer works. */
+  expiresAt: z.number(),
+});
+export type DownloadLinkResponse = z.infer<typeof DownloadLinkResponseSchema>;
 export const DocPageParamsSchema = DocLayerParamsSchema.extend({
   pageKey: z
     .string()
@@ -2288,6 +2665,27 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
+  'doc.downloadLink': {
+    operationId: 'doc.downloadLink',
+    title: 'Create download link',
+    summary:
+      "A short-lived URL that downloads the layer's current PDF without an Authorization header, for services that only take a plain URL.",
+    method: 'POST',
+    path: wireTemplates.layerDownloadLink,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    body: { contentType: 'application/json', schema: DownloadLinkRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: DownloadLinkResponseSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      501: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      'The link opens the layer as it is when created: once the layer changes, it answers 404, so create it right before handing it over. It downloads that one file and nothing else, and a password-protected document is checked when the link is created. Deployments that verify tokens with their own keys (JWKS) mint links on their backend: a doc token with `layer_name`, a `download: { docVersion, mode: "incremental" }` claim and a short `exp`, passed as `link` on the versioned download URL.',
+  },
   'doc.download': {
     operationId: 'doc.download',
     title: 'Download PDF',
@@ -2327,8 +2725,10 @@ export const docsGroups = {
   deployment: { title: 'Deployment' },
   tenants: { title: 'Tenants' },
   documents: { title: 'Tenant documents' },
+  'documents.layers': { title: 'Layers' },
   tokens: { title: 'Tokens' },
   shares: { title: 'Shares' },
+  'shares.visitors': { title: 'Visitors' },
   doc: { title: 'Document operations', slug: 'document-operations' },
   'doc.annotations': { title: 'Annotations' },
   'doc.attachments': { title: 'Attachments' },

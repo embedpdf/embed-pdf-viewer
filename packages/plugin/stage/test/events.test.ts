@@ -3,14 +3,14 @@ import { toPageRef, type HostClock } from '@embedpdf/core';
 import { createTestContext, manualClock } from '@embedpdf/core/testing';
 
 import { createStageController } from '../src/controller';
-import { initialStageState } from '../src/model';
+import { initialStageModel } from '../src/model';
 import type { StageConfig, StageHostCapability } from '../src/host-contract';
 
 function harness(config: StageConfig = {}, clock?: HostClock) {
   const ctx = createTestContext({
     id: 'stage',
     clock,
-    state: initialStageState({ viewUnitsPerPoint: 1, ...config }),
+    state: initialStageModel({ viewUnitsPerPoint: 1, ...config }),
     pages: Array.from({ length: 5 }, (_, index) => ({
       ref: toPageRef(index + 1),
       size: { width: 600, height: 800 },

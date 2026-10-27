@@ -2,7 +2,7 @@ import { definePlugin } from '@embedpdf/core';
 
 import { PageEditToken } from './contract';
 import { createPageEditController } from './controller';
-import { initialPageEditState } from './model';
+import { initialPageEditModel } from './model';
 
 /**
  * Document-scoped: the document's page edits, each one change of its
@@ -14,6 +14,6 @@ export const pageEditPlugin = () =>
     id: 'page-edit',
     scope: 'document',
     token: PageEditToken,
-    state: initialPageEditState,
+    state: initialPageEditModel,
     create: createPageEditController,
   });

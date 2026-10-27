@@ -6,7 +6,7 @@
  * `stage.plugin.ts`.
  */
 export { stagePlugin } from './stage.plugin';
-export { stageState } from './state';
+export { stageState, type StageState } from './state';
 export * from './contract';
 export { createScrollHandler } from './scroll-handler';
 export type { ScrollHandlerOptions } from './scroll-handler';

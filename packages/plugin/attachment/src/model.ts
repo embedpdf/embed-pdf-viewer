@@ -14,14 +14,14 @@ import {
 import type { AttachedFile } from './contract';
 
 /** The session's part: the selected files, by id, in the order they were selected. */
-export interface AttachmentState {
+export interface AttachmentModel {
   readonly selected: readonly string[];
 }
 
-export const initialAttachmentState = (): AttachmentState => ({ selected: [] });
+export const initialAttachmentModel = (): AttachmentModel => ({ selected: [] });
 
 /** Make these files the selection; the same ids leave the state as it is. */
-export function selected(state: AttachmentState, ids: readonly string[]): AttachmentState {
+export function selected(state: AttachmentModel, ids: readonly string[]): AttachmentModel {
   const unique = ids.filter((id, i) => ids.indexOf(id) === i);
   const same =
     unique.length === state.selected.length && unique.every((id, i) => id === state.selected[i]);

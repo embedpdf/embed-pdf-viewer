@@ -2,7 +2,7 @@ import { definePlugin } from '@embedpdf/core';
 
 import { ShellToken } from './contract';
 import { createShellController } from './controller';
-import { initialShellState } from './model';
+import { initialShellModel } from './model';
 
 /**
  * The shell plugin: which surfaces (panels, modals, overlays) and menus are
@@ -15,6 +15,6 @@ export const shellPlugin = () =>
     id: 'shell',
     scope: 'document',
     token: ShellToken,
-    state: initialShellState,
+    state: initialShellModel,
     create: createShellController,
   });

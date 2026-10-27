@@ -22,7 +22,7 @@ export type { LocalPageHandle } from './engine/LocalPageHandle';
 export { LOCAL_ENGINE_BRAND } from './engine/localEngineBrand';
 export type { FontService } from './engine/FontService';
 export type { DocumentFontSettings, FontEmbeddingPolicy } from './engine/DocumentFontSettings';
-export type { DocumentHandle } from './engine/DocumentHandle';
+export type { DocumentHandle, DocumentShare } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
   DocumentEventInit,

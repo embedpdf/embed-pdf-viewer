@@ -6,7 +6,7 @@
  */
 import type { Locale, TranslationDictionary } from './contract';
 
-export interface I18nState {
+export interface I18nModel {
   /** The current language's code. */
   readonly locale: string;
   /** The loaded languages, by code: what `t()` reads. */
@@ -18,7 +18,7 @@ export interface I18nState {
 }
 
 /** Nothing loaded yet: the controller seeds the state from the settings. */
-export const initialI18nState = (): I18nState => ({
+export const initialI18nModel = (): I18nModel => ({
   locale: '',
   locales: {},
   loading: null,
@@ -31,14 +31,14 @@ export const initialI18nState = (): I18nState => ({
  * loader fetches it once connected.
  */
 export function seedFromSettings(
-  state: I18nState,
+  state: I18nModel,
   settings: {
     readonly locale: string | null;
     readonly fallbackLocale: string;
     readonly locales: readonly Locale[];
     readonly loaders: Readonly<Record<string, unknown>>;
   },
-): I18nState {
+): I18nModel {
   const seeded = settings.locales.reduce(registerLocale, state);
   const locale = settings.locale ?? settings.fallbackLocale;
   if (seeded.locales[locale] || settings.loaders[locale] === undefined) {
@@ -96,14 +96,14 @@ const withNestedKeys = (locale: Locale): Locale => {
  * language in `loaders` becomes current through {@link startLocaleLoad}, {@link registerLocale}
  * and then this transition, which the loader drives.
  */
-export function setLocale(state: I18nState, code: string): I18nState {
+export function setLocale(state: I18nModel, code: string): I18nModel {
   if (!state.locales[code]) return state;
   if (state.locale === code && state.loading === null) return state;
   return { ...state, locale: code, loading: null };
 }
 
 /** Add a language, with any strings that were added to it before it loaded on top. */
-export function registerLocale(state: I18nState, locale: Locale): I18nState {
+export function registerLocale(state: I18nModel, locale: Locale): I18nModel {
   const pack = withNestedKeys(locale);
   const waiting = state.waitingTranslations[locale.code];
   if (!waiting) return { ...state, locales: { ...state.locales, [locale.code]: pack } };
@@ -118,7 +118,7 @@ export function registerLocale(state: I18nState, locale: Locale): I18nState {
   };
 }
 
-export function unregisterLocale(state: I18nState, code: string): I18nState {
+export function unregisterLocale(state: I18nModel, code: string): I18nModel {
   if (!state.locales[code]) return state;
   const { [code]: _removed, ...locales } = state.locales;
   return { ...state, locales };
@@ -130,10 +130,10 @@ export function unregisterLocale(state: I18nState, code: string): I18nState {
  * loader get here.
  */
 export function addTranslations(
-  state: I18nState,
+  state: I18nModel,
   code: string,
   dictionary: TranslationDictionary,
-): I18nState {
+): I18nModel {
   const strings = nestKeys(dictionary);
   const pack = state.locales[code];
   if (!pack) {
@@ -156,11 +156,11 @@ export function addTranslations(
 }
 
 /** A language in `loaders` is wanted: the loader fetches whatever `loading` names. */
-export function startLocaleLoad(state: I18nState, code: string): I18nState {
+export function startLocaleLoad(state: I18nModel, code: string): I18nModel {
   return state.loading === code ? state : { ...state, loading: code };
 }
 
 /** A load ended without switching: it failed or was cancelled. Only the load still wanted ends. */
-export function endLocaleLoad(state: I18nState, code: string): I18nState {
+export function endLocaleLoad(state: I18nModel, code: string): I18nModel {
   return state.loading === code ? { ...state, loading: null } : state;
 }

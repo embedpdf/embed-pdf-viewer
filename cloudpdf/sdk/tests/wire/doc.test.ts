@@ -240,6 +240,74 @@ describe("DocClient", () => {
         }).rejects.toThrow(CloudPDF.ContentTooLargeError);
     });
 
+    test("downloadLink (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { url: "url", expiresAt: 1.1 };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/download-link")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.downloadLink({
+            docId: "docId",
+            layerName: "layerName",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("downloadLink (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/download-link")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.downloadLink({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("downloadLink (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { name: "EngineError", code: "Unknown", message: "message" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/download-link")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(501)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.downloadLink({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.NotImplementedError);
+    });
+
     test("manifest (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });

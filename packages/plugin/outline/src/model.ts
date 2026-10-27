@@ -185,7 +185,7 @@ export function spotAt(
 
 /* ── the session ─────────────────────────────────────────────────────────── */
 
-export interface OutlineState {
+export interface OutlineModel {
   /** The items whose children show. Starts from the items the file opens. */
   readonly expanded: Readonly<Record<OutlineKey, true>>;
   /** Whether `expanded` started from the file's open items: on the first load. */
@@ -193,21 +193,21 @@ export interface OutlineState {
   readonly selected: readonly OutlineItemRef[];
 }
 
-export const initialOutlineState = (): OutlineState => ({
+export const initialOutlineModel = (): OutlineModel => ({
   expanded: {},
   seeded: false,
   selected: [],
 });
 
 /** The first load: the items the file opens start expanded. Later loads keep what the user chose. */
-export function seeded(state: OutlineState, tree: OutlineTree): OutlineState {
+export function seeded(state: OutlineModel, tree: OutlineTree): OutlineModel {
   if (state.seeded) return state;
   const expanded: Record<OutlineKey, true> = { ...state.expanded };
   for (const [key, item] of Object.entries(tree.items)) if (item.open) expanded[key] = true;
   return { ...state, expanded, seeded: true };
 }
 
-export function expanded(state: OutlineState, keys: readonly OutlineKey[]): OutlineState {
+export function expanded(state: OutlineModel, keys: readonly OutlineKey[]): OutlineModel {
   const added = keys.filter((key) => state.expanded[key] !== true);
   if (added.length === 0) return state;
   const next: Record<OutlineKey, true> = { ...state.expanded };
@@ -215,7 +215,7 @@ export function expanded(state: OutlineState, keys: readonly OutlineKey[]): Outl
   return { ...state, expanded: next };
 }
 
-export function collapsed(state: OutlineState, keys: readonly OutlineKey[]): OutlineState {
+export function collapsed(state: OutlineModel, keys: readonly OutlineKey[]): OutlineModel {
   const removed = keys.filter((key) => state.expanded[key] === true);
   if (removed.length === 0) return state;
   const next: Record<OutlineKey, true> = { ...state.expanded };
@@ -223,7 +223,7 @@ export function collapsed(state: OutlineState, keys: readonly OutlineKey[]): Out
   return { ...state, expanded: next };
 }
 
-export function selected(state: OutlineState, refs: readonly OutlineItemRef[]): OutlineState {
+export function selected(state: OutlineModel, refs: readonly OutlineItemRef[]): OutlineModel {
   const keys = refs.map(outlineKeyOf);
   const unique = refs.filter((_ref, i) => keys.indexOf(keys[i]!) === i);
   const same =
@@ -233,7 +233,7 @@ export function selected(state: OutlineState, refs: readonly OutlineItemRef[]): 
 }
 
 /** Forget what names items the tree no longer has. */
-export function pruned(state: OutlineState, tree: OutlineTree): OutlineState {
+export function pruned(state: OutlineModel, tree: OutlineTree): OutlineModel {
   const expandedKeys = Object.keys(state.expanded).filter((key) => !tree.items[key]);
   const selection = state.selected.filter((ref) => tree.items[outlineKeyOf(ref)]);
   if (expandedKeys.length === 0 && selection.length === state.selected.length) return state;

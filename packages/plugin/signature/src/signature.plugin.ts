@@ -6,7 +6,7 @@ import { StampToken } from '@embedpdf/plugin-stamp/contract';
 
 import { SIGNATURE_DEFAULTS, SignatureToken, type SignatureConfig } from './contract';
 import { createSignatureController } from './controller';
-import { initialSignatureState } from './model';
+import { initialSignatureModel } from './model';
 
 /**
  * The signature plugin: the act of signing, document-scoped. It owns no
@@ -27,7 +27,7 @@ export const signaturePlugin = (config?: SignatureConfig) =>
     scope: 'document',
     requires: [FormToken],
     optional: [InteractionToken, StampToken, AnnotationToken],
-    state: initialSignatureState,
+    state: initialSignatureModel,
     // A key and a trust port are one value each: a change replaces them, never merges into them.
     settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['key', 'trust'] },
     create: createSignatureController,

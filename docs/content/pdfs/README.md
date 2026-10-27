@@ -92,3 +92,16 @@ drop the tool's own scripts and stylesheets.
 Each document has a key in `../documents.mjs`. A sample opens it with a
 `// [!doc-source <key>]` block that fetches `/pdfs/embedpdf-<key>.pdf`; the docs sync gives the
 cloud site's copy its own form of the block.
+
+## On CloudPDF
+
+cloudpdf.com's examples open the same PDFs from CloudPDF. `pdfs:cloud` uploads each one and
+creates a share grant for it that can read everything and change nothing, then records the
+document and the grant in `cloud.json`:
+
+```sh
+CLOUDPDF_API_TOKEN=… CLOUDPDF_TENANT_ID=… pnpm --filter @embedpdf/docs-content pdfs:cloud
+```
+
+`--dry-run` only says what it would do. A document already in `cloud.json` is left alone; one
+whose PDF changed since is reported, since its grant can't point at a new document yet.

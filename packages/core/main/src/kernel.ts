@@ -61,12 +61,20 @@ import {
   type Unsubscribe,
   type UnlockOptions,
   type UrlSource,
+  type RetryOptions,
+  type ShareOpenRequest,
 } from './types';
 import { VIEWER_DEFAULTS, VIEWER_WHOLE_SETTINGS, type ViewerSettings } from './viewer-settings';
 import {
   CONTINUOUS_RENDER_POLICY,
+  EngineError,
+  EngineErrorCode,
   isLocalDocument,
   pageRefsEqual,
+  visitorIdentityRequestOf,
+  type OpenInputShare,
+  type VisitorAnswers,
+  type VisitorIdentityRequest,
   type DocumentEvent,
   type EngineRenderPolicy,
   type PageLayout,
@@ -172,6 +180,7 @@ const readyInfo = (meta: DocumentMeta): DocumentInfo =>
     status: 'ready',
     pageCount: meta.pageCount,
     hasUnsavedChanges: meta.hasUnsavedChanges,
+    ...(meta.identityRequest ? { identityRequest: meta.identityRequest } : {}),
   });
 const pendingInfo = (meta: PendingMeta): DocumentInfo =>
   Object.freeze({
@@ -184,7 +193,50 @@ const pendingInfo = (meta: PendingMeta): DocumentInfo =>
     ...(meta.status === 'error' && meta.error !== undefined
       ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
       : {}),
+    ...(meta.shareRequest ? { shareRequest: meta.shareRequest } : {}),
   });
+
+/**
+ * What an open from a share link (`share`) that failed with `error` waits for: the link's
+ * passphrase, or the visitor's answers. `share` says whether a passphrase was tried.
+ */
+function shareRequestOf(
+  error: unknown,
+  share: OpenInputShare | null,
+): ShareOpenRequest | undefined {
+  if (!share) return undefined;
+  if (EngineError.is(error, EngineErrorCode.SharePasswordRequired)) {
+    return { kind: 'passphrase', passwordProvided: share.sharePassword !== undefined };
+  }
+  const request = visitorIdentityRequestOf(error);
+  return request ? { kind: 'identity', request } : undefined;
+}
+
+/**
+ * What `retry()` opens: the failed document's source, or, with what the visitor gave
+ * (`RetryOptions`), the share link it opened with the passphrase and answers added to any given
+ * before.
+ */
+function retrySourceOf(
+  source: OpenSource,
+  share: OpenInputShare | null,
+  options: RetryOptions | undefined,
+): OpenSource {
+  const { sharePassword, visitor } = options ?? {};
+  if (sharePassword === undefined && visitor === undefined) return source;
+  if (!share) {
+    throw new PluginError(
+      'invalid-input',
+      'documents',
+      'only a document from a share link takes its passphrase or answers',
+    );
+  }
+  return {
+    ...share,
+    ...(sharePassword !== undefined ? { sharePassword } : {}),
+    ...(visitor !== undefined ? { visitor: { ...share.visitor, ...visitor } } : {}),
+  };
+}
 
 /** Whether an event is a change to the document, one a download would carry. */
 const changesDocument = (event: DocumentEvent): boolean =>
@@ -287,6 +339,8 @@ interface DocumentSession extends SessionRef {
   name?: string;
   /** What `open()` was called with, so a failed tab can `retry()`. */
   source: OpenSource | null;
+  /** The share link the source opened (`{ kind: 'share' }`), once a function source gave it. */
+  shareInput: OpenInputShare | null;
   openOptions: OpenDocumentOptions | undefined;
   phase: 'opening' | 'locked' | 'bringup' | 'ready' | 'error' | 'closing';
   /** In-flight open/unlock — close() cancels, then joins this before disposing,
@@ -478,6 +532,7 @@ export function createKernel(config: {
       instanceId: `${id}#${++instanceCounter}`,
       name,
       source: null,
+      shareInput: null,
       openOptions: undefined,
       phase: 'opening',
       handle: null,
@@ -607,10 +662,17 @@ export function createKernel(config: {
 
   function publishError(session: DocumentSession, error: unknown): void {
     const core = store.getCore();
+    const shareRequest = shareRequestOf(error, session.shareInput);
     setCore({
       pending: {
         ...core.pending,
-        [session.id]: { id: session.id, name: session.name, status: 'error', error },
+        [session.id]: {
+          id: session.id,
+          name: session.name,
+          status: 'error',
+          error,
+          ...(shareRequest ? { shareRequest } : {}),
+        },
       },
     });
     openFailed.emit({
@@ -641,7 +703,55 @@ export function createKernel(config: {
     const core = store.getCore();
     const { [session.id]: _resolved, ...pending } = core.pending;
     setCore({ documents: { ...core.documents, [session.id]: meta }, pending });
+    // A share link that asks before the first change: a change waiting for the answers shows
+    // on the document until the visitor gives them or declines.
+    const share = session.handle?.share;
+    if (share) {
+      session.scope.defer(
+        share.onIdentityRequest((request) => setIdentityRequest(session, request)),
+      );
+    }
     opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
+  }
+
+  /** Show, or stop showing, that a change waits for the visitor's answers. */
+  function setIdentityRequest(
+    session: DocumentSession,
+    request: VisitorIdentityRequest | null,
+  ): void {
+    const core = store.getCore();
+    const published = core.documents[session.id];
+    if (!published || (published.identityRequest ?? null) === request) return;
+    const { identityRequest: _shown, ...rest } = published;
+    setCore({
+      documents: {
+        ...core.documents,
+        [session.id]: request ? { ...rest, identityRequest: request } : rest,
+      },
+    });
+  }
+
+  async function identify(id: string, answers: VisitorAnswers): Promise<void> {
+    const session = readySession(id, 'identify');
+    const share = session.handle!.share;
+    if (!share) {
+      throw new PluginError('invalid-input', 'documents', `${id} isn't from a share link`);
+    }
+    try {
+      await share.identify(answers);
+    } catch (error) {
+      // Still asked: the request shows what's missing or can't be taken.
+      const request = visitorIdentityRequestOf(error);
+      if (request) setIdentityRequest(session, request);
+      throw toPluginError('documents', error);
+    }
+    setIdentityRequest(session, share.identityRequest);
+  }
+
+  function declineIdentity(id: string): void {
+    const session = readySession(id, 'decline');
+    session.handle!.share?.decline();
+    setIdentityRequest(session, null);
   }
 
   /**
@@ -1316,6 +1426,7 @@ export function createKernel(config: {
           ? await engineCall(session, fetchUrlSource(given, session.cancel.signal))
           : given;
         checkpoint(session);
+        session.shareInput = source.kind === 'share' ? source : null;
         const sourceId = idOfInput(source);
         if (sourceId) rekeySession(session, sourceId);
 
@@ -1466,10 +1577,13 @@ export function createKernel(config: {
       // In its own tab, which keeps its id and place; the active document stays the active one.
       // The failed session holds nothing (its scope was released when it failed), so the new
       // one takes its id without closing it: the tab never closes.
-      const { source, openOptions } = session;
+      const { source, shareInput, openOptions } = session;
+      const given = retrySourceOf(source, shareInput, options);
       sessions.delete(id);
-      return openDocument(source, { ...openOptions, activate: false, signal: options?.signal }, id);
+      return openDocument(given, { ...openOptions, activate: false, signal: options?.signal }, id);
     },
+    identify,
+    declineIdentity,
     rename: (id, name) => {
       const core = store.getCore();
       if (core.documents[id]) {

@@ -100,6 +100,7 @@ import {
 import { packChangeRecord, unpackChangeRecord } from '@embedpdf/engine-services';
 import { sql, type Kysely, type Transaction } from 'kysely';
 
+import { deleteStoredLayer } from './deleteStoredLayer';
 import type { DocumentService, OpenContext } from './DocumentService';
 import type { AuditEvent, EventLogService } from './EventLogService';
 import {
@@ -134,16 +135,19 @@ import {
   MAX_OBJECT_NUMBER_TOP_UP,
   objectNumberNotHeld,
   type EditSessionKey,
+  type NumberedLayer,
   type ObjectNumberService,
 } from './ObjectNumberService';
 import type { EngineCounters } from '../app/engine-counters';
 import { RequestRateLimiter } from '../app/request-rate-limiter';
+import { visitorLayerOf } from '../auth/visitor-handle';
 import { AuditLogRepo, type AuditMutationKind } from '../db/repos/audit_log.repo';
 import { ChangeOutcomesRepo, type ChangeOutcomeRow } from '../db/repos/change_outcomes.repo';
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
 import type { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
+import { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import type { Database as Schema } from '../db/schema';
 import { isUniqueViolation } from '../db/uniqueViolation';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
@@ -259,15 +263,20 @@ function writeOpIdOf(ctx: LayerWriteContext): string {
   return ctx.idempotencyKey ?? randomUUID();
 }
 
-/** The editing session a request acts as, on `layerId`. */
-function editSessionKey(ctx: LayerWriteContext, layerId: string): EditSessionKey {
+/** The editing session a request acts as, on `layer`. */
+function editSessionKey(ctx: LayerWriteContext, layer: NumberedLayer): EditSessionKey {
   if (!ctx.originSessionId) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'object numbers need an editing session: send X-Engine-Session-Id',
     );
   }
-  return { layerId, sessionId: ctx.originSessionId, sub: ctx.sub };
+  return {
+    docId: layer.docId,
+    layerName: layer.layerName,
+    sessionId: ctx.originSessionId,
+    sub: ctx.sub,
+  };
 }
 
 export interface MaterializedLayer {
@@ -377,12 +386,15 @@ export class LayerService {
     const base = doc.baseSha
       ? await this.layerState.baseVersionFacts(docId, doc.baseSha, doc.storageSizeBytes)
       : null;
+    // A share session's own layer is stamped with its link and visitor.
+    const visitor = visitorLayerOf(ctx.sub, layerName);
     const layer = await this.layerState.repos.layers.createEmpty({
       id: `layer_${randomUUID()}`,
       docId,
       tenantId: ctx.tenantId,
       name: layerName,
       baseSha: doc.baseSha,
+      ...(visitor ? { visitor } : {}),
       docVersion: doc.docVersion,
       ...(base
         ? {
@@ -395,6 +407,10 @@ export class LayerService {
           }
         : {}),
     });
+    // Their layer's first write makes a visitor of them, if answering didn't.
+    if (visitor && layer.currentVersion === 0) {
+      await new ShareVisitorsRepo(this.requireDb()).record({ ...visitor, docId, now: Date.now() });
+    }
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     return { layer, pages };
   }
@@ -1548,11 +1564,24 @@ export class LayerService {
       // session blessed with the committed version (advanceLayerSession).
       { forWrite: true },
     );
-    await this.prepareObjectNumbers(
-      ctx,
-      materialized.layer,
-      typeof numbers === 'function' ? numbers() : numbers,
-    );
+    try {
+      await this.prepareObjectNumbers(
+        ctx,
+        materialized.layer,
+        typeof numbers === 'function' ? numbers() : numbers,
+      );
+    } catch (err) {
+      // The same write may have committed on another replica since the check
+      // above: its commit spent the numbers this attempt names.
+      const late =
+        err instanceof EngineError &&
+        err.code === EngineErrorCode.ObjectNumberUnavailable &&
+        answered
+          ? await answered(materialized.layer)
+          : undefined;
+      if (late !== undefined) throw new CommittedWrite(late);
+      throw err;
+    }
     return materialized;
   }
 
@@ -1578,11 +1607,10 @@ export class LayerService {
       write = new LayerWriteObjectNumbers(
         this.objectNumbers,
         db,
-        layer.id,
         layer.docId,
         layer.name,
         ctx.originSessionId
-          ? { layerId: layer.id, sessionId: ctx.originSessionId, sub: ctx.sub }
+          ? editSessionKey(ctx, { docId: layer.docId, layerName: layer.name })
           : null,
         ctx.edit,
         ctx.edit && ctx.edit.topUp > 0 && this.takeIssueTurn(ctx) ? ctx.edit.topUp : 0,
@@ -2205,15 +2233,16 @@ export class LayerService {
    * `/access` for a client that may create: make, revive or keep alive its
    * editing session (`ctx.originSessionId` with the token's subject) and
    * hand it `wanted` numbers (`FIRST_OBJECT_NUMBERS` for a new session when
-   * the client names no count). The layer becomes real here if it wasn't.
+   * the client names no count). A layer nobody changed stays that way: its
+   * row comes with its first write.
    */
   async openEditSession(
     ctx: LayerWriteContext,
     input: { docId: string; layerName: string; wanted?: number },
   ): Promise<EditSessionAccess> {
     const objectNumbers = this.requireObjectNumbers();
-    const layer = await this.prepareEditLayer(ctx, input.docId, input.layerName);
-    const key = editSessionKey(ctx, layer.id);
+    const layer = await this.prepareEditNumbers(ctx, input.docId, input.layerName);
+    const key = editSessionKey(ctx, layer);
     return this.requireDb()
       .transaction()
       .execute(async (trx) => {
@@ -2254,8 +2283,8 @@ export class LayerService {
         { details: { field: 'count' } },
       );
     }
-    const layer = await this.prepareEditLayer(ctx, input.docId, input.layerName);
-    const key = editSessionKey(ctx, layer.id);
+    const layer = await this.prepareEditNumbers(ctx, input.docId, input.layerName);
+    const key = editSessionKey(ctx, layer);
     return this.requireDb()
       .transaction()
       .execute(async (trx) => {
@@ -2281,17 +2310,20 @@ export class LayerService {
   ): Promise<EditSessionStatus | null> {
     if (!this.objectNumbers || !this.db || !ctx.originSessionId) return null;
     const objectNumbers = this.objectNumbers;
-    const layer = await this.layerState.repos.layers.findByDocAndName(input.docId, input.layerName);
-    if (!layer || layer.tenantId !== ctx.tenantId) return null;
-    const key = editSessionKey(ctx, layer.id);
+    const doc = await this.documents.findById(input.docId);
+    if (!doc || doc.tenantId !== ctx.tenantId) return null;
+    const key = editSessionKey(ctx, input);
     if (!(await objectNumbers.findSession(this.db, key))) return null;
+    // Numbers count on the layer's base version: the head while it has no row.
+    const layer = await this.layerState.repos.layers.findByDocAndName(input.docId, input.layerName);
+    const baseSha = layer ? layer.baseSha : doc.baseSha;
     return this.db.transaction().execute(async (trx) => {
       const touched = await objectNumbers.touchSession(trx, key);
       let held = await objectNumbers.held(trx, key);
       if (
         held.length === 0 &&
         input.mayCreate &&
-        (await objectNumbers.hasCounter(trx, layer.id)) &&
+        (await objectNumbers.hasCounter(trx, key, baseSha)) &&
         this.takeIssueTurn(ctx)
       ) {
         await objectNumbers.issue(trx, key, FIRST_OBJECT_NUMBERS);
@@ -2302,32 +2334,43 @@ export class LayerService {
   }
 
   /**
-   * The layer an editing session hands numbers out on: real (its row made),
-   * open on the engine, and with its counter started.
+   * The layer an editing session hands numbers out on, with its counter
+   * started. A layer nobody changed has no row: it reads the head version,
+   * so its numbers count past the head's last one, and nothing is made or
+   * opened for it. Its row comes with its first write.
    */
-  private async prepareEditLayer(
+  private async prepareEditNumbers(
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
-  ): Promise<LayerRow> {
+  ): Promise<NumberedLayer> {
     const documentService = this.requireDocumentService();
     await documentService.getLayerManifest(ctx, docId, layerName);
-    const { layer } = await this.materializeLayerForWrite(ctx, docId, layerName);
-    await documentService.ensureLayerFreshOnPool(ctx, docId, layerName, layer.currentVersion);
-    await this.startObjectCounter(layer);
-    return layer;
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    if (layer) {
+      await documentService.ensureLayerFreshOnPool(ctx, docId, layerName, layer.currentVersion);
+      await this.startObjectCounter(layer);
+    } else {
+      const head = await documentService.headObjectNumbers(ctx, docId, layerName);
+      await this.requireObjectNumbers().startCounter(
+        { docId, layerName },
+        head.baseSha,
+        head.lastObjectNumber,
+      );
+    }
+    return { docId, layerName };
   }
 
-  /** Start the layer's counter the first time, past what the engine reported on opening it. */
+  /** Start the layer's counter on its base version, past what the engine reported on opening it. */
   private async startObjectCounter(layer: LayerRow): Promise<void> {
     const objectNumbers = this.requireObjectNumbers();
-    const db = this.requireDb();
-    if (await objectNumbers.hasCounter(db, layer.id)) return;
+    const numbered = { docId: layer.docId, layerName: layer.name };
+    if (await objectNumbers.hasCounter(this.requireDb(), numbered, layer.baseSha)) return;
     const last = this.requireDocumentService().lastObjectNumberAtOpen(layer.docId, layer.name);
     if (last === undefined) {
       throw new EngineError(EngineErrorCode.Unknown, `layer ${layer.id} is not open`);
     }
-    await objectNumbers.startCounter(db, layer.id, last);
+    await objectNumbers.startCounter(numbered, layer.baseSha, last);
   }
 
   /**
@@ -3299,6 +3342,31 @@ export class LayerService {
     return expired.length;
   }
 
+  // ── deleting a layer ──────────────────────────────────────────────────────
+
+  /**
+   * Delete a layer and what it stored (see `deleteStoredLayer`), once this
+   * replica's writes queued on it have ended, and close its worker session
+   * here. Writes that arrive after it find the name deleted.
+   */
+  async deleteLayer(tenantId: string, input: { docId: string; layerName: string }): Promise<void> {
+    const { docId, layerName } = input;
+    const deps = {
+      db: this.requireDb(),
+      storage: this.requireStorage(),
+      documents: this.documents,
+    };
+    await this.queueOnLayer(`${tenantId}::${docId}::${layerName}`, async () => {
+      await deleteStoredLayer(deps, tenantId, input);
+      await this.requireDocumentService().forgetLayer(docId, layerName);
+    });
+  }
+
+  /** The sweep tick for object numbers: what layers nobody changed were handed goes, once long expired. */
+  async sweepObjectNumbers(): Promise<number> {
+    return this.objectNumbers ? this.objectNumbers.sweepUntouched() : 0;
+  }
+
   /**
    * The sweep tick for changes: answers past their retention go, with their
    * captures; captures below a layer's undo horizon go, their answers kept.
@@ -3659,7 +3727,12 @@ export class LayerService {
         );
         // The new version numbers its objects anew: every number handed out
         // on the layer is dropped, and new ones start past the version's.
-        await this.objectNumbers?.publish(trx, layer.id, finalized.lastObjectNumber);
+        await this.objectNumbers?.publish(
+          trx,
+          { docId: layer.docId, layerName: layer.name },
+          finalized.version.sha256,
+          finalized.lastObjectNumber,
+        );
 
         // (4) The version row, numbered after the fenced parent; carries
         //     the layer's plane pointers (law 9). A document committed
@@ -3705,9 +3778,9 @@ export class LayerService {
           createdAt: now,
         });
 
-        // (5) Promote the whole layer into the base catalog; every sibling's
-        //     manifest body changes too (scopes flip), so their docVersion
-        //     advances — in id order.
+        // (5) Promote the whole layer into the base catalog; every live
+        //     sibling's manifest body changes too (scopes flip), so their
+        //     docVersion advances — in id order.
         const promoted = await this.layerState.promoteLayerToBase(trx, {
           docId: input.docId,
           layerId: layer.id,
@@ -3719,6 +3792,7 @@ export class LayerService {
           .select('id')
           .where('doc_id', '=', input.docId)
           .where('id', '!=', layer.id)
+          .where('deleted_at', 'is', null)
           .orderBy('id')
           .execute();
         for (const sibling of siblings) {
@@ -3940,11 +4014,27 @@ export class LayerService {
     layerName: string,
     op: () => Promise<T>,
   ): Promise<T> {
-    const key = layerWriteKey(ctx, docId, layerName);
+    // A share-link visitor answers the link's questions before their first
+    // change: decided from the token alone, before anything runs.
+    const pending = ctx.jwt?.claims.identity_pending;
+    if (pending) {
+      return Promise.reject(
+        new EngineError(
+          EngineErrorCode.VisitorIdentityRequired,
+          "answer the share link's questions before making changes",
+          { details: { ...pending } },
+        ),
+      );
+    }
+    return this.queueOnLayer(layerWriteKey(ctx, docId, layerName), () =>
+      this.runWithRebase(ctx, docId, layerName, op),
+    );
+  }
+
+  /** Run `op` once every operation queued before it on the layer, on this replica, has ended. */
+  private queueOnLayer<T>(key: string, op: () => Promise<T>): Promise<T> {
     const previous = this.layerWriteQueues.get(key) ?? Promise.resolve();
-    const operation = previous
-      .catch(() => undefined)
-      .then(() => this.runWithRebase(ctx, docId, layerName, op));
+    const operation = previous.catch(() => undefined).then(op);
 
     const queueEntry = operation
       .catch(() => undefined)

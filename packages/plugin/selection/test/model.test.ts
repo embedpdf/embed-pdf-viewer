@@ -6,7 +6,7 @@ import type { SelectionSegment } from '../src/geometry';
 import {
   clearSelection,
   contentChangedPagesOf,
-  initialSelectionState,
+  initialSelectionModel,
   setSelecting,
   setHighlightHidden,
   setSelection,
@@ -28,13 +28,13 @@ const documentEvent = (partial: Record<string, unknown>): DocumentEvent =>
 
 describe('selection model', () => {
   it('setSelection returns the same state when the range and segments are unchanged', () => {
-    const state = setSelection(initialSelectionState(), range(3), { 1: [segment(0)] });
+    const state = setSelection(initialSelectionModel(), range(3), { 1: [segment(0)] });
     // Equal by value, new objects: nothing changed.
     expect(setSelection(state, range(3), { 1: [segment(0)] })).toBe(state);
   });
 
   it('setSelection keeps the previous array of every page whose segments are unchanged', () => {
-    const state = setSelection(initialSelectionState(), range(3), { 1: [segment(0)] });
+    const state = setSelection(initialSelectionModel(), range(3), { 1: [segment(0)] });
     const next = setSelection(state, range(3), { 1: [segment(0)], 2: [segment(8)] });
     expect(next).not.toBe(state);
     expect(next.segments[1]).toBe(state.segments[1]);
@@ -43,7 +43,7 @@ describe('selection model', () => {
   });
 
   it('setSelection replaces a changed range or changed segments', () => {
-    const state = setSelection(initialSelectionState(), range(3), { 1: [segment(0)] });
+    const state = setSelection(initialSelectionModel(), range(3), { 1: [segment(0)] });
     const extended = setSelection(state, range(4), { 1: [segment(0)] });
     expect(extended.selection).toEqual(range(4));
     expect(extended.segments).toBe(state.segments);
@@ -54,7 +54,7 @@ describe('selection model', () => {
   });
 
   it('clearSelection empties the range and segments, and is a no-op when empty', () => {
-    const empty = initialSelectionState();
+    const empty = initialSelectionModel();
     expect(clearSelection(empty)).toBe(empty);
     const cleared = clearSelection(setSelection(empty, range(3), { 1: [segment(0)] }));
     expect(cleared.selection).toBeNull();
@@ -62,7 +62,7 @@ describe('selection model', () => {
   });
 
   it('the fact transitions return the same state when nothing changes', () => {
-    const state = initialSelectionState();
+    const state = initialSelectionModel();
     expect(setHighlightHidden(state, false)).toBe(state);
     expect(setHighlightHidden(state, true).highlightHidden).toBe(true);
     expect(setSelecting(state, false)).toBe(state);

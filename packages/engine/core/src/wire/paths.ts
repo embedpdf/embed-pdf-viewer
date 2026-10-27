@@ -729,6 +729,10 @@ export const wirePaths = {
   layerDownloadVersioned: (docId: string, layerName: string, token: DownloadToken) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/download@${encodeDownloadToken(token)}`,
 
+  /** POST: a short-lived URL that downloads the layer's current PDF without an Authorization header. */
+  layerDownloadLink: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/download-link`,
+
   /**
    * POST: pre-warm the doc cache + worker open before any user
    * request lands. Body is `{ docId }`. Doc-scoped token required.
@@ -811,6 +815,7 @@ export const wireTemplates = {
   layerPagesExtract: '/v1/docs/:docId/layers/:layerName/pages/extract',
   layerRedactionsApply: '/v1/docs/:docId/layers/:layerName/redactions/apply',
   layerDownload: '/v1/docs/:docId/layers/:layerName/download',
+  layerDownloadLink: '/v1/docs/:docId/layers/:layerName/download-link',
   layerSignatures: '/v1/docs/:docId/layers/:layerName/signatures',
   layerSignaturesAnalysis: '/v1/docs/:docId/layers/:layerName/signatures/analysis',
   layerSignaturesPrepare: '/v1/docs/:docId/layers/:layerName/signatures/prepare',

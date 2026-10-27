@@ -7,7 +7,12 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { resolveResourceIdForPath, wirePaths } from '@embedpdf/engine-core/wire';
 import { CloudObjectNumberPool } from '../src/document/CloudObjectNumberPool';
-import { CloudWrites, type ChangeSender, type SentChange } from '../src/document/CloudWrites';
+import {
+  CloudWrites,
+  type ChangeSender,
+  type SentChange,
+  type WriteGate,
+} from '../src/document/CloudWrites';
 import { HttpClient } from '../src/transport/HttpClient';
 
 /**
@@ -353,5 +358,78 @@ describe('the transport', () => {
       'https://cdn.test',
       'https://api.test',
     ]);
+  });
+});
+
+describe('the gate', () => {
+  /** A gate that's closed until `open()`, and closes again when the server refuses a write for it. */
+  function closedGate(): WriteGate & { open: () => void } {
+    let opened: Promise<void> | null = null;
+    let open = (): void => {};
+    const close = (): void => {
+      opened = new Promise<void>((resolve) => (open = resolve));
+    };
+    close();
+    return {
+      open: () => {
+        opened = null;
+        open();
+      },
+      passed: () => opened ?? Promise.resolve(),
+      refused: (error) => {
+        if (!EngineError.is(error, EngineErrorCode.VisitorIdentityRequired)) return false;
+        close();
+        return true;
+      },
+    };
+  }
+
+  test('the line waits at the gate, and a write refused for it goes again under its opId', async () => {
+    const gate = closedGate();
+    const writes = new CloudWrites(newPool(), undefined, gate);
+    const sent: string[] = [];
+    let refuseOnce = true;
+    const first = writes.run('a', signal(), (line) =>
+      line.send(async (options) => {
+        sent.push(options.write!.opId!);
+        if (refuseOnce) {
+          refuseOnce = false;
+          throw new EngineError(EngineErrorCode.VisitorIdentityRequired, 'answer first');
+        }
+        return 'a';
+      }),
+    );
+    const second = writes.run('b', signal(), (line) =>
+      line.send(async (options) => {
+        sent.push(options.write!.opId!);
+        return 'b';
+      }),
+    );
+    await tick();
+    expect(sent).toEqual([]);
+    gate.open();
+    await tick();
+    // Refused for the gate: it closed again, and the line waits.
+    expect(sent).toEqual(['a']);
+    gate.open();
+    expect(await Promise.all([first, second])).toEqual(['a', 'b']);
+    expect(sent).toEqual(['a', 'a', 'b']);
+  });
+
+  test('a write the gate turns away fails, and the next one goes', async () => {
+    let turnAway = true;
+    const writes = new CloudWrites(newPool(), undefined, {
+      passed: async () => {
+        if (turnAway) {
+          turnAway = false;
+          throw new EngineError(EngineErrorCode.VisitorIdentityRequired, 'nobody to ask');
+        }
+      },
+      refused: () => false,
+    });
+    const refused = writes.run('a', signal(), (line) => line.send(async () => 'a'));
+    const next = writes.run('b', signal(), (line) => line.send(async () => 'b'));
+    await expect(refused).rejects.toMatchObject({ code: EngineErrorCode.VisitorIdentityRequired });
+    expect(await next).toBe('b');
   });
 });

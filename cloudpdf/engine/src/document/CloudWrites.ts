@@ -40,6 +40,21 @@ export type ChangeSender = (
   options: RequestOptions,
 ) => Promise<readonly ChangeAnswer[]>;
 
+/**
+ * What a document's writes wait for before they go out: a share visitor's
+ * answers to what the link asks before their first change.
+ */
+export interface WriteGate {
+  /** Resolves when a write may go out; rejects when this one can't. */
+  passed(signal: AbortSignal): Promise<void>;
+  /**
+   * Whether the server refused a write (`error`) for what the gate waits
+   * for. Nothing of it ran: it waits at the gate again, then goes out again
+   * as it was (the same `opId`).
+   */
+  refused(error: unknown): boolean;
+}
+
 /** How a change takes its place in the line (see {@link CloudWrites.change}). */
 export interface LinedChangeOptions {
   /** The object numbers the change creates objects at. */
@@ -78,6 +93,9 @@ interface Batch {
  * Changes (`doc.apply`) called one after another share a place: while the
  * write before them is in flight they wait together, and go out as one
  * request when their turn comes, each answered on its own.
+ *
+ * On its turn a write passes the document's gate first, when it has one (a
+ * share visitor's answers): the line waits there.
  */
 export class CloudWrites {
   /** Settles when every write so far has settled. */
@@ -90,6 +108,7 @@ export class CloudWrites {
     private readonly sendChanges: ChangeSender = () => {
       throw new EngineError(EngineErrorCode.NotImplemented, 'this line sends no changes');
     },
+    private readonly gate: WriteGate | null = null,
   ) {}
 
   run<T>(
@@ -107,13 +126,15 @@ export class CloudWrites {
     const write: CloudWrite = {
       send: async (request) => {
         await untilTurn(before, signal);
-        const reserve = this.pool.topUp();
-        return request({
-          write: {
-            opId,
-            ...(reserve > 0 ? { reserveObjectNumbers: reserve } : {}),
-            onObjectNumbers: (ranges) => this.pool.receive(ranges),
-          },
+        return this.throughGate(signal, () => {
+          const reserve = this.pool.topUp();
+          return request({
+            write: {
+              opId,
+              ...(reserve > 0 ? { reserveObjectNumbers: reserve } : {}),
+              onObjectNumbers: (ranges) => this.pool.receive(ranges),
+            },
+          });
         });
       },
     };
@@ -190,17 +211,21 @@ export class CloudWrites {
       else going.push({ lined, sent: ready.value });
     });
     if (going.length === 0) return;
-    const reserve = this.pool.topUp();
     try {
-      const answers = await this.sendChanges(
-        going.map(({ sent }) => sent),
-        {
-          write: {
-            ...(reserve > 0 ? { reserveObjectNumbers: reserve } : {}),
-            onObjectNumbers: (ranges) => this.pool.receive(ranges),
+      // The batch waits at the gate as long as one of its changes still wants to go.
+      const waiting = allAborted(going.map(({ lined }) => lined.signal));
+      const answers = await this.throughGate(waiting, () => {
+        const reserve = this.pool.topUp();
+        return this.sendChanges(
+          going.map(({ sent }) => sent),
+          {
+            write: {
+              ...(reserve > 0 ? { reserveObjectNumbers: reserve } : {}),
+              onObjectNumbers: (ranges) => this.pool.receive(ranges),
+            },
           },
-        },
-      );
+        );
+      });
       if (answers.length !== going.length) {
         throw new EngineError(
           EngineErrorCode.WireFormat,
@@ -212,9 +237,34 @@ export class CloudWrites {
       for (const { lined } of going) lined.reject(error);
     }
   }
+
+  /** Send once the gate lets it through, and again each time the server refuses it for the gate. */
+  private async throughGate<T>(signal: AbortSignal, send: () => Promise<T>): Promise<T> {
+    const gate = this.gate;
+    if (!gate) return send();
+    for (;;) {
+      await gate.passed(signal);
+      try {
+        return await send();
+      } catch (error) {
+        if (!gate.refused(error)) throw error;
+      }
+    }
+  }
 }
 
 function noop(): void {}
+
+/** Aborts once every one of `signals` has. */
+function allAborted(signals: readonly AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  const check = (): void => {
+    if (signals.every((signal) => signal.aborted)) controller.abort();
+  };
+  for (const signal of signals) signal.addEventListener('abort', check, { once: true });
+  check();
+  return controller.signal;
+}
 
 /** What a write that failed with `error` did with the numbers it named. */
 function outcomeOf(error: unknown): 'refused' | 'failed' {

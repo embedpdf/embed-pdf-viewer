@@ -299,6 +299,90 @@ export class DocClient {
     }
 
     /**
+     * The link opens the layer as it is when created: once the layer changes, it answers 404, so create it right before handing it over. It downloads that one file and nothing else, and a password-protected document is checked when the link is created. Deployments that verify tokens with their own keys (JWKS) mint links on their backend: a doc token with `layer_name`, a `download: { docVersion, mode: "incremental" }` claim and a short `exp`, passed as `link` on the versioned download URL.
+     *
+     * @param {CloudPDF.DocDownloadLinkRequest} request
+     * @param {DocClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link CloudPDF.NotImplementedError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.doc.downloadLink({
+     *         docId: "docId",
+     *         layerName: "layerName"
+     *     })
+     */
+    public downloadLink(
+        request: CloudPDF.DocDownloadLinkRequest,
+        requestOptions?: DocClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocDownloadLink200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__downloadLink(request, requestOptions));
+    }
+
+    private async __downloadLink(
+        request: CloudPDF.DocDownloadLinkRequest,
+        requestOptions?: DocClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocDownloadLink200Response>> {
+        const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/download-link`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as CloudPDF.DocDownloadLink200Response, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 501:
+                    throw new CloudPDF.NotImplementedError(
+                        _response.error.body as CloudPDF.DocDownloadLink501Response,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/docs/{docId}/layers/{layerName}/download-link",
+        );
+    }
+
+    /**
      * @param {CloudPDF.ManifestDocRequest} request
      * @param {DocClient.RequestOptions} requestOptions - Request-specific configuration.
      *

@@ -10,9 +10,11 @@
     "snippets": "node scripts/snippets.mjs",
     "publish-gate": "node scripts/publish-gate.mjs",
     "samples": "node scripts/samples.mjs",
-    "pdfs": "tsx pdfs/build.mjs"
+    "pdfs": "tsx pdfs/build.mjs",
+    "pdfs:cloud": "node pdfs/cloud.mjs"
   },
   "devDependencies": {
+    "@cloudpdf/sdk": "workspace:*",
     "@embedpdf/core-signature": "workspace:*",
     "@embedpdf/default-stamps": "workspace:*",
     "@embedpdf/engine": "workspace:*",

@@ -16,7 +16,6 @@ import type { SignatureCapability, SignerRow } from '@embedpdf/plugin-signature'
 import { useCapability, useCapabilityEvent } from '../runtime/capabilities';
 import { useStampAssets, useStampLibraries } from '../stamp';
 import { settingsComposable, stateComposable } from '../state';
-import type { StateComposable } from '../state';
 
 /**
  * The signature API for the document in scope: sign, place a mark, fill or
@@ -34,13 +33,8 @@ export function useSignature(): SignatureCapability {
  * (`busy`), a two-step signing in progress, and whether they're read,
  * declared once in `signatureState`. With a selector, one ref that updates
  * only when the value it picks changes. Empty without a document.
- *
- * Typed through the declaration, so the published types name it from
- * `@embedpdf/plugin-signature`, a dependency of this package, and not from the
- * engine package `protection`'s type comes from, which isn't one.
  */
-export const useSignatureState: StateComposable<ReturnType<typeof signatureState.read>> =
-  stateComposable(signatureState);
+export const useSignatureState = stateComposable(signatureState);
 
 /**
  * The signature settings (`key`, `mode`, `trust`, `allowCertify`) as refs, or

@@ -3,7 +3,7 @@ import { FeedbackToken, InteractionToken } from '@embedpdf/plugin-interaction/co
 import { SELECTION_DEFAULTS, type SelectionConfig } from './contract';
 import { createSelectionController } from './controller';
 import { SelectionToken } from './host-contract';
-import { initialSelectionState } from './model';
+import { initialSelectionModel } from './model';
 
 /**
  * Text selection: document-scoped, requires the interaction hub, whose
@@ -20,7 +20,7 @@ export const selectionPlugin = (config?: SelectionConfig) =>
     scope: 'document',
     requires: [InteractionToken],
     optional: [FeedbackToken],
-    state: initialSelectionState,
+    state: initialSelectionModel,
     settings: { defaults: SELECTION_DEFAULTS, registered: config },
     create: createSelectionController,
   });

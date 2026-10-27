@@ -5,15 +5,15 @@
  */
 import type { PageRef } from '@embedpdf/core';
 
-export interface PageEditState {
+export interface PageEditModel {
   /** The selected pages, in the order they were selected. */
   readonly selected: readonly PageRef[];
 }
 
-export const initialPageEditState = (): PageEditState => ({ selected: [] });
+export const initialPageEditModel = (): PageEditModel => ({ selected: [] });
 
 /** The selection becomes `refs`, each page once. */
-export function selected(state: PageEditState, refs: readonly PageRef[]): PageEditState {
+export function selected(state: PageEditModel, refs: readonly PageRef[]): PageEditModel {
   const numbers = refs.map((ref) => ref.objectNumber);
   const unique = refs.filter((_ref, i) => numbers.indexOf(numbers[i]!) === i);
   const same =

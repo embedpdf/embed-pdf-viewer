@@ -34,6 +34,7 @@ import {
   isDocUserClaims,
   isTenantClaims,
   type DocScope,
+  type DownloadLinkClaim,
   type JwtClaims,
   type JwtVerifier,
   type JwtVerifierConfig,
@@ -47,6 +48,12 @@ import { MAX_OBJECT_NUMBER_TOP_UP } from '../services/ObjectNumberService';
 declare module 'fastify' {
   interface FastifyRequest {
     tenant?: { id: string; sub: string; claims: JwtClaims };
+    /**
+     * Set when the request came in on a download link (`?link=`, see
+     * `DocUserClaims.download`) instead of an Authorization header: what
+     * the link downloads. The download route serves exactly that.
+     */
+    downloadLink?: DownloadLinkClaim;
     /**
      * True when the bearer matched a configured API auth token — the
      * deployment's root credential, valid on every surface. No tenant
@@ -146,6 +153,39 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
     }
 
     const auth = req.headers['authorization'];
+    // A download link stands in for the header, on its download URL only.
+    const link = auth === undefined ? downloadLinkOf(req.url, pathname) : null;
+    if (link) {
+      let claims: JwtClaims;
+      try {
+        claims = await verifier.verify(link.token);
+      } catch (err) {
+        limiter?.recordFailure(req.ip);
+        req.log.info({ err }, 'download link rejected');
+        reply.code(401).send({ error: 'invalid download link' });
+        return;
+      }
+      if (
+        !isDocUserClaims(claims) ||
+        !claims.download ||
+        claims.doc_id !== link.docId ||
+        claims.layer_name !== link.layerName
+      ) {
+        limiter?.recordFailure(req.ip);
+        reply.code(401).send({ error: 'invalid download link' });
+        return;
+      }
+      if (opts.suspendedTenants && (await opts.suspendedTenants.isSuspended(claims.tenant_id))) {
+        reply
+          .code(403)
+          .header('x-cloudpdf-tenant-status', 'suspended')
+          .send({ error: 'tenant suspended' });
+        return;
+      }
+      req.tenant = { id: claims.tenant_id, sub: claims.sub, claims };
+      req.downloadLink = claims.download;
+      return;
+    }
     if (!auth || typeof auth !== 'string' || !auth.startsWith('Bearer ')) {
       limiter?.recordFailure(req.ip);
       reply.code(401).send({ error: 'missing bearer token' });
@@ -167,6 +207,12 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       // operator's logs, not the anonymous caller.
       req.log.info({ err }, 'jwt verification rejected');
       reply.code(401).send({ error: 'invalid token' });
+      return;
+    }
+    // A download link only ever opens its download, from the URL.
+    if (isDocUserClaims(claims) && claims.download) {
+      limiter?.recordFailure(req.ip);
+      reply.code(401).send({ error: 'a download link is not a bearer token' });
       return;
     }
 
@@ -950,4 +996,28 @@ function readUnlockKey(claims: JwtClaims): string | null {
   return claims.embedpdf?.unlock_key && claims.embedpdf.unlock_key.length > 0
     ? claims.embedpdf.unlock_key
     : null;
+}
+
+/** The versioned download URL, `/v1/docs/{docId}/layers/{layerName}/download@{token}`. */
+const VERSIONED_DOWNLOAD = /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/download@[^/]+$/;
+
+/** The download link a request carries in `?link=`, on a versioned download URL; `null` otherwise. */
+function downloadLinkOf(
+  url: string,
+  pathname: string,
+): { token: string; docId: string; layerName: string } | null {
+  const match = VERSIONED_DOWNLOAD.exec(pathname);
+  if (!match) return null;
+  const query = url.slice(pathname.length + 1);
+  const token = new URLSearchParams(query).get('link');
+  if (!token) return null;
+  try {
+    return {
+      token,
+      docId: decodeURIComponent(match[1]!),
+      layerName: decodeURIComponent(match[2]!),
+    };
+  } catch {
+    return null;
+  }
 }

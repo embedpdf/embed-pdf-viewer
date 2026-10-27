@@ -19,6 +19,7 @@ import {
   type DocumentFormsService,
   type DocumentPagesService,
   type DocumentHandle,
+  type DocumentShare,
   type DocumentOutlineService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
@@ -63,6 +64,7 @@ import { CloudPageHandle } from './CloudPageHandle';
 import { CloudWrites } from './CloudWrites';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
+import type { ShareSessionSource } from '../share';
 import { awaitSignal } from '../shared/awaitSignal';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -157,6 +159,8 @@ export class CloudDocumentHandle implements DocumentHandle {
     initialToken: string | null = null,
     /** Called once, when the handle closes (the engine forgets it). */
     private readonly onClose: () => void = () => {},
+    /** A share session's: the document's `share`, and the gate its writes pass. */
+    private readonly shareSession: Pick<ShareSessionSource, 'share' | 'writeGate'> | null = null,
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
@@ -174,7 +178,11 @@ export class CloudDocumentHandle implements DocumentHandle {
     });
     this.pool = pool;
     this.objectNumbers = pool;
-    this.writes = new CloudWrites(pool, changeSender(http, id, layerName));
+    this.writes = new CloudWrites(
+      pool,
+      changeSender(http, id, layerName),
+      shareSession?.writeGate ?? null,
+    );
     const security = new CloudDocumentSecurityService(
       http,
       id,
@@ -379,6 +387,10 @@ export class CloudDocumentHandle implements DocumentHandle {
   /** One change as one transaction, or the undo of one (see `DocumentHandle.apply`). */
   apply(change: Change, options?: WriteOptions): AbortablePromise<ChangeResult> {
     return this.changes.apply(change, options);
+  }
+
+  get share(): DocumentShare | undefined {
+    return this.shareSession?.share;
   }
 
   /** Ignored: the server learns what's needed from what is asked of it. */

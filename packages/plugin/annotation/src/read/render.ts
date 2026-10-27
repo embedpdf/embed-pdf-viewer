@@ -23,7 +23,7 @@ import {
 
 import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationAppearancePicture } from '../host-contract';
-import type { AnnotationState } from '../model';
+import type { AnnotationModel } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { buildTextItem, buildTextItems } from '../text-item';
 import type { Ghost } from '../tools/ghost';
@@ -48,8 +48,8 @@ export function createRenderReads(
     number,
     {
       model: Model;
-      ghostAt: AnnotationState['ghostAt'];
-      placing: AnnotationState['placing'];
+      ghostAt: AnnotationModel['ghostAt'];
+      placing: AnnotationModel['placing'];
       zoom: number | undefined;
       rotation: number | undefined;
       v: RenderItem[];

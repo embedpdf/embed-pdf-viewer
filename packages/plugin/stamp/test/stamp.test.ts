@@ -30,7 +30,7 @@ import { STAMP_DEFAULTS, type StampConfig } from '../src/contract';
 import { stampPlugin } from '../src/stamp.plugin';
 import { stampState } from '../src/state';
 import { createStampController } from '../src/controller';
-import { initialStampState } from '../src/model';
+import { initialStampModel } from '../src/model';
 
 /** Minimal PDF bytes: enough for the magic-byte sniff. */
 const pdfBytes = () => new TextEncoder().encode('%PDF-1.7\n%fake fixture\n');
@@ -69,7 +69,7 @@ function makeStamp(
   if (options.actions) capabilities.push([ActionsToken, options.actions]);
   const ctx = createTestContext({
     id: 'stamp',
-    state: initialStampState(),
+    state: initialStampModel(),
     settings: { defaults: STAMP_DEFAULTS, registered: options.config, whole: ['assetEngine'] },
     engine,
     documentId: options.target?.id,
