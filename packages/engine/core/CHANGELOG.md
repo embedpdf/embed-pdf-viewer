@@ -1,5 +1,17 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `wirePaths.layerDownloadLink` and its template, the route that makes a short-lived download URL for a layer's PDF.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add the `LayerDeleted` error code: the cloud layer was deleted, what it held is gone, and its name is refused from then on.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – `OpenInputShare.restart` starts over on a share link that keeps each visitor's layer, and `DocumentHandle.share` (`layerMode`, `keep`) says how a document opened from a share link reaches its layer.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – New engine code `VisitorIdentityRequired`: a share link asks who the visitor is, and its `details` (`VisitorIdentityRequest`: `fields`, `missing`, `invalid`, `purpose`, `privacyUrl`) say what; `visitorIdentityRequestOf(error)` reads them. `OpenInputShare.visitor` sends the visitor's answers (`VisitorAnswers`) with the open. `DocumentHandle.share` is now a `DocumentShare`: besides `layerMode` and `keep`, `identityRequest` says what the link asks before the first change, `identify(answers)` answers it, `onIdentityRequest` is called when a change waits for the answers, and `decline()` lets the waiting changes fail.
+
 ## 3.0.0-next.16
 
 ### Minor Changes

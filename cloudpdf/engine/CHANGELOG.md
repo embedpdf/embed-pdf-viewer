@@ -1,5 +1,13 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links keep their visitor. Every renewal sends the handle the last exchange answered, so the visitor and, on a per-visitor link, their layer stay the same; an open document also renews on a timer, so a visitor who only reads still counts as seen. When the link keeps visitors' layers, the handle waits in the engine's `visitorStore` for the next open: the browser's `localStorage` by default, none outside a browser (`browserVisitorStore()`, or a store of your own). `open({ kind: 'share', shareToken, restart: true })` deletes the kept layer and starts a new visitor, and `doc.share` says whether the layer is shared or the visitor's own and whether it is kept. An open whose layer was deleted under it (another tab started over) refuses with `Forbidden` (`details.reason: 'layer-changed'`); opening again picks up the new layer.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links that ask who the visitor is. `open({ kind: 'share', shareToken, visitor })` sends the answers; without the required ones, a link that asks on open fails the open with `VisitorIdentityRequired`, whose `details` are the questions. A link that asks before the first change opens at once: its changes wait in the document's write line while something listens (`doc.share.onIdentityRequest`), and go out as they were once `doc.share.identify(answers)` succeeds; `doc.share.decline()` fails them, and with nothing listening they fail at once. A change the server refuses for the answers waits the same way and is sent again with the same `opId`. A passphrase or answer the exchange refuses keeps its details on the `EngineError`.
+
 ## 3.0.0-next.16
 
 ### Minor Changes

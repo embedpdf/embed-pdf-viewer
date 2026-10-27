@@ -1,5 +1,11 @@
 # @embedpdf/svelte
 
+## 3.0.0-next.17
+
+### Patch Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – `useRedactionState()` and `useSignatureState()` are typed like every other state reader, through the plugins' named state types (`StateReader<RedactionState>`).
+
 ## 3.0.0-next.16
 
 ### Minor Changes

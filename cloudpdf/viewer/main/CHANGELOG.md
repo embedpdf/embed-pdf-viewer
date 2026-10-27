@@ -1,5 +1,13 @@
 # @cloudpdf/viewer
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A share link source takes `restart` (`src: { shareToken, restart: true }`) to start over on a link that keeps each visitor's layer.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – `src: { shareToken, visitor }` passes the visitor's answers to what a share link asks, when your page already has them. Without them, the viewer asks.
+
 ## 3.0.0-next.16
 
 ## 3.0.0-next.15

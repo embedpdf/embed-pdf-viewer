@@ -1,5 +1,23 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links can be archived: `shares.archive` (`POST /v1/tenants/{tenantId}/shares/{shareId}/archive`) ends a link for good while keeping what its visitors made, and the record carries `archivedAt`. `shares.list` leaves archived links out unless asked with `archived=true`. `shares.delete` deletes only a link whose visitors made no changes and answers 409 otherwise, and `shares.update` answers 409 for an archived link.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `doc.downloadLink` (`POST /v1/docs/{docId}/layers/{layerName}/download-link`, `doc.download`): a short-lived URL (`expiresIn` 60 to 3600 seconds, default 300) that downloads the layer's current PDF with a plain GET and no Authorization header, for services that only take a URL. It downloads that one file as it is when made, and answers 404 once the layer changes.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `documents.layers.delete` (`DELETE /v1/tenants/{tenantId}/documents/{id}/layers/{layerName}`, scope `docs.delete`): delete a layer and everything it stored, for example a user's data. A layer that was written can't be used again under its name; one nobody wrote stays usable. A layer a share link uses is refused with 409 until the link is deleted.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `documents.layers.list` (`GET /v1/tenants/{tenantId}/documents/{id}/layers`, scope `docs.read`): a document's layers that hold changes, newest first, paged like the other tenant lists with `limit`, `cursor` and `nextCursor`. Each record says whose layer it is (`shareId` and `visitorId` for a share-link visitor's own), its `storageSizeBytes`, and when it was made, last changed and last seen. `shareId` filters to one link's visitors, a deleted link's too. A layer appears at its first change, and a deleted one is not listed.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A share link's `visitorIdleSeconds` is nullable and null by default: visitors' layers stay until they are deleted on purpose. Set it (an hour to 30 days) only for links whose visitors' layers are throwaway, and set it back to null on `shares.update` to stop deleting them.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links take `visitorIdentity` (`ShareVisitorIdentitySchema`: the fields to ask, each required or optional, `ask`, `purpose`, `privacyUrl`), and the exchange request takes the visitor's answers (`ShareVisitorAnswersSchema`). The exchange response's `visitor.identityRequest` (`ShareVisitorIdentityRequestSchema`) says what a link that asks before the first change still needs. New operations `shares.visitors.list` and `shares.visitors.delete`, with `ShareVisitorRecordSchema`. Admin error payloads may carry `error.details`. `visitorLayerIdleSeconds` is now `visitorIdleSeconds`.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links say whose layer their visitors write into. `layerMode` is `'shared'` (one layer, `layerName`, as before) or `'per-visitor'` (each visitor gets a layer of their own, and `layerName` is `null`), with `keepVisitorLayers` and `visitorIdleSeconds` (an hour to 30 days) for per-visitor links. `shares.create` and `shares.update` take all of them, so a link can switch modes and keep its token. The exchange takes `visitorHandle` and `restart`, and answers `layerMode` and `visitor: { handle, keep }`: send the handle back to stay the same visitor, and keep it for the next visit when `keep` is true.
+
 ## 3.0.0-next.16
 
 ### Minor Changes

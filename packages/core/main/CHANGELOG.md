@@ -1,5 +1,15 @@
 # @embedpdf/core
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Documents from share links that wait for something. A failed open says what its share link waits for in `DocumentInfo.shareRequest` (the passphrase, with whether one was tried, or the visitor's answers), and `documents.retry(id, { sharePassword })` or `retry(id, { visitor })` opens it with them; answers add to the ones given before. Once open, a change waiting for the visitor's answers shows as `DocumentInfo.identityRequest` until `documents.identify(id, answers)` sends it or `documents.declineIdentity(id)` lets it fail.
+
+### Patch Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A `LayerDeleted` refusal from the engine reaches plugins as `not-found`.
+
 ## 3.0.0-next.16
 
 ### Minor Changes

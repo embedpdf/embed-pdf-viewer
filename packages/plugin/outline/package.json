@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-outline",
-  "version": "3.0.0-next.16",
+  "version": "3.0.0-next.17",
   "private": false,
   "description": "Document-scoped outline (bookmarks): the document's outline mirrored from the engine with this session's pending edits shown, which items are expanded and selected, the item for the reading position, activation, and create, update, move and delete as undoable changes.",
   "type": "module",

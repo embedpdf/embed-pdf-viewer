@@ -1,5 +1,11 @@
 # @embedpdf/plugin-shell
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `ShellState`, what `shellState` reads and `useShellState()` returns, the State table of the panels page with a comment on each field. Published types now name it instead of spelling out its fields. The plugin's model, from `/internal` and `/contract/host`, is now `ShellModel`, made by `initialShellModel()`, so `ShellState` has one meaning.
+
 ## 3.0.0-next.16
 
 ## 3.0.0-next.15

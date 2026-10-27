@@ -1,5 +1,11 @@
 # @embedpdf/plugin-i18n
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `I18nState`, what `i18nState` reads and `useI18nState()` returns, the State table of the translations page with a comment on each field. Published types now name it instead of spelling out its fields.
+
 ## 3.0.0-next.16
 
 ### Patch Changes

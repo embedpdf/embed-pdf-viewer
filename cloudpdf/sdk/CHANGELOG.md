@@ -1,5 +1,11 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links that ask their visitors who they are: `visitorIdentity` on `client.shares.create` and `client.shares.update`, the visitor's answers on `client.shares.exchange`, and `visitor.identityRequest` in its response. `client.shares.visitors.list` lists a link's visitors with their answers and layer, and `client.shares.visitors.delete` erases one. `visitorLayerIdleSeconds` is now `visitorIdleSeconds`.
+
 ## 3.0.0-next.16
 
 ### Minor Changes
