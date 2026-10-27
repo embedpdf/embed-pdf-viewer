@@ -94,12 +94,15 @@ const PrintDialog = lazyComponent(() => import('./ui/print-dialog').then((ui) =>
   shownWhile: usePrintDialogOpen,
 });
 const useOutlinePropertiesOpen = () => useSurface(OUTLINE_PROPERTIES_DIALOG).isOpen;
-// A share link's passphrase or questions: only documents from share links ask.
-const SharePrompt = lazyComponent(() => import('./ui/share-prompt').then((ui) => ui.SharePrompt));
+// A share link's passphrase or questions: only documents from share links ask, so these load
+// when they first show, never in the background.
+const SharePrompt = lazyComponent(() => import('./ui/share-prompt').then((ui) => ui.SharePrompt), {
+  prefetch: false,
+});
 const useIdentityAsked = () => useDocument((document) => document.identityRequest !== undefined);
 const VisitorIdentityDialog = lazyComponent(
   () => import('./ui/share-prompt').then((ui) => ui.VisitorIdentityDialog),
-  { shownWhile: useIdentityAsked },
+  { shownWhile: useIdentityAsked, prefetch: false },
 );
 const OutlinePropertiesDialog = lazyComponent(
   () => import('./ui/outline-properties').then((ui) => ui.OutlinePropertiesDialog),
