@@ -27,7 +27,9 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
   const conditions: Record<string, Record<string, string>> = pkg.epdf?.conditions ?? {};
   // epdf.neverBundle (package.json): specifiers left as they are in dist, for
   // the consumer's resolver: a `package.json` `imports` entry whose target
-  // depends on where the code runs (the engine's `#inline-transport`).
+  // depends on where the code runs (the engine's `#inline-transport`). Each
+  // target is a file of the package: Turbopack doesn't follow one that names
+  // another package.
   const neverBundle: string[] = pkg.epdf?.neverBundle ?? [];
   const withConditions = (generated: Record<string, unknown>) => {
     const out: Record<string, unknown> = { ...generated };

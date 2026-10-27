@@ -1086,14 +1086,14 @@ importers:
         specifier: workspace:*
         version: link:../acrojs
       '@jitl/quickjs-singlefile-browser-release-sync':
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
       '@jitl/quickjs-wasmfile-release-sync':
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
       quickjs-emscripten-core:
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
     devDependencies:
       '@embedpdf/engine':
         specifier: workspace:*
@@ -5306,14 +5306,14 @@ packages:
     resolution: {integrity: sha512-ZXRY4jNvVgSVQ8DL3LTcakaAtXwTVUxE81hslsyD2AtoXW/wVob10HkOJ1X/pAlcI7D+2YoZKg5do8G/w6RYgA==}
     engines: {node: '>=8'}
 
-  '@jitl/quickjs-ffi-types@0.32.0':
-    resolution: {integrity: sha512-v9T+GQpmk43VDJ7d72sf0Nexhk+ArvtUihW27dy7lqAl0zBObFKtSBBIm5RBjwIhE8VwsPPm9PNuvPvNqLWUEg==}
+  '@jitl/quickjs-ffi-types@0.31.0':
+    resolution: {integrity: sha512-1yrgvXlmXH2oNj3eFTrkwacGJbmM0crwipA3ohCrjv52gBeDaD7PsTvFYinlAnqU8iPME3LGP437yk05a2oejw==}
 
-  '@jitl/quickjs-singlefile-browser-release-sync@0.32.0':
-    resolution: {integrity: sha512-Hfdl7rh8dzxNWFRiYAYNbhn0RMF1/tO6SMH2mUW0aTibqwaAtqPRbi4WkwaIDlhNz8Z4dksJi1Zjl1R54Jsc/Q==}
+  '@jitl/quickjs-singlefile-browser-release-sync@0.31.0':
+    resolution: {integrity: sha512-JctBiLmRpxEp83gJWhDcBuFqm5X7T683OLmncN9g0chAHkC8+y5cJmgknaAk5Rb/ANDR3pXMMnGdnGXDdysfBQ==}
 
-  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
-    resolution: {integrity: sha512-BKNDI/TPBfGlLNGYpLrhcDGXmIk4xHm4MRAisOBnOzpXVn9HZWsfmMAc9WMBrAHjvvds6HOikKeaOBKdPdpVrg==}
+  '@jitl/quickjs-wasmfile-release-sync@0.31.0':
+    resolution: {integrity: sha512-hYduecOByj9AsAfsJhZh5nA6exokmuFC8cls39+lYmTCGY51bgjJJJwReEu7Ff7vBWaQCL6TeDdVlnp2WYz0jw==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -13055,8 +13055,8 @@ packages:
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
-  quickjs-emscripten-core@0.32.0:
-    resolution: {integrity: sha512-QFnPfjFey8EqknSrSxe1hZrf1/8z7/6s1QzGOmKo6++02r7QRRX7ZoyNaZh7JuVjWsVW87KnQrbZqnHkOAzUyg==}
+  quickjs-emscripten-core@0.31.0:
+    resolution: {integrity: sha512-oQz8p0SiKDBc1TC7ZBK2fr0GoSHZKA0jZIeXxsnCyCs4y32FStzCW4d1h6E1sE0uHDMbGITbk2zhNaytaoJwXQ==}
 
   railroad-diagrams@1.0.0:
     resolution: {integrity: sha512-cz93DjNeLY0idrCNOH6PviZGRN9GJhsdm9hpn1YCS879fj4W+x5IFJhhkRZcwVgMmFF7R82UA/7Oh+R8lLZg6A==}
@@ -17557,15 +17557,15 @@ snapshots:
 
   '@istanbuljs/schema@0.1.3': {}
 
-  '@jitl/quickjs-ffi-types@0.32.0': {}
+  '@jitl/quickjs-ffi-types@0.31.0': {}
 
-  '@jitl/quickjs-singlefile-browser-release-sync@0.32.0':
+  '@jitl/quickjs-singlefile-browser-release-sync@0.31.0':
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
-  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
+  '@jitl/quickjs-wasmfile-release-sync@0.31.0':
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -26687,9 +26687,9 @@ snapshots:
 
   quick-format-unescaped@4.0.4: {}
 
-  quickjs-emscripten-core@0.32.0:
+  quickjs-emscripten-core@0.31.0:
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
   railroad-diagrams@1.0.0: {}
 
