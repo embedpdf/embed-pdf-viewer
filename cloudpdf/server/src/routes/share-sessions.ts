@@ -288,7 +288,9 @@ export async function registerShareSessionRoutes(
         layerMode: grant.layerMode,
         visitor: {
           handle: handles.issue(grant.id, visitorId, now),
-          keep: grant.layerMode === 'per-visitor' && grant.keepVisitorLayers,
+          // The browser comes back as this visitor, with their answers and what
+          // they made, unless the link gives a new copy every visit.
+          keep: grant.layerMode === 'shared' || grant.keepVisitorLayers,
           identityRequest: pending,
         },
         expiresAt: Math.floor(Date.now() / 1000) + ttl,

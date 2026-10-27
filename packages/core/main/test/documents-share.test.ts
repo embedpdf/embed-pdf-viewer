@@ -8,6 +8,7 @@ import {
   type DocumentShare,
   type Engine,
   type OpenInput,
+  type ShareOpenRequest,
   type VisitorIdentityRequest,
 } from '@embedpdf/engine-core/runtime';
 
@@ -15,7 +16,8 @@ import {
  * A document from a share link: before it opens, its tab shows what the link waits for (its
  * passphrase, or who the visitor is), and `retry()` opens it again with the answer; once open, a
  * change waiting for the visitor's answers shows on the document until they `identify()` or
- * `declineIdentity()`.
+ * `declineIdentity()`, and a passphrase or questions the link got after it opened show until
+ * `retry()` gives them.
  */
 
 const ASKED: VisitorIdentityRequest = {
@@ -118,6 +120,9 @@ describe('documents · share links', () => {
         };
       },
       decline,
+      openRequest: null,
+      onOpenRequest: () => () => {},
+      resume: () => AbortablePromise.run(async () => {}),
     };
     const handle = Object.assign(makeHandle('a'), { share });
     const engine = {
@@ -146,6 +151,73 @@ describe('documents · share links', () => {
 
     // Closing the document stops listening.
     await documents.close('a');
+    expect(ask).toBeNull();
+    await kernel.destroy();
+  });
+
+  it('a passphrase or questions the link got after it opened show until retry() gives them', async () => {
+    let ask: ((request: ShareOpenRequest) => void) | null = null;
+    let openRequest: ShareOpenRequest | null = null;
+    const given: unknown[] = [];
+    const share: DocumentShare = {
+      layerMode: 'shared',
+      keep: true,
+      identityRequest: null,
+      identify: () => AbortablePromise.run(async () => {}),
+      onIdentityRequest: () => () => {},
+      decline: () => {},
+      get openRequest() {
+        return openRequest;
+      },
+      onOpenRequest: (listener) => {
+        ask = listener;
+        return () => {
+          ask = null;
+        };
+      },
+      resume: (answer) =>
+        AbortablePromise.run(async () => {
+          given.push(answer);
+          if (answer.sharePassword !== 'open sesame') {
+            openRequest = { kind: 'passphrase', passwordProvided: true };
+            throw new EngineError(EngineErrorCode.SharePasswordRequired, 'share exchange failed');
+          }
+          openRequest = null;
+        }),
+    };
+    const handle = Object.assign(makeHandle('b'), { share });
+    const engine = {
+      open: () => Promise.resolve(handle),
+      destroy: () => Promise.resolve(),
+    } as unknown as Engine;
+    const kernel = createKernel({ engine, plugins: [] });
+    await kernel.start();
+    const { documents } = kernel;
+    await documents.open({ kind: 'share', shareToken: 'shr_z' });
+    // Nothing asked: retry() is for failed documents only.
+    await expect(documents.retry('b', { sharePassword: 'x' })).rejects.toMatchObject({
+      code: 'invalid-input',
+    });
+
+    openRequest = { kind: 'passphrase', passwordProvided: false };
+    ask!(openRequest);
+    expect(documents.get('b')).toMatchObject({ status: 'ready', shareRequest: openRequest });
+
+    await expect(documents.retry('b', { sharePassword: 'wrong' })).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+    expect(documents.get('b')?.shareRequest).toEqual({
+      kind: 'passphrase',
+      passwordProvided: true,
+    });
+    // The same document goes on: not opened again.
+    await expect(documents.retry('b', { sharePassword: 'open sesame' })).resolves.toMatchObject({
+      document: { id: 'b', status: 'ready' },
+    });
+    expect(documents.get('b')?.shareRequest).toBeUndefined();
+    expect(given).toEqual([{ sharePassword: 'wrong' }, { sharePassword: 'open sesame' }]);
+
+    await documents.close('b');
     expect(ask).toBeNull();
     await kernel.destroy();
   });

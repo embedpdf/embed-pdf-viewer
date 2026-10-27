@@ -140,7 +140,8 @@ function OpeningDocuments() {
  * `error` tab its error pane, or the share link's passphrase or questions it
  * waits for — per tab (keyed by document), so several can coexist and tab
  * switching stays free. Everything else is the ready-gated Stage; the gate's
- * fallback covers `loading`.
+ * fallback covers `loading`. A ready document whose link asks again shows its
+ * passphrase or questions over the Stage.
  */
 function DocumentArea({ children }: { children: ReactNode }) {
   const docId = useDocumentId();
@@ -157,7 +158,18 @@ function DocumentArea({ children }: { children: ReactNode }) {
   if (status === 'error') {
     return shareAsks ? <SharePrompt key={docId} /> : <DocumentError key={docId} />;
   }
-  return <DocumentGate fallback={<OpeningDocuments />}>{children}</DocumentGate>;
+  return (
+    <DocumentGate fallback={<OpeningDocuments />}>
+      {children}
+      {/* a passphrase or questions the link got after the document opened: over the document,
+      which goes on once they're given */}
+      {shareAsks && (
+        <div className="absolute inset-0 z-40">
+          <SharePrompt key={docId} />
+        </div>
+      )}
+    </DocumentGate>
+  );
 }
 
 /**

@@ -173,6 +173,10 @@ change waits for the answers, the document's `identityRequest` holds the questio
 `documents.identify(id, answers)`, and the change goes out; `documents.declineIdentity(id)` takes
 it back. See [Who the visitor is](/docs/engine/authentication#who-the-visitor-is).
 
+A passphrase or questions the link gets after the document opened ask the same way: the document
+stays `'ready'`, its `shareRequest` says what the link asks, and `retry()` with the answer lets it go
+on as the same visitor. Until then it reads on until its session runs out.
+
 </Engine>
 
 ## Who the user is and what they may do
@@ -266,7 +270,7 @@ empty `id` and `status: 'loading'`, so a component that shows it never has to ch
 | `hasUnsavedChanges` | Whether it has changes that weren't downloaded yet. [Warn before changes are lost](saving#warn-before-changes-are-lost) |
 | `passwordProvided`  | When it's locked: whether a password was tried and was wrong                                                 |
 | `error`             | Why it couldn't be opened, when `status` is `'error'`: `{ code, message }`                                   |
-| `shareRequest`      | When it's from a share link and `status` is `'error'`: the passphrase or the questions it waits for          |
+| `shareRequest`      | When it's from a share link: the passphrase or the questions it waits for, to open or to go on               |
 | `identityRequest`   | When it's ready and a change waits for the visitor's answers to the share link's questions                   |
 
 Every open document, with the same fields, comes from [`useDocumentsState()`](tabs#state).

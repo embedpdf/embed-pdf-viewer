@@ -33,6 +33,31 @@ export interface VisitorIdentityRequest {
   readonly privacyUrl?: string;
 }
 
+/**
+ * What a share link waits for before its document opens, or before an open one goes on: the
+ * link's passphrase (`passwordProvided`: one was tried and was wrong), or the visitor's answers to
+ * what it asks on open.
+ */
+export type ShareOpenRequest =
+  | { readonly kind: 'passphrase'; readonly passwordProvided: boolean }
+  | { readonly kind: 'identity'; readonly request: VisitorIdentityRequest };
+
+/**
+ * What a share link's refusal waits for: its passphrase (`SharePasswordRequired`;
+ * `passwordProvided` says whether one was tried) or the visitor's answers
+ * (`VisitorIdentityRequired`); `null` for any other error.
+ */
+export function shareOpenRequestOf(
+  error: unknown,
+  passwordProvided: boolean,
+): ShareOpenRequest | null {
+  if (EngineError.is(error, EngineErrorCode.SharePasswordRequired)) {
+    return { kind: 'passphrase', passwordProvided };
+  }
+  const request = visitorIdentityRequestOf(error);
+  return request ? { kind: 'identity', request } : null;
+}
+
 /** The questions a `VisitorIdentityRequired` error asks (its details); `null` for any other error. */
 export function visitorIdentityRequestOf(error: unknown): VisitorIdentityRequest | null {
   if (!EngineError.is(error, EngineErrorCode.VisitorIdentityRequired)) return null;

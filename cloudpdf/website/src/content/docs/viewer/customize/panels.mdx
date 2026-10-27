@@ -23,7 +23,7 @@ one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
 | `thumbnails` | A small picture of every page; pick one to go there, or [organize the pages](#organize-pages) | `start` | `panel:thumbnails` |
 | `outline` | The document's table of contents (its bookmarks): follow, filter, and with the right to change the outline, add, rename, drag and delete items | `start` | `panel:outline` |
 | `attachments` | The files inside the PDF, its own and those pinned to its pages: save them, go to a page's file, and with the right to, attach and remove files | `start` | `panel:attachments` |
-| `search` | Find text, and every match in context | `end` | `panel:search`, `search:find` (`Ctrl`/`Cmd`+`F`) |
+| `search` | Find text, and every match in context; [a find bar](#search-without-copying) where copying isn't allowed | `end` | `panel:search`, `search:find` (`Ctrl`/`Cmd`+`F`) |
 | `comments` | Every comment and its replies | `end` | `panel:comments` |
 | `style` | Color, width and font of the selected annotation, or of the tool | `end` | `panel:style` |
 | `stamps` | Stamp libraries; pick one, then click the page | `end` | `panel:stamps` |
@@ -67,6 +67,16 @@ every size, or a way for the sizes you name; the other sizes keep the default:
 `panels(changes)` changes every panel the layout has so far, the way `panel(id, changes)` changes
 one. A map of sizes changes only the sizes it names, so the thumbnails above still dock at medium
 widths. The sizes go by the viewer's own width: see [Small screens](small-screens#the-three-sizes).
+
+### Search without copying
+
+Where the document's permissions let people search but not copy text, search opens as a find bar
+instead. The panel would list each match with the words around it, and showing those words is
+copying them, so there would be nothing to list. The bar sits over the top corner of the pages on
+the panel's side, and across them on a phone. It shows which match you're on and how many there
+are. `Enter` goes to the next match, `Shift`+`Enter` to the one before, and its options sit behind
+a button. It has the same button and the same `Ctrl`/`Cmd`+`F`, and keeps the same search, but
+`present` doesn't apply to it.
 
 ## Width
 

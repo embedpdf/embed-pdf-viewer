@@ -47,12 +47,14 @@ import type {
   PdfDestination,
   Identity,
   PrintDpi,
+  ShareOpenRequest,
   VisitorAnswers,
   VisitorIdentityRequest,
 } from '@embedpdf/engine-core/runtime';
 
 // re-export the engine contracts so consumers import them from @embedpdf/core
 export type {
+  ShareOpenRequest,
   VisitorAnswers,
   VisitorIdentityRequest,
   DocumentHandle,
@@ -231,6 +233,11 @@ export interface DocumentMeta {
    * change: answer with `documents.identify()`, or `declineIdentity()`.
    */
   readonly identityRequest?: VisitorIdentityRequest;
+  /**
+   * The share link asks before the document goes on (a passphrase, or questions on open, it got
+   * after the document opened): give it with `documents.retry()`.
+   */
+  readonly shareRequest?: ShareOpenRequest;
 }
 
 /**
@@ -252,15 +259,6 @@ export interface PendingMeta {
   /** `error` only: the share link's passphrase or questions the open waits for. */
   readonly shareRequest?: ShareOpenRequest;
 }
-
-/**
- * What a document from a share link waits for before it opens: the link's passphrase
- * (`passwordProvided`: one was tried and was wrong), or the visitor's answers to what the link
- * asks. `documents.retry(id, { sharePassword })` or `retry(id, { visitor })` gives it.
- */
-export type ShareOpenRequest =
-  | { readonly kind: 'passphrase'; readonly passwordProvided: boolean }
-  | { readonly kind: 'identity'; readonly request: VisitorIdentityRequest };
 
 /** The document registry — what document scope is built on. */
 export interface CoreState {
@@ -579,7 +577,10 @@ export interface DocumentInfo {
   readonly passwordProvided?: boolean;
   /** `error` only: why it couldn't be opened, in the plugin error vocabulary. */
   readonly error?: PluginErrorInfo;
-  /** `error` only: the share link's passphrase or questions the open waits for (`retry` with them). */
+  /**
+   * The share link's passphrase or questions the document waits for (`retry` with them): `error`,
+   * before it opens; `ready`, when the link got them after it opened.
+   */
   readonly shareRequest?: ShareOpenRequest;
   /**
    * `ready` only: a change waits for the visitor's answers to what the share link asks before
@@ -829,8 +830,10 @@ export interface DocumentsCapability {
    * Open a failed document (`status: 'error'`) again, with the same source and options, in its
    * own tab: it keeps its id and its place, and the active document stays the active one. A
    * document from a share link that waited for its passphrase or the visitor's answers
-   * (`shareRequest`) opens with `sharePassword` or `visitor`. Resolves like `open()`. Rejects
-   * `invalid-input` for a document that didn't fail, or answers for one not from a share link.
+   * (`shareRequest`) opens with `sharePassword` or `visitor`; a ready one the link asks again
+   * (`shareRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
+   * `invalid-input` for a document that didn't fail and isn't asked, or answers for one not from
+   * a share link; `permission-denied` while the link still asks, and `shareRequest` says what.
    */
   retry(id: string, options?: RetryOptions): Promise<OpenDocumentResult>;
   /**

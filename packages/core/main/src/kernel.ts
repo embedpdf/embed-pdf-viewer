@@ -67,10 +67,9 @@ import {
 import { VIEWER_DEFAULTS, VIEWER_WHOLE_SETTINGS, type ViewerSettings } from './viewer-settings';
 import {
   CONTINUOUS_RENDER_POLICY,
-  EngineError,
-  EngineErrorCode,
   isLocalDocument,
   pageRefsEqual,
+  shareOpenRequestOf,
   visitorIdentityRequestOf,
   type OpenInputShare,
   type VisitorAnswers,
@@ -181,6 +180,7 @@ const readyInfo = (meta: DocumentMeta): DocumentInfo =>
     pageCount: meta.pageCount,
     hasUnsavedChanges: meta.hasUnsavedChanges,
     ...(meta.identityRequest ? { identityRequest: meta.identityRequest } : {}),
+    ...(meta.shareRequest ? { shareRequest: meta.shareRequest } : {}),
   });
 const pendingInfo = (meta: PendingMeta): DocumentInfo =>
   Object.freeze({
@@ -205,11 +205,7 @@ function shareRequestOf(
   share: OpenInputShare | null,
 ): ShareOpenRequest | undefined {
   if (!share) return undefined;
-  if (EngineError.is(error, EngineErrorCode.SharePasswordRequired)) {
-    return { kind: 'passphrase', passwordProvided: share.sharePassword !== undefined };
-  }
-  const request = visitorIdentityRequestOf(error);
-  return request ? { kind: 'identity', request } : undefined;
+  return shareOpenRequestOf(error, share.sharePassword !== undefined) ?? undefined;
 }
 
 /**
@@ -705,13 +701,47 @@ export function createKernel(config: {
     setCore({ documents: { ...core.documents, [session.id]: meta }, pending });
     // A share link that asks before the first change: a change waiting for the answers shows
     // on the document until the visitor gives them or declines.
+    // A passphrase or questions the link got after it opened show the same way, until given.
     const share = session.handle?.share;
     if (share) {
       session.scope.defer(
         share.onIdentityRequest((request) => setIdentityRequest(session, request)),
       );
+      session.scope.defer(share.onOpenRequest((request) => setShareRequest(session, request)));
     }
     opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
+  }
+
+  /** Show, or stop showing, that the share link asks before the document goes on. */
+  function setShareRequest(session: DocumentSession, request: ShareOpenRequest | null): void {
+    const core = store.getCore();
+    const published = core.documents[session.id];
+    if (!published || (published.shareRequest ?? null) === request) return;
+    const { shareRequest: _shown, ...rest } = published;
+    setCore({
+      documents: {
+        ...core.documents,
+        [session.id]: request ? { ...rest, shareRequest: request } : rest,
+      },
+    });
+  }
+
+  /** Give a ready document's share link what it asks (`shareRequest`): it goes on as the same visitor. */
+  async function resumeShare(session: DocumentSession, options: RetryOptions | undefined) {
+    const share = session.handle!.share!;
+    const { sharePassword, visitor } = options ?? {};
+    try {
+      await share.resume({
+        ...(sharePassword !== undefined ? { sharePassword } : {}),
+        ...(visitor !== undefined ? { visitor } : {}),
+      });
+    } catch (error) {
+      // Still asked: the request shows what's wrong or missing.
+      setShareRequest(session, share.openRequest);
+      throw toPluginError('documents', error);
+    }
+    setShareRequest(session, share.openRequest);
+    return { document: getDocument(session.id)! };
   }
 
   /** Show, or stop showing, that a change waits for the visitor's answers. */
@@ -1567,6 +1597,9 @@ export function createKernel(config: {
     canOpenFiles: () => engine.canOpenFiles,
     retry: async (id, options) => {
       const session = sessions.get(id);
+      if (session?.phase === 'ready' && session.handle?.share?.openRequest) {
+        return resumeShare(session, options);
+      }
       if (!session || session.phase !== 'error' || session.source === null) {
         throw new PluginError(
           'invalid-input',

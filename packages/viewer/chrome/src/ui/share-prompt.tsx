@@ -4,6 +4,8 @@
  *
  *   an `error` tab with a `shareRequest` → <SharePrompt/>, which opens it again with the answer
  *     (`documents.retry(id, { sharePassword })` or `{ visitor }`)
+ *   a ready document with a `shareRequest` (the link got it after the document opened) → the
+ *     same <SharePrompt/> over it, and `retry` with the answer lets it go on
  *   a ready document with an `identityRequest` (a change waits) → <VisitorIdentityDialog/>, which
  *     answers for the changes waiting (`documents.identify`) or lets them go (`declineIdentity`)
  *
@@ -156,8 +158,9 @@ function VisitorQuestions({
 }
 
 /**
- * A document from a share link that waits, before it opens, for the link's passphrase or the
- * visitor's answers: the tab's pane asks, and opens it again with what's given.
+ * A document from a share link that waits for the link's passphrase or the visitor's answers,
+ * before it opens or to go on: the pane asks, and `retry` with what's given opens it again or
+ * lets it go on.
  */
 export function SharePrompt() {
   const docId = useDocumentId();
@@ -210,8 +213,9 @@ function PassphraseForm({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!passphrase) return;
-    // The tab shows it loading at once, and this pane again if the passphrase is wrong.
-    void retry(docId, { sharePassword: passphrase }).catch(() => {});
+    // Before it opens, the tab shows it loading at once, and this pane again if the passphrase
+    // is wrong; over an open document this pane stays, so a wrong one is cleared.
+    void retry(docId, { sharePassword: passphrase }).catch(() => setPassphrase(''));
   };
   return (
     <form onSubmit={submit}>

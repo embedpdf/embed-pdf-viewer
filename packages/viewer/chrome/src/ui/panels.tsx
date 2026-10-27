@@ -7,6 +7,9 @@
  * built-in content, so content of your own replaces it, and a panel of your
  * own with nothing in its slot is empty.
  *
+ * A built-in panel with nothing to list opens as a bar instead (search whose
+ * hits come without their text: the find bar).
+ *
  * Which panels are open is each document's own (the shell plugin keeps them
  * per document), so switching documents brings back that document's panels.
  * A panel whose button no longer shows (its feature turned off, or not
@@ -15,20 +18,27 @@
 import { panelCommandOf } from '@embedpdf/core-ui';
 import { useCommands } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
-import { useDocumentId, useKernelValue, useOptionalCapability } from '@embedpdf/react/runtime';
+import {
+  useDocumentId,
+  useKernelValue,
+  useOptionalCapability,
+  type Kernel,
+} from '@embedpdf/react/runtime';
+import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken, useShellEvent } from '@embedpdf/react/shell';
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
 
 import { panelsOnSide } from '../config/panels';
 import { useResolvedLayout } from '../config-context';
 import { lazyComponent } from './lazy';
-import { PanelFrame } from './panel-frame';
+import { PanelBar, PanelFrame } from './panel-frame';
 import type { PanelSide } from './panel-layout';
 import { PanelSwitcher } from './panel-switcher';
 import { ThumbnailList } from './thumbnail-list';
 
 // Each feature's panel loads the first time it opens.
 const SearchPanel = lazyComponent(() => import('./search-panel').then((ui) => ui.SearchPanel));
+const FindBar = lazyComponent(() => import('./search-panel').then((ui) => ui.FindBar));
 const CommentsPanel = lazyComponent(() =>
   import('./comments-panel').then((ui) => ui.CommentsPanel),
 );
@@ -58,6 +68,11 @@ interface BuiltInContent {
   readonly draw: (documentId: string | null) => ReactNode;
   /** It holds a list: in a sheet or an overlay, picking one of its items closes the panel. */
   readonly list?: boolean;
+  /** What it draws instead, as a bar ({@link PanelBar}), while `when` says its list would be empty. */
+  readonly bar?: {
+    readonly when: (kernel: Kernel, documentId: string | null) => boolean;
+    readonly draw: (documentId: string | null) => ReactNode;
+  };
 }
 
 const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, BuiltInContent>([
@@ -70,7 +85,21 @@ const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, Bu
     { draw: (documentId) => <AttachmentsPanel key={documentId ?? 'none'} />, list: true },
   ],
   // These read the document as they mount, so each document gets its own.
-  ['search', { draw: (documentId) => <SearchPanel key={documentId ?? 'none'} />, list: true }],
+  [
+    'search',
+    {
+      draw: (documentId) => <SearchPanel key={documentId ?? 'none'} />,
+      list: true,
+      // Without snippets (copying isn't allowed) every hit would be a blank row.
+      bar: {
+        when: (kernel, documentId) =>
+          kernel
+            .tryCapability(SearchToken, documentId ?? undefined)
+            ?.canSearch({ snippets: true }) === false,
+        draw: (documentId) => <FindBar key={documentId ?? 'none'} />,
+      },
+    },
+  ],
   ['comments', { draw: (documentId) => <CommentsPanel key={documentId ?? 'none'} /> }],
   ['measurement', { draw: (documentId) => <MeasurementSection key={documentId ?? 'none'} /> }],
   ['style', { draw: () => <AnnotationStylePanel /> }],
@@ -153,9 +182,17 @@ function OpenPanel({
   const panel = useResolvedLayout().data.panels?.[id];
   const shell = useOptionalCapability(ShellToken);
   const documentId = useDocumentId();
+  const content = BUILT_IN_CONTENT.get(id);
+  const bar = useKernelValue((kernel) => content?.bar?.when(kernel, documentId) === true);
   if (!panel) return null;
   const title = panel.title ?? (panel.titleKey !== undefined ? t(panel.titleKey) : id);
-  const content = BUILT_IN_CONTENT.get(id);
+  if (bar) {
+    return (
+      <PanelBar id={id} side={side} title={title} onClose={() => shell?.close(id)}>
+        <slot name={`panel:${id}`}>{content?.bar?.draw(documentId)}</slot>
+      </PanelBar>
+    );
+  }
   return (
     <PanelFrame
       id={id}

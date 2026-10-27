@@ -290,7 +290,7 @@ describe('the exchange names a visitor', () => {
     const first = await visit(link.id);
     expect(first).toMatchObject({ layerName: 'together', layerMode: 'shared' });
     expect(first.visitor.handle).toMatch(/^vis_[0-9a-f]{24}\.[0-9a-z]+\.[A-Za-z0-9_-]{22}$/);
-    expect(first.visitor.keep).toBe(false);
+    expect(first.visitor.keep).toBe(true);
     const claims = claimsOf(first.token);
     expect(claims).toMatchObject({ sub: `share:${link.id}`, layer_name: 'together' });
     expect(claims.identity?.userId).toMatch(/^visitor_[0-9a-f]{24}$/);
@@ -301,6 +301,16 @@ describe('the exchange names a visitor', () => {
     const restarted = await visit(link.id, { visitorHandle: first.visitor.handle, restart: true });
     expect(claimsOf(restarted.token).identity?.userId).not.toBe(claims.identity?.userId);
     expect(restarted.visitor.handle).not.toBe(first.visitor.handle);
+  });
+
+  test('the browser keeps the visitor on every link but one that gives a new copy every visit', async () => {
+    const keeps = async (settings: Record<string, unknown>) =>
+      (await visit((await createLink(settings)).body.share.id)).visitor.keep;
+    expect(await keeps({})).toBe(true);
+    // The setting is about visitors' own copies: a shared link keeps its visitors either way.
+    expect(await keeps({ keepVisitorLayers: false })).toBe(true);
+    expect(await keeps({ layerMode: 'per-visitor' })).toBe(true);
+    expect(await keeps({ layerMode: 'per-visitor', keepVisitorLayers: false })).toBe(false);
   });
 
   test('a handle another link issued, a forged one, or garbage is a new visitor', async () => {

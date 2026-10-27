@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Kysely } from 'kysely';
 import {
   createSqliteDb,
@@ -23,12 +23,14 @@ import { browserVisitorStore, cloudEngine, type VisitorStore } from '../src/inde
 /**
  * A share link's visitor, on the client: every renewal sends the handle the
  * last exchange answered, so the visitor (and on a per-visitor link, their
- * layer) stays the same; a link that keeps visitors' layers leaves the
- * handle in the engine's visitor store for the next open; `restart` starts
- * over; an open document renews on a timer; and the document says how it
- * reaches its layer (`share`). A link that asks who the visitor is refuses
+ * layer) stays the same; unless the link gives a new copy every visit, the
+ * handle waits in the engine's visitor store for the next open; `restart`
+ * starts over; an open document renews on a timer; and the document says how
+ * it reaches its layer (`share`). A link that asks who the visitor is refuses
  * the open until it carries the answers, or holds the document's changes
- * until `share.identify` gives them.
+ * until `share.identify` gives them. A passphrase or questions on open that
+ * the link gets while a document is open are asked once (`share.openRequest`),
+ * and the open goes on as the same visitor once `share.resume` gives them.
  */
 
 const STUB_ENTRY = fileURLToPath(
@@ -183,6 +185,28 @@ async function writeAs(session: Exchange['answered']): Promise<void> {
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const identityOf = (token: string) =>
+  (
+    JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')) as {
+      identity: Record<string, string>;
+    }
+  ).identity;
+
+/** Change a link's settings, as its owner. */
+async function updateLink(shareToken: string, body: Record<string, unknown>): Promise<void> {
+  const token = signDevToken(SECRET, {
+    sub: 'dash-1',
+    tenant_id: TENANT,
+    scope: ['shares.manage'],
+  });
+  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares/${shareToken}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  expect(res.status).toBe(200);
+}
+
 describe('a share link visitor', () => {
   test('renewals send the handle, keep the layer, and run on a timer while the document is open', async () => {
     // A 60 second session is always inside the renewal margin: the timer renews every second.
@@ -223,7 +247,8 @@ describe('a share link visitor', () => {
     }
   });
 
-  test('a link that keeps layers brings the visitor back on the next open; one that does not, starts fresh', async () => {
+  test('the next open comes back as the same visitor, unless the link gives a new copy every visit', async () => {
+    const shared = await createLink({});
     const kept = await createLink({ layerMode: 'per-visitor' });
     const fresh = await createLink({ layerMode: 'per-visitor', keepVisitorLayers: false });
     const store = memoryStore();
@@ -240,6 +265,16 @@ describe('a share link visitor', () => {
         await doc.close();
         return { doc, session };
       };
+
+      // A shared link keeps its visitor too: their answers and what they add stay theirs.
+      const reader = await open(shared);
+      expect(reader.doc.share).toMatchObject({ layerMode: 'shared', keep: true });
+      expect(store.handles.get(shared)).toBe(reader.session.answered.visitor.handle);
+      const back = await open(shared);
+      expect(back.session.sent.visitorHandle).toBe(reader.session.answered.visitor.handle);
+      expect(identityOf(back.session.answered.token).userId).toBe(
+        identityOf(reader.session.answered.token).userId,
+      );
 
       const first = await open(kept);
       expect(store.handles.get(kept)).toBe(first.session.answered.visitor.handle);
@@ -400,12 +435,6 @@ describe('a link that asks who the visitor is', () => {
       );
   const identityRequired = (error: unknown) =>
     EngineError.is(error, EngineErrorCode.VisitorIdentityRequired);
-  const identityOf = (token: string) =>
-    (
-      JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')) as {
-        identity: Record<string, string>;
-      }
-    ).identity;
 
   /** The browser's fetch, also recording the status of every change request. */
   function recording(exchanges: Exchange[]): { fetch: typeof fetch; changesSent: number[] } {
@@ -534,19 +563,9 @@ describe('a link that asks who the visitor is', () => {
       doc.share!.onIdentityRequest((request) => asked.push(request));
       // The link starts asking while the document is open: the change's own
       // request renews into a session the server refuses changes from.
-      const token = signDevToken(SECRET, {
-        sub: 'dash-1',
-        tenant_id: TENANT,
-        scope: ['shares.manage'],
+      await updateLink(link, {
+        visitorIdentity: { fields: { displayName: 'required' }, ask: 'before-first-change' },
       });
-      const updated = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares/${link}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          visitorIdentity: { fields: { displayName: 'required' }, ask: 'before-first-change' },
-        }),
-      });
-      expect(updated.status).toBe(200);
 
       const waiting = square(doc);
       await pause(100);
@@ -585,6 +604,161 @@ describe('a link that asks who the visitor is', () => {
       await doc.share!.identify({ displayName: 'Later' });
       expect(identityRequired(await again)).toBe(false);
       expect(changesSent).toEqual([200]);
+      await doc.close();
+    } finally {
+      await engine.destroy();
+    }
+  });
+});
+
+describe('a link that asks again while a document is open', () => {
+  /**
+   * The browser's fetch, also counting every exchange (refused ones too) and
+   * recording the status of every other request. The stub worker's answers
+   * predate the client's wire schema, so a read settles with a parse error:
+   * what matters is whether it reached the server with a session it took.
+   */
+  function counting(exchanges: Exchange[]): {
+    fetch: typeof fetch;
+    tries: { count: number };
+    reads: number[];
+  } {
+    const tries = { count: 0 };
+    const reads: number[] = [];
+    const inner = browserFetch(exchanges);
+    return {
+      tries,
+      reads,
+      fetch: async (input, init) => {
+        const exchange = String(input).endsWith('/v1/share-sessions');
+        if (exchange) tries.count += 1;
+        const res = await inner(input, init);
+        if (!exchange) reads.push(res.status);
+        return res;
+      },
+    };
+  }
+  /** A read, settled: its error, or null. */
+  const read = (doc: DocumentHandle) =>
+    doc.pages.list().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('questions on open: asked once, the session serves until it runs out, then reads wait for the answers', async () => {
+    // A 60 second session is always inside the renewal margin: every request would exchange again.
+    const link = await createLink({ sessionTtlSeconds: 60 });
+    const exchanges: Exchange[] = [];
+    const { fetch: countingFetch, tries, reads } = counting(exchanges);
+    const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: countingFetch, visitorStore: null });
+    try {
+      const doc = await engine.open({ kind: 'share', shareToken: link });
+      const share = doc.share!;
+      const asked: unknown[] = [];
+      share.onOpenRequest((request) => asked.push(request));
+      await updateLink(link, {
+        visitorIdentity: { fields: { displayName: 'required' }, ask: 'on-open' },
+      });
+
+      // The next renewal is refused: asked once, and the reads go on with the session they have.
+      const before = tries.count;
+      reads.length = 0;
+      for (let i = 0; i < 5; i += 1) await read(doc);
+      await pause(1_500);
+      expect(tries.count - before).toBe(1);
+      expect(reads).toEqual([200, 200, 200, 200, 200]);
+      expect(asked).toEqual([
+        { kind: 'identity', request: expect.objectContaining({ missing: ['displayName'] }) },
+      ]);
+      expect(share.openRequest).toEqual(asked[0]);
+
+      // The session runs out: a read waits for the answers, then goes on as the same visitor.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 120_000);
+      let done = false;
+      const reading = read(doc).then(() => {
+        done = true;
+      });
+      await pause(100);
+      expect(done).toBe(false);
+      expect(tries.count - before).toBe(1);
+      expect(reads).toHaveLength(5);
+
+      await share.resume({ visitor: { displayName: 'Ada' } });
+      await reading;
+      expect(reads).toEqual([200, 200, 200, 200, 200, 200]);
+      expect(share.openRequest).toBeNull();
+      const resumed = exchanges.at(-1)!;
+      expect(resumed.sent.visitorHandle).toBe(exchanges.at(-2)!.answered.visitor.handle);
+      expect(identityOf(resumed.answered.token)).toMatchObject({
+        displayName: 'Ada',
+        userId: identityOf(exchanges[0]!.answered.token).userId,
+      });
+      await doc.close();
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test('a passphrase: a wrong one is refused and still asked; the right one goes on', async () => {
+    const link = await createLink({ sessionTtlSeconds: 60 });
+    const exchanges: Exchange[] = [];
+    const { fetch: countingFetch, tries, reads } = counting(exchanges);
+    const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: countingFetch, visitorStore: null });
+    try {
+      const doc = await engine.open({ kind: 'share', shareToken: link });
+      const share = doc.share!;
+      const asked: unknown[] = [];
+      share.onOpenRequest((request) => asked.push(request));
+      await updateLink(link, { password: 'open sesame' });
+
+      await read(doc);
+      expect(asked).toEqual([{ kind: 'passphrase', passwordProvided: false }]);
+      const refused = await share.resume({ sharePassword: 'wrong' }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(EngineError.is(refused, EngineErrorCode.SharePasswordRequired)).toBe(true);
+      expect(share.openRequest).toEqual({ kind: 'passphrase', passwordProvided: true });
+
+      await share.resume({ sharePassword: 'open sesame' });
+      expect(share.openRequest).toBeNull();
+      // From then on every renewal carries it, as the same visitor.
+      const before = tries.count;
+      reads.length = 0;
+      await read(doc);
+      expect(tries.count).toBeGreaterThan(before);
+      expect(reads).toEqual([200]);
+      const visitors = new Set(
+        exchanges.map((exchange) => identityOf(exchange.answered.token).userId),
+      );
+      expect(visitors.size).toBe(1);
+      await doc.close();
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test('nobody to ask: once the session runs out, a read fails with the refusal', async () => {
+    const link = await createLink({ sessionTtlSeconds: 60 });
+    const engine = cloudEngine({
+      baseUrl: fx.baseUrl,
+      fetch: browserFetch([]),
+      visitorStore: null,
+    });
+    try {
+      const doc = await engine.open({ kind: 'share', shareToken: link });
+      await updateLink(link, { password: 'open sesame' });
+      await read(doc);
+      expect(doc.share!.openRequest).toEqual({ kind: 'passphrase', passwordProvided: false });
+
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 120_000);
+      expect(EngineError.is(await read(doc), EngineErrorCode.SharePasswordRequired)).toBe(true);
       await doc.close();
     } finally {
       await engine.destroy();
