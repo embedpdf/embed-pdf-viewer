@@ -1,5 +1,11 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `StageState`, what `stageState` reads and `useStageState()` returns, the State table of the Stage page with a comment on each field. Published types now name it instead of spelling out its fields. The plugin's model, from `/contract/host`, is now `StageModel`, made by `initialStageModel()`, so `StageState` has one meaning.
+
 ## 3.0.0-next.16
 
 ### Minor Changes

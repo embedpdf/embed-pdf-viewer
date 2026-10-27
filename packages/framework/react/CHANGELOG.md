@@ -1,5 +1,11 @@
 # @embedpdf/react
 
+## 3.0.0-next.17
+
+### Patch Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – The state hooks' published types name each plugin's state type (`useFormState: StateHook<FormState>`) instead of spelling out its fields. The declarations no longer carry a copy of engine types, which they did on some builds, from 34 kB to 229 kB with zod's types inside.
+
 ## 3.0.0-next.16
 
 ### Minor Changes

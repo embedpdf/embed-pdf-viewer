@@ -1,5 +1,11 @@
 # @embedpdf/core-js-sandbox
 
+## 3.0.0-next.17
+
+### Patch Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – The published package now picks its QuickJS build where it runs: `dist` keeps the `#quickjs-variant` import, so a browser bundler resolves QuickJS's browser build and Node its wasm-file build. Before, the build fixed the wasm-file build into `dist` for both.
+
 ## 3.0.0-next.16
 
 ## 3.0.0-next.15

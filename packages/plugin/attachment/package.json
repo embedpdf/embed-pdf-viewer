@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-attachment",
-  "version": "3.0.0-next.16",
+  "version": "3.0.0-next.17",
   "private": false,
   "description": "Document-scoped attachments: the files a document carries, in its attachments and in file attachment annotations, as one list with this session's pending adds and removes shown; adding and removing them as undoable changes, downloading them, and going to a page's file.",
   "type": "module",
