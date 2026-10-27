@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { I18N_DEFAULTS, type I18nConfig, type Locale } from '../src/contract';
 import { createI18nController } from '../src/controller';
-import { initialI18nState } from '../src/model';
+import { initialI18nModel } from '../src/model';
 
 const en: Locale = {
   code: 'en',
@@ -17,7 +17,7 @@ const ar: Locale = { code: 'ar', name: 'العربية', direction: 'rtl', trans
 function harness(config: I18nConfig) {
   const ctx = createTestContext({
     id: 'i18n',
-    state: initialI18nState(),
+    state: initialI18nModel(),
     settings: { defaults: I18N_DEFAULTS, registered: config },
     doc: null,
   });

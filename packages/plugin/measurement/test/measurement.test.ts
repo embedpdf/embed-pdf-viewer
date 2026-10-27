@@ -11,7 +11,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
 import { createMeasurementController } from '../src/controller';
 import { MEASUREMENT_DEFAULTS, NO_READOUT, type MeasurementConfig } from '../src/contract';
-import { initialMeasurementState } from '../src/model';
+import { initialMeasurementModel } from '../src/model';
 import { measurementState } from '../src/state';
 
 const PAGE = toPageRef(1);
@@ -87,7 +87,7 @@ function harness(
   };
   const ctx = createTestContext({
     id: 'measurement',
-    state: initialMeasurementState(),
+    state: initialMeasurementModel(),
     settings: {
       defaults: MEASUREMENT_DEFAULTS,
       registered: options.config,

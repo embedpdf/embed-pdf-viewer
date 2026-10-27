@@ -25,7 +25,7 @@ import {
   type InteractionHostCapability,
   type PointerSample,
 } from './host-contract';
-import { activateTool, popTool, pushTool, setCursor, type InteractionState } from './model';
+import { activateTool, popTool, pushTool, setCursor, type InteractionModel } from './model';
 
 interface Claim {
   cursor: Cursor;
@@ -49,7 +49,7 @@ const NO_TAGS: ReadonlySet<string> = new Set();
  * tool's cursors (`setToolCursor`) when they name that keyword.
  */
 export function createInteractionController(
-  ctx: PluginContext<InteractionState, InteractionSettings>,
+  ctx: PluginContext<InteractionModel, InteractionSettings>,
   builtinTools: readonly HostTool[],
 ) {
   const settings = ctx.settings();
@@ -193,7 +193,7 @@ export function createInteractionController(
    * Activate a tool through `transition`. Every activation is announced,
    * including activating the active tool again.
    */
-  function arm(id: ToolId, transition: (current: InteractionState) => InteractionState): void {
+  function arm(id: ToolId, transition: (current: InteractionModel) => InteractionModel): void {
     if (!tools.has(id)) throw new PluginError('not-found', 'interaction', `unknown tool '${id}'`);
     const previousToolId = state().activeToolId;
     owner = null;

@@ -11,7 +11,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import { FORM_DEFAULTS } from '../src/contract';
 import { createFormController } from '../src/controller';
-import { initialFormState } from '../src/model';
+import { initialFormModel } from '../src/model';
 
 const byObjectNumber = (objectNumber: number) => ({ kind: 'objectNumber' as const, objectNumber });
 
@@ -88,7 +88,7 @@ function harness(granted: readonly string[], fields: readonly FormFieldDTO[] = [
   const create = vi.fn();
   const ctx = createTestContext({
     id: 'form',
-    state: initialFormState(),
+    state: initialFormModel(),
     settings: { defaults: FORM_DEFAULTS },
     pages: [{ ref: toPageRef(1) }],
     capabilities: [[InteractionToken, interaction]],

@@ -27,10 +27,10 @@ import type { Rect } from '@embedpdf/core-geometry';
 import { memo, type PluginContext, type PageRef } from '@embedpdf/core';
 
 import type { StageSettings } from '../contract';
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import { SETTINGS_EFFECT, SETTING_KEYS } from '../settings';
 
-export function createScene(ctx: PluginContext<StageState>) {
+export function createScene(ctx: PluginContext<StageModel>) {
   const state = () => ctx.state.get();
   const camera = () => state().camera;
   const viewport = () => state().viewport;

@@ -499,6 +499,6 @@ export function widgetAt(
 // ── session state ────────────────────────────────────────────────────────────
 
 /** The plugin's session state: nothing yet; a write in flight shows in the mirror's view. */
-export type FormState = Readonly<Record<string, never>>;
+export type FormModel = Readonly<Record<string, never>>;
 
-export const initialFormState = (): FormState => ({});
+export const initialFormModel = (): FormModel => ({});

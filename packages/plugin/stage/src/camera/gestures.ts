@@ -16,14 +16,14 @@ import type { PluginContext } from '@embedpdf/core';
 
 import type { StageScrollToOptions } from '../contract';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, type StageState } from '../model';
+import { patchSettings, type StageModel } from '../model';
 import type { StagePageReads } from '../read/pages';
 import type { StageServices } from '../services';
 import type { StageAnimation } from './animation';
 import type { StageCameraWrite } from './write';
 
 export function createGestures(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene }: Pick<StageServices, 'scene'>,
   write: StageCameraWrite,
   { cancelAnimation, animateTo, startCameraPhysics }: StageAnimation,

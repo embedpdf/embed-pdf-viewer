@@ -8,7 +8,7 @@
  *
  *   const ctx = createTestContext({
  *     id: 'measurement',
- *     state: initialMeasurementState(),
+ *     state: initialMeasurementModel(),
  *     pages: [{ ref: toPageRef(1), size: { width: 600, height: 800 } }],
  *     capabilities: [[AnnotationToken, fakeAnnotation]],
  *     doc: { security: { allows: () => true } },

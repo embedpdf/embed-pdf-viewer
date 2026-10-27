@@ -10,7 +10,7 @@ import type { PluginContext } from '@embedpdf/core';
 import type { StageViewState } from '../contract';
 import type { StageAnimation } from '../camera/animation';
 import type { StageHostCapability } from '../host-contract';
-import { markPlaced, setDpr, setViewport, type StageState } from '../model';
+import { markPlaced, setDpr, setViewport, type StageModel } from '../model';
 import type { StageArrival } from '../navigation/arrive';
 import type { StageServices } from '../services';
 import type { StageSettingsArea } from '../settings/settings';
@@ -21,7 +21,7 @@ interface InitialViewProvider {
 }
 
 export function createViewLifecycle(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene, placement }: Pick<StageServices, 'scene' | 'placement'>,
   { cancelAnimation }: Pick<StageAnimation, 'cancelAnimation'>,
   arrive: Pick<StageArrival, 'goToTarget' | 'reapply' | 'resetView'>,

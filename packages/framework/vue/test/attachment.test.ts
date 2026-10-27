@@ -6,6 +6,7 @@ import { toPageRef } from '../src/runtime';
 import {
   attachmentPlugin,
   attachmentState,
+  type AttachmentState,
   AttachmentToken,
   useAttachment,
   useAttachmentState,
@@ -86,7 +87,7 @@ describe('useAttachmentState', () => {
     await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
     await vi.waitFor(() => expect(kernel.capability(AttachmentToken).getStatus()).toBe('ready'));
     await settle();
-    const state = latest(states) as ReturnType<typeof attachmentState.read>;
+    const state = latest(states) as AttachmentState;
     expect(state.files.map((file) => file.name)).toEqual(['notes.txt', 'scan.pdf']);
     expect(state).toMatchObject({ status: 'ready', canAdd: true, canDownload: true });
   });

@@ -5,7 +5,7 @@ import type { StampAsset, StampLibrary } from '../src/contract';
 import {
   addAsset,
   addLibrary,
-  initialStampState,
+  initialStampModel,
   removeAsset,
   removeLibrary,
   setAsset,
@@ -26,7 +26,7 @@ const asset = (name: string): StampAsset => ({
 describe('stamp transitions', () => {
   it('adds libraries in order and assets to the end of their library', () => {
     const state = addAsset(
-      addAsset(addLibrary(initialStampState(), library), asset('One')),
+      addAsset(addLibrary(initialStampModel(), library), asset('One')),
       asset('Two'),
     );
     expect(state.libraryOrder).toEqual(['lib']);
@@ -35,7 +35,7 @@ describe('stamp transitions', () => {
   });
 
   it('changes nothing for unknown libraries and assets', () => {
-    const state = addLibrary(initialStampState(), library);
+    const state = addLibrary(initialStampModel(), library);
     expect(addAsset(state, { ...asset('One'), libraryId: 'other' })).toBe(state);
     expect(setLibrary(state, { ...library, id: 'other' })).toBe(state);
     expect(setAsset(state, asset('One'))).toBe(state);
@@ -44,7 +44,7 @@ describe('stamp transitions', () => {
   });
 
   it('replaces descriptors, and removes an asset from its library order', () => {
-    const state = addAsset(addLibrary(initialStampState(), library), asset('One'));
+    const state = addAsset(addLibrary(initialStampModel(), library), asset('One'));
     const renamed = setLibrary(state, { ...state.libraries.lib, name: 'Renamed' });
     expect(renamed.libraries.lib.name).toBe('Renamed');
     const relabeled = setAsset(state, { ...asset('One'), label: 'Uno' });
@@ -55,8 +55,8 @@ describe('stamp transitions', () => {
   });
 
   it('removes a library together with its assets', () => {
-    const state = addAsset(addLibrary(initialStampState(), library), asset('One'));
+    const state = addAsset(addLibrary(initialStampModel(), library), asset('One'));
     const removed = removeLibrary(state, 'lib');
-    expect(removed).toEqual(initialStampState());
+    expect(removed).toEqual(initialStampModel());
   });
 });

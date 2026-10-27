@@ -13,7 +13,7 @@ import {
 } from '@embedpdf/core';
 
 import type { I18nSettings } from '../contract';
-import { endLocaleLoad, registerLocale, setLocale, type I18nState } from '../model';
+import { endLocaleLoad, registerLocale, setLocale, type I18nModel } from '../model';
 
 export interface LoadSettlers {
   /** A load finished: the language shows (`ok`), or it failed (`error`). */
@@ -21,7 +21,7 @@ export interface LoadSettlers {
 }
 
 export function createLoaders(
-  ctx: PluginContext<I18nState, I18nSettings>,
+  ctx: PluginContext<I18nModel, I18nSettings>,
   settings: Settings<I18nSettings>,
   settlers: LoadSettlers,
   onFailed: (locale: string, error: unknown) => void,

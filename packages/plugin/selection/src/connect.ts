@@ -5,7 +5,7 @@ import { FeedbackToken, InteractionToken } from '@embedpdf/plugin-interaction/co
 import type { SelectionSettings } from './contract';
 import { createTextSelectHandler } from './handler';
 import type { SelectionHostCapability } from './host-contract';
-import type { SelectionState } from './model';
+import type { SelectionModel } from './model';
 
 /**
  * Register the text-select pointer handler with the interaction hub, which
@@ -15,7 +15,7 @@ import type { SelectionState } from './model';
  * to the next gesture.
  */
 export function connectSelection(
-  ctx: PluginContext<SelectionState, SelectionSettings>,
+  ctx: PluginContext<SelectionModel, SelectionSettings>,
   selection: SelectionHostCapability,
 ): void {
   const interaction = ctx.get(InteractionToken);

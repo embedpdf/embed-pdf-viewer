@@ -31,7 +31,7 @@ import {
   freeName,
   pageFileOf,
   selected,
-  type AttachmentState,
+  type AttachmentModel,
   type DocumentFiles,
 } from './model';
 import { displayNameOf } from './names';
@@ -52,7 +52,7 @@ const NO_FILES: readonly AttachedFile[] = Object.freeze([]);
  * an attachment is one change on the document's queue: it shows at once, is
  * one step of the history, and undoing it shows the files as they were.
  */
-export function createAttachmentController(ctx: PluginContext<AttachmentState>) {
+export function createAttachmentController(ctx: PluginContext<AttachmentModel>) {
   const changed = ctx.events.source<AttachmentsChangedEvent>();
   const resynced = ctx.events.source<AttachmentsResyncedEvent>();
 

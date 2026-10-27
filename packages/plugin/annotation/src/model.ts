@@ -37,7 +37,7 @@ export interface ForeignPlacement {
   readonly to: Point;
 }
 
-export interface AnnotationState {
+export interface AnnotationModel {
   /** The core's session: selection, hover, the gesture in progress, tool settings. */
   readonly session: Session;
   /**
@@ -68,7 +68,7 @@ export interface AnnotationState {
 }
 
 /** The initial state. The session's snapping and editable rule come from the settings (`withSnap`, `withEditable`). */
-export const initialAnnotationState = (): AnnotationState => ({
+export const initialAnnotationModel = (): AnnotationModel => ({
   session: initialSession,
   vector: {},
   ghostAt: null,
@@ -77,11 +77,11 @@ export const initialAnnotationState = (): AnnotationState => ({
 });
 
 /** The session snaps as the settings say. */
-export const withSnap = (state: AnnotationState, snap: SnapSettings): AnnotationState =>
+export const withSnap = (state: AnnotationModel, snap: SnapSettings): AnnotationModel =>
   state.session.snap === snap ? state : { ...state, session: { ...state.session, snap } };
 
 /** People change by hand what the settings' `editable` rule lets them. */
-export const withEditable = (state: AnnotationState, editable: EditableKinds): AnnotationState =>
+export const withEditable = (state: AnnotationModel, editable: EditableKinds): AnnotationModel =>
   state.session.editable === editable
     ? state
     : { ...state, session: { ...state.session, editable } };
@@ -94,19 +94,19 @@ export const withEditable = (state: AnnotationState, editable: EditableKinds): A
  * its own painter draws.
  */
 export function withSession(
-  state: AnnotationState,
+  state: AnnotationModel,
   session: Session,
   vector: readonly Id[] = [],
-): AnnotationState {
+): AnnotationModel {
   const next = sameSession(state.session, session) ? state : { ...state, session };
   return preferVector(next, vector);
 }
 
 /** The session holds these object numbers too, for the records it creates next. */
 export const withObjectNumbers = (
-  state: AnnotationState,
+  state: AnnotationModel,
   numbers: readonly number[],
-): AnnotationState =>
+): AnnotationModel =>
   numbers.length
     ? {
         ...state,
@@ -119,9 +119,9 @@ export const withObjectNumbers = (
 
 /** The session lost these object numbers: the engine refuses a create that names one. */
 export function withoutObjectNumbers(
-  state: AnnotationState,
+  state: AnnotationModel,
   lost: readonly number[],
-): AnnotationState {
+): AnnotationModel {
   const gone = new Set(lost);
   const objectNumbers = state.session.objectNumbers.filter((number) => !gone.has(number));
   return objectNumbers.length === state.session.objectNumbers.length
@@ -130,7 +130,7 @@ export function withoutObjectNumbers(
 }
 
 /** Render these records live from their description. */
-export function preferVector(state: AnnotationState, ids: readonly Id[]): AnnotationState {
+export function preferVector(state: AnnotationModel, ids: readonly Id[]): AnnotationModel {
   const added = ids.filter((id) => !state.vector[id]);
   if (!added.length) return state;
   const vector = { ...state.vector };
@@ -139,7 +139,7 @@ export function preferVector(state: AnnotationState, ids: readonly Id[]): Annota
 }
 
 /** Render these records from the engine's raster again. */
-export function preferBaked(state: AnnotationState, ids: readonly Id[]): AnnotationState {
+export function preferBaked(state: AnnotationModel, ids: readonly Id[]): AnnotationModel {
   const removed = ids.filter((id) => state.vector[id]);
   if (!removed.length) return state;
   const vector = { ...state.vector };
@@ -150,16 +150,16 @@ export function preferBaked(state: AnnotationState, ids: readonly Id[]): Annotat
 /* ── ghost and text selection ─────────────────────────────────────────────── */
 
 export const setGhostAt = (
-  state: AnnotationState,
+  state: AnnotationModel,
   ghostAt: GhostPointer | null,
-): AnnotationState => (state.ghostAt === ghostAt ? state : { ...state, ghostAt });
+): AnnotationModel => (state.ghostAt === ghostAt ? state : { ...state, ghostAt });
 
 export const setPlacing = (
-  state: AnnotationState,
+  state: AnnotationModel,
   placing: ForeignPlacement | null,
-): AnnotationState => (state.placing === placing ? state : { ...state, placing });
+): AnnotationModel => (state.placing === placing ? state : { ...state, placing });
 
 export const setTextSelection = (
-  state: AnnotationState,
+  state: AnnotationModel,
   textSelection: TextSelection | null,
-): AnnotationState => (state.textSelection === textSelection ? state : { ...state, textSelection });
+): AnnotationModel => (state.textSelection === textSelection ? state : { ...state, textSelection });

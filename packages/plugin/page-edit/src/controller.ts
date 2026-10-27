@@ -24,7 +24,7 @@ import type {
 } from '@embedpdf/core';
 
 import type { PageEditCapability, PageEditInsertResult } from './contract';
-import { selected, type PageEditState } from './model';
+import { selected, type PageEditModel } from './model';
 
 /** Inserting, rotating and deleting pages (PDF permission bit 4 or 11). The engine enforces it too. */
 const ASSEMBLE: DocCapability = 'doc.pages.assemble';
@@ -43,7 +43,7 @@ type PageOp = Extract<PredictedOp, { type: `pages.${string}` }>;
 /** What a change is called in history and refusals. */
 type PageVerb = 'rotate' | 'reorder' | 'delete' | 'insertBlank' | 'insert' | 'duplicate';
 
-export function createPageEditController(ctx: PluginContext<PageEditState>) {
+export function createPageEditController(ctx: PluginContext<PageEditModel>) {
   /** Engine calls outside the guarded `ctx.doc` (another document, a scratch document) map their errors here. */
   const mapErrors = async <T>(work: () => Promise<T>): Promise<T> => {
     try {

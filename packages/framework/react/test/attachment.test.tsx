@@ -7,6 +7,7 @@ import { toPageRef } from '../src/runtime';
 import {
   attachmentPlugin,
   attachmentState,
+  type AttachmentState,
   AttachmentToken,
   useAttachment,
   useAttachmentState,
@@ -82,7 +83,7 @@ describe('useAttachmentState', () => {
     // Nothing reads the attachments as the document opens: the hook's reading them loads them.
     await act(() => kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() }));
     await waitFor(() => expect(kernel.capability(AttachmentToken).getStatus()).toBe('ready'));
-    const state = latest(renders) as ReturnType<typeof attachmentState.read>;
+    const state = latest(renders) as AttachmentState;
     expect(state.files.map((file) => [file.id, file.name])).toEqual([
       ['doc:notes.txt', 'notes.txt'],
       ['doc:scan.pdf', 'scan.pdf'],

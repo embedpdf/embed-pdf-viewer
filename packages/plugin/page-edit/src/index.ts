@@ -4,5 +4,5 @@
  * of the history, and the page selection.
  */
 export { pageEditPlugin } from './page-edit.plugin';
-export { pageEditState } from './state';
+export { pageEditState, type PageEditState } from './state';
 export * from './contract';

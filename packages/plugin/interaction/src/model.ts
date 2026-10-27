@@ -7,7 +7,7 @@
 import type { Cursor, ToolId } from './contract';
 import type { HostTool } from './host-contract';
 
-export interface InteractionState {
+export interface InteractionModel {
   readonly activeToolId: ToolId;
   /** Tools activated with `pushTool`, oldest first; `popTool` restores the last. */
   readonly toolStack: readonly ToolId[];
@@ -15,25 +15,25 @@ export interface InteractionState {
 }
 
 /** A document starts on `pointer`; the controller then activates the `defaultTool` setting. */
-export const initialInteractionState = (): InteractionState => ({
+export const initialInteractionModel = (): InteractionModel => ({
   activeToolId: 'pointer',
   toolStack: [],
   cursor: 'default',
 });
 
 /** Activate a tool and forget every pushed one. */
-export function activateTool(state: InteractionState, toolId: ToolId): InteractionState {
+export function activateTool(state: InteractionModel, toolId: ToolId): InteractionModel {
   if (state.activeToolId === toolId && state.toolStack.length === 0) return state;
   return { ...state, activeToolId: toolId, toolStack: [] };
 }
 
 /** Activate a tool for a moment, saving the active one for {@link popTool}. */
-export function pushTool(state: InteractionState, toolId: ToolId): InteractionState {
+export function pushTool(state: InteractionModel, toolId: ToolId): InteractionModel {
   return { ...state, toolStack: [...state.toolStack, state.activeToolId], activeToolId: toolId };
 }
 
 /** Activate the tool saved last; an empty stack changes nothing. */
-export function popTool(state: InteractionState): InteractionState {
+export function popTool(state: InteractionModel): InteractionModel {
   if (state.toolStack.length === 0) return state;
   return {
     ...state,
@@ -42,7 +42,7 @@ export function popTool(state: InteractionState): InteractionState {
   };
 }
 
-export function setCursor(state: InteractionState, cursor: Cursor): InteractionState {
+export function setCursor(state: InteractionModel, cursor: Cursor): InteractionModel {
   return state.cursor === cursor ? state : { ...state, cursor };
 }
 

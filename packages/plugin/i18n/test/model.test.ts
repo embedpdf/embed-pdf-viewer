@@ -3,19 +3,19 @@ import { describe, expect, it } from 'vitest';
 import {
   addTranslations,
   endLocaleLoad,
-  initialI18nState,
+  initialI18nModel,
   nestKeys,
   registerLocale,
   seedFromSettings,
   setLocale,
   startLocaleLoad,
   unregisterLocale,
-  type I18nState,
+  type I18nModel,
 } from '../src/model';
 import { I18N_DEFAULTS, type I18nSettings } from '../src/contract';
 import { ar, en, es } from './fixtures';
 
-const stateWith = (overrides: Partial<I18nState> = {}): I18nState => ({
+const stateWith = (overrides: Partial<I18nModel> = {}): I18nModel => ({
   locale: 'es',
   locales: { en, es },
   loading: null,
@@ -31,19 +31,19 @@ describe('i18n transitions', () => {
 
   it('seeds from the settings: their languages loaded, the start language current', () => {
     const state = seedFromSettings(
-      initialI18nState(),
+      initialI18nModel(),
       settingsWith({ locales: [en, es], locale: 'es' }),
     );
     expect(state.locale).toBe('es');
     expect(Object.keys(state.locales)).toEqual(['en', 'es']);
     expect(state.loading).toBeNull();
-    const fallback = seedFromSettings(initialI18nState(), settingsWith({ locales: [en] }));
+    const fallback = seedFromSettings(initialI18nModel(), settingsWith({ locales: [en] }));
     expect(fallback.locale).toBe('en');
   });
 
   it('shows the fallback language while a start language from loaders loads', () => {
     const state = seedFromSettings(
-      initialI18nState(),
+      initialI18nModel(),
       settingsWith({ locales: [en], locale: 'ar', loaders: { ar: async () => ar } }),
     );
     expect(state.locale).toBe('en');

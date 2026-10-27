@@ -21,12 +21,12 @@ import type { GoToOptions } from '../contract';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, setCursor, type StageState } from '../model';
+import { patchSettings, setCursor, type StageModel } from '../model';
 import type { StageServices } from '../services';
 import { whenPlaced } from '../services/placement-latch';
 
 export function createArrival(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene, placement }: Pick<StageServices, 'scene' | 'placement'>,
   { writeCamera, markCause }: Pick<StageCameraWrite, 'writeCamera' | 'markCause'>,
   { cancelAnimation, animateTo }: Pick<StageAnimation, 'cancelAnimation' | 'animateTo'>,

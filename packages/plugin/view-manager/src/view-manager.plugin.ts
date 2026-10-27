@@ -2,7 +2,7 @@ import { definePlugin, DocumentsToken } from '@embedpdf/core';
 
 import { ViewManagerToken } from './contract';
 import { createViewManagerController } from './controller';
-import { initialViewManagerState } from './model';
+import { initialViewManagerModel } from './model';
 
 /**
  * The view-manager plugin: which documents each pane shows. Workspace-scoped,
@@ -14,6 +14,6 @@ export const viewManagerPlugin = () =>
     scope: 'workspace',
     token: ViewManagerToken,
     requires: [DocumentsToken],
-    state: initialViewManagerState,
+    state: initialViewManagerModel,
     create: createViewManagerController,
   });

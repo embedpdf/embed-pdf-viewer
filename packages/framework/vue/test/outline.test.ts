@@ -6,6 +6,7 @@ import { toPageRef } from '../src/runtime';
 import {
   outlinePlugin,
   outlineState,
+  type OutlineState,
   OutlineToken,
   useOutline,
   useOutlineState,
@@ -90,7 +91,7 @@ describe('useOutlineState', () => {
     await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
     await vi.waitFor(() => expect(kernel.capability(OutlineToken).getStatus()).toBe('ready'));
     await settle();
-    const state = latest(states) as ReturnType<typeof outlineState.read>;
+    const state = latest(states) as OutlineState;
     expect(state.rows.map((row) => [row.item.title, row.depth])).toEqual([
       ['Chapter', 0],
       ['Section', 1],

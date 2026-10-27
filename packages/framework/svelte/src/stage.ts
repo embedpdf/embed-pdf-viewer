@@ -23,4 +23,3 @@ export {
   useStageSettings,
   useStageState,
 } from './stage/readers.svelte';
-export type { StageStateValue } from './stage/readers.svelte';

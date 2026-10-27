@@ -33,11 +33,11 @@ import {
 
 import type { Viewpoint, VisiblePage } from '../contract';
 import type { StageHostCapability } from '../host-contract';
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import type { StageServices } from '../services';
 
 export function createPageReads(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene }: Pick<StageServices, 'scene'>,
 ) {
   const {
@@ -80,7 +80,7 @@ export function createPageReads(
     const ratio = dpr();
     // The footprint's top-left, camera-resolved. Device-snapped at rest, which
     // keeps a rotated page on the device grid; while the zoom moves it places
-    // fractionally (see `StageState.cameraResting`).
+    // fractionally (see `StageModel.cameraResting`).
     const rawX = (box.x - current.x) * current.zoom;
     const rawY = (box.y - current.y) * current.zoom;
     const resting = state().cameraResting;
