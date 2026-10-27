@@ -13,9 +13,9 @@
   },
   "imports": {
     "#quickjs-variant": {
-      "types": "@jitl/quickjs-wasmfile-release-sync",
-      "browser": "@jitl/quickjs-singlefile-browser-release-sync",
-      "default": "@jitl/quickjs-wasmfile-release-sync"
+      "types": "./quickjs-variant/index.d.ts",
+      "browser": "./quickjs-variant/browser.js",
+      "default": "./quickjs-variant/wasmfile.js"
     }
   },
   "publishConfig": {
@@ -31,7 +31,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "quickjs-variant"
   ],
   "scripts": {
     "build": "epdf-build",
@@ -41,9 +42,9 @@
   },
   "dependencies": {
     "@embedpdf/core-acrojs": "workspace:*",
-    "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",
-    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
-    "quickjs-emscripten-core": "0.32.0"
+    "@jitl/quickjs-singlefile-browser-release-sync": "0.31.0",
+    "@jitl/quickjs-wasmfile-release-sync": "0.31.0",
+    "quickjs-emscripten-core": "0.31.0"
   },
   "devDependencies": {
     "@embedpdf/engine": "workspace:*",
