@@ -11,7 +11,7 @@ export { AbortablePromise } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
 export { EngineError } from './errors/EngineError';
 export { EngineErrorCode } from './errors/EngineErrorCode';
-export { visitorIdentityRequestOf } from './dto/ShareVisitor';
+export { shareOpenRequestOf, visitorIdentityRequestOf } from './dto/ShareVisitor';
 
 // Local engine.
 export { isLocalEngine } from './engine/LocalEngine';
@@ -99,6 +99,7 @@ export type {
   OpenInputById,
   OpenInputToken,
   OpenInputShare,
+  ShareOpenRequest,
   VisitorAnswers,
   VisitorIdentityField,
   VisitorIdentityRequest,

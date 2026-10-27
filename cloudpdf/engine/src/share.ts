@@ -4,6 +4,8 @@ import {
   EngineError,
   EngineErrorCode,
   type DocumentShare,
+  type ShareOpenRequest,
+  shareOpenRequestOf,
   type VisitorAnswers,
   type VisitorIdentityRequest,
   visitorIdentityRequestOf,
@@ -25,12 +27,16 @@ import type { WriteGate } from './document/CloudWrites';
  *
  * Every exchange names a visitor and answers their handle: sent back on
  * each renewal, it keeps the same visitor (and on a per-visitor link,
- * their layer). When the link keeps visitors' layers (`visitor.keep`),
- * the handle also waits in a {@link VisitorStore} for the next visit.
+ * their layer). Unless the link gives a new copy every visit
+ * (`visitor.keep`), the handle also waits in a {@link VisitorStore} for the
+ * next visit.
  *
  * A link can ask its visitors who they are: on open (the exchange answers
  * `VisitorIdentityRequired` until they answer), or before their first change
- * (the session reads at once, and its writes wait for the answers).
+ * (the session reads at once, and its writes wait for the answers). A
+ * passphrase or questions on open that the link gets while a document is
+ * open refuse its next renewal: the open asks the visitor once
+ * (`openRequest`) and exchanges nothing more until they give it.
  *
  * The endpoint requires a browser `Origin` header (the server checks
  * it against the grant's allowlist). Browsers attach it automatically;
@@ -47,7 +53,7 @@ export interface ShareSession {
   visitor: {
     /** Send it back with the next exchange to stay the same visitor. */
     handle: string;
-    /** Keep the handle for the next visit too: the link keeps visitors' layers. */
+    /** Keep the handle for the next visit too: false only where every visit gets a new copy. */
     keep: boolean;
     /** What the link asks before this visitor's first change, unanswered; `null` when nothing. */
     identityRequest: VisitorIdentityRequest | null;
@@ -71,8 +77,8 @@ export interface ShareExchangeOptions {
 
 /**
  * Where a share link's visitor waits for the next visit: the handle of a
- * link that keeps visitors' layers, by share token. Calls may be async (a
- * native app's storage).
+ * visitor the link keeps (`visitor.keep`), by share token. Calls may be async
+ * (a native app's storage).
  */
 export interface VisitorStore {
   get(shareToken: string): string | null | Promise<string | null>;
@@ -210,6 +216,8 @@ function asEngineError(error: unknown): unknown {
 const RENEW_MARGIN_SECONDS = 60;
 /** After a renewal on the timer failed, try again this much later; a request says why meanwhile. */
 const KEEP_ALIVE_RETRY_MS = 60_000;
+/** While the link asks before an open goes on, its session serves until this close to `expiresAt`. */
+const LAST_USE_MARGIN_SECONDS = 5;
 
 export interface ShareSessionOptions {
   /** Passphrase for protected grants. */
@@ -235,6 +243,12 @@ export interface ShareSessionOptions {
  * answered, the document's writes wait at {@link writeGate} while someone
  * listens (`share.onIdentityRequest`), until `share.identify` exchanges again
  * with the answers or `share.decline` lets them fail.
+ *
+ * When a renewal is refused for a passphrase or questions on open (the link
+ * got them after this open), the open asks once (`share.onOpenRequest`) and
+ * exchanges nothing more: the session serves until it runs out, then
+ * requests wait while someone listens, until `share.resume` exchanges again
+ * with what the visitor gave.
  */
 export class ShareSessionSource {
   private session: ShareSession | null = null;
@@ -245,6 +259,16 @@ export class ShareSessionSource {
   /** Answers given at open, sent until an exchange takes them. */
   private answers: VisitorAnswers | undefined;
   private lost: EngineError | null = null;
+  /** The passphrase every exchange sends: the one given at open, or to `resume`. */
+  private password: string | undefined;
+  /** What the link asks before this open goes on, and the refusal that asked it; `null` while nothing is. */
+  private asked: {
+    readonly request: ShareOpenRequest;
+    readonly refusal: EngineError;
+    readonly resumed: Promise<void>;
+    readonly resolve: () => void;
+  } | null = null;
+  private readonly openListeners = new Set<(request: ShareOpenRequest) => void>();
   /** What the link asks before the first change, unanswered: the gate is closed while set. */
   private request: VisitorIdentityRequest | null = null;
   private readonly listeners = new Set<(request: VisitorIdentityRequest) => void>();
@@ -262,19 +286,31 @@ export class ShareSessionSource {
   ) {
     this.restart = opts.restart === true;
     this.answers = opts.visitor;
+    this.password = opts.password;
   }
 
-  /** A session token that isn't about to expire, exchanging when it is. */
+  /**
+   * A session token that isn't about to expire, exchanging when it is. While
+   * the link asks before this open goes on, the session serves until it runs
+   * out, then waits for the visitor.
+   */
   async token(): Promise<string> {
     if (this.lost) throw this.lost;
-    const session = this.session;
-    if (session && session.expiresAt - Date.now() / 1000 > RENEW_MARGIN_SECONDS) {
-      return session.token;
+    if (!this.asked) {
+      const session = this.session;
+      if (session && session.expiresAt - Date.now() / 1000 > RENEW_MARGIN_SECONDS) {
+        return session.token;
+      }
+      this.inflight ??= this.exchange().finally(() => {
+        this.inflight = null;
+      });
+      try {
+        return (await this.inflight).token;
+      } catch (error) {
+        if (!this.askOnRefusal(error)) throw error;
+      }
     }
-    this.inflight ??= this.exchange().finally(() => {
-      this.inflight = null;
-    });
-    return (await this.inflight).token;
+    return this.whileAsked();
   }
 
   /** The document's view of the session (`DocumentHandle.share`), once it has opened. */
@@ -305,6 +341,11 @@ export class ShareSessionSource {
       (timer as { unref?: () => void }).unref?.();
     };
     const renew = () => {
+      // Nothing renews while the link asks: the timer goes on once the visitor gives it.
+      if (this.asked) {
+        void this.asked.resumed.then(() => schedule(this.untilRenewalMs()));
+        return;
+      }
       this.token().then(
         () => schedule(this.untilRenewalMs()),
         () => schedule(KEEP_ALIVE_RETRY_MS),
@@ -336,6 +377,83 @@ export class ShareSessionSource {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  /** What the link asks before this open goes on; `null` while nothing is. */
+  get openRequest(): ShareOpenRequest | null {
+    return this.asked?.request ?? null;
+  }
+
+  /** Called when the link asks before this open goes on. Returns the unsubscriber. */
+  onOpenRequest(listener: (request: ShareOpenRequest) => void): () => void {
+    this.openListeners.add(listener);
+    return () => {
+      this.openListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Exchange again with what the visitor gave the link: the same visitor goes
+   * on, and the requests waiting go out. Refused, it still asks (with what
+   * the refusal says) and rejects.
+   */
+  async resume(
+    given: { readonly sharePassword?: string; readonly visitor?: VisitorAnswers },
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const asked = this.asked;
+    if (!asked) return;
+    await this.inflight?.catch(() => undefined);
+    if (given.sharePassword !== undefined) this.password = given.sharePassword;
+    const exchanged = this.exchange(given.visitor, signal).finally(() => {
+      this.inflight = null;
+    });
+    this.inflight = exchanged;
+    try {
+      await exchanged;
+    } catch (error) {
+      const refusal = asEngineError(error);
+      const request = shareOpenRequestOf(refusal, given.sharePassword !== undefined);
+      if (request && refusal instanceof EngineError) this.asked = { ...asked, request, refusal };
+      throw refusal;
+    }
+    this.asked = null;
+    asked.resolve();
+  }
+
+  /**
+   * A renewal the link refused for a passphrase or questions on open: ask the
+   * visitor, once. Whether it asks; any other refusal is the request's to
+   * report.
+   */
+  private askOnRefusal(error: unknown): boolean {
+    if (this.asked) return true;
+    if (!this.session) return false;
+    const refusal = asEngineError(error);
+    // A passphrase the visitor gave at open that no longer works is asked as new.
+    const request = shareOpenRequestOf(refusal, false);
+    if (!request || !(refusal instanceof EngineError)) return false;
+    let resolve!: () => void;
+    const resumed = new Promise<void>((res) => {
+      resolve = res;
+    });
+    this.asked = { request, refusal, resumed, resolve };
+    for (const listener of [...this.openListeners]) listener(request);
+    return true;
+  }
+
+  /**
+   * The token while the link asks: the session's own until it runs out, then
+   * the one `resume` brings. Nobody to ask: the refusal.
+   */
+  private async whileAsked(): Promise<string> {
+    const asked = this.asked;
+    const session = this.session;
+    if (!asked || !session) return this.token();
+    if (session.expiresAt - Date.now() / 1000 > LAST_USE_MARGIN_SECONDS) return session.token;
+    if (this.openListeners.size === 0) throw asked.refusal;
+    await asked.resumed;
+    return this.token();
   }
 
   /** A second into the renewal margin: when `token()` exchanges again. */
@@ -402,7 +520,7 @@ export class ShareSessionSource {
     }
     const visitorIdentity = answers ?? this.answers;
     const next = await exchangeShareToken(this.baseUrl, this.shareToken, {
-      ...(this.opts.password !== undefined ? { password: this.opts.password } : {}),
+      ...(this.password !== undefined ? { password: this.password } : {}),
       ...(this.handle ? { visitorHandle: this.handle } : {}),
       ...(this.restart ? { restart: true } : {}),
       ...(visitorIdentity ? { visitorIdentity } : {}),
@@ -459,6 +577,21 @@ class SessionShare implements DocumentShare {
 
   decline(): void {
     this.source.decline();
+  }
+
+  get openRequest(): ShareOpenRequest | null {
+    return this.source.openRequest;
+  }
+
+  onOpenRequest(listener: (request: ShareOpenRequest) => void): () => void {
+    return this.source.onOpenRequest(listener);
+  }
+
+  resume(given: {
+    readonly sharePassword?: string;
+    readonly visitor?: VisitorAnswers;
+  }): AbortablePromise<void> {
+    return AbortablePromise.run((signal) => this.source.resume(given, signal));
   }
 }
 

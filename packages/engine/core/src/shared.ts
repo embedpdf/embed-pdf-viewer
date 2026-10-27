@@ -21,11 +21,12 @@ export type {
   TokenSource,
 } from './dto/OpenInput';
 export type {
+  ShareOpenRequest,
   VisitorAnswers,
   VisitorIdentityField,
   VisitorIdentityRequest,
 } from './dto/ShareVisitor';
-export { visitorIdentityRequestOf } from './dto/ShareVisitor';
+export { shareOpenRequestOf, visitorIdentityRequestOf } from './dto/ShareVisitor';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
 export type {
   DocumentOutline,

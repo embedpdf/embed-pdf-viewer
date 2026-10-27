@@ -77,9 +77,11 @@ doc.share?.layerMode; // 'per-visitor'
 doc.share?.keep; // true
 ```
 
-When the link keeps each visitor's layer (`keep`), the engine remembers the visitor in the
-browser's `localStorage`, and the next visit opens the same layer. To start over, open with
-`restart`: the kept layer is deleted and a fresh one begins.
+The engine remembers the visitor in the browser's `localStorage`, so the next visit is the same
+visitor: their answers stay, what they added stays theirs, and on a per-visitor link the same layer
+opens. The exception is a per-visitor link that doesn't keep visitors' layers: there every visit is
+a new visitor with a new layer, and `keep` is `false`. To start over, open with `restart`: a new
+visitor begins, and on a per-visitor link the old layer is deleted.
 
 ```ts
 const doc = await engine.open({ kind: 'share', shareToken, restart: true });
@@ -128,6 +130,26 @@ doc.share?.onIdentityRequest(async (request) => {
 ```
 
 A change made while nothing listens doesn't wait: it fails with `VisitorIdentityRequired`.
+
+### When the link changes while it's open
+
+A passphrase, or questions asked on open, that the link gets while a document is open apply to that
+document too: its session isn't renewed without them. `doc.share.openRequest` says what the link
+asks: `{ kind: 'passphrase', passwordProvided }`, or `{ kind: 'identity', request }` with the
+questions. The document reads on until its session runs out, then its requests wait. Listen for
+it, ask, and go on with `resume()` as the same visitor, or close the document:
+
+```ts
+doc.share?.onOpenRequest(async (request) => {
+  const given = await askTheVisitor(request); // { sharePassword } or { visitor }
+  if (given) await doc.share!.resume(given);
+  else await doc.close();
+});
+```
+
+`resume()` rejects with `SharePasswordRequired` or `VisitorIdentityRequired` while the link still
+asks, and `openRequest` says what. With nothing listening, a request fails with the same error once
+the session runs out.
 
 ## Password-protected PDFs
 

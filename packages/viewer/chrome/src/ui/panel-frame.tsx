@@ -20,6 +20,8 @@
  * list closes from either when one of its items is picked
  * ({@link useCloseOnPick}). The frame is named after its title for assistive
  * technology: a region when docked, a dialog otherwise (modal as a sheet).
+ *
+ * A panel with nothing to list opens as a bar instead ({@link PanelBar}).
  */
 import type { PanelPresentation, PanelPresentationBySize, PanelWidth } from '@embedpdf/core-ui';
 import { useT } from '@embedpdf/react/i18n';
@@ -352,5 +354,60 @@ function SheetPanel({ id, title, onClose, header, list, children }: PanelFramePr
     >
       {children}
     </Sheet>
+  );
+}
+
+// ── bar ──────────────────────────────────────────────────────────────────────
+
+/**
+ * A panel with nothing to list, as a bar over the top corner of the pages on its side, across
+ * them on a phone; the layout's `present` doesn't apply. The pages stay as they are and keep
+ * working under it. It takes focus as it opens, closes on Escape and gives focus back; Tab
+ * moves on from it to the rest of the viewer.
+ */
+export function PanelBar({
+  id,
+  side,
+  title,
+  onClose,
+  children,
+}: Pick<PanelFrameProps, 'id' | 'side' | 'title' | 'onClose' | 'children'>) {
+  const t = useT();
+  const { size } = useLayoutEnv();
+  const bar = useRef<HTMLElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useLayoutEffect(() => {
+    const element = bar.current;
+    if (!element) return;
+    const held = holdFocus(element, { onEscape: () => close.current(), trap: false });
+    return () => held.release();
+    // The bar opens once; it closes by unmounting.
+  }, []);
+  const place =
+    size === 'compact'
+      ? 'inset-x-2'
+      : `w-[24rem] max-w-[calc(100%-1rem)] ${side === 'start' ? 'start-2' : 'end-2'}`;
+  return (
+    <section
+      ref={bar}
+      role="dialog"
+      aria-label={title}
+      part="panel"
+      data-epdf-panel={id}
+      data-present="bar"
+      className={`bg-surface border-border-subtle absolute top-2 z-40 flex items-start gap-1 rounded-lg border p-2 shadow-xl ${place}`}
+    >
+      <div className="min-w-0 flex-1">{children}</div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t('panel.close')}
+        title={t('panel.close')}
+        className="text-fg-muted hover:bg-hover grid h-8 w-8 shrink-0 place-items-center rounded-md"
+      >
+        <Icon name="x" size={16} />
+      </button>
+    </section>
   );
 }

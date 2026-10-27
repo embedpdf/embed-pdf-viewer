@@ -781,7 +781,10 @@ export const ShareGrantRecordSchema = z.object({
   layerMode: ShareLayerModeSchema,
   /** The layer every visitor shares; null for a per-visitor link. */
   layerName: z.string().nullable(),
-  /** Per-visitor links: a visitor's browser keeps its layer for the next visit. */
+  /**
+   * Per-visitor links: a visitor's browser comes back to their layer on the next visit; false
+   * gives every visit a new visitor and a new layer.
+   */
   keepVisitorLayers: z.boolean(),
   /**
    * Delete a visitor (their answers and their layer) after this long
@@ -822,7 +825,10 @@ export const ShareGrantCreateRequestSchema = z.object({
   layerMode: ShareLayerModeSchema.optional(),
   /** The shared layer, default `default`. Not for a per-visitor link, and never `visitor-…`. */
   layerName: z.string().min(1).max(256).optional(),
-  /** Per-visitor links: keep a visitor's layer for their next visit. Default true. */
+  /**
+   * Per-visitor links: a visitor's browser comes back to their layer on the next visit; false
+   * gives every visit a new visitor and a new layer. Default true.
+   */
   keepVisitorLayers: z.boolean().optional(),
   /**
    * Delete a visitor (their answers and their layer) after this long unseen,
@@ -1011,7 +1017,11 @@ export const ShareSessionResponseSchema = z.object({
   visitor: z.object({
     /** Send it back with the next exchange: renewals keep the same visitor. */
     handle: z.string(),
-    /** Keep the handle for the next visit too: the link keeps a visitor's layer. */
+    /**
+     * Keep the handle for the next visit too: the browser comes back as this visitor, with their
+     * answers and, on a per-visitor link, their layer. False only on a per-visitor link that
+     * doesn't keep visitors' layers, where every visit is a new visitor.
+     */
     keep: z.boolean(),
     /**
      * What the link asks before this visitor's first change, when they
@@ -1877,7 +1887,7 @@ export const docOperations = {
     operationId: 'doc.attachments.list',
     title: 'List attachments',
     summary:
-      "The files embedded in the document (its /EmbeddedFiles) for a layer, in key order: each with its name, type, description, size, checksum and dates, never its bytes. Add and remove them with the attachment ops of a change.",
+      'The files embedded in the document (its /EmbeddedFiles) for a layer, in key order: each with its name, type, description, size, checksum and dates, never its bytes. Add and remove them with the attachment ops of a change.',
     method: 'GET',
     path: wireTemplates.layerAttachments,
     credentials: docCredentials,

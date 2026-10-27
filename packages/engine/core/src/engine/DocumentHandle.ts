@@ -12,7 +12,7 @@ import type { DocumentSignaturesService } from './DocumentSignaturesService';
 import type { MetadataService } from './MetadataService';
 import type { PageHandle } from './PageHandle';
 import type { DownloadOptions } from '../dto/PdfSaveMode';
-import type { VisitorAnswers, VisitorIdentityRequest } from '../dto/ShareVisitor';
+import type { ShareOpenRequest, VisitorAnswers, VisitorIdentityRequest } from '../dto/ShareVisitor';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
 import type { ObjectNumberPool } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
@@ -24,12 +24,17 @@ import type { CallFacts, WorkingSetPage } from '../scheduling/facts';
 /**
  * A document opened from a share link: how it reaches its layer, and who the
  * visitor is. A link that asks before the first change lets the visitor
- * read at once; their changes wait for their answers.
+ * read at once; their changes wait for their answers. A passphrase or
+ * questions on open that the link gets while the document is open are asked
+ * then (`openRequest`), and the document goes on once given.
  */
 export interface DocumentShare {
   /** `'shared'`: everyone with the link works in one layer. `'per-visitor'`: this visitor's own. */
   readonly layerMode: 'shared' | 'per-visitor';
-  /** This browser keeps the visitor, and their layer, for the next visit. */
+  /**
+   * This browser comes back as this visitor on the next visit, with their answers and, on a
+   * per-visitor link, their layer. False only where the link gives every visit a new copy.
+   */
   readonly keep: boolean;
   /**
    * What the link asks before this visitor's first change, while they
@@ -54,6 +59,26 @@ export interface DocumentShare {
   onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void;
   /** Not now: the changes waiting fail with `VisitorIdentityRequired`, and the next one asks again. */
   decline(): void;
+  /**
+   * What the link asks before this open can go on: a passphrase, or questions asked on open,
+   * that the link got after it opened. `null` while nothing is. The document reads on until its
+   * session runs out, then its requests wait for `resume`.
+   */
+  readonly openRequest: ShareOpenRequest | null;
+  /**
+   * Called when the link asks before this open can go on: show its passphrase or questions,
+   * then `resume`, or close the document. Returns the unsubscriber.
+   */
+  onOpenRequest(listener: (request: ShareOpenRequest) => void): () => void;
+  /**
+   * Give the link what it asks (`openRequest`): the same visitor goes on, and the requests
+   * waiting go out. Rejects with `SharePasswordRequired` or `VisitorIdentityRequired` while it
+   * still asks, and `openRequest` says what.
+   */
+  resume(given: {
+    readonly sharePassword?: string;
+    readonly visitor?: VisitorAnswers;
+  }): AbortablePromise<void>;
 }
 
 /**
