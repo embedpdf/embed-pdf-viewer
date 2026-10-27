@@ -14,6 +14,7 @@ import { AnnotationToken } from '@embedpdf/react/annotation';
 import { AttachmentToken } from '@embedpdf/react/attachment';
 import { CommandsToken, type CommandDef } from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
+import { MeasurementToken } from '@embedpdf/react/measurement';
 import { OutlineToken } from '@embedpdf/react/outline';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { SearchToken } from '@embedpdf/react/search';
@@ -167,7 +168,19 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
       },
     },
   ],
-  ['measurement', { categories: ['measurement'] }],
+  // Useful to a session that can draw measurements or set a page's scale; with neither power the
+  // panel (and the Measure bar's scale button, which opens it) could only read the scale back.
+  [
+    'measurement',
+    {
+      categories: ['measurement'],
+      allowed: (commandContext) => {
+        const measurement = commandContext.tryGet(MeasurementToken);
+        const annotation = commandContext.tryGet(AnnotationToken);
+        return measurement ? measurement.canCalibrate() || (annotation?.canCreate() ?? true) : true;
+      },
+    },
+  ],
   // The form designer's sidebar: for a session that may design forms, and in Form mode only,
   // so it closes as Form mode does (`form:design` is its switch).
   [

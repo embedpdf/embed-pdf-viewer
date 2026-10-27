@@ -1,7 +1,9 @@
 /**
  * Undo, redo and style are dependent groups in the mode bars: they show beside a mode's tools,
  * and a mode bar left with only them shows nothing. So its tab goes, the last tab takes View
- * with it, and a read-only viewer shows no tab strip and no empty bar under the main one.
+ * with it, and a read-only viewer, or one whose scope allows no change, shows no tab strip and
+ * no empty bar under the main one. And every mode bar stands as tall as the next, so switching
+ * modes never moves the page.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -38,6 +40,9 @@ const page = (config: string) => `<!doctype html><html><head><meta charset="utf-
 const PAGES = {
   '/default.html': page('{}'),
   '/read-only.html': page('{ readOnly: true }'),
+  '/view-only.html': page(
+    "{ scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.text.search', 'doc.annotate.read'] }",
+  ),
   '/no-insert.html': page("{ disable: ['stamps', 'attachments', 'signatures'] }"),
 };
 
@@ -97,11 +102,41 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('dependent groups', () =
     await tab.close();
   });
 
+  it('leave every mode bar as tall as the next', async () => {
+    const tab = await open('/default.html');
+    const heights: Record<string, number> = {};
+    for (const mode of MODE_BARS) {
+      const label = mode[0]!.toUpperCase() + mode.slice(1);
+      await tab.locator('embedpdf-viewer [part~="mode-tab"]', { hasText: label }).first().click();
+      await frames(tab);
+      heights[mode] = await tab.evaluate(
+        (bar) =>
+          document
+            .querySelector('embedpdf-viewer')!
+            .shadowRoot!.querySelector(`[data-bar="${bar}"]`)!
+            .getBoundingClientRect().height,
+        mode,
+      );
+    }
+    expect(heights).toEqual(Object.fromEntries(MODE_BARS.map((mode) => [mode, heights.annotate])));
+    await tab.close();
+  });
+
   it('leave a read-only viewer no mode tab, no View tab and no bar under the main one', async () => {
     const tab = await open('/read-only.html');
     const { tabs, bars } = await drawn(tab);
     expect(tabs).toEqual([]);
     expect(bars).toContain('main');
+    expect(bars.filter((bar) => MODE_BARS.includes(bar))).toEqual([]);
+    await tab.close();
+  });
+
+  // The features are on, so only the plugins' can* checks take the tools away: the Measure bar's
+  // scale button goes with them, and no bar is left with only style beside it.
+  it('leave a viewer whose scope allows no change no mode tab and no bar under the main one', async () => {
+    const tab = await open('/view-only.html');
+    const { tabs, bars } = await drawn(tab);
+    expect(tabs).toEqual([]);
     expect(bars.filter((bar) => MODE_BARS.includes(bar))).toEqual([]);
     await tab.close();
   });
