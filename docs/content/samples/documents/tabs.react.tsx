@@ -17,21 +17,21 @@ const plugins = [stagePlugin(), renderPlugin()];
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 // [!doc-source article]
 const article = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  const response = await fetch('/pdfs/article.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 // [!doc-source sketch]
 const sketch = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  const response = await fetch('/pdfs/sketch.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

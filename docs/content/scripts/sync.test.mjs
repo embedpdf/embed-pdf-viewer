@@ -86,13 +86,13 @@ describe('the cloud site’s copy of a viewer file', () => {
 
   it('keeps a doc-source block’s declaration and gives it the cloud document', () => {
     const source = `  // [!doc-source welcome]
-  readonly welcome = '/pdfs/embedpdf-welcome.pdf';
+  readonly welcome = '/pdfs/welcome.pdf';
   // [!/doc-source]
 `;
     assert.equal(cloud(source, 'viewer/a.angular.ts'), `  readonly welcome = ${document};\n`);
     assert.equal(
       transformViewerFile(source, 'local', 'viewer/a.angular.ts'),
-      "  readonly welcome = '/pdfs/embedpdf-welcome.pdf';\n",
+      "  readonly welcome = '/pdfs/welcome.pdf';\n",
     );
     assert.throws(
       () =>

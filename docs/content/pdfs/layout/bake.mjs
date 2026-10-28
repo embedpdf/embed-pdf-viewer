@@ -1,10 +1,12 @@
 /**
- * The wireframes, as Dana Smith marked up the home page in a design review: a box around the
- * product image, a circle around the main button, an arrow that moves a card, three overlapping
- * frames where the screenshots go, a section crossed out and one outlined. Only shapes: the
- * examples that open this document select, move, restyle and stack them.
+ * Fernquill's website wireframes, as Dana Smith marked up the home page in a design review: a box
+ * around the product image, a circle around the main button, an arrow that moves a card, three
+ * overlapping frames where the screenshots go, a section crossed out and one outlined. Only
+ * shapes: the examples that open this document select, move, restyle and stack them.
  */
-import { DANA, inset, outset } from '../shared/annotations.mjs';
+import { DANA, FERNQUILL, inset, outset } from '../shared/annotations.mjs';
+
+export const company = FERNQUILL;
 
 // The three screenshot frames, back to front: red, green, blue.
 const STACK = [
@@ -108,7 +110,7 @@ export default async function bake({ edit }) {
       title: 'Website redesign: wireframes',
       author: 'Dana Smith',
       subject: 'Wireframes of the new home, pricing and documentation pages, with review marks',
-      keywords: 'EmbedPDF, website, wireframes, design review',
+      keywords: 'Fernquill, website, wireframes, design review',
     });
     for (const [index, title] of ['Home', 'Pricing', 'Documentation'].entries()) {
       await doc.outline.create({

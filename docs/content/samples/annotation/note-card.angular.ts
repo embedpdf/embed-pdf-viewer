@@ -23,7 +23,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source proposal]
 const proposal = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-proposal.pdf');
+  const response = await fetch('/pdfs/proposal.pdf');
   return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

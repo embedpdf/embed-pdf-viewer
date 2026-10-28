@@ -13,7 +13,7 @@ const engine = localEngine();
 const plugins = [stagePlugin({ padding: 32, gap: { px: 12 }, responsive: [] }), renderPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>

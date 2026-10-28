@@ -3,7 +3,18 @@
  * Every mark carries a comment, so every thread has something to read, and the conversation runs
  * in the order it happened: each `edit()` step is one person's turn.
  */
-import { ADA, DANA, addNote, markText, outset, reply, setStatus } from '../shared/annotations.mjs';
+import {
+  ADA,
+  DANA,
+  FERNQUILL,
+  addNote,
+  markText,
+  outset,
+  reply,
+  setStatus,
+} from '../shared/annotations.mjs';
+
+export const company = FERNQUILL;
 
 export default async function bake({ edit }) {
   let titleNote;
@@ -60,10 +71,10 @@ export default async function bake({ edit }) {
 
   await edit(async ({ doc, pages }) => {
     await doc.metadata.update({
-      title: 'Proposal: a comments sidebar for the ready-made viewer',
+      title: "Proposal: a comments sidebar for the portal's viewer",
       author: 'Ada Lovelace',
       subject: 'A sidebar that lists every comment thread, with review comments',
-      keywords: 'EmbedPDF, proposal, comments, review',
+      keywords: 'Fernquill, proposal, comments, review',
     });
     for (const [index, title] of ['Problem and proposal', 'Open questions'].entries()) {
       await doc.outline.create({

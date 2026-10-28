@@ -13,13 +13,13 @@ const plugins = [stagePlugin(), renderPlugin(), pageEditPlugin()];
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('/pdfs/embedpdf-welcome.pdf')).arrayBuffer();
+const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 function InsertToolbar() {

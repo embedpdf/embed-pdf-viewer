@@ -46,7 +46,7 @@ export const DEMO_DOCUMENTS = {
      */
     viewerCloud: `{ shareToken: '${shareTokenOf('welcome')}' }`,
     /** The demo file itself, and `/report.pdf`, the path the snippets give for a reader's own PDF. */
-    viewerUrls: ['/pdfs/embedpdf-welcome.pdf', '/report.pdf'],
+    viewerUrls: ['/pdfs/welcome.pdf', '/report.pdf'],
   },
   links: { cloudSource: cloudSource('links') },
   forms: { cloudSource: cloudSource('forms') },

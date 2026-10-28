@@ -22,7 +22,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 // The original stays as it is: the document opens with a layer over it, and the changes go there.
 const withLayer = async (layer?: Uint8Array): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return {
     kind: 'layerBytes',
     baseBytes: new Uint8Array(await response.arrayBuffer()),

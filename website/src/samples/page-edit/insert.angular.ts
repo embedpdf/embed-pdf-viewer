@@ -17,12 +17,12 @@ import { EpdfPageEdit, withPageEdit } from '@embedpdf/angular/page-edit';
 import { localEngine } from '@embedpdf/engine';
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('/pdfs/embedpdf-welcome.pdf')).arrayBuffer();
+const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 @Component({

@@ -16,7 +16,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin(
 
 // [!doc-source registration]
 const registration = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-registration.pdf');
+  const response = await fetch('/pdfs/registration.pdf');
   return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

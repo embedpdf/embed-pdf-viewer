@@ -12,7 +12,7 @@ const PAGE = `<embedpdf-viewer id="viewer" style="height: 100%"></embedpdf-viewe
 <script type="module">
   import '${VIEWER.url}';
 
-  const welcome = '/pdfs/embedpdf-welcome.pdf';
+  const welcome = '/pdfs/welcome.pdf';
 
   document.getElementById('viewer').config = { src: welcome };
 </script>
@@ -82,7 +82,7 @@ describe('a plain-HTML example in the demo build', () => {
     expect(el.innerHTML).toContain('<embedpdf-viewer id="viewer"');
     expect(el.classes.has('epdf-example--viewer-page')).toBe(true);
     expect(el.elements.get('viewer')).toEqual({
-      config: { src: '/pdfs/embedpdf-welcome.pdf' },
+      config: { src: '/pdfs/welcome.pdf' },
     });
 
     unmount();

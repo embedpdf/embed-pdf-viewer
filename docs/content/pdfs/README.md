@@ -9,12 +9,13 @@ pnpm --filter @embedpdf/docs-content pdfs          # every document
 pnpm --filter @embedpdf/docs-content pdfs forms    # one
 ```
 
-The PDFs land in `website/public/pdfs/embedpdf-<folder>.pdf`, which embedpdf.com serves at
-`/pdfs/…`. The build needs Google Chrome installed (`CHROME_PATH` names another).
+Each PDF lands in both sites' `public/pdfs/<folder>.pdf`, so embedpdf.com and cloudpdf.com both
+serve it at `/pdfs/<folder>.pdf`. The build needs Google Chrome installed (`CHROME_PATH` names
+another).
 
 ## What a document is
 
-One document serves one family of examples: the ones that turn on the same things. Three rules
+One document serves one family of examples: the ones that turn on the same things. Four rules
 keep it honest, since a reader judges the product by what the example shows:
 
 - **It never instructs.** No "click", "your turn" or "try each one": it reads like a document
@@ -26,6 +27,18 @@ keep it honest, since a reader judges the product by what the example shows:
 - **The example's hint says what to try.** Only the example knows what it turned on, so its hint
   and the page's **Try it** carry the instruction, and name what's on the document (the note next
   to the title, the box around the downloads row).
+- **It belongs to a made-up company.** With our name on it, an invoice or a notice would read as
+  a real one of ours. Every document but the welcome is Fernquill Ltd's or Lanternfield's
+  (`shared/annotations.mjs`), with that company's logo and colours (`<body class="fernquill">`).
+  Their email and web addresses end in `.example`, a domain that never reaches anyone; a link a
+  reader can follow goes to a real page. The build fails when a made-up company's document names
+  EmbedPDF or CloudPDF.
+
+The welcome is the one document that's ours: "Documents belong on the web", built once as each
+brand, EmbedPDF's for embedpdf.com and CloudPDF's for cloudpdf.com. `shared/brand.js` gives the
+elements it marks with `data-brand` the brand named by `?brand=`: open
+`welcome/document.html?brand=cloudpdf` to see CloudPDF's pages. Each version names only its own
+brand.
 
 ## A document
 
@@ -38,8 +51,10 @@ A folder with two files:
 - **`bake.mjs`**: what the engine adds after Chrome printed the pages, in `edit()` steps:
 
   ```js
+  export const company = FERNQUILL; // from ../shared/annotations.mjs
+
   export default async function bake({ edit }) {
-    await edit(async ({ doc, pages, place }) => { /* as EmbedPDF */ });
+    await edit(async ({ doc, pages, place }) => { /* as the company */ });
     await edit({ userId: 'u_381', displayName: 'Dana Smith' }, async ({ doc }) => { /* as Dana */ });
   }
   ```
@@ -56,7 +71,7 @@ A folder with two files:
   ```js
   export async function sign({ engine, doc, pages, place, publish }) {
     /* sign a field with @embedpdf/core-signature */
-    publish('.cer', certificate); // → embedpdf-<folder>.cer, next to the PDF
+    publish('.cer', certificate); // → <folder>.cer, next to the PDF
   }
   ```
 
@@ -90,18 +105,20 @@ drop the tool's own scripts and stylesheets.
 ## In a sample
 
 Each document has a key in `../documents.mjs`. A sample opens it with a
-`// [!doc-source <key>]` block that fetches `/pdfs/embedpdf-<key>.pdf`; the docs sync gives the
-cloud site's copy its own form of the block.
+`// [!doc-source <key>]` block that fetches `/pdfs/<key>.pdf`; the docs sync gives the cloud
+site's copy its own form of the block, which opens the document's share link.
 
 ## On CloudPDF
 
-cloudpdf.com's examples open the same PDFs from CloudPDF. `pdfs:cloud` uploads each one and
-creates a share grant for it that can read everything and change nothing, then records the
-document and the grant in `cloud.json`:
+cloudpdf.com's examples open the same PDFs from CloudPDF, with CloudPDF's welcome. `pdfs:cloud`
+uploads cloudpdf.com's copy of each one and creates a share link for it that gives each visit its
+own layer, changed only by what that document's examples do. It records the document and the
+link in `cloud.json`:
 
 ```sh
 CLOUDPDF_API_TOKEN=… CLOUDPDF_TENANT_ID=… pnpm --filter @embedpdf/docs-content pdfs:cloud
 ```
 
-`--dry-run` only says what it would do. A document already in `cloud.json` is left alone; one
-whose PDF changed since is reported, since its grant can't point at a new document yet.
+`--dry-run` only says what it would do. A document already in `cloud.json` keeps its link, which
+is set to the script's settings again; one whose PDF changed since is reported, since a link can't
+point at a new document yet.

@@ -1,8 +1,8 @@
 /**
  * Puts the docs' demo PDFs on CloudPDF, so cloudpdf.com's examples open the same documents as
- * embedpdf.com's. For each document `build.mjs` makes, it uploads
- * `website/public/pdfs/embedpdf-<folder>.pdf` and creates a share link for it, then records both
- * in `cloud.json`, which `documents.mjs` reads. Run
+ * embedpdf.com's, with CloudPDF's own welcome. For each document `build.mjs` makes, it uploads
+ * cloudpdf.com's copy, `cloudpdf/website/public/pdfs/<folder>.pdf`, and creates a share link for
+ * it, then records both in `cloud.json`, which `documents.mjs` reads. Run
  * `CLOUDPDF_API_TOKEN=… CLOUDPDF_TENANT_ID=… pnpm --filter @embedpdf/docs-content pdfs:cloud`;
  * `--dry-run` only says what it would do. `CLOUDPDF_BASE_URL` names another engine than
  * engine.cloudpdf.com.
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { CloudPDFClient } from '@cloudpdf/sdk';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const pdfs = resolve(here, '../../../website/public/pdfs');
+const pdfs = resolve(here, '../../../cloudpdf/website/public/pdfs');
 const record = join(here, 'cloud.json');
 
 /** What every reader may do with any document: everything that reads. */
@@ -68,7 +68,7 @@ const CHANGES = {
     'doc.redact',
   ],
   // Signatures: filling the agreement, signing it, drawing a signature (a stamp) in its field,
-  // and the edits that keep or break EmbedPDF's signature (a comment, a new form field).
+  // and the edits that keep or break Lanternfield's signature (a comment, a new form field).
   agreement: [...ANNOTATE, ...FILL, 'doc.forms.modify', 'doc.sign'],
   // Stamps.
   approvals: ANNOTATE,
@@ -127,7 +127,7 @@ const client = dryRun ? null : new CloudPDFClient({ baseUrl, token });
 
 const changed = [];
 for (const name of documents) {
-  const bytes = new Uint8Array(await readFile(join(pdfs, `embedpdf-${name}.pdf`)));
+  const bytes = new Uint8Array(await readFile(join(pdfs, `${name}.pdf`)));
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const settings = linkSettings(name);
   const known = links[name];
@@ -148,7 +148,7 @@ for (const name of documents) {
   const { document } = await client.uploads.create({
     tenantId,
     source: bytes,
-    metadata: { name: `embedpdf-${name}.pdf` },
+    metadata: { name: `${name}.pdf` },
   });
   const { share } = await client.shares.create({ tenantId, docId: document.id, ...settings });
   links[name] = { docId: document.id, shareToken: share.id, sha256 };

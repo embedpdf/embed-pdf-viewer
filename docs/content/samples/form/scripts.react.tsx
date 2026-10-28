@@ -28,7 +28,7 @@ const plugins = [
 
 // [!doc-source invoice]
 const invoice = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-invoice.pdf');
+  const response = await fetch('/pdfs/invoice.pdf');
   return { kind: 'bytes', id: 'invoice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

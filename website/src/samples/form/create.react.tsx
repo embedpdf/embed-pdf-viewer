@@ -15,7 +15,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
 const registration = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-registration.pdf');
+  const response = await fetch('/pdfs/registration.pdf');
   return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

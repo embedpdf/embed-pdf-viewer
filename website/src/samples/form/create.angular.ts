@@ -17,7 +17,7 @@ import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
 const registration = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-registration.pdf');
+  const response = await fetch('/pdfs/registration.pdf');
   return { kind: 'bytes', id: 'registration', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
