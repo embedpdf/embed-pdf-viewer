@@ -87,7 +87,6 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
   NotImplemented: 'unsupported',
   Aborted: 'operation-cancelled',
   LayerVersionConflict: 'conflict',
-  StaleBase: 'conflict',
   SigningPending: 'conflict',
   SigningExpired: 'conflict',
   SigningVersionMismatch: 'conflict',

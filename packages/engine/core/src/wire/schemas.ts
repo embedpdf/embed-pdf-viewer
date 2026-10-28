@@ -2076,7 +2076,7 @@ export const DocumentVersionSchema = z.object({
 export type DocumentVersion = z.infer<typeof DocumentVersionSchema>;
 
 export const DocumentVersionsSchema = z.object({
-  /** `documents.base_sha`: the version every layer is over, or behind. */
+  /** `documents.base_sha`: the upload, where every new layer starts. */
   head: z.string().regex(/^[0-9a-f]{64}$/),
   /** Oldest first. */
   versions: z.array(DocumentVersionSchema),

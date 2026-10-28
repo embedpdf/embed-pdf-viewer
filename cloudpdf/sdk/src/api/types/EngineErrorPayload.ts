@@ -35,7 +35,6 @@ export namespace EngineErrorPayload {
         SigningVersionMismatch: "SigningVersionMismatch",
         SignatureRefused: "SignatureRefused",
         ProtectedDocument: "ProtectedDocument",
-        StaleBase: "StaleBase",
         PayloadTooLarge: "PayloadTooLarge",
         ObjectNumberUnavailable: "ObjectNumberUnavailable",
         LayerFull: "LayerFull",

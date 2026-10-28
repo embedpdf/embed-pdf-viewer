@@ -192,8 +192,20 @@ async function layerNumbers(): Promise<{ counter: number; blocks: number }> {
 }
 
 describe('signing across replicas', () => {
-  test('prepared on A, completed on B; A follows the published version on its next read', async () => {
+  test("prepared on A, completed on B; A follows the layer's version, and another layer's session is untouched", async () => {
     const signer = await createTestSigner({ commonName: 'Replica Signer' });
+    // Bob's layer has a session on A, with a change of its own, before Alice signs.
+    const bobLayer = `/v1/docs/${DOC}/layers/bob`;
+    await json(
+      await call(
+        a,
+        'POST',
+        `${bobLayer}/form/fields/${encodeURIComponent('fqn:group.total')}/value`,
+        'bob',
+        JSON.stringify({ value: { value: 'bob on A' } }),
+        'application/json',
+      ),
+    );
     // A holds the layer session and edits it.
     await json(
       await call(
@@ -353,5 +365,30 @@ describe('signing across replicas', () => {
       prepareForm({ field: { kind: 'fqn', name: 'sig' } }),
     );
     expect(refused.status).toBe(422);
+
+    // Bob's layer, on both replicas: still over the upload, still his own
+    // change, no signature; the document stays its upload.
+    for (const replica of [a, b]) {
+      const bobManifest = await json<{ baseSha: string }>(
+        await call(replica, 'GET', `${bobLayer}/manifest`, 'bob'),
+      );
+      expect(bobManifest.baseSha).toBe(seeded.sha);
+      const bobForm = await json<{ fields: Array<{ name: string; value: unknown }> }>(
+        await call(replica, 'GET', `${bobLayer}/form`, 'bob'),
+      );
+      const total = JSON.stringify(bobForm.fields.find((f) => f.name === 'group.total')?.value);
+      expect(total).toContain('bob on A');
+      expect(total).not.toContain('from A');
+      const bobSignatures = await json<{ signatures: Array<{ signed: boolean }> }>(
+        await call(replica, 'GET', `${bobLayer}/signatures`, 'bob'),
+      );
+      expect(bobSignatures.signatures.some((each) => each.signed)).toBe(false);
+    }
+    const doc = await a.db
+      .selectFrom('documents')
+      .select('base_sha')
+      .where('id', '=', DOC)
+      .executeTakeFirstOrThrow();
+    expect(doc.base_sha).toBe(seeded.sha);
   });
 });

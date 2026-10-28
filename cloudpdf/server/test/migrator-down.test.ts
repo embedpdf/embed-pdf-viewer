@@ -7,6 +7,7 @@ import { migrate, migrateDown, status, type MigrationSource } from '../src/db/mi
 import { sqliteMigrations } from '../src/db/migrations/sqlite/index';
 import { postgresMigrations } from '../src/db/migrations/postgres/index';
 import type { Database as Schema } from '../src/db/schema';
+import { checkVersionsByLayerMigration } from './_helpers/versions-by-layer-migration';
 
 /**
  * `migrate down` (rollback) tests. The down path is the symmetric
@@ -273,6 +274,15 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
         source: { kind: 'inline', migrations: postgresMigrations },
       });
       expect(reapplied).toHaveLength(postgresMigrations.length);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  test('migration 044 gives signed versions their layer and moves documents back', async () => {
+    const db = await makeDb();
+    try {
+      await checkVersionsByLayerMigration(db, postgresMigrations);
     } finally {
       await db.destroy();
     }

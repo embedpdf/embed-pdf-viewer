@@ -98,7 +98,7 @@ import {
   encodePrepared,
 } from '@embedpdf/engine-core/wire';
 import { packChangeRecord, unpackChangeRecord } from '@embedpdf/engine-services';
-import { sql, type Kysely, type Transaction } from 'kysely';
+import type { Kysely, Transaction } from 'kysely';
 
 import { deleteStoredLayer } from './deleteStoredLayer';
 import type { DocumentService, OpenContext } from './DocumentService';
@@ -146,14 +146,12 @@ import { ChangeOutcomesRepo, type ChangeOutcomeRow } from '../db/repos/change_ou
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
-import type { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
 import { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import type { Database as Schema } from '../db/schema';
 import { isUniqueViolation } from '../db/uniqueViolation';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
 import type { BuildPack, EnginePool } from '../runtime/EnginePool';
 import { signingCandidatePath } from '../runtime/signing-paths';
-import type { PasswordSessionBinding } from '../security/password-session';
 import type { LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
@@ -226,8 +224,6 @@ export interface LayerServiceOptions {
   counters?: EngineCounters;
   /** Durable signings (migration 030); the signing verbs need it. */
   signings?: DocumentSigningsRepo;
-  /** Password sessions, for rebinding the completer's session to the published version. */
-  passwordSessions?: PdfPasswordSessionsRepo;
   /** Where the engine writes signing candidates (the same root the workers boot with). */
   signingRoot?: string;
   /** How long a prepared signing may wait for its CMS. Default 15 minutes. */
@@ -302,7 +298,6 @@ export class LayerService {
   private readonly storage?: ObjectStore;
   private readonly realtime?: RealtimeBus;
   private readonly signings?: DocumentSigningsRepo;
-  private readonly passwordSessions?: PdfPasswordSessionsRepo;
   private readonly signingRoot?: string;
   private readonly signingTtlMs: number;
   private readonly layerWriteQueues = new Map<string, Promise<unknown>>();
@@ -334,7 +329,6 @@ export class LayerService {
     this.documents = opts.documents;
     this.layerState = opts.layerState;
     this.signings = opts.signings;
-    this.passwordSessions = opts.passwordSessions;
     this.signingRoot = opts.signingRoot;
     this.signingTtlMs = opts.signingTtlMs ?? DEFAULT_SIGNING_TTL_MS;
     this.documentService = opts.documentService;
@@ -2976,17 +2970,13 @@ export class LayerService {
   ): Promise<SignaturePrepared> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      const documentService = this.requireDocumentService();
-      const head = await documentService.getHead(ctx, input.docId);
-      if (layer.baseSha !== null && layer.baseSha !== head.baseSha) {
-        throw new EngineError(
-          EngineErrorCode.StaleBase,
-          'this layer is behind the document head; rebase it before signing',
-        );
-      }
-      const headVersion = await this.layerState.baseVersionFacts(
+      // The layer signs over its own base: the upload, or the version its
+      // last signature made. Other layers' signatures never move it.
+      const head = await this.requireDocumentService().getHead(ctx, input.docId);
+      const baseSha = layer.baseSha ?? head.baseSha;
+      const baseVersion = await this.layerState.baseVersionFacts(
         input.docId,
-        head.baseSha,
+        baseSha,
         head.storageSizeBytes,
       );
       const fieldObjectNumber = await this.resolveSignatureField(
@@ -3019,13 +3009,13 @@ export class LayerService {
           ctx,
           input.docId,
           prepared.signingId,
-          headVersion.byteLength,
+          baseVersion.byteLength,
         );
         const now = Date.now();
         const expiresAt = now + this.signingTtlMs;
         const nextVersion = layer.currentVersion + 1;
         const expectedVersion: DocumentVersionRef = {
-          baseSha256: head.baseSha,
+          baseSha256: baseSha,
           editsVersion: nextVersion,
         };
         const answer: SignaturePrepared = {
@@ -3059,9 +3049,9 @@ export class LayerService {
                 docId: input.docId,
                 layerId: layer.id,
                 layerName: input.layerName,
-                expectedBaseSha: head.baseSha,
+                expectedBaseSha: baseSha,
                 expectedLayerVersion: nextVersion,
-                baseByteLength: headVersion.byteLength,
+                baseByteLength: baseVersion.byteLength,
                 tailKey: tail.key,
                 tailSha: tail.sha256,
                 tailSize: tail.size,
@@ -3229,21 +3219,18 @@ export class LayerService {
             }
             const finalized = finalizedPayload;
 
-            // 3. The new immutable version, uploaded before the fences: the key
-            //    is the content, so a losing attempt leaves only a harmless object.
-            const versionKey = StorageKeys.baseVersionPdf(
+            // 3. The new immutable version, uploaded before the fences under
+            //    the layer it belongs to: the key is the content, so a losing
+            //    attempt leaves only a harmless object, and it goes with the layer.
+            const versionKey = StorageKeys.layerVersionPdf(
               ctx.tenantId,
               input.docId,
+              input.layerName,
               finalized.version.sha256,
             );
             await this.uploadVersionObject(versionKey, candidatePath, finalized.version);
 
-            // 4. Publish: one transaction, two fences, one audit row.
-            const sessionRebindContext = await documentService.sessionRebindContext(
-              ctx,
-              input.docId,
-              input.layerName,
-            );
+            // 4. Commit: one transaction, the layer's fences, one audit row.
             let committed: { result: SignatureCompleteResult; auditId: number };
             try {
               committed = await this.commitSignature(ctx, {
@@ -3254,7 +3241,6 @@ export class LayerService {
                 finalized,
                 versionKey,
                 cms: input.cms,
-                sessionRebindContext,
               });
             } catch (err) {
               if (err instanceof AlreadyCompleted) {
@@ -3265,26 +3251,26 @@ export class LayerService {
                 (err instanceof EngineError && err.code === EngineErrorCode.SigningVersionMismatch)
               ) {
                 // A CMS signs the exact bytes its digest covers; those bytes
-                // are no longer publishable. End the signing so the layer is
-                // writable again; the client prepares anew.
+                // can't be the layer's version any more. End the signing so the
+                // layer is writable again; the client prepares anew.
                 await this.discardSigning(signing);
                 throw new EngineError(
                   EngineErrorCode.SigningVersionMismatch,
-                  'the document or layer moved since prepare; prepare again',
+                  'the layer moved since prepare; prepare again',
                 );
               }
               throw err;
             }
 
-            // 5. Sessions over the old base are garbage, here and everywhere;
-            //    the new version's protection is the signing's own.
+            // 5. The layer's session is over its old base: it reopens over the
+            //    new version at its next request, here and on every replica (its
+            //    version moved). The new version's protection is the signing's own.
             documentService.rememberProtection(
               committed.result.version.sha256,
               committed.result.protection,
             );
-            await documentService.onBaseVersionPublished(input.docId);
+            documentService.invalidateLayerSession(input.docId, input.layerName);
             this.publishMutation(ctx, input.docId, committed.auditId);
-            this.publishBaseChanged(ctx, input.docId);
             return committed.result;
           },
         );
@@ -3614,9 +3600,9 @@ export class LayerService {
   }
 
   /**
-   * The publish transaction. Lock order for a transaction touching more
-   * than one row of a document (law 9d): the signing row, the document
-   * row, then layers in id order.
+   * The commit transaction: the signing row, then the layer. A signature
+   * moves only its layer's base; the document (`documents.base_sha`, the
+   * upload) and every other layer stay as they are.
    */
   private async commitSignature(
     ctx: LayerWriteContext,
@@ -3634,7 +3620,6 @@ export class LayerService {
       };
       versionKey: string;
       cms: Uint8Array;
-      sessionRebindContext: { binding: PasswordSessionBinding; unlockKey: string } | null;
     },
   ): Promise<{ result: SignatureCompleteResult; auditId: number }> {
     const signings = this.requireSignings();
@@ -3676,28 +3661,9 @@ export class LayerService {
           );
         }
 
-        // (2) Fence two: the head did not move since prepare. Its docVersion
-        //     advances so every doc-level pinned family re-resolves.
-        const moved = await trx
-          .updateTable('documents')
-          .set({
-            base_sha: finalized.version.sha256,
-            storage_size_bytes: finalized.version.byteLength,
-            doc_version: sql`doc_version + 1`,
-            updated_at: now,
-          })
-          .where('id', '=', input.docId)
-          .where('base_sha', '=', signing.expectedBaseSha)
-          .executeTakeFirst();
-        if (Number(moved?.numUpdatedRows ?? 0) !== 1) {
-          throw new EngineError(
-            EngineErrorCode.SigningVersionMismatch,
-            'the document head moved since prepare',
-          );
-        }
-
-        // (3) Fence one: the layer is exactly what the candidate consumed.
-        //     It becomes an empty workspace over the new version.
+        // (2) The fence: the layer is exactly what the candidate consumed (its
+        //     base moves only with its own versions). It becomes an empty
+        //     workspace over the new version.
         const currentLayer = await trx
           .selectFrom('layers')
           .select(['current_version', 'doc_version'])
@@ -3734,11 +3700,10 @@ export class LayerService {
           finalized.lastObjectNumber,
         );
 
-        // (4) The version row, numbered after the fenced parent; carries
-        //     the layer's plane pointers (law 9). A document committed
-        //     before the catalog existed has no row for its upload: this
-        //     first publish materializes version 1 for it (the fence above
-        //     proved the sha is the head).
+        // (3) The version row, the layer's own, numbered after its parent (the
+        //     layer's base); carries the layer's plane pointers (law 9). A
+        //     document committed before the catalog existed has no row for its
+        //     upload: the first signature over it materializes version 1.
         let parent = await this.layerState.repos.baseVersions.find(
           input.docId,
           signing.expectedBaseSha,
@@ -3764,6 +3729,7 @@ export class LayerService {
         await this.layerState.repos.baseVersions.insertPublished(trx, {
           tenantId: ctx.tenantId,
           docId: input.docId,
+          layerId: layer.id,
           sha256: finalized.version.sha256,
           byteLength: finalized.version.byteLength,
           parent,
@@ -3778,43 +3744,15 @@ export class LayerService {
           createdAt: now,
         });
 
-        // (5) Promote the whole layer into the base catalog; every live
-        //     sibling's manifest body changes too (scopes flip), so their
-        //     docVersion advances — in id order.
-        const promoted = await this.layerState.promoteLayerToBase(trx, {
+        // (4) The layer's pages over its new version.
+        const signedPages = await this.layerState.signLayerPages(trx, {
           docId: input.docId,
           layerId: layer.id,
           signedPage: widgetPage,
           now,
         });
-        const siblings = await trx
-          .selectFrom('layers')
-          .select('id')
-          .where('doc_id', '=', input.docId)
-          .where('id', '!=', layer.id)
-          .where('deleted_at', 'is', null)
-          .orderBy('id')
-          .execute();
-        for (const sibling of siblings) {
-          await trx
-            .updateTable('layers')
-            .set({ doc_version: sql`doc_version + 1`, updated_at: now })
-            .where('id', '=', sibling.id)
-            .execute();
-        }
 
-        // (6) The completer's password session follows the version.
-        if (input.sessionRebindContext && this.passwordSessions) {
-          await this.passwordSessions.rebind(
-            trx,
-            input.sessionRebindContext.binding,
-            { ...input.sessionRebindContext.binding, baseSha: finalized.version.sha256 },
-            input.sessionRebindContext.unlockKey,
-            now,
-          );
-        }
-
-        // (7) The response, complete before it is audited.
+        // (5) The response, complete before it is audited.
         const result: SignatureCompleteResult = {
           status: 'completed',
           signature: finalized.signature,
@@ -3825,8 +3763,8 @@ export class LayerService {
           },
           protection: finalized.protection,
           meta: {
-            affectedPages: promoted.map((page) => toPageRef(page.pageObjectNumber)),
-            // No delta: a publish changes more of the manifest than a delta
+            affectedPages: signedPages.map((page) => toPageRef(page.pageObjectNumber)),
+            // No delta: a new base changes more of the manifest than a delta
             // carries; the client refreshes its manifest on completion.
             cacheDelta: null,
             // Signing is final: it ends undo for every write before it.
@@ -3867,12 +3805,6 @@ export class LayerService {
         });
         return { result, auditId };
       });
-  }
-
-  private publishBaseChanged(ctx: LayerWriteContext, docId: string): void {
-    void this.realtime
-      ?.publishBaseChanged({ tenantId: ctx.tenantId, docId })
-      .catch(() => undefined);
   }
 
   private requireSignings(): DocumentSigningsRepo {

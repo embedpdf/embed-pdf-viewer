@@ -588,7 +588,19 @@ export class DocumentService {
     // session, so eagerly warming it would resurrect the
     // session-per-visitor explosion this policy avoids.
     if (layer) void this.warmLayerIfOwned(ctx, docId, layerName).catch(() => undefined);
-    return layer ? { ...head, docVersion: layer.docVersion } : head;
+    if (!layer) return head;
+    // A layer's head is over its own base: the upload, or the version its
+    // last signature made.
+    if (layer.baseSha === null || layer.baseSha === head.baseSha) {
+      return { ...head, docVersion: layer.docVersion };
+    }
+    const base = await this.layerState.baseVersionFacts(docId, layer.baseSha, null);
+    return {
+      ...head,
+      baseSha: base.sha256,
+      storageSizeBytes: base.byteLength,
+      docVersion: layer.docVersion,
+    };
   }
 
   /** Fire-and-forget half of the plane-scoped warming policy (see getLayerHead). */
@@ -2515,47 +2527,6 @@ export class DocumentService {
     return this.passwordForOpen(ctx, row, layerName);
   }
 
-  /**
-   * The binding and JWT unlock key needed to rebind the caller's session
-   * inside the publishing transaction. This context contains no PDF
-   * password: the repository decrypts and re-encrypts it under the new
-   * version's binding. `null` when the document needs no password session
-   * (unencrypted, or an api token that supplies the password per request).
-   */
-  async sessionRebindContext(
-    ctx: OpenContext,
-    docId: string,
-    layerName: string,
-  ): Promise<{ binding: PasswordSessionBinding; unlockKey: string } | null> {
-    const row = await this.requireReadyRow(ctx, docId);
-    if (!requiresPasswordSession(row) || ctx.sub === 'api-token' || !this.passwordSessions)
-      return null;
-    return {
-      binding: this.passwordSessionBinding(ctx, row, layerName),
-      unlockKey: this.requireUnlockKey(ctx),
-    };
-  }
-
-  /**
-   * After a version was published (a signature completed): every session
-   * over the old base is garbage — the head, the layer sessions, the
-   * held files. The next open routes by the new sha. Other replicas hear
-   * it through the realtime bus; correctness never depends on that (a
-   * stale head only makes a later prepare record a stale fence, which
-   * the completion rejects).
-   */
-  async onBaseVersionPublished(docId: string): Promise<void> {
-    this.heads.delete(docId);
-    this.forgetLayerSessions(docId);
-    try {
-      await this.pool.close(docId);
-    } catch {
-      // Best effort: an evicted document is already gone from the pool.
-    } finally {
-      this.releaseBaseHandles(docId);
-    }
-  }
-
   private replaceLayerArtifactHandle(key: string, handle: LocalFileHandle | null): void {
     this.releaseLayerArtifactHandle(key);
     if (handle) this.layerArtifactHandles.set(key, handle);
@@ -2618,6 +2589,7 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
   return {
     tenantId: row.tenantId,
     docId: row.id,
+    layerId: null,
     sha256: sha,
     byteLength: row.storageSizeBytes ?? 0,
     number: 1,

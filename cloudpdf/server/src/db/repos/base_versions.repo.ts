@@ -1,12 +1,11 @@
 /**
- * The base version catalog (migration 030): every immutable PDF a
- * document's head has pointed at. `documents.base_sha` is the head; a
- * completed signature inserts the next row (number = parent's + 1) and
- * moves the head in the same transaction. A version's plane pointers are
- * what the base manifest publishes for it, and what a fresh layer over
- * it is seeded with — version 1 carries the initial epochs, so an
- * unsigned document (only version 1) reads the same as one without a
- * catalog row.
+ * The base version catalog (migrations 030, 044): a document's upload, and
+ * every version a signature made. `documents.base_sha` is the upload; a
+ * completed signature inserts the next row along its layer's chain (number =
+ * parent's + 1) and moves only that layer's `base_sha`, in the same
+ * transaction. A version's plane pointers are what its manifest publishes;
+ * version 1 carries the initial epochs, so an unsigned document (only
+ * version 1) reads the same as one without a catalog row.
  */
 import type { Kysely, Transaction } from 'kysely';
 
@@ -37,6 +36,8 @@ export const INITIAL_BASE_POINTERS: Readonly<BasePlanePointers> = Object.freeze(
 export interface BaseVersionRow extends BasePlanePointers {
   tenantId: string;
   docId: string;
+  /** The layer whose signature made it; `null` for the upload. */
+  layerId: string | null;
   sha256: string;
   byteLength: number;
   number: number;
@@ -59,9 +60,11 @@ export interface InsertInitialBaseVersion {
 export interface InsertPublishedBaseVersion extends BasePlanePointers {
   tenantId: string;
   docId: string;
+  /** The signing layer: the version is its own. */
+  layerId: string;
   sha256: string;
   byteLength: number;
-  /** The head the signature was built on; the new number is its number + 1. */
+  /** The layer's base the signature was built on; the new number is its number + 1. */
   parent: Pick<BaseVersionRow, 'sha256' | 'number'>;
   signingId: string;
   storageKey: string;
@@ -119,6 +122,7 @@ export class BaseVersionsRepo {
       .values({
         tenant_id: input.tenantId,
         doc_id: input.docId,
+        layer_id: null,
         sha256: input.sha256,
         byte_length: input.byteLength,
         number: 1,
@@ -139,9 +143,9 @@ export class BaseVersionsRepo {
   }
 
   /**
-   * The version a completed signature published. Inside the completion
-   * transaction: the `(doc_id, number)` uniqueness is the third fence —
-   * two completions racing over the same parent cannot both insert
+   * The version a completed signature made in its layer. Inside the
+   * completion transaction: the `(layer_id, number)` uniqueness is the third
+   * fence, so two completions racing over the same parent cannot both insert
    * parent + 1.
    */
   async insertPublished(
@@ -151,6 +155,7 @@ export class BaseVersionsRepo {
     const values: BaseVersionsTable = {
       tenant_id: input.tenantId,
       doc_id: input.docId,
+      layer_id: input.layerId,
       sha256: input.sha256,
       byte_length: input.byteLength,
       number: input.parent.number + 1,
@@ -169,12 +174,38 @@ export class BaseVersionsRepo {
     await trx.insertInto('base_versions').values(values).execute();
     return mapRow(values);
   }
+
+  /**
+   * Forget a deleted layer's versions. Their files go with the layer's
+   * storage; a version another live layer is on stays (only data from
+   * before migration 044 can be in that state).
+   */
+  async deleteForLayer(executor: DbExecutor, docId: string, layerId: string): Promise<void> {
+    await executor
+      .deleteFrom('base_versions')
+      .where('doc_id', '=', docId)
+      .where('layer_id', '=', layerId)
+      .where(({ not, exists, selectFrom }) =>
+        not(
+          exists(
+            selectFrom('layers')
+              .select('layers.id')
+              .whereRef('layers.doc_id', '=', 'base_versions.doc_id')
+              .whereRef('layers.base_sha', '=', 'base_versions.sha256')
+              .where('layers.deleted_at', 'is', null)
+              .where('layers.id', '!=', layerId),
+          ),
+        ),
+      )
+      .execute();
+  }
 }
 
 function mapRow(row: BaseVersionsTable): BaseVersionRow {
   return {
     tenantId: row.tenant_id,
     docId: row.doc_id,
+    layerId: row.layer_id ?? null,
     sha256: row.sha256,
     byteLength: Number(row.byte_length),
     number: Number(row.number),

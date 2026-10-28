@@ -544,13 +544,15 @@ export interface EngineQuarantineAuditTable {
   reason: string;
 }
 
-/** One immutable base PDF of a document (migration 030). */
+/** One immutable base PDF of a document (migrations 030, 044). */
 export interface BaseVersionsTable {
   tenant_id: string;
   doc_id: string;
+  /** The layer whose signature made it; NULL for the upload (migration 044). */
+  layer_id: string | null;
   sha256: string;
   byte_length: number;
-  /** 1-based, gapless per document: parent's number + 1. */
+  /** 1-based, gapless along a layer's chain: parent's number + 1 (the upload is 1). */
   number: number;
   parent_sha256: string | null;
   producer_kind: 'upload' | 'signature';
