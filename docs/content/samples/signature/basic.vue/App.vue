@@ -34,7 +34,7 @@ const plugins = [
 
 // [!doc-source agreement]
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  const response = await fetch('/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

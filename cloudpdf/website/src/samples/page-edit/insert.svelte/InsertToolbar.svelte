@@ -6,7 +6,7 @@
 
   /** Another PDF's bytes, to insert pages from. */
   const otherPdf = async () =>
-    (await fetch('/pdfs/embedpdf-welcome.pdf')).arrayBuffer();
+    (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
 
   const pageEdit = usePageEdit();
   const stage = useStage();

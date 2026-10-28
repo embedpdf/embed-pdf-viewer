@@ -5,9 +5,11 @@
  * and the word into one stamp; page 2 has an empty column to stamp.
  */
 import { loadDefaultLibrary } from '@embedpdf/default-stamps/library';
-import { ADA, DANA } from '../shared/annotations.mjs';
+import { ADA, DANA, FERNQUILL } from '../shared/annotations.mjs';
 
-const QUOTE = `Quote Q-2026-1187: CDN hosting for snippet.embedpdf.com
+export const company = FERNQUILL;
+
+const QUOTE = `Quote Q-2026-1187: CDN hosting for portal.fernquill.example
 24 months from 1 November 2026, EUR 1,150 a month.
 Includes 40 TB of traffic a month; more at EUR 0.01 per GB.
 `;
@@ -71,7 +73,7 @@ export default async function bake({ edit }) {
       title: 'Spending approvals, Q4 2026',
       author: 'Ada Lovelace',
       subject: 'The infrastructure budget for 2027 and the CDN hosting contract, for approval',
-      keywords: 'EmbedPDF, approvals, budget, contract',
+      keywords: 'Fernquill, approvals, budget, contract',
     });
     for (const [index, title] of ['This quarter', 'Next quarter'].entries()) {
       await doc.outline.create({

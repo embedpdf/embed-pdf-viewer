@@ -1,9 +1,13 @@
 /**
- * The membership application. The HTML draws each field's box; this puts a field over it. The
- * fields have no border or background of their own, so the printed box shows, and a viewer may
- * draw its own field style on top. No scripts and no signature: every example that opens it can
- * fill in everything it shows.
+ * Lanternfield's membership application. The HTML draws each field's box; this puts a field over
+ * it. The fields have no border or background of their own, so the printed box shows, and a viewer
+ * may draw its own field style on top. No scripts and no signature: every example that opens it
+ * can fill in everything it shows.
  */
+import { LANTERNFIELD } from '../shared/annotations.mjs';
+
+export const company = LANTERNFIELD;
+
 const look = { fontSize: 11 };
 
 export default async function bake({ edit }) {
@@ -42,10 +46,10 @@ export default async function bake({ edit }) {
     });
 
     await doc.metadata.update({
-      title: 'Apply for EmbedPDF Pro',
-      author: 'EmbedPDF',
+      title: 'Apply for Lanternfield Pro',
+      author: 'Lanternfield',
       subject: 'The membership application for priority support and an onboarding call',
-      keywords: 'EmbedPDF, membership, application form',
+      keywords: 'Lanternfield, membership, application form',
     });
   });
 }

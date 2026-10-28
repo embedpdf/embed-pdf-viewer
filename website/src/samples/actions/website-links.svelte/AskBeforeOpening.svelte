@@ -10,7 +10,13 @@
 
   // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
   const websiteLink: PdfActionTree = {
-    root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
+    root: {
+      type: 'uri',
+      subtype: 'URI',
+      uri: 'https://www.w3.org/TR/WCAG22/',
+      isMap: false,
+      next: [],
+    },
     incomplete: false,
     warningFlags: 0,
     warnings: [],
@@ -39,7 +45,7 @@
 
 <section class="panel">
   <p class="lead">
-    The document links to <code>https://www.embedpdf.com</code>.
+    The document links to <code>https://www.w3.org/TR/WCAG22/</code>.
   </p>
   <button type="button" class="button" onclick={() => actions.execute(websiteLink, click)}>
     Click the link

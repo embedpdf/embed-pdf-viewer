@@ -25,7 +25,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source layout]
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  const response = await fetch('/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -142,7 +142,7 @@ const layout = async (): Promise<OpenInput> => {
           (change)="setLink(link.value)"
         >
           <option value="none" [selected]="!value()">No link</option>
-          <option value="website" [selected]="!!value()">embedpdf.com</option>
+          <option value="website" [selected]="!!value()">example.com</option>
         </select>
       }
     }
@@ -197,7 +197,7 @@ export class Control {
 
   protected setLink(value: string) {
     void this.annotation.selection.updateLink(
-      value === 'website' ? { kind: 'uri', uri: 'https://www.embedpdf.com' } : null,
+      value === 'website' ? { kind: 'uri', uri: 'https://example.com' } : null,
     );
   }
 }

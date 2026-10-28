@@ -1,10 +1,12 @@
 /**
- * The notice after its sender updated it: the switch moved an hour earlier, so its row is boxed and
- * a typed text box gives the new time, and a formatted text box stresses who has to act. Two text
- * boxes, one plain and one with bold and coloured words, and a rectangle: what the text box
- * examples edit, format and draw their own way.
+ * Lanternfield's notice after it was updated: the switch moved an hour earlier, so its row is
+ * boxed and a typed text box gives the new time, and a formatted text box stresses who has to act.
+ * Two text boxes, one plain and one with bold and coloured words, and a rectangle: what the text
+ * box examples edit, format and draw their own way.
  */
-import { outset } from '../shared/annotations.mjs';
+import { LANTERNFIELD, outset } from '../shared/annotations.mjs';
+
+export const company = LANTERNFIELD;
 
 // A typed note's look: dark text on pale yellow, in a thin amber frame.
 const TEXT_BOX = { interiorColor: '#fffbe6', color: '#e9c46a' };
@@ -55,10 +57,10 @@ export default async function bake({ edit }) {
     });
 
     await doc.metadata.update({
-      title: 'Planned maintenance of the EmbedPDF CDN',
-      author: 'EmbedPDF maintainers',
-      subject: 'snippet.embedpdf.com moves to a new CDN on 4 November 2026',
-      keywords: 'EmbedPDF, CDN, maintenance, notice',
+      title: 'Planned maintenance of the Lanternfield CDN',
+      author: 'Lanternfield support',
+      subject: 'cdn.lanternfield.example moves to a new CDN on 4 November 2026',
+      keywords: 'Lanternfield, CDN, maintenance, notice',
     });
   });
 }

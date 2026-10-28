@@ -23,7 +23,7 @@ const plugins = [
 
 // [!doc-source article]
 const article = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  const response = await fetch('/pdfs/article.pdf');
   return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

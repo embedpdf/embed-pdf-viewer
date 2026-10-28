@@ -16,7 +16,7 @@ import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotatio
 import { localEngine } from '@embedpdf/engine';
 
 const sketch = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-sketch.pdf');
+  const response = await fetch('/pdfs/sketch.pdf');
   return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

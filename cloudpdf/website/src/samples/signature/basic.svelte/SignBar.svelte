@@ -17,7 +17,7 @@
     formState.fields.find((candidate) => candidate.family === 'signature'),
   );
   const person = $derived(rows.current[0]);
-  // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+  // Ada's signature, once she signs: the agreement already carries Lanternfield's.
   const signed = $derived(signatureState.signatures.find((each) => each.fieldName === 'approval'));
   let error = $state<string | null>(null);
 
