@@ -7,20 +7,20 @@
 <style>
   /* An order form that is also its invoice: boxes for the buyer's part, amounts the form works out. */
   .sheet .title.form-title { margin-top: 24px; font-size: 28px; }
-  .label { display: block; margin-bottom: 6px; font: 600 12.5px/1.2 var(--font-body); color: var(--color-deep-navy); }
-  .required { color: var(--color-brand-blue); }
+  .label { display: block; margin-bottom: 6px; font: 600 12.5px/1.2 var(--font-body); color: var(--color-ink); }
+  .required { color: var(--color-accent); }
   .hint { font: 400 12px/1.4 var(--font-body); color: var(--color-fg-muted); }
   .box { height: 30px; border: 1px solid var(--color-border); border-radius: 5px; background: #ffffff; }
   .parties { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; margin-top: 22px; }
   .parties p { margin: 0; }
   .sheet td.cell { padding-top: 6px; padding-bottom: 6px; }
-  .sheet tr.total td { border-bottom: 0; padding-top: 14px; font: 700 14px/1.3 var(--font-display); color: var(--color-deep-navy); }
+  .sheet tr.total td { border-bottom: 0; padding-top: 14px; font: 700 14px/1.3 var(--font-display); color: var(--color-ink); }
 </style>
 </head>
-<body>
+<body class="lanternfield">
 <section class="page sheet">
   <div class="letterhead">
-    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
+    <img src="../shared/lanternfield-logo.svg" alt="Lanternfield">
     <span class="kind">Order form</span>
   </div>
 
@@ -30,7 +30,7 @@
   <div class="parties">
     <div>
       <span class="label">From</span>
-      <p>EmbedPDF<br>Herengracht 182<br>1016 BR Amsterdam</p>
+      <p>Lanternfield<br>Lantaarnkade 14<br>1019 ZZ Amsterdam</p>
     </div>
     <div style="display:grid; gap:12px;">
       <div>
@@ -83,7 +83,7 @@
   <h2>Payment</h2>
   <p>We send the invoice by email once the order is in. Payment is due within 30 days, by bank transfer to the account on the invoice. Prices exclude VAT where it applies.</p>
 
-  <div class="page-footer"><span>EmbedPDF · Order form</span><span>1 of 1</span></div>
+  <div class="page-footer"><span>Lanternfield · Order form</span><span>1 of 1</span></div>
 </section>
 </body>
 </html>

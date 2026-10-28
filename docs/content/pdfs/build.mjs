@@ -6,8 +6,9 @@
  *
  * A document is a folder: `document.html`, US Letter pages styled by `shared/document.css`, and
  * `bake.mjs`, which changes the printed document in `edit()` steps, each as one person, and places
- * what it adds on the boxes the HTML marks with `data-pdf`. The PDFs land in
- * `website/public/pdfs/embedpdf-<folder>.pdf`. Chrome is the installed Google Chrome;
+ * what it adds on the boxes the HTML marks with `data-pdf`. Each PDF lands in both sites'
+ * `public/pdfs/<folder>.pdf`, embedpdf.com's and cloudpdf.com's: a made-up company's document the
+ * same on both, the welcome as each site's own brand. Chrome is the installed Google Chrome;
  * `CHROME_PATH` names another.
  */
 import { readdir, writeFile } from 'node:fs/promises';
@@ -20,15 +21,20 @@ import { localEngine } from '@embedpdf/engine';
 import { chromium } from 'playwright-core';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const output = resolve(here, '../../../website/public/pdfs');
+// Where each site serves the PDFs, by the brand it's for.
+const SITES = {
+  embedpdf: resolve(here, '../../../website/public/pdfs'),
+  cloudpdf: resolve(here, '../../../cloudpdf/website/public/pdfs'),
+};
 const chrome =
   process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 // CSS lays the pages out in px (96 per inch); PDF positions are points (72 per inch).
 const POINTS_PER_PX = 72 / 96;
 
-// Who writes what a bake adds, unless an `edit()` step names someone else.
-const EMBEDPDF = { userId: 'embedpdf', displayName: 'EmbedPDF' };
+// Our products' names. A document says only its own company's, so a made-up company's never says
+// either: a reader can't take its invoice or notice for one of ours.
+const PRODUCTS = ['embedpdf', 'cloudpdf'];
 
 // The fonts `shared/document.css` loads. Any other font in a printed page is a fallback: a
 // character the fonts don't have, which should be drawn as SVG instead.
@@ -48,15 +54,33 @@ const browser = await chromium.launch({ executablePath: chrome });
 const engine = localEngine({ runtime: { prefer: 'wasm' } });
 try {
   for (const name of documents) {
-    const { pdf, marks } = await print(join(here, name, 'document.html'));
-    const { bytes, published } = await bake(name, pdf, marks);
-    const file = join(output, `embedpdf-${name}.pdf`);
-    await writeFile(file, bytes);
-    console.log(`${name}: ${marks.length} marked boxes, ${bytes.length} bytes → ${file}`);
-    for (const [extension, data] of published) {
-      const beside = join(output, `embedpdf-${name}${extension}`);
-      await writeFile(beside, data);
-      console.log(`${name}: ${data.length} bytes → ${beside}`);
+    const bakeModule = await import(pathToFileURL(join(here, name, 'bake.mjs')).href);
+    // Ours (the welcome): a version per brand, each for its own site. A made-up company's: one,
+    // the same on every site.
+    const versions = bakeModule.brands
+      ? bakeModule.brands.map((company) => ({
+          company,
+          brand: company.userId,
+          sites: [company.userId],
+        }))
+      : [{ company: bakeModule.company, brand: null, sites: Object.keys(SITES) }];
+    for (const { company, brand, sites } of versions) {
+      if (!company)
+        throw new Error(`${name}: bake.mjs exports no company (shared/annotations.mjs)`);
+      const { pdf, marks } = await print(join(here, name, 'document.html'), brand);
+      const { bytes, published } = await bake(name, bakeModule, company, pdf, marks);
+      await checkNames(name, bytes, company);
+      for (const site of sites) {
+        await writeFile(join(SITES[site], `${name}.pdf`), bytes);
+        for (const [extension, data] of published) {
+          await writeFile(join(SITES[site], `${name}${extension}`), data);
+        }
+      }
+      const as = brand ? ` as ${company.displayName}` : '';
+      console.log(
+        `${name}${as}: ${marks.length} marked boxes, ${bytes.length} bytes` +
+          `${published.map(([extension]) => ` and ${name}${extension}`).join('')} → ${sites.join(', ')}`,
+      );
     }
   }
 } finally {
@@ -64,11 +88,16 @@ try {
   await engine.destroy();
 }
 
-/** Prints one document with Chrome, and measures the boxes it marks with `data-pdf`. */
-async function print(htmlFile) {
+/**
+ * Prints one document with Chrome, as `brand` when it's one of ours (`shared/brand.js` reads it),
+ * and measures the boxes it marks with `data-pdf`.
+ */
+async function print(htmlFile, brand) {
   const page = await browser.newPage();
   try {
-    await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'networkidle' });
+    const url = pathToFileURL(htmlFile);
+    if (brand) url.searchParams.set('brand', brand);
+    await page.goto(url.href, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     const marks = await page.evaluate((scale) => {
       const sheets = [...document.querySelectorAll('.page')];
@@ -107,8 +136,7 @@ async function print(htmlFile) {
  * to it, so a signature made there seals the finished document. Its `publish(extension, bytes)`
  * puts a file next to the PDF, such as the certificate a signature can be checked against.
  */
-async function bake(name, pdf, marks) {
-  const bakeModule = await import(pathToFileURL(join(here, name, 'bake.mjs')).href);
+async function bake(name, bakeModule, company, pdf, marks) {
   let bytes = new Uint8Array(pdf);
   const used = new Set();
   const published = [];
@@ -140,9 +168,9 @@ async function bake(name, pdf, marks) {
       await doc.close();
     }
   };
-  const edit = (...args) => step(...(args.length === 1 ? [EMBEDPDF, args[0]] : args));
+  const edit = (...args) => step(...(args.length === 1 ? [company, args[0]] : args));
 
-  await bakeModule.default({ edit });
+  await bakeModule.default({ edit, company });
 
   const whole = await engine.open({ kind: 'bytes', bytes });
   try {
@@ -150,11 +178,47 @@ async function bake(name, pdf, marks) {
   } finally {
     await whole.close();
   }
-  if (bakeModule.sign) await step(EMBEDPDF, bakeModule.sign);
+  if (bakeModule.sign) await step(company, bakeModule.sign);
 
   const unused = [...new Set(marks.map((mark) => mark.name))].filter((mark) => !used.has(mark));
   if (unused.length > 0) throw new Error(`${name}: bake.mjs never uses ${unused.join(', ')}`);
   return { bytes, published };
+}
+
+/**
+ * Fails when the finished document names a product of ours other than its company's own: in its
+ * text, its annotations (link targets and notes among them), its fields, its outline or the
+ * metadata a reader sees. The producer, the app that made the file, isn't the document's to say.
+ */
+async function checkNames(name, bytes, company) {
+  const doc = await engine.open({ kind: 'bytes', bytes });
+  try {
+    const { pages } = await doc.pages.list();
+    const texts = [];
+    for (const page of pages) texts.push((await doc.page(page.ref).text.get()).text);
+    const { annotations } = await doc.annotations.list();
+    const { fields } = await doc.forms.list();
+    const { items } = await doc.outline.get();
+    const { title, author, subject, keywords } = await doc.metadata.get();
+    const everything = JSON.stringify([
+      texts,
+      annotations,
+      fields,
+      items,
+      title,
+      author,
+      subject,
+      keywords,
+    ]).toLowerCase();
+    const named = PRODUCTS.filter(
+      (product) => product !== company.userId && everything.includes(product),
+    );
+    if (named.length > 0) {
+      throw new Error(`${name}: ${company.displayName}'s document names ${named.join(' and ')}`);
+    }
+  } finally {
+    await doc.close();
+  }
 }
 
 /** Fails when a page drew text in a font of its own instead of one `document.css` loads. */

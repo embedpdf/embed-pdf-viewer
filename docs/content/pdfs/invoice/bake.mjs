@@ -1,7 +1,12 @@
 /**
- * The order form. Each amount is its quantity times the price, the total adds them up, and the
- * date takes day/month/year: all form scripts, so they run where JavaScript is on. No signature.
+ * Lanternfield's order form. Each amount is its quantity times the price, the total adds them up,
+ * and the date takes day/month/year: all form scripts, so they run where JavaScript is on. No
+ * signature.
  */
+import { LANTERNFIELD } from '../shared/annotations.mjs';
+
+export const company = LANTERNFIELD;
+
 const look = { fontSize: 11 };
 
 const PRICES = { license: 290, support: 120, onboarding: 80 };
@@ -89,9 +94,9 @@ export default async function bake({ edit }) {
 
     await doc.metadata.update({
       title: 'Order form and invoice',
-      author: 'EmbedPDF',
+      author: 'Lanternfield',
       subject: 'An order for licenses, support and onboarding, with amounts that add up',
-      keywords: 'EmbedPDF, order form, invoice',
+      keywords: 'Lanternfield, order form, invoice',
     });
   });
 }

@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { EpdfPdfViewer, type ViewerConfig } from '@embedpdf/viewer-angular';
 
-const welcome = '/pdfs/embedpdf-welcome.pdf';
+const welcome = '/pdfs/welcome.pdf';
 
 @Component({
   selector: 'demo-root',

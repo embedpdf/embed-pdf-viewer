@@ -34,7 +34,7 @@ const plugins = [
 
 // [!doc-source agreement]
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  const response = await fetch('/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -75,7 +75,7 @@ function ArmBar() {
   const mark = person?.signatures[0];
 
   let hint = 'Getting ready…';
-  // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+  // Ada's signature, once she signs: the agreement already carries Lanternfield's.
   const signed = signatures.find((each) => each.fieldName === 'approval');
   if (signed) hint = `The field is signed by ${signed.signer.name}`;
   else if (armedAsset) hint = 'Click the empty field to sign it, or anywhere else to place it';

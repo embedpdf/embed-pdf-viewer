@@ -20,7 +20,7 @@ import { EpdfRedaction, withRedaction } from '@embedpdf/angular/redaction';
 import { localEngine } from '@embedpdf/engine';
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -70,7 +70,7 @@ export class MarkFromCode {
   protected readonly redaction = inject(EpdfRedaction);
   protected readonly selection = inject(EpdfSelection);
   private readonly annotation = inject(EpdfAnnotation);
-  protected readonly text = signal('EmbedPDF');
+  protected readonly text = signal('John Warnock');
   protected readonly marks = computed(() => {
     const count = this.redaction.pendingCount();
     return `${count} ${count === 1 ? 'mark' : 'marks'}`;
@@ -78,11 +78,11 @@ export class MarkFromCode {
   private started = false;
 
   constructor() {
-    // On load: every "EmbedPDF" in the document.
+    // On load: every "John Warnock" in the document.
     effect(() => {
       if (this.annotation.status() !== 'ready' || this.started) return;
       this.started = true;
-      void this.redaction.markMatches({ text: 'EmbedPDF' });
+      void this.redaction.markMatches({ text: 'John Warnock' });
     });
   }
 

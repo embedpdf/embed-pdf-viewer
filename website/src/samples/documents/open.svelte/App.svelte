@@ -12,7 +12,7 @@
   const plugins = [stagePlugin(), renderPlugin()];
 
   const welcome = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+    const response = await fetch('/pdfs/welcome.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>

@@ -14,7 +14,7 @@ const plugins = [stagePlugin(), renderPlugin(), pageEditPlugin()];
 const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('/pdfs/embedpdf-welcome.pdf')).arrayBuffer();
+const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 function InsertToolbar() {

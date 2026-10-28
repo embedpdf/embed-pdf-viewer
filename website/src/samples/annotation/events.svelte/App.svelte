@@ -21,7 +21,7 @@
   ];
 
   const report = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/embedpdf-report.pdf');
+    const response = await fetch('/pdfs/report.pdf');
     return { kind: 'bytes', id: 'report', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>

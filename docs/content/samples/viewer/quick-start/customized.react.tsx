@@ -1,7 +1,7 @@
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-react';
 
 // [!doc-source welcome]
-const welcome = '/pdfs/embedpdf-welcome.pdf';
+const welcome = '/pdfs/welcome.pdf';
 // [!/doc-source]
 
 const config: ViewerConfig = {

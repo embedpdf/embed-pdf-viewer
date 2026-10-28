@@ -21,7 +21,13 @@ const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 
 // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
-  root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
+  root: {
+    type: 'uri',
+    subtype: 'URI',
+    uri: 'https://www.w3.org/TR/WCAG22/',
+    isMap: false,
+    next: [],
+  },
   incomplete: false,
   warningFlags: 0,
   warnings: [],
@@ -44,7 +50,7 @@ export class LinkPrompt {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="panel">
-      <p class="lead">The document links to <code>https://www.embedpdf.com</code>.</p>
+      <p class="lead">The document links to <code>https://www.w3.org/TR/WCAG22/</code>.</p>
       <button type="button" class="button" (click)="clickLink()">Click the link</button>
       @if (prompt.asking(); as asking) {
         <div class="prompt" role="alertdialog" aria-label="Open a website">

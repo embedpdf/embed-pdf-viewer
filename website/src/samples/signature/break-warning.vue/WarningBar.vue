@@ -6,8 +6,8 @@ import { useAnnotation } from '@embedpdf/vue/annotation';
 import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import { useSignature, useSignatureEvent, useSignatureState } from '@embedpdf/vue/signature';
 
-// EmbedPDF's signature field, signed before the agreement was sent.
-const EMBEDPDF = toFieldRef('embedpdf');
+// Lanternfield's signature field, signed before the agreement was sent.
+const PROVIDER = toFieldRef('provider');
 
 const annotation = useAnnotation();
 const form = useForm();
@@ -21,7 +21,7 @@ const signed = computed(() => signatures.value.find((each) => each.signed));
 
 // Where the signature is: the edits go next to it.
 function signatureWidget() {
-  return form.getWidgets(EMBEDPDF)[0];
+  return form.getWidgets(PROVIDER)[0];
 }
 
 // On load: the signatures, in view. Nothing is changed until a button is pressed.

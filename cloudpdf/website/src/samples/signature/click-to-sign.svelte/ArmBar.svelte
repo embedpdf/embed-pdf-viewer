@@ -35,7 +35,7 @@
   });
 
   const hint = $derived.by(() => {
-    // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+    // Ada's signature, once she signs: the agreement already carries Lanternfield's.
     const signed = signatureState.signatures.find((each) => each.fieldName === 'approval');
     if (signed) return `The field is signed by ${signed.signer.name}`;
     if (stampState.armedAsset) return 'Click the empty field to sign it, or anywhere else to place it';

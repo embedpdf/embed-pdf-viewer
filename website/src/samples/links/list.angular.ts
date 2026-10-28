@@ -17,7 +17,7 @@ import type { Link } from '@embedpdf/angular/link';
 import { localEngine } from '@embedpdf/engine';
 
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-links.pdf');
+  const response = await fetch('/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

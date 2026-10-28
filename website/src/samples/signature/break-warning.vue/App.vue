@@ -14,10 +14,10 @@ import '../break-warning.css';
 
 const engine = localEngine();
 
-// The certificate EmbedPDF signed the agreement with, published next to it. Trusting it is what
+// The certificate Lanternfield signed the agreement with, published next to it. Trusting it is what
 // makes the signature read 'valid'; your app trusts its own certificates the same way.
-const embedpdfCertificate = async () => {
-  const response = await fetch('/pdfs/embedpdf-agreement.cer');
+const lanternfieldCertificate = async () => {
+  const response = await fetch('/pdfs/agreement.cer');
   return new Uint8Array(await response.arrayBuffer());
 };
 
@@ -27,11 +27,11 @@ const plugins = [
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  signaturePlugin({ trust: { anchors: async () => [await embedpdfCertificate()] } }),
+  signaturePlugin({ trust: { anchors: async () => [await lanternfieldCertificate()] } }),
 ];
 
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  const response = await fetch('/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>

@@ -1,6 +1,6 @@
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-react';
 
-const welcome = '/pdfs/embedpdf-welcome.pdf';
+const welcome = '/pdfs/welcome.pdf';
 
 const config: ViewerConfig = {
   theme: { accent: '#7c3aed' },

@@ -26,17 +26,17 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 const engine = cloudEngine();
 
-// The certificate EmbedPDF signed the agreement with, published next to it. Trusting it is what
+// The certificate Lanternfield signed the agreement with, published next to it. Trusting it is what
 // makes the signature read 'valid'; your app trusts its own certificates the same way.
-const embedpdfCertificate = async () => {
-  const response = await fetch('/pdfs/embedpdf-agreement.cer');
+const lanternfieldCertificate = async () => {
+  const response = await fetch('/pdfs/agreement.cer');
   return new Uint8Array(await response.arrayBuffer());
 };
 
 const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// EmbedPDF's signature field, signed before the agreement was sent.
-const EMBEDPDF = toFieldRef('embedpdf');
+// Lanternfield's signature field, signed before the agreement was sent.
+const PROVIDER = toFieldRef('provider');
 
 // Two edits after an approval signature: a comment keeps it valid, a new form field breaks it.
 @Component({
@@ -50,7 +50,7 @@ const EMBEDPDF = toFieldRef('embedpdf');
       withInteraction(),
       withAnnotation(),
       withForm(),
-      withSignature({ trust: { anchors: async () => [await embedpdfCertificate()] } }),
+      withSignature({ trust: { anchors: async () => [await lanternfieldCertificate()] } }),
     ),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -112,7 +112,7 @@ export class App {
 
   /** Where the signature is: the edits go next to it. */
   private readonly widget = computed(() => {
-    const first = this.form.get(EMBEDPDF)?.widgets[0];
+    const first = this.form.get(PROVIDER)?.widgets[0];
     return first ? this.form.getWidget(first) : null;
   });
 

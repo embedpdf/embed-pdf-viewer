@@ -13,12 +13,12 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 const article = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-article.pdf');
+  const response = await fetch('/pdfs/article.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
