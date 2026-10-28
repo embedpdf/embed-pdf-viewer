@@ -103,8 +103,8 @@ export function xmlName(prefix: string, local: string): string {
 
 /**
  * Characters XML 1.0 can't hold at all, not even as a reference: controls
- * other than tab, line feed and carriage return, lone surrogates, U+FFFE and
- * U+FFFF.
+ * other than tab, line feed and carriage return, lone surrogates, `U+FFFE`
+ * and `U+FFFF`.
  */
 function withoutUnwritable(value: string): string {
   let kept = '';
