@@ -223,7 +223,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(revision0.byteLength).toBe(seeded.size);
       expect(sha256(revision0)).toBe(seeded.sha);
       const download = await fetch(
-        `${fx!.baseUrl}/v1/docs/${DOC_ID}/versions/download/${result.version.sha256}`,
+        `${fx!.baseUrl}/v1/docs/${DOC_ID}/layers/alice/versions/download/${result.version.sha256}`,
         {
           headers: {
             Authorization: `Bearer ${docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], 'alice')}`,
@@ -250,17 +250,17 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
         ['valid', 'valid', 'unchanged'],
       ]);
 
-      // The catalog: Alice's version 2 descends from version 1; the document stays its upload.
+      // Alice's versions: the upload, then her version 2, which is her base.
       const versions = await fetchJson<{
-        head: string;
+        baseSha: string;
         versions: Array<{
           sha256: string;
           number: number;
           parentSha256: string | null;
           producer: string;
         }>;
-      }>(`/v1/docs/${DOC_ID}/versions`, 'alice');
-      expect(versions.head).toBe(seeded.sha);
+      }>(`/v1/docs/${DOC_ID}/layers/alice/versions`, 'alice');
+      expect(versions.baseSha).toBe(result.version.sha256);
       expect(
         versions.versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producer]),
       ).toEqual([
@@ -435,10 +435,10 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       ]);
 
       const versions = await fetchJson<{
-        head: string;
+        baseSha: string;
         versions: Array<{ sha256: string; number: number; parentSha256: string | null }>;
-      }>(`/v1/docs/${docId}/versions`, 'erin', docId);
-      expect(versions.head).toBe(seeded3.sha);
+      }>(`/v1/docs/${docId}/layers/erin/versions`, 'erin', docId);
+      expect(versions.baseSha).toBe(second.version.sha256);
       expect(versions.versions.map((v) => [v.number, v.sha256, v.parentSha256])).toEqual([
         [1, seeded3.sha, null],
         [2, first.version.sha256, seeded3.sha],

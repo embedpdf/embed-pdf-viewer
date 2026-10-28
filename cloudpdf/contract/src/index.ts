@@ -38,7 +38,7 @@ import {
   RedactionApplyScopeSchema,
   PageTextSnapshotSchema,
   ChangeAnalysisSchema,
-  DocumentVersionsSchema,
+  LayerVersionsSchema,
   SignatureCancelResultSchema,
   SignatureCompleteBodySchema,
   SignatureCompleteResultSchema,
@@ -1793,7 +1793,7 @@ export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),
 });
 const sha256Pattern = /^[0-9a-f]{64}$/;
-export const DocVersionParamsSchema = DocIdParamsSchema.extend({
+export const DocVersionParamsSchema = DocLayerParamsSchema.extend({
   sha: z.string().regex(sha256Pattern),
 });
 export const DocVersionFieldParamsSchema = DocVersionParamsSchema.extend({
@@ -2050,26 +2050,29 @@ export const docOperations = {
   'doc.versions.list': {
     operationId: 'doc.versions.list',
     title: 'List versions',
-    summary: "The document's base versions, oldest first, and its head.",
+    summary:
+      "A layer's versions, oldest first: the upload, then the ones its signatures made; and its base.",
     method: 'GET',
-    path: wireTemplates.docVersions,
+    path: wireTemplates.layerVersions,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.open'],
     requestHeaders: [documentPasswordHeader],
-    params: DocIdParamsSchema,
+    params: DocLayerParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: DocumentVersionsSchema },
+      200: { contentType: 'application/json', schema: LayerVersionsSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
-    notes: 'Every completed signature publishes a new version. Never cached: the list grows.',
+    notes:
+      "Every completed signature makes a new version of its layer; another layer's versions are never listed. " +
+      'Never cached: the list grows.',
   },
   'doc.versions.signatures': {
     operationId: 'doc.versions.signatures',
     title: 'Version signatures',
-    summary: 'The signature snapshot of one base version (immutable).',
+    summary: "The signature snapshot of one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionSignatures,
+    path: wireTemplates.layerVersionSignatures,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -2083,9 +2086,9 @@ export const docOperations = {
   'doc.versions.signatureContents': {
     operationId: 'doc.versions.signatureContents',
     title: 'Signature contents',
-    summary: 'The DER /Contents of a signed field in one base version (immutable).',
+    summary: "The DER /Contents of a signed field in one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionSignatureContents,
+    path: wireTemplates.layerVersionSignatureContents,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -2101,9 +2104,9 @@ export const docOperations = {
   'doc.versions.signatureDigest': {
     operationId: 'doc.versions.signatureDigest',
     title: 'Signature digest',
-    summary: "The digest of a signed field's /ByteRange in one base version (immutable).",
+    summary: "The digest of a signed field's /ByteRange in one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionSignatureDigest,
+    path: wireTemplates.layerVersionSignatureDigest,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -2118,9 +2121,9 @@ export const docOperations = {
   'doc.versions.analysis': {
     operationId: 'doc.versions.analysis',
     title: 'Analyze version history',
-    summary: 'What changed between two revisions of one base version (immutable).',
+    summary: "What changed between two revisions of one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionAnalysis,
+    path: wireTemplates.layerVersionAnalysis,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.read'],
@@ -2134,14 +2137,14 @@ export const docOperations = {
     },
     notes:
       'Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. ' +
-      'The same answer for every layer and every caller.',
+      'The same answer for every caller.',
   },
   'doc.versions.download': {
     operationId: 'doc.versions.download',
     title: 'Download a version',
-    summary: 'The bytes of one base version (immutable).',
+    summary: "The bytes of one of a layer's versions (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionDownload,
+    path: wireTemplates.layerVersionDownload,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.download'],
@@ -2156,9 +2159,9 @@ export const docOperations = {
     operationId: 'doc.versions.revision',
     title: 'Download a revision',
     summary:
-      'The byte prefix of one revision of a base version: exactly what a signature over it signed (immutable).',
+      "The byte prefix of one revision of a layer's version: exactly what a signature over it signed (immutable).",
     method: 'GET',
-    path: wireTemplates.docVersionRevision,
+    path: wireTemplates.layerVersionRevision,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.download'],

@@ -328,7 +328,7 @@ describe('signing across replicas', () => {
       const download = await call(
         replica,
         'GET',
-        `/v1/docs/${DOC}/versions/download/${version.sha256}`,
+        `/v1/docs/${DOC}/layers/alice/versions/download/${version.sha256}`,
         'alice',
       );
       expect(sha256(new Uint8Array(await download.arrayBuffer()))).toBe(version.sha256);
@@ -341,7 +341,7 @@ describe('signing across replicas', () => {
     expect(published.counter).toBeGreaterThan(Math.max(...before));
     const versionBytes = Buffer.from(
       await (
-        await call(a, 'GET', `/v1/docs/${DOC}/versions/download/${version.sha256}`, 'alice')
+        await call(a, 'GET', `/v1/docs/${DOC}/layers/alice/versions/download/${version.sha256}`, 'alice')
       ).arrayBuffer(),
     ).toString('latin1');
     // The last trailer's /Size is one past the version's last object number.

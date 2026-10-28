@@ -279,7 +279,7 @@ describe('digital signatures over the wire (native runtime)', () => {
 
     // The catalog and the head.
     const versions = await json<{
-      head: string;
+      baseSha: string;
       versions: Array<{
         number: number;
         sha256: string;
@@ -287,9 +287,9 @@ describe('digital signatures over the wire (native runtime)', () => {
         producer: string;
         signingId: string | null;
       }>;
-    }>(await call('GET', `/v1/docs/${docId}/versions`, docId, 'alice'));
-    // The document stays its upload: the new version is Alice's layer's.
-    expect(versions.head).toBe(seeded.sha);
+    }>(await call('GET', `/v1/docs/${docId}/layers/alice/versions`, docId, 'alice'));
+    // Alice's versions: the upload, then hers; her base is her new version.
+    expect(versions.baseSha).toBe(completed.version.sha256);
     expect(versions.versions).toEqual([
       expect.objectContaining({
         number: 1,
@@ -320,7 +320,7 @@ describe('digital signatures over the wire (native runtime)', () => {
     // Immutable version reads: snapshot, contents, digest, download, revision prefix.
     const vsig = await call(
       'GET',
-      `/v1/docs/${docId}/versions/signatures/${completed.version.sha256}`,
+      `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}`,
       docId,
       'alice',
     );
@@ -332,7 +332,7 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect(vsnap.revisions).toHaveLength(2);
     const contents = await call(
       'GET',
-      `/v1/docs/${docId}/versions/signatures/${completed.version.sha256}/${encodeFieldKey('sig')}/contents`,
+      `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}/${encodeFieldKey('sig')}/contents`,
       docId,
       'alice',
     );
@@ -341,14 +341,14 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect(new Uint8Array(await contents.arrayBuffer())).toEqual(cms);
     const digest = await call(
       'GET',
-      `/v1/docs/${docId}/versions/signatures/${completed.version.sha256}/${encodeFieldKey('sig')}/digest/sha256`,
+      `/v1/docs/${docId}/layers/alice/versions/signatures/${completed.version.sha256}/${encodeFieldKey('sig')}/digest/sha256`,
       docId,
       'alice',
     );
     expect(new Uint8Array(await digest.arrayBuffer())).toEqual(prepared.digest);
     const download = await call(
       'GET',
-      `/v1/docs/${docId}/versions/download/${completed.version.sha256}`,
+      `/v1/docs/${docId}/layers/alice/versions/download/${completed.version.sha256}`,
       docId,
       'alice',
     );
@@ -357,7 +357,7 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect(sha256(published)).toBe(completed.version.sha256);
     const rev0 = await call(
       'GET',
-      `/v1/docs/${docId}/versions/revisions/${completed.version.sha256}/0`,
+      `/v1/docs/${docId}/layers/alice/versions/revisions/${completed.version.sha256}/0`,
       docId,
       'alice',
     );
@@ -368,15 +368,21 @@ describe('digital signatures over the wire (native runtime)', () => {
       (
         await call(
           'GET',
-          `/v1/docs/${docId}/versions/revisions/${completed.version.sha256}/7`,
+          `/v1/docs/${docId}/layers/alice/versions/revisions/${completed.version.sha256}/7`,
           docId,
           'alice',
         )
       ).status,
     ).toBe(404);
     expect(
-      (await call('GET', `/v1/docs/${docId}/versions/download/${'0'.repeat(64)}`, docId, 'alice'))
-        .status,
+      (
+        await call(
+          'GET',
+          `/v1/docs/${docId}/layers/alice/versions/download/${'0'.repeat(64)}`,
+          docId,
+          'alice',
+        )
+      ).status,
     ).toBe(404);
 
     // The layer is clean over its new version; the fill survived in its bytes.
@@ -490,7 +496,8 @@ describe('digital signatures over the wire (native runtime)', () => {
       ),
     );
     const sha = completed.version.sha256;
-    const versionUrl = (q: string) => `/v1/docs/${docId}/versions/analysis/${sha}?${q}`;
+    const versionUrl = (q: string) =>
+      `/v1/docs/${docId}/layers/alice/versions/analysis/${sha}?${q}`;
 
     // The current policy: a settled verdict, cached for a year.
     const ok = await call(
@@ -780,6 +787,34 @@ describe('digital signatures over the wire (native runtime)', () => {
       );
     expect(await download('alice', alice)).toBe(done.version.sha256);
     expect(await download('bob', bob)).toBe(bobDone.version.sha256);
+
+    // A layer reads only the upload and its own versions: Bob gets 404 for
+    // Alice's version through his layer, and his token can't use hers.
+    const aliceSha = done.version.sha256;
+    expect((await call('GET', `${bob}/versions/download/${aliceSha}`, docId, 'bob')).status).toBe(
+      404,
+    );
+    expect((await call('GET', `${bob}/versions/signatures/${aliceSha}`, docId, 'bob')).status).toBe(
+      404,
+    );
+    expect((await call('GET', `${alice}/versions/download/${aliceSha}`, docId, 'bob')).status).toBe(
+      403,
+    );
+    expect((await call('GET', `${bob}/versions/download/${seeded.sha}`, docId, 'bob')).status).toBe(
+      200,
+    );
+    const bobVersions = await json<{ baseSha: string; versions: Array<{ sha256: string }> }>(
+      await call('GET', `${bob}/versions`, docId, 'bob'),
+    );
+    expect(bobVersions.baseSha).toBe(bobDone.version.sha256);
+    expect(bobVersions.versions.map((v) => v.sha256)).toEqual([seeded.sha, bobDone.version.sha256]);
+    // A tenant token reads any layer's versions, through that layer.
+    const tenantToken = signDevToken(SECRET, { sub: 'admin', tenant_id: TENANT, scope: ['*'] });
+    const tenantRead = await fetch(`${fx.baseUrl}${alice}/versions/download/${aliceSha}`, {
+      headers: { Authorization: `Bearer ${tenantToken}` },
+    });
+    expect(tenantRead.status).toBe(200);
+    expect(sha256(new Uint8Array(await tenantRead.arrayBuffer()))).toBe(aliceSha);
 
     // Deleting Bob's layer deletes his version, row and file; the upload and
     // Alice's version stay.

@@ -217,10 +217,10 @@ export class LayerStateService {
     > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
-    // Law 9: a layer whose base is not the head (a sibling published a
-    // version since) is diverged for every plane — the head's layout,
-    // metadata and attachments are another version's. Its reads resolve
-    // at layer URLs over its own base until it is rebased.
+    // Law 9: a layer whose base is not the document's (the upload: its own
+    // signature made a version) is diverged for every plane: the shared
+    // layout, metadata and attachments are the upload's. Its reads resolve
+    // at layer URLs over its own base.
     if (head && layer.baseSha !== null && layer.baseSha !== head.sha256) {
       return {
         content: 'layer',
@@ -311,7 +311,7 @@ export class LayerStateService {
 
   buildLayerManifest(
     docId: string,
-    /** The layer's base version (behind the head after a sibling published). */
+    /** The layer's base version: the upload, or the version its last signature made. */
     base: Pick<BaseVersionFacts, 'sha256' | 'byteLength'>,
     /** What the base version's signatures forbid. */
     protection: DocumentProtection | null,

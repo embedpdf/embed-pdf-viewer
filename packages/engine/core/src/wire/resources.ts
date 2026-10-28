@@ -97,17 +97,18 @@ export type DocResourceId =
   | 'layer-metadata'
   | 'layer-metadata-custom'
   // Digital signatures: the layer's snapshot and analysis (pinned by
-  // docVersion, like the manifest), and the version-scoped families —
+  // docVersion, like the manifest), and the layer's version families,
   // content-addressed by base sha, each under its own prefix (the CDN
   // signs literal prefixes, so a grant for signature reads must never
-  // also cover version downloads). The versions list is origin-only.
+  // also cover version downloads, and a layer's grant never another
+  // layer's versions). The versions list is origin-only.
   | 'layer-signatures'
   | 'layer-signatures-analysis'
-  | 'versions'
-  | 'version-signatures'
-  | 'version-analysis'
-  | 'version-download'
-  | 'version-revisions'
+  | 'layer-versions'
+  | 'layer-version-signatures'
+  | 'layer-version-analysis'
+  | 'layer-version-download'
+  | 'layer-version-revisions'
   | 'layer-actions'
   | 'layer-page-render'
   | 'layer-page-render-annotations'
@@ -742,54 +743,64 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  versions: {
-    id: 'versions',
-    pathPattern: '/v1/docs/{docId}/versions',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions`,
-    pathPrefix: '/v1/docs/{docId}/versions',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions`,
+  'layer-versions': {
+    id: 'layer-versions',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions`,
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'origin',
     // The list grows with every signature and its prefix covers every
     // version family below: never signed at the edge.
     cdnCacheable: false,
   },
-  'version-signatures': {
-    id: 'version-signatures',
-    pathPattern: '/v1/docs/{docId}/versions/signatures/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/signatures/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/signatures/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/signatures/`,
+  'layer-version-signatures': {
+    id: 'layer-version-signatures',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/signatures/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/signatures/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/signatures/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/signatures/`,
     requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'version-analysis': {
-    id: 'version-analysis',
-    pathPattern: '/v1/docs/{docId}/versions/analysis/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/analysis/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/analysis/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/analysis/`,
+  'layer-version-analysis': {
+    id: 'layer-version-analysis',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/analysis/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/analysis/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/analysis/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/analysis/`,
     requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'version-download': {
-    id: 'version-download',
-    pathPattern: '/v1/docs/{docId}/versions/download/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/download/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/download/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/download/`,
+  'layer-version-download': {
+    id: 'layer-version-download',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/download/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/download/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/download/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/download/`,
     requirement: { kind: 'single', capability: 'doc.download' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
-  'version-revisions': {
-    id: 'version-revisions',
-    pathPattern: '/v1/docs/{docId}/versions/revisions/*',
-    resolvePathPattern: (docId) => `/v1/docs/${docId}/versions/revisions/*`,
-    pathPrefix: '/v1/docs/{docId}/versions/revisions/',
-    resolvePathPrefix: (docId) => `/v1/docs/${docId}/versions/revisions/`,
+  'layer-version-revisions': {
+    id: 'layer-version-revisions',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/versions/revisions/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/revisions/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/versions/revisions/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/versions/revisions/`,
     requirement: { kind: 'single', capability: 'doc.download' },
     routeKind: 'versioned-read',
     cdnCacheable: true,

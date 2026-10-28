@@ -2063,8 +2063,8 @@ export function analyzeInputFromQuery(
   };
 }
 
-/** One row of the document's version catalog. */
-export const DocumentVersionSchema = z.object({
+/** One of a layer's versions: the upload, or one its signatures made. */
+export const LayerVersionSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   byteLength: z.number().int().nonnegative(),
   number: z.number().int().positive(),
@@ -2073,15 +2073,15 @@ export const DocumentVersionSchema = z.object({
   signingId: z.string().nullable(),
   createdAt: z.number().int(),
 });
-export type DocumentVersion = z.infer<typeof DocumentVersionSchema>;
+export type LayerVersion = z.infer<typeof LayerVersionSchema>;
 
-export const DocumentVersionsSchema = z.object({
-  /** `documents.base_sha`: the upload, where every new layer starts. */
-  head: z.string().regex(/^[0-9a-f]{64}$/),
-  /** Oldest first. */
-  versions: z.array(DocumentVersionSchema),
+export const LayerVersionsSchema = z.object({
+  /** The layer's base: the upload, or the version its last signature made. */
+  baseSha: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Oldest first: the upload, then the versions the layer's signatures made. */
+  versions: z.array(LayerVersionSchema),
 });
-export type DocumentVersions = z.infer<typeof DocumentVersionsSchema>;
+export type LayerVersions = z.infer<typeof LayerVersionsSchema>;
 
 export { DigestAlgorithmSchema, ModificationLevelSchema };
 

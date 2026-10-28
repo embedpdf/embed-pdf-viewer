@@ -218,6 +218,22 @@ describe('cdnCoverageForScope', () => {
     }
   });
 
+  it("a layer's grant covers its own versions, never another layer's", () => {
+    const coverage = cdnCoverageForScope(['*'], NO_BITS, { docId: 'doc_1', layerName: 'bob' });
+    const versionPrefixes = coverage
+      .filter((e) => e.resourceId.startsWith('layer-version-'))
+      .map((e) => e.pathPrefix);
+    expect(versionPrefixes.sort()).toEqual([
+      '/v1/docs/doc_1/layers/bob/versions/analysis/',
+      '/v1/docs/doc_1/layers/bob/versions/download/',
+      '/v1/docs/doc_1/layers/bob/versions/revisions/',
+      '/v1/docs/doc_1/layers/bob/versions/signatures/',
+    ]);
+    expect(coverage.some((e) => e.pathPrefix.includes('/layers/alice/'))).toBe(false);
+    // The list grows with every signature: never signed at the edge.
+    expect(coverage.some((e) => e.resourceId === 'layer-versions')).toBe(false);
+  });
+
   it('never includes head or download-current', () => {
     const coverage = cdnCoverageForScope(['*'], NO_BITS, { docId: 'doc_1' });
     expect(coverage.some((e) => e.resourceId === 'head')).toBe(false);
@@ -593,8 +609,8 @@ describe('cdnCoverageForScope', () => {
         // no download right (contents/digests, history).
         'layer-signatures',
         'layer-signatures-analysis',
-        'version-signatures',
-        'version-analysis',
+        'layer-version-signatures',
+        'layer-version-analysis',
         // ...and the form: its fields and widget rows, and the widget images.
         'form',
         'page-form',

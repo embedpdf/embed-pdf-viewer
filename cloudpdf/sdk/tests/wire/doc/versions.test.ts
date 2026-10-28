@@ -10,7 +10,7 @@ describe("VersionsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            head: "head",
+            baseSha: "baseSha",
             versions: [
                 {
                     sha256: "sha256",
@@ -26,7 +26,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions")
+            .get("/v1/docs/docId/layers/layerName/versions")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -34,6 +34,7 @@ describe("VersionsClient", () => {
 
         const response = await client.doc.versions.list({
             docId: "docId",
+            layerName: "layerName",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -46,7 +47,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions")
+            .get("/v1/docs/docId/layers/layerName/versions")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -55,6 +56,7 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.list({
                 docId: "docId",
+                layerName: "layerName",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -93,7 +95,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/analysis/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/analysis/sha")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -101,6 +103,7 @@ describe("VersionsClient", () => {
 
         const response = await client.doc.versions.analysis({
             docId: "docId",
+            layerName: "layerName",
             sha: "sha",
         });
         expect(response).toEqual(rawResponseBody);
@@ -114,7 +117,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/analysis/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/analysis/sha")
             .respondWith()
             .statusCode(400)
             .jsonBody(rawResponseBody)
@@ -123,6 +126,7 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.analysis({
                 docId: "docId",
+                layerName: "layerName",
                 sha: "sha",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
@@ -136,7 +140,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/analysis/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/analysis/sha")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -145,6 +149,7 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.analysis({
                 docId: "docId",
+                layerName: "layerName",
                 sha: "sha",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
@@ -200,7 +205,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/signatures/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/signatures/sha")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -208,6 +213,7 @@ describe("VersionsClient", () => {
 
         const response = await client.doc.versions.signatures({
             docId: "docId",
+            layerName: "layerName",
             sha: "sha",
         });
         expect(response).toEqual(rawResponseBody);
@@ -221,7 +227,7 @@ describe("VersionsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/versions/signatures/sha")
+            .get("/v1/docs/docId/layers/layerName/versions/signatures/sha")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -230,6 +236,7 @@ describe("VersionsClient", () => {
         await expect(async () => {
             return await client.doc.versions.signatures({
                 docId: "docId",
+                layerName: "layerName",
                 sha: "sha",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);

@@ -98,7 +98,27 @@ export class BaseVersionsRepo {
     return row;
   }
 
-  /** Oldest first. */
+  /** A layer's versions, oldest first: the upload, then the ones its signatures made. */
+  async listForLayer(
+    docId: string,
+    layerId: string | null,
+    executor: DbExecutor = this.db,
+  ): Promise<BaseVersionRow[]> {
+    const rows = await executor
+      .selectFrom('base_versions')
+      .selectAll()
+      .where('doc_id', '=', docId)
+      .where((eb) =>
+        layerId === null
+          ? eb('producer_kind', '=', 'upload')
+          : eb.or([eb('producer_kind', '=', 'upload'), eb('layer_id', '=', layerId)]),
+      )
+      .orderBy('number', 'asc')
+      .execute();
+    return rows.map(mapRow);
+  }
+
+  /** Every version of the document, oldest first. */
   async listForDocument(docId: string, executor: DbExecutor = this.db): Promise<BaseVersionRow[]> {
     const rows = await executor
       .selectFrom('base_versions')
