@@ -6,7 +6,7 @@
  * viewer fetches them in the background, so opening one afterwards fetches nothing. A module is
  * known by a translation key only it asks for.
  *
- * FEATURES lists every chunk the viewer fetches in the background: one missing from it can still
+ * `FEATURES` lists every chunk the viewer fetches in the background: one missing from it can still
  * be arriving when the last test opens the others, and counts as fetched by them.
  *
  * Runs against the built snippet (`pnpm build` first).
