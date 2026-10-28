@@ -588,7 +588,19 @@ export class DocumentService {
     // session, so eagerly warming it would resurrect the
     // session-per-visitor explosion this policy avoids.
     if (layer) void this.warmLayerIfOwned(ctx, docId, layerName).catch(() => undefined);
-    return layer ? { ...head, docVersion: layer.docVersion } : head;
+    if (!layer) return head;
+    // A layer's head is over its own base: the upload, or the version its
+    // last signature made.
+    if (layer.baseSha === null || layer.baseSha === head.baseSha) {
+      return { ...head, docVersion: layer.docVersion };
+    }
+    const base = await this.layerState.baseVersionFacts(docId, layer.baseSha, null);
+    return {
+      ...head,
+      baseSha: base.sha256,
+      storageSizeBytes: base.byteLength,
+      docVersion: layer.docVersion,
+    };
   }
 
   /** Fire-and-forget half of the plane-scoped warming policy (see getLayerHead). */
@@ -658,8 +670,8 @@ export class DocumentService {
       this.loadBasePages(ctx, docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
-    // The layer's own base version (law 2): behind the head once a sibling
-    // published, until the layer is rebased.
+    // The layer's own base version (law 2): the upload, or the version its
+    // last signature made.
     const layerBaseSha = layer.baseSha ?? head.baseSha;
     const layerVersion =
       layerBaseSha === head.baseSha
@@ -668,11 +680,11 @@ export class DocumentService {
     // Plane scopes: annotation writes own `annotations` only (renders/
     // text/geometry keep sharing); move/rotate own `layout` only (normalized
     // artifacts survive); flatten/redaction/page-set changes own `content`;
-    // a layer behind the head owns everything.
+    // a layer over its own signed version owns everything.
     return this.layerState.buildLayerManifest(
       docId,
       layerVersion,
-      await this.protectionOf(ctx, row, layerBaseSha),
+      await this.protectionOf(ctx, row, layerBaseSha, layerName),
       layerName,
       layer,
       pages,
@@ -2216,10 +2228,9 @@ export class DocumentService {
 
     const sessionKey = layerSessionKey(docId, layerName);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
-    // Law 2: a layer session materializes over the layer's base version,
-    // which sits behind the head once a sibling published. Its file is
-    // held beside the head's, keyed by sha, until the document closes or
-    // a publish forgets every session over the old base.
+    // Law 2: a layer session materializes over the layer's base version:
+    // the upload, or the version its last signature made. Its file is held
+    // beside the upload's, keyed by sha, until the document closes.
     const layerBaseSha = layer?.baseSha ?? head.baseSha;
     const handle = await this.baseHandleFor(row, layerBaseSha);
     let layerHandle: LocalFileHandle | null = null;
@@ -2366,28 +2377,50 @@ export class DocumentService {
     return this.cache.acquire({ sha, key });
   }
 
-  /** The document's version catalog, oldest first, and its head. */
+  /**
+   * A layer's versions, oldest first: the upload, then the ones its
+   * signatures made; and its base, the latest of them.
+   */
   async listVersions(
     ctx: OpenContext,
     docId: string,
-  ): Promise<{ head: string; versions: BaseVersionRow[] }> {
+    layerName: string,
+  ): Promise<{ baseSha: string; versions: BaseVersionRow[] }> {
     const row = await this.requireReadyRow(ctx, docId);
-    const head = requireBaseSha(row);
-    const versions = await this.baseVersions.listForDocument(docId);
+    const upload = requireBaseSha(row);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    const versions = await this.baseVersions.listForLayer(docId, layer?.id ?? null);
+    const baseSha = layer?.baseSha ?? upload;
     if (versions.length === 0) {
-      // Committed before the catalog existed and never signed: version 1 is the head itself.
-      return { head, versions: [legacyVersionRow(row, head)] };
+      // Committed before the catalog existed and never signed: version 1 is the upload itself.
+      return { baseSha, versions: [legacyVersionRow(row, upload)] };
     }
-    return { head, versions };
+    return { baseSha, versions };
   }
 
-  /** One catalogued version of the document; `NotFound` for a sha that is not one of its versions. */
-  async requireVersion(ctx: OpenContext, docId: string, sha: string): Promise<BaseVersionRow> {
+  /**
+   * One version a layer can read: the upload, or one its own signatures
+   * made. `NotFound` for any other sha, another layer's versions included.
+   */
+  async requireVersion(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    sha: string,
+  ): Promise<BaseVersionRow> {
     const row = await this.requireReadyRow(ctx, docId);
     const version = await this.baseVersions.find(docId, sha);
-    if (version) return version;
-    if (row.baseSha === sha) return legacyVersionRow(row, sha);
-    throw new EngineError(EngineErrorCode.NotFound, `${sha} is not a version of ${docId}`);
+    if (version?.producerKind === 'upload') return version;
+    if (version) {
+      const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+      if (layer && version.layerId === layer.id) return version;
+    } else if (row.baseSha === sha) {
+      return legacyVersionRow(row, sha);
+    }
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `${sha} is not a version of layer ${layerName} of ${docId}`,
+    );
   }
 
   /**
@@ -2400,26 +2433,28 @@ export class DocumentService {
   async readVersionOnPool(
     ctx: OpenContext,
     docId: string,
+    layerName: string,
     sha: string,
     build: (sessionId: string, jobId: WorkerJobId) => WirePack<WorkerRequest>,
     signal?: AbortSignal,
   ): Promise<WorkerResultPayload> {
-    return this.withVersionSession(ctx, docId, sha, signal, (sessionId) =>
+    return this.withVersionSession(ctx, docId, layerName, sha, signal, (sessionId) =>
       this.pool.run(sessionId, (jobId: WorkerJobId) => build(sessionId, jobId), signal),
     );
   }
 
-  /** `sha`'s bytes opened into a private transient session for `run`, then closed. */
+  /** `sha`'s bytes, a version of `layerName`, opened into a private transient session for `run`, then closed. */
   private async withVersionSession<T>(
     ctx: OpenContext,
     docId: string,
+    layerName: string,
     sha: string,
     signal: AbortSignal | undefined,
     run: (sessionId: string) => Promise<T>,
   ): Promise<T> {
     const row = await this.requireReadyRow(ctx, docId);
-    const version = await this.requireVersion(ctx, docId, sha);
-    const password = await this.passwordForOpen(ctx, row, pinnedLayerName(ctx));
+    const version = await this.requireVersion(ctx, docId, layerName, sha);
+    const password = await this.passwordForOpen(ctx, row, layerName);
     const handle = await this.acquireBaseFile(row, version.sha256);
     const sessionId = `${docId}#${version.sha256}#${randomUUID()}`;
     try {
@@ -2463,7 +2498,7 @@ export class DocumentService {
   ): Promise<DocumentProtection | null> {
     const row = await this.requireReadyRow(ctx, docId);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
-    return this.protectionOf(ctx, row, layer?.baseSha ?? requireBaseSha(row));
+    return this.protectionOf(ctx, row, layer?.baseSha ?? requireBaseSha(row), layerName);
   }
 
   /** What a version a signing just published forbids, as the signing reported it. */
@@ -2472,21 +2507,22 @@ export class DocumentService {
   }
 
   /**
-   * `sha`'s protection: known once the worker has opened its bytes. The head
-   * is opened as every read opens it; a version behind the head (a layer a
-   * sibling's signature left behind) is opened on its own.
+   * `sha`'s protection: known once the worker has opened its bytes. The
+   * upload is opened as every read opens it; a version a layer's signature
+   * made is opened on its own, as that layer's.
    */
   private async protectionOf(
     ctx: OpenContext,
     row: DocumentRow,
     sha: string,
+    layerName: string = pinnedLayerName(ctx),
   ): Promise<DocumentProtection | null> {
     const known = this.protections.get(sha);
     if (known !== undefined) return known;
     if (sha === row.baseSha) {
       await this.openOnPool(ctx, row.id);
     } else {
-      await this.withVersionSession(ctx, row.id, sha, undefined, async () => undefined);
+      await this.withVersionSession(ctx, row.id, layerName, sha, undefined, async () => undefined);
     }
     // An open that couldn't read the signatures (a locked one) reports none.
     return this.protections.get(sha) ?? null;
@@ -2513,47 +2549,6 @@ export class DocumentService {
   async passwordFor(ctx: OpenContext, docId: string, layerName: string): Promise<string | null> {
     const row = await this.requireReadyRow(ctx, docId);
     return this.passwordForOpen(ctx, row, layerName);
-  }
-
-  /**
-   * The binding and JWT unlock key needed to rebind the caller's session
-   * inside the publishing transaction. This context contains no PDF
-   * password: the repository decrypts and re-encrypts it under the new
-   * version's binding. `null` when the document needs no password session
-   * (unencrypted, or an api token that supplies the password per request).
-   */
-  async sessionRebindContext(
-    ctx: OpenContext,
-    docId: string,
-    layerName: string,
-  ): Promise<{ binding: PasswordSessionBinding; unlockKey: string } | null> {
-    const row = await this.requireReadyRow(ctx, docId);
-    if (!requiresPasswordSession(row) || ctx.sub === 'api-token' || !this.passwordSessions)
-      return null;
-    return {
-      binding: this.passwordSessionBinding(ctx, row, layerName),
-      unlockKey: this.requireUnlockKey(ctx),
-    };
-  }
-
-  /**
-   * After a version was published (a signature completed): every session
-   * over the old base is garbage — the head, the layer sessions, the
-   * held files. The next open routes by the new sha. Other replicas hear
-   * it through the realtime bus; correctness never depends on that (a
-   * stale head only makes a later prepare record a stale fence, which
-   * the completion rejects).
-   */
-  async onBaseVersionPublished(docId: string): Promise<void> {
-    this.heads.delete(docId);
-    this.forgetLayerSessions(docId);
-    try {
-      await this.pool.close(docId);
-    } catch {
-      // Best effort: an evicted document is already gone from the pool.
-    } finally {
-      this.releaseBaseHandles(docId);
-    }
   }
 
   private replaceLayerArtifactHandle(key: string, handle: LocalFileHandle | null): void {
@@ -2618,6 +2613,7 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
   return {
     tenantId: row.tenantId,
     docId: row.id,
+    layerId: null,
     sha256: sha,
     byteLength: row.storageSizeBytes ?? 0,
     number: 1,

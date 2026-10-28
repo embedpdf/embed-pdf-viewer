@@ -1,5 +1,6 @@
 import { sql, type Kysely } from 'kysely';
 
+import { BaseVersionsRepo } from '../db/repos/base_versions.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import { ObjectNumbersRepo } from '../db/repos/object_numbers.repo';
 import type { Database as Schema } from '../db/schema';
@@ -14,7 +15,8 @@ export interface StoredLayerDeps {
 
 /**
  * Delete what a layer stored: its artifacts, renders and change captures,
- * its changes, audit rows, signings, password sessions and object numbers.
+ * the versions its signatures made, its changes, audit rows, signings,
+ * password sessions and object numbers.
  * A written layer keeps its row as a tombstone, with its version counters
  * and its pages' (no content), and its name is refused from then on
  * (`LayerDeleted`): its read URLs were cached as immutable, and a layer
@@ -74,6 +76,8 @@ export async function deleteStoredLayer(
     for (const table of ['change_outcomes', 'audit_log', 'document_signings'] as const) {
       await trx.deleteFrom(table).where('layer_id', '=', layer.id).execute();
     }
+    // Their files are under the layer's root, deleted below.
+    await new BaseVersionsRepo(db).deleteForLayer(trx, docId, layer.id);
     return owned.map((signing) => signing.id);
   });
   await storage.deletePrefix(StorageKeys.layerRoot(tenantId, docId, layerName));

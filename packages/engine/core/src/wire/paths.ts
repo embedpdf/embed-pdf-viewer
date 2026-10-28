@@ -261,31 +261,41 @@ export const wirePaths = {
   layerSignatureCancel: (docId: string, layerName: string, signingId: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}`,
 
-  /** The document's base versions, oldest first (grows; never cached). */
-  docVersions: (docId: string) => `/v1/docs/${encodeURIComponent(docId)}/versions`,
-  /** Immutable: the signature snapshot of one base version. */
-  docVersionSignatures: (docId: string, sha256: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/versions/signatures/${sha256}`,
-  /** Immutable: a signed field's DER `/Contents` in one base version (`application/pkcs7-signature`). */
-  docVersionSignatureContents: (docId: string, sha256: string, fieldName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/contents`,
-  /** Immutable: the digest of a signed field's `/ByteRange` in one base version. */
-  docVersionSignatureDigest: (
+  /** A layer's versions, oldest first: the upload, then its signatures' (grows; never cached). */
+  layerVersions: (docId: string, layerName: string) => `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions`,
+  /** Immutable: the signature snapshot of one of a layer's versions. */
+  layerVersionSignatures: (docId: string, layerName: string, sha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}`,
+  /** Immutable: a signed field's DER `/Contents` in one of a layer's versions (`application/pkcs7-signature`). */
+  layerVersionSignatureContents: (
     docId: string,
+    layerName: string,
+    sha256: string,
+    fieldName: string,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/contents`,
+  /** Immutable: the digest of a signed field's `/ByteRange` in one of a layer's versions. */
+  layerVersionSignatureDigest: (
+    docId: string,
+    layerName: string,
     sha256: string,
     fieldName: string,
     algorithm: 'sha1' | 'sha256' | 'sha384' | 'sha512',
   ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/digest/${algorithm}`,
-  /** Immutable: history between two revisions of one base version. */
-  docVersionAnalysis: (docId: string, sha256: string, query: AnalysisQueryInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/versions/analysis/${sha256}?${analysisQueryString(query)}`,
-  /** Immutable: the bytes of one base version. */
-  docVersionDownload: (docId: string, sha256: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/versions/download/${sha256}`,
-  /** Immutable: the byte prefix `[0, end)` of revision `index` of one base version. */
-  docVersionRevision: (docId: string, sha256: string, index: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/versions/revisions/${sha256}/${index}`,
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/digest/${algorithm}`,
+  /** Immutable: history between two revisions of one of a layer's versions. */
+  layerVersionAnalysis: (
+    docId: string,
+    layerName: string,
+    sha256: string,
+    query: AnalysisQueryInput,
+  ) => `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/analysis/${sha256}?${analysisQueryString(query)}`,
+  /** Immutable: the bytes of one of a layer's versions. */
+  layerVersionDownload: (docId: string, layerName: string, sha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/download/${sha256}`,
+  /** Immutable: the byte prefix `[0, end)` of revision `index` of one of a layer's versions. */
+  layerVersionRevision: (docId: string, layerName: string, sha256: string, index: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/revisions/${sha256}/${index}`,
 
   /** POST (multipart envelope): draw a PDF page into an unsigned signature field's widgets. */
   layerFormFieldSignatureAppearance: (docId: string, layerName: string, fieldKey: string) =>
@@ -821,11 +831,13 @@ export const wireTemplates = {
   layerSignaturesPrepare: '/v1/docs/:docId/layers/:layerName/signatures/prepare',
   layerSignatureComplete: '/v1/docs/:docId/layers/:layerName/signatures/:signingId/complete',
   layerSignatureCancel: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
-  docVersions: '/v1/docs/:docId/versions',
-  docVersionSignatures: '/v1/docs/:docId/versions/signatures/:sha',
-  docVersionSignatureContents: '/v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents',
-  docVersionSignatureDigest: '/v1/docs/:docId/versions/signatures/:sha/:fieldKey/digest/:algorithm',
-  docVersionAnalysis: '/v1/docs/:docId/versions/analysis/:sha',
-  docVersionDownload: '/v1/docs/:docId/versions/download/:sha',
-  docVersionRevision: '/v1/docs/:docId/versions/revisions/:sha/:index',
+  layerVersions: '/v1/docs/:docId/layers/:layerName/versions',
+  layerVersionSignatures: '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha',
+  layerVersionSignatureContents:
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/contents',
+  layerVersionSignatureDigest:
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm',
+  layerVersionAnalysis: '/v1/docs/:docId/layers/:layerName/versions/analysis/:sha',
+  layerVersionDownload: '/v1/docs/:docId/layers/:layerName/versions/download/:sha',
+  layerVersionRevision: '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha/:index',
 } as const;

@@ -1373,17 +1373,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         storage: opts.objectStore,
         realtime: realtimeBus,
         signings: new DocumentSigningsRepo(opts.db),
-        ...(passwordSessionsRepo ? { passwordSessions: passwordSessionsRepo } : {}),
         signingRoot,
         ...(opts.signingTtlMs !== undefined ? { signingTtlMs: opts.signingTtlMs } : {}),
         objectNumbers,
       });
-      // A signature published on another replica: forget every session
-      // over the old base here too (this replica's own publish already did).
-      const unsubscribeBaseChanged = realtimeBus.subscribeBaseChanged((key) => {
-        void documentService?.onBaseVersionPublished(key.docId).catch(() => undefined);
-      });
-      app.addHook('onClose', () => unsubscribeBaseChanged());
       await registerAccessRoutes(app, {
         service: documentService,
         layers: layerService,
@@ -1704,7 +1697,6 @@ function mapToHttp(code: string): number {
     case EngineErrorCode.LayerVersionConflict:
     case EngineErrorCode.SigningPending:
     case EngineErrorCode.SigningVersionMismatch:
-    case EngineErrorCode.StaleBase:
     case EngineErrorCode.ProtectedDocument:
     case EngineErrorCode.ObjectNumberUnavailable:
     case EngineErrorCode.LayerFull:

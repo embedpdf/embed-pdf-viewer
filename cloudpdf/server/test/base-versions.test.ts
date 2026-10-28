@@ -1,8 +1,8 @@
 /**
- * W1 of the signatures server phase: the base version catalog, the
- * durable signing rows, the sha-addressed storage keys, and the laws the
- * layer state derives from them (seeds from the base version, divergence
- * behind the head).
+ * The base version catalog, the durable signing rows, the sha-addressed
+ * storage keys, and the laws the layer state derives from them. A
+ * signature's version belongs to its layer and moves only that layer's
+ * base; the document stays its upload, where every new layer starts.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { Kysely } from 'kysely';
@@ -22,6 +22,7 @@ import {
   type DbSchema,
 } from '../src/index';
 import { StorageKeys } from '../src/storage/keys';
+import { checkVersionsByLayerMigration } from './_helpers/versions-by-layer-migration';
 
 const TENANT = 'tenant-versions';
 const DOC = 'doc-versions';
@@ -43,6 +44,18 @@ async function migrateAll(): Promise<void> {
 }
 
 async function seedReadyDocument(): Promise<void> {
+  await seedDocumentRow();
+  await new BaseVersionsRepo(db).insertInitial({
+    tenantId: TENANT,
+    docId: DOC,
+    sha256: SHA1,
+    byteLength: 1234,
+    createdAt: 1,
+  });
+}
+
+/** The ready document and its pages, without its catalog row. */
+async function seedDocumentRow(): Promise<void> {
   await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
   const documents = new DocumentsRepo(db);
   await documents.createPending({
@@ -59,13 +72,6 @@ async function seedReadyDocument(): Promise<void> {
     storageSizeBytes: 1234,
   });
   expect(committed?.state).toBe('ready');
-  await new BaseVersionsRepo(db).insertInitial({
-    tenantId: TENANT,
-    docId: DOC,
-    sha256: SHA1,
-    byteLength: 1234,
-    createdAt: 1,
-  });
   await new DocumentPagesRepo(db).upsertForDocument(DOC, [
     { pageObjectNumber: 11 },
     { pageObjectNumber: 22 },
@@ -84,40 +90,39 @@ function services() {
   return { layerState, layerService };
 }
 
-/** Publish SHA2 as version 2 with metadata at epoch 2, and move the head. */
-async function publishVersion2(): Promise<void> {
+/** A signature in a layer, as its commit records it: SHA2 as the layer's version 2, metadata at epoch 2. */
+async function signIn(layerId: string, layerName: string, sha = SHA2): Promise<void> {
   const baseVersions = new BaseVersionsRepo(db);
   const v1 = await baseVersions.require(DOC, SHA1);
   await db.transaction().execute(async (trx) => {
     await baseVersions.insertPublished(trx, {
       tenantId: TENANT,
       docId: DOC,
-      sha256: SHA2,
+      layerId,
+      sha256: sha,
       byteLength: 2345,
       parent: v1,
-      signingId: 'signing-1',
-      storageKey: StorageKeys.baseVersionPdf(TENANT, DOC, SHA2),
+      signingId: `signing-${layerName}`,
+      storageKey: StorageKeys.layerVersionPdf(TENANT, DOC, layerName, sha),
       ...INITIAL_BASE_POINTERS,
       metadataVersion: 2,
       createdAt: 2,
     });
-    await trx
-      .updateTable('documents')
-      .set({ base_sha: SHA2, doc_version: 5 })
-      .where('id', '=', DOC)
-      .execute();
+    await trx.updateTable('layers').set({ base_sha: sha }).where('id', '=', layerId).execute();
   });
 }
 
 describe('storage keys', () => {
-  test('base versions are sha-addressed under the document; tails under signings', () => {
-    expect(StorageKeys.baseVersionPdf(TENANT, DOC, SHA2)).toBe(
-      `${StorageKeys.docRoot(TENANT, DOC)}versions/${SHA2}.pdf`,
+  test("a layer's versions are sha-addressed under the layer; tails under signings", () => {
+    expect(StorageKeys.layerVersionPdf(TENANT, DOC, 'alice', SHA2)).toBe(
+      `${StorageKeys.layerRoot(TENANT, DOC, 'alice')}versions/${SHA2}.pdf`,
     );
     expect(StorageKeys.signingTail(TENANT, DOC, 'sig_abc-123')).toBe(
       `${StorageKeys.docRoot(TENANT, DOC)}signings/sig_abc-123.tail`,
     );
-    expect(() => StorageKeys.baseVersionPdf(TENANT, DOC, 'not-a-sha')).toThrow(/bad sha256/);
+    expect(() => StorageKeys.layerVersionPdf(TENANT, DOC, 'alice', 'not-a-sha')).toThrow(
+      /bad sha256/,
+    );
     expect(() => StorageKeys.signingTail(TENANT, DOC, '../escape')).toThrow(/bad signing id/);
   });
 });
@@ -177,13 +182,19 @@ describe('migration 030', () => {
   });
 });
 
+describe('migration 044', () => {
+  test('gives signed versions their layer and puts a moved document back on its upload', async () => {
+    await checkVersionsByLayerMigration(db, sqliteMigrations);
+  });
+});
+
 describe('BaseVersionsRepo', () => {
   beforeEach(async () => {
     await migrateAll();
     await seedReadyDocument();
   });
 
-  test('version 1 is idempotent; a published version numbers after its parent and never twice', async () => {
+  test("version 1 is idempotent; a layer's version numbers after its parent, never twice in the layer", async () => {
     const repo = new BaseVersionsRepo(db);
     await repo.insertInitial({
       tenantId: TENANT,
@@ -194,34 +205,67 @@ describe('BaseVersionsRepo', () => {
     });
     expect(await repo.listForDocument(DOC)).toHaveLength(1);
 
-    await publishVersion2();
+    const { layerService } = services();
+    const alice = await layerService.materializeLayerForWrite(ctx, DOC, 'alice');
+    const bob = await layerService.materializeLayerForWrite(ctx, DOC, 'bob');
+    await signIn(alice.layer.id, 'alice');
     const versions = await repo.listForDocument(DOC);
     expect(
-      versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producerKind, v.producerRef]),
+      versions.map((v) => [
+        v.number,
+        v.sha256,
+        v.parentSha256,
+        v.producerKind,
+        v.producerRef,
+        v.layerId,
+      ]),
     ).toEqual([
-      [1, SHA1, null, 'upload', null],
-      [2, SHA2, SHA1, 'signature', 'signing-1'],
+      [1, SHA1, null, 'upload', null, null],
+      [2, SHA2, SHA1, 'signature', 'signing-alice', alice.layer.id],
     ]);
-    expect(versions[1]?.storageKey).toBe(StorageKeys.baseVersionPdf(TENANT, DOC, SHA2));
+    expect(versions[1]?.storageKey).toBe(StorageKeys.layerVersionPdf(TENANT, DOC, 'alice', SHA2));
     expect(versions[1]?.metadataVersion).toBe(2);
 
-    // Two completions over the same parent cannot both become number 2.
+    // Two completions over the same parent in one layer cannot both become number 2.
     const v1 = await repo.require(DOC, SHA1);
-    await expect(
+    const another = (layerId: string, sha: string) =>
       db.transaction().execute((trx) =>
         repo.insertPublished(trx, {
           tenantId: TENANT,
           docId: DOC,
-          sha256: 'c'.repeat(64),
+          layerId,
+          sha256: sha,
           byteLength: 1,
           parent: v1,
-          signingId: 'signing-2',
-          storageKey: StorageKeys.baseVersionPdf(TENANT, DOC, 'c'.repeat(64)),
+          signingId: `signing-${sha.slice(0, 4)}`,
+          storageKey: StorageKeys.layerVersionPdf(TENANT, DOC, 'x', sha),
           ...INITIAL_BASE_POINTERS,
           createdAt: 3,
         }),
-      ),
-    ).rejects.toThrow(/UNIQUE|unique/);
+      );
+    await expect(another(alice.layer.id, 'c'.repeat(64))).rejects.toThrow(/UNIQUE|unique/);
+    // Another layer's signature over the upload is that layer's own version 2.
+    await another(bob.layer.id, 'd'.repeat(64));
+    expect((await repo.find(DOC, 'd'.repeat(64)))?.number).toBe(2);
+  });
+
+  test("deleting a layer's versions keeps one another live layer is on", async () => {
+    const repo = new BaseVersionsRepo(db);
+    const { layerService } = services();
+    const alice = await layerService.materializeLayerForWrite(ctx, DOC, 'alice');
+    const bob = await layerService.materializeLayerForWrite(ctx, DOC, 'bob');
+    await signIn(alice.layer.id, 'alice');
+    await signIn(bob.layer.id, 'bob', 'c'.repeat(64));
+    // Only data from before migration 044 can have a layer on another layer's version.
+    await db
+      .updateTable('layers')
+      .set({ base_sha: 'c'.repeat(64) })
+      .where('id', '=', alice.layer.id)
+      .execute();
+
+    await repo.deleteForLayer(db, DOC, alice.layer.id);
+    await repo.deleteForLayer(db, DOC, bob.layer.id);
+    expect((await repo.listForDocument(DOC)).map((v) => v.sha256)).toEqual([SHA1, 'c'.repeat(64)]);
   });
 });
 
@@ -310,7 +354,7 @@ describe('layers over base versions', () => {
     await seedReadyDocument();
   });
 
-  test('a new layer is seeded from the head: its sha, its docVersion, its version pointers', async () => {
+  test("a new layer starts on the upload, whatever another layer's signature made", async () => {
     const { layerService, layerState } = services();
     const alice = await layerService.materializeLayerForWrite(ctx, DOC, 'alice');
     expect(alice.layer).toMatchObject({
@@ -320,17 +364,17 @@ describe('layers over base versions', () => {
       currentVersion: 0,
     });
 
-    await publishVersion2();
+    await signIn(alice.layer.id, 'alice');
+    expect((await new DocumentsRepo(db).findById(DOC))?.baseSha).toBe(SHA1);
     const bob = await layerService.materializeLayerForWrite(ctx, DOC, 'bob');
     expect(bob.layer).toMatchObject({
-      baseSha: SHA2,
-      docVersion: 5,
-      metadataVersion: 2,
-      layoutVersion: 1,
+      baseSha: SHA1,
+      docVersion: 1,
+      ...INITIAL_BASE_POINTERS,
     });
 
-    // Bob inherits every plane at the head's epochs (metadata 2 = 2 is
-    // inherited, not owned); Alice is behind the head: diverged everywhere.
+    // Bob inherits every plane of the upload; Alice is over her own version,
+    // so every plane is hers, read at her layer's URLs.
     expect(await layerState.computeLayerScopesFromDb(DOC, 'bob')).toEqual({
       content: 'base',
       annotations: 'base',

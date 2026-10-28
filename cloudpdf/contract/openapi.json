@@ -3882,7 +3882,7 @@
         "x-fern-sdk-method-name": "complete",
         "x-docs-title": "Complete a signature",
         "summary": "Install the CMS into the prepared candidate and publish the sealed bytes as the document's next base version.",
-        "description": "`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. Idempotent by signing id: the same CMS again answers `already-completed`. Every layer of the document then sits over the new version; refetch the manifest after a completion.",
+        "description": "`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. Idempotent by signing id: the same CMS again answers `already-completed`. The new version is the layer's own: only this layer moves to it, and the document and every other layer stay as they were. Refetch the manifest after a completion.",
         "security": [
           {
             "apiToken": []
@@ -4120,7 +4120,7 @@
         "x-fern-sdk-method-name": "prepare",
         "x-docs-title": "Prepare a signature",
         "summary": "Author and seal a signing candidate; returns the digest to sign and the version fences.",
-        "description": "Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).",
+        "description": "Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). The signature is made over the layer's own base: the upload, or the version its last signature made.",
         "security": [
           {
             "apiToken": []
@@ -4322,14 +4322,14 @@
         }
       }
     },
-    "/v1/docs/{docId}/versions": {
+    "/v1/docs/{docId}/layers/{layerName}/versions": {
       "get": {
         "operationId": "doc.versions.list",
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List versions",
-        "summary": "The document's base versions, oldest first, and its head.",
-        "description": "Every completed signature publishes a new version. Never cached: the list grows.",
+        "summary": "A layer's versions, oldest first: the upload, then the ones its signatures made; and its base.",
+        "description": "Every completed signature makes a new version of its layer; another layer's versions are never listed. Never cached: the list grows.",
         "security": [
           {
             "apiToken": []
@@ -4348,6 +4348,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           },
           {
@@ -4394,14 +4403,14 @@
         }
       }
     },
-    "/v1/docs/{docId}/versions/analysis/{sha}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha}": {
       "get": {
         "operationId": "doc.versions.analysis",
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "analysis",
         "x-docs-title": "Analyze version history",
-        "summary": "What changed between two revisions of one base version (immutable).",
-        "description": "Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every layer and every caller.",
+        "summary": "What changed between two revisions of one of a layer's versions (immutable).",
+        "description": "Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller.",
         "security": [
           {
             "apiToken": []
@@ -4420,6 +4429,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           },
           {
@@ -4530,13 +4548,13 @@
         }
       }
     },
-    "/v1/docs/{docId}/versions/download/{sha}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha}": {
       "get": {
         "operationId": "doc.versions.download",
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "download",
         "x-docs-title": "Download a version",
-        "summary": "The bytes of one base version (immutable).",
+        "summary": "The bytes of one of a layer's versions (immutable).",
         "security": [
           {
             "apiToken": []
@@ -4555,6 +4573,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           },
           {
@@ -4611,13 +4638,13 @@
         }
       }
     },
-    "/v1/docs/{docId}/versions/revisions/{sha}/{index}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha}/{index}": {
       "get": {
         "operationId": "doc.versions.revision",
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "revision",
         "x-docs-title": "Download a revision",
-        "summary": "The byte prefix of one revision of a base version: exactly what a signature over it signed (immutable).",
+        "summary": "The byte prefix of one revision of a layer's version: exactly what a signature over it signed (immutable).",
         "security": [
           {
             "apiToken": []
@@ -4636,6 +4663,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           },
           {
@@ -4701,13 +4737,13 @@
         }
       }
     },
-    "/v1/docs/{docId}/versions/signatures/{sha}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}": {
       "get": {
         "operationId": "doc.versions.signatures",
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "signatures",
         "x-docs-title": "Version signatures",
-        "summary": "The signature snapshot of one base version (immutable).",
+        "summary": "The signature snapshot of one of a layer's versions (immutable).",
         "security": [
           {
             "apiToken": []
@@ -4726,6 +4762,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           },
           {
@@ -4781,13 +4826,13 @@
         }
       }
     },
-    "/v1/docs/{docId}/versions/signatures/{sha}/{fieldKey}/contents": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/contents": {
       "get": {
         "operationId": "doc.versions.signatureContents",
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "signatureContents",
         "x-docs-title": "Signature contents",
-        "summary": "The DER /Contents of a signed field in one base version (immutable).",
+        "summary": "The DER /Contents of a signed field in one of a layer's versions (immutable).",
         "description": "`fieldKey` is the field's fully qualified name, token-text encoded (the same encoding attachment keys use).",
         "security": [
           {
@@ -4807,6 +4852,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           },
           {
@@ -4872,13 +4926,13 @@
         }
       }
     },
-    "/v1/docs/{docId}/versions/signatures/{sha}/{fieldKey}/digest/{algorithm}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/digest/{algorithm}": {
       "get": {
         "operationId": "doc.versions.signatureDigest",
         "x-fern-sdk-group-name": ["doc", "versions"],
         "x-fern-sdk-method-name": "signatureDigest",
         "x-docs-title": "Signature digest",
-        "summary": "The digest of a signed field's /ByteRange in one base version (immutable).",
+        "summary": "The digest of a signed field's /ByteRange in one of a layer's versions (immutable).",
         "description": "What a CMS verifier compares its message digest to.",
         "security": [
           {
@@ -4898,6 +4952,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           },
           {
@@ -7441,7 +7504,6 @@
               "SigningVersionMismatch",
               "SignatureRefused",
               "ProtectedDocument",
-              "StaleBase",
               "PayloadTooLarge",
               "ObjectNumberUnavailable",
               "LayerFull",
@@ -27561,7 +27623,7 @@
       "DocVersionsList200Response": {
         "type": "object",
         "properties": {
-          "head": {
+          "baseSha": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
           },
@@ -27612,7 +27674,7 @@
             }
           }
         },
-        "required": ["head", "versions"],
+        "required": ["baseSha", "versions"],
         "additionalProperties": false
       },
       "DocVersionsList404Response": {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.17",
-  "openapiSha256": "7319281e23c67ee0134ac115415159409d17c5aa45939de3a0712c6dd9781a76",
+  "openapiSha256": "8dd26f86f0c1ca9811b354af914f433f0ed217850fd079355229defbe1fb2966",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -1618,259 +1618,259 @@
     "doc.versions.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.list({\n  docId: \"docId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.list({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.list(\n    doc_id=\"docId\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.list(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->list(\n    'docId',\n    new ListVersionsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->list(\n    'docId',\n    'layerName',\n    new ListVersionsRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.ListAsync(new ListVersionsRequest { DocId = \"docId\" });",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.ListAsync(\n    new ListVersionsRequest { DocId = \"docId\", LayerName = \"layerName\" }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.ListVersionsRequest{\n    DocID: \"docId\",\n}\nclient.Doc.Versions.List(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.ListVersionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n}\nclient.Doc.Versions.List(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().list(\n    \"docId\",\n    ListVersionsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().list(\n    \"docId\",\n    \"layerName\",\n    ListVersionsRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.list(doc_id: \"docId\")",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.list(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
         "frameLines": 7
       }
     },
     "doc.versions.analysis": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.analysis({\n  docId: \"docId\",\n  sha: \"sha\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.analysis({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  sha: \"sha\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.analysis(\n    doc_id=\"docId\",\n    sha=\"sha\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.analysis(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    sha=\"sha\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->analysis(\n    'docId',\n    'sha',\n    new AnalysisVersionsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->analysis(\n    'docId',\n    'layerName',\n    'sha',\n    new AnalysisVersionsRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.AnalysisAsync(\n    new AnalysisVersionsRequest { DocId = \"docId\", Sha = \"sha\" }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.AnalysisAsync(\n    new AnalysisVersionsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Sha = \"sha\",\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.AnalysisVersionsRequest{\n    DocID: \"docId\",\n    Sha: \"sha\",\n}\nclient.Doc.Versions.Analysis(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.AnalysisVersionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Sha: \"sha\",\n}\nclient.Doc.Versions.Analysis(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().analysis(\n    \"docId\",\n    \"sha\",\n    AnalysisVersionsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().analysis(\n    \"docId\",\n    \"layerName\",\n    \"sha\",\n    AnalysisVersionsRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.analysis(\n  doc_id: \"docId\",\n  sha: \"sha\"\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.analysis(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  sha: \"sha\"\n)",
         "frameLines": 7
       }
     },
     "doc.versions.download": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.download({\n  docId: \"docId\",\n  sha: \"sha\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.download({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  sha: \"sha\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.download(\n    doc_id=\"docId\",\n    sha=\"sha\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.download(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    sha=\"sha\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->download(\n    'docId',\n    'sha',\n    new DownloadVersionsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->download(\n    'docId',\n    'layerName',\n    'sha',\n    new DownloadVersionsRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.DownloadAsync(\n    new DownloadVersionsRequest { DocId = \"docId\", Sha = \"sha\" }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.DownloadAsync(\n    new DownloadVersionsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Sha = \"sha\",\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.DownloadVersionsRequest{\n    DocID: \"docId\",\n    Sha: \"sha\",\n}\nclient.Doc.Versions.Download(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.DownloadVersionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Sha: \"sha\",\n}\nclient.Doc.Versions.Download(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().download(\n    \"docId\",\n    \"sha\",\n    DownloadVersionsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().download(\n    \"docId\",\n    \"layerName\",\n    \"sha\",\n    DownloadVersionsRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.download(\n  doc_id: \"docId\",\n  sha: \"sha\"\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.download(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  sha: \"sha\"\n)",
         "frameLines": 7
       }
     },
     "doc.versions.revision": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.revision({\n  docId: \"docId\",\n  sha: \"sha\",\n  index: 1\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.revision({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  sha: \"sha\",\n  index: 1\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.revision(\n    doc_id=\"docId\",\n    sha=\"sha\",\n    index=1,\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.revision(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    sha=\"sha\",\n    index=1,\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->revision(\n    'docId',\n    'sha',\n    1,\n    new RevisionVersionsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->revision(\n    'docId',\n    'layerName',\n    'sha',\n    1,\n    new RevisionVersionsRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.RevisionAsync(\n    new RevisionVersionsRequest\n    {\n        DocId = \"docId\",\n        Sha = \"sha\",\n        Index = 1,\n    }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.RevisionAsync(\n    new RevisionVersionsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Sha = \"sha\",\n        Index = 1,\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.RevisionVersionsRequest{\n    DocID: \"docId\",\n    Sha: \"sha\",\n    Index: 1,\n}\nclient.Doc.Versions.Revision(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.RevisionVersionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Sha: \"sha\",\n    Index: 1,\n}\nclient.Doc.Versions.Revision(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().revision(\n    \"docId\",\n    \"sha\",\n    1,\n    RevisionVersionsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().revision(\n    \"docId\",\n    \"layerName\",\n    \"sha\",\n    1,\n    RevisionVersionsRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.revision(\n  doc_id: \"docId\",\n  sha: \"sha\",\n  index: 1\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.revision(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  sha: \"sha\",\n  index: 1\n)",
         "frameLines": 7
       }
     },
     "doc.versions.signatures": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.signatures({\n  docId: \"docId\",\n  sha: \"sha\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.signatures({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  sha: \"sha\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.signatures(\n    doc_id=\"docId\",\n    sha=\"sha\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.signatures(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    sha=\"sha\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->signatures(\n    'docId',\n    'sha',\n    new SignaturesVersionsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->signatures(\n    'docId',\n    'layerName',\n    'sha',\n    new SignaturesVersionsRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.SignaturesAsync(\n    new SignaturesVersionsRequest { DocId = \"docId\", Sha = \"sha\" }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.SignaturesAsync(\n    new SignaturesVersionsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Sha = \"sha\",\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.SignaturesVersionsRequest{\n    DocID: \"docId\",\n    Sha: \"sha\",\n}\nclient.Doc.Versions.Signatures(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.SignaturesVersionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Sha: \"sha\",\n}\nclient.Doc.Versions.Signatures(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().signatures(\n    \"docId\",\n    \"sha\",\n    SignaturesVersionsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().signatures(\n    \"docId\",\n    \"layerName\",\n    \"sha\",\n    SignaturesVersionsRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.signatures(\n  doc_id: \"docId\",\n  sha: \"sha\"\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.signatures(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  sha: \"sha\"\n)",
         "frameLines": 7
       }
     },
     "doc.versions.signatureContents": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.signatureContents({\n  docId: \"docId\",\n  sha: \"sha\",\n  fieldKey: \"fieldKey\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.signatureContents({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  sha: \"sha\",\n  fieldKey: \"fieldKey\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.signature_contents(\n    doc_id=\"docId\",\n    sha=\"sha\",\n    field_key=\"fieldKey\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.signature_contents(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    sha=\"sha\",\n    field_key=\"fieldKey\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->signatureContents(\n    'docId',\n    'sha',\n    'fieldKey',\n    new SignatureContentsVersionsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->signatureContents(\n    'docId',\n    'layerName',\n    'sha',\n    'fieldKey',\n    new SignatureContentsVersionsRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.SignatureContentsAsync(\n    new SignatureContentsVersionsRequest\n    {\n        DocId = \"docId\",\n        Sha = \"sha\",\n        FieldKey = \"fieldKey\",\n    }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.SignatureContentsAsync(\n    new SignatureContentsVersionsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Sha = \"sha\",\n        FieldKey = \"fieldKey\",\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.SignatureContentsVersionsRequest{\n    DocID: \"docId\",\n    Sha: \"sha\",\n    FieldKey: \"fieldKey\",\n}\nclient.Doc.Versions.SignatureContents(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.SignatureContentsVersionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Sha: \"sha\",\n    FieldKey: \"fieldKey\",\n}\nclient.Doc.Versions.SignatureContents(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().signatureContents(\n    \"docId\",\n    \"sha\",\n    \"fieldKey\",\n    SignatureContentsVersionsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().signatureContents(\n    \"docId\",\n    \"layerName\",\n    \"sha\",\n    \"fieldKey\",\n    SignatureContentsVersionsRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.signature_contents(\n  doc_id: \"docId\",\n  sha: \"sha\",\n  field_key: \"fieldKey\"\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.signature_contents(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  sha: \"sha\",\n  field_key: \"fieldKey\"\n)",
         "frameLines": 7
       }
     },
     "doc.versions.signatureDigest": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.signatureDigest({\n  docId: \"docId\",\n  sha: \"sha\",\n  fieldKey: \"fieldKey\",\n  algorithm: \"sha1\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.versions.signatureDigest({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  sha: \"sha\",\n  fieldKey: \"fieldKey\",\n  algorithm: \"sha1\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.signature_digest(\n    doc_id=\"docId\",\n    sha=\"sha\",\n    field_key=\"fieldKey\",\n    algorithm=\"sha1\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.versions.signature_digest(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    sha=\"sha\",\n    field_key=\"fieldKey\",\n    algorithm=\"sha1\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->signatureDigest(\n    'docId',\n    'sha',\n    'fieldKey',\n    SignatureDigestVersionsRequestAlgorithm::Sha1->value,\n    new SignatureDigestVersionsRequest([]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->versions->signatureDigest(\n    'docId',\n    'layerName',\n    'sha',\n    'fieldKey',\n    SignatureDigestVersionsRequestAlgorithm::Sha1->value,\n    new SignatureDigestVersionsRequest([]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.SignatureDigestAsync(\n    new SignatureDigestVersionsRequest\n    {\n        DocId = \"docId\",\n        Sha = \"sha\",\n        FieldKey = \"fieldKey\",\n        Algorithm = SignatureDigestVersionsRequestAlgorithm.Sha1,\n    }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Versions.SignatureDigestAsync(\n    new SignatureDigestVersionsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Sha = \"sha\",\n        FieldKey = \"fieldKey\",\n        Algorithm = SignatureDigestVersionsRequestAlgorithm.Sha1,\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.SignatureDigestVersionsRequest{\n    DocID: \"docId\",\n    Sha: \"sha\",\n    FieldKey: \"fieldKey\",\n    Algorithm: doc.SignatureDigestVersionsRequestAlgorithmSha1,\n}\nclient.Doc.Versions.SignatureDigest(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.SignatureDigestVersionsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Sha: \"sha\",\n    FieldKey: \"fieldKey\",\n    Algorithm: doc.SignatureDigestVersionsRequestAlgorithmSha1,\n}\nclient.Doc.Versions.SignatureDigest(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().signatureDigest(\n    \"docId\",\n    \"sha\",\n    \"fieldKey\",\n    SignatureDigestVersionsRequestAlgorithm.SHA1,\n    SignatureDigestVersionsRequest\n        .builder()\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().versions().signatureDigest(\n    \"docId\",\n    \"layerName\",\n    \"sha\",\n    \"fieldKey\",\n    SignatureDigestVersionsRequestAlgorithm.SHA1,\n    SignatureDigestVersionsRequest\n        .builder()\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.signature_digest(\n  doc_id: \"docId\",\n  sha: \"sha\",\n  field_key: \"fieldKey\",\n  algorithm: \"sha1\"\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.versions.signature_digest(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  sha: \"sha\",\n  field_key: \"fieldKey\",\n  algorithm: \"sha1\"\n)",
         "frameLines": 7
       }
     },

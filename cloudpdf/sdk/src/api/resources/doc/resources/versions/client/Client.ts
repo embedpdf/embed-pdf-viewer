@@ -22,7 +22,7 @@ export class VersionsClient {
     }
 
     /**
-     * Every completed signature publishes a new version. Never cached: the list grows.
+     * Every completed signature makes a new version of its layer; another layer's versions are never listed. Never cached: the list grows.
      *
      * @param {CloudPDF.doc.ListVersionsRequest} request
      * @param {VersionsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -33,7 +33,8 @@ export class VersionsClient {
      *
      * @example
      *     await client.doc.versions.list({
-     *         docId: "docId"
+     *         docId: "docId",
+     *         layerName: "layerName"
      *     })
      */
     public list(
@@ -47,7 +48,7 @@ export class VersionsClient {
         request: CloudPDF.doc.ListVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocVersionsList200Response>> {
-        const { docId, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -59,7 +60,7 @@ export class VersionsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/versions`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions`,
             ),
             method: "GET",
             headers: _headers,
@@ -87,11 +88,16 @@ export class VersionsClient {
             }
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/docs/{docId}/versions");
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/v1/docs/{docId}/layers/{layerName}/versions",
+        );
     }
 
     /**
-     * Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every layer and every caller.
+     * Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller.
      *
      * @param {CloudPDF.doc.AnalysisVersionsRequest} request
      * @param {VersionsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -104,6 +110,7 @@ export class VersionsClient {
      * @example
      *     await client.doc.versions.analysis({
      *         docId: "docId",
+     *         layerName: "layerName",
      *         sha: "sha"
      *     })
      */
@@ -120,6 +127,7 @@ export class VersionsClient {
     ): Promise<core.WithRawResponse<CloudPDF.DocVersionsAnalysis200Response>> {
         const {
             docId,
+            layerName,
             sha,
             "since.signature": sinceSignature,
             "since.revision": sinceRevision,
@@ -146,7 +154,7 @@ export class VersionsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/versions/analysis/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/analysis/${core.url.encodePathParam(sha)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -187,7 +195,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/versions/analysis/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha}",
         );
     }
 
@@ -207,7 +215,7 @@ export class VersionsClient {
         request: CloudPDF.doc.DownloadVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, sha, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -219,7 +227,7 @@ export class VersionsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/versions/download/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/download/${core.url.encodePathParam(sha)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -252,7 +260,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/versions/download/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha}",
         );
     }
 
@@ -272,7 +280,7 @@ export class VersionsClient {
         request: CloudPDF.doc.RevisionVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, sha, index, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha, index, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -284,7 +292,7 @@ export class VersionsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/versions/revisions/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(index)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/revisions/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(index)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -317,7 +325,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/versions/revisions/{sha}/{index}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha}/{index}",
         );
     }
 
@@ -332,6 +340,7 @@ export class VersionsClient {
      * @example
      *     await client.doc.versions.signatures({
      *         docId: "docId",
+     *         layerName: "layerName",
      *         sha: "sha"
      *     })
      */
@@ -346,7 +355,7 @@ export class VersionsClient {
         request: CloudPDF.doc.SignaturesVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocVersionsSignatures200Response>> {
-        const { docId, sha, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -358,7 +367,7 @@ export class VersionsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/versions/signatures/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -393,7 +402,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/versions/signatures/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}",
         );
     }
 
@@ -415,7 +424,7 @@ export class VersionsClient {
         request: CloudPDF.doc.SignatureContentsVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, sha, fieldKey, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha, fieldKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -427,7 +436,7 @@ export class VersionsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/contents`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/contents`,
             ),
             method: "GET",
             headers: _headers,
@@ -460,7 +469,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/versions/signatures/{sha}/{fieldKey}/contents",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/contents",
         );
     }
 
@@ -482,7 +491,7 @@ export class VersionsClient {
         request: CloudPDF.doc.SignatureDigestVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, sha, fieldKey, algorithm, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha, fieldKey, algorithm, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -494,7 +503,7 @@ export class VersionsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/digest/${core.url.encodePathParam(algorithm)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/digest/${core.url.encodePathParam(algorithm)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -527,7 +536,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/versions/signatures/{sha}/{fieldKey}/digest/{algorithm}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/digest/{algorithm}",
         );
     }
 }

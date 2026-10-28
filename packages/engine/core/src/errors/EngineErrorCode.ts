@@ -82,12 +82,6 @@ export const EngineErrorCode = {
    */
   ProtectedDocument: 'ProtectedDocument',
   /**
-   * The layer is built on a base version that is no longer the
-   * document's head (another signing completed); it can be read and
-   * edited but not signed from.
-   */
-  StaleBase: 'StaleBase',
-  /**
    * A payload passed one of its limits: an annotation bundle's bytes,
    * counts or image pixels. Nothing was read past the limit and nothing was
    * written. `details` has the `limit`, its `max` and the `value` found.

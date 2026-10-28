@@ -21,8 +21,8 @@ export {
   LayerAnalysisQuerySchema,
   VersionAnalysisQuerySchema,
   analyzeInputFromQuery,
-  DocumentVersionSchema,
-  DocumentVersionsSchema,
+  LayerVersionSchema,
+  LayerVersionsSchema,
   DigestAlgorithmSchema,
   ModificationLevelSchema,
   SignaturePreparedWireSchema,
@@ -449,8 +449,8 @@ export type {
   SignatureAppearanceBody,
   LayerAnalysisQuery,
   VersionAnalysisQuery,
-  DocumentVersion,
-  DocumentVersions,
+  LayerVersion,
+  LayerVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
 export type { AnnotationsExportToken, FormExportToken, OutlineToken } from './wire/tokens';

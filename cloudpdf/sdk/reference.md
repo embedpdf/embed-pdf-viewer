@@ -3653,7 +3653,7 @@ await client.doc.signatures.cancel({
 <dl>
 <dd>
 
-`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. Idempotent by signing id: the same CMS again answers `already-completed`. Every layer of the document then sits over the new version; refetch the manifest after a completion.
+`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. Idempotent by signing id: the same CMS again answers `already-completed`. The new version is the layer's own: only this layer moves to it, and the document and every other layer stay as they were. Refetch the manifest after a completion.
 </dd>
 </dl>
 </dd>
@@ -3791,7 +3791,7 @@ await client.doc.signatures.analysis({
 <dl>
 <dd>
 
-Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). A layer behind the document head cannot sign (StaleBase).
+Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). The signature is made over the layer's own base: the upload, or the version its last signature made.
 </dd>
 </dl>
 </dd>
@@ -3859,7 +3859,7 @@ await client.doc.signatures.prepare({
 <dl>
 <dd>
 
-Every completed signature publishes a new version. Never cached: the list grows.
+Every completed signature makes a new version of its layer; another layer's versions are never listed. Never cached: the list grows.
 </dd>
 </dl>
 </dd>
@@ -3875,7 +3875,8 @@ Every completed signature publishes a new version. Never cached: the list grows.
 
 ```typescript
 await client.doc.versions.list({
-    docId: "docId"
+    docId: "docId",
+    layerName: "layerName"
 });
 
 ```
@@ -3924,7 +3925,7 @@ await client.doc.versions.list({
 <dl>
 <dd>
 
-Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every layer and every caller.
+Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. The same answer for every caller.
 </dd>
 </dl>
 </dd>
@@ -3941,6 +3942,7 @@ Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults
 ```typescript
 await client.doc.versions.analysis({
     docId: "docId",
+    layerName: "layerName",
     sha: "sha"
 });
 
@@ -3993,6 +3995,7 @@ await client.doc.versions.analysis({
 ```typescript
 await client.doc.versions.download({
     docId: "docId",
+    layerName: "layerName",
     sha: "sha"
 });
 
@@ -4045,6 +4048,7 @@ await client.doc.versions.download({
 ```typescript
 await client.doc.versions.revision({
     docId: "docId",
+    layerName: "layerName",
     sha: "sha",
     index: 1
 });
@@ -4098,6 +4102,7 @@ await client.doc.versions.revision({
 ```typescript
 await client.doc.versions.signatures({
     docId: "docId",
+    layerName: "layerName",
     sha: "sha"
 });
 
@@ -4164,6 +4169,7 @@ await client.doc.versions.signatures({
 ```typescript
 await client.doc.versions.signatureContents({
     docId: "docId",
+    layerName: "layerName",
     sha: "sha",
     fieldKey: "fieldKey"
 });
@@ -4231,6 +4237,7 @@ What a CMS verifier compares its message digest to.
 ```typescript
 await client.doc.versions.signatureDigest({
     docId: "docId",
+    layerName: "layerName",
     sha: "sha",
     fieldKey: "fieldKey",
     algorithm: "sha1"
