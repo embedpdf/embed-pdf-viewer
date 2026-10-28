@@ -11,7 +11,7 @@ const engine = cloudEngine();
 // No Stage: a page on its own needs only the render plugin.
 const plugins = [renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // A card that shows one page, like a preview next to a search result or a comment.
 function PageCard() {

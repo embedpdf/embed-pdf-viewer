@@ -28,7 +28,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 
 // One thread: the first comment, its replies, a reply box, and a button that shows it.
 function Thread({ thread }: { thread: CommentThreadView }) {

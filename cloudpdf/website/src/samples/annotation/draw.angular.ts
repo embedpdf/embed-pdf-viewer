@@ -14,7 +14,7 @@ import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const article: OpenInput = { kind: 'share', shareToken: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },

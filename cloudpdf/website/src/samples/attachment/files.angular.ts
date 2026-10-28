@@ -7,7 +7,7 @@ import { displayNameOf, EpdfAttachment, withAttachment } from '@embedpdf/angular
 import type { AttachedFile } from '@embedpdf/angular/attachment';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // The files the document carries: attach some, save one, remove one.
 @Component({

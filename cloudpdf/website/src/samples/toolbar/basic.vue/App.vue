@@ -23,7 +23,7 @@ const plugins = [
   commandsPlugin({ commands: standardCommands }),
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Narrow the toolbar to watch it make room: labels go first, then the tools fold, then "More".
 const width = ref(100);

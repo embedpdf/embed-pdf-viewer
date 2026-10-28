@@ -17,7 +17,7 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import { EpdfRedaction, withRedaction } from '@embedpdf/angular/redaction';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // The cover's subtitle, in page coordinates.
 const SUBTITLE = { x: 44, y: 318, width: 206, height: 50 };

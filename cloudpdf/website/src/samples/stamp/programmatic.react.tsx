@@ -29,7 +29,7 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 // The middle of a Letter page, in page coordinates.
 const MIDDLE = { x: 306, y: 396 };

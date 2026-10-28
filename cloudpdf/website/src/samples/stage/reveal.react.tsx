@@ -11,7 +11,7 @@ import './reveal.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Spots to jump to: a page index and a box in page coordinates (points from
 // the page's top-left), like a search hit or a comment would give you.

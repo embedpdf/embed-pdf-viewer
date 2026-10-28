@@ -24,7 +24,7 @@ const plugins = [
   searchPlugin(),
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Something on every layer on load: the matches of a search, and the title selected.
 function OnLoad() {

@@ -22,6 +22,9 @@ export default {
   sponsors: {
     display: 'hidden',
   },
+  tools: {
+    display: 'hidden',
+  },
   docs: {
     title: 'Documentation',
     type: 'page',

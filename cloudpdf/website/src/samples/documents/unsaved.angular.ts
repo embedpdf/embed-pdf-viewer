@@ -21,7 +21,7 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfMetadata, withMetadata } from '@embedpdf/angular/metadata';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-title-bar',

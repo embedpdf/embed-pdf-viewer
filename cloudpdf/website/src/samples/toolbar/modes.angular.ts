@@ -17,7 +17,7 @@ import { EpdfToolbar, EpdfToolbarCommandTemplate, group } from '@embedpdf/angula
 import type { BarSchema } from '@embedpdf/angular/toolbar';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // A bar per mode.
 const viewBar: BarSchema = {

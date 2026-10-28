@@ -30,7 +30,7 @@ const plugins = [
   signaturePlugin({ trust: { anchors: async () => [await lanternfieldCertificate()] } }),
 ];
 
-const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'share', shareToken: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 </script>
 
 <template>

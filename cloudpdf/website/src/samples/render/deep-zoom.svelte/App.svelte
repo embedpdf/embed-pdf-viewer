@@ -11,7 +11,7 @@
   // Open at 250%: past what a whole-page picture shows sharply, so tiles carry it.
   const plugins = [stagePlugin({ zoom: { level: 2.5 } }), renderPlugin()];
 
-  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>

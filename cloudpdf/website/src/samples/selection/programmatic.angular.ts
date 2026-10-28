@@ -18,7 +18,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 const TITLE = { start: 28, count: 30 };
 const POINT = { x: 260, y: 242 };
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Every button selects on the cover, the first page: by its ref, or by its index, 0.
 @Component({

@@ -19,7 +19,7 @@
     annotationPlugin(),
   ];
 
-  const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: proposal }]}>

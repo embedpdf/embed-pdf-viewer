@@ -11,7 +11,7 @@ import './rotate.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), pageEditPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Rotates the page you're on, in the file: the turn is kept when the document is downloaded.
 function RotateToolbar() {

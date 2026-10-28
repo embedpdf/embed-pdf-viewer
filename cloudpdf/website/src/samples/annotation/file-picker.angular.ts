@@ -8,7 +8,7 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfAnnotationLayer, withAnnotation, withFilePicker } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },

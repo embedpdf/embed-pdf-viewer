@@ -12,7 +12,7 @@ import './props.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), searchPlugin(), shellPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // The panel shows the match its props name, and steps to the next one without reopening.
 function MatchPanel() {

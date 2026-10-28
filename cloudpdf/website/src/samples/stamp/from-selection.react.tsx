@@ -35,7 +35,7 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 const MY_STAMPS = 'my-stamps';
 // On load: the document's frame and word, both selected, scrolled into view.

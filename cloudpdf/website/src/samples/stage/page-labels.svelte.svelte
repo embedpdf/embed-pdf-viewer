@@ -12,7 +12,7 @@
   // covers the page and keeps its size when you zoom.
   const plugins = [stagePlugin({ pageFrame: { bottom: 26 } }), renderPlugin()];
 
-  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>

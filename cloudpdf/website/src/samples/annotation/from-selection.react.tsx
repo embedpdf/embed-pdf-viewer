@@ -24,7 +24,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const article: OpenInput = { kind: 'share', shareToken: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 // On page 1: the characters of the title's first line, and where it is.
 const SENTENCE = { start: 6, count: 33 };

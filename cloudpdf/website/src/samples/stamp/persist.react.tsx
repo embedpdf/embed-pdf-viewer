@@ -34,7 +34,7 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 // Where the libraries live between visits: this browser's IndexedDB.
 const store = indexedDbByteStore('embedpdf-stamp-example');

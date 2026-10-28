@@ -7,7 +7,7 @@ import { EpdfOutline, withOutline } from '@embedpdf/angular/outline';
 import type { OutlineItem } from '@embedpdf/angular/outline';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Bookmarks the reader adds: each one goes to the place in view when it's added.
 @Component({

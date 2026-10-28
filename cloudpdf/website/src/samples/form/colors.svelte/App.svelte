@@ -18,7 +18,7 @@
     formPlugin({ fields: { border: '#ea580c' } }),
   ];
 
-  const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const forms: OpenInput = { kind: 'share', shareToken: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: forms }]}>

@@ -50,7 +50,7 @@ const plugins = [
   }),
 ];
 
-const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 // A toolbar that builds itself from the tools: every tool with a label gets a button.
 function Toolbar() {

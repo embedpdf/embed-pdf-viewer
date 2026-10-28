@@ -24,7 +24,7 @@ import { localEngine } from '@embedpdf/engine';
     stampPlugin({ assetEngine }),
   ];
 
-  const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: approvals }]}>

@@ -19,7 +19,7 @@
     annotationPlugin(),
   ];
 
-  const report: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const report: OpenInput = { kind: 'share', shareToken: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: report }]}>

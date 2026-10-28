@@ -18,7 +18,7 @@ import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular
 import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const forms: OpenInput = { kind: 'share', shareToken: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
 /** A field's value as text, whatever its family. */
 function valueText(field: FormFieldDTO): string {

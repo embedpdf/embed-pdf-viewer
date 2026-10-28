@@ -24,7 +24,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const article: OpenInput = { kind: 'share', shareToken: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 const TOOLS = [
   { id: 'pointer', label: 'Select' },

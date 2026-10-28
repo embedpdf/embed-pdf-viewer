@@ -10,7 +10,7 @@ import './pins.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // A pin is a page and a point on it, in points from the page's top-left. No pixels.
 interface Pin {

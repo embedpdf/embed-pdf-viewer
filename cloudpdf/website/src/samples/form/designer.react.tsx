@@ -20,7 +20,7 @@ const plugins = [
   formPlugin(),
 ];
 
-const registration: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const registration: OpenInput = { kind: 'share', shareToken: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
 
 const FIELD_TOOLS = [
   ['form-text', 'Text'],

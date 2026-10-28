@@ -16,7 +16,7 @@ const engine = cloudEngine();
 // No responsive rules, so the padding you set applies at every width.
 const plugins = [stagePlugin({ padding: 32, gap: { px: 12 }, responsive: [] }), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function SpacingControls() {
   const stage = useStage();

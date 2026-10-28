@@ -14,7 +14,7 @@ async function print() {
 
 <template>
   <button @click="print">Print</button>
-  <PDFViewer ref="viewer" :config="{ src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' } }" :style="{ height: '80vh' }" />
+  <PDFViewer ref="viewer" :config="{ src: { shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' } }" :style="{ height: '80vh' }" />
 </template>
 -->
 
@@ -27,5 +27,5 @@ const viewer = shallowRef<Viewer | null>(null);
 
 <template>
   <button :disabled="!viewer" @click="viewer?.commands.execute('document:print')">Print</button>
-  <PDFViewer :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 80vh" @ready="viewer = $event" />
+  <PDFViewer :src="{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 80vh" @ready="viewer = $event" />
 </template>

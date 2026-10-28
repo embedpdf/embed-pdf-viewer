@@ -19,7 +19,7 @@ const plugins = [
   redactionPlugin(),
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // The cover's title, in page coordinates: the shapes drawn over it go with it.
 const TITLE = { x: 100, y: 212, width: 392, height: 156 };

@@ -16,9 +16,9 @@ import './panes.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
-const article: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const article: OpenInput = { kind: 'share', shareToken: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 function Pane({ pane, canRemove }: { pane: PaneInfo; canRemove: boolean }) {
   const views = useViewManager();

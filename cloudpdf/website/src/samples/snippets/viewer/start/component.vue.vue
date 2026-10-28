@@ -6,7 +6,7 @@ const layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main'
 </script>
 
 <template>
-  <PDFViewer :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" :layout="layout" style="height: 100vh">
+  <PDFViewer :src="{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" :layout="layout" style="height: 100vh">
     <ToolbarItem id="status">
       <DocumentStatus />
     </ToolbarItem>

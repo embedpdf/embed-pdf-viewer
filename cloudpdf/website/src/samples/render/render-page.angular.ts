@@ -12,7 +12,7 @@ import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
 import { EpdfRender, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 interface Thumbnail {
   page: PageRef;
