@@ -22,7 +22,7 @@ export interface EncodeImageRequest {
 export interface EncodeImageResponse {
   id: string;
   type: 'result' | 'error';
-  data: Blob | { message: string };
+  data: Blob | { message: string; imageData?: EncodeImageRequest['data']['imageData'] };
 }
 
 /**
@@ -93,9 +93,11 @@ self.onmessage = async (event: MessageEvent<EncodeImageRequest>) => {
       type: 'error',
       data: {
         message: error instanceof Error ? error.message : String(error),
+        imageData: request.data.imageData,
       },
     };
 
-    self.postMessage(response);
+    // Hand the transferred pixels back so the caller can still fall back
+    self.postMessage(response, [request.data.imageData.data.buffer]);
   }
 };
