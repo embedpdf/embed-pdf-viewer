@@ -28,7 +28,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 // One stamp's status, pinned to it: a check on its corner once it's signed off,
 // and a status with a button under it. Both stay there while the stamp moves.

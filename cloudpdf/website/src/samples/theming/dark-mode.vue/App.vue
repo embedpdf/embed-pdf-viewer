@@ -21,7 +21,7 @@ const plugins = [
   searchPlugin(),
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Your app's own switch: the colors are in the stylesheet, under [data-theme='dark'].
 const theme = ref<'light' | 'dark'>('dark');

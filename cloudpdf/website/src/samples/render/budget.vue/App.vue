@@ -12,7 +12,7 @@ const engine = cloudEngine();
 // Zoomed in, where the budget and the tiles show.
 const plugins = [stagePlugin({ zoom: { level: 2 } }), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
 <template>

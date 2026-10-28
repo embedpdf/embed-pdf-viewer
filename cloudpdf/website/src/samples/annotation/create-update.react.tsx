@@ -25,7 +25,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const report: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const report: OpenInput = { kind: 'share', shareToken: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 // Create a rectangle, then change, move and delete it, all from code.
 function SquareControls() {

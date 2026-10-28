@@ -13,7 +13,7 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const LABELS: Record<string, string> = { pointer: 'Select', pan: 'Hand' };
 const HINTS: Record<string, string> = {

@@ -31,7 +31,7 @@ const plugins = [
   signaturePlugin({ key: () => signer }),
 ];
 
-const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'share', shareToken: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 
 /** On load: the agreement, where the form's signature field is, and a person's signature, armed. */
 function useSetUp() {

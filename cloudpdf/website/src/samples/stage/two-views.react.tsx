@@ -29,7 +29,7 @@ const plugins = [
   renderPlugin(),
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function ZoomBar({ label, token }: { label: string; token?: typeof OverviewToken }) {
   const stage = useStage(token);

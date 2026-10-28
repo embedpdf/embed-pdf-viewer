@@ -31,7 +31,7 @@ const plugins = [
   stampPlugin({ assetEngine }),
 ];
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 // A signature as a pen would draw it: two strokes, in points.
 const loop = Array.from({ length: 48 }, (_, i) => ({

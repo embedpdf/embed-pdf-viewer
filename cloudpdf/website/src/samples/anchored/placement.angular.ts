@@ -17,7 +17,7 @@ import { EpdfAnchored } from '@embedpdf/angular/anchored';
 import type { AnchoredPlacement, AnchoredSide } from '@embedpdf/angular/anchored';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const SIDES: AnchoredSide[] = ['top', 'right', 'bottom', 'left'];
 const ALIGNS = ['start', 'center', 'end'] as const;

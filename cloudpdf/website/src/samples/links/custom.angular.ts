@@ -9,7 +9,7 @@ import { withActions, withActionsUi } from '@embedpdf/angular/actions';
 import { EpdfLinkLayer, EpdfLinkTemplate, withLink } from '@embedpdf/angular/link';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'share', shareToken: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
 @Component({
   selector: 'demo-root',

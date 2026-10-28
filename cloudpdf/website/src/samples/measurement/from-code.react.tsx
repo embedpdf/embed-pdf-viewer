@@ -20,7 +20,7 @@ const plugins = [
   measurementPlugin(),
 ];
 
-const sketch: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'share', shareToken: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 // Points on the floor plan, in page coordinates: two for a
 // distance, the corners otherwise.

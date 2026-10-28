@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { EpdfPdfViewer, type ViewerConfig } from '@cloudpdf/viewer-angular';
 
-const welcome = { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome = { shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',

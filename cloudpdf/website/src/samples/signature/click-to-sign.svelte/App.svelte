@@ -26,7 +26,7 @@ import { localEngine } from '@embedpdf/engine';
     signaturePlugin({ key: () => signer }),
   ];
 
-  const agreement: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const agreement: OpenInput = { kind: 'share', shareToken: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: agreement }]}>

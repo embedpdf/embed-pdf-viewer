@@ -16,7 +16,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPl
 
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const accent = ref('#e91e63');
 </script>

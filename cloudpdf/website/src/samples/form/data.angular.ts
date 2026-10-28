@@ -17,7 +17,7 @@ import { EpdfForm, EpdfFormLayer, FormTransfer, withForm } from '@embedpdf/angul
 import type { FormBundle } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const forms: OpenInput = { kind: 'share', shareToken: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
 @Component({
   selector: 'demo-root',

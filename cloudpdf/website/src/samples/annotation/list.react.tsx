@@ -26,7 +26,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 
 const KINDS: { label: string; subtype?: AnnotationSubtype }[] = [
   { label: 'All' },

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { PDFViewer, type ViewerConfig } from '@cloudpdf/viewer-svelte';
 
-  const welcome = { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome = { shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
   const config: ViewerConfig = {
     theme: { accent: '#7c3aed' },

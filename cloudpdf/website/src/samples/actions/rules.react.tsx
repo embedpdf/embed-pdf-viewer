@@ -24,7 +24,7 @@ const plugins = [
   }),
 ];
 
-const links: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'share', shareToken: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
 // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
 const websiteLink: PdfActionTree = {

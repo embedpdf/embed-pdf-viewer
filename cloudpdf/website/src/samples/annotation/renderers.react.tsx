@@ -24,7 +24,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 
 // A note drawn as your app's comment bubble, the author's initials in it and its
 // text in the tooltip. It fills its frame, so the selection outline and the click

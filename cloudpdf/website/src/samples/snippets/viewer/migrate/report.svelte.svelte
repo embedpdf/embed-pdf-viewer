@@ -8,7 +8,7 @@
 
 <PDFViewer
   config={{
-    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    src: { shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
     theme: { preference: 'dark' },
     disabledCategories: ['redaction', 'document-print'],
   }}
@@ -24,7 +24,7 @@
 </script>
 
 <PDFViewer
-  src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }}
+  src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
   theme="dark"
   disable={['redaction', 'documents.print']}
   style="height: 100vh"

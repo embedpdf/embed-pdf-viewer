@@ -15,7 +15,7 @@ import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/searc
 import { EpdfShell, withShell } from '@embedpdf/angular/shell';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-workspace',

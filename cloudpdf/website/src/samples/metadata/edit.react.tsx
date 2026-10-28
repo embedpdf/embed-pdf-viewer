@@ -14,7 +14,7 @@ import './edit.css';
 const engine = cloudEngine();
 const plugins = [metadataPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const EDITABLE = ['title', 'author', 'subject', 'keywords'] as const;
 type Draft = Record<(typeof EDITABLE)[number], string>;

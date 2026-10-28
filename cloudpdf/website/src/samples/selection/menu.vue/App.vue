@@ -23,7 +23,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPl
 const PLACEMENTS = ['top', 'bottom', 'left', 'right'] as const;
 type Placement = (typeof PLACEMENTS)[number];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const placement = ref<Placement>('top');
 </script>

@@ -13,7 +13,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 // The strip is a second view of the document, with its own token and settings.
 const ThumbsToken = createCapabilityToken<StageCapability>('stage-thumbs');
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',

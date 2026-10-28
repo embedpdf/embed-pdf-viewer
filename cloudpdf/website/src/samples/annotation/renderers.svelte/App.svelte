@@ -24,7 +24,7 @@
     annotationPlugin(),
   ];
 
-  const proposal: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 
   // Defined once, in the module: the layer registers each entry.
   const RENDERERS: AnnotationRenderer[] = [

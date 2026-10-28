@@ -18,7 +18,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 const TITLE = { start: 28, count: 30 };
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
 @Component({

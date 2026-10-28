@@ -17,7 +17,7 @@ import './hold-space.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // While Space is held over the pages, the hand tool is active; on release, the tool from before.
 function HoldSpaceToPan({ children }: { children: ReactNode }) {

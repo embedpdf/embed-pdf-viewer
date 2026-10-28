@@ -21,7 +21,7 @@ const COLORS = [
   { name: 'Pink', color: '#fcc2d7', activeColor: '#f06595' },
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',
