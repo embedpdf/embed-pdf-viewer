@@ -50,8 +50,8 @@ const ANNOTATE = ['doc.annotate.modify'];
 const FILL = ['doc.forms.fill'];
 
 /**
- * What each document's examples change, on top of reading. Never signing: completing a signature
- * publishes a new version of the document itself, for every reader, so no docs link may sign.
+ * What each document's examples change, on top of reading. A signature makes a version of the
+ * reader's own layer only, deleted with it, so the signing examples sign for real.
  */
 const CHANGES = {
   // The getting-started document: annotations, forms, pages, redaction, attachments, outline,
@@ -67,9 +67,9 @@ const CHANGES = {
     'doc.pages.assemble',
     'doc.redact',
   ],
-  // Signatures: filling the agreement, drawing a signature (a stamp) in its field, and the edits
-  // that keep or break EmbedPDF's signature (a comment, a new form field).
-  agreement: [...ANNOTATE, ...FILL, 'doc.forms.modify'],
+  // Signatures: filling the agreement, signing it, drawing a signature (a stamp) in its field,
+  // and the edits that keep or break EmbedPDF's signature (a comment, a new form field).
+  agreement: [...ANNOTATE, ...FILL, 'doc.forms.modify', 'doc.sign'],
   // Stamps.
   approvals: ANNOTATE,
   // Drawing and marking up text; documents in panes and tabs.
