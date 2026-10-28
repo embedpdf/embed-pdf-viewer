@@ -135,14 +135,15 @@ one the document doesn't have fails with `NotFound`.
 await doc.pages.delete([page.ref]);
 ```
 
-A page's annotations go with it. Outline items that go to it stay, and their target reads
+A page's annotations go with it. A form field with a widget on it stays in the form, with its
+value, and that widget shows on no page. Outline items that go to it stay, and their target reads
 `unsupported` from then on (see [Outline](/docs/engine/documents/outline#pages-that-are-gone)). A
 document keeps at least one page: deleting every page fails with `InvalidArg`.
 
 ## Insert another PDF
 
 `insert(bytes, position?)` copies every page of another PDF into this one, with their
-annotations. Without a position, the pages go at the end:
+annotations and form fields. Without a position, the pages go at the end:
 
 ```ts
 const response = await fetch('/appendix.pdf');
@@ -151,6 +152,27 @@ const { insertedPages } = await doc.pages.insert(await response.arrayBuffer());
 
 `insertedPages` holds the refs of the new pages, in order. To merge several files, insert them one
 after the other.
+
+### Form fields
+
+The pages bring the form fields of their widgets into the document's form, with their values, so
+they fill in here and in other PDF apps alike.
+
+A top-level field whose name the document already uses is kept apart: it comes in as `name_2`, or
+the next number that's free, and the fields under it keep their place. Insert a filled-in form
+twice and you get `email` and `email_2`, `address.city` and `address_2.city`, each with its own
+value. Joined, two fields of one name would be one field with one value, and the second file's
+answers would be lost.
+
+```ts
+await doc.pages.insert(firstCopy);
+await doc.pages.insert(secondCopy);
+const { fields } = await doc.forms.list();
+fields.map((field) => field.name); // ['email', 'address.city', 'email_2', 'address_2.city']
+```
+
+A script in the inserted PDF that looks up a renamed field by its name finds the document's field
+of that name.
 
 ## Insert blank pages
 
@@ -173,6 +195,10 @@ document itself doesn't change.
 ```ts
 const bytes = await doc.pages.extract([pages[0].ref, pages[1].ref]);
 ```
+
+The copy has the form fields of those pages' widgets, with their values. A field with widgets on
+other pages too keeps only the ones on the pages you copy, and a field with no widget on them
+stays behind.
 
 That makes splitting a document a loop, one file per page:
 
@@ -284,6 +310,9 @@ make several page edits one step, apply them as one change. See
 const { meta } = await doc.pages.delete([ref]);
 await doc.apply({ undoOf: meta.opId }); // the page is back where it was
 ```
+
+An undo of an insert deletes the pages it copied in. The form fields they brought stay in the
+form, on no page, as after a delete.
 
 ### Inserting
 

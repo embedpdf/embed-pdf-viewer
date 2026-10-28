@@ -44,6 +44,15 @@ cd packages/engine/runtime/runtime-src/testing/resources && cp \
 If the vendored list keeps growing, replace the manual copy with a sync
 script instead of adding more entries here.
 
+## Form fixtures for page insert and extract
+
+`page-form-fields.test.ts` uses two more copies:
+
+- `form_page_import.pdf`: the runtime fork's `testing/resources/form_page_import.pdf`
+  (generated from its `.in` template), a two-page form whose fields sit on both pages.
+- `embedpdf-forms.pdf`: `website/public/pdfs/embedpdf-forms.pdf`, the docs' form demo, whose
+  fields have kids. Merging it into a blank PDF is what the website's merge tool does.
+
 ## Generated action-payload fixtures
 
 `action_payloads.pdf` and `open_action_dest.pdf` are authored in-repo by a

@@ -11,6 +11,7 @@ import {
 import { NULL_PTR } from '@embedpdf/engine-runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { keepFieldNamesApart } from './internal/keepFieldNamesApart';
 import { pageIndexAt } from './internal/pageIndexAt';
 import { PagesReader } from './PagesReader';
 import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
@@ -24,10 +25,11 @@ import { throwIfAborted } from '../../shared/abort';
 /**
  * Insert every page of a standalone PDF into the session document. A
  * structural mutation (like move/delete): the source bytes are loaded as a
- * throwaway PDFium document, `FPDF_ImportPagesByIndex` deep-copies its
- * pages in at `position`, and the page registry is rebuilt. Pre-existing
- * pages keep their identity and `RevisionToken`s; the inserted copies get
- * fresh object numbers, resolved from the post-insert registry.
+ * throwaway PDFium document, `EPDFDoc_ImportPages` deep-copies its pages in
+ * at `position` with the form fields of their widgets, and the page registry
+ * is rebuilt. Pre-existing pages keep their identity and `RevisionToken`s;
+ * the inserted copies get fresh object numbers, resolved from the post-insert
+ * registry.
  */
 export class PagesInserter {
   constructor(
@@ -49,8 +51,8 @@ export class PagesInserter {
     const destPtr = this.session.requireDocPtr();
     const at = pageIndexAt(this.session, position, fn.FPDF_GetPageCount(destPtr));
 
-    // FPDF_ImportPagesByIndex does not fully detach imported objects from
-    // their source document (imported streams still read through it), so
+    // EPDFDoc_ImportPages does not fully detach imported objects from their
+    // source document (imported streams still read through it), so
     // the source doc and its buffer must outlive every future save of the
     // destination. On failure they are released immediately; on success
     // they are parked on the session and released at session close; only a
@@ -77,11 +79,12 @@ export class PagesInserter {
       if (insertedCount <= 0) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'pages.insert source PDF has no pages');
       }
+      keepFieldNamesApart(this.runtime, this.session, srcPtr);
       // Null index array + count 0 = "import every page", in order.
-      if (!fn.FPDF_ImportPagesByIndex(destPtr, srcPtr, NULL_PTR, 0, at)) {
+      if (!fn.EPDFDoc_ImportPages(destPtr, srcPtr, NULL_PTR, 0, at)) {
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `FPDF_ImportPagesByIndex rejected the insert at index ${at}`,
+          `EPDFDoc_ImportPages rejected the insert at index ${at}`,
         );
       }
       const retainedSrc = srcPtr;

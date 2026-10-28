@@ -116,6 +116,8 @@ export {
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
 export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
+export { runPageFormFieldsConformance } from './conformance/runPageFormFieldsConformance';
+export type { PageFormFieldsConformanceOptions } from './conformance/runPageFormFieldsConformance';
 export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
 export {
   OBJECT_NUMBER_FIXTURE_PDF,

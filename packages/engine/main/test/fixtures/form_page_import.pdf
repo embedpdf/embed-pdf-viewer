@@ -1,0 +1,204 @@
+%PDF-1.7
+% ò¤ô
+% A two-page form for copying pages with their fields (public/epdf_ppo.h).
+% - "person" (5) holds "name" (6), whose widget (7, page 1) has no /Parent:
+%   only name's /Kids lists it, and "email" (8), merged with its widget
+%   (page 2), with a /DA of its own using /F1 and a calculate script (in /CO).
+% - "plan" (10), a radio group with a widget on each page: monthly (11,
+%   page 1) and yearly (19, page 2), which is on.
+% - "agree" (12), a check box merged with its widget (page 2), checked.
+% - "hidden" (14), a text field with no widget: no page brings it.
+% - A note (16, page 1) with a pop-up (17), whose /Parent is the note.
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+  /AcroForm <<
+    /Fields [5 0 R 10 0 R 12 0 R 14 0 R]
+    /DA (/Helv 0 Tf 0 g)
+    /Q 1
+    /DR << /Font << /Helv 20 0 R /F1 21 0 R >> >>
+    /NeedAppearances true
+    /CO [8 0 R]
+  >>
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /Count 2
+  /Kids [3 0 R 4 0 R]
+>>
+endobj
+3 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 300 300]
+  /Annots [7 0 R 11 0 R 16 0 R 17 0 R]
+>>
+endobj
+4 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 300 300]
+  /Annots [8 0 R 19 0 R 12 0 R]
+>>
+endobj
+5 0 obj <<
+  /T (person)
+  /Kids [6 0 R 8 0 R]
+>>
+endobj
+6 0 obj <<
+  /FT /Tx
+  /T (name)
+  /V (Ann)
+  /Parent 5 0 R
+  /Kids [7 0 R]
+>>
+endobj
+7 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Rect [20 250 280 280]
+  /P 3 0 R
+>>
+endobj
+8 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /FT /Tx
+  /T (email)
+  /V (ann@example.com)
+  /DA (/F1 10 Tf 0 g)
+  /Parent 5 0 R
+  /Rect [20 250 280 280]
+  /P 4 0 R
+  /AA << /C << /S /JavaScript /JS (event.value = 1;) >> >>
+>>
+endobj
+10 0 obj <<
+  /FT /Btn
+  /Ff 49152
+  /T (plan)
+  /V /yearly
+  /Kids [11 0 R 19 0 R]
+>>
+endobj
+11 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 10 0 R
+  /Rect [20 200 40 220]
+  /P 3 0 R
+  /AS /Off
+  /AP << /N << /monthly 22 0 R /Off 23 0 R >> >>
+>>
+endobj
+12 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /FT /Btn
+  /T (agree)
+  /V /Yes
+  /AS /Yes
+  /Rect [20 150 40 170]
+  /P 4 0 R
+  /AP << /N << /Yes 22 0 R /Off 23 0 R >> >>
+>>
+endobj
+14 0 obj <<
+  /FT /Tx
+  /T (hidden)
+  /V (kept back)
+>>
+endobj
+16 0 obj <<
+  /Type /Annot
+  /Subtype /Text
+  /Rect [250 20 270 40]
+  /Contents (A note)
+  /P 3 0 R
+  /Popup 17 0 R
+>>
+endobj
+17 0 obj <<
+  /Type /Annot
+  /Subtype /Popup
+  /Rect [150 20 250 80]
+  /Parent 16 0 R
+  /P 3 0 R
+>>
+endobj
+19 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 10 0 R
+  /Rect [20 200 40 220]
+  /P 4 0 R
+  /AS /yearly
+  /AP << /N << /yearly 22 0 R /Off 23 0 R >> >>
+>>
+endobj
+20 0 obj <<
+  /Type /Font
+  /Subtype /Type1
+  /BaseFont /Helvetica
+>>
+endobj
+21 0 obj <<
+  /Type /Font
+  /Subtype /Type1
+  /BaseFont /Times-Roman
+>>
+endobj
+22 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /BBox [0 0 20 20]
+  /Length 18
+>>
+stream
+0 g 4 4 12 12 re f
+endstream
+endobj
+23 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /BBox [0 0 20 20]
+  /Length -1
+>>
+stream
+endstream
+endobj
+xref
+0 24
+0000000000 65535 f 
+0000000649 00000 n 
+0000000889 00000 n 
+0000000958 00000 n 
+0000001074 00000 n 
+0000001183 00000 n 
+0000001240 00000 n 
+0000001326 00000 n 
+0000001417 00000 n 
+0000000000 65535 f 
+0000001651 00000 n 
+0000001745 00000 n 
+0000001913 00000 n 
+0000000000 65535 f 
+0000002094 00000 n 
+0000000000 65535 f 
+0000002157 00000 n 
+0000002283 00000 n 
+0000000000 65535 f 
+0000002390 00000 n 
+0000002560 00000 n 
+0000002637 00000 n 
+0000002716 00000 n 
+0000002841 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 24
+>>
+startxref
+2947
+%%EOF
